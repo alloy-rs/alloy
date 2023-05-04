@@ -1,0 +1,21 @@
+name: deps
+
+on:
+    push:
+        branches: [main]
+        paths: [Cargo.lock]
+    pull_request:
+        branches: [main]
+        paths: [Cargo.lock]
+
+concurrency: deps-${{ github.head_ref || github.run_id }}
+
+jobs:
+    deny:
+        name: deny
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: EmbarkStudios/cargo-deny-action@v1
+              with:
+                  command: check all

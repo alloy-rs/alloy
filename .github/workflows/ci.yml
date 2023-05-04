@@ -1,0 +1,60 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    test:
+        name: test ${{ matrix.os }} ${{ matrix.flags }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+                flags: ["--no-default-features", "", "--all-features"]
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: Swatinem/rust-cache@v2
+            - name: test
+              run: cargo +stable test --workspace ${{ matrix.flags }}
+
+    clippy:
+        name: clippy
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@clippy
+            - uses: Swatinem/rust-cache@v2
+            - name: clippy
+              run: cargo clippy --workspace --tests
+              env:
+                  RUSTFLAGS: -Dwarnings
+
+    docs:
+        name: docs
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  components: rust-docs
+            - uses: Swatinem/rust-cache@v2
+            - name: doc
+              run: cargo doc --workspace --no-deps --document-private-items
+
+    fmt:
+        name: fmt
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  components: rustfmt
+            - name: fmt --check
+              run: cargo fmt --all --check
