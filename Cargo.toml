@@ -1,16 +1,19 @@
-[package]
-name = "ethers-next"
-version = "0.1.0"
-edition.workspace = true
-
 [workspace]
-members = []
+members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.65"
-authors = []
+authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/ethers-rs/next"
 repository = "https://github.com/ethers-rs/next"
+exclude = ["benches/", "tests/"]
+
+[workspace.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[workspace.dependencies]
