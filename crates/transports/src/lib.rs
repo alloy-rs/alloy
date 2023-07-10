@@ -1,14 +1,25 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#![warn(
+    missing_debug_implementations,
+    // missing_docs,
+    unreachable_pub,
+    // unused_crate_dependencies
+)]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![doc(test(
+    no_crate_inject,
+    attr(deny(warnings, rust_2018_idioms), allow(dead_code, unused_variables))
+))]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod common;
+pub(crate) mod utils;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+mod error;
+pub use error::TransportError;
+
+mod call;
+
+mod transport;
+pub use transport::{Connection, PubSubConnection};
+
+pub mod transports;
+pub use transports::Http;
