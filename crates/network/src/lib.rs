@@ -96,9 +96,10 @@ where
         'a: 'b,
     {
         Box::pin(async move {
-            let res = self.estimate_gas(tx).await;
-
-            res.map(|gas| tx.set_gas(gas)).convert_err()
+            self.estimate_gas(tx)
+                .await
+                .map(|gas| tx.set_gas(gas))
+                .convert_err()
         })
     }
 }

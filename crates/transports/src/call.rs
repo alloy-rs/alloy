@@ -184,3 +184,32 @@ where
         Poll::Ready(RpcResult::from(res))
     }
 }
+
+impl<'a, B, T, Resp> RpcCall<B, T, Resp>
+where
+    B: Borrow<T> + Unpin + 'a,
+    T: Connection + 'a,
+    Resp: RpcResp + 'a,
+{
+    /// Map the result of the future to a new type, returning a new future.
+    pub fn map<U, F>(self, op: F) -> Pin<Box<dyn Future<Output = U> + 'a>>
+    where
+        F: FnOnce(<Self as Future>::Output) -> U + 'a,
+    {
+        Box::pin(async move { op(self.await) })
+    }
+
+    /// Map the result of the future to a new type, returning a new future.
+    pub fn map_ok<U, F>(
+        self,
+        op: F,
+    ) -> Pin<Box<dyn Future<Output = RpcResult<U, TransportError>> + 'a>>
+    where
+        F: FnOnce(Resp) -> U + 'a,
+    {
+        Box::pin(async move {
+            let resp = self.await;
+            resp.map(op)
+        })
+    }
+}
