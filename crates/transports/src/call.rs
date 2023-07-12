@@ -67,9 +67,9 @@ impl<B, T, Params> CallState<B, T, Params> {
 
 impl<B, T, Params> CallState<B, T, Params>
 where
-    B: Borrow<T> + Unpin,
-    T: Connection + Unpin,
-    Params: Serialize + Unpin,
+    B: Borrow<T>,      /*+ Unpin*/
+    T: Connection,     /*+ Unpin*/
+    Params: Serialize, /*+ Unpin*/
 {
     fn poll_prepared(&mut self, cx: &mut Context<'_>) -> Poll<RpcOutcome> {
         let this = std::mem::replace(self, CallState::Running);
@@ -117,13 +117,13 @@ where
 impl<B, T, Params> Future for CallState<B, T, Params>
 where
     B: Borrow<T> + Unpin,
-    T: Connection + Unpin,
+    T: Connection,
     Params: Serialize + Unpin,
 {
     type Output = RpcOutcome;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let state = self.get_mut();
+        let state: &mut CallState<B, T, Params> = self.get_mut();
         match state {
             CallState::Prepared { .. } => state.poll_prepared(cx),
             CallState::AwaitingResponse { .. } => state.poll_awaiting(cx),
@@ -153,7 +153,7 @@ impl<B, T, Params, Resp> RpcCall<B, T, Params, Resp> {
 impl<B, T, Params, Resp> Future for RpcCall<B, T, Params, Resp>
 where
     B: Borrow<T> + Unpin,
-    T: Connection + Unpin,
+    T: Connection,
     Params: RpcObject,
     Resp: RpcObject,
 {

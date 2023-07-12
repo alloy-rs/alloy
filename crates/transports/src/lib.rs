@@ -14,13 +14,13 @@ pub mod common;
 pub(crate) mod utils;
 
 mod error;
-pub use error::TransportError;
+pub use error::{RpcResult, TransportError};
 
 mod call;
 pub use call::RpcCall;
 
-mod transport;
-pub use transport::{Connection, PubSubConnection, RpcObject};
+mod connection;
+pub use connection::{Connection, PubSubConnection, RpcObject};
 
 pub mod transports;
 pub use transports::Http;

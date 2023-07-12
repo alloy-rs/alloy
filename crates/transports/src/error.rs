@@ -1,7 +1,7 @@
 use crate::{common::RpcOutcome, utils::from_json, RpcObject};
 
 use jsonrpsee_types::ErrorObject;
-use std::error::Error as StdError;
+use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -55,6 +55,60 @@ pub enum RpcResult<T, E> {
     Ok(T),
     ErrResp(ErrorObject<'static>),
     Err(E),
+}
+
+impl<T, E> RpcResult<T, E> {
+    pub fn is_ok(&self) -> bool {
+        matches!(self, RpcResult::Ok(_))
+    }
+
+    pub fn is_err(&self) -> bool {
+        matches!(self, RpcResult::Err(_))
+    }
+
+    pub fn is_err_resp(&self) -> bool {
+        matches!(self, RpcResult::ErrResp(_))
+    }
+
+    pub fn map<U, F>(self, op: F) -> RpcResult<U, E>
+    where
+        F: FnOnce(T) -> U,
+    {
+        match self {
+            RpcResult::Ok(val) => RpcResult::Ok(op(val)),
+            RpcResult::ErrResp(err) => RpcResult::ErrResp(err),
+            RpcResult::Err(err) => RpcResult::Err(err),
+        }
+    }
+
+    pub fn unwrap(self) -> T
+    where
+        E: Debug,
+    {
+        match self {
+            RpcResult::Ok(val) => val,
+            RpcResult::ErrResp(err) => panic!("Error response: {:?}", err),
+            RpcResult::Err(err) => panic!("Error: {:?}", err),
+        }
+    }
+
+    pub fn map_err<U, F>(self, op: F) -> RpcResult<T, U>
+    where
+        F: FnOnce(E) -> U,
+    {
+        match self {
+            RpcResult::Ok(val) => RpcResult::Ok(val),
+            RpcResult::ErrResp(err) => RpcResult::ErrResp(err),
+            RpcResult::Err(err) => RpcResult::Err(op(err)),
+        }
+    }
+
+    pub fn convert_err<U>(self) -> RpcResult<T, U>
+    where
+        U: From<E>,
+    {
+        self.map_err(Into::into)
+    }
 }
 
 impl<T, E> From<TransportError> for RpcResult<T, E>

@@ -12,7 +12,7 @@ use serde_json::{self, value::RawValue};
 
 use crate::{
     common::{self, Authorization, BatchRpcOutcome, RpcFuture},
-    transport::Connection,
+    connection::Connection,
     utils::deser_rpc_result,
     TransportError,
 };
