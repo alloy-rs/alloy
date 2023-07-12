@@ -4,6 +4,12 @@ use alloy_primitives::{TxHash, U256};
 use alloy_rlp::{Decodable, Encodable};
 use alloy_transports::{Connection, RpcCall, RpcParam, RpcResp, RpcResult, TransportError};
 
+type MwareCall<'a, M, N, Resp> =
+    RpcCall<&'a <M as Middleware<N>>::Connection, <M as Middleware<N>>::Connection, Resp>;
+
+type MwareFut<'a, M, N, T> =
+    Pin<Box<dyn Future<Output = RpcResult<T, <M as Middleware<N>>::Error>> + Send + 'a>>;
+
 pub trait Transaction: Encodable + Decodable {
     // VALUE
     fn get_value(&self) -> U256;
@@ -60,12 +66,6 @@ pub trait Network: Sized + Send + Sync + 'static {
     type Receipt: RpcResp;
 }
 
-type MwareCall<'a, M, N, Resp> =
-    RpcCall<&'a <M as Middleware<N>>::Connection, <M as Middleware<N>>::Connection, Resp>;
-
-type MwareFut<'a, M, N, T> =
-    Pin<Box<dyn Future<Output = RpcResult<T, <M as Middleware<N>>::Error>> + Send + 'a>>;
-
 pub trait Middleware<N>: Send + Sync + std::fmt::Debug
 where
     N: Network,
@@ -95,18 +95,10 @@ where
     where
         'a: 'b,
     {
-        let est = self.estimate_gas(tx);
         Box::pin(async move {
-            let res = est.await;
+            let res = self.estimate_gas(tx).await;
 
-            match res {
-                RpcResult::Ok(gas) => {
-                    tx.set_gas(gas);
-                    RpcResult::Ok(())
-                }
-                RpcResult::ErrResp(e) => RpcResult::ErrResp(e),
-                RpcResult::Err(e) => RpcResult::Err(e.into()),
-            }
+            res.map(|gas| tx.set_gas(gas)).convert_err()
         })
     }
 }

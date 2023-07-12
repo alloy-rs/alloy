@@ -109,6 +109,10 @@ impl<T, E> RpcResult<T, E> {
     {
         self.map_err(Into::into)
     }
+
+    pub fn empty(self) -> RpcResult<(), E> {
+        self.map(|_| ())
+    }
 }
 
 impl<T, E> From<TransportError> for RpcResult<T, E>
