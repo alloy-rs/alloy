@@ -94,6 +94,7 @@ impl<T, E> RpcResult<T, E> {
 
     pub fn unwrap_err_resp(self) -> ErrorObject<'static>
     where
+        T: Debug,
         E: Debug,
     {
         match self {
@@ -105,6 +106,7 @@ impl<T, E> RpcResult<T, E> {
 
     pub fn unwrap_err(self) -> E
     where
+        T: Debug,
         E: Debug,
     {
         match self {
