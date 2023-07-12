@@ -49,6 +49,7 @@ pub trait Eip1559Transaction: Transaction {
 }
 
 pub trait Network: Sized + Send + Sync + 'static {
+    #[doc(hidden)]
     const __ENFORCE_ZST: () = assert!(
         // This ensures that the network is a zero-sized type by checking that
         // its pointer is thin
@@ -66,6 +67,7 @@ pub trait Network: Sized + Send + Sync + 'static {
     type Receipt: RpcResp;
 }
 
+// TODO: replace these with things that aren't Box<dyn Future>
 pub trait Middleware<N>: Send + Sync + std::fmt::Debug
 where
     N: Network,
