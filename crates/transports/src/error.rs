@@ -62,12 +62,12 @@ impl<T, E> RpcResult<T, E> {
         matches!(self, RpcResult::Ok(_))
     }
 
-    pub fn is_err(&self) -> bool {
-        matches!(self, RpcResult::Err(_))
-    }
-
     pub fn is_err_resp(&self) -> bool {
         matches!(self, RpcResult::ErrResp(_))
+    }
+
+    pub fn is_err(&self) -> bool {
+        matches!(self, RpcResult::Err(_))
     }
 
     pub fn map<U, F>(self, op: F) -> RpcResult<U, E>
@@ -89,6 +89,28 @@ impl<T, E> RpcResult<T, E> {
             RpcResult::Ok(val) => val,
             RpcResult::ErrResp(err) => panic!("Error response: {:?}", err),
             RpcResult::Err(err) => panic!("Error: {:?}", err),
+        }
+    }
+
+    pub fn unwrap_err_resp(self) -> ErrorObject<'static>
+    where
+        E: Debug,
+    {
+        match self {
+            RpcResult::Ok(val) => panic!("Ok: {:?}", val),
+            RpcResult::ErrResp(err) => err,
+            RpcResult::Err(err) => panic!("Error: {:?}", err),
+        }
+    }
+
+    pub fn unwrap_err(self) -> E
+    where
+        E: Debug,
+    {
+        match self {
+            RpcResult::Ok(val) => panic!("Ok: {:?}", val),
+            RpcResult::ErrResp(err) => panic!("Error response: {:?}", err),
+            RpcResult::Err(err) => err,
         }
     }
 
