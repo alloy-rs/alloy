@@ -6,20 +6,20 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use serde::Serialize;
+use serde_json::value::RawValue;
 
 use crate::{
     common::{Id, Request, RpcFuture, RpcOutcome},
     error::RpcResult,
     utils::to_json_raw_value,
-    Connection, RpcObject, TransportError,
+    Connection, RpcParam, RpcResp, TransportError,
 };
 
-pub(crate) enum CallState<B, T, Params> {
+pub(crate) enum CallState<B, T> {
     Prepared {
         connection: B,
         method: &'static str,
-        params: Params,
+        params: Box<RawValue>,
         id: Id<'static>,
         // using `fn() -> T` makes this type covariant in T, and removes
         // drop-checking for T
@@ -31,9 +31,10 @@ pub(crate) enum CallState<B, T, Params> {
     },
     Complete,
     Running,
+    SerFailure(TransportError),
 }
 
-impl<B, T, Params> std::fmt::Debug for CallState<B, T, Params> {
+impl<B, T> std::fmt::Debug for CallState<B, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Prepared { method, id, .. } => f
@@ -42,34 +43,39 @@ impl<B, T, Params> std::fmt::Debug for CallState<B, T, Params> {
                 .field("id", id)
                 .finish(),
             Self::AwaitingResponse { .. } => f.debug_struct("AwaitingResponse").finish(),
+            Self::SerFailure(err) => f.debug_tuple("SerFailure").field(err).finish(),
             Self::Complete => write!(f, "Complete"),
             Self::Running => write!(f, "Running"),
         }
     }
 }
 
-impl<B, T, Params> CallState<B, T, Params> {
-    pub(crate) fn new(
+impl<B, T> CallState<B, T> {
+    pub(crate) fn new<Params: RpcParam>(
         connection: B,
         method: &'static str,
         params: Params,
         id: Id<'static>,
-    ) -> CallState<B, T, Params> {
-        Self::Prepared {
-            connection,
-            method,
-            params,
-            id,
-            _pd: PhantomData,
+    ) -> CallState<B, T> {
+        let params = to_json_raw_value(&params);
+
+        match params {
+            Ok(params) => Self::Prepared {
+                connection,
+                method,
+                params,
+                id,
+                _pd: PhantomData,
+            },
+            Err(err) => Self::SerFailure(err),
         }
     }
 }
 
-impl<B, T, Params> CallState<B, T, Params>
+impl<B, T> CallState<B, T>
 where
-    B: Borrow<T>,      /*+ Unpin*/
-    T: Connection,     /*+ Unpin*/
-    Params: Serialize, /*+ Unpin*/
+    B: Borrow<T>,
+    T: Connection,
 {
     fn poll_prepared(&mut self, cx: &mut Context<'_>) -> Poll<RpcOutcome> {
         let this = std::mem::replace(self, CallState::Running);
@@ -112,37 +118,56 @@ where
             _ => unreachable!("called poll_awaiting in incorrect state"),
         }
     }
+
+    fn poll_ser_failure(&mut self, _cx: &mut Context<'_>) -> Poll<RpcOutcome> {
+        let this = std::mem::replace(self, CallState::Running);
+        match this {
+            CallState::SerFailure(err) => {
+                *self = CallState::Complete;
+                Poll::Ready(Err(err))
+            }
+            _ => unreachable!("called poll_ser_failure in incorrect state"),
+        }
+    }
 }
 
-impl<B, T, Params> Future for CallState<B, T, Params>
+impl<B, T> Future for CallState<B, T>
 where
     B: Borrow<T> + Unpin,
     T: Connection,
-    Params: Serialize + Unpin,
 {
     type Output = RpcOutcome;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let state: &mut CallState<B, T, Params> = self.get_mut();
+        let state: &mut CallState<B, T> = self.get_mut();
         match state {
             CallState::Prepared { .. } => state.poll_prepared(cx),
             CallState::AwaitingResponse { .. } => state.poll_awaiting(cx),
+            CallState::SerFailure(..) => state.poll_ser_failure(cx),
             _ => panic!("Polled in bad state"),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct RpcCall<B, T, Params, Resp> {
-    state: CallState<B, T, Params>,
+pub struct RpcCall<B, T, Resp> {
+    state: CallState<B, T>,
     // using `fn() -> Resp` makes this type covariant in Resp, and removes
     // drop-checking for Resp
     // c.f. https://doc.rust-lang.org/nomicon/subtyping.html#variance
     resp: PhantomData<fn() -> Resp>,
 }
 
-impl<B, T, Params, Resp> RpcCall<B, T, Params, Resp> {
-    pub fn new(connection: B, method: &'static str, params: Params, id: Id<'static>) -> Self {
+impl<B, T, Resp> RpcCall<B, T, Resp>
+where
+    Resp: RpcResp,
+{
+    pub fn new<Params: RpcParam>(
+        connection: B,
+        method: &'static str,
+        params: Params,
+        id: Id<'static>,
+    ) -> Self {
         Self {
             state: CallState::new(connection, method, params, id),
             resp: PhantomData,
@@ -150,12 +175,11 @@ impl<B, T, Params, Resp> RpcCall<B, T, Params, Resp> {
     }
 }
 
-impl<B, T, Params, Resp> Future for RpcCall<B, T, Params, Resp>
+impl<B, T, Resp> Future for RpcCall<B, T, Resp>
 where
     B: Borrow<T> + Unpin,
     T: Connection,
-    Params: RpcObject,
-    Resp: RpcObject,
+    Resp: RpcResp,
 {
     type Output = RpcResult<Resp, TransportError>;
 

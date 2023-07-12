@@ -6,9 +6,10 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{call::RpcCall, common::*, TransportError};
 
-/// Blanket-impld trait for types that can be sent to and received via Rpc
-pub trait RpcObject: Serialize + DeserializeOwned + Send + Sync + Unpin {}
-impl<T> RpcObject for T where T: Serialize + DeserializeOwned + Send + Sync + Unpin {}
+pub trait RpcParam: Serialize + Send + Sync + Unpin {}
+impl<T> RpcParam for T where T: Serialize + Send + Sync + Unpin {}
+pub trait RpcResp: DeserializeOwned + Send + Sync + Unpin {}
+impl<T> RpcResp for T where T: DeserializeOwned + Send + Sync + Unpin {}
 
 pub trait Connection: Debug + Send + Sync + Unpin {
     fn is_local(&self) -> bool;
@@ -27,11 +28,11 @@ pub trait Connection: Debug + Send + Sync + Unpin {
         &self,
         method: &'static str,
         params: Params,
-    ) -> RpcCall<&Self, Self, Params, Resp>
+    ) -> RpcCall<&Self, Self, Resp>
     where
         Self: Sized,
-        Params: RpcObject,
-        Resp: RpcObject,
+        Params: RpcParam,
+        Resp: RpcResp,
     {
         RpcCall::new(self, method, params, self.next_id())
     }

@@ -1,4 +1,4 @@
-use crate::{common::RpcOutcome, utils::from_json, RpcObject};
+use crate::{common::RpcOutcome, utils::from_json, RpcResp};
 
 use jsonrpsee_types::ErrorObject;
 use std::{error::Error as StdError, fmt::Debug};
@@ -122,7 +122,7 @@ where
 
 impl<T> From<RpcOutcome> for RpcResult<T, TransportError>
 where
-    T: RpcObject,
+    T: RpcResp,
 {
     fn from(value: RpcOutcome) -> Self {
         match value {

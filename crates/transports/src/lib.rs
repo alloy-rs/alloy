@@ -20,7 +20,7 @@ mod call;
 pub use call::RpcCall;
 
 mod connection;
-pub use connection::{Connection, PubSubConnection, RpcObject};
+pub use connection::{Connection, PubSubConnection, RpcParam, RpcResp};
 
 pub mod transports;
 pub use transports::Http;

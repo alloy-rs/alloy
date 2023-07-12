@@ -2,7 +2,7 @@ use std::{future::Future, pin::Pin};
 
 use alloy_primitives::{TxHash, U256};
 use alloy_rlp::{Decodable, Encodable};
-use alloy_transports::{Connection, RpcCall, RpcObject, RpcResult, TransportError};
+use alloy_transports::{Connection, RpcCall, RpcParam, RpcResp, RpcResult, TransportError};
 
 pub trait Transaction: Encodable + Decodable {
     // VALUE
@@ -51,17 +51,17 @@ pub trait Network: Sized + Send + Sync + 'static {
     );
 
     // argument for `eth_sendTransaction`
-    type Transaction: Transaction + RpcObject;
+    type Transaction: Transaction + RpcParam;
 
     // return for `eth_getTransaction`
-    type TransactionRespose: RpcObject;
+    type TransactionRespose: RpcResp;
 
     // return for `eth_getTransactionReceipt`
-    type Receipt: RpcObject;
+    type Receipt: RpcResp;
 }
 
-type MwareCall<'a, M, N, Params, Resp> =
-    RpcCall<&'a <M as Middleware<N>>::Connection, <M as Middleware<N>>::Connection, Params, Resp>;
+type MwareCall<'a, M, N, Resp> =
+    RpcCall<&'a <M as Middleware<N>>::Connection, <M as Middleware<N>>::Connection, Resp>;
 
 type MwareFut<'a, M, N, T> =
     Pin<Box<dyn Future<Output = RpcResult<T, <M as Middleware<N>>::Error>> + Send + 'a>>;
@@ -80,23 +80,65 @@ where
         self.inner().connection()
     }
 
-    fn get_transaction(
-        &self,
-        tx_hash: TxHash,
-    ) -> MwareCall<Self, N, TxHash, N::TransactionRespose> {
+    fn get_transaction(&self, tx_hash: TxHash) -> MwareCall<Self, N, N::TransactionRespose> {
         self.inner().get_transaction(tx_hash)
     }
 
-    fn estimate_gas(&self, tx: &N::Transaction) -> MwareCall<Self, N, N::Transaction, U256> {
+    fn estimate_gas<'a, 'b>(&'a self, tx: &'b N::Transaction) -> MwareCall<Self, N, U256>
+    where
+        'a: 'b,
+    {
         self.inner().estimate_gas(tx)
     }
 
-    fn populate_gas<'a>(&'a self, tx: &'a mut N::Transaction) -> MwareFut<'a, Self, N, ()> {
+    fn populate_gas<'a, 'b>(&'a self, tx: &'b mut N::Transaction) -> MwareFut<'b, Self, N, ()>
+    where
+        'a: 'b,
+    {
         let est = self.estimate_gas(tx);
         Box::pin(async move {
             let res = est.await;
-            res.map(|gas| tx.set_gas(gas)).convert_err()
+
+            match res {
+                RpcResult::Ok(gas) => {
+                    tx.set_gas(gas);
+                    RpcResult::Ok(())
+                }
+                RpcResult::ErrResp(e) => RpcResult::ErrResp(e),
+                RpcResult::Err(e) => RpcResult::Err(e.into()),
+            }
         })
+    }
+}
+
+impl<N: Network, T> Middleware<N> for T
+where
+    T: Connection,
+{
+    type Connection = Self;
+    type Inner = Self;
+    type Error = TransportError;
+
+    fn inner(&self) -> &Self::Inner {
+        self
+    }
+
+    fn connection(&self) -> &Self::Connection {
+        self
+    }
+
+    fn get_transaction(
+        &self,
+        tx_hash: TxHash,
+    ) -> MwareCall<Self, N, <N as Network>::TransactionRespose> {
+        self.request("eth_getTransactionByHash", tx_hash)
+    }
+
+    fn estimate_gas<'a, 'b>(&'a self, tx: &'b N::Transaction) -> MwareCall<Self, N, U256>
+    where
+        'a: 'b,
+    {
+        self.request("eth_estimateGas", tx)
     }
 }
 
