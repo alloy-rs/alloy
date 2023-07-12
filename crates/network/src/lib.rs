@@ -138,4 +138,88 @@ where
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::marker::PhantomData;
+
+    use alloy_primitives::U256;
+    use alloy_transports::Http;
+
+    use super::*;
+
+    struct DummyNet;
+
+    impl Transaction for u8 {
+        fn get_value(&self) -> alloy_primitives::U256 {
+            todo!()
+        }
+
+        fn set_value(&mut self, _value: alloy_primitives::U256) {
+            todo!()
+        }
+
+        fn value(self, _value: alloy_primitives::U256) -> Self {
+            todo!()
+        }
+
+        fn get_gas_price(&self) -> alloy_primitives::U256 {
+            todo!()
+        }
+
+        fn get_gas(&self) -> alloy_primitives::U256 {
+            todo!()
+        }
+
+        fn set_gas(&mut self, _gas: alloy_primitives::U256) {
+            todo!()
+        }
+
+        fn gas(self, _gas: alloy_primitives::U256) -> Self {
+            todo!()
+        }
+
+        fn get_data(&self) -> &[u8] {
+            todo!()
+        }
+
+        fn set_data(&mut self, _data: Vec<u8>) {
+            todo!()
+        }
+
+        fn data(self, _data: Vec<u8>) -> Self {
+            todo!()
+        }
+
+        fn get_to(&self) -> Option<&[u8]> {
+            todo!()
+        }
+
+        fn set_to(&mut self, _to: Option<Vec<u8>>) {
+            todo!()
+        }
+
+        fn to(self, _to: Option<Vec<u8>>) -> Self {
+            todo!()
+        }
+    }
+
+    impl super::Network for DummyNet {
+        type Transaction = u8;
+        type TransactionRespose = u8;
+        type Receipt = u8;
+    }
+
+    type DummyCall<'a, M, Resp> = MwareCall<'a, M, DummyNet, Resp>;
+
+    trait DummyMiddleware: Middleware<DummyNet> {
+        fn estimate_gas(&self, tx: &u8) -> DummyCall<Self, U256> {
+            Middleware::<DummyNet>::estimate_gas(self, tx)
+        }
+    }
+
+    impl<T> DummyMiddleware for T where T: Middleware<DummyNet> {}
+
+    #[test]
+    fn __compile_check() {
+        let _pd: PhantomData<DummyCall<Http, ()>> = PhantomData;
+    }
+}
