@@ -18,6 +18,12 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
 
+alloy-transports = { path = "crates/transports" }
+alloy-network = { path = "crates/network" }
+
+alloy-primitives = { version = "0.2.0", features = ["serde"] }
+alloy-rlp = "0.3.0"
+
 # futures
 futures-channel = "0.3"
 futures-util = "0.3"
