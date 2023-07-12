@@ -21,7 +21,10 @@ pub(crate) enum CallState<B, T, Params> {
         method: &'static str,
         params: Params,
         id: Id<'static>,
-        _pd: PhantomData<T>,
+        // using `fn() -> T` makes this type covariant in T, and removes
+        // drop-checking for T
+        // c.f. https://doc.rust-lang.org/nomicon/subtyping.html#variance
+        _pd: PhantomData<fn() -> T>,
     },
     AwaitingResponse {
         fut: RpcFuture,
@@ -132,7 +135,8 @@ where
 #[derive(Debug)]
 pub struct RpcCall<B, T, Params, Resp> {
     state: CallState<B, T, Params>,
-    // using `fn() -> Resp` makes this type covariant in Resp.
+    // using `fn() -> Resp` makes this type covariant in Resp, and removes
+    // drop-checking for Resp
     // c.f. https://doc.rust-lang.org/nomicon/subtyping.html#variance
     resp: PhantomData<fn() -> Resp>,
 }

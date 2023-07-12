@@ -17,9 +17,10 @@ mod error;
 pub use error::TransportError;
 
 mod call;
+pub use call::RpcCall;
 
 mod transport;
-pub use transport::{Connection, PubSubConnection};
+pub use transport::{Connection, PubSubConnection, RpcObject};
 
 pub mod transports;
 pub use transports::Http;

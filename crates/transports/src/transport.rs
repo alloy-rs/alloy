@@ -1,12 +1,16 @@
 use futures_channel::mpsc::UnboundedReceiver;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json::value::RawValue;
 
 use std::{borrow::Cow, fmt::Debug};
 
 use crate::{call::RpcCall, common::*, TransportError};
 
-pub trait Connection: Debug + Send + Sync {
+/// Blanket-impld trait for types that can be sent to and received via Rpc
+pub trait RpcObject: Serialize + DeserializeOwned + Send + Sync {}
+impl<T> RpcObject for T where T: Serialize + DeserializeOwned + Send + Sync {}
+
+pub trait Connection: Debug + Send + Sync + Unpin {
     fn is_local(&self) -> bool;
 
     fn increment_id(&self) -> u64;
@@ -26,8 +30,8 @@ pub trait Connection: Debug + Send + Sync {
     ) -> RpcCall<&Self, Self, Params, Resp>
     where
         Self: Sized,
-        Params: Serialize,
-        Resp: for<'de> Deserialize<'de>,
+        Params: RpcObject,
+        Resp: RpcObject,
     {
         RpcCall::new(self, method, params, self.next_id())
     }
