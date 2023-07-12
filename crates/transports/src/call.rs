@@ -88,12 +88,6 @@ where
                 id,
                 ..
             } => {
-                let params = to_json_raw_value(&params);
-                if let Err(err) = params {
-                    *self = CallState::Complete;
-                    return Poll::Ready(Err(err));
-                }
-                let params = params.unwrap();
                 let req = Request::owned(id, method, Some(params));
                 let fut = connection.borrow().json_rpc_request(&req);
                 *self = CallState::AwaitingResponse { fut };
