@@ -119,6 +119,3 @@ impl Connection for Http {
         })
     }
 }
-
-#[cfg(test)]
-mod test {}

@@ -6,13 +6,13 @@ use std::{
     task::{ready, Context, Poll},
 };
 
-use jsonrpsee_types::ErrorObjectOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::{
     common::{Id, Request, RpcFuture, RpcOutcome},
-    utils::{from_json, to_json_raw_value},
-    Connection, TransportError,
+    error::RpcResult,
+    utils::to_json_raw_value,
+    Connection, RpcObject, TransportError,
 };
 
 pub(crate) enum CallState<B, T, Params> {
@@ -154,19 +154,15 @@ impl<B, T, Params, Resp> Future for RpcCall<B, T, Params, Resp>
 where
     B: Borrow<T> + Unpin,
     T: Connection + Unpin,
-    Params: Serialize + Unpin,
-    Resp: for<'de> Deserialize<'de> + Unpin,
+    Params: RpcObject,
+    Resp: RpcObject,
 {
-    type Output = Result<Result<Resp, ErrorObjectOwned>, TransportError>;
+    type Output = RpcResult<Resp, TransportError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let state = Pin::new(&mut self.get_mut().state);
         let res = ready!(state.poll(cx));
 
-        match res {
-            Ok(Ok(val)) => Poll::Ready(from_json(val.get()).map(Result::Ok)),
-            Ok(Err(err)) => Poll::Ready(Ok(Err(err))),
-            Err(e) => Poll::Ready(Err(e)),
-        }
+        Poll::Ready(RpcResult::from(res))
     }
 }

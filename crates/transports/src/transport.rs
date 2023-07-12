@@ -7,8 +7,8 @@ use std::{borrow::Cow, fmt::Debug};
 use crate::{call::RpcCall, common::*, TransportError};
 
 /// Blanket-impld trait for types that can be sent to and received via Rpc
-pub trait RpcObject: Serialize + DeserializeOwned + Send + Sync {}
-impl<T> RpcObject for T where T: Serialize + DeserializeOwned + Send + Sync {}
+pub trait RpcObject: Serialize + DeserializeOwned + Send + Sync + Unpin {}
+impl<T> RpcObject for T where T: Serialize + DeserializeOwned + Send + Sync + Unpin {}
 
 pub trait Connection: Debug + Send + Sync + Unpin {
     fn is_local(&self) -> bool;
