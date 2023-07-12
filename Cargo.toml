@@ -20,6 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 # futures
 futures-channel = "0.3"
+futures-util = "0.3"
 
 # jsonrpsee-types
 jsonrpsee-types = "0.16"

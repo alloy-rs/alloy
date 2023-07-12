@@ -23,10 +23,7 @@ where
     let s = s.as_ref();
     match serde_json::from_str(s) {
         Ok(val) => Ok(val),
-        Err(err) => Err(TransportError::SerdeJson {
-            err,
-            text: s.to_owned(),
-        }),
+        Err(err) => Err(TransportError::deser_err(err, s)),
     }
 }
 
@@ -37,9 +34,6 @@ pub(crate) fn deser_rpc_result(resp: &str) -> Result<JsonRpcResultOwned, Transpo
     let deser = serde_json::from_str::<Response<'_, Cow<'_, RawValue>>>(resp);
     match deser {
         Ok(v) => Ok(Ok(v.result)),
-        Err(err) => Err(TransportError::SerdeJson {
-            err,
-            text: resp.to_owned(),
-        }),
+        Err(err) => Err(TransportError::deser_err(err, resp)),
     }
 }

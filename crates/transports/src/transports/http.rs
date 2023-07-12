@@ -108,14 +108,10 @@ impl Connection for Http {
             let res = fut.await?;
             let body = res.text().await?;
 
-            let resps: Result<Vec<&'_ RawValue>, _> = serde_json::from_str(&body);
-
-            if let Err(err) = resps {
-                return Err(TransportError::SerdeJson { err, text: body });
-            }
+            let resps: Vec<&'_ RawValue> =
+                serde_json::from_str(&body).map_err(|e| TransportError::deser_err(e, &body))?;
 
             resps
-                .unwrap()
                 .into_iter()
                 .map(RawValue::get)
                 .map(deser_rpc_result)

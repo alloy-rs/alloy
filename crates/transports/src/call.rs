@@ -29,6 +29,7 @@ pub(crate) enum CallState<B, T, Params> {
     Complete,
     Running,
 }
+
 impl<B, T, Params> std::fmt::Debug for CallState<B, T, Params> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -90,7 +91,7 @@ where
                 cx.waker().wake_by_ref();
                 Poll::Pending
             }
-            _ => panic!(""),
+            _ => unreachable!("called poll_prepared in incorrect state"),
         }
     }
 
@@ -105,7 +106,7 @@ where
                 *self = CallState::AwaitingResponse { fut };
                 Poll::Pending
             }
-            _ => panic!(""),
+            _ => unreachable!("called poll_awaiting in incorrect state"),
         }
     }
 }
@@ -131,6 +132,8 @@ where
 #[derive(Debug)]
 pub struct RpcCall<B, T, Params, Resp> {
     state: CallState<B, T, Params>,
+    // using `fn() -> Resp` makes this type covariant in Resp.
+    // c.f. https://doc.rust-lang.org/nomicon/subtyping.html#variance
     resp: PhantomData<fn() -> Resp>,
 }
 
