@@ -1,4 +1,4 @@
-use crate::{utils::from_json, RpcObject};
+use crate::{common::RpcOutcome, utils::from_json, RpcObject};
 
 use jsonrpsee_types::ErrorObject;
 use std::error::Error as StdError;
@@ -48,18 +48,29 @@ where
     }
 }
 
+/// The result of a JSON-RPC request. Either a success response, an error
+/// response, or another error.
 #[derive(Error, Debug)]
-pub enum RpcResult<T, E: StdError> {
+pub enum RpcResult<T, E> {
     Ok(T),
     ErrResp(ErrorObject<'static>),
     Err(E),
 }
 
-impl<T> From<crate::common::RpcOutcome> for RpcResult<T, TransportError>
+impl<T, E> From<TransportError> for RpcResult<T, E>
+where
+    E: StdError + From<TransportError>,
+{
+    fn from(value: TransportError) -> Self {
+        RpcResult::Err(value.into())
+    }
+}
+
+impl<T> From<RpcOutcome> for RpcResult<T, TransportError>
 where
     T: RpcObject,
 {
-    fn from(value: crate::common::RpcOutcome) -> Self {
+    fn from(value: RpcOutcome) -> Self {
         match value {
             Ok(Ok(val)) => {
                 let val = val.get();
