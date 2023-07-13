@@ -51,8 +51,7 @@ pub trait Eip1559Transaction: Transaction {
 pub trait Network: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     const __ENFORCE_ZST: () = assert!(
-        // This ensures that the network is a zero-sized type by checking that
-        // its pointer is thin
+        // This ensures that the network is a zero-sized type
         std::mem::size_of::<Self>() == 0,
         "Network must be a zero-sized type"
     );
