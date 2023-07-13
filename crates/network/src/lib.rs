@@ -106,9 +106,10 @@ where
     }
 }
 
-impl<N: Network, T> Middleware<N> for T
+impl<N, T> Middleware<N> for T
 where
     T: Connection,
+    N: Network,
 {
     type Connection = Self;
     type Inner = Self;
@@ -139,7 +140,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::marker::PhantomData;
+    use std::str::FromStr;
 
     use alloy_primitives::U256;
     use alloy_transports::Http;
@@ -218,8 +219,19 @@ mod tests {
 
     impl<T> DummyMiddleware for T where T: Middleware<DummyNet> {}
 
+    fn __compile_check_dyn_mware<N: Network>(
+    ) -> Box<dyn Middleware<N, Connection = Http, Inner = Http, Error = TransportError>> {
+        Box::new(Http::from_str("http://localhost:8545").unwrap())
+    }
+
     #[test]
-    fn __compile_check() {
-        let _pd: PhantomData<DummyCall<Http, ()>> = PhantomData;
+    fn __compile_check_use_dyn() {
+        let provider = __compile_check_dyn_mware::<DummyNet>();
+        let _call: DummyCall<Http, U256> = provider.estimate_gas(&0u8);
+    }
+
+    fn __compile_check_subtype_mware(
+    ) -> Box<dyn DummyMiddleware<Connection = Http, Error = TransportError, Inner = Http>> {
+        Box::new(Http::from_str("http://localhost:8545").unwrap())
     }
 }
