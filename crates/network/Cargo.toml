@@ -14,3 +14,4 @@ alloy-transports.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tower = "0.4.13"

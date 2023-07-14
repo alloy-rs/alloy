@@ -24,3 +24,6 @@ pub use connection::{Connection, PubSubConnection, RpcParam, RpcResp};
 
 pub mod transports;
 pub use transports::Http;
+
+mod post;
+pub use post::CallWithPost;

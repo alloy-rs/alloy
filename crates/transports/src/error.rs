@@ -50,6 +50,7 @@ where
 
 /// The result of a JSON-RPC request. Either a success response, an error
 /// response, or another error.
+#[must_use = "Results must be handled."]
 #[derive(Error, Debug)]
 pub enum RpcResult<T, E> {
     Ok(T),
