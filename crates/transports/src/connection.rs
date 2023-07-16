@@ -17,6 +17,14 @@ pub trait Transport:
 {
 }
 
+impl<T> Transport for T where
+    T: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>
+        + Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>
+        + Clone
+        + 'static
+{
+}
+
 pub struct RpcClient<T> {
     pub(crate) transport: T,
     pub(crate) is_local: bool,
