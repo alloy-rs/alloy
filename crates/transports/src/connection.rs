@@ -2,7 +2,7 @@ use crate::{
     batch::BatchRequest,
     call::RpcCall,
     error::TransportError,
-    types::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
+    rpc_types::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
     utils::to_json_raw_value,
 };
 
@@ -79,6 +79,6 @@ mod test {
     fn basic_instantiation() {
         let h: RpcClient<Http<reqwest::Client>> = "http://localhost:8545".parse().unwrap();
 
-        assert_eq!(h.is_local(), true);
+        assert!(h.is_local());
     }
 }

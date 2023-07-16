@@ -1,4 +1,4 @@
-use crate::types::{ErrorPayload, JsonRpcResponse, ResponsePayload, RpcReturn};
+use crate::rpc_types::{ErrorPayload, JsonRpcResponse, ResponsePayload, RpcReturn};
 
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};

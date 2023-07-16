@@ -9,7 +9,7 @@ use tower::Service;
 
 use crate::{
     error::{RpcResult, TransportError},
-    types::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
+    rpc_types::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
 };
 
 #[pin_project::pin_project(project = CallStateProj)]

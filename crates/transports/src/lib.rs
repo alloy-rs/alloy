@@ -1,9 +1,21 @@
-pub mod call;
-pub mod common;
-pub mod connection;
-pub mod error;
-pub mod utils;
+mod call;
+pub use call::RpcCall;
 
-pub mod batch;
-pub mod transports;
-pub mod types;
+mod common;
+pub use common::Authorization;
+
+pub mod connection;
+pub use connection::RpcClient;
+
+mod error;
+pub use error::{RpcResult, TransportError};
+
+pub(crate) mod utils;
+
+mod batch;
+pub use batch::BatchRequest;
+
+mod transports;
+pub use transports::Http;
+
+pub mod rpc_types;

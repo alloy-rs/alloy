@@ -6,7 +6,7 @@ use tower::Service;
 use crate::{
     connection::RpcClient,
     error::TransportError,
-    types::{JsonRpcRequest, JsonRpcResponse},
+    rpc_types::{JsonRpcRequest, JsonRpcResponse},
 };
 
 impl<T> RpcClient<Http<T>>

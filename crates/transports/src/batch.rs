@@ -12,12 +12,13 @@ use tower::Service;
 
 use crate::{
     error::{RpcResult, TransportError},
-    types::{Id, JsonRpcRequest, JsonRpcResponse, RpcReturn},
+    rpc_types::{Id, JsonRpcRequest, JsonRpcResponse, RpcReturn},
 };
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
 
+/// A Batch JSON-RPC request, awaiting dispatch.
 #[derive(Debug, Default)]
 pub struct BatchRequest<T> {
     transport: T,
@@ -27,6 +28,7 @@ pub struct BatchRequest<T> {
     channels: ChannelMap,
 }
 
+/// Awaits a single response for a request that has been included in a batch.
 pub struct Waiter<Resp> {
     rx: oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>>,
     _resp: PhantomData<Resp>,
@@ -84,9 +86,15 @@ impl<T> BatchRequest<T> {
         self.requests.push(request);
         rx
     }
+}
 
-    pub fn decompose(self) -> (Vec<JsonRpcRequest>, ChannelMap) {
-        (self.requests, self.channels)
+impl<T> BatchRequest<T>
+where
+    T: Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>,
+{
+    /// Send the batch future via its connection.
+    pub fn send(self) -> BatchFuture<T> {
+        BatchFuture::Prepared(self)
     }
 }
 
