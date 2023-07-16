@@ -1,13 +1,9 @@
-use std::{future::Future, pin::Pin, str::FromStr, sync::atomic::AtomicU64, task};
-
+use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse};
 use reqwest::Url;
+use std::{future::Future, pin::Pin, str::FromStr, sync::atomic::AtomicU64, task};
 use tower::Service;
 
-use crate::{
-    connection::RpcClient,
-    error::TransportError,
-    rpc_types::{JsonRpcRequest, JsonRpcResponse},
-};
+use crate::{connection::RpcClient, error::TransportError};
 
 impl<T> RpcClient<Http<T>>
 where

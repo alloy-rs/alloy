@@ -1,51 +1,12 @@
 use std::fmt;
 
 use serde::{
-    de::{DeserializeOwned, MapAccess, Visitor},
-    ser::SerializeMap,
+    de::{MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
 use serde_json::value::RawValue;
 
-pub trait RpcParam: Serialize + Send + Sync + Unpin {}
-impl<T> RpcParam for T where T: Serialize + Send + Sync + Unpin {}
-pub trait RpcReturn: DeserializeOwned + Send + Sync + Unpin {}
-impl<T> RpcReturn for T where T: DeserializeOwned + Send + Sync + Unpin {}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-#[serde(untagged)]
-pub enum Id {
-    Number(u64),
-    String(String),
-    None,
-}
-
-impl Id {
-    pub fn is_none(&self) -> bool {
-        matches!(self, Id::None)
-    }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct JsonRpcRequest {
-    pub method: &'static str,
-    pub params: Box<RawValue>,
-    pub id: Id,
-}
-
-impl Serialize for JsonRpcRequest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut map = serializer.serialize_map(Some(4))?;
-        map.serialize_entry("method", self.method)?;
-        map.serialize_entry("params", &self.params)?;
-        map.serialize_entry("id", &self.id)?;
-        map.serialize_entry("jsonrpc", "2.0")?;
-        map.end()
-    }
-}
+use crate::common::Id;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ErrorPayload {

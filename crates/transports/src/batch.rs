@@ -10,10 +10,8 @@ use futures_channel::oneshot;
 use serde_json::value::RawValue;
 use tower::Service;
 
-use crate::{
-    error::{RpcResult, TransportError},
-    rpc_types::{Id, JsonRpcRequest, JsonRpcResponse, RpcReturn},
-};
+use crate::error::TransportError;
+use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcResult, RpcReturn};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
@@ -47,7 +45,7 @@ where
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
 
         task::Poll::Ready(match resp {
-            Ok(resp) => resp.deser_ok(),
+            Ok(resp) => resp.deser_ok_or_else(|e, text| TransportError::deser_err(e, text)),
             Err(e) => RpcResult::Err(TransportError::Custom(Box::new(e))),
         })
     }

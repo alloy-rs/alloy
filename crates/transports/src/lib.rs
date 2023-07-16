@@ -8,7 +8,7 @@ pub mod connection;
 pub use connection::RpcClient;
 
 mod error;
-pub use error::{RpcResult, TransportError};
+pub use error::TransportError;
 
 pub(crate) mod utils;
 
@@ -18,4 +18,4 @@ pub use batch::BatchRequest;
 mod transports;
 pub use transports::Http;
 
-pub mod rpc_types;
+pub use alloy_json_rpc::RpcResult;

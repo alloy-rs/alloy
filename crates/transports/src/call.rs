@@ -1,3 +1,6 @@
+use crate::error::TransportError;
+
+use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcResult, RpcReturn};
 use serde_json::value::RawValue;
 use std::{
     future::Future,
@@ -6,11 +9,6 @@ use std::{
     task::{self, ready},
 };
 use tower::Service;
-
-use crate::{
-    error::{RpcResult, TransportError},
-    rpc_types::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
-};
 
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Conn>
@@ -154,8 +152,8 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
 
-        let res = task::ready!(this.state.poll(cx));
+        let resp = task::ready!(this.state.poll(cx));
 
-        task::Poll::Ready(res.deser_ok())
+        task::Poll::Ready(resp.deser_ok_or_else(|e, text| TransportError::deser_err(e, text)))
     }
 }

@@ -19,7 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 [workspace.dependencies]
 
 alloy-transports = { path = "crates/transports" }
-alloy-network = { path = "crates/network" }
+alloy-json-rpc = { path = "crates/json-rpc" }
 
 alloy-primitives = { version = "0.2.0", features = ["serde"] }
 alloy-rlp = "0.3.0"

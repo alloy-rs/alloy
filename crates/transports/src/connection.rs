@@ -1,10 +1,5 @@
-use crate::{
-    batch::BatchRequest,
-    call::RpcCall,
-    error::TransportError,
-    rpc_types::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
-    utils::to_json_raw_value,
-};
+use crate::{batch::BatchRequest, call::RpcCall, error::TransportError, utils::to_json_raw_value};
+use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use tower::Service;
