@@ -1,6 +1,6 @@
-use crate::{common::RpcOutcome, utils::from_json, RpcResp};
+use crate::types::{ErrorPayload, JsonRpcResponse, ResponsePayload, RpcReturn};
 
-use jsonrpsee_types::ErrorObject;
+use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
 
@@ -17,6 +17,10 @@ pub enum TransportError {
     /// Http transport
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+
+    /// Missing batch response
+    #[error("Missing response in batch request")]
+    MissingBatchResponse,
 
     #[error(transparent)]
     Custom(Box<dyn StdError + Send + Sync + 'static>),
@@ -54,7 +58,7 @@ where
 #[derive(Error, Debug)]
 pub enum RpcResult<T, E> {
     Ok(T),
-    ErrResp(ErrorObject<'static>),
+    ErrResp(ErrorPayload),
     Err(E),
 }
 
@@ -93,7 +97,7 @@ impl<T, E> RpcResult<T, E> {
         }
     }
 
-    pub fn unwrap_err_resp(self) -> ErrorObject<'static>
+    pub fn unwrap_err_resp(self) -> ErrorPayload
     where
         T: Debug,
         E: Debug,
@@ -140,6 +144,19 @@ impl<T, E> RpcResult<T, E> {
     }
 }
 
+impl RpcResult<Box<RawValue>, TransportError> {
+    pub fn deser_ok<Resp: RpcReturn>(self) -> RpcResult<Resp, TransportError> {
+        match self {
+            RpcResult::Ok(val) => match serde_json::from_str(val.get()) {
+                Ok(val) => RpcResult::Ok(val),
+                Err(err) => RpcResult::Err(TransportError::deser_err(err, val.get())),
+            },
+            RpcResult::ErrResp(er) => RpcResult::ErrResp(er),
+            RpcResult::Err(e) => RpcResult::Err(e),
+        }
+    }
+}
+
 impl<T, E> From<TransportError> for RpcResult<T, E>
 where
     E: StdError + From<TransportError>,
@@ -149,21 +166,20 @@ where
     }
 }
 
-impl<T> From<RpcOutcome> for RpcResult<T, TransportError>
-where
-    T: RpcResp,
-{
-    fn from(value: RpcOutcome) -> Self {
+impl From<JsonRpcResponse> for RpcResult<Box<RawValue>, TransportError> {
+    fn from(value: JsonRpcResponse) -> Self {
+        match value.payload {
+            ResponsePayload::Success(res) => RpcResult::Ok(res),
+            ResponsePayload::Error(e) => RpcResult::ErrResp(e),
+        }
+    }
+}
+
+impl From<Result<JsonRpcResponse, TransportError>> for RpcResult<Box<RawValue>, TransportError> {
+    fn from(value: Result<JsonRpcResponse, TransportError>) -> Self {
         match value {
-            Ok(Ok(val)) => {
-                let val = val.get();
-                match from_json(val) {
-                    Ok(val) => RpcResult::Ok(val),
-                    Err(err) => RpcResult::Err(err),
-                }
-            }
-            Ok(Err(err)) => RpcResult::ErrResp(err),
-            Err(e) => RpcResult::Err(e),
+            Ok(res) => res.into(),
+            Err(err) => err.into(),
         }
     }
 }

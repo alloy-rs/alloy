@@ -28,9 +28,6 @@ alloy-rlp = "0.3.0"
 futures-channel = "0.3"
 futures-util = "0.3"
 
-# jsonrpsee-types
-jsonrpsee-types = "0.16"
-
 # serde
 serde = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

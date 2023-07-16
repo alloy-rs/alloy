@@ -1,121 +1,95 @@
-use std::{
-    ops::Deref,
-    str::FromStr,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+use std::{future::Future, pin::Pin, str::FromStr, sync::atomic::AtomicU64, task};
 
-use reqwest::{header::HeaderValue, Client, Url};
-use serde_json::{self, value::RawValue};
+use reqwest::Url;
+use tower::Service;
 
 use crate::{
-    common::{self, Authorization, BatchRpcOutcome, RpcFuture},
-    connection::Connection,
-    utils::deser_rpc_result,
-    TransportError,
+    connection::RpcClient,
+    error::TransportError,
+    types::{JsonRpcRequest, JsonRpcResponse},
 };
 
-#[derive(Debug)]
-pub struct HttpInternal {
-    id: AtomicU64,
-    client: Client,
-    url: Url,
-}
-
-impl HttpInternal {
-    pub fn new(url: Url) -> Self {
+impl<T> RpcClient<Http<T>>
+where
+    T: Default,
+{
+    pub fn new_http(url: Url) -> Self {
+        let transport = Http::new(url);
+        let is_local = transport.is_local();
         Self {
-            id: Default::default(),
-            client: Default::default(),
-            url,
+            transport,
+            is_local,
+            id: AtomicU64::new(0),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Http(Arc<HttpInternal>);
-
-impl Deref for Http {
-    type Target = HttpInternal;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.deref()
-    }
-}
-
-impl FromStr for Http {
+impl<T> FromStr for RpcClient<Http<T>>
+where
+    T: Default,
+{
     type Err = <Url as FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self::new)
+        s.parse().map(Self::new_http)
     }
 }
 
-impl Http {
-    pub fn new(url: Url) -> Self {
-        Self::new_with_client(url, Default::default())
-    }
+#[derive(Debug, Clone)]
+pub struct Http<T> {
+    client: T,
+    url: Url,
+}
 
-    pub fn new_with_client(url: Url, client: Client) -> Self {
-        Self(Arc::new(HttpInternal {
-            id: Default::default(),
-            client,
+impl<T> Http<T> {
+    pub fn new(url: Url) -> Self
+    where
+        T: Default,
+    {
+        Self {
+            client: Default::default(),
             url,
-        }))
+        }
     }
 
-    pub fn new_with_auth(url: Url, auth: Authorization) -> Self {
-        let mut auth_value = HeaderValue::from_str(&auth.to_string()).expect("valid auth");
-        auth_value.set_sensitive(true);
+    pub fn with_client(client: T, url: Url) -> Self {
+        Self { client, url }
+    }
 
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(reqwest::header::AUTHORIZATION, auth_value);
-
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .expect("reqwest builds");
-
-        Self::new_with_client(url, client)
+    /// True if the connection has no hostname, or the hostname is `localhost`
+    /// or `127.0.0.1`.
+    pub fn is_local(&self) -> bool {
+        self.url
+            .host_str()
+            .map_or(true, |host| host == "localhost" || host == "127.0.0.1")
     }
 }
 
-impl Connection for Http {
-    fn is_local(&self) -> bool {
-        self.url.as_str().contains("127.0.0.1") || self.url.as_str().contains("localhost")
+impl Service<JsonRpcRequest> for Http<reqwest::Client> {
+    type Response = JsonRpcResponse;
+    type Error = TransportError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    #[inline]
+    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        self.client.poll_ready(cx).map_err(Into::into)
     }
 
-    fn increment_id(&self) -> u64 {
-        self.id.fetch_add(1, Ordering::Relaxed)
-    }
+    #[inline]
+    fn call(&mut self, req: JsonRpcRequest) -> Self::Future {
+        let replacement = self.client.clone();
+        let client = std::mem::replace(&mut self.client, replacement);
 
-    fn json_rpc_request(&self, req: &common::Request<'_>) -> RpcFuture {
-        let fut = self.client.post(self.url.as_ref()).json(&req).send();
+        let url = self.url.clone();
 
         Box::pin(async move {
-            let res = fut.await?;
-            let body = res.text().await?;
-            deser_rpc_result(&body)
-        })
-    }
+            let resp = client.post(url).json(&req).send().await?;
+            let body = resp.text().await?;
 
-    fn batch_request(&self, reqs: &[common::Request<'_>]) -> common::BatchRpcFuture {
-        let fut = self.client.post(self.url.as_ref()).json(&reqs).send();
-
-        Box::pin(async move {
-            let res = fut.await?;
-            let body = res.text().await?;
-
-            let resps: Vec<&'_ RawValue> =
-                serde_json::from_str(&body).map_err(|e| TransportError::deser_err(e, &body))?;
-
-            resps
-                .into_iter()
-                .map(RawValue::get)
-                .map(deser_rpc_result)
-                .collect::<BatchRpcOutcome>()
+            match serde_json::from_str::<JsonRpcResponse>(&body) {
+                Ok(resp) => Ok(resp),
+                Err(e) => Err(TransportError::deser_err(e, &body)),
+            }
         })
     }
 }

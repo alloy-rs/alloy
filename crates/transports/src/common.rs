@@ -1,24 +1,5 @@
 use base64::{engine::general_purpose, Engine};
-use serde_json::value::RawValue;
-use std::{borrow::Cow, fmt, future::Future, pin::Pin};
-
-pub use jsonrpsee_types::{ErrorObject, ErrorResponse, Id, RequestSer as Request, Response};
-
-use crate::TransportError;
-
-#[cfg(target_arch = "wasm32")]
-pub(crate) type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) type DynFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
-pub type JsonRpcResult<'a> = Result<Cow<'a, RawValue>, ErrorObject<'a>>;
-pub type JsonRpcResultOwned = JsonRpcResult<'static>;
-
-pub type RpcOutcome = Result<JsonRpcResultOwned, TransportError>;
-pub type BatchRpcOutcome = Result<Vec<JsonRpcResultOwned>, TransportError>;
-
-pub type RpcFuture = DynFuture<'static, RpcOutcome>;
-pub type BatchRpcFuture = DynFuture<'static, BatchRpcOutcome>;
+use std::fmt;
 
 /// Basic or bearer authentication in http or websocket transport
 ///

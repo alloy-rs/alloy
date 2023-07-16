@@ -1,62 +1,62 @@
-use futures_channel::mpsc::UnboundedReceiver;
-use serde::{de::DeserializeOwned, Serialize};
-use serde_json::value::RawValue;
+use crate::{
+    batch::BatchRequest,
+    call::RpcCall,
+    error::TransportError,
+    types::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn},
+    utils::to_json_raw_value,
+};
 
-use std::{borrow::Cow, fmt::Debug};
+use std::sync::atomic::{AtomicU64, Ordering};
+use tower::Service;
 
-use crate::{call::RpcCall, common::*, TransportError};
+pub trait Transport:
+    Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>
+    + Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>
+    + Clone
+    + 'static
+{
+}
 
-pub trait RpcParam: Serialize + Send + Sync + Unpin {}
-impl<T> RpcParam for T where T: Serialize + Send + Sync + Unpin {}
-pub trait RpcResp: DeserializeOwned + Send + Sync + Unpin {}
-impl<T> RpcResp for T where T: DeserializeOwned + Send + Sync + Unpin {}
+pub struct RpcClient<T> {
+    pub(crate) transport: T,
+    pub(crate) is_local: bool,
+    pub(crate) id: AtomicU64,
+}
 
-pub trait Connection: Debug + Send + Sync + Unpin {
-    fn is_local(&self) -> bool;
+impl<T> RpcClient<T>
+where
+    T: Transport,
+{
+    #[inline]
+    pub fn increment_id(&self) -> u64 {
+        self.id.fetch_add(1, Ordering::Relaxed)
+    }
 
-    fn increment_id(&self) -> u64;
-
-    fn next_id(&self) -> Id<'static> {
+    #[inline]
+    pub fn next_id(&self) -> Id {
         Id::Number(self.increment_id())
     }
 
-    fn json_rpc_request(&self, req: &Request<'_>) -> RpcFuture;
+    pub fn new_batch(&self) -> BatchRequest<T> {
+        BatchRequest::new(self.transport.clone())
+    }
 
-    fn batch_request(&self, reqs: &[Request<'_>]) -> BatchRpcFuture;
-
-    fn request<Params, Resp>(
+    pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
         params: Params,
-    ) -> RpcCall<&Self, Self, Resp>
-    where
-        Self: Sized,
-        Params: RpcParam,
-        Resp: RpcResp,
-    {
-        RpcCall::new(self, method, params, self.next_id())
+    ) -> RpcCall<T, Params, Resp> {
+        // Serialize the params greedily, but only return the error lazily
+        let request = to_json_raw_value(&params).map(|v| JsonRpcRequest {
+            method,
+            params: v,
+            id: self.next_id(),
+        });
+
+        RpcCall::new(request, self.transport.clone())
     }
-}
 
-pub trait PubSubConnection: Connection {
-    #[doc(hidden)]
-    fn uninstall_listener(&self, id: [u8; 32]) -> Result<(), TransportError>;
-
-    #[doc(hidden)]
-    fn install_listener(
-        &self,
-        id: [u8; 32],
-    ) -> Result<UnboundedReceiver<Cow<'_, RawValue>>, TransportError>;
-}
-
-#[cfg(test)]
-mod test {
-    use crate::{Connection, PubSubConnection};
-
-    fn __compile_check() -> Box<dyn Connection> {
-        todo!()
-    }
-    fn __compile_check_pubsub() -> Box<dyn PubSubConnection> {
-        todo!()
+    pub fn is_local(&self) -> bool {
+        self.is_local
     }
 }
