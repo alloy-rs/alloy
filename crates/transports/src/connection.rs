@@ -68,3 +68,17 @@ where
         self.is_local
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::transports::http::Http;
+
+    use super::RpcClient;
+
+    #[test]
+    fn basic_instantiation() {
+        let h: RpcClient<Http<reqwest::Client>> = "http://localhost:8545".parse().unwrap();
+
+        assert_eq!(h.is_local(), true);
+    }
+}

@@ -93,3 +93,32 @@ impl Service<JsonRpcRequest> for Http<reqwest::Client> {
         })
     }
 }
+
+impl Service<Vec<JsonRpcRequest>> for Http<reqwest::Client> {
+    type Response = Vec<JsonRpcResponse>;
+    type Error = TransportError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    #[inline]
+    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        self.client.poll_ready(cx).map_err(Into::into)
+    }
+
+    #[inline]
+    fn call(&mut self, reqs: Vec<JsonRpcRequest>) -> Self::Future {
+        let replacement = self.client.clone();
+        let client = std::mem::replace(&mut self.client, replacement);
+
+        let url = self.url.clone();
+
+        Box::pin(async move {
+            let resp = client.post(url).json(&reqs).send().await?;
+            let body = resp.text().await?;
+
+            match serde_json::from_str::<Vec<JsonRpcResponse>>(&body) {
+                Ok(resp) => Ok(resp),
+                Err(e) => Err(TransportError::deser_err(e, &body)),
+            }
+        })
+    }
+}
