@@ -1,21 +1,43 @@
-use crate::{batch::BatchRequest, call::RpcCall, error::TransportError, utils::to_json_raw_value};
+use crate::{
+    batch::BatchRequest,
+    call::RpcCall,
+    error::TransportError,
+    transports::{BatchTransportFuture, TransportFuture},
+    utils::to_json_raw_value,
+};
 use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcReturn};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use tower::Service;
 
 pub trait Transport:
-    Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>
-    + Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>
-    + Clone
+    Service<
+        JsonRpcRequest,
+        Response = JsonRpcResponse,
+        Error = TransportError,
+        Future = TransportFuture,
+    > + Service<
+        Vec<JsonRpcRequest>,
+        Response = Vec<JsonRpcResponse>,
+        Error = TransportError,
+        Future = BatchTransportFuture,
+    > + Clone
     + 'static
 {
 }
 
 impl<T> Transport for T where
-    T: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>
-        + Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>
-        + Clone
+    T: Service<
+            JsonRpcRequest,
+            Response = JsonRpcResponse,
+            Error = TransportError,
+            Future = TransportFuture,
+        > + Service<
+            Vec<JsonRpcRequest>,
+            Response = Vec<JsonRpcResponse>,
+            Error = TransportError,
+            Future = BatchTransportFuture,
+        > + Clone
         + 'static
 {
 }

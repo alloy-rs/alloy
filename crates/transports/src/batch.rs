@@ -10,7 +10,7 @@ use futures_channel::oneshot;
 use serde_json::value::RawValue;
 use tower::Service;
 
-use crate::error::TransportError;
+use crate::{error::TransportError, transports::BatchTransportFuture};
 use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcResult, RpcReturn};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
@@ -54,7 +54,12 @@ where
 #[pin_project::pin_project(project = CallStateProj)]
 pub enum BatchFuture<T>
 where
-    T: Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>,
+    T: Service<
+        Vec<JsonRpcRequest>,
+        Response = Vec<JsonRpcResponse>,
+        Error = TransportError,
+        Future = BatchTransportFuture,
+    >,
 {
     Prepared(BatchRequest<T>),
     SerError(Option<TransportError>),
@@ -88,7 +93,12 @@ impl<T> BatchRequest<T> {
 
 impl<T> BatchRequest<T>
 where
-    T: Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>,
+    T: Service<
+        Vec<JsonRpcRequest>,
+        Response = Vec<JsonRpcResponse>,
+        Error = TransportError,
+        Future = BatchTransportFuture,
+    >,
 {
     /// Send the batch future via its connection.
     pub fn send(self) -> BatchFuture<T> {
@@ -98,7 +108,12 @@ where
 
 impl<T> BatchFuture<T>
 where
-    T: Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>,
+    T: Service<
+        Vec<JsonRpcRequest>,
+        Response = Vec<JsonRpcResponse>,
+        Error = TransportError,
+        Future = BatchTransportFuture,
+    >,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -181,7 +196,12 @@ where
 
 impl<T> Future for BatchFuture<T>
 where
-    T: Service<Vec<JsonRpcRequest>, Response = Vec<JsonRpcResponse>, Error = TransportError>,
+    T: Service<
+        Vec<JsonRpcRequest>,
+        Response = Vec<JsonRpcResponse>,
+        Error = TransportError,
+        Future = BatchTransportFuture,
+    >,
 {
     type Output = Result<(), TransportError>;
 
