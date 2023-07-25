@@ -1,4 +1,4 @@
-use crate::{error::TransportError, transports::TransportFuture};
+use crate::{error::TransportError, transports::FutureOf};
 
 use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcResult, RpcReturn};
 use serde_json::value::RawValue;
@@ -13,12 +13,7 @@ use tower::Service;
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Conn>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
 {
     Prepared {
         request: Option<JsonRpcRequest>,
@@ -26,7 +21,7 @@ where
     },
     AwaitingResponse {
         #[pin]
-        fut: <Conn as Service<JsonRpcRequest>>::Future,
+        fut: FutureOf<Conn>,
     },
     Complete,
     SerError(Option<TransportError>),
@@ -34,12 +29,7 @@ where
 
 impl<Conn> CallState<Conn>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -98,12 +88,7 @@ where
 
 impl<Conn> Future for CallState<Conn>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
 {
     type Output = RpcResult<Box<RawValue>, TransportError>;
 
@@ -127,12 +112,7 @@ where
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
     Params: RpcParam,
 {
     #[pin]
@@ -142,12 +122,7 @@ where
 
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
     Params: RpcParam,
 {
     pub fn new(request: Result<JsonRpcRequest, TransportError>, connection: Conn) -> Self {
@@ -168,12 +143,7 @@ where
 
 impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<
-        JsonRpcRequest,
-        Response = JsonRpcResponse,
-        Error = TransportError,
-        Future = TransportFuture,
-    >,
+    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
     Params: RpcParam,
     Resp: RpcReturn,
 {

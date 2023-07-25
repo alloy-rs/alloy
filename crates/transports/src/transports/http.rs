@@ -1,13 +1,9 @@
 use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse};
 use reqwest::Url;
-use std::{str::FromStr, sync::atomic::AtomicU64, task};
+use std::{future::Future, pin::Pin, str::FromStr, sync::atomic::AtomicU64, task};
 use tower::Service;
 
-use crate::{
-    connection::RpcClient,
-    error::TransportError,
-    transports::{BatchTransportFuture, TransportFuture},
-};
+use crate::{connection::RpcClient, error::TransportError};
 
 impl<T> RpcClient<Http<T>>
 where
@@ -68,7 +64,7 @@ impl<T> Http<T> {
 impl Service<JsonRpcRequest> for Http<reqwest::Client> {
     type Response = JsonRpcResponse;
     type Error = TransportError;
-    type Future = TransportFuture;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
@@ -97,7 +93,7 @@ impl Service<JsonRpcRequest> for Http<reqwest::Client> {
 impl Service<Vec<JsonRpcRequest>> for Http<reqwest::Client> {
     type Response = Vec<JsonRpcResponse>;
     type Error = TransportError;
-    type Future = BatchTransportFuture;
+    type Future = Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
 
     #[inline]
     fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
