@@ -10,6 +10,7 @@ use std::{
 };
 use tower::Service;
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Conn>
 where
@@ -109,6 +110,7 @@ where
     }
 }
 
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
 where

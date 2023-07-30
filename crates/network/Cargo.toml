@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 alloy-json-rpc.workspace = true
 alloy-rlp.workspace = true
+alloy-transports.workspace = true

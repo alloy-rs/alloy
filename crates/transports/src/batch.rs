@@ -20,7 +20,7 @@ use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
 
-#[must_use = "A BatchRequest does nothing unless sent via `send_batch` or via `.await`"]
+#[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
 /// A Batch JSON-RPC request, awaiting dispatch.
 #[derive(Debug)]
 pub struct BatchRequest<'a, T> {
