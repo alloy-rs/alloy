@@ -14,6 +14,14 @@ pub struct RpcClient<T> {
 }
 
 impl<T> RpcClient<T> {
+    pub fn new(t: T, is_local: bool) -> Self {
+        Self {
+            transport: t,
+            is_local,
+            id: AtomicU64::new(0),
+        }
+    }
+
     #[inline]
     pub fn is_local(&self) -> bool {
         self.is_local
@@ -32,7 +40,8 @@ impl<T> RpcClient<T> {
 
 impl<T> RpcClient<T>
 where
-    T: Transport,
+    T: Transport + Clone,
+    T::Future: Send,
 {
     #[inline]
     pub fn new_batch(&self) -> BatchRequest<T> {
@@ -42,7 +51,7 @@ where
     pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
-        params: Params,
+        params: &Params,
     ) -> Result<JsonRpcRequest, TransportError> {
         // Serialize the params greedily, but only return the error lazily
         to_json_raw_value(&params).map(|v| JsonRpcRequest {
@@ -55,9 +64,9 @@ where
     pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
-        params: Params,
+        params: &Params,
     ) -> RpcCall<T, Params, Resp> {
-        let request = self.make_request(method, params);
+        let request: Result<JsonRpcRequest, TransportError> = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
 }

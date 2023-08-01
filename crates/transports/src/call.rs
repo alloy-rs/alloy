@@ -1,6 +1,9 @@
-use crate::{error::TransportError, transports::FutureOf};
+use crate::{
+    error::TransportError,
+    transports::{FutureOf, JsonRpcLayer, JsonRpcService, Transport},
+};
 
-use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
 use serde_json::value::RawValue;
 use std::{
     future::Future,
@@ -8,21 +11,22 @@ use std::{
     pin::Pin,
     task::{self, ready},
 };
-use tower::Service;
+use tower::{Layer, Service};
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Conn>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
 {
     Prepared {
         request: Option<JsonRpcRequest>,
-        connection: Conn,
+        connection: JsonRpcService<Conn>,
     },
     AwaitingResponse {
         #[pin]
-        fut: FutureOf<Conn>,
+        fut: FutureOf<JsonRpcService<Conn>>,
     },
     Complete,
     SerError(Option<TransportError>),
@@ -30,7 +34,8 @@ where
 
 impl<Conn> CallState<Conn>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -45,7 +50,7 @@ where
                 unreachable!("Called poll_prepared in incorrect state")
             };
 
-            if let Err(e) = task::ready!(connection.poll_ready(cx)) {
+            if let Err(e) = task::ready!(Service::<JsonRpcRequest>::poll_ready(connection, cx)) {
                 self.set(CallState::Complete);
                 return task::Poll::Ready(RpcResult::Err(e));
             }
@@ -89,7 +94,8 @@ where
 
 impl<Conn> Future for CallState<Conn>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
 {
     type Output = RpcResult<Box<RawValue>, TransportError>;
 
@@ -114,7 +120,8 @@ where
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
     Params: RpcParam,
 {
     #[pin]
@@ -124,14 +131,15 @@ where
 
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
     Params: RpcParam,
 {
     pub fn new(request: Result<JsonRpcRequest, TransportError>, connection: Conn) -> Self {
         let state = match request {
             Ok(req) => CallState::Prepared {
                 request: Some(req),
-                connection,
+                connection: JsonRpcLayer.layer(connection),
             },
             Err(e) => CallState::SerError(Some(e)),
         };
@@ -145,7 +153,8 @@ where
 
 impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
-    Conn: Service<JsonRpcRequest, Response = JsonRpcResponse, Error = TransportError>,
+    Conn: Transport,
+    Conn::Future: Send,
     Params: RpcParam,
     Resp: RpcReturn,
 {

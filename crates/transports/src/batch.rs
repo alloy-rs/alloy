@@ -8,11 +8,11 @@ use std::{
 
 use futures_channel::oneshot;
 use serde_json::value::RawValue;
-use tower::Service;
+use tower::{Layer, Service};
 
 use crate::{
     error::TransportError,
-    transports::{BatchFutureOf, Transport},
+    transports::{BatchFutureOf, JsonRpcLayer, JsonRpcService, Transport},
     RpcClient,
 };
 use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
@@ -69,9 +69,10 @@ where
 pub enum BatchFuture<Conn>
 where
     Conn: Transport,
+    Conn::Future: Send,
 {
     Prepared {
-        transport: Conn,
+        transport: JsonRpcService<Conn>,
         requests: Vec<JsonRpcRequest>,
         channels: ChannelMap,
     },
@@ -79,7 +80,7 @@ where
     AwaitingResponse {
         channels: ChannelMap,
         #[pin]
-        fut: BatchFutureOf<Conn>,
+        fut: BatchFutureOf<JsonRpcService<Conn>>,
     },
     Complete,
 }
@@ -111,6 +112,7 @@ impl<'a, T> BatchRequest<'a, T> {
 impl<'a, T> BatchRequest<'a, T>
 where
     T: Transport,
+    T::Future: Send,
 {
     #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless its batch is sent."]
     /// Add a call to the batch.
@@ -119,14 +121,14 @@ where
         method: &'static str,
         params: Params,
     ) -> Waiter<Resp> {
-        let request = self.transport.make_request(method, params).unwrap();
+        let request = self.transport.make_request(method, &params).unwrap();
         self.push(request)
     }
 
     /// Send the batch future via its connection.
     pub fn send_batch(self) -> BatchFuture<T> {
         BatchFuture::Prepared {
-            transport: self.transport.transport.clone(),
+            transport: JsonRpcLayer.layer(self.transport.transport.clone()),
             requests: self.requests,
             channels: self.channels,
         }
@@ -136,6 +138,7 @@ where
 impl<'a, T> IntoFuture for BatchRequest<'a, T>
 where
     T: Transport,
+    T::Future: Send,
 {
     type Output = <BatchFuture<T> as Future>::Output;
     type IntoFuture = BatchFuture<T>;
@@ -148,6 +151,7 @@ where
 impl<T> BatchFuture<T>
 where
     T: Transport,
+    T::Future: Send,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -162,9 +166,7 @@ where
             unreachable!("Called poll_prepared in incorrect state")
         };
 
-        if let Err(e) = task::ready!(<T as Service<Vec<JsonRpcRequest>>>::poll_ready(
-            transport, cx
-        )) {
+        if let Err(e) = task::ready!(Service::<Vec<JsonRpcRequest>>::poll_ready(transport, cx)) {
             self.set(BatchFuture::Complete);
             return task::Poll::Ready(Err(e));
         }
@@ -174,7 +176,7 @@ where
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
         let requests = std::mem::replace(requests, Vec::with_capacity(0));
 
-        let fut = transport.call(requests);
+        let fut = Service::<Vec<JsonRpcRequest>>::call(transport, requests);
 
         self.set(BatchFuture::AwaitingResponse { channels, fut });
         cx.waker().wake_by_ref();
@@ -233,6 +235,7 @@ where
 impl<T> Future for BatchFuture<T>
 where
     T: Transport,
+    T::Future: Send,
 {
     type Output = Result<(), TransportError>;
 
