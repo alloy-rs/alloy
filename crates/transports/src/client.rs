@@ -75,14 +75,12 @@ where
 
 pub struct ClientBuilder<L> {
     builder: ServiceBuilder<L>,
-    is_local: bool,
 }
 
 impl<L> ClientBuilder<L> {
     pub fn layer<M>(self, layer: M) -> ClientBuilder<tower::layer::util::Stack<M, L>> {
         ClientBuilder {
             builder: self.builder.layer(layer),
-            is_local: self.is_local,
         }
     }
 
@@ -93,7 +91,8 @@ impl<L> ClientBuilder<L> {
         L::Service: Transport + Clone,
         <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {
-        RpcClient::new(self.builder.service(transport), self.is_local)
+        let is_local = transport.is_local();
+        RpcClient::new(self.builder.service(transport), is_local)
     }
 }
 

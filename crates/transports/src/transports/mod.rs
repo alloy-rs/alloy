@@ -107,20 +107,7 @@ pub trait Transport:
     + Send
     + 'static
 {
-}
-
-impl<T> Transport for T
-where
-    T: Service<
-            Box<RawValue>,
-            Response = Box<RawValue>,
-            Error = TransportError,
-            Future = Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>>,
-        > + Clone
-        + Send
-        + 'static,
-    T::Future: Send + 'static,
-{
+    fn is_local(&self) -> bool;
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
