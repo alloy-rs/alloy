@@ -80,7 +80,6 @@ impl Service<Box<RawValue>> for Http<reqwest::Client> {
         let url = self.url.clone();
 
         Box::pin(async move {
-            let req = req;
             let resp = client.post(url).json(&req).send().await?;
             let json = resp.text().await?;
 
