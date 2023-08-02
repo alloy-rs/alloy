@@ -1,16 +1,18 @@
-use crate::common::Id;
+use crate::{common::Id, RpcParam};
 
 use serde::{ser::SerializeMap, Deserialize, Serialize};
-use serde_json::value::RawValue;
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct JsonRpcRequest {
+pub struct JsonRpcRequest<Params> {
     pub method: &'static str,
-    pub params: Box<RawValue>,
+    pub params: Params,
     pub id: Id,
 }
 
-impl Serialize for JsonRpcRequest {
+impl<Params> Serialize for JsonRpcRequest<Params>
+where
+    Params: RpcParam,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

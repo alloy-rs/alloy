@@ -8,14 +8,9 @@ use std::{
 
 use futures_channel::oneshot;
 use serde_json::value::RawValue;
-use tower::{Layer, Service};
 
-use crate::{
-    error::TransportError,
-    transports::{BatchFutureOf, JsonRpcLayer, JsonRpcService, Transport},
-    RpcClient,
-};
-use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
+use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
+use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcResult, RpcReturn};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
@@ -26,7 +21,7 @@ type ChannelMap = HashMap<Id, Channel>;
 pub struct BatchRequest<'a, T> {
     transport: &'a RpcClient<T>,
 
-    requests: Vec<JsonRpcRequest>,
+    requests: Vec<Box<RawValue>>,
 
     channels: ChannelMap,
 }
@@ -72,15 +67,15 @@ where
     Conn::Future: Send,
 {
     Prepared {
-        transport: JsonRpcService<Conn>,
-        requests: Vec<JsonRpcRequest>,
+        transport: Conn,
+        requests: Vec<Box<RawValue>>,
         channels: ChannelMap,
     },
     SerError(Option<TransportError>),
     AwaitingResponse {
         channels: ChannelMap,
         #[pin]
-        fut: BatchFutureOf<JsonRpcService<Conn>>,
+        fut: Conn::Future,
     },
     Complete,
 }
@@ -96,16 +91,20 @@ impl<'a, T> BatchRequest<'a, T> {
 
     fn push_raw(
         &mut self,
-        request: JsonRpcRequest,
+        id: Id,
+        request: Box<RawValue>,
     ) -> oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>> {
         let (tx, rx) = oneshot::channel();
-        self.channels.insert(request.id.clone(), tx);
+        self.channels.insert(id, tx);
         self.requests.push(request);
         rx
     }
 
-    fn push<Resp: RpcReturn>(&mut self, request: JsonRpcRequest) -> Waiter<Resp> {
-        self.push_raw(request).into()
+    fn push<Params: RpcParam, Resp: RpcReturn>(
+        &mut self,
+        request: JsonRpcRequest<Params>,
+    ) -> Result<Waiter<Resp>, TransportError> {
+        to_json_raw_value(&request).map(|rv| self.push_raw(request.id, rv).into())
     }
 }
 
@@ -116,19 +115,23 @@ where
 {
     #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless its batch is sent."]
     /// Add a call to the batch.
+    ///
+    /// ### Errors
+    ///
+    /// If the request cannot be serialized, this will return an error.
     pub fn add_call<Params: RpcParam, Resp: RpcReturn>(
         &mut self,
         method: &'static str,
         params: Params,
-    ) -> Waiter<Resp> {
-        let request = self.transport.make_request(method, &params).unwrap();
+    ) -> Result<Waiter<Resp>, TransportError> {
+        let request = self.transport.make_request(method, &params);
         self.push(request)
     }
 
     /// Send the batch future via its connection.
     pub fn send_batch(self) -> BatchFuture<T> {
         BatchFuture::Prepared {
-            transport: JsonRpcLayer.layer(self.transport.transport.clone()),
+            transport: self.transport.transport.clone(),
             requests: self.requests,
             channels: self.channels,
         }
@@ -166,7 +169,7 @@ where
             unreachable!("Called poll_prepared in incorrect state")
         };
 
-        if let Err(e) = task::ready!(Service::<Vec<JsonRpcRequest>>::poll_ready(transport, cx)) {
+        if let Err(e) = task::ready!(transport.poll_ready(cx)) {
             self.set(BatchFuture::Complete);
             return task::Poll::Ready(Err(e));
         }
@@ -174,13 +177,19 @@ where
         // We only have mut refs, and we want ownership, so we just replace
         // with 0-capacity collections.
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
-        let requests = std::mem::replace(requests, Vec::with_capacity(0));
+        let req = std::mem::replace(requests, Vec::with_capacity(0));
 
-        let fut = Service::<Vec<JsonRpcRequest>>::call(transport, requests);
+        let req = match to_json_raw_value(&req) {
+            Ok(req) => req,
+            Err(e) => {
+                self.set(BatchFuture::Complete);
+                return task::Poll::Ready(Err(e));
+            }
+        };
 
+        let fut = transport.call(req);
         self.set(BatchFuture::AwaitingResponse { channels, fut });
         cx.waker().wake_by_ref();
-
         task::Poll::Pending
     }
 
@@ -198,6 +207,14 @@ where
             Err(e) => {
                 self.set(BatchFuture::Complete);
                 return task::Poll::Ready(Err(e));
+            }
+        };
+
+        let responses: Vec<JsonRpcResponse> = match serde_json::from_str(responses.get()) {
+            Ok(responses) => responses,
+            Err(err) => {
+                self.set(BatchFuture::Complete);
+                return task::Poll::Ready(Err(TransportError::deser_err(err, responses.get())));
             }
         };
 

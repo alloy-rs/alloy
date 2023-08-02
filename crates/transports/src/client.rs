@@ -1,12 +1,10 @@
-use crate::{
-    batch::BatchRequest, call::RpcCall, transports::Transport, utils::to_json_raw_value,
-    TransportError,
-};
 use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
 use serde_json::value::RawValue;
 use tower::{Layer, ServiceBuilder};
 
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use crate::{BatchRequest, RpcCall, Transport};
 
 #[derive(Debug)]
 pub struct RpcClient<T> {
@@ -53,22 +51,21 @@ where
     pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
-        params: &Params,
-    ) -> Result<JsonRpcRequest, TransportError> {
-        // Serialize the params greedily, but only return the error lazily
-        to_json_raw_value(&params).map(|v| JsonRpcRequest {
+        params: Params,
+    ) -> JsonRpcRequest<Params> {
+        JsonRpcRequest {
             method,
-            params: v,
+            params,
             id: self.next_id(),
-        })
+        }
     }
 
     pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
-        params: &Params,
+        params: Params,
     ) -> RpcCall<T, Params, Resp> {
-        let request: Result<JsonRpcRequest, TransportError> = self.make_request(method, params);
+        let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
 }

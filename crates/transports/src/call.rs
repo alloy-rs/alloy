@@ -1,41 +1,37 @@
 use crate::{
     error::TransportError,
-    transports::{FutureOf, JsonRpcLayer, JsonRpcService, Transport},
+    transports::{JsonRpcLayer, JsonRpcService, Transport},
 };
 
 use alloy_json_rpc::{JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
 use serde_json::value::RawValue;
-use std::{
-    future::Future,
-    marker::PhantomData,
-    pin::Pin,
-    task::{self, ready},
-};
+use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::{Layer, Service};
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = CallStateProj)]
-enum CallState<Conn>
+enum CallState<Params, Conn>
 where
     Conn: Transport,
     Conn::Future: Send,
+    Params: RpcParam,
 {
     Prepared {
-        request: Option<JsonRpcRequest>,
+        request: Option<JsonRpcRequest<Params>>,
         connection: JsonRpcService<Conn>,
     },
     AwaitingResponse {
         #[pin]
-        fut: FutureOf<JsonRpcService<Conn>>,
+        fut: <JsonRpcService<Conn> as Service<JsonRpcRequest<Params>>>::Future,
     },
     Complete,
-    SerError(Option<TransportError>),
 }
 
-impl<Conn> CallState<Conn>
+impl<Params, Conn> CallState<Params, Conn>
 where
     Conn: Transport,
     Conn::Future: Send,
+    Params: RpcParam,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -50,7 +46,9 @@ where
                 unreachable!("Called poll_prepared in incorrect state")
             };
 
-            if let Err(e) = task::ready!(Service::<JsonRpcRequest>::poll_ready(connection, cx)) {
+            if let Err(e) = task::ready!(Service::<JsonRpcRequest<Params>>::poll_ready(
+                connection, cx
+            )) {
                 self.set(CallState::Complete);
                 return task::Poll::Ready(RpcResult::Err(e));
             }
@@ -72,30 +70,17 @@ where
             unreachable!("Called poll_awaiting in incorrect state")
         };
 
-        let res = ready!(fut.poll(cx));
+        let res = task::ready!(fut.poll(cx));
 
         task::Poll::Ready(RpcResult::from(res))
     }
-
-    fn poll_ser_error(
-        mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
-    ) -> task::Poll<<Self as Future>::Output> {
-        let e = if let CallStateProj::SerError(e) = self.as_mut().project() {
-            e.take().expect("No error. This is a bug.")
-        } else {
-            unreachable!("Called poll_ser_error in incorrect state")
-        };
-
-        self.set(CallState::Complete);
-        task::Poll::Ready(RpcResult::Err(e))
-    }
 }
 
-impl<Conn> Future for CallState<Conn>
+impl<Params, Conn> Future for CallState<Params, Conn>
 where
     Conn: Transport,
     Conn::Future: Send,
+    Params: RpcParam,
 {
     type Output = RpcResult<Box<RawValue>, TransportError>;
 
@@ -106,10 +91,6 @@ where
 
         if matches!(*self.as_mut(), CallState::AwaitingResponse { .. }) {
             return self.poll_awaiting(cx);
-        }
-
-        if matches!(*self.as_mut(), CallState::SerError(_)) {
-            return self.poll_ser_error(cx);
         }
 
         panic!("Polled in bad state");
@@ -125,7 +106,7 @@ where
     Params: RpcParam,
 {
     #[pin]
-    state: CallState<Conn>,
+    state: CallState<Params, Conn>,
     _pd: PhantomData<fn() -> (Params, Resp)>,
 }
 
@@ -134,18 +115,14 @@ where
     Conn: Transport,
     Conn::Future: Send,
     Params: RpcParam,
+    Params: RpcParam,
 {
-    pub fn new(request: Result<JsonRpcRequest, TransportError>, connection: Conn) -> Self {
-        let state = match request {
-            Ok(req) => CallState::Prepared {
+    pub fn new(req: JsonRpcRequest<Params>, connection: Conn) -> Self {
+        Self {
+            state: CallState::Prepared {
                 request: Some(req),
                 connection: JsonRpcLayer.layer(connection),
             },
-            Err(e) => CallState::SerError(Some(e)),
-        };
-
-        Self {
-            state,
             _pd: PhantomData,
         }
     }
@@ -155,6 +132,7 @@ impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
     Conn: Transport,
     Conn::Future: Send,
+    Params: RpcParam,
     Params: RpcParam,
     Resp: RpcReturn,
 {

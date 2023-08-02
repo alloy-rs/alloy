@@ -7,11 +7,8 @@ use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 
 use crate::{utils::to_json_raw_value, TransportError};
-use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse};
+use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse, RpcParam};
 use tower::Service;
-
-pub type FutureOf<S> = <S as Service<JsonRpcRequest>>::Future;
-pub type BatchFutureOf<S> = <S as Service<Vec<JsonRpcRequest>>>::Future;
 
 #[derive(Debug, Clone)]
 pub struct JsonRpcService<S> {
@@ -29,10 +26,10 @@ impl<S> tower::Layer<S> for JsonRpcLayer {
     }
 }
 
-impl<S> Service<JsonRpcRequest> for JsonRpcService<S>
+impl<S, Param> Service<JsonRpcRequest<Param>> for JsonRpcService<S>
 where
     S: Transport + 'static,
-    S::Error: Into<TransportError>,
+    Param: RpcParam,
 {
     type Response = JsonRpcResponse;
 
@@ -44,41 +41,7 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: JsonRpcRequest) -> Self::Future {
-        let replacement = self.inner.clone();
-        let mut client = std::mem::replace(&mut self.inner, replacement);
-
-        match to_json_raw_value(&req) {
-            Ok(raw) => JsonRpcFuture {
-                state: States::Pending {
-                    fut: client.call(raw),
-                },
-                _resp: std::marker::PhantomData,
-            },
-            Err(e) => JsonRpcFuture {
-                state: States::Errored(Some(e)),
-                _resp: std::marker::PhantomData,
-            },
-        }
-    }
-}
-
-impl<S> Service<Vec<JsonRpcRequest>> for JsonRpcService<S>
-where
-    S: Transport + 'static,
-    S::Error: Into<TransportError>,
-{
-    type Response = Vec<JsonRpcResponse>;
-
-    type Error = TransportError;
-
-    type Future = JsonRpcFuture<S::Future, Self::Response>;
-
-    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
-    }
-
-    fn call(&mut self, req: Vec<JsonRpcRequest>) -> Self::Future {
+    fn call(&mut self, req: JsonRpcRequest<Param>) -> Self::Future {
         let replacement = self.inner.clone();
         let mut client = std::mem::replace(&mut self.inner, replacement);
 
