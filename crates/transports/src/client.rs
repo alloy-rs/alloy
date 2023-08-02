@@ -3,6 +3,8 @@ use crate::{
     TransportError,
 };
 use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
+use serde_json::value::RawValue;
+use tower::{Layer, ServiceBuilder};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -68,6 +70,30 @@ where
     ) -> RpcCall<T, Params, Resp> {
         let request: Result<JsonRpcRequest, TransportError> = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
+    }
+}
+
+pub struct ClientBuilder<L> {
+    builder: ServiceBuilder<L>,
+    is_local: bool,
+}
+
+impl<L> ClientBuilder<L> {
+    pub fn layer<M>(self, layer: M) -> ClientBuilder<tower::layer::util::Stack<M, L>> {
+        ClientBuilder {
+            builder: self.builder.layer(layer),
+            is_local: self.is_local,
+        }
+    }
+
+    pub fn transport<T>(self, transport: T) -> RpcClient<L::Service>
+    where
+        L: Layer<T>,
+        T: Transport,
+        L::Service: Transport + Clone,
+        <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
+    {
+        RpcClient::new(self.builder.service(transport), self.is_local)
     }
 }
 
