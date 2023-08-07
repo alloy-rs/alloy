@@ -6,7 +6,7 @@ pub use json_rpc::{JsonRpcFuture, JsonRpcLayer, JsonRpcService};
 
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin};
-use tower::{util::BoxCloneService, Service};
+use tower::Service;
 
 use crate::TransportError;
 
@@ -32,9 +32,4 @@ impl<T> Transport for T where
         + Send
         + 'static
 {
-}
-
-fn __compile_check() -> impl Transport {
-    let a: BoxCloneService<Box<RawValue>, Box<RawValue>, TransportError> = todo!();
-    a
 }
