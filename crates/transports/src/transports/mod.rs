@@ -1,8 +1,8 @@
 mod http;
 pub use http::Http;
 
-mod json_rpc;
-pub use json_rpc::{JsonRpcFuture, JsonRpcLayer, JsonRpcService};
+mod json_service;
+pub use json_service::{JsonRpcFuture, JsonRpcLayer, JsonRpcService};
 
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin};

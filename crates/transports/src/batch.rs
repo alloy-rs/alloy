@@ -108,10 +108,9 @@ impl<'a, T> BatchRequest<'a, T> {
     }
 }
 
-impl<'a, T> BatchRequest<'a, T>
+impl<'a, Conn> BatchRequest<'a, Conn>
 where
-    T: Transport,
-    T::Future: Send,
+    Conn: Transport,
 {
     #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless its batch is sent."]
     /// Add a call to the batch.
@@ -129,7 +128,7 @@ where
     }
 
     /// Send the batch future via its connection.
-    pub fn send_batch(self) -> BatchFuture<T> {
+    pub fn send_batch(self) -> BatchFuture<Conn> {
         BatchFuture::Prepared {
             transport: self.transport.transport.clone(),
             requests: self.requests,
@@ -141,7 +140,6 @@ where
 impl<'a, T> IntoFuture for BatchRequest<'a, T>
 where
     T: Transport,
-    T::Future: Send,
 {
     type Output = <BatchFuture<T> as Future>::Output;
     type IntoFuture = BatchFuture<T>;
@@ -154,7 +152,6 @@ where
 impl<T> BatchFuture<T>
 where
     T: Transport,
-    T::Future: Send,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
