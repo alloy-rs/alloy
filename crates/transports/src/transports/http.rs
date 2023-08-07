@@ -3,7 +3,7 @@ use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, str::FromStr, sync::atomic::AtomicU64, task};
 use tower::Service;
 
-use crate::{client::RpcClient, error::TransportError, Transport};
+use crate::{client::RpcClient, error::TransportError};
 
 impl<T> RpcClient<Http<T>>
 where
@@ -85,11 +85,5 @@ impl Service<Box<RawValue>> for Http<reqwest::Client> {
 
             RawValue::from_string(json).map_err(|err| TransportError::deser_err(err, ""))
         })
-    }
-}
-
-impl Transport for Http<reqwest::Client> {
-    fn is_local(&self) -> bool {
-        self.is_local()
     }
 }

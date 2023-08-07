@@ -1,10 +1,10 @@
 use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
 use serde_json::value::RawValue;
-use tower::{Layer, ServiceBuilder};
+use tower::{util::BoxCloneService, Layer, ServiceBuilder};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::{BatchRequest, RpcCall, Transport};
+use crate::{BatchRequest, RpcCall, Transport, TransportError};
 
 #[derive(Debug)]
 pub struct RpcClient<T> {
@@ -40,7 +40,7 @@ impl<T> RpcClient<T> {
 
 impl<T> RpcClient<T>
 where
-    T: Transport + Clone,
+    T: Transport,
     T::Future: Send,
 {
     #[inline]
@@ -68,6 +68,18 @@ where
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
+
+    /// Type erase the transport, allowing it to be used in a generic context.
+    #[inline]
+    pub fn type_erased(
+        self,
+    ) -> RpcClient<BoxCloneService<Box<RawValue>, Box<RawValue>, TransportError>> {
+        RpcClient {
+            transport: BoxCloneService::new(self.transport),
+            is_local: self.is_local,
+            id: self.id,
+        }
+    }
 }
 
 pub struct ClientBuilder<L> {
@@ -81,21 +93,20 @@ impl<L> ClientBuilder<L> {
         }
     }
 
-    pub fn transport<T>(self, transport: T) -> RpcClient<L::Service>
+    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
     where
         L: Layer<T>,
         T: Transport,
-        L::Service: Transport + Clone,
+        L::Service: Transport,
         <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {
-        let is_local = transport.is_local();
         RpcClient::new(self.builder.service(transport), is_local)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::transports::http::Http;
+    use crate::transports::Http;
 
     use super::RpcClient;
 
