@@ -1,7 +1,4 @@
-use std::marker::PhantomData;
-
-use alloy_json_rpc::{RpcObject, RpcParam, RpcReturn};
-use alloy_transports::{BoxTransport, RpcCall, RpcClient, Transport, TransportError};
+use alloy_json_rpc::RpcObject;
 
 pub trait Network {
     type Transaction: Transaction;

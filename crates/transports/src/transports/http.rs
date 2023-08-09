@@ -15,7 +15,7 @@ where
         Self {
             transport,
             is_local,
-            id: AtomicU64::new(0).into(),
+            id: AtomicU64::new(0),
         }
     }
 }

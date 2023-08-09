@@ -1,5 +1,5 @@
 [package]
-name = "alloy-network"
+name = "alloy-networks"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
