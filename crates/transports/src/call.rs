@@ -107,14 +107,13 @@ where
 {
     #[pin]
     state: CallState<Params, Conn>,
-    _pd: PhantomData<fn() -> (Params, Resp)>,
+    _pd: PhantomData<fn() -> Resp>,
 }
 
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
     Conn: Transport,
     Conn::Future: Send,
-    Params: RpcParam,
     Params: RpcParam,
 {
     pub fn new(req: JsonRpcRequest<Params>, connection: Conn) -> Self {
@@ -128,11 +127,24 @@ where
     }
 }
 
+impl<'a, Conn, Params, Resp> RpcCall<Conn, Params, Resp>
+where
+    Conn: Transport,
+    Conn::Future: Send,
+    Params: RpcParam + 'a,
+    Resp: RpcReturn,
+{
+    pub fn box_pin(
+        self,
+    ) -> Pin<Box<dyn Future<Output = RpcResult<Resp, TransportError>> + Send + 'a>> {
+        Box::pin(self)
+    }
+}
+
 impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
     Conn: Transport,
     Conn::Future: Send,
-    Params: RpcParam,
     Params: RpcParam,
     Resp: RpcReturn,
 {

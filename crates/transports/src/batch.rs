@@ -123,7 +123,7 @@ where
         method: &'static str,
         params: Params,
     ) -> Result<Waiter<Resp>, TransportError> {
-        let request = self.transport.make_request(method, &params);
+        let request = self.transport.make_request(method, params);
         self.push(request)
     }
 
