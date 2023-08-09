@@ -48,11 +48,11 @@ where
         BatchRequest::new(self)
     }
 
-    pub fn make_request<Params: RpcParam>(
+    pub fn make_request<'a, Params: RpcParam>(
         &self,
         method: &'static str,
-        params: Params,
-    ) -> JsonRpcRequest<Params> {
+        params: &'a Params,
+    ) -> JsonRpcRequest<&'a Params> {
         JsonRpcRequest {
             method,
             params,
@@ -60,11 +60,11 @@ where
         }
     }
 
-    pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
+    pub fn prepare<'a, Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
-        params: Params,
-    ) -> RpcCall<T, Params, Resp> {
+        params: &'a Params,
+    ) -> RpcCall<T, &'a Params, Resp> {
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
