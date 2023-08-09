@@ -16,6 +16,6 @@ mod batch;
 pub use batch::BatchRequest;
 
 mod transports;
-pub use transports::{Http, Transport};
+pub use transports::{BoxTransport, Http, Transport};
 
 pub use alloy_json_rpc::RpcResult;

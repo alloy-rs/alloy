@@ -6,9 +6,11 @@ pub use json_service::{JsonRpcFuture, JsonRpcLayer, JsonRpcService};
 
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin};
-use tower::Service;
+use tower::{util::BoxCloneService, Service};
 
 use crate::TransportError;
+
+pub type BoxTransport = BoxCloneService<Box<RawValue>, Box<RawValue>, TransportError>;
 
 pub trait Transport:
     Service<

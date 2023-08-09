@@ -1,18 +1,7 @@
-use std::marker::PhantomData;
+use alloy_network::Network;
+use alloy_transport::{BoxTransport, RpcCall, RpcClient, Transport, TransportError};
 
-use alloy_json_rpc::{RpcObject, RpcParam, RpcReturn};
-use alloy_transports::{RpcCall, RpcClient, Transport};
-
-pub trait Network {
-    type Transaction: Transaction;
-    type Receipt: RpcObject;
-}
-
-pub trait Transaction: alloy_rlp::Encodable + alloy_rlp::Decodable + RpcObject {}
-
-pub trait Eip1559Transaction: Transaction {}
-
-pub trait Middleware<N: Network, T: Transport> {
+pub trait Middleware<N: Network, T: Transport = BoxTransport> {
     fn client(&self) -> &RpcClient<T>;
 
     fn inner(&self) -> &dyn Middleware<N, T>;
@@ -44,8 +33,19 @@ where
     Resp: RpcReturn,
 {
     pub(crate) inner: RpcCall<T, Params, Resp>,
-    pub(crate) pre: Option<Box<dyn FnOnce(Params) -> Params>>,
-    pub(crate) post: Option<Box<dyn FnOnce(Resp) -> Resp>>,
+    pub(crate) pre: Option<
+        Box<
+            dyn FnOnce(
+                Params,
+            )
+                -> Box<dyn std::future::Future<Output = Result<Params, TransportError>>>,
+        >,
+    >,
+    pub(crate) post: Option<
+        Box<
+            dyn FnOnce(Resp) -> Box<dyn std::future::Future<Output = Result<Resp, TransportError>>>,
+        >,
+    >,
     _pd: PhantomData<fn() -> N>,
 }
 
@@ -63,5 +63,14 @@ where
             post: None,
             _pd: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Middleware;
+
+    fn _compile_check<N>() -> Box<dyn Middleware<N>> {
+        todo!()
     }
 }
