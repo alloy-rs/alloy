@@ -12,7 +12,7 @@ use tower::{Layer, Service};
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Params, Conn>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
 {
@@ -29,7 +29,7 @@ where
 
 impl<Params, Conn> CallState<Params, Conn>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
 {
@@ -78,7 +78,7 @@ where
 
 impl<Params, Conn> Future for CallState<Params, Conn>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
 {
@@ -101,7 +101,7 @@ where
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
 {
@@ -112,7 +112,7 @@ where
 
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
 {
@@ -129,7 +129,7 @@ where
 
 impl<'a, Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam + 'a,
     Resp: RpcReturn,
@@ -143,7 +143,7 @@ where
 
 impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
     Params: RpcParam,
     Resp: RpcReturn,

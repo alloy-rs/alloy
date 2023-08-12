@@ -63,7 +63,7 @@ where
 #[pin_project::pin_project(project = CallStateProj)]
 pub enum BatchFuture<Conn>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
     Conn::Future: Send,
 {
     Prepared {
@@ -110,7 +110,7 @@ impl<'a, T> BatchRequest<'a, T> {
 
 impl<'a, Conn> BatchRequest<'a, Conn>
 where
-    Conn: Transport,
+    Conn: Transport + Clone,
 {
     #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless its batch is sent."]
     /// Add a call to the batch.
@@ -139,7 +139,7 @@ where
 
 impl<'a, T> IntoFuture for BatchRequest<'a, T>
 where
-    T: Transport,
+    T: Transport + Clone,
 {
     type Output = <BatchFuture<T> as Future>::Output;
     type IntoFuture = BatchFuture<T>;
@@ -151,7 +151,7 @@ where
 
 impl<T> BatchFuture<T>
 where
-    T: Transport,
+    T: Transport + Clone,
 {
     fn poll_prepared(
         mut self: Pin<&mut Self>,
@@ -248,7 +248,7 @@ where
 
 impl<T> Future for BatchFuture<T>
 where
-    T: Transport,
+    T: Transport + Clone,
     T::Future: Send,
 {
     type Output = Result<(), TransportError>;

@@ -14,4 +14,6 @@ exclude.workspace = true
 [dependencies]
 alloy-json-rpc.workspace = true
 alloy-networks.workspace = true
+alloy-primitives.workspace = true
 alloy-transports.workspace = true
+futures-util = "0.3.28"

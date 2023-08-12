@@ -24,7 +24,7 @@ impl<S> tower::Layer<S> for JsonRpcLayer {
 
 impl<S, Param> Service<JsonRpcRequest<Param>> for JsonRpcService<S>
 where
-    S: Transport,
+    S: Transport + Clone,
     Param: RpcParam,
 {
     type Response = JsonRpcResponse;

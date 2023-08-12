@@ -40,7 +40,7 @@ impl<T> RpcClient<T> {
 
 impl<T> RpcClient<T>
 where
-    T: Transport,
+    T: Transport + Clone,
     T::Future: Send,
 {
     #[inline]

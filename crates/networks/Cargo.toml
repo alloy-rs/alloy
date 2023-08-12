@@ -12,6 +12,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-json-rpc.workspace = true
+alloy-primitives.workspace = true
 alloy-rlp.workspace = true
 alloy-transports.workspace = true
 pin-project = "1.1.2"

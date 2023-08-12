@@ -1,6 +1,14 @@
 use alloy_json_rpc::RpcObject;
 
-pub trait Network {
+/// Captures type info for network-specific RPC requests/responses
+pub trait Network: Sized + Send + Sync + 'static {
+    #[doc(hidden)]
+    /// Asserts that this trait can only be implemented on a ZST.
+    const __ASSERT_ZST: bool = {
+        assert!(std::mem::size_of::<Self>() == 0, "Network must by a ZST");
+        true
+    };
+
     /// The JSON body of a transaction request.
     type TransactionRequest: Transaction;
 
@@ -11,10 +19,12 @@ pub trait Network {
     type TransactionResponse: Transaction;
 }
 
-/// Captures getters and setters common across transactions across all networks
+/// Captures getters and setters common across transactions and
+/// transaction-like objects across all networks.
 pub trait Transaction:
-    alloy_rlp::Encodable + alloy_rlp::Decodable + RpcObject + Sized + 'static
+    alloy_rlp::Encodable + alloy_rlp::Decodable + RpcObject + Clone + Sized + 'static
 {
+    fn set_gas(&mut self, gas: alloy_primitives::U256);
 }
 
 /// Captures getters and setters common across EIP-1559 transactions across all networks
