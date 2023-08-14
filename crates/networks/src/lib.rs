@@ -5,7 +5,7 @@ pub trait Network: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     /// Asserts that this trait can only be implemented on a ZST.
     const __ASSERT_ZST: bool = {
-        assert!(std::mem::size_of::<Self>() == 0, "Network must by a ZST");
+        assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
         true
     };
 

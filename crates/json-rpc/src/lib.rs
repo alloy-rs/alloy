@@ -12,8 +12,8 @@ pub use common::Id;
 mod result;
 pub use result::RpcResult;
 
-pub trait RpcParam: Serialize + Send + Sync + Unpin {}
-impl<T> RpcParam for T where T: Serialize + Send + Sync + Unpin {}
+pub trait RpcParam: Serialize + Clone + Send + Sync + Unpin {}
+impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
 
 // Note: we add `'static` here to indicate that the Resp is wholly owned. it
 // may not borrow.

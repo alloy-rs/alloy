@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     future::{Future, IntoFuture},
     marker::PhantomData,
@@ -123,7 +124,7 @@ where
         method: &'static str,
         params: &Params,
     ) -> Result<Waiter<Resp>, TransportError> {
-        let request = self.transport.make_request(method, &params);
+        let request = self.transport.make_request(method, Cow::Borrowed(params));
         self.push(request)
     }
 

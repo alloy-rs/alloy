@@ -2,7 +2,10 @@ use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
 use serde_json::value::RawValue;
 use tower::{util::BoxCloneService, Layer, ServiceBuilder};
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    borrow::Cow,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::{BatchRequest, RpcCall, Transport, TransportError};
 
@@ -51,8 +54,8 @@ where
     pub fn make_request<'a, Params: RpcParam>(
         &self,
         method: &'static str,
-        params: &'a Params,
-    ) -> JsonRpcRequest<&'a Params> {
+        params: Cow<'a, Params>,
+    ) -> JsonRpcRequest<Cow<'a, Params>> {
         JsonRpcRequest {
             method,
             params,
@@ -63,8 +66,9 @@ where
     pub fn prepare<'a, Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
-        params: &'a Params,
-    ) -> RpcCall<T, &'a Params, Resp> {
+        params: Cow<'a, Params>,
+    ) -> RpcCall<T, Cow<'a, Params>, Resp> {
+        let params = params.into();
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }

@@ -1,8 +1,9 @@
 use alloy_json_rpc::RpcResult;
 use alloy_networks::{Network, Transaction};
+use alloy_primitives::Address;
 use alloy_transports::{BoxTransport, RpcClient, Transport, TransportError};
 
-use std::{future::Future, pin::Pin};
+use std::{borrow::Cow, future::Future, pin::Pin};
 
 pub type MwareFut<'a, T, E> = Pin<Box<dyn Future<Output = RpcResult<T, E>> + Send + 'a>>;
 
@@ -24,6 +25,20 @@ pub trait Middleware<N: Network, T: Transport = BoxTransport>: Send + Sync {
         Self: Sync + 'fut,
     {
         self.inner().estimate_gas(tx)
+    }
+
+    /// Get the transaction count for an address. Used for finding the
+    /// appropriate nonce.
+    ///
+    /// TODO: block number/hash/tag
+    fn get_transaction_count<'s: 'fut, 'a: 'fut, 'fut>(
+        &'s self,
+        address: Address,
+    ) -> MwareFut<'fut, alloy_primitives::U256, TransportError>
+    where
+        Self: Sync + 'fut,
+    {
+        self.inner().get_transaction_count(address)
     }
 
     /// Send a transaction to the network.
@@ -64,14 +79,29 @@ impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
         &'s self,
         tx: &'a <N as Network>::TransactionRequest,
     ) -> MwareFut<'fut, alloy_primitives::U256, TransportError> {
-        self.prepare("eth_estimateGas", tx).box_pin()
+        self.prepare("eth_estimateGas", Cow::Borrowed(tx)).box_pin()
+    }
+
+    fn get_transaction_count<'s: 'fut, 'a: 'fut, 'fut>(
+        &'s self,
+        address: Address,
+    ) -> MwareFut<'fut, alloy_primitives::U256, TransportError>
+    where
+        Self: Sync + 'fut,
+    {
+        self.prepare(
+            "eth_getTransactionCount",
+            Cow::<(Address, &'static str)>::Owned((address, "latest")),
+        )
+        .box_pin()
     }
 
     fn send_transaction<'s: 'fut, 'a: 'fut, 'fut>(
         &'s self,
         tx: &'a N::TransactionRequest,
     ) -> MwareFut<'fut, N::Receipt, TransportError> {
-        self.prepare("eth_sendTransaction", tx).box_pin()
+        self.prepare("eth_sendTransaction", Cow::Borrowed(tx))
+            .box_pin()
     }
 }
 
