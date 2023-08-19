@@ -1,6 +1,6 @@
 use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
 use serde_json::value::RawValue;
-use tower::{util::BoxCloneService, Layer, ServiceBuilder};
+use tower::{layer::util::Stack, util::BoxCloneService, Layer, ServiceBuilder};
 
 use std::{
     borrow::Cow,
@@ -74,7 +74,7 @@ where
 
     /// Type erase the transport, allowing it to be used in a generic context.
     #[inline]
-    pub fn type_erased(
+    pub fn boxed_service(
         self,
     ) -> RpcClient<BoxCloneService<Box<RawValue>, Box<RawValue>, TransportError>> {
         RpcClient {
@@ -90,7 +90,7 @@ pub struct ClientBuilder<L> {
 }
 
 impl<L> ClientBuilder<L> {
-    pub fn layer<M>(self, layer: M) -> ClientBuilder<tower::layer::util::Stack<M, L>> {
+    pub fn layer<M>(self, layer: M) -> ClientBuilder<Stack<M, L>> {
         ClientBuilder {
             builder: self.builder.layer(layer),
         }

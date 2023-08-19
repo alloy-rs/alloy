@@ -20,7 +20,7 @@ pub trait Transport:
     + Sync
     + 'static
 {
-    fn erased(self) -> BoxTransport
+    fn boxed(self) -> BoxTransport
     where
         Self: Sized + Clone + Send + Sync + 'static,
     {
