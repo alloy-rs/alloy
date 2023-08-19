@@ -68,7 +68,6 @@ where
         method: &'static str,
         params: Cow<'a, Params>,
     ) -> RpcCall<T, Cow<'a, Params>, Resp> {
-        let params = params.into();
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
