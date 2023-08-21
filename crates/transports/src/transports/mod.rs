@@ -10,8 +10,32 @@ use tower::Service;
 
 use crate::TransportError;
 
+mod private {
+    use super::*;
+
+    pub trait Sealed {}
+    impl<T> Sealed for T where
+        T: Service<
+                Box<RawValue>,
+                Response = Box<RawValue>,
+                Error = TransportError,
+                Future = Pin<
+                    Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>,
+                >,
+            > + Send
+            + Sync
+            + 'static
+    {
+    }
+}
+
+/// A marker trait for transports.
+///
+/// This trait is blanket implemented for all appropriate types, and should not
+/// be manually implemented.
 pub trait Transport:
-    Service<
+    private::Sealed
+    + Service<
         Box<RawValue>,
         Response = Box<RawValue>,
         Error = TransportError,
@@ -28,10 +52,14 @@ pub trait Transport:
             inner: Box::new(self),
         }
     }
+
+    #[doc(hidden)]
+    fn __sealed(&self) {}
 }
 
 impl<T> Transport for T where
-    T: Service<
+    T: private::Sealed
+        + Service<
             Box<RawValue>,
             Response = Box<RawValue>,
             Error = TransportError,
