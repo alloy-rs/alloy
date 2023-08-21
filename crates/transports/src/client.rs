@@ -15,10 +15,20 @@ use crate::{BatchRequest, BoxTransport, Http, RpcCall, Transport};
 /// This struct manages a [`Transport`] and a request ID counter. It is used to
 /// build [`RpcCall`] and [`BatchRequest`] objects. The client delegates
 /// transport access to the calls.
+///
+/// ### Note
+///
+/// IDs are allocated sequentially, starting at 0. IDs are reserved via
+/// [`RpcClient::next_id`]. Note that allocated IDs may not be used. There is
+/// no guarantee that a prepared [`RpcCall`] will be sent, or that a sent call
+/// will receive a response.
 #[derive(Debug)]
 pub struct RpcClient<T> {
+    /// The underlying transport.
     pub(crate) transport: T,
+    /// `true` if the transport is local.
     pub(crate) is_local: bool,
+    /// The next request ID to use.
     pub(crate) id: AtomicU64,
 }
 

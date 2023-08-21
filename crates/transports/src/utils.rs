@@ -3,6 +3,8 @@ use serde_json::{self, value::RawValue};
 
 use crate::error::TransportError;
 
+/// Convert to a `Box<RawValue>` from a `Serialize` type, mapping the error
+/// to a `TransportError`.
 pub(crate) fn to_json_raw_value<S>(s: &S) -> Result<Box<RawValue>, TransportError>
 where
     S: Serialize,

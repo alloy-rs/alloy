@@ -8,6 +8,11 @@ use serde_json::value::RawValue;
 
 use crate::common::Id;
 
+/// A JSONRPC-2.0 error object.
+///
+/// This response indicates that the server received and handled the request,
+/// but that there was an error in the processing of it. The error should be
+/// included in the `message` field of the response.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ErrorPayload {
     pub code: i64,
@@ -16,12 +21,17 @@ pub struct ErrorPayload {
     pub data: Option<Box<RawValue>>,
 }
 
+/// A JSONRPC-2.0 response payload.
+///
+/// This enum covers both the success and error cases of a JSONRPC-2.0
+/// response.
 #[derive(Debug, Clone)]
 pub enum ResponsePayload {
     Success(Box<RawValue>),
     Error(ErrorPayload),
 }
 
+/// A JSONRPC-2.0 response object.
 pub struct JsonRpcResponse {
     pub id: Id,
     pub payload: ResponsePayload,

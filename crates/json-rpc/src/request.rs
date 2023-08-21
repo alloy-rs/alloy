@@ -2,6 +2,15 @@ use crate::{common::Id, RpcParam};
 
 use serde::{ser::SerializeMap, Deserialize, Serialize};
 
+/// A JSON-RPC 2.0 request object.
+///
+/// This is a generic type that can be used to represent any JSON-RPC request.
+/// The `Params` type parameter is used to represent the parameters of the
+/// request, and the `method` field is used to represent the method name.
+///
+/// ### Note
+///
+/// The value of `method` must be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
 pub struct JsonRpcRequest<Params> {
     pub method: &'static str,

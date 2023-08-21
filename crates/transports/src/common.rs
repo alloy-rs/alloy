@@ -13,7 +13,7 @@ pub enum Authorization {
 }
 
 impl Authorization {
-    /// Make a new basic auth
+    /// Instantiate a new basic auth.
     pub fn basic(username: impl AsRef<str>, password: impl AsRef<str>) -> Self {
         let username = username.as_ref();
         let password = password.as_ref();
@@ -21,7 +21,7 @@ impl Authorization {
         Self::Basic(auth_secret)
     }
 
-    /// Make a new bearer auth
+    /// Instantiate a new bearer auth.
     pub fn bearer(token: impl Into<String>) -> Self {
         Self::Bearer(token.into())
     }

@@ -113,7 +113,10 @@ where
 /// ### Note:
 ///
 /// Serializing the request is done lazily. The request is not serialized until
-/// the future is polled. This differes from
+/// the future is polled. This differs from the behavior of
+/// [`crate::BatchRequest`], which serializes greedily. This is because the
+/// batch request must immediately erase the `Param` type to allow batching of
+/// requests with different `Param` types, while the `RpcCall` may do so lazily.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
