@@ -1,3 +1,6 @@
+mod builder;
+pub use builder::{ProviderBuilder, ProviderLayer, Stack};
+
 use alloy_json_rpc::RpcResult;
 use alloy_networks::{Network, Transaction};
 use alloy_primitives::Address;
@@ -9,13 +12,13 @@ pub type MwareFut<'a, T, E> = Pin<Box<dyn Future<Output = RpcResult<T, E>> + Sen
 
 /// Middleware is parameterized with a network and a transport. The default
 /// transport is type-erased, but you can do `Middleware<N, Http>`.
-pub trait Middleware<N: Network, T: Transport = BoxTransport>: Send + Sync {
+pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     fn client(&self) -> &RpcClient<T>;
 
     /// Return a reference to the inner Middleware.
     ///
     /// Middleware are object safe now :)
-    fn inner(&self) -> &dyn Middleware<N, T>;
+    fn inner(&self) -> &dyn Provider<N, T>;
 
     fn estimate_gas<'s: 'fut, 'a: 'fut, 'fut>(
         &'s self,
@@ -66,13 +69,13 @@ pub trait Middleware<N: Network, T: Transport = BoxTransport>: Send + Sync {
     }
 }
 
-impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
+impl<N: Network, T: Transport + Clone> Provider<N, T> for RpcClient<T> {
     fn client(&self) -> &RpcClient<T> {
         self
     }
 
-    fn inner(&self) -> &dyn Middleware<N, T> {
-        panic!("called inner on <RpcClient as Middleware>")
+    fn inner(&self) -> &dyn Provider<N, T> {
+        panic!("called inner on <RpcClient as Provider>")
     }
 
     fn estimate_gas<'s: 'fut, 'a: 'fut, 'fut>(
@@ -105,22 +108,12 @@ impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
     }
 }
 
-/// Middleware use a tower-like Layer abstraction
-pub trait MwareLayer<N: Network> {
-    type Middleware<T: Transport>: Middleware<N, T>;
-
-    fn layer<M, T>(&self, inner: M) -> Self::Middleware<T>
-    where
-        M: Middleware<N, T>,
-        T: Transport;
-}
-
 #[cfg(test)]
 mod test {
-    use crate::Middleware;
+    use crate::Provider;
     use alloy_networks::Network;
 
-    fn __compile_check<N: Network>() -> Box<dyn Middleware<N>> {
+    fn __compile_check<N: Network>() -> Box<dyn Provider<N>> {
         unimplemented!()
     }
 }

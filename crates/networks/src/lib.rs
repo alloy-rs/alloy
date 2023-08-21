@@ -1,12 +1,11 @@
 use alloy_json_rpc::RpcObject;
 
-/// Captures type info for network-specific RPC requests/responses
+/// Captures type info for network-specific RPC requests/responses.
 pub trait Network: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     /// Asserts that this trait can only be implemented on a ZST.
-    const __ASSERT_ZST: bool = {
+    const __ASSERT_ZST: () = {
         assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
-        true
     };
 
     /// The JSON body of a transaction request.
