@@ -1,4 +1,6 @@
 mod hyper;
+
+#[cfg(feature = "reqwest")]
 mod reqwest;
 
 use crate::client::RpcClient;
@@ -12,7 +14,7 @@ use url::Url;
 /// `Service<Box<RawValue>>`, and a URL to which to connect.
 ///
 /// Currently supported clients are:
-/// - [`::reqwest::Client`]
+#[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]
 #[derive(Debug, Clone)]
 pub struct Http<T> {
     client: T,
