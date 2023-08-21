@@ -113,7 +113,7 @@ where
 /// ### Note:
 ///
 /// Serializing the request is done lazily. The request is not serialized until
-/// the future is polled.
+/// the future is polled. This differes from
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
@@ -150,7 +150,10 @@ where
     /// prepared.
     pub fn params(&mut self) -> &mut Params {
         if let CallState::Prepared { request, .. } = &mut self.state {
-            &mut request.as_mut().unwrap().params
+            &mut request
+                .as_mut()
+                .expect("No params in prepared. This is a bug")
+                .params
         } else {
             panic!("Cannot get params after request has been sent");
         }

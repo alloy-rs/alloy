@@ -2,7 +2,7 @@ mod http;
 pub use http::Http;
 
 mod json_service;
-pub use json_service::{JsonRpcFuture, JsonRpcLayer, JsonRpcService};
+pub(crate) use json_service::{JsonRpcLayer, JsonRpcService};
 
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin};

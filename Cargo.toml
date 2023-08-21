@@ -35,3 +35,8 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 # thiserror
 thiserror = "1.0"
+
+# transports
+url = "2.4.0"
+pin-project = "1.1.2"
+tower = { version = "0.4.13", features = ["util"] }

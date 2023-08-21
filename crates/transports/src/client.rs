@@ -128,7 +128,9 @@ where
 
 /// A builder for the transport  [`RpcClient`].
 ///
-///
+/// This is a wrapper around [`tower::ServiceBuilder`]. It allows you to
+/// configure middleware layers that will be applied to the transport, and has
+/// some shortcuts for common layers and transports.
 pub struct ClientBuilder<L> {
     builder: ServiceBuilder<L>,
 }

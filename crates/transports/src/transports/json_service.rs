@@ -6,13 +6,16 @@ use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
 
+/// A service layer that transforms [`JsonRpcRequest`] into [`JsonRpcResponse`]
+/// by wrapping an inner service that implements [`Transport`].
 #[derive(Debug, Clone)]
-pub struct JsonRpcService<S> {
+pub(crate) struct JsonRpcService<S> {
     pub(crate) inner: S,
 }
 
+/// Layer for [`JsonRpcService`]
 #[derive(Debug, Copy, Clone)]
-pub struct JsonRpcLayer;
+pub(crate) struct JsonRpcLayer;
 
 impl<S> tower::Layer<S> for JsonRpcLayer {
     type Service = JsonRpcService<S>;
@@ -56,9 +59,10 @@ where
     }
 }
 
+/// States for [`JsonRpcFuture`]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = StatesProj)]
-pub enum States<F> {
+enum States<F> {
     Errored(Option<TransportError>),
     Pending {
         #[pin]
@@ -109,6 +113,7 @@ where
     }
 }
 
+/// Wrapper future  to do JSON ser and deser
 #[pin_project::pin_project]
 pub struct JsonRpcFuture<T, Resp> {
     #[pin]
