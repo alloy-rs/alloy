@@ -79,7 +79,7 @@ impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
         &'s self,
         tx: &'a <N as Network>::TransactionRequest,
     ) -> MwareFut<'fut, alloy_primitives::U256, TransportError> {
-        self.prepare("eth_estimateGas", Cow::Borrowed(tx)).box_pin()
+        self.prepare("eth_estimateGas", Cow::Borrowed(tx)).boxed()
     }
 
     fn get_transaction_count<'s: 'fut, 'a: 'fut, 'fut>(
@@ -93,7 +93,7 @@ impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
             "eth_getTransactionCount",
             Cow::<(Address, &'static str)>::Owned((address, "latest")),
         )
-        .box_pin()
+        .boxed()
     }
 
     fn send_transaction<'s: 'fut, 'a: 'fut, 'fut>(
@@ -101,7 +101,7 @@ impl<N: Network, T: Transport + Clone> Middleware<N, T> for RpcClient<T> {
         tx: &'a N::TransactionRequest,
     ) -> MwareFut<'fut, N::Receipt, TransportError> {
         self.prepare("eth_sendTransaction", Cow::Borrowed(tx))
-            .box_pin()
+            .boxed()
     }
 }
 

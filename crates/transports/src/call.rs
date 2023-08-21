@@ -4,10 +4,12 @@ use crate::{
 };
 
 use alloy_json_rpc::{JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
+use core::panic;
 use serde_json::value::RawValue;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::{Layer, Service};
 
+/// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Params, Conn>
@@ -97,6 +99,21 @@ where
     }
 }
 
+/// A prepared, but unsent, RPC call.
+///
+/// This is a future that will send the request when polled. It contains a
+/// [`JsonRpcRequest`], a [`Transport`], and knowledge of its expected response
+/// type. Upon awaiting, it will send the request and wait for the response. It
+/// will then deserialize the response into the expected type.
+///
+/// Errors are captured in the [`RpcResult`] type. Rpc Calls will result in
+/// either a successful response of the `Resp` type, an error response, or a
+/// transport error.
+///
+/// ### Note:
+///
+/// Serializing the request is done lazily. The request is not serialized until
+/// the future is polled.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
 pub struct RpcCall<Conn, Params, Resp>
@@ -116,6 +133,7 @@ where
     Conn::Future: Send,
     Params: RpcParam,
 {
+    #[doc(hidden)]
     pub fn new(req: JsonRpcRequest<Params>, connection: Conn) -> Self {
         Self {
             state: CallState::Prepared {
@@ -123,6 +141,18 @@ where
                 connection: JsonRpcLayer.layer(connection),
             },
             _pd: PhantomData,
+        }
+    }
+
+    /// Get a mutable reference to the params of the request.
+    ///
+    /// This is useful for modifying the params after the request has been
+    /// prepared.
+    pub fn params(&mut self) -> &mut Params {
+        if let CallState::Prepared { request, .. } = &mut self.state {
+            &mut request.as_mut().unwrap().params
+        } else {
+            panic!("Cannot get params after request has been sent");
         }
     }
 }
@@ -134,7 +164,8 @@ where
     Params: RpcParam + 'a,
     Resp: RpcReturn,
 {
-    pub fn box_pin(
+    /// Convert this future into a boxed, pinned future, erasing its type.
+    pub fn boxed(
         self,
     ) -> Pin<Box<dyn Future<Output = RpcResult<Resp, TransportError>> + Send + 'a>> {
         Box::pin(self)
