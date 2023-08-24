@@ -1,0 +1,19 @@
+[package]
+name = "alloy-networks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alloy-json-rpc.workspace = true
+alloy-primitives.workspace = true
+alloy-rlp.workspace = true
+alloy-transports.workspace = true
+pin-project = "1.1.2"
+tower = "0.4.13"

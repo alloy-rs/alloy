@@ -8,8 +8,8 @@ edition = "2021"
 rust-version = "1.65"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
-homepage = "https://github.com/ethers-rs/next"
-repository = "https://github.com/ethers-rs/next"
+homepage = "https://github.com/alloy-rs/next"
+repository = "https://github.com/alloy-rs/next"
 exclude = ["benches/", "tests/"]
 
 [workspace.metadata.docs.rs]
@@ -17,3 +17,26 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
+
+alloy-json-rpc = { path = "crates/json-rpc" }
+alloy-transports = { path = "crates/transports" }
+alloy-networks = { path = "crates/networks" }
+
+alloy-primitives = { version = "0.2.0", features = ["serde"] }
+alloy-rlp = "0.3.0"
+
+# futures
+futures-channel = "0.3"
+futures-util = "0.3"
+
+# serde
+serde = { version = "1.0", default-features = false, features = ["alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+
+# thiserror
+thiserror = "1.0"
+
+# transports
+url = "2.4.0"
+pin-project = "1.1.2"
+tower = { version = "0.4.13", features = ["util"] }

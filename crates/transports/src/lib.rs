@@ -1,14 +1,22 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+mod call;
+pub use call::RpcCall;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod common;
+pub use common::Authorization;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+/// [`RpcClient`] and [`ClientBuilder`].
+pub mod client;
+pub use client::{ClientBuilder, RpcClient};
+
+mod error;
+pub use error::TransportError;
+
+mod batch;
+pub use batch::BatchRequest;
+
+mod transports;
+pub use transports::{BoxTransport, Http, Transport};
+
+pub use alloy_json_rpc::RpcResult;
+
+pub(crate) mod utils;
