@@ -34,9 +34,6 @@ pub trait Transport:
             inner: Box::new(self),
         }
     }
-
-    #[doc(hidden)]
-    fn __sealed(&self) {}
 }
 
 impl<T> Transport for T where
