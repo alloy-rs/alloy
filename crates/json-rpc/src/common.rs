@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// A JSON-RPC 2.0 ID object. This may be a number, string, or null.
+/// A JSON-RPC 2.0 ID object. This may be a number, a string, or null.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(untagged)]
 pub enum Id {

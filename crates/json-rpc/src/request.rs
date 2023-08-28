@@ -10,7 +10,7 @@ use serde::{ser::SerializeMap, Deserialize, Serialize};
 ///
 /// ### Note
 ///
-/// The value of `method` must be known at compile time.
+/// The value of `method` should be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
 pub struct Request<Params> {
     pub method: &'static str,

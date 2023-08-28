@@ -12,7 +12,7 @@ use crate::common::Id;
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
-/// included in the `message` field of the response.
+/// included in the `message` field of the response payload.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ErrorPayload {
     pub code: i64,
@@ -24,14 +24,25 @@ pub struct ErrorPayload {
 /// A JSONRPC-2.0 response payload.
 ///
 /// This enum covers both the success and error cases of a JSONRPC-2.0
-/// response.
+/// response. It is used to represent the `result` and `error` fields of a
+/// response object.
+///
+/// ### Note
+///
+/// This type does not implement `Serialize` or `Deserialize` directly. It is
+/// deserialized as part of the [`Response`] type.
 #[derive(Debug, Clone)]
 pub enum ResponsePayload {
     Success(Box<RawValue>),
     Error(ErrorPayload),
 }
 
-/// A JSONRPC-2.0 response object.
+/// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
+///
+/// This object is used to represent a JSONRPC-2.0 response. It may contain
+/// either a successful result or an error. The `id` field is used to match
+/// the response to the request that it is responding to, and should be
+/// mirrored from the response.
 pub struct Response {
     pub id: Id,
     pub payload: ResponsePayload,
