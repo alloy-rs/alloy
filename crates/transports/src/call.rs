@@ -3,7 +3,7 @@ use crate::{
     transports::{JsonRpcLayer, JsonRpcService, Transport},
 };
 
-use alloy_json_rpc::{JsonRpcRequest, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{Request, RpcParam, RpcResult, RpcReturn};
 use core::panic;
 use serde_json::value::RawValue;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
@@ -19,12 +19,12 @@ where
     Params: RpcParam,
 {
     Prepared {
-        request: Option<JsonRpcRequest<Params>>,
+        request: Option<Request<Params>>,
         connection: JsonRpcService<Conn>,
     },
     AwaitingResponse {
         #[pin]
-        fut: <JsonRpcService<Conn> as Service<JsonRpcRequest<Params>>>::Future,
+        fut: <JsonRpcService<Conn> as Service<Request<Params>>>::Future,
     },
     Complete,
 }
@@ -48,9 +48,7 @@ where
                 unreachable!("Called poll_prepared in incorrect state")
             };
 
-            if let Err(e) = task::ready!(Service::<JsonRpcRequest<Params>>::poll_ready(
-                connection, cx
-            )) {
+            if let Err(e) = task::ready!(Service::<Request<Params>>::poll_ready(connection, cx)) {
                 self.set(CallState::Complete);
                 return task::Poll::Ready(RpcResult::Err(e));
             }
@@ -102,7 +100,7 @@ where
 /// A prepared, but unsent, RPC call.
 ///
 /// This is a future that will send the request when polled. It contains a
-/// [`JsonRpcRequest`], a [`Transport`], and knowledge of its expected response
+/// [`Request`], a [`Transport`], and knowledge of its expected response
 /// type. Upon awaiting, it will send the request and wait for the response. It
 /// will then deserialize the response into the expected type.
 ///
@@ -137,7 +135,7 @@ where
     Params: RpcParam,
 {
     #[doc(hidden)]
-    pub fn new(req: JsonRpcRequest<Params>, connection: Conn) -> Self {
+    pub fn new(req: Request<Params>, connection: Conn) -> Self {
         Self {
             state: CallState::Prepared {
                 request: Some(req),

@@ -12,10 +12,10 @@
 use serde::{de::DeserializeOwned, Serialize};
 
 mod request;
-pub use request::JsonRpcRequest;
+pub use request::Request;
 
 mod response;
-pub use response::{ErrorPayload, JsonRpcResponse, ResponsePayload};
+pub use response::{ErrorPayload, Response, ResponsePayload};
 
 mod common;
 pub use common::Id;
@@ -24,15 +24,29 @@ mod result;
 pub use result::RpcResult;
 
 /// An object that can be used as a JSON-RPC parameter.
+///
+/// This marker trait is blanket-implemented for every qualifying type. It is
+/// used to indicate that a type can be used as a JSON-RPC parameter.
 pub trait RpcParam: Serialize + Clone + Send + Sync + Unpin {}
 impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
 
 /// An object that can be used as a JSON-RPC return value.
-// Note: we add `'static` here to indicate that the Resp is wholly owned. It
-// may not borrow.
+///
+/// This marker trait is blanket-implemented for every qualifying type. It is
+/// used to indicate that a type can be used as a JSON-RPC return value.
+///
+/// # Note
+///
+/// We add the `'static` lifetime bound to indicate that the type can't borrow.
+/// This is a simplification that makes it easier to use the types in client
+/// code. It is not suitable for use in server code.
 pub trait RpcReturn: DeserializeOwned + Send + Sync + Unpin + 'static {}
 impl<T> RpcReturn for T where T: DeserializeOwned + Send + Sync + Unpin + 'static {}
 
 /// An object that can be used as a JSON-RPC parameter and return value.
+///
+/// This marker trait is blanket-implemented for every qualifying type. It is
+/// used to indicate that a type can be used as both a JSON-RPC parameter and
+/// return value.
 pub trait RpcObject: RpcParam + RpcReturn {}
 impl<T> RpcObject for T where T: RpcParam + RpcReturn {}

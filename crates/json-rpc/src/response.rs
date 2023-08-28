@@ -12,7 +12,7 @@ use crate::common::Id;
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
-/// included in the `message` field of the response.
+/// included in the `message` field of the response payload.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ErrorPayload {
     pub code: i64,
@@ -24,20 +24,31 @@ pub struct ErrorPayload {
 /// A JSONRPC-2.0 response payload.
 ///
 /// This enum covers both the success and error cases of a JSONRPC-2.0
-/// response.
+/// response. It is used to represent the `result` and `error` fields of a
+/// response object.
+///
+/// ### Note
+///
+/// This type does not implement `Serialize` or `Deserialize` directly. It is
+/// deserialized as part of the [`Response`] type.
 #[derive(Debug, Clone)]
 pub enum ResponsePayload {
     Success(Box<RawValue>),
     Error(ErrorPayload),
 }
 
-/// A JSONRPC-2.0 response object.
-pub struct JsonRpcResponse {
+/// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
+///
+/// This object is used to represent a JSONRPC-2.0 response. It may contain
+/// either a successful result or an error. The `id` field is used to match
+/// the response to the request that it is responding to, and should be
+/// mirrored from the response.
+pub struct Response {
     pub id: Id,
     pub payload: ResponsePayload,
 }
 
-impl<'de> Deserialize<'de> for JsonRpcResponse {
+impl<'de> Deserialize<'de> for Response {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -82,7 +93,7 @@ impl<'de> Deserialize<'de> for JsonRpcResponse {
         struct JsonRpcResponseVisitor;
 
         impl<'de> Visitor<'de> for JsonRpcResponseVisitor {
-            type Value = JsonRpcResponse;
+            type Value = Response;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str(
@@ -126,11 +137,11 @@ impl<'de> Deserialize<'de> for JsonRpcResponse {
                 let id = id.unwrap_or(Id::None);
 
                 match (result, error) {
-                    (Some(result), None) => Ok(JsonRpcResponse {
+                    (Some(result), None) => Ok(Response {
                         id,
                         payload: ResponsePayload::Success(result),
                     }),
-                    (None, Some(error)) => Ok(JsonRpcResponse {
+                    (None, Some(error)) => Ok(Response {
                         id,
                         payload: ResponsePayload::Error(error),
                     }),
@@ -155,7 +166,7 @@ mod test {
             "result": "california",
             "id": 1
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::Number(1));
         assert!(matches!(
             response.payload,
@@ -173,7 +184,7 @@ mod test {
             },
             "id": null
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
         assert!(matches!(response.payload, super::ResponsePayload::Error(_)));
     }
@@ -190,7 +201,7 @@ mod test {
                 ]
             }
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
         assert!(matches!(
             response.payload,

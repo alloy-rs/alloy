@@ -10,15 +10,17 @@ use serde::{ser::SerializeMap, Deserialize, Serialize};
 ///
 /// ### Note
 ///
-/// The value of `method` must be known at compile time.
+/// The value of `method` should be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
-pub struct JsonRpcRequest<Params> {
+pub struct Request<Params> {
     pub method: &'static str,
     pub params: Params,
     pub id: Id,
 }
 
-impl<Params> Serialize for JsonRpcRequest<Params>
+// manually implemented to avoid adding a type for the protocol-required
+// `jsonrpc` field
+impl<Params> Serialize for Request<Params>
 where
     Params: RpcParam,
 {
@@ -28,9 +30,18 @@ where
     {
         let mut map = serializer.serialize_map(Some(4))?;
         map.serialize_entry("method", self.method)?;
-        map.serialize_entry("params", &self.params)?;
+
+        // Params may be omitted if it is 0-sized
+        if !is_zst::<Params>() {
+            map.serialize_entry("params", &self.params)?;
+        }
+
         map.serialize_entry("id", &self.id)?;
         map.serialize_entry("jsonrpc", "2.0")?;
         map.end()
     }
+}
+
+fn is_zst<T>() -> bool {
+    std::mem::size_of::<T>() == 0
 }

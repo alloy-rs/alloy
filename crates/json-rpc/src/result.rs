@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use serde_json::value::RawValue;
 
-use crate::{response::ErrorPayload, JsonRpcResponse, ResponsePayload, RpcReturn};
+use crate::{response::ErrorPayload, Response, ResponsePayload, RpcReturn};
 
 /// The result of a JSON-RPC request.
 ///
@@ -187,8 +187,8 @@ impl<E> RpcResult<Box<RawValue>, E> {
     }
 }
 
-impl<E> From<JsonRpcResponse> for RpcResult<Box<RawValue>, E> {
-    fn from(value: JsonRpcResponse) -> Self {
+impl<E> From<Response> for RpcResult<Box<RawValue>, E> {
+    fn from(value: Response) -> Self {
         match value.payload {
             ResponsePayload::Success(res) => Self::Ok(res),
             ResponsePayload::Error(e) => Self::ErrResp(e),
@@ -196,8 +196,8 @@ impl<E> From<JsonRpcResponse> for RpcResult<Box<RawValue>, E> {
     }
 }
 
-impl<E> From<Result<JsonRpcResponse, E>> for RpcResult<Box<RawValue>, E> {
-    fn from(value: Result<JsonRpcResponse, E>) -> Self {
+impl<E> From<Result<Response, E>> for RpcResult<Box<RawValue>, E> {
+    fn from(value: Result<Response, E>) -> Self {
         match value {
             Ok(res) => res.into(),
             Err(err) => Self::Err(err),

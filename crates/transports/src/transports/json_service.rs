@@ -1,12 +1,12 @@
 use crate::{utils::to_json_raw_value, Transport, TransportError};
 
-use alloy_json_rpc::{JsonRpcRequest, JsonRpcResponse, RpcParam};
+use alloy_json_rpc::{Request, Response, RpcParam};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
 
-/// A service layer that transforms [`JsonRpcRequest`] into [`JsonRpcResponse`]
+/// A service layer that transforms [`Request`] into [`Response`]
 /// by wrapping an inner service that implements [`Transport`].
 #[derive(Debug, Clone)]
 pub(crate) struct JsonRpcService<S> {
@@ -25,12 +25,12 @@ impl<S> tower::Layer<S> for JsonRpcLayer {
     }
 }
 
-impl<S, Param> Service<JsonRpcRequest<Param>> for JsonRpcService<S>
+impl<S, Param> Service<Request<Param>> for JsonRpcService<S>
 where
     S: Transport + Clone,
     Param: RpcParam,
 {
-    type Response = JsonRpcResponse;
+    type Response = Response;
 
     type Error = TransportError;
 
@@ -40,7 +40,7 @@ where
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: JsonRpcRequest<Param>) -> Self::Future {
+    fn call(&mut self, req: Request<Param>) -> Self::Future {
         let replacement = self.inner.clone();
         let mut client = std::mem::replace(&mut self.inner, replacement);
 
