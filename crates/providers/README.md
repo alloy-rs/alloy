@@ -19,10 +19,10 @@ transactions to create a `Provider` that can send signed transactions with
 correct nonces.
 
 The `ProviderBuilder` struct can quickly create a stacked provider, similar to
-[tower] `ServiceBuilder`.
+[`tower::ServiceBuilder`].
 
 [alloy-networks]: ../networks/
-[tower]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
+[`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 
 ## Usage
 
