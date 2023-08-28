@@ -20,8 +20,9 @@ This repository contains the following crates:
 - [`alloy-transports`] - Transport implementations for JSON-RPC 2.0 clients.
 - [`alloy-networks`] - Network abstraction for RPC types. Allows capturing
   different RPC param and response types on a per-network basis.
-- [`alloy-providers`] - Based on `ethers::middleware::Middleware`, but abstract
-  over a `Network`, and object-safe.
+- [`alloy-providers`] - A client trait for interacting with Ethereum-like RPC
+  endpoints. Abstract over `alloy_networks::Network`, which allows capturing
+  different RPC types on a per-network basis.
 
 [`alloy-json-rpc`]: ./crates/json-rpc
 [`alloy-transports`]: ./crates/transports
@@ -52,30 +53,6 @@ Alloy project.
 
 Pull requests will not be merged unless CI passes, so please ensure that your
 contribution follows the linting rules and passes clippy.
-
-## WASM support
-
-We provide full support for all the `wasm*-*` targets. If a crate does not
-build on a WASM target, please [open an issue].
-
-When building for the `wasm32-unknown-unknown` target and the `"getrandom"`
-feature is enabled, compilation for the `getrandom` crate will fail. This is
-expected: see [their documentation][getrandom] for more details.
-
-To fix this, either disable the `"getrandom"` feature on `alloy-core` or add
-`getrandom` to your dependencies with the `"js"` feature enabled:
-
-```toml
-getrandom = { version = "0.2", features = ["js"] }
-```
-
-There is currently no plan to provide an official JS/TS-accessible library
-interface, as we believe [viem] or [ethers.js] serve that need very well.
-
-[open an issue]: https://github.com/alloy-rs/core/issues/new/choose
-[getrandom]: https://docs.rs/getrandom/#webassembly-support
-[viem]: https://viem.sh
-[ethers.js]: https://docs.ethers.io/v6/
 
 ## Note on `no_std`
 
