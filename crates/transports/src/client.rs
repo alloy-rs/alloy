@@ -1,4 +1,4 @@
-use alloy_json_rpc::{Id, JsonRpcRequest, RpcParam, RpcReturn};
+use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use reqwest::Url;
 use serde_json::value::RawValue;
 use tower::{layer::util::Stack, Layer, ServiceBuilder};
@@ -91,8 +91,8 @@ where
         &self,
         method: &'static str,
         params: Cow<'a, Params>,
-    ) -> JsonRpcRequest<Cow<'a, Params>> {
-        JsonRpcRequest {
+    ) -> Request<Cow<'a, Params>> {
+        Request {
             method,
             params,
             id: self.next_id(),

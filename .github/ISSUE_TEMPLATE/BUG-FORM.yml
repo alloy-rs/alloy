@@ -1,0 +1,43 @@
+name: Bug report
+description: File a bug report
+labels: ["bug"]
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please ensure that the bug has not already been filed in the issue tracker.
+
+        Thanks for taking the time to report this bug!
+  - type: dropdown
+    attributes:
+      label: Component
+      description: What component is the bug in?
+      multiple: true
+      options:
+        - json-rpc
+        - transports
+        - networks
+        - providers
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: What version of Alloy are you on?
+      placeholder: "Run `carge tree | grep alloy` and paste the output here"
+  - type: dropdown
+    attributes:
+      label: Operating System
+      description: What operating system are you on?
+      options:
+        - Windows
+        - macOS (Intel)
+        - macOS (Apple Silicon)
+        - Linux
+        - Other (please specify)
+  - type: textarea
+    attributes:
+      label: Describe the bug
+      description: Please include code snippets as well if relevant.
+    validations:
+      required: true

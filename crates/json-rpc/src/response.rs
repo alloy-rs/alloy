@@ -32,12 +32,12 @@ pub enum ResponsePayload {
 }
 
 /// A JSONRPC-2.0 response object.
-pub struct JsonRpcResponse {
+pub struct Response {
     pub id: Id,
     pub payload: ResponsePayload,
 }
 
-impl<'de> Deserialize<'de> for JsonRpcResponse {
+impl<'de> Deserialize<'de> for Response {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -82,7 +82,7 @@ impl<'de> Deserialize<'de> for JsonRpcResponse {
         struct JsonRpcResponseVisitor;
 
         impl<'de> Visitor<'de> for JsonRpcResponseVisitor {
-            type Value = JsonRpcResponse;
+            type Value = Response;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str(
@@ -126,11 +126,11 @@ impl<'de> Deserialize<'de> for JsonRpcResponse {
                 let id = id.unwrap_or(Id::None);
 
                 match (result, error) {
-                    (Some(result), None) => Ok(JsonRpcResponse {
+                    (Some(result), None) => Ok(Response {
                         id,
                         payload: ResponsePayload::Success(result),
                     }),
-                    (None, Some(error)) => Ok(JsonRpcResponse {
+                    (None, Some(error)) => Ok(Response {
                         id,
                         payload: ResponsePayload::Error(error),
                     }),
@@ -155,7 +155,7 @@ mod test {
             "result": "california",
             "id": 1
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::Number(1));
         assert!(matches!(
             response.payload,
@@ -173,7 +173,7 @@ mod test {
             },
             "id": null
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
         assert!(matches!(response.payload, super::ResponsePayload::Error(_)));
     }
@@ -190,7 +190,7 @@ mod test {
                 ]
             }
         }"#;
-        let response: super::JsonRpcResponse = serde_json::from_str(response).unwrap();
+        let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
         assert!(matches!(
             response.payload,

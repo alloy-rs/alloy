@@ -12,10 +12,10 @@
 use serde::{de::DeserializeOwned, Serialize};
 
 mod request;
-pub use request::JsonRpcRequest;
+pub use request::Request;
 
 mod response;
-pub use response::{ErrorPayload, JsonRpcResponse, ResponsePayload};
+pub use response::{ErrorPayload, Response, ResponsePayload};
 
 mod common;
 pub use common::Id;

@@ -11,7 +11,7 @@ use futures_channel::oneshot;
 use serde_json::value::RawValue;
 
 use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
-use alloy_json_rpc::{Id, JsonRpcRequest, JsonRpcResponse, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{Id, Request, Response, RpcParam, RpcResult, RpcReturn};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
@@ -101,7 +101,7 @@ impl<'a, T> BatchRequest<'a, T> {
 
     fn push<Params: RpcParam, Resp: RpcReturn>(
         &mut self,
-        request: JsonRpcRequest<Params>,
+        request: Request<Params>,
     ) -> Result<Waiter<Resp>, TransportError> {
         to_json_raw_value(&request).map(|rv| self.push_raw(request.id, rv).into())
     }
@@ -127,7 +127,7 @@ where
     }
 
     /// Send the batch future via its connection.
-    pub fn send_batch(self) -> BatchFuture<Conn> {
+    pub fn send(self) -> BatchFuture<Conn> {
         BatchFuture::Prepared {
             transport: self.transport.transport.clone(),
             requests: self.requests,
@@ -144,7 +144,7 @@ where
     type IntoFuture = BatchFuture<T>;
 
     fn into_future(self) -> Self::IntoFuture {
-        self.send_batch()
+        self.send()
     }
 }
 
@@ -206,7 +206,7 @@ where
             }
         };
 
-        let responses: Vec<JsonRpcResponse> = match serde_json::from_str(responses.get()) {
+        let responses: Vec<Response> = match serde_json::from_str(responses.get()) {
             Ok(responses) => responses,
             Err(err) => {
                 self.set(BatchFuture::Complete);
