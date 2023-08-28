@@ -52,6 +52,8 @@ where
 ///
 /// This type is similar to [`tower::ServiceBuilder`], with extra complication
 /// around maintaining the network and transport types.
+///
+/// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 pub struct ProviderBuilder<L, N = (), T = ()> {
     layer: L,
 
@@ -63,8 +65,16 @@ impl<L, N, T> ProviderBuilder<L, N, T> {
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
     ///
-    /// Note: layers are added in outer-to-inner order, as in
-    /// [`tower::ServiceBuilder`].
+    /// ## Note:
+    ///
+    /// Layers are added in outer-to-inner order, as in
+    /// [`tower::ServiceBuilder`]. The first layer added will be the first to
+    /// see the request.
+    ///
+    ///
+    /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
+    /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
+
     pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<T, Inner, L>> {
         ProviderBuilder {
             layer: Stack::new(layer, self.layer),

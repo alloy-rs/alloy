@@ -100,7 +100,7 @@ where
 /// A prepared, but unsent, RPC call.
 ///
 /// This is a future that will send the request when polled. It contains a
-/// [`JsonRpcRequest`], a [`Transport`], and knowledge of its expected response
+/// [`Request`], a [`Transport`], and knowledge of its expected response
 /// type. Upon awaiting, it will send the request and wait for the response. It
 /// will then deserialize the response into the expected type.
 ///
