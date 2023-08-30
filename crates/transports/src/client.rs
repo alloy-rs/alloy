@@ -1,5 +1,4 @@
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use reqwest::Url;
 use serde_json::value::RawValue;
 use tower::{layer::util::Stack, Layer, ServiceBuilder};
 
@@ -171,7 +170,7 @@ impl<L> ClientBuilder<L> {
     #[cfg(feature = "reqwest")]
     /// Create a new [`RpcClient`] with an HTTP transport connecting to the
     /// given URL and the configured layers.
-    pub fn reqwest_http(self, url: Url) -> RpcClient<L::Service>
+    pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
         L: Layer<Http<reqwest::Client>>,
         L::Service: Transport,
