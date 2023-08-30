@@ -64,7 +64,7 @@ impl<T> RpcClient<T> {
         self.id.fetch_add(1, Ordering::Relaxed)
     }
 
-    /// Reserve a request ID.
+    /// Reserve a request ID u64.
     #[inline]
     pub fn next_id(&self) -> Id {
         Id::Number(self.increment_id())
