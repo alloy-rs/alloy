@@ -168,6 +168,7 @@ impl<L> ClientBuilder<L> {
         RpcClient::new(self.builder.service(transport), is_local)
     }
 
+    #[cfg(feature = "reqwest")]
     /// Create a new [`RpcClient`] with an HTTP transport connecting to the
     /// given URL and the configured layers.
     pub fn http(self, url: Url) -> RpcClient<L::Service>
@@ -183,7 +184,7 @@ impl<L> ClientBuilder<L> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "reqwest"))]
 mod test {
     use crate::transports::Http;
 
