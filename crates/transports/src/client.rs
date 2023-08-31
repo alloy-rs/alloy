@@ -168,11 +168,26 @@ impl<L> ClientBuilder<L> {
     }
 
     #[cfg(feature = "reqwest")]
-    /// Create a new [`RpcClient`] with an HTTP transport connecting to the
-    /// given URL and the configured layers.
+    /// Create a new [`RpcClient`] with a [`reqwest`] HTTP transport connecting
+    /// to the given URL and the configured layers.
     pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
         L: Layer<Http<reqwest::Client>>,
+        L::Service: Transport,
+        <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
+    {
+        let transport = Http::new(url);
+        let is_local = transport.is_local();
+
+        self.transport(transport, is_local)
+    }
+
+    #[cfg(feature = "hyper")]
+    /// Create a new [`RpcClient`] with a [`hyper`] HTTP transport connecting
+    /// to the given URL and the configured layers.
+    pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
+    where
+        L: Layer<Http<hyper::client::Client<hyper::client::HttpConnector>>>,
         L::Service: Transport,
         <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {

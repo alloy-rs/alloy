@@ -54,3 +54,8 @@ batch.send().await.unwrap();
 let block_number = block_number_fut.await.unwrap();
 let balance = balance_fut.await.unwrap();
 ```
+
+### Features
+
+- `reqwest`: Enables the `reqwest` transport implementation.
+- `hyper`: Enables the `hyper` transport implementation.
