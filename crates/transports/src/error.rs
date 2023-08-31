@@ -21,10 +21,15 @@ pub enum TransportError {
     #[error(transparent)]
     Custom(Box<dyn StdError + Send + Sync + 'static>),
 
-    /// Http transport
+    /// Hyper http transport
     #[error(transparent)]
     #[cfg(feature = "reqwest")]
     Reqwest(#[from] reqwest::Error),
+
+    /// Hyper http transport
+    #[error(transparent)]
+    #[cfg(feature = "hyper")]
+    Hyper(#[from] hyper::Error),
 }
 
 impl TransportError {

@@ -1,3 +1,4 @@
+#[cfg(feature = "hyper")]
 mod hyper;
 
 #[cfg(feature = "reqwest")]
