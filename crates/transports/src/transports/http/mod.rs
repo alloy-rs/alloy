@@ -17,6 +17,7 @@ use url::Url;
 ///
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]
+#[cfg_attr(feature = "hyper", doc = " - [`::hyper::client::Client`]")]
 #[derive(Debug, Clone)]
 pub struct Http<T> {
     client: T,
