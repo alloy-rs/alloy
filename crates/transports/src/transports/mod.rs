@@ -62,6 +62,8 @@ impl<T> Transport for T where
 /// Most higher-level types will be generic over `T: Transport = BoxTransport`.
 /// This allows paramterization with a concrete type, while hiding this
 /// complexity from the library consumer.
+///
+/// [`RpcClient`]: crate::client::RpcClient
 #[repr(transparent)]
 pub struct BoxTransport {
     inner: Box<dyn CloneTransport + Send + Sync>,
