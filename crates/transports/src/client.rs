@@ -1,6 +1,8 @@
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use serde_json::value::RawValue;
-use tower::{layer::util::Stack, Layer, ServiceBuilder};
+use tower::{
+    layer::util::{Identity, Stack},
+    Layer, ServiceBuilder,
+};
 
 use std::{
     borrow::Cow,
@@ -29,6 +31,14 @@ pub struct RpcClient<T> {
     pub(crate) is_local: bool,
     /// The next request ID to use.
     pub(crate) id: AtomicU64,
+}
+
+impl RpcClient<Identity> {
+    pub fn builder() -> ClientBuilder<Identity> {
+        ClientBuilder {
+            builder: ServiceBuilder::new(),
+        }
+    }
 }
 
 impl<T> RpcClient<T> {
@@ -73,7 +83,6 @@ impl<T> RpcClient<T> {
 impl<T> RpcClient<T>
 where
     T: Transport + Clone,
-    T::Future: Send,
 {
     /// Create a new [`BatchRequest`] builder.
     #[inline]
@@ -144,6 +153,14 @@ pub struct ClientBuilder<L> {
     builder: ServiceBuilder<L>,
 }
 
+impl Default for ClientBuilder<Identity> {
+    fn default() -> Self {
+        Self {
+            builder: ServiceBuilder::new(),
+        }
+    }
+}
+
 impl<L> ClientBuilder<L> {
     /// Add a middleware layer to the stack.
     ///
@@ -162,37 +179,34 @@ impl<L> ClientBuilder<L> {
         L: Layer<T>,
         T: Transport,
         L::Service: Transport,
-        <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {
         RpcClient::new(self.builder.service(transport), is_local)
     }
 
-    #[cfg(feature = "reqwest")]
     /// Create a new [`RpcClient`] with a [`reqwest`] HTTP transport connecting
     /// to the given URL and the configured layers.
+    #[cfg(feature = "reqwest")]
     pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
         L: Layer<Http<reqwest::Client>>,
         L::Service: Transport,
-        <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {
         let transport = Http::new(url);
-        let is_local = transport.is_local();
+        let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
     }
 
-    #[cfg(feature = "hyper")]
     /// Create a new [`RpcClient`] with a [`hyper`] HTTP transport connecting
     /// to the given URL and the configured layers.
+    #[cfg(feature = "hyper")]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
         L: Layer<Http<hyper::client::Client<hyper::client::HttpConnector>>>,
         L::Service: Transport,
-        <L::Service as tower::Service<Box<RawValue>>>::Future: Send,
     {
         let transport = Http::new(url);
-        let is_local = transport.is_local();
+        let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
     }

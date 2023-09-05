@@ -3,7 +3,7 @@ use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
 
-use crate::{Http, TransportError};
+use crate::{Http, TransportError, TransportFut};
 
 impl<C> Http<Client<C>>
 where
@@ -44,8 +44,7 @@ where
 {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future = TransportFut;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
@@ -65,8 +64,7 @@ where
 {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future = TransportFut;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {

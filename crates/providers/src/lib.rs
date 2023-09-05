@@ -54,7 +54,8 @@ where
     }
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 /// Provider is parameterized with a network and a transport. The default
 /// transport is type-erased, but you can do `Provider<N, Http>`.
 pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
@@ -105,7 +106,8 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     }
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T> {
     fn client(&self) -> &NetworkRpcClient<N, T> {
         self

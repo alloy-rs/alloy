@@ -1,4 +1,4 @@
-#[cfg(feature = "hyper")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
 #[cfg(feature = "reqwest")]
@@ -41,12 +41,35 @@ impl<T> Http<T> {
         Self { client, url }
     }
 
-    /// True if the connection has no hostname, or the hostname is `localhost`
-    /// or `127.0.0.1`.
-    pub fn is_local(&self) -> bool {
+    /// Set the URL.
+    pub fn set_url(&mut self, url: Url) {
+        self.url = url;
+    }
+
+    /// Set the client.
+    pub fn set_client(&mut self, client: T) {
+        self.client = client;
+    }
+
+    /// Guess whether the URL is local, based on the hostname.
+    ///
+    /// The ouput of this function is best-efforts, and should be checked if
+    /// possible. It simply returns `true` if the connection has no hostname,
+    /// or the hostname is `localhost` or `127.0.0.1`.
+    pub fn guess_local(&self) -> bool {
         self.url
             .host_str()
             .map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+    }
+
+    /// Get a reference to the client.
+    pub fn client(&self) -> &T {
+        &self.client
+    }
+
+    /// Get a reference to the URL.
+    pub fn url(&self) -> &str {
+        self.url.as_ref()
     }
 }
 
@@ -57,7 +80,7 @@ where
     /// Create a new [`RpcClient`] from a URL.
     pub fn new_http(url: Url) -> Self {
         let transport = Http::new(url);
-        let is_local = transport.is_local();
+        let is_local = transport.guess_local();
         Self {
             transport,
             is_local,

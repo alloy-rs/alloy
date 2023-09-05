@@ -1,6 +1,7 @@
 use crate::{
     error::TransportError,
     transports::{JsonRpcLayer, JsonRpcService, Transport},
+    RpcFut,
 };
 
 use alloy_json_rpc::{Request, RpcParam, RpcResult, RpcReturn};
@@ -15,7 +16,6 @@ use tower::{Layer, Service};
 enum CallState<Params, Conn>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
 {
     Prepared {
@@ -32,7 +32,6 @@ where
 impl<Params, Conn> CallState<Params, Conn>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
 {
     fn poll_prepared(
@@ -79,7 +78,6 @@ where
 impl<Params, Conn> Future for CallState<Params, Conn>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
 {
     type Output = RpcResult<Box<RawValue>, TransportError>;
@@ -120,7 +118,6 @@ where
 pub struct RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
 {
     #[pin]
@@ -131,7 +128,6 @@ where
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
 {
     #[doc(hidden)]
@@ -164,14 +160,11 @@ where
 impl<'a, Conn, Params, Resp> RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam + 'a,
     Resp: RpcReturn,
 {
     /// Convert this future into a boxed, pinned future, erasing its type.
-    pub fn boxed(
-        self,
-    ) -> Pin<Box<dyn Future<Output = RpcResult<Resp, TransportError>> + Send + 'a>> {
+    pub fn boxed(self) -> RpcFut<'a, Resp> {
         Box::pin(self)
     }
 }
@@ -179,7 +172,6 @@ where
 impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
-    Conn::Future: Send,
     Params: RpcParam,
     Resp: RpcReturn,
 {
