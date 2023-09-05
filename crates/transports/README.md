@@ -58,4 +58,4 @@ let balance = balance_fut.await.unwrap();
 ### Features
 
 - `reqwest`: Enables the `reqwest` transport implementation.
-- `hyper`: Enables the `hyper` transport implementation.
+- `hyper`: Enables the `hyper` transport implementation (not available in WASM).

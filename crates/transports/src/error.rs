@@ -28,7 +28,7 @@ pub enum TransportError {
 
     /// Hyper http transport
     #[error(transparent)]
-    #[cfg(feature = "hyper")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     Hyper(#[from] hyper::Error),
 }
 

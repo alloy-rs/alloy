@@ -5,27 +5,30 @@ mod json_service;
 pub(crate) use json_service::{JsonRpcLayer, JsonRpcService};
 
 use serde_json::value::RawValue;
-use std::{future::Future, pin::Pin};
+use std::fmt::Debug;
 use tower::Service;
 
-use crate::TransportError;
+use crate::{TransportError, TransportFut};
 
 /// A marker trait for transports.
 ///
+/// # Implementing `Transport`
+///
 /// This trait is blanket implemented for all appropriate types. To implement
 /// this trait, you must implement the [`tower::Service`] trait with the
-/// appropriate associated types.
+/// appropriate associated types. It cannot be implemented directly.
 pub trait Transport:
     private::Sealed
     + Service<
         Box<RawValue>,
         Response = Box<RawValue>,
         Error = TransportError,
-        Future = Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>>,
+        Future = TransportFut<'static>,
     > + Send
     + Sync
     + 'static
 {
+    /// Convert this transport into a boxed trait object.
     fn boxed(self) -> BoxTransport
     where
         Self: Sized + Clone + Send + Sync + 'static,
@@ -42,15 +45,34 @@ impl<T> Transport for T where
             Box<RawValue>,
             Response = Box<RawValue>,
             Error = TransportError,
-            Future = Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>>,
+            Future = TransportFut<'static>,
         > + Send
         + Sync
         + 'static
 {
 }
 
+/// A boxed, Clone-able [`Transport`] trait object.
+///
+/// This type allows [`RpcClient`] to use a type-erased transport. It is
+/// [`Clone`] and [`Send`] + [`Sync`], and implementes [`Transport`]. This
+/// allows for complex behavior abstracting across several different clients
+/// with different transport types.
+///
+/// Most higher-level types will be generic over `T: Transport = BoxTransport`.
+/// This allows paramterization with a concrete type, while hiding this
+/// complexity from the library consumer.
+///
+/// [`RpcClient`]: crate::client::RpcClient
+#[repr(transparent)]
 pub struct BoxTransport {
     inner: Box<dyn CloneTransport + Send + Sync>,
+}
+
+impl Debug for BoxTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BoxTransport").finish()
+    }
 }
 
 impl Clone for BoxTransport {
@@ -61,6 +83,7 @@ impl Clone for BoxTransport {
     }
 }
 
+/// Helper trait for constructing [`BoxTransport`].
 trait CloneTransport: Transport {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync>;
 }
@@ -79,7 +102,7 @@ impl Service<Box<RawValue>> for BoxTransport {
 
     type Error = TransportError;
 
-    type Future = Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>>;
+    type Future = TransportFut<'static>;
 
     fn poll_ready(
         &mut self,
@@ -110,9 +133,7 @@ mod private {
                 Box<RawValue>,
                 Response = Box<RawValue>,
                 Error = TransportError,
-                Future = Pin<
-                    Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send>,
-                >,
+                Future = TransportFut<'static>,
             > + Send
             + Sync
             + 'static

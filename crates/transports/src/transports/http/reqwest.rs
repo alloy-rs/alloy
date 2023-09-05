@@ -1,14 +1,12 @@
 use serde_json::value::RawValue;
-use std::{future::Future, pin::Pin, task};
+use std::task;
 use tower::Service;
 
-use crate::{Http, TransportError};
+use crate::{Http, TransportError, TransportFut};
 
 impl Http<reqwest::Client> {
-    fn request(
-        &self,
-        req: Box<RawValue>,
-    ) -> Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send + 'static>> {
+    /// Make a request.
+    fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             let resp = this.client.post(this.url).json(&req).send().await?;
@@ -22,8 +20,7 @@ impl Http<reqwest::Client> {
 impl Service<Box<RawValue>> for Http<reqwest::Client> {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future = TransportFut<'static>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
@@ -40,8 +37,7 @@ impl Service<Box<RawValue>> for Http<reqwest::Client> {
 impl Service<Box<RawValue>> for &Http<reqwest::Client> {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future =
-        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future = TransportFut<'static>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {

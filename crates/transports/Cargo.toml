@@ -27,7 +27,11 @@ pin-project.workspace = true
 
 # feature deps
 reqwest = { version = "0.11.18", features = ["serde_json", "json"], optional = true }
-hyper = { version = "0.14.27", optional = true, features = ["full"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
+version = "0.14.27"
+optional = true
+features = ["full"]
 
 [features]
 default = ["reqwest", "hyper"]
