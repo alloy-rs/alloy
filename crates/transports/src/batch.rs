@@ -63,7 +63,6 @@ where
 pub enum BatchFuture<Conn>
 where
     Conn: Transport + Clone,
-    // Conn::Future: Send,
 {
     Prepared {
         transport: Conn,
@@ -250,7 +249,6 @@ where
 impl<T> Future for BatchFuture<T>
 where
     T: Transport + Clone,
-    // T::Future: Send,
 {
     type Output = Result<(), TransportError>;
 
