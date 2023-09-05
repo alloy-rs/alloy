@@ -5,6 +5,7 @@ use tower::Service;
 use crate::{Http, TransportError, TransportFut};
 
 impl Http<reqwest::Client> {
+    /// Make a request.
     fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {

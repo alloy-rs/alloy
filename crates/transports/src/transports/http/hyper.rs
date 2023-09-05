@@ -9,7 +9,8 @@ impl<C> Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
-    pub fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
+    /// Make a request.
+    fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             // convert the Box<RawValue> into a hyper request<B>
