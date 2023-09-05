@@ -199,7 +199,7 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with a [`hyper`] HTTP transport connecting
     /// to the given URL and the configured layers.
-    #[cfg(feature = "hyper")]
+    #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
         L: Layer<Http<hyper::client::Client<hyper::client::HttpConnector>>>,
