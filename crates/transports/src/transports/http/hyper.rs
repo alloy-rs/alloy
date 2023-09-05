@@ -1,6 +1,6 @@
 use hyper::client::{connect::Connect, Client};
 use serde_json::value::RawValue;
-use std::{future::Future, pin::Pin, task};
+use std::task;
 use tower::Service;
 
 use crate::{Http, TransportError, TransportFut};
@@ -9,10 +9,7 @@ impl<C> Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
-    pub fn request(
-        &self,
-        req: Box<RawValue>,
-    ) -> Pin<Box<dyn Future<Output = Result<Box<RawValue>, TransportError>> + Send + 'static>> {
+    pub fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             // convert the Box<RawValue> into a hyper request<B>
@@ -44,7 +41,7 @@ where
 {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future = TransportFut;
+    type Future = TransportFut<'static>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
@@ -64,7 +61,7 @@ where
 {
     type Response = Box<RawValue>;
     type Error = TransportError;
-    type Future = TransportFut;
+    type Future = TransportFut<'static>;
 
     #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
