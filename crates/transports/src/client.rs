@@ -51,6 +51,23 @@ impl<T> RpcClient<T> {
         }
     }
 
+    /// Build a `JsonRpcRequest` with the given method and params.
+    ///
+    /// This function reserves an ID for the request, however the request
+    /// is not sent. To send a request, use [`RpcClient::prepare`] and await
+    /// the returned [`RpcCall`].
+    pub fn make_request<'a, Params: RpcParam>(
+        &self,
+        method: &'static str,
+        params: Cow<'a, Params>,
+    ) -> Request<Cow<'a, Params>> {
+        Request {
+            method,
+            params,
+            id: self.next_id(),
+        }
+    }
+
     /// `true` if the client believes the transport is local.
     ///
     /// This can be used to optimize remote API usage, or to change program
@@ -88,23 +105,6 @@ where
     #[inline]
     pub fn new_batch(&self) -> BatchRequest<T> {
         BatchRequest::new(self)
-    }
-
-    /// Build a `JsonRpcRequest` with the given method and params.
-    ///
-    /// This function reserves an ID for the request, however the request
-    /// is not sent. To send a request, use [`RpcClient::prepare`] and await
-    /// the returned [`RpcCall`].
-    pub fn make_request<'a, Params: RpcParam>(
-        &self,
-        method: &'static str,
-        params: Cow<'a, Params>,
-    ) -> Request<Cow<'a, Params>> {
-        Request {
-            method,
-            params,
-            id: self.next_id(),
-        }
     }
 
     /// Prepare an [`RpcCall`].
