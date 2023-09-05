@@ -21,14 +21,18 @@ type ChannelMap = HashMap<Id, Channel>;
 /// call.
 #[derive(Debug)]
 pub struct BatchRequest<'a, T> {
+    /// The transport via which the batch will be sent.
     transport: &'a RpcClient<T>,
 
+    /// The requests to be sent.
     requests: Vec<Box<RawValue>>,
 
+    /// The channels to send the responses through.
     channels: ChannelMap,
 }
 
 /// Awaits a single response for a request that has been included in a batch.
+#[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
 pub struct Waiter<Resp> {
     rx: oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>>,
     _resp: PhantomData<Resp>,
@@ -62,7 +66,7 @@ where
 #[pin_project::pin_project(project = CallStateProj)]
 pub enum BatchFuture<Conn>
 where
-    Conn: Transport + Clone,
+    Conn: Transport,
 {
     Prepared {
         transport: Conn,
