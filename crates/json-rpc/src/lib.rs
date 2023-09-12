@@ -11,6 +11,9 @@
 
 use serde::{de::DeserializeOwned, Serialize};
 
+mod notification;
+pub use notification::EthNotification;
+
 mod request;
 pub use request::Request;
 

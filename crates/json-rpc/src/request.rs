@@ -32,7 +32,7 @@ where
         map.serialize_entry("method", self.method)?;
 
         // Params may be omitted if it is 0-sized
-        if !is_zst::<Params>() {
+        if std::mem::size_of::<Params>() != 0 {
             map.serialize_entry("params", &self.params)?;
         }
 
@@ -40,8 +40,4 @@ where
         map.serialize_entry("jsonrpc", "2.0")?;
         map.end()
     }
-}
-
-fn is_zst<T>() -> bool {
-    std::mem::size_of::<T>() == 0
 }
