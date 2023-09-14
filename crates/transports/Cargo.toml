@@ -27,6 +27,9 @@ pin-project.workspace = true
 
 # feature deps
 reqwest = { version = "0.11.18", features = ["serde_json", "json"], optional = true }
+alloy-primitives.workspace = true
+tokio = "1.32.0"
+bimap = "0.6.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
 version = "0.14.27"

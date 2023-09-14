@@ -17,6 +17,10 @@ pub use batch::BatchRequest;
 mod transports;
 pub use transports::{BoxTransport, Http, Transport};
 
+/// Tools for working with [`PubSub`] transports.
+pub mod pubsub;
+pub use pubsub::{BoxPubSub, PubSub};
+
 pub use alloy_json_rpc::RpcResult;
 
 pub(crate) mod utils;
