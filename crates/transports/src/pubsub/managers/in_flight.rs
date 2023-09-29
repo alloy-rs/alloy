@@ -1,7 +1,7 @@
 use alloy_json_rpc::{Request, ResponsePayload};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::oneshot;
 
 use crate::TransportError;
 
