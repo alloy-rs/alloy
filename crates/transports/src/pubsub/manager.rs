@@ -18,6 +18,7 @@ impl SubscriptionManager {
         &self.aliases
     }
 
+    /// Drop all aliases.
     pub fn drop_aliases(&mut self) {
         self.aliases.clear();
     }
@@ -73,7 +74,10 @@ impl SubscriptionManager {
     }
 
     /// Send a notification. Remove the sub and alias if sending fails.
-    pub fn send(&mut self, notification: EthNotification<Box<serde_json::value::RawValue>>) {
+    pub fn forward_notification(
+        &mut self,
+        notification: EthNotification<Box<serde_json::value::RawValue>>,
+    ) {
         if let Some(sub) = self.sub_mut_by_alias(notification.subscription) {
             if let Err(_) = sub.notify(notification.result) {
                 self.remove_sub_and_alias(notification.subscription);

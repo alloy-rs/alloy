@@ -15,6 +15,9 @@ use crate::{Transport, TransportError, TransportFut};
 pub trait PubSub: Transport {
     /// Reserve an ID for a subscription, based on the JSON-RPC request ID of
     /// the subscription request.
+    ///
+    /// This is intended for internal use by RPC clients, and should not be
+    /// called directly.
     fn reserve_id(&self, id: &Id) -> U256;
 
     /// Get a [`broadcast::Receiver`] for the given subscription ID.
@@ -83,11 +86,11 @@ impl Service<Box<RawValue>> for BoxPubSub {
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        Service::<Box<RawValue>>::poll_ready(&mut self.inner, cx)
     }
 
     fn call(&mut self, req: Box<RawValue>) -> Self::Future {
-        self.inner.call(req)
+        Service::<Box<RawValue>>::call(&mut self.inner, req)
     }
 }
 

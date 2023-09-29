@@ -17,14 +17,12 @@ pub use batch::BatchRequest;
 mod transports;
 pub use transports::{BoxTransport, Http, Transport};
 
-/// Tools for working with [`PubSub`] transports.
-pub mod pubsub;
+mod pubsub;
 pub use pubsub::{BoxPubSub, PubSub};
-
-pub use alloy_json_rpc::RpcResult;
 
 pub(crate) mod utils;
 
+pub use alloy_json_rpc::RpcResult;
 pub use type_aliases::*;
 
 #[cfg(not(target_arch = "wasm32"))]

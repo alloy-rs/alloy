@@ -7,4 +7,5 @@ pub use manager::SubscriptionManager;
 mod pubsub;
 pub use pubsub::{BoxPubSub, PubSub};
 
-pub mod backend;
+mod service;
+pub use service::{ConnectionHandle, PubSubConnect, PubSubService};

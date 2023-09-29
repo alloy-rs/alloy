@@ -18,18 +18,23 @@ pub enum TransportError {
     #[error("Missing response in batch request")]
     MissingBatchResponse,
 
+    /// Custom error
     #[error(transparent)]
     Custom(Box<dyn StdError + Send + Sync + 'static>),
 
-    /// Hyper http transport
+    /// Hyper http transport.
     #[error(transparent)]
     #[cfg(feature = "reqwest")]
     Reqwest(#[from] reqwest::Error),
 
-    /// Hyper http transport
+    /// Hyper http transport.
     #[error(transparent)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     Hyper(#[from] hyper::Error),
+
+    /// Tungstenite websocket transport.
+    #[error(transparent)]
+    Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
 }
 
 impl TransportError {

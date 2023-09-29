@@ -12,7 +12,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 
 mod notification;
-pub use notification::EthNotification;
+pub use notification::{EthNotification, PubSubItem};
 
 mod request;
 pub use request::Request;

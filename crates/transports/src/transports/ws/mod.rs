@@ -1,3 +1,5 @@
-pub struct WsBackend {}
+mod backend;
+pub use backend::WsBackend;
 
-pub struct WsFrontend {}
+mod connect;
+pub use connect::WsConnect;

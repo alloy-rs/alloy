@@ -43,6 +43,7 @@ pub enum ResponsePayload {
 /// either a successful result or an error. The `id` field is used to match
 /// the response to the request that it is responding to, and should be
 /// mirrored from the response.
+#[derive(Debug, Clone)]
 pub struct Response {
     pub id: Id,
     pub payload: ResponsePayload,
