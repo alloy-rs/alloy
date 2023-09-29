@@ -1,4 +1,4 @@
-use alloy_json_rpc::{EthNotification, Request};
+use alloy_json_rpc::Request;
 use serde_json::value::RawValue;
 use tokio::sync::broadcast;
 
@@ -43,10 +43,14 @@ impl ActiveSubscription {
     }
 
     /// Notify the subscription channel of a new value.
+    ///
+    /// # Errors
+    ///
+    /// When there are no listeners
     pub fn notify(
         &mut self,
         notification: Box<RawValue>,
-    ) -> Result<usize, broadcast::error::SendError<Box<RawValue>>> {
-        self.tx.send(notification)
+    ) -> Result<(), broadcast::error::SendError<Box<RawValue>>> {
+        self.tx.send(notification).map(|_| ())
     }
 }

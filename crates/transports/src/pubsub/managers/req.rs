@@ -1,10 +1,12 @@
-use alloy_json_rpc::{Id, Request, Response, ResponsePayload, RpcParam};
+use alloy_json_rpc::{Id, Request, Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
 use std::collections::BTreeMap;
 use tokio::sync::oneshot;
 
 use crate::{pubsub::InFlight, TransportError};
+
+use super::in_flight;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
@@ -13,22 +15,9 @@ pub struct RequestManager {
 }
 
 impl RequestManager {
-    /// Add a request to the manager, returning the request ID and a channel
-    /// to receive the response.
-    pub fn add_req(
-        &mut self,
-        req: Request<Box<RawValue>>,
-    ) -> (
-        Id,
-        oneshot::Receiver<Result<ResponsePayload, TransportError>>,
-    ) {
-        let id = req.id.clone();
-
-        let (in_flight, rx) = InFlight::new(req);
-
-        self.reqs.insert(id.clone(), in_flight);
-
-        (id, rx)
+    /// Insert a new in-flight request.
+    pub fn insert(&mut self, in_flight: InFlight) {
+        self.reqs.insert(in_flight.request.id.clone(), in_flight);
     }
 
     /// Get a reference to an in-flight request.

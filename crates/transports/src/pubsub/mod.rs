@@ -1,8 +1,8 @@
 mod managers;
 pub use managers::{ActiveSubscription, InFlight, RequestManager, SubscriptionManager};
 
-mod pubsub;
-pub use pubsub::{BoxPubSub, PubSub};
+mod r#trait;
+pub use r#trait::{BoxPubSub, PubSub};
 
 mod service;
 pub use service::PubSubService;

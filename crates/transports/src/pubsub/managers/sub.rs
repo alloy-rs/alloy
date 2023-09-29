@@ -11,7 +11,7 @@ use crate::pubsub::managers::ActiveSubscription;
 #[derive(Default, Debug)]
 pub struct SubscriptionManager {
     subs: BTreeMap<Id, ActiveSubscription>,
-    aliases: BiBTreeMap<U256, Id>,
+    server_ids: BiBTreeMap<U256, Id>,
 }
 
 impl SubscriptionManager {
@@ -19,25 +19,41 @@ impl SubscriptionManager {
     pub fn insert(
         &mut self,
         request: Request<Box<RawValue>>,
-        alias: U256,
+        server_id: U256,
     ) -> broadcast::Receiver<Box<RawValue>> {
         let id = request.id.clone();
 
         let (sub, rx) = ActiveSubscription::new(request);
         self.subs.insert(id.clone(), sub);
-        self.aliases.insert(alias, id);
+        self.server_ids.insert(server_id, id);
 
         rx
     }
 
-    /// Get a ref to the alias bimap.
-    pub fn aliases(&self) -> &BiBTreeMap<U256, Id> {
-        &self.aliases
+    /// Calculates an alias based on the ID. This alias is given to the waiting
+    /// subscribers.
+    pub fn alias(&self, server_id: U256) -> Option<U256> {
+        let id = self.server_ids.get_by_left(&server_id)?;
+        match id {
+            Id::Number(n) => Some(U256::from(*n)),
+            Id::String(s) => {
+                let mut buf = [0u8; 32];
+                let cap = if s.len() > 32 { 32 } else { s.len() };
+                buf[..cap].copy_from_slice(s.as_bytes());
+                Some(U256::from_be_bytes::<32>(buf))
+            }
+            Id::None => None,
+        }
     }
 
-    /// Drop all aliases.
-    pub fn drop_aliases(&mut self) {
-        self.aliases.clear();
+    /// Get a ref to the server_id bimap.
+    pub fn server_ids(&self) -> &BiBTreeMap<U256, Id> {
+        &self.server_ids
+    }
+
+    /// Drop all server_ids.
+    pub fn drop_server_ids(&mut self) {
+        self.server_ids.clear();
     }
 
     /// Get a reference to a subscription.
@@ -50,18 +66,18 @@ impl SubscriptionManager {
         self.subs.get_mut(id)
     }
 
-    /// Get a mutable reference to a subscription by alias.
-    pub fn sub_mut_by_alias(&mut self, alias: U256) -> Option<&mut ActiveSubscription> {
-        if let Some(id) = self.aliases.get_by_left(&alias) {
+    /// Get a mutable reference to a subscription by server_id.
+    pub fn sub_mut_by_server_id(&mut self, server_id: U256) -> Option<&mut ActiveSubscription> {
+        if let Some(id) = self.server_ids.get_by_left(&server_id) {
             self.subs.get_mut(id)
         } else {
             None
         }
     }
 
-    /// Change the alias of a subscription.
-    pub fn change_alias(&mut self, id: &Id, alias: U256) {
-        self.aliases.insert(alias, id.clone());
+    /// Change the server_id of a subscription.
+    pub fn change_server_id(&mut self, id: &Id, server_id: U256) {
+        self.server_ids.insert(server_id, id.clone());
     }
 
     /// Get sub params.
@@ -69,9 +85,9 @@ impl SubscriptionManager {
         self.subs.get(id).map(|sub| sub.params())
     }
 
-    /// Get sub params by alias.
-    pub fn params_by_alias(&self, alias: U256) -> Option<&serde_json::value::RawValue> {
-        if let Some(id) = self.aliases.get_by_left(&alias) {
+    /// Get sub params by server_id.
+    pub fn params_by_server_id(&self, server_id: U256) -> Option<&serde_json::value::RawValue> {
+        if let Some(id) = self.server_ids.get_by_left(&server_id) {
             self.params(id)
         } else {
             None
@@ -85,7 +101,7 @@ impl SubscriptionManager {
 
     /// Remove a subscription and the alias.
     pub fn remove_sub_and_alias(&mut self, alias: U256) {
-        if let Some((_, id)) = self.aliases.remove_by_left(&alias) {
+        if let Some((_, id)) = self.server_ids.remove_by_left(&alias) {
             self.subs.remove(&id);
         }
     }
@@ -94,11 +110,14 @@ impl SubscriptionManager {
     pub fn forward_notification(
         &mut self,
         notification: EthNotification<Box<serde_json::value::RawValue>>,
-    ) {
-        if let Some(sub) = self.sub_mut_by_alias(notification.subscription) {
-            if let Err(_) = sub.notify(notification.result) {
+    ) -> Result<(), broadcast::error::SendError<Box<RawValue>>> {
+        if let Some(sub) = self.sub_mut_by_server_id(notification.subscription) {
+            let res = sub.notify(notification.result);
+            if res.is_err() {
                 self.remove_sub_and_alias(notification.subscription);
             }
+            return res;
         }
+        Ok(())
     }
 }

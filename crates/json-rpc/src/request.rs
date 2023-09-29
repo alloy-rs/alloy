@@ -36,7 +36,7 @@ where
         }
     }
 
-    /// Convert to a boxed [`RawValue`].
+    /// Convert the entire request to a boxed [`RawValue`].
     pub fn to_boxed_raw_value(&self) -> serde_json::Result<Box<RawValue>> {
         serde_json::to_string(&self).and_then(RawValue::from_string)
     }

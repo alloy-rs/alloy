@@ -1,6 +1,5 @@
 use std::{future::Future, pin::Pin};
 
-use serde_json::value::RawValue;
 use tokio::sync::mpsc;
 
 use crate::pubsub::{ConnectionHandle, InFlight, PubSubService};

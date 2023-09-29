@@ -27,6 +27,7 @@ impl PartialOrd for Id {
         }
     }
 }
+
 impl Ord for Id {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()

@@ -1,11 +1,9 @@
-use alloy_json_rpc::{Request, ResponsePayload, RpcParam};
+use alloy_json_rpc::{Request, ResponsePayload};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
-use tokio::sync::oneshot;
+use tokio::sync::{broadcast, oneshot};
 
 use crate::TransportError;
-
-use crate::pubsub::ActiveSubscription;
 
 /// An in-flight JSON-RPC request.
 ///
@@ -42,6 +40,7 @@ impl InFlight {
         oneshot::Receiver<Result<ResponsePayload, TransportError>>,
     ) {
         let (tx, rx) = oneshot::channel();
+
         (Self { request, tx }, rx)
     }
 
@@ -52,7 +51,7 @@ impl InFlight {
 
     /// Get the method
     pub fn method(&self) -> &'static str {
-        &self.request.method
+        self.request.method
     }
 
     /// Serialize the request as a boxed [`RawValue`].
