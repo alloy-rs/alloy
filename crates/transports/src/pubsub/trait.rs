@@ -97,7 +97,7 @@ impl Service<Box<RawValue>> for BoxPubSub {
 /// checks trait + send + sync + 'static
 fn __compile_check() {
     fn inner<T: ClonePubSub>() {
-        todo!()
+        unimplemented!()
     }
     inner::<BoxPubSub>();
 }

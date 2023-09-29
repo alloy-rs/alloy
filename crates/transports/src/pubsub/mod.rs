@@ -5,7 +5,7 @@ mod r#trait;
 pub use r#trait::{BoxPubSub, PubSub};
 
 mod service;
-pub use service::PubSubService;
+pub use service::{PubSubInstruction, PubSubService};
 
 mod handle;
 pub use handle::ConnectionHandle;

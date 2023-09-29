@@ -18,7 +18,7 @@ mod transports;
 pub use transports::{BoxTransport, Http, Transport};
 
 mod pubsub;
-pub use pubsub::{BoxPubSub, PubSub};
+pub use pubsub::{BoxPubSub, PubSub, PubSubConnect};
 
 pub(crate) mod utils;
 

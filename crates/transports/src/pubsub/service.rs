@@ -1,6 +1,10 @@
-use alloy_json_rpc::{PubSubItem, Request, ResponsePayload};
+use alloy_json_rpc::{PubSubItem, ResponsePayload};
 use alloy_primitives::U256;
-use tokio::task::JoinHandle;
+use serde_json::value::RawValue;
+use tokio::{
+    sync::{broadcast, oneshot},
+    task::JoinHandle,
+};
 
 use crate::{
     pubsub::{
@@ -10,6 +14,23 @@ use crate::{
     utils::to_json_raw_value,
     TransportError,
 };
+
+/// Instructions for the pubsub service.
+pub enum PubSubInstruction {
+    /// Send a request.
+    Request(InFlight),
+    /// Get the subscription ID for a server ID.
+    GetSub(U256, oneshot::Sender<broadcast::Receiver<Box<RawValue>>>),
+}
+
+impl std::fmt::Debug for PubSubInstruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Request(arg0) => f.debug_tuple("Request").field(arg0).finish(),
+            Self::GetSub(arg0, _) => f.debug_tuple("GetSub").field(arg0).finish(),
+        }
+    }
+}
 
 #[derive(Debug)]
 /// The service contains the backend handle, a subscription manager, and the
@@ -22,7 +43,7 @@ pub struct PubSubService<T> {
     pub(crate) connector: T,
 
     /// The inbound requests.
-    pub(crate) reqs: tokio::sync::mpsc::UnboundedReceiver<InFlight>,
+    pub(crate) reqs: tokio::sync::mpsc::UnboundedReceiver<PubSubInstruction>,
 
     /// The subscription manager.
     pub(crate) subs: SubscriptionManager,
@@ -36,37 +57,103 @@ where
     T: PubSubConnect,
 {
     /// Reconnect by dropping the backend and creating a new one.
-    pub async fn reconnect(&mut self) -> Result<(), T::Error> {
-        let handle = self.connector.connect().await?;
-        self.handle = handle;
+    async fn get_new_backend(&mut self) -> Result<ConnectionHandle, T::Error> {
+        let mut handle = self.connector.connect().await?;
+        std::mem::swap(&mut self.handle, &mut handle);
+        Ok(handle)
+    }
+
+    pub async fn reconnect(&mut self) -> Result<(), TransportError> {
+        tracing::info!("Reconnecting pubsub service backend.");
+
+        let mut old_handle = self
+            .get_new_backend()
+            .await
+            .map_err(TransportError::custom)?;
+
+        tracing::debug!("Draining old backend to_handle");
+
+        // Drain the old backend
+        while let Ok(item) = old_handle.from_socket.try_recv() {
+            self.handle_item(item)?;
+        }
+
+        old_handle.shutdown();
+
+        // Re-issue pending requests.
+        tracing::debug!(count = self.in_flights.len(), "Reissuing pending requests");
+        self.in_flights
+            .iter()
+            .map(|(_, in_flight)| in_flight.req_json().map_err(TransportError::ser_err))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .try_for_each(|brv| self.dispatch_request(brv))?;
+
+        // Re-subscribe to all active subscriptions
+        tracing::debug!(count = self.subs.len(), "Re-starting active subscriptions");
+
+        // Drop all server IDs. We'll re-insert them as we get responses.
+        self.subs.drop_server_ids();
+        // Dispatch all subscription requests
+        self.subs
+            .iter()
+            .map(|(_, sub)| sub.req_json().map_err(TransportError::custom))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .try_for_each(|brv| self.dispatch_request(brv))?;
+
         Ok(())
+    }
+
+    /// Dispatch a request to the socket.
+    fn dispatch_request(&mut self, brv: Box<RawValue>) -> Result<(), TransportError> {
+        self.handle
+            .to_socket
+            .send(brv)
+            .map(|_| ())
+            .map_err(|_| TransportError::BackendGone)
     }
 
     /// Service a request.
     async fn service_request(&mut self, in_flight: InFlight) -> Result<(), TransportError> {
         let brv = in_flight.req_json().map_err(TransportError::ser_err)?;
 
+        self.dispatch_request(brv)?;
         self.in_flights.insert(in_flight);
-        if self.handle.to_socket.send(brv).is_err() {
-            self.reconnect().await.map_err(TransportError::custom)?;
-        }
 
         Ok(())
     }
 
+    /// Service a GetSub instruction.
+    fn service_get_sub(
+        &mut self,
+        alias: U256,
+        tx: oneshot::Sender<broadcast::Receiver<Box<RawValue>>>,
+    ) -> Result<(), TransportError> {
+        let rx = self.subs.get_rx_by_alias(alias).unwrap();
+        let _ = tx.send(rx);
+
+        Ok(())
+    }
+
+    /// Service an instruction
+    async fn service_ix(&mut self, ix: PubSubInstruction) -> Result<(), TransportError> {
+        tracing::trace!(?ix, "servicing instruction");
+        match ix {
+            PubSubInstruction::Request(in_flight) => self.service_request(in_flight).await,
+            PubSubInstruction::GetSub(alias, tx) => self.service_get_sub(alias, tx),
+        }
+    }
+
     /// Handle an item from the backend.
-    async fn handle_item(&mut self, item: PubSubItem) -> Result<(), TransportError> {
+    fn handle_item(&mut self, item: PubSubItem) -> Result<(), TransportError> {
         match item {
             PubSubItem::Response(resp) => match self.in_flights.handle_response(resp) {
                 Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
                 None => Ok(()),
             },
             PubSubItem::Notification(notification) => {
-                let server_id = notification.subscription;
-                // disconnect on err
-                if self.subs.forward_notification(notification).is_err() {
-                    self.unsubscribe(server_id)?;
-                }
+                self.subs.notify(notification);
                 Ok(())
             }
         }
@@ -76,29 +163,18 @@ where
     fn handle_sub_response(
         &mut self,
         in_flight: InFlight,
-        server_id: alloy_primitives::Uint<256, 4>,
+        server_id: U256,
     ) -> Result<(), TransportError> {
         let request = in_flight.request;
+        let id = request.id.clone();
 
-        self.subs.insert(request, server_id);
-        let alias = self.subs.alias(server_id).unwrap();
+        self.subs.upsert(request, server_id);
+        let alias = self.subs.alias_for(&id).unwrap();
 
         // lie to the client about the sub id
         let ser_alias = to_json_raw_value(&alias)?;
         let _ = in_flight.tx.send(Ok(ResponsePayload::Success(ser_alias)));
 
-        Ok(())
-    }
-
-    /// Unsubscribe from a subscription.
-    fn unsubscribe(&mut self, server_id: U256) -> Result<(), TransportError> {
-        let req = Request {
-            method: "eth_unsubscribe",
-            params: to_json_raw_value(&server_id)?,
-            id: alloy_json_rpc::Id::None,
-        };
-        let (in_flight, _) = InFlight::new(req);
-        self.service_request(in_flight);
         Ok(())
     }
 
@@ -114,7 +190,7 @@ where
 
                     item_opt = self.handle.from_socket.recv() => {
                         if let Some(item) = item_opt {
-                            if let Err(e) = self.handle_item(item).await {
+                            if let Err(e) = self.handle_item(item) {
                                 break Err(e)
                             }
                         } else if let Err(e) = self.reconnect().await {
@@ -123,6 +199,7 @@ where
                     }
 
                     _ = &mut self.handle.error => {
+                        tracing::error!("Pubsub service backend error.");
                         if let Err(e) = self.reconnect().await {
                             break Err(TransportError::Custom(Box::new(e)))
                         }
@@ -130,7 +207,7 @@ where
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            if let Err(e) = self.service_request(req).await {
+                            if let Err(e) = self.service_ix(req).await {
                                 break Err(e)
                             }
                         } else {

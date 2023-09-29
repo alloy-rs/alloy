@@ -2,11 +2,11 @@ use std::{future::Future, pin::Pin};
 
 use tokio::sync::mpsc;
 
-use crate::pubsub::{ConnectionHandle, InFlight, PubSubService};
+use crate::pubsub::{ConnectionHandle, PubSubInstruction, PubSubService};
 
 #[derive(Debug, Clone)]
 pub struct PubSubServiceTransport {
-    pub tx: mpsc::UnboundedSender<InFlight>,
+    pub tx: mpsc::UnboundedSender<PubSubInstruction>,
 }
 
 /// Configuration objects that contain connection details for a backend.

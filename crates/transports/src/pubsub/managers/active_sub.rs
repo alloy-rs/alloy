@@ -42,15 +42,11 @@ impl ActiveSubscription {
         serde_json::to_string(&self.request).and_then(RawValue::from_string)
     }
 
-    /// Notify the subscription channel of a new value.
-    ///
-    /// # Errors
-    ///
-    /// When there are no listeners
-    pub fn notify(
-        &mut self,
-        notification: Box<RawValue>,
-    ) -> Result<(), broadcast::error::SendError<Box<RawValue>>> {
-        self.tx.send(notification).map(|_| ())
+    /// Notify the subscription channel of a new value, if any receiver exists.
+    /// If no receiver exists, the notification is dropped.
+    pub fn notify(&mut self, notification: Box<RawValue>) {
+        if self.tx.receiver_count() > 0 {
+            let _ = self.tx.send(notification);
+        }
     }
 }

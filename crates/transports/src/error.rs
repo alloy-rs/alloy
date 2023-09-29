@@ -35,6 +35,10 @@ pub enum TransportError {
     /// Tungstenite websocket transport.
     #[error(transparent)]
     Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
+
+    /// PubSub backend connection task has stopped.
+    #[error("PubSub backend connection task has stopped.")]
+    BackendGone,
 }
 
 impl TransportError {

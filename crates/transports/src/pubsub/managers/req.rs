@@ -1,12 +1,8 @@
-use alloy_json_rpc::{Id, Request, Response, ResponsePayload};
+use alloy_json_rpc::{Id, Response};
 use alloy_primitives::U256;
-use serde_json::value::RawValue;
 use std::collections::BTreeMap;
-use tokio::sync::oneshot;
 
 use crate::{pubsub::InFlight, TransportError};
-
-use super::in_flight;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
@@ -15,6 +11,21 @@ pub struct RequestManager {
 }
 
 impl RequestManager {
+    /// Get the number of in-flight requests.
+    pub fn len(&self) -> usize {
+        self.reqs.len()
+    }
+
+    /// Check if the request manager is empty.
+    pub fn is_empty(&self) -> bool {
+        self.reqs.is_empty()
+    }
+
+    /// Get an iterator over the in-flight requests.
+    pub fn iter(&self) -> impl Iterator<Item = (&Id, &InFlight)> {
+        self.reqs.iter()
+    }
+
     /// Insert a new in-flight request.
     pub fn insert(&mut self, in_flight: InFlight) {
         self.reqs.insert(in_flight.request.id.clone(), in_flight);
