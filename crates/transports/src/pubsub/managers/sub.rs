@@ -86,26 +86,11 @@ impl SubscriptionManager {
         self.server_ids.insert(server_id, id.clone());
     }
 
-    /// Remove a subscription.
-    pub fn remove_sub(&mut self, id: &Id) {
-        self.subs.remove(id);
-        self.aliases.remove_by_right(id);
-        self.server_ids.remove_by_right(id);
-    }
-
     /// Remove a subscription by the alias.
     pub fn remove_sub_by_alias(&mut self, alias: U256) {
         if let Some((_, id)) = self.aliases.remove_by_left(&alias) {
             self.subs.remove(&id);
             self.server_ids.remove_by_right(&id);
-        }
-    }
-
-    /// Remove a subscription by the server_id.
-    pub fn remove_sub_by_server_id(&mut self, server_id: U256) {
-        if let Some((_, id)) = self.server_ids.remove_by_left(&server_id) {
-            self.subs.remove(&id);
-            self.aliases.remove_by_right(&id);
         }
     }
 
@@ -126,15 +111,6 @@ impl SubscriptionManager {
     /// Get a receiver for a subscription by alias.
     pub fn get_rx_by_alias(&self, alias: U256) -> Option<broadcast::Receiver<Box<RawValue>>> {
         let id = self.dealias(alias)?;
-        self.get_rx(id)
-    }
-
-    /// Get a receiver for a subscription by server_id.
-    pub fn get_rx_by_server_id(
-        &self,
-        server_id: U256,
-    ) -> Option<broadcast::Receiver<Box<RawValue>>> {
-        let id = self.server_ids.get_by_left(&server_id)?;
         self.get_rx(id)
     }
 }

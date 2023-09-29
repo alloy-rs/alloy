@@ -30,11 +30,6 @@ impl ActiveSubscription {
         (Self { request, tx }, rx)
     }
 
-    /// Get the params
-    pub fn params(&self) -> &RawValue {
-        &self.request.params
-    }
-
     /// Serialize the request as a boxed [`RawValue`].
     ///
     /// This is used to (re-)send the request over the transport.
