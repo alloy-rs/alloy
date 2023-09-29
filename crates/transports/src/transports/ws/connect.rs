@@ -33,6 +33,7 @@ impl PubSubConnect for WsConnect {
     ) -> std::pin::Pin<
         Box<
             dyn std::future::Future<Output = Result<crate::pubsub::ConnectionHandle, Self::Error>>
+                + Send
                 + 'b,
         >,
     > {

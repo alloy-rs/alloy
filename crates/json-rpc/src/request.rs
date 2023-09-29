@@ -1,6 +1,7 @@
 use crate::{common::Id, RpcParam};
 
 use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde_json::value::RawValue;
 
 /// A JSON-RPC 2.0 request object.
 ///
@@ -16,6 +17,29 @@ pub struct Request<Params> {
     pub method: &'static str,
     pub params: Params,
     pub id: Id,
+}
+
+impl<Params> Request<Params>
+where
+    Params: RpcParam,
+{
+    /// Serialize the request parameters as a boxed [`RawValue`].
+    ///
+    /// # Panics
+    ///
+    /// If serialization of the params fails.
+    pub fn box_params(self) -> Request<Box<RawValue>> {
+        Request {
+            method: self.method,
+            params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),
+            id: self.id,
+        }
+    }
+
+    /// Convert to a boxed [`RawValue`].
+    pub fn to_boxed_raw_value(&self) -> serde_json::Result<Box<RawValue>> {
+        serde_json::to_string(&self).and_then(RawValue::from_string)
+    }
 }
 
 // manually implemented to avoid adding a type for the protocol-required

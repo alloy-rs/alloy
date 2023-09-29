@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
-use alloy_json_rpc::{EthNotification, Id};
+use alloy_json_rpc::{EthNotification, Id, Request};
 use alloy_primitives::U256;
 use bimap::BiBTreeMap;
+use serde_json::value::RawValue;
+use tokio::sync::broadcast;
 
-use super::ActiveSubscription;
+use crate::pubsub::managers::ActiveSubscription;
 
 #[derive(Default, Debug)]
 pub struct SubscriptionManager {
@@ -13,6 +15,21 @@ pub struct SubscriptionManager {
 }
 
 impl SubscriptionManager {
+    /// Insert a subscription.
+    pub fn insert(
+        &mut self,
+        request: Request<Box<RawValue>>,
+        alias: U256,
+    ) -> broadcast::Receiver<Box<RawValue>> {
+        let id = request.id.clone();
+
+        let (sub, rx) = ActiveSubscription::new(request);
+        self.subs.insert(id.clone(), sub);
+        self.aliases.insert(alias, id);
+
+        rx
+    }
+
     /// Get a ref to the alias bimap.
     pub fn aliases(&self) -> &BiBTreeMap<U256, Id> {
         &self.aliases
