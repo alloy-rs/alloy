@@ -61,21 +61,20 @@ impl InFlight {
         serde_json::to_string(&self.request).and_then(RawValue::from_string)
     }
 
-    /// Fulfill the request with a response.
+    /// Fulfill the request with a response. This consumes the in-flight
+    /// request. If the request is a subscription and the response is not an
+    /// error, the subscription ID and the in-flight request are returned.
     pub fn fulfill(self, resp: ResponsePayload) -> Option<(U256, Self)> {
         if self.method() == "eth_subscribe" {
-            match resp {
-                ResponsePayload::Success(val) => {
-                    let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
-                    match sub_id {
-                        Ok(alias) => return Some((alias, self)),
-                        Err(e) => {
-                            let _ = self.tx.send(Err(TransportError::deser_err(e, val.get())));
-                            return None;
-                        }
+            if let ResponsePayload::Success(val) = resp {
+                let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
+                match sub_id {
+                    Ok(alias) => return Some((alias, self)),
+                    Err(e) => {
+                        let _ = self.tx.send(Err(TransportError::deser_err(e, val.get())));
+                        return None;
                     }
                 }
-                ResponsePayload::Error(_) => {}
             }
         }
 

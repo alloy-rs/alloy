@@ -29,11 +29,6 @@ impl SubscriptionManager {
         self.subs.len()
     }
 
-    /// Check if the subscription manager is empty.
-    pub fn is_empty(&self) -> bool {
-        self.subs.is_empty()
-    }
-
     /// Insert a subscription.
     pub fn insert(
         &mut self,
@@ -75,24 +70,9 @@ impl SubscriptionManager {
         self.aliases.get_by_left(&alias)
     }
 
-    /// Get a ref to the server_id bimap.
-    pub fn server_ids(&self) -> &BiBTreeMap<U256, Id> {
-        &self.server_ids
-    }
-
     /// Drop all server_ids.
     pub fn drop_server_ids(&mut self) {
         self.server_ids.clear();
-    }
-
-    /// Get a reference to a subscription.
-    pub fn sub(&self, id: &Id) -> Option<&ActiveSubscription> {
-        self.subs.get(id)
-    }
-
-    /// Get a mutable reference to a subscription.
-    pub fn sub_mut(&mut self, id: &Id) -> Option<&mut ActiveSubscription> {
-        self.subs.get_mut(id)
     }
 
     /// Get a mutable reference to a subscription by server_id.
@@ -104,22 +84,6 @@ impl SubscriptionManager {
     /// Change the server_id of a subscription.
     pub fn change_server_id(&mut self, id: &Id, server_id: U256) {
         self.server_ids.insert(server_id, id.clone());
-    }
-
-    /// Get sub params.
-    pub fn params(&self, id: &Id) -> Option<&serde_json::value::RawValue> {
-        self.subs.get(id).map(|sub| sub.params())
-    }
-
-    pub fn params_by_alias(&self, alias: U256) -> Option<&serde_json::value::RawValue> {
-        let id = self.dealias(alias)?;
-        self.params(id)
-    }
-
-    /// Get sub params by server_id.
-    pub fn params_by_server_id(&self, server_id: U256) -> Option<&serde_json::value::RawValue> {
-        let id = self.server_ids.get_by_left(&server_id)?;
-        self.params(id)
     }
 
     /// Remove a subscription.

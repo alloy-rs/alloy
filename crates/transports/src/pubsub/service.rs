@@ -1,4 +1,4 @@
-use alloy_json_rpc::{PubSubItem, ResponsePayload};
+use alloy_json_rpc::{Id, PubSubItem, Request, ResponsePayload};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
 use tokio::{
@@ -21,6 +21,8 @@ pub enum PubSubInstruction {
     Request(InFlight),
     /// Get the subscription ID for a server ID.
     GetSub(U256, oneshot::Sender<broadcast::Receiver<Box<RawValue>>>),
+    /// Unsubscribe from a subscription.
+    Unsubscribe(U256),
 }
 
 impl std::fmt::Debug for PubSubInstruction {
@@ -28,6 +30,7 @@ impl std::fmt::Debug for PubSubInstruction {
         match self {
             Self::Request(arg0) => f.debug_tuple("Request").field(arg0).finish(),
             Self::GetSub(arg0, _) => f.debug_tuple("GetSub").field(arg0).finish(),
+            Self::Unsubscribe(arg0) => f.debug_tuple("Unsubscribe").field(arg0).finish(),
         }
     }
 }
@@ -63,6 +66,8 @@ where
         Ok(handle)
     }
 
+    /// Reconnect the backend, re-issue pending requests, and re-start active
+    /// subscriptions.
     pub async fn reconnect(&mut self) -> Result<(), TransportError> {
         tracing::info!("Reconnecting pubsub service backend.");
 
@@ -115,7 +120,7 @@ where
     }
 
     /// Service a request.
-    async fn service_request(&mut self, in_flight: InFlight) -> Result<(), TransportError> {
+    fn service_request(&mut self, in_flight: InFlight) -> Result<(), TransportError> {
         let brv = in_flight.req_json().map_err(TransportError::ser_err)?;
 
         self.dispatch_request(brv)?;
@@ -136,12 +141,26 @@ where
         Ok(())
     }
 
+    /// Service an unsubscribe instruction.
+    fn service_unsubscribe(&mut self, alias: U256) -> Result<(), TransportError> {
+        let req = Request {
+            method: "eth_unsubscribe",
+            params: to_json_raw_value(&[alias])?,
+            id: Id::None,
+        };
+
+        self.dispatch_request(to_json_raw_value(&req)?)?;
+        self.subs.remove_sub_by_alias(alias);
+        Ok(())
+    }
+
     /// Service an instruction
-    async fn service_ix(&mut self, ix: PubSubInstruction) -> Result<(), TransportError> {
+    fn service_ix(&mut self, ix: PubSubInstruction) -> Result<(), TransportError> {
         tracing::trace!(?ix, "servicing instruction");
         match ix {
-            PubSubInstruction::Request(in_flight) => self.service_request(in_flight).await,
+            PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
             PubSubInstruction::GetSub(alias, tx) => self.service_get_sub(alias, tx),
+            PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias),
         }
     }
 
@@ -169,7 +188,7 @@ where
         let id = request.id.clone();
 
         self.subs.upsert(request, server_id);
-        let alias = self.subs.alias_for(&id).unwrap();
+        let alias = self.subs.alias_for(&id).expect("just upserted");
 
         // lie to the client about the sub id
         let ser_alias = to_json_raw_value(&alias)?;
@@ -207,7 +226,7 @@ where
 
                     req_opt = self.reqs.recv() => {
                         if let Some(req) = req_opt {
-                            if let Err(e) = self.service_ix(req).await {
+                            if let Err(e) = self.service_ix(req) {
                                 break Err(e)
                             }
                         } else {
