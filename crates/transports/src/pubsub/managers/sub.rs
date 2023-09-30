@@ -71,11 +71,10 @@ impl SubscriptionManager {
         self.server_to_local.insert(server_id, local_id);
     }
 
-    /// Remove a subscription by its server_id
-    pub fn remove_sub_by_server_id(&mut self, server_id: U256) {
-        if let Some((_, local_id)) = self.server_to_local.remove_by_left(&server_id) {
-            self.local_to_sub.remove_by_left(&local_id);
-        }
+    /// Remove a subscription by its local_id.
+    pub fn remove_sub(&mut self, local_id: B256) {
+        let _ = self.local_to_sub.remove_by_left(&local_id);
+        let _ = self.server_to_local.remove_by_right(&local_id);
     }
 
     /// Notify the subscription channel of a new value, if the sub is known,
@@ -94,11 +93,5 @@ impl SubscriptionManager {
     pub fn get_rx(&self, local_id: B256) -> Option<broadcast::Receiver<Box<RawValue>>> {
         let sub = self.local_to_sub.get_by_left(&local_id)?;
         Some(sub.tx.subscribe())
-    }
-
-    /// Get a receiver for a subscription by alias.
-    pub fn get_rx_by_alias(&self, server_id: U256) -> Option<broadcast::Receiver<Box<RawValue>>> {
-        let local_id = self.local_id_for(server_id)?;
-        self.get_rx(local_id)
     }
 }

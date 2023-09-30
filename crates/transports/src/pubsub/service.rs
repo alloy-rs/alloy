@@ -19,7 +19,7 @@ use crate::{
 pub enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
-    /// Get the subscription ID for a server ID.
+    /// Get the subscription ID for a local ID.
     GetSub(U256, oneshot::Sender<broadcast::Receiver<Box<RawValue>>>),
     /// Unsubscribe from a subscription.
     Unsubscribe(U256),
@@ -130,27 +130,36 @@ where
     }
 
     /// Service a GetSub instruction.
+    ///
+    /// If the subscription exists, the waiter is sent a broadcast receiver. If
+    /// the subscription does not exist, the waiter is sent nothing, and the
+    /// `tx` is dropped. This notifies the waiter that the subscription does
+    /// not exist.
     fn service_get_sub(
         &mut self,
-        alias: U256,
+        local_id: U256,
         tx: oneshot::Sender<broadcast::Receiver<Box<RawValue>>>,
     ) -> Result<(), TransportError> {
-        let rx = self.subs.get_rx_by_alias(alias).unwrap();
-        let _ = tx.send(rx);
+        let local_id = local_id.into();
+
+        if let Some(rx) = self.subs.get_rx(local_id) {
+            let _ = tx.send(rx);
+        }
 
         Ok(())
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, server_id: U256) -> Result<(), TransportError> {
+    fn service_unsubscribe(&mut self, local_id: U256) -> Result<(), TransportError> {
+        let local_id = local_id.into();
         let req = Request {
             method: "eth_unsubscribe",
-            params: to_json_raw_value(&[server_id])?,
+            params: to_json_raw_value(&[local_id])?,
             id: Id::None,
         };
 
         self.dispatch_request(to_json_raw_value(&req)?)?;
-        self.subs.remove_sub_by_server_id(server_id);
+        self.subs.remove_sub(local_id);
         Ok(())
     }
 
