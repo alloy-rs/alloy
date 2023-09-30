@@ -5,8 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     pubsub::{
-        handle::ConnectionHandle, managers::InFlight, service::PubSubInstruction,
-        service::PubSubService,
+        handle::ConnectionHandle, ix::PubSubInstruction, managers::InFlight, service::PubSubService,
     },
     TransportError,
 };

@@ -36,6 +36,8 @@
 
 mod managers;
 
+mod ix;
+
 mod r#trait;
 pub use r#trait::{BoxPubSub, PubSub};
 
