@@ -1,11 +1,11 @@
 mod active_sub;
-pub use active_sub::ActiveSubscription;
+pub(crate) use active_sub::ActiveSubscription;
 
 mod in_flight;
-pub use in_flight::InFlight;
+pub(crate) use in_flight::InFlight;
 
 mod req;
-pub use req::RequestManager;
+pub(crate) use req::RequestManager;
 
 mod sub;
-pub use sub::SubscriptionManager;
+pub(crate) use sub::SubscriptionManager;

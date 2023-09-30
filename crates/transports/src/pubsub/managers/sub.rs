@@ -16,7 +16,7 @@ pub struct SubscriptionManager {
 
 impl SubscriptionManager {
     /// Get an iterator over the subscriptions.
-    pub fn iter(&self) -> impl Iterator<Item = (&B256, &ActiveSubscription)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&B256, &ActiveSubscription)> {
         self.local_to_sub.iter()
     }
 

@@ -1,16 +1,26 @@
+use std::hash::Hash;
+
 use alloy_primitives::{keccak256, B256};
 use serde_json::value::RawValue;
 use tokio::sync::broadcast;
 
 #[derive(Clone)]
 /// An active subscription.
-pub struct ActiveSubscription {
-    /// The serialized subscription request.
-    pub request: Box<RawValue>,
+pub(crate) struct ActiveSubscription {
     /// Cached hash of the request, used for sorting and equality.
     pub local_id: B256,
+    /// The serialized subscription request.
+    pub request: Box<RawValue>,
     /// The channel via which notifications are broadcast.
     pub tx: broadcast::Sender<Box<RawValue>>,
+}
+
+// NB: We implement this to prevent any incorrect future implementations.
+// See: https://doc.rust-lang.org/std/hash/trait.Hash.html#hash-and-eq
+impl Hash for ActiveSubscription {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.local_id.hash(state);
+    }
 }
 
 impl PartialEq for ActiveSubscription {

@@ -1,5 +1,4 @@
 mod managers;
-pub use managers::{ActiveSubscription, InFlight, RequestManager, SubscriptionManager};
 
 mod r#trait;
 pub use r#trait::{BoxPubSub, PubSub};

@@ -2,7 +2,7 @@ use alloy_json_rpc::{Id, Response};
 use alloy_primitives::U256;
 use std::collections::BTreeMap;
 
-use crate::pubsub::InFlight;
+use crate::pubsub::managers::InFlight;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
