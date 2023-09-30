@@ -1,32 +1,22 @@
-use alloy_json_rpc::PubSubItem;
 use futures_util::{FutureExt, SinkExt, StreamExt};
-use serde_json::value::RawValue;
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use tokio::task::JoinHandle;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{error, trace};
+
+use crate::pubsub::ConnectionInterface;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 /// An ongoing connection to a backend.
 ///
-/// This is intended to be spawned in a background task.
-pub struct WsBackend<T> {
+/// Users should NEVER instantiate a backend directly. Instead, they should use
+/// [`PubSubConnect`] to get a running service with a running backend.
+///
+/// [`PubSubConnect`]: crate::pubsub::PubSubConnect
+pub(crate) struct WsBackend<T> {
     pub(crate) socket: T,
 
-    /// Inbound channel from frontend.
-    pub(crate) from_frontend: mpsc::UnboundedReceiver<Box<RawValue>>,
-
-    /// Channel of responses to the frontend
-    pub(crate) to_frontend: mpsc::UnboundedSender<PubSubItem>,
-
-    /// Notifies the frontend of a terminal error.
-    pub(crate) error: oneshot::Sender<()>,
-
-    /// Causes local shutdown when sender is triggered or dropped.
-    pub(crate) shutdown: oneshot::Receiver<()>,
+    pub(crate) interface: ConnectionInterface,
 }
 
 impl<T> WsBackend<T> {
@@ -36,7 +26,7 @@ impl<T> WsBackend<T> {
         match serde_json::from_str(&t) {
             Ok(item) => {
                 trace!(?item, "Deserialized message");
-                let res = self.to_frontend.send(item);
+                let res = self.interface.to_frontend.send(item);
                 if res.is_err() {
                     error!("Failed to send message to handler");
                     return Err(());
@@ -113,7 +103,7 @@ impl WsBackend<TungsteniteStream> {
                     }
                     // we've received a new dispatch, so we send it via
                     // websocket
-                    inst = self.from_frontend.recv() => {
+                    inst = self.interface.from_frontend.recv() => {
                         match inst {
                             Some(msg) => {
                                 if let Err(e) = self.socket.send(Message::Text(msg.to_string())).await {
@@ -129,13 +119,13 @@ impl WsBackend<TungsteniteStream> {
                         }
                     },
                     // break on shutdown recv, or on shutdown recv error
-                    _ = &mut self.shutdown => {
+                    _ = &mut self.interface.shutdown => {
                         break
                     },
                 }
             }
             if err {
-                let _ = self.error.send(());
+                let _ = self.interface.error.send(());
             }
         })
     }

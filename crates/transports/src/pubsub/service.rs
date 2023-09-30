@@ -8,8 +8,9 @@ use tokio::{
 
 use crate::{
     pubsub::{
+        handle::ConnectionHandle,
         managers::{InFlight, RequestManager, SubscriptionManager},
-        ConnectionHandle, PubSubConnect,
+        PubSubConnect,
     },
     utils::to_json_raw_value,
     TransportError,

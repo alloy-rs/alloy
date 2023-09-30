@@ -1,7 +1,6 @@
-use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::tungstenite::{self, client::IntoClientRequest};
 
-use crate::{pubsub::PubSubConnect, transports::ws::WsBackend, TransportError};
+use crate::{pubsub::PubSubConnect, transports::ws::backend::WsBackend, TransportError};
 
 #[derive(Debug, Clone)]
 pub struct WsConnect {
@@ -40,26 +39,14 @@ impl PubSubConnect for WsConnect {
         let request = self.clone().into_client_request();
 
         Box::pin(async move {
-            let (t, _) = tokio_tungstenite::connect_async(request?).await?;
+            let (socket, _) = tokio_tungstenite::connect_async(request?).await?;
 
-            let reqs = mpsc::unbounded_channel();
-            let resps = mpsc::unbounded_channel();
-            let error = oneshot::channel();
-            let shutdown = oneshot::channel();
-
-            let backend = WsBackend {
-                socket: t,
-                from_frontend: reqs.1,
-                to_frontend: resps.0,
-                error: error.0,
-                shutdown: shutdown.1,
-            };
+            let (handle, interface) = crate::pubsub::ConnectionHandle::new();
+            let backend = WsBackend { socket, interface };
 
             backend.spawn();
 
-            Ok(crate::pubsub::ConnectionHandle::new(
-                reqs.0, resps.1, error.1, shutdown.0,
-            ))
+            Ok(handle)
         })
     }
 }
