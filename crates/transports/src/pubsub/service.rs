@@ -142,15 +142,15 @@ where
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, alias: U256) -> Result<(), TransportError> {
+    fn service_unsubscribe(&mut self, server_id: U256) -> Result<(), TransportError> {
         let req = Request {
             method: "eth_unsubscribe",
-            params: to_json_raw_value(&[alias])?,
+            params: to_json_raw_value(&[server_id])?,
             id: Id::None,
         };
 
         self.dispatch_request(to_json_raw_value(&req)?)?;
-        self.subs.remove_sub_by_alias(alias);
+        self.subs.remove_sub_by_server_id(server_id);
         Ok(())
     }
 
@@ -185,13 +185,16 @@ where
         server_id: U256,
     ) -> Result<(), TransportError> {
         let request = in_flight.request;
-        let id = request.id.clone();
+        let brv = request
+            .to_boxed_raw_value()
+            .map_err(TransportError::ser_err)?;
 
-        self.subs.upsert(request, server_id);
-        let alias = self.subs.alias_for(&id).expect("just upserted");
+        self.subs.upsert(brv, server_id);
 
-        // lie to the client about the sub id
-        let ser_alias = to_json_raw_value(&alias)?;
+        // lie to the client about the sub id.
+        let local_id = self.subs.local_id_for(server_id).unwrap();
+        // Serialized B256 is always a valid serialized U256 too.
+        let ser_alias = to_json_raw_value(&local_id)?;
         let _ = in_flight.tx.send(Ok(ResponsePayload::Success(ser_alias)));
 
         Ok(())
