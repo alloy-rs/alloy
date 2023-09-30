@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
 use serde::{
     de::{MapAccess, Visitor},
@@ -6,7 +6,7 @@ use serde::{
 };
 use serde_json::value::RawValue;
 
-use crate::common::Id;
+use crate::{common::Id, RpcReturn};
 
 /// A JSONRPC-2.0 error object.
 ///
@@ -32,8 +32,8 @@ pub struct ErrorPayload {
 /// This type does not implement `Serialize` or `Deserialize` directly. It is
 /// deserialized as part of the [`Response`] type.
 #[derive(Debug, Clone)]
-pub enum ResponsePayload {
-    Success(Box<RawValue>),
+pub enum ResponsePayload<T = Box<RawValue>> {
+    Success(T),
     Error(ErrorPayload),
 }
 
@@ -44,12 +44,15 @@ pub enum ResponsePayload {
 /// the response to the request that it is responding to, and should be
 /// mirrored from the response.
 #[derive(Debug, Clone)]
-pub struct Response {
+pub struct Response<T = Box<RawValue>> {
     pub id: Id,
-    pub payload: ResponsePayload,
+    pub payload: ResponsePayload<T>,
 }
 
-impl<'de> Deserialize<'de> for Response {
+impl<'de, T> Deserialize<'de> for Response<T>
+where
+    T: RpcReturn,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -91,10 +94,13 @@ impl<'de> Deserialize<'de> for Response {
             }
         }
 
-        struct JsonRpcResponseVisitor;
+        struct JsonRpcResponseVisitor<T>(PhantomData<T>);
 
-        impl<'de> Visitor<'de> for JsonRpcResponseVisitor {
-            type Value = Response;
+        impl<'de, T> Visitor<'de> for JsonRpcResponseVisitor<T>
+        where
+            T: RpcReturn,
+        {
+            type Value = Response<T>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str(
@@ -154,7 +160,7 @@ impl<'de> Deserialize<'de> for Response {
             }
         }
 
-        deserializer.deserialize_map(JsonRpcResponseVisitor)
+        deserializer.deserialize_map(JsonRpcResponseVisitor(PhantomData))
     }
 }
 

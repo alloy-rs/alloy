@@ -13,7 +13,7 @@ use serde_json::value::RawValue;
 ///
 /// The value of `method` should be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
-pub struct Request<Params> {
+pub struct Request<Params = Box<RawValue>> {
     pub method: &'static str,
     pub params: Params,
     pub id: Id,
@@ -28,7 +28,7 @@ where
     /// # Panics
     ///
     /// If serialization of the params fails.
-    pub fn box_params(self) -> Request<Box<RawValue>> {
+    pub fn box_params(self) -> Request {
         Request {
             method: self.method,
             params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),

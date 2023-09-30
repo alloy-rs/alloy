@@ -1,4 +1,4 @@
-use alloy_json_rpc::{Request, ResponsePayload};
+use alloy_json_rpc::{Id, Request, ResponsePayload, RpcParam};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
 use tokio::sync::oneshot;
@@ -10,7 +10,9 @@ use crate::TransportError;
 /// This struct contains the request that was sent, as well as a channel to
 /// receive the response on.
 pub struct InFlight {
-    /// The request ID.
+    pub id: Id,
+
+    /// The request
     pub request: Request<Box<RawValue>>,
 
     /// The channel to send the response on.
@@ -33,15 +35,21 @@ impl std::fmt::Debug for InFlight {
 
 impl InFlight {
     /// Create a new in-flight request.
-    pub fn new(
-        request: Request<Box<RawValue>>,
+    pub fn new<T>(
+        request: Request<T>,
     ) -> (
         Self,
         oneshot::Receiver<Result<ResponsePayload, TransportError>>,
-    ) {
+    )
+    where
+        T: RpcParam,
+    {
+        let id = request.id.clone();
+
+        let request = request.box_params();
         let (tx, rx) = oneshot::channel();
 
-        (Self { request, tx }, rx)
+        (Self { id, request, tx }, rx)
     }
 
     /// Get the params
