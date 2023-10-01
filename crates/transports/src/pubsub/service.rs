@@ -13,7 +13,7 @@ use crate::{
         managers::{InFlight, RequestManager, SubscriptionManager},
         PubSubConnect,
     },
-    utils::to_json_raw_value,
+    utils::{self, to_json_raw_value},
     TransportError,
 };
 
@@ -176,9 +176,7 @@ where
         server_id: U256,
     ) -> Result<(), TransportError> {
         let request = in_flight.request;
-        let brv = request
-            .to_boxed_raw_value()
-            .map_err(TransportError::ser_err)?;
+        let brv = utils::to_json_raw_value(&request)?;
 
         self.subs.upsert(brv, server_id);
 

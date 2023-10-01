@@ -35,11 +35,6 @@ where
             id: self.id,
         }
     }
-
-    /// Convert the entire request to a boxed [`RawValue`].
-    pub fn to_boxed_raw_value(&self) -> serde_json::Result<Box<RawValue>> {
-        serde_json::to_string(&self).and_then(RawValue::from_string)
-    }
 }
 
 // manually implemented to avoid adding a type for the protocol-required
@@ -52,11 +47,14 @@ where
     where
         S: serde::Serializer,
     {
-        let mut map = serializer.serialize_map(Some(4))?;
+        let sized_params = std::mem::size_of::<Params>() != 0;
+
+        let mut map = serializer.serialize_map(Some(3 + sized_params as usize))?;
         map.serialize_entry("method", self.method)?;
 
         // Params may be omitted if it is 0-sized
-        if std::mem::size_of::<Params>() != 0 {
+        if sized_params {
+            // TODO: remove unwrap
             map.serialize_entry("params", &self.params)?;
         }
 
