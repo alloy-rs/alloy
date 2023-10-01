@@ -30,7 +30,7 @@
 //! - [ConnectionInterface]: The reciprocal of [ConnectionHandle]. This type is
 //!   owned by the **backend**, and is used to communicate with the **service**.
 //!   Dropping the interface will notify the **service** of a terminal error.
-//! - [ServiceFrontend]: The **frontend**. A handle to a running PubSub
+//! - [PubSubFrontend]: The **frontend**. A handle to a running PubSub
 //!   **service**. It is used to issue requests and subscription lifecycle
 //!   instructions to the **service**.
 
