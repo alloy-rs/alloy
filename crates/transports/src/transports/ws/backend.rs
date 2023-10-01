@@ -74,8 +74,8 @@ impl WsBackend<TungsteniteStream> {
             loop {
                 // We bias the loop as follows
                 // 1. Shutdown channels.
-                // 2. Keepalive.
-                // 3. New dispatch to server.
+                // 2. New dispatch to server.
+                // 3. Keepalive.
                 // 4. Response or notification from server.
                 tokio::select! {
                     biased;
@@ -84,17 +84,6 @@ impl WsBackend<TungsteniteStream> {
                         self.interface.from_frontend.close();
                         break
                     },
-                    // Send a ping to the server, if no other messages have been
-                    // sent in the last 10 seconds.
-                    _ = &mut keepalive => {
-                        // Reset the keepalive timer.
-                        keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
-                        if let Err(e) = self.socket.send(Message::Ping(vec![])).await {
-                            error!(err = %e, "WS connection error");
-                            err = true;
-                            break
-                        }
-                    }
                     // we've received a new dispatch, so we send it via
                     // websocket. We handle new work before processing any
                     // responses from the server.
@@ -115,6 +104,17 @@ impl WsBackend<TungsteniteStream> {
                             },
                         }
                     },
+                    // Send a ping to the server, if no other messages have been
+                    // sent in the last 10 seconds.
+                    _ = &mut keepalive => {
+                        // Reset the keepalive timer.
+                        keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                        if let Err(e) = self.socket.send(Message::Ping(vec![])).await {
+                            error!(err = %e, "WS connection error");
+                            err = true;
+                            break
+                        }
+                    }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
