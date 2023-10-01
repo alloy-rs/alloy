@@ -1,11 +1,14 @@
-use futures_util::{FutureExt, SinkExt, StreamExt};
-use tokio::task::JoinHandle;
+use futures_util::{SinkExt, StreamExt};
+use std::time::Duration;
+use tokio::{task::JoinHandle, time::sleep};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 use tracing::{error, trace};
 
 use crate::pubsub::ConnectionInterface;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+
+const KEEPALIVE: u64 = 10;
 
 /// An ongoing connection to a backend.
 ///
@@ -66,23 +69,52 @@ impl WsBackend<TungsteniteStream> {
     pub fn spawn(mut self) -> JoinHandle<()> {
         let mut err = false;
         tokio::spawn(async move {
+            let keepalive = sleep(Duration::from_secs(KEEPALIVE));
+            tokio::pin!(keepalive);
             loop {
-                #[cfg(not(target_arch = "wasm32"))]
-                let keepalive = tokio::time::sleep(std::time::Duration::from_secs(10)).fuse();
-                #[cfg(not(target_arch = "wasm32"))]
-                tokio::pin!(keepalive);
-
+                // We bias the loop as follows
+                // 1. Shutdown channels.
+                // 2. Keepalive.
+                // 3. New dispatch to server.
+                // 4. Response or notification from server.
                 tokio::select! {
-                    _ = keepalive => {
-                        #[cfg(not(target_arch = "wasm32"))]
+                    biased;
+                    // break on shutdown recv, or on shutdown recv error
+                    _ = &mut self.interface.shutdown => {
+                        self.interface.from_frontend.close();
+                        break
+                    },
+                    // Send a ping to the server, if no other messages have been
+                    // sent in the last 10 seconds.
+                    _ = &mut keepalive => {
+                        // Reset the keepalive timer.
+                        keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
                         if let Err(e) = self.socket.send(Message::Ping(vec![])).await {
                             error!(err = %e, "WS connection error");
                             err = true;
                             break
                         }
-                        #[cfg(target_arch = "wasm32")]
-                        unreachable!();
                     }
+                    // we've received a new dispatch, so we send it via
+                    // websocket. We handle new work before processing any
+                    // responses from the server.
+                    inst = self.interface.from_frontend.recv() => {
+                        match inst {
+                            Some(msg) => {
+                                // Reset the keepalive timer.
+                                keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
+                                if let Err(e) = self.socket.send(Message::Text(msg.to_string())).await {
+                                    error!(err = %e, "WS connection error");
+                                    err = true;
+                                    break
+                                }
+                            },
+                            // dispatcher has gone away
+                            None => {
+                                break
+                            },
+                        }
+                    },
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
@@ -101,27 +133,6 @@ impl WsBackend<TungsteniteStream> {
                             },
                         }
                     }
-                    // we've received a new dispatch, so we send it via
-                    // websocket
-                    inst = self.interface.from_frontend.recv() => {
-                        match inst {
-                            Some(msg) => {
-                                if let Err(e) = self.socket.send(Message::Text(msg.to_string())).await {
-                                    error!(err = %e, "WS connection error");
-                                    err = true;
-                                    break
-                                }
-                            },
-                            // dispatcher has gone away
-                            None => {
-                                break
-                            },
-                        }
-                    },
-                    // break on shutdown recv, or on shutdown recv error
-                    _ = &mut self.interface.shutdown => {
-                        break
-                    },
                 }
             }
             if err {
