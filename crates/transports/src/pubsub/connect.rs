@@ -1,39 +1,8 @@
 use std::{future::Future, pin::Pin};
 
-use alloy_json_rpc::{Request, ResponsePayload, RpcParam};
 use tokio::sync::mpsc;
 
-use crate::{
-    pubsub::{
-        handle::ConnectionHandle, ix::PubSubInstruction, managers::InFlight, service::PubSubService,
-    },
-    TransportError,
-};
-
-#[derive(Debug, Clone)]
-pub struct ServiceFrontend {
-    pub tx: mpsc::UnboundedSender<PubSubInstruction>,
-}
-
-impl ServiceFrontend {
-    /// Send a request.
-    pub fn send<T>(
-        &self,
-        req: Request<T>,
-    ) -> Pin<Box<dyn Future<Output = Result<ResponsePayload, TransportError>> + Send>>
-    where
-        T: RpcParam,
-    {
-        let (in_flight, rx) = InFlight::new(req.box_params());
-        let ix = PubSubInstruction::Request(in_flight);
-        let tx = self.tx.clone();
-
-        Box::pin(async move {
-            tx.send(ix).map_err(|_| TransportError::BackendGone)?;
-            rx.await.map_err(|_| TransportError::BackendGone)?
-        })
-    }
-}
+use crate::pubsub::{handle::ConnectionHandle, service::PubSubService, PubSubFrontend};
 
 /// Configuration objects that contain connection details for a backend.
 ///
@@ -57,12 +26,12 @@ pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// Convert the configuration object into a service with a running backend.
     fn into_service(
         self,
-    ) -> Pin<Box<dyn Future<Output = Result<ServiceFrontend, Self::Error>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = Result<PubSubFrontend, Self::Error>> + Send>> {
         Box::pin(async move {
             let handle = self.connect().await?;
             let (tx, reqs) = mpsc::unbounded_channel();
 
-            let service_handle = ServiceFrontend { tx };
+            let service_handle = PubSubFrontend::new(tx);
             let service = PubSubService {
                 handle,
                 connector: self,

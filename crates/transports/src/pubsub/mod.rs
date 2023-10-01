@@ -34,9 +34,12 @@
 //!   **service**. It is used to issue requests and subscription lifecycle
 //!   instructions to the **service**.
 
-mod managers;
+mod frontend;
+pub use frontend::PubSubFrontend;
 
 mod ix;
+
+mod managers;
 
 mod r#trait;
 pub use r#trait::{BoxPubSub, PubSub};
@@ -47,4 +50,4 @@ mod handle;
 pub use handle::{ConnectionHandle, ConnectionInterface};
 
 mod connect;
-pub use connect::{PubSubConnect, ServiceFrontend};
+pub use connect::PubSubConnect;

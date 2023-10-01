@@ -1,4 +1,5 @@
 use futures_util::{SinkExt, StreamExt};
+use serde_json::value::RawValue;
 use std::time::Duration;
 use tokio::{task::JoinHandle, time::sleep};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -42,7 +43,9 @@ impl<T> WsBackend<T> {
         }
         Ok(())
     }
+}
 
+impl WsBackend<TungsteniteStream> {
     pub async fn handle(&mut self, msg: Message) -> Result<(), ()> {
         match msg {
             Message::Text(t) => self.handle_text(t).await,
@@ -63,9 +66,15 @@ impl<T> WsBackend<T> {
             Message::Frame(_) => Ok(()),
         }
     }
-}
 
-impl WsBackend<TungsteniteStream> {
+    pub async fn send(
+        &mut self,
+        msg: Box<RawValue>,
+    ) -> Result<(), tokio_tungstenite::tungstenite::Error> {
+        self.socket.send(Message::Text(msg.to_string())).await
+    }
+
+    /// Spawn a new backend task.
     pub fn spawn(mut self) -> JoinHandle<()> {
         let mut err = false;
         tokio::spawn(async move {
@@ -77,6 +86,11 @@ impl WsBackend<TungsteniteStream> {
                 // 2. New dispatch to server.
                 // 3. Keepalive.
                 // 4. Response or notification from server.
+                // This ensures that keepalive is sent only if no other messages
+                // have been sent in the last 10 seconds. And prioritizes new
+                // dispatches over responses from the server. This will fail if
+                // the client saturates the task with dispatches, but that's
+                // probably not a big deal.
                 tokio::select! {
                     biased;
                     // break on shutdown recv, or on shutdown recv error
@@ -92,7 +106,7 @@ impl WsBackend<TungsteniteStream> {
                             Some(msg) => {
                                 // Reset the keepalive timer.
                                 keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
-                                if let Err(e) = self.socket.send(Message::Text(msg.to_string())).await {
+                                if let Err(e) = self.send(msg).await {
                                     error!(err = %e, "WS connection error");
                                     err = true;
                                     break

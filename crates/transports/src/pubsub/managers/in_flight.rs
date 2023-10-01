@@ -52,11 +52,6 @@ impl InFlight {
         (Self { id, request, tx }, rx)
     }
 
-    /// Get the params
-    pub fn params(&self) -> &RawValue {
-        &self.request.params
-    }
-
     /// Get the method
     pub fn method(&self) -> &'static str {
         self.request.method
@@ -88,10 +83,5 @@ impl InFlight {
 
         let _ = self.tx.send(Ok(resp));
         None
-    }
-
-    /// Fulfill the request with an error.
-    pub fn fulfill_err(self, err: TransportError) {
-        let _ = self.tx.send(Err(err));
     }
 }

@@ -97,7 +97,7 @@ where
         self.handle
             .to_socket
             .send(brv)
-            .map(|_| ())
+            .map(drop)
             .map_err(|_| TransportError::BackendGone)
     }
 
