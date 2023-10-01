@@ -33,7 +33,7 @@ impl Eq for ActiveSubscription {}
 
 impl PartialOrd for ActiveSubscription {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.local_id.partial_cmp(&other.local_id)
+        Some(self.cmp(&other))
     }
 }
 
