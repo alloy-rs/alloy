@@ -10,7 +10,11 @@ use std::{
 use futures_channel::oneshot;
 use serde_json::value::RawValue;
 
-use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
+use crate::{
+    error::TransportError,
+    transports::{SingleRequest, Transport},
+    RpcClient,
+};
 use alloy_json_rpc::{Id, Request, Response, RpcParam, RpcResult, RpcReturn};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
@@ -25,7 +29,7 @@ pub struct BatchRequest<'a, T> {
     transport: &'a RpcClient<T>,
 
     /// The requests to be sent.
-    requests: Vec<Box<RawValue>>,
+    requests: Vec<SingleRequest>,
 
     /// The channels to send the responses through.
     channels: ChannelMap,
@@ -70,7 +74,7 @@ where
 {
     Prepared {
         transport: Conn,
-        requests: Vec<Box<RawValue>>,
+        requests: Vec<SingleRequest>,
         channels: ChannelMap,
     },
     SerError(Option<TransportError>),
@@ -93,11 +97,10 @@ impl<'a, T> BatchRequest<'a, T> {
 
     fn push_raw(
         &mut self,
-        id: Id,
-        request: Box<RawValue>,
+        request: SingleRequest,
     ) -> oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>> {
         let (tx, rx) = oneshot::channel();
-        self.channels.insert(id, tx);
+        self.channels.insert(request.id.clone(), tx);
         self.requests.push(request);
         rx
     }
@@ -106,7 +109,8 @@ impl<'a, T> BatchRequest<'a, T> {
         &mut self,
         request: Request<Params>,
     ) -> Result<Waiter<Resp>, TransportError> {
-        to_json_raw_value(&request).map(|rv| self.push_raw(request.id, rv).into())
+        let req = request.try_into()?;
+        Ok(self.push_raw(req).into())
     }
 }
 
@@ -176,17 +180,10 @@ where
         // We only have mut refs, and we want ownership, so we just replace
         // with 0-capacity collections.
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
+
         let req = std::mem::replace(requests, Vec::with_capacity(0));
 
-        let req = match to_json_raw_value(&req) {
-            Ok(req) => req,
-            Err(e) => {
-                self.set(BatchFuture::Complete);
-                return Poll::Ready(Err(e));
-            }
-        };
-
-        let fut = transport.call(req);
+        let fut = transport.call(req.into());
         self.set(BatchFuture::AwaitingResponse { channels, fut });
         cx.waker().wake_by_ref();
         Poll::Pending

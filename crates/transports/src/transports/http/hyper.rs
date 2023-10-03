@@ -3,22 +3,23 @@ use serde_json::value::RawValue;
 use std::task;
 use tower::Service;
 
-use crate::{Http, TransportError, TransportFut};
+use crate::{transports::TransportRequest, Http, TransportError, TransportFut};
 
 impl<C> Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
     /// Make a request.
-    fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
+    fn request(&self, req: TransportRequest) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
+            let ser = req.serialized()?.into_owned();
             // convert the Box<RawValue> into a hyper request<B>
             let req = hyper::Request::builder()
                 .method(hyper::Method::POST)
                 .uri(this.url.as_str())
                 .header("content-type", "application/json")
-                .body(hyper::Body::from(req.get().to_owned()))
+                .body(hyper::Body::from(ser))
                 .expect("request parts are valid");
 
             let resp = this.client.request(req).await?;
@@ -36,7 +37,7 @@ where
     }
 }
 
-impl<C> Service<Box<RawValue>> for &Http<Client<C>>
+impl<C> Service<TransportRequest> for &Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
@@ -51,12 +52,12 @@ where
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: TransportRequest) -> Self::Future {
         self.request(req)
     }
 }
 
-impl<C> Service<Box<RawValue>> for Http<Client<C>>
+impl<C> Service<TransportRequest> for Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
@@ -71,7 +72,7 @@ where
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: TransportRequest) -> Self::Future {
         self.request(req)
     }
 }

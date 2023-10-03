@@ -1,10 +1,12 @@
-use crate::{utils::to_json_raw_value, Transport, TransportError};
+use crate::{Transport, TransportError};
 
 use alloy_json_rpc::{Request, Response, RpcParam};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
+
+use super::TransportRequest;
 
 /// A service layer that transforms [`Request`] into [`Response`]
 /// by wrapping an inner service that implements [`Transport`].
@@ -41,13 +43,33 @@ where
     }
 
     fn call(&mut self, req: Request<Param>) -> Self::Future {
+        Service::<&Request<Param>>::call(self, &req)
+    }
+}
+
+impl<S, Param> Service<&Request<Param>> for JsonRpcService<S>
+where
+    S: Transport + Clone,
+    Param: RpcParam,
+{
+    type Response = Response;
+
+    type Error = TransportError;
+
+    type Future = JsonRpcFuture<S::Future, Self::Response>;
+
+    fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx).map_err(Into::into)
+    }
+
+    fn call(&mut self, req: &Request<Param>) -> Self::Future {
         let replacement = self.inner.clone();
         let mut client = std::mem::replace(&mut self.inner, replacement);
 
-        match to_json_raw_value(&req) {
-            Ok(raw) => JsonRpcFuture {
+        match TransportRequest::try_from(req) {
+            Ok(req) => JsonRpcFuture {
                 state: States::Pending {
-                    fut: client.call(raw),
+                    fut: client.call(req),
                 },
                 _resp: std::marker::PhantomData,
             },

@@ -12,8 +12,8 @@ use url::Url;
 /// An Http transport.
 ///
 /// The user must provide an internal http client and a URL to which to
-/// connect. It implements `Service<Box<RawValue>>`, and can be used directly
-/// by an [`RpcClient`].
+/// connect. When parameterized properly, it implements
+/// `Service<TransportRequest>`, and can be used directly by an [`RpcClient`].
 ///
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]

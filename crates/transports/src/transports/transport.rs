@@ -1,8 +1,95 @@
+use alloy_json_rpc::{Id, Request, RpcParam};
 use serde_json::value::RawValue;
-use std::fmt::Debug;
+use std::{borrow::Cow, fmt::Debug};
 use tower::Service;
 
-use crate::{TransportError, TransportFut};
+use crate::{utils, TransportError, TransportFut};
+
+/// A single JSON-RPC request, serialized, and accompanied by its ID and method.
+#[derive(Debug, Clone)]
+pub struct SingleRequest {
+    pub id: Id,
+    pub method: &'static str,
+    pub serialized: Box<RawValue>,
+}
+
+/// A Request to be sent by the transport
+#[derive(Debug, Clone)]
+pub enum TransportRequest {
+    Single(SingleRequest),
+    Batch(Vec<SingleRequest>),
+}
+
+impl From<Vec<SingleRequest>> for TransportRequest {
+    fn from(v: Vec<SingleRequest>) -> Self {
+        Self::Batch(v)
+    }
+}
+
+impl<T: RpcParam> TryFrom<&Request<T>> for SingleRequest {
+    type Error = TransportError;
+
+    fn try_from(req: &Request<T>) -> Result<Self, Self::Error> {
+        let id = req.id.clone();
+        let method = req.method;
+        let serialized = utils::to_json_raw_value(&req)?;
+
+        Ok(Self {
+            id,
+            method,
+            serialized,
+        })
+    }
+}
+
+impl FromIterator<SingleRequest> for TransportRequest {
+    fn from_iter<T: IntoIterator<Item = SingleRequest>>(iter: T) -> Self {
+        Self::Batch(iter.into_iter().collect())
+    }
+}
+
+impl<T: RpcParam> TryFrom<Request<T>> for SingleRequest {
+    type Error = TransportError;
+
+    fn try_from(req: Request<T>) -> Result<Self, Self::Error> {
+        Self::try_from(&req)
+    }
+}
+
+impl<T: RpcParam> TryFrom<&Request<T>> for TransportRequest {
+    type Error = TransportError;
+
+    fn try_from(req: &Request<T>) -> Result<Self, Self::Error> {
+        let single = SingleRequest::try_from(req)?;
+        Ok(TransportRequest::Single(single))
+    }
+}
+
+impl<T: RpcParam> TryFrom<Request<T>> for TransportRequest {
+    type Error = TransportError;
+
+    fn try_from(req: Request<T>) -> Result<Self, Self::Error> {
+        let single = SingleRequest::try_from(&req)?;
+        Ok(TransportRequest::Single(single))
+    }
+}
+
+impl TransportRequest {
+    pub fn serialized(&self) -> Result<Cow<str>, TransportError> {
+        match self {
+            TransportRequest::Single(req) => Ok(Cow::Borrowed(req.serialized.get())),
+            TransportRequest::Batch(batch) => {
+                let mut reqs = Vec::with_capacity(batch.len());
+                for req in batch {
+                    reqs.push(&req.serialized);
+                }
+                serde_json::to_string(&reqs)
+                    .map(Cow::Owned)
+                    .map_err(TransportError::ser_err)
+            }
+        }
+    }
+}
 
 /// A marker trait for transports.
 ///
@@ -14,7 +101,7 @@ use crate::{TransportError, TransportFut};
 pub trait Transport:
     private::Sealed
     + Service<
-        Box<RawValue>,
+        TransportRequest,
         Response = Box<RawValue>,
         Error = TransportError,
         Future = TransportFut<'static>,
@@ -36,7 +123,7 @@ pub trait Transport:
 impl<T> Transport for T where
     T: private::Sealed
         + Service<
-            Box<RawValue>,
+            TransportRequest,
             Response = Box<RawValue>,
             Error = TransportError,
             Future = TransportFut<'static>,
@@ -91,7 +178,7 @@ where
     }
 }
 
-impl Service<Box<RawValue>> for BoxTransport {
+impl Service<TransportRequest> for BoxTransport {
     type Response = Box<RawValue>;
 
     type Error = TransportError;
@@ -105,7 +192,7 @@ impl Service<Box<RawValue>> for BoxTransport {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: TransportRequest) -> Self::Future {
         self.inner.call(req)
     }
 }
@@ -124,7 +211,7 @@ mod private {
     pub trait Sealed {}
     impl<T> Sealed for T where
         T: Service<
-                Box<RawValue>,
+                TransportRequest,
                 Response = Box<RawValue>,
                 Error = TransportError,
                 Future = TransportFut<'static>,

@@ -6,7 +6,7 @@ use serde_json::value::RawValue;
 use tokio::sync::broadcast;
 use tower::Service;
 
-use crate::{Transport, TransportError, TransportFut};
+use crate::{transports::TransportRequest, Transport, TransportError, TransportFut};
 
 /// A trait for transports supporting notifications.
 ///
@@ -75,7 +75,7 @@ impl PubSub for BoxPubSub {
     }
 }
 
-impl Service<Box<RawValue>> for BoxPubSub {
+impl Service<TransportRequest> for BoxPubSub {
     type Response = Box<RawValue>;
 
     type Error = TransportError;
@@ -86,11 +86,11 @@ impl Service<Box<RawValue>> for BoxPubSub {
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
-        Service::<Box<RawValue>>::poll_ready(&mut self.inner, cx)
+        Service::<TransportRequest>::poll_ready(&mut self.inner, cx)
     }
 
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
-        Service::<Box<RawValue>>::call(&mut self.inner, req)
+    fn call(&mut self, req: TransportRequest) -> Self::Future {
+        Service::<TransportRequest>::call(&mut self.inner, req)
     }
 }
 
