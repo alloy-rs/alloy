@@ -118,7 +118,8 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
 }
 
 /// A [`ErrorPayload`] that has been partially deserialized, borrowing its
-/// contents from the deserializer.
+/// contents from the deserializer. This is used primarily for intermediate
+/// deserialization. Most users will not require it.
 pub type BorrowedErrorPayload<'a> = ErrorPayload<&'a RawValue>;
 
 impl<'a, Data> ErrorPayload<Data>

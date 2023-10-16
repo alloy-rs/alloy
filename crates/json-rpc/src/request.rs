@@ -28,7 +28,7 @@ where
     /// # Panics
     ///
     /// If serialization of the params fails.
-    pub fn box_params(self) -> Request {
+    pub fn box_params(self) -> Request<Box<RawValue>> {
         Request {
             method: self.method,
             params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),

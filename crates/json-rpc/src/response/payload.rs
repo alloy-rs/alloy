@@ -15,6 +15,8 @@ use crate::ErrorPayload;
 ///
 /// This type does not implement `Serialize` or `Deserialize` directly. It is
 /// deserialized as part of the [`Response`] type.
+///
+/// [`Response`]: crate::Response
 #[derive(Debug, Clone)]
 pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Success(Payload),
@@ -22,7 +24,8 @@ pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
 }
 
 /// A [`ResponsePayload`] that has been partially deserialized, borrowing its
-/// contents from the deserializer.
+/// contents from the deserializer. This is used primarily for intermediate
+/// deserialization. Most users will not require it.
 pub type BorrowedResponsePayload<'a> = ResponsePayload<&'a RawValue, &'a RawValue>;
 
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
@@ -145,9 +148,7 @@ where
                 Ok(deser) => Ok(ResponsePayload::Error(deser)),
                 Err(err) => Err(ResponsePayload::Error(err)),
             },
-            ResponsePayload::Success(payload) => {
-                return Ok(ResponsePayload::Success(payload));
-            }
+            ResponsePayload::Success(payload) => Ok(ResponsePayload::Success(payload)),
         }
     }
 }

@@ -18,9 +18,6 @@ pub enum TransportError {
     #[error("Missing response in batch request")]
     MissingBatchResponse,
 
-    #[error(transparent)]
-    Custom(Box<dyn StdError + Send + Sync + 'static>),
-
     /// Hyper http transport
     #[error(transparent)]
     #[cfg(feature = "reqwest")]
@@ -30,6 +27,10 @@ pub enum TransportError {
     #[error(transparent)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     Hyper(#[from] hyper::Error),
+
+    /// Custom error
+    #[error(transparent)]
+    Custom(Box<dyn StdError + Send + Sync + 'static>),
 }
 
 impl TransportError {

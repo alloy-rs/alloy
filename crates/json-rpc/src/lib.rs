@@ -14,6 +14,9 @@ use serde::{de::DeserializeOwned, Serialize};
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
 
+mod packet;
+pub use packet::{BorrowedResponsePacket, RequestPacket, ResponsePacket};
+
 mod request;
 pub use request::Request;
 
