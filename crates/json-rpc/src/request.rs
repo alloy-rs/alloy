@@ -1,6 +1,7 @@
 use crate::{common::Id, RpcParam};
 
 use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde_json::value::RawValue;
 
 /// A JSON-RPC 2.0 request object.
 ///
@@ -12,10 +13,28 @@ use serde::{ser::SerializeMap, Deserialize, Serialize};
 ///
 /// The value of `method` should be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
-pub struct Request<Params> {
+pub struct Request<Params = Box<RawValue>> {
     pub method: &'static str,
     pub params: Params,
     pub id: Id,
+}
+
+impl<Params> Request<Params>
+where
+    Params: RpcParam,
+{
+    /// Serialize the request parameters as a boxed [`RawValue`].
+    ///
+    /// # Panics
+    ///
+    /// If serialization of the params fails.
+    pub fn box_params(self) -> Request {
+        Request {
+            method: self.method,
+            params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),
+            id: self.id,
+        }
+    }
 }
 
 // manually implemented to avoid adding a type for the protocol-required
@@ -28,11 +47,14 @@ where
     where
         S: serde::Serializer,
     {
-        let mut map = serializer.serialize_map(Some(4))?;
+        let sized_params = std::mem::size_of::<Params>() != 0;
+
+        let mut map = serializer.serialize_map(Some(3 + sized_params as usize))?;
         map.serialize_entry("method", self.method)?;
 
         // Params may be omitted if it is 0-sized
-        if !is_zst::<Params>() {
+        if sized_params {
+            // TODO: remove unwrap
             map.serialize_entry("params", &self.params)?;
         }
 
@@ -40,8 +62,4 @@ where
         map.serialize_entry("jsonrpc", "2.0")?;
         map.end()
     }
-}
-
-fn is_zst<T>() -> bool {
-    std::mem::size_of::<T>() == 0
 }

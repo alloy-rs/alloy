@@ -9,6 +9,31 @@ pub enum Id {
     None,
 }
 
+impl PartialOrd for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // numbers < strings
+        // strings < null
+        // null == null
+        match (self, other) {
+            (Id::Number(a), Id::Number(b)) => a.cmp(b),
+            (Id::Number(_), _) => std::cmp::Ordering::Less,
+
+            (Id::String(_), Id::Number(_)) => std::cmp::Ordering::Greater,
+            (Id::String(a), Id::String(b)) => a.cmp(b),
+            (Id::String(_), Id::None) => std::cmp::Ordering::Less,
+
+            (Id::None, Id::None) => std::cmp::Ordering::Equal,
+            (Id::None, _) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
 impl Id {
     /// Returns `true` if the ID is a number.
     pub fn is_number(&self) -> bool {
