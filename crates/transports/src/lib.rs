@@ -43,6 +43,7 @@ mod type_aliases {
 #[cfg(target_arch = "wasm32")]
 mod type_aliases {
     use alloy_json_rpc::RpcResult;
+    use serde_json::value::RawValue;
 
     use crate::TransportError;
 
@@ -52,5 +53,5 @@ mod type_aliases {
 
     /// Future for RPC-level requests.
     pub type RpcFut<'a, T, E = TransportError> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = RpcResult<T, E>> + 'a>>;
+        std::pin::Pin<Box<dyn std::future::Future<Output = RpcResult<T, Box<RawValue>, E>> + 'a>>;
 }
