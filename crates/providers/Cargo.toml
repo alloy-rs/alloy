@@ -18,3 +18,4 @@ alloy-primitives.workspace = true
 alloy-transports.workspace = true
 async-trait = "0.1.73"
 futures-util = "0.3.28"
+serde_json = { workspace = true, features = ["raw_value"] }

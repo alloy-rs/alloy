@@ -80,7 +80,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
 {
-    type Output = RpcResult<Box<RawValue>, TransportError>;
+    type Output = RpcResult<Box<RawValue>, Box<RawValue>, TransportError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         if matches!(*self.as_mut(), CallState::Prepared { .. }) {
@@ -175,7 +175,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
 {
-    type Output = RpcResult<Resp, TransportError>;
+    type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();

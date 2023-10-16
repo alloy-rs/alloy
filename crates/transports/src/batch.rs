@@ -13,7 +13,7 @@ use serde_json::value::RawValue;
 use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
 use alloy_json_rpc::{Id, Request, Response, RpcParam, RpcResult, RpcReturn};
 
-type Channel = oneshot::Sender<RpcResult<Box<RawValue>, TransportError>>;
+type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
 
 #[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
@@ -34,12 +34,16 @@ pub struct BatchRequest<'a, T> {
 /// Awaits a single response for a request that has been included in a batch.
 #[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
 pub struct Waiter<Resp> {
-    rx: oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>>,
+    rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
     _resp: PhantomData<Resp>,
 }
 
-impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>>> for Waiter<Resp> {
-    fn from(rx: oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>>) -> Self {
+impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>>
+    for Waiter<Resp>
+{
+    fn from(
+        rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
+    ) -> Self {
         Self {
             rx,
             _resp: PhantomData,
@@ -51,7 +55,7 @@ impl<Resp> std::future::Future for Waiter<Resp>
 where
     Resp: RpcReturn,
 {
-    type Output = RpcResult<Resp, TransportError>;
+    type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
 
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
@@ -95,7 +99,7 @@ impl<'a, T> BatchRequest<'a, T> {
         &mut self,
         id: Id,
         request: Box<RawValue>,
-    ) -> oneshot::Receiver<RpcResult<Box<RawValue>, TransportError>> {
+    ) -> oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>> {
         let (tx, rx) = oneshot::channel();
         self.channels.insert(id, tx);
         self.requests.push(request);
