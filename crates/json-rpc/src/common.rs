@@ -1,12 +1,88 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
 
 /// A JSON-RPC 2.0 ID object. This may be a number, a string, or null.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-#[serde(untagged)]
+///
+/// ### Ordering
+///
+/// This type implements [`PartialOrd`], [`Ord`], [`PartialEq`], and [`Eq`] so
+/// that it can be used as a key in a [`BTreeMap`] or an item in a
+/// [`BTreeSet`]. The ordering is as follows:
+///
+/// 1. Numbers are less than strings.
+/// 2. Strings are less than null.
+/// 3. Null is equal to null.
+///
+/// ### Hash
+///
+/// This type implements [`Hash`] so that it can be used as a key in a
+/// [`HashMap`] or an item in a [`HashSet`].
+///
+/// [`BTreeMap`]: std::collections::BTreeMap
+/// [`BTreeSet`]: std::collections::BTreeSet
+/// [`HashMap`]: std::collections::HashMap
+/// [`HashSet`]: std::collections::HashSet
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Id {
     Number(u64),
     String(String),
     None,
+}
+
+impl Serialize for Id {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Id::Number(n) => serializer.serialize_u64(*n),
+            Id::String(s) => serializer.serialize_str(s),
+            Id::None => serializer.serialize_none(),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Id {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct IdVisitor;
+
+        impl<'de> Visitor<'de> for IdVisitor {
+            type Value = Id;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a string, a number, or null")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::String(v.to_owned()))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::Number(v))
+            }
+
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::None)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::None)
+            }
+        }
+
+        deserializer.deserialize_any(IdVisitor)
+    }
 }
 
 impl PartialOrd for Id {
@@ -63,6 +139,41 @@ impl Id {
         match self {
             Id::String(s) => Some(s),
             _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Deserialize, Serialize, Debug, PartialEq)]
+    struct TestCase {
+        id: Id,
+    }
+
+    #[test]
+    fn it_serializes_and_deserializes() {
+        let cases = [
+            TestCase { id: Id::Number(1) },
+            TestCase {
+                id: Id::String("foo".to_string()),
+            },
+            TestCase { id: Id::None },
+        ];
+
+        let serialized = [r#"{"id":1}"#, r#"{"id":"foo"}"#, r#"{"id":null}"#];
+
+        for i in 0..3 {
+            let case = &cases[i];
+            let expected = serialized[i];
+            dbg!(&expected);
+
+            let serialized = serde_json::to_string(case).unwrap();
+            assert_eq!(serialized, expected);
+
+            let deserialized: TestCase = serde_json::from_str(expected).unwrap();
+            assert_eq!(&deserialized, case);
         }
     }
 }
