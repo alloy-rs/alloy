@@ -18,7 +18,10 @@ mod request;
 pub use request::Request;
 
 mod response;
-pub use response::{ErrorPayload, Response, ResponsePayload};
+pub use response::{
+    BorrowedErrorPayload, BorrowedResponse, BorrowedResponsePayload, ErrorPayload, Response,
+    ResponsePayload,
+};
 
 mod common;
 pub use common::Id;

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use serde_json::value::RawValue;
 
-use crate::{response::ErrorPayload, Response, ResponsePayload, RpcReturn};
+use crate::{ErrorPayload, Response, ResponsePayload, RpcReturn};
 
 /// The result of a JSON-RPC request.
 ///

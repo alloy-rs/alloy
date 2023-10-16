@@ -1,42 +1,18 @@
-use std::{fmt, marker::PhantomData};
+mod error;
+pub use error::{BorrowedErrorPayload, ErrorPayload};
+
+mod payload;
+pub use payload::{BorrowedResponsePayload, ResponsePayload};
+
+use std::{borrow::Borrow, fmt, marker::PhantomData};
 
 use serde::{
-    de::{MapAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
+    de::{DeserializeOwned, MapAccess, Visitor},
+    Deserialize, Deserializer,
 };
 use serde_json::value::RawValue;
 
-use crate::{common::Id, RpcReturn};
-
-/// A JSONRPC-2.0 error object.
-///
-/// This response indicates that the server received and handled the request,
-/// but that there was an error in the processing of it. The error should be
-/// included in the `message` field of the response payload.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ErrorPayload {
-    pub code: i64,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data: Option<Box<RawValue>>,
-}
-
-/// A JSONRPC-2.0 response payload.
-///
-/// This enum covers both the success and error cases of a JSONRPC-2.0
-/// response. It is used to represent the `result` and `error` fields of a
-/// response object.
-///
-/// ### Note
-///
-/// This type does not implement `Serialize` or `Deserialize` directly. It is
-/// deserialized as part of the [`Response`] type.
-#[derive(Debug, Clone)]
-pub enum ResponsePayload<T = Box<RawValue>> {
-    Success(T),
-    Error(ErrorPayload),
-}
-
+use crate::common::Id;
 /// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
 ///
 /// This object is used to represent a JSONRPC-2.0 response. It may contain
@@ -44,14 +20,109 @@ pub enum ResponsePayload<T = Box<RawValue>> {
 /// the response to the request that it is responding to, and should be
 /// mirrored from the response.
 #[derive(Debug, Clone)]
-pub struct Response<T = Box<RawValue>> {
+pub struct Response<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     pub id: Id,
-    pub payload: ResponsePayload<T>,
+    pub payload: ResponsePayload<Payload, ErrData>,
 }
 
-impl<'de, T> Deserialize<'de> for Response<T>
+/// A [`Response`] that has been partially deserialized, borrowing its contents
+/// from the deserializer.
+pub type BorrowedResponse<'a> = Response<&'a RawValue, &'a RawValue>;
+
+impl<Payload, ErrData> Response<Payload, ErrData> {
+    /// Returns `true` if the response is a success.
+    pub fn is_success(&self) -> bool {
+        self.payload.is_success()
+    }
+
+    /// Returns `true` if the response is an error.
+    pub fn is_error(&self) -> bool {
+        self.payload.is_error()
+    }
+}
+
+impl<'a, Payload, ErrData> Response<Payload, ErrData>
 where
-    T: RpcReturn,
+    Payload: AsRef<RawValue> + 'a,
+{
+    /// Attempt to deserialize the success payload.
+    ///
+    /// See [`ResponsePayload::try_success_as`].
+    pub fn try_success_as<T: DeserializeOwned>(&self) -> Option<serde_json::Result<T>> {
+        self.payload.try_success_as()
+    }
+
+    /// Attempt to deserialize the success payload, borrowing from the payload.
+    ///
+    /// See [`ResponsePayload::try_borrow_success_as`].
+    pub fn try_borrow_success_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
+        self.payload.try_borrow_success_as()
+    }
+
+    /// Attempt to deserialize the Success payload, transforming this type.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Response<T, ErrData>)`` if the payload is a success and can be
+    ///   deserialized as T, or if the payload is an error.
+    /// - `Err(self)` if the payload is a success and can't be deserialized.
+    pub fn deser_success<T: DeserializeOwned>(self) -> Result<Response<T, ErrData>, Self> {
+        match self.payload.deserialize_success() {
+            Ok(payload) => Ok(Response {
+                id: self.id,
+                payload,
+            }),
+            Err(payload) => Err(Response {
+                id: self.id,
+                payload,
+            }),
+        }
+    }
+}
+
+impl<'a, Payload, ErrData> Response<Payload, ErrData>
+where
+    ErrData: Borrow<RawValue> + 'a,
+{
+    /// Attempt to deserialize the error payload.
+    ///
+    /// See [`ResponsePayload::try_error_as`].
+    pub fn try_error_as<T: DeserializeOwned>(&self) -> Option<serde_json::Result<T>> {
+        self.payload.try_error_as()
+    }
+
+    /// Attempt to deserialize the error payload, borrowing from the payload.
+    ///
+    /// See [`ResponsePayload::try_borrow_error_as`].
+    pub fn try_borrow_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
+        self.payload.try_borrow_error_as()
+    }
+
+    /// Attempt to deserialize the Error payload, transforming this type.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(Response<Payload, T>)` if the payload is an error and can be
+    ///   deserialized as `T`, or if the payload is a success.
+    /// - `Err(self)` if the payload is an error and can't be deserialized.
+    pub fn deser_err<T: DeserializeOwned>(self) -> Result<Response<Payload, T>, Self> {
+        match self.payload.deserialize_error() {
+            Ok(payload) => Ok(Response {
+                id: self.id,
+                payload,
+            }),
+            Err(payload) => Err(Response {
+                id: self.id,
+                payload,
+            }),
+        }
+    }
+}
+
+impl<'de, Payload, ErrData> Deserialize<'de> for Response<Payload, ErrData>
+where
+    Payload: Deserialize<'de>,
+    ErrData: Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -96,11 +167,12 @@ where
 
         struct JsonRpcResponseVisitor<T>(PhantomData<T>);
 
-        impl<'de, T> Visitor<'de> for JsonRpcResponseVisitor<T>
+        impl<'de, Payload, ErrData> Visitor<'de> for JsonRpcResponseVisitor<fn() -> (Payload, ErrData)>
         where
-            T: RpcReturn,
+            Payload: Deserialize<'de>,
+            ErrData: Deserialize<'de>,
         {
-            type Value = Response<T>;
+            type Value = Response<Payload, ErrData>;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str(
