@@ -78,7 +78,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// - Responses are not guaranteed to be in the same order.
     /// - Responses are not guaranteed to be in the set.
     /// - If the packet contains duplicate IDs, both will be found.
-    pub fn responses_by_id(&self, ids: &HashSet<Id>) -> Vec<&Response<Payload, ErrData>> {
+    pub fn responses_by_ids(&self, ids: &HashSet<Id>) -> Vec<&Response<Payload, ErrData>> {
         match self {
             Self::Single(single) => {
                 let mut resps = Vec::new();
