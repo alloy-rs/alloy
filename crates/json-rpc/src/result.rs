@@ -1,6 +1,5 @@
-use std::{borrow::Borrow, fmt::Debug};
-
 use serde_json::value::RawValue;
+use std::{borrow::Borrow, fmt::Debug};
 
 use crate::{ErrorPayload, Response, ResponsePayload, RpcReturn};
 
@@ -10,29 +9,49 @@ use crate::{ErrorPayload, Response, ResponsePayload, RpcReturn};
 /// non-response error is intended to be used for errors returned by a
 /// transport, or serde errors.
 ///
-/// The three cases
+/// The three cases are
+/// - Success: The server returned a succesful response.
+/// - Failure: The server returned an error response.
+/// - Err: Some client-side or communication error occurred.
 #[must_use = "Results must be handled."]
 #[derive(Debug)]
 pub enum RpcResult<T, ErrData, E> {
-    /// Server returned a response.
-    Ok(T),
+    /// Server returned a succesful response.
+    Success(T),
     /// Server returned an error response. No communication or serialization
     /// errors occurred.
-    ErrResp(ErrorPayload<ErrData>),
+    Failure(ErrorPayload<ErrData>),
     /// Some other error occurred. This could indicate a transport error, a
-    /// serde error, or anything else.
+    /// serialization error, or anything else.
     Err(E),
+}
+
+/// A [`RpcResult`] that has been partially deserialized, borrowing its
+/// contents from the deserializer. This is used primarily for intermediate
+/// deserialization. Most users will not require it.
+pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, &'a RawValue, E>;
+
+impl<'a, E> BorrowedRpcResult<'a, E> {
+    /// Convert this borrowed RpcResult into an owned RpcResult by copying
+    /// the data from the deserializer (if necessary).
+    pub fn into_owned(self) -> RpcResult<Box<RawValue>, Box<RawValue>, E> {
+        match self {
+            RpcResult::Success(val) => RpcResult::Success(val.to_owned()),
+            RpcResult::Failure(err) => RpcResult::Failure(err.into_owned()),
+            RpcResult::Err(err) => RpcResult::Err(err),
+        }
+    }
 }
 
 impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     /// `true` if the result is an `Ok` value.
-    pub fn is_ok(&self) -> bool {
-        matches!(self, RpcResult::Ok(_))
+    pub fn is_success(&self) -> bool {
+        matches!(self, RpcResult::Success(_))
     }
 
-    /// `true` if the result is an `ErrResp` value.
-    pub fn is_err_resp(&self) -> bool {
-        matches!(self, RpcResult::ErrResp(_))
+    /// `true` if the result is an `Failure` value.
+    pub fn is_failure(&self) -> bool {
+        matches!(self, RpcResult::Failure(_))
     }
 
     /// `true` if the result is an `Err` value.
@@ -47,21 +66,21 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         E: Debug,
     {
         match self {
-            RpcResult::Ok(val) => val,
-            RpcResult::ErrResp(err) => panic!("Error response: {:?}", err),
+            RpcResult::Success(val) => val,
+            RpcResult::Failure(err) => panic!("Error response: {:?}", err),
             RpcResult::Err(err) => panic!("Error: {:?}", err),
         }
     }
 
-    /// Unwrap the inner value if it is `ErrResp`, panic otherwise.
-    pub fn unwrap_err_resp(self) -> ErrorPayload<ErrData>
+    /// Unwrap the inner value if it is `Failure`, panic otherwise.
+    pub fn unwrap_failure(self) -> ErrorPayload<ErrData>
     where
         T: Debug,
         E: Debug,
     {
         match self {
-            RpcResult::Ok(val) => panic!("Ok: {:?}", val),
-            RpcResult::ErrResp(err) => err,
+            RpcResult::Success(val) => panic!("Ok: {:?}", val),
+            RpcResult::Failure(err) => err,
             RpcResult::Err(err) => panic!("Error: {:?}", err),
         }
     }
@@ -74,8 +93,8 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         E: Debug,
     {
         match self {
-            RpcResult::Ok(val) => panic!("Ok: {:?}", val),
-            RpcResult::ErrResp(err) => panic!("Error response: {:?}", err),
+            RpcResult::Success(val) => panic!("Ok: {:?}", val),
+            RpcResult::Failure(err) => panic!("Error response: {:?}", err),
             RpcResult::Err(err) => err,
         }
     }
@@ -86,21 +105,21 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         F: FnOnce(T) -> U,
     {
         match self {
-            RpcResult::Ok(val) => RpcResult::Ok(op(val)),
-            RpcResult::ErrResp(err) => RpcResult::ErrResp(err),
+            RpcResult::Success(val) => RpcResult::Success(op(val)),
+            RpcResult::Failure(err) => RpcResult::Failure(err),
             RpcResult::Err(err) => RpcResult::Err(err),
         }
     }
 
     /// Calls `op` if the result is `Ok`, otherwise returns the `Err` or
-    /// `ErrResp` value of `self`
+    /// `Failure` value of `self`
     pub fn and_then<U, F>(self, op: F) -> RpcResult<U, ErrData, E>
     where
         F: FnOnce(T) -> RpcResult<U, ErrData, E>,
     {
         match self {
-            RpcResult::Ok(val) => op(val),
-            RpcResult::ErrResp(err) => RpcResult::ErrResp(err),
+            RpcResult::Success(val) => op(val),
+            RpcResult::Failure(err) => RpcResult::Failure(err),
             RpcResult::Err(err) => RpcResult::Err(err),
         }
     }
@@ -111,8 +130,8 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         F: FnOnce(E) -> U,
     {
         match self {
-            RpcResult::Ok(val) => RpcResult::Ok(val),
-            RpcResult::ErrResp(err) => RpcResult::ErrResp(err),
+            RpcResult::Success(val) => RpcResult::Success(val),
+            RpcResult::Failure(err) => RpcResult::Failure(err),
             RpcResult::Err(err) => RpcResult::Err(op(err)),
         }
     }
@@ -134,17 +153,17 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     }
 
     /// Converts from `RpcResult<T, ErrData, E>` to `Option<T>`.
-    pub fn ok(self) -> Option<T> {
+    pub fn success(self) -> Option<T> {
         match self {
-            RpcResult::Ok(val) => Some(val),
+            RpcResult::Success(val) => Some(val),
             _ => None,
         }
     }
 
     /// Converts from `RpcResult<T, ErrData, E>` to `Option<ErrorPayload>`.
-    pub fn err_resp(self) -> Option<ErrorPayload<ErrData>> {
+    pub fn failure(self) -> Option<ErrorPayload<ErrData>> {
         match self {
-            RpcResult::ErrResp(err) => Some(err),
+            RpcResult::Failure(err) => Some(err),
             _ => None,
         }
     }
@@ -163,31 +182,91 @@ where
     B: Borrow<RawValue>,
 {
     /// Deserialize the inner value, if it is `Ok`. Pass through other values.
-    ///
-    /// # Returns
-    /// - `Ok` if the inner value is `Ok` and deserialization succeeds.
-    /// - `Err` if the inner value is an `Err`, or if the value is an `Ok` and
-    ///   deserialization fails.
-    /// - `ErrResp` if the inner value is `ErrResp`.
-    pub fn deser_ok<Resp: RpcReturn>(self) -> RpcResult<Resp, ErrData, E>
-    where
-        E: From<serde_json::Error>,
-    {
-        self.deser_ok_or_else::<Resp, _>(|e, _| e.into())
+    pub fn deserialize_success<Resp: RpcReturn>(self) -> Result<RpcResult<Resp, ErrData, E>, Self> {
+        match self {
+            RpcResult::Success(ref ok) => match serde_json::from_str(ok.borrow().get()) {
+                Ok(val) => Ok(RpcResult::Success(val)),
+                Err(_) => Err(self),
+            },
+            RpcResult::Failure(err) => Ok(RpcResult::Failure(err)),
+            RpcResult::Err(err) => Ok(RpcResult::Err(err)),
+        }
     }
 
+    /// Deserialize the inner value, if it is `Ok`. Pass through other values.
+    /// Transform deser errors with `F`.
     #[doc(hidden)]
-    pub fn deser_ok_or_else<Resp: RpcReturn, F>(self, f: F) -> RpcResult<Resp, ErrData, E>
+    pub fn try_deserialize_success_or_else<T, F>(self, f: F) -> RpcResult<T, ErrData, E>
     where
+        T: RpcReturn,
         F: FnOnce(serde_json::Error, &str) -> E,
     {
         match self {
-            RpcResult::Ok(val) => match serde_json::from_str(val.borrow().get()) {
-                Ok(val) => RpcResult::Ok(val),
-                Err(err) => RpcResult::Err(f(err, val.borrow().get())),
+            RpcResult::Success(val) => {
+                let text = val.borrow().get();
+                match serde_json::from_str(text) {
+                    Ok(val) => RpcResult::Success(val),
+                    Err(e) => RpcResult::Err(f(e, text)),
+                }
+            }
+            RpcResult::Failure(f) => RpcResult::Failure(f),
+            RpcResult::Err(e) => RpcResult::Err(e),
+        }
+    }
+}
+
+impl<T, B, E> RpcResult<T, B, E>
+where
+    B: Borrow<RawValue>,
+{
+    /// Deserialize the inner value, if it is `Failure`. Pass through other
+    /// values.
+    pub fn deserialize_failure<ErrData: RpcReturn>(self) -> Result<RpcResult<T, ErrData, E>, Self> {
+        match self {
+            RpcResult::Success(ok) => Ok(RpcResult::Success(ok)),
+            RpcResult::Failure(err_resp) => err_resp
+                .deser_data::<ErrData>()
+                .map(RpcResult::Failure)
+                .map_err(RpcResult::Failure),
+            RpcResult::Err(err) => Ok(RpcResult::Err(err)),
+        }
+    }
+
+    /// Deserialize the inner value, if it is `Failure`. Pass through other
+    /// values. Transform deser errors with `F`.
+    #[doc(hidden)]
+    pub fn try_deserialize_failure_or_else<ErrData, F>(
+        self,
+        f: F,
+    ) -> Result<RpcResult<T, ErrData, E>, E>
+    where
+        ErrData: RpcReturn,
+        F: FnOnce(serde_json::Error, &str) -> E,
+    {
+        match self {
+            RpcResult::Success(ok) => Ok(RpcResult::Success(ok)),
+            RpcResult::Failure(err_resp) => match err_resp.try_data_as::<ErrData>() {
+                None => Ok(RpcResult::Failure(ErrorPayload {
+                    code: err_resp.code,
+                    message: err_resp.message,
+                    data: None,
+                })),
+                Some(Ok(data)) => Ok(RpcResult::Failure(ErrorPayload {
+                    code: err_resp.code,
+                    message: err_resp.message,
+                    data: Some(data),
+                })),
+                Some(Err(e)) => {
+                    let text = err_resp
+                        .data
+                        .as_ref()
+                        .map(|d| d.borrow().get())
+                        .unwrap_or("");
+                    Err(f(e, text))
+                }
             },
-            Self::ErrResp(er) => RpcResult::ErrResp(er),
-            Self::Err(e) => RpcResult::Err(e),
+
+            RpcResult::Err(err) => Ok(RpcResult::Err(err)),
         }
     }
 }
@@ -195,8 +274,8 @@ where
 impl<Payload, ErrData, E> From<Response<Payload, ErrData>> for RpcResult<Payload, ErrData, E> {
     fn from(value: Response<Payload, ErrData>) -> Self {
         match value.payload {
-            ResponsePayload::Success(res) => Self::Ok(res),
-            ResponsePayload::Error(e) => Self::ErrResp(e),
+            ResponsePayload::Success(res) => Self::Success(res),
+            ResponsePayload::Failure(e) => Self::Failure(e),
         }
     }
 }

@@ -182,6 +182,8 @@ where
 
         let resp = task::ready!(this.state.poll(cx));
 
-        task::Poll::Ready(resp.deser_ok_or_else(|e, text| TransportError::deser_err(e, text)))
+        task::Poll::Ready(
+            resp.try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
+        )
     }
 }

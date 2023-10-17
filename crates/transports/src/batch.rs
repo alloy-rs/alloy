@@ -61,7 +61,8 @@ where
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
 
         Poll::Ready(match resp {
-            Ok(resp) => resp.deser_ok_or_else(|e, text| TransportError::deser_err(e, text)),
+            Ok(resp) => resp
+                .try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
             Err(e) => RpcResult::Err(TransportError::Custom(Box::new(e))),
         })
     }

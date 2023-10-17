@@ -20,7 +20,7 @@ use crate::ErrorPayload;
 #[derive(Debug, Clone)]
 pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Success(Payload),
-    Error(ErrorPayload<ErrData>),
+    Failure(ErrorPayload<ErrData>),
 }
 
 /// A [`ResponsePayload`] that has been partially deserialized, borrowing its
@@ -34,7 +34,7 @@ impl BorrowedResponsePayload<'_> {
     pub fn into_owned(self) -> ResponsePayload {
         match self {
             Self::Success(payload) => ResponsePayload::Success(payload.to_owned()),
-            Self::Error(error) => ResponsePayload::Error(error.into_owned()),
+            Self::Failure(error) => ResponsePayload::Failure(error.into_owned()),
         }
     }
 }
@@ -51,7 +51,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Fallible conversion to the error object.
     pub fn as_error(&self) -> Option<&ErrorPayload<ErrData>> {
         match self {
-            ResponsePayload::Error(payload) => Some(payload),
+            ResponsePayload::Failure(payload) => Some(payload),
             _ => None,
         }
     }
@@ -63,7 +63,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
 
     /// Returns `true` if the response payload is an error.
     pub fn is_error(&self) -> bool {
-        matches!(self, ResponsePayload::Error(_))
+        matches!(self, ResponsePayload::Failure(_))
     }
 }
 
@@ -101,7 +101,7 @@ where
                     Err(_) => Err(self),
                 }
             }
-            ResponsePayload::Error(e) => Ok(ResponsePayload::Error(e)),
+            ResponsePayload::Failure(e) => Ok(ResponsePayload::Failure(e)),
         }
     }
 }
@@ -133,9 +133,9 @@ where
         self,
     ) -> Result<ResponsePayload<Payload, T>, Self> {
         match self {
-            ResponsePayload::Error(err) => match err.deser_data() {
-                Ok(deser) => Ok(ResponsePayload::Error(deser)),
-                Err(err) => Err(ResponsePayload::Error(err)),
+            ResponsePayload::Failure(err) => match err.deser_data() {
+                Ok(deser) => Ok(ResponsePayload::Failure(deser)),
+                Err(err) => Err(ResponsePayload::Failure(err)),
             },
             ResponsePayload::Success(payload) => Ok(ResponsePayload::Success(payload)),
         }

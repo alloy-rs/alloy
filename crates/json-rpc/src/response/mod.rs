@@ -222,7 +222,7 @@ where
                     }),
                     (None, Some(error)) => Ok(Response {
                         id,
-                        payload: ResponsePayload::Error(error),
+                        payload: ResponsePayload::Failure(error),
                     }),
                     (None, None) => Err(serde::de::Error::missing_field("result or error")),
                     (Some(_), Some(_)) => Err(serde::de::Error::custom(
@@ -265,7 +265,10 @@ mod test {
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
-        assert!(matches!(response.payload, super::ResponsePayload::Error(_)));
+        assert!(matches!(
+            response.payload,
+            super::ResponsePayload::Failure(_)
+        ));
     }
 
     #[test]
