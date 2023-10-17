@@ -56,7 +56,7 @@ where
 }
 
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
-pub enum ResponsePacket<Payload, ErrData> {
+pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Single(Response<Payload, ErrData>),
     Batch(Vec<Response<Payload, ErrData>>),
 }
@@ -65,6 +65,19 @@ pub enum ResponsePacket<Payload, ErrData> {
 /// deserialized, borrowing its contents from the deserializer. This is used
 /// primarily for intermediate deserialization. Most users will not require it.
 pub type BorrowedResponsePacket<'a> = ResponsePacket<&'a RawValue, &'a RawValue>;
+
+impl BorrowedResponsePacket<'_> {
+    /// Convert this borrowed response packet into an owned packet by copying
+    /// the data from the deserializer (if necessary).
+    pub fn into_owned(self) -> ResponsePacket {
+        match self {
+            Self::Single(single) => ResponsePacket::Single(single.into_owned()),
+            Self::Batch(batch) => {
+                ResponsePacket::Batch(batch.into_iter().map(Response::into_owned).collect())
+            }
+        }
+    }
+}
 
 impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// Find responses by a list of IDs.

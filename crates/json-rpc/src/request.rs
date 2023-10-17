@@ -1,6 +1,6 @@
 use crate::{common::Id, RpcParam};
 
-use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 /// A JSON-RPC 2.0 request object.
@@ -13,7 +13,7 @@ use serde_json::value::RawValue;
 ///
 /// The value of `method` should be known at compile time.
 #[derive(Debug, Deserialize, Clone)]
-pub struct Request<Params = Box<RawValue>> {
+pub struct Request<Params> {
     pub method: &'static str,
     pub params: Params,
     pub id: Id,
@@ -34,6 +34,32 @@ where
             params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),
             id: self.id,
         }
+    }
+}
+
+impl<'a, Params> Request<Params>
+where
+    Params: AsRef<RawValue> + 'a,
+{
+    /// Attempt to deserialize the params.
+    ///
+    /// To borrow from the params via the deserializer, use
+    /// [`Request::try_borrow_params_as`].
+    ///
+    /// # Returns
+    /// - `Ok(T)` if the params can be deserialized as `T`
+    /// - `Err(e)` if the params cannot be deserialized as `T`
+    pub fn try_params_as<T: DeserializeOwned>(&self) -> serde_json::Result<T> {
+        serde_json::from_str(self.params.as_ref().get())
+    }
+
+    /// Attempt to deserialize the params, borrowing from the params
+    ///
+    /// # Returns
+    /// - `Ok(T)` if the params can be deserialized as `T`
+    /// - `Err(e)` if the params cannot be deserialized as `T`
+    pub fn try_borrow_params_as<T: Deserialize<'a>>(&'a self) -> serde_json::Result<T> {
+        serde_json::from_str(self.params.as_ref().get())
     }
 }
 

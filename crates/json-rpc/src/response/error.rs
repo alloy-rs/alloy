@@ -17,6 +17,23 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
     pub data: Option<ErrData>,
 }
 
+/// A [`ErrorPayload`] that has been partially deserialized, borrowing its
+/// contents from the deserializer. This is used primarily for intermediate
+/// deserialization. Most users will not require it.
+pub type BorrowedErrorPayload<'a> = ErrorPayload<&'a RawValue>;
+
+impl BorrowedErrorPayload<'_> {
+    /// Convert this borrowed error payload into an owned payload by copying
+    /// the data from the deserializer (if necessary).
+    pub fn into_owned(self) -> ErrorPayload {
+        ErrorPayload {
+            code: self.code,
+            message: self.message,
+            data: self.data.map(|data| data.to_owned()),
+        }
+    }
+}
+
 impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -117,16 +134,12 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
     }
 }
 
-/// A [`ErrorPayload`] that has been partially deserialized, borrowing its
-/// contents from the deserializer. This is used primarily for intermediate
-/// deserialization. Most users will not require it.
-pub type BorrowedErrorPayload<'a> = ErrorPayload<&'a RawValue>;
-
 impl<'a, Data> ErrorPayload<Data>
 where
     Data: Borrow<RawValue> + 'a,
 {
-    /// Deserialize the data field.
+    /// Deserialize the error's `data` field, borrowing from the data field if
+    /// necessary.
     ///
     /// # Returns
     ///
@@ -135,22 +148,7 @@ where
     ///   deserialized.
     /// - `Some(Err(err))` if the error has a `data` field that can't be
     ///   deserialized.
-    pub fn try_data_as<T: DeserializeOwned>(&self) -> Option<serde_json::Result<T>> {
-        self.data
-            .as_ref()
-            .map(|data| serde_json::from_str(data.borrow().get()))
-    }
-
-    /// Deserialize the error's `data` field, borrowing from the data field./s
-    ///
-    /// # Returns
-    ///
-    /// - `None` if the error has no `data` field.
-    /// - `Some(Ok(data))` if the error has a `data` field that can be
-    ///   deserialized.
-    /// - `Some(Err(err))` if the error has a `data` field that can't be
-    ///   deserialized.
-    pub fn try_borrow_data_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
+    pub fn try_data_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
         self.data
             .as_ref()
             .map(|data| serde_json::from_str(data.borrow().get()))

@@ -28,6 +28,17 @@ pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
 /// deserialization. Most users will not require it.
 pub type BorrowedResponsePayload<'a> = ResponsePayload<&'a RawValue, &'a RawValue>;
 
+impl BorrowedResponsePayload<'_> {
+    /// Convert this borrowed response payload into an owned payload by copying
+    /// the data from the deserializer (if necessary).
+    pub fn into_owned(self) -> ResponsePayload {
+        match self {
+            Self::Success(payload) => ResponsePayload::Success(payload.to_owned()),
+            Self::Error(error) => ResponsePayload::Error(error.into_owned()),
+        }
+    }
+}
+
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Fallible conversion to the succesful payload.
     pub fn as_success(&self) -> Option<&Payload> {
@@ -60,26 +71,15 @@ impl<'a, Payload, ErrData> ResponsePayload<Payload, ErrData>
 where
     Payload: AsRef<RawValue> + 'a,
 {
-    /// Attempt to deserialize the success payload.
+    /// Attempt to deserialize the success payload, borrowing from the payload
+    /// if necessary.
     ///
     /// # Returns
     /// - `None` if the payload is an error
     /// - `Some(Ok(T))` if the payload is a success and can be deserialized
     /// - `Some(Err(serde_json::Error))` if the payload is a success and can't
     ///   be deserialized as `T`
-    pub fn try_success_as<T: DeserializeOwned>(&self) -> Option<serde_json::Result<T>> {
-        self.as_success()
-            .map(|payload| serde_json::from_str(payload.as_ref().get()))
-    }
-
-    /// Attempt to deserialize the success payload, borrowing from the payload.
-    ///
-    /// # Returns
-    /// - `None` if the payload is an error
-    /// - `Some(Ok(T))` if the payload is a success and can be deserialized
-    /// - `Some(Err(serde_json::Error))` if the payload is a success and can't
-    ///   be deserialized as `T`
-    pub fn try_borrow_success_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
+    pub fn try_success_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
         self.as_success()
             .map(|payload| serde_json::from_str(payload.as_ref().get()))
     }
@@ -110,27 +110,16 @@ impl<'a, Payload, Data> ResponsePayload<Payload, Data>
 where
     Data: Borrow<RawValue> + 'a,
 {
-    /// Attempt to deserialize the error payload.
+    /// Attempt to deserialize the error payload, borrowing from the payload if
+    /// necessary.
     ///
     /// # Returns
     /// - `None` if the payload is a success
     /// - `Some(Ok(T))` if the payload is an error and can be deserialized
     /// - `Some(Err(serde_json::Error))` if the payload is an error and can't
     ///   be deserialized as `T`
-    pub fn try_error_as<T: DeserializeOwned>(&self) -> Option<serde_json::Result<T>> {
+    pub fn try_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
         self.as_error().and_then(|error| error.try_data_as::<T>())
-    }
-
-    /// Attempt to deserialize the error payload, borrowing from the payload.
-    ///
-    /// # Returns
-    /// - `None` if the payload is a success
-    /// - `Some(Ok(T))` if the payload is an error and can be deserialized
-    /// - `Some(Err(serde_json::Error))` if the payload is an error and can't
-    ///   be deserialized as `T`
-    pub fn try_borrow_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
-        self.as_error()
-            .and_then(|error| error.try_borrow_data_as::<T>())
     }
 
     /// Deserialize an Error payload, if possible, transforming this type.

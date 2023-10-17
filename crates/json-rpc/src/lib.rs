@@ -5,9 +5,7 @@
 //! JSON-RPC data.
 //!
 //! This crate is aimed at simplifying client implementations. It is not
-//! well-suited to in-server applications. We do not support borrowing data from
-//! deserializers, for example. This choice prevents complex lifetime
-//! propagation in user code, at the expense of copying data
+//! well-suited to in-server applications.
 
 use serde::{de::DeserializeOwned, Serialize};
 
