@@ -28,6 +28,10 @@ pub struct Response<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
 /// A [`Response`] that has been partially deserialized, borrowing its contents
 /// from the deserializer. This is used primarily for intermediate
 /// deserialization. Most users will not require it.
+///
+/// See the [top-level docs] for more info.
+///
+/// [top-level docs]: crate
 pub type BorrowedResponse<'a> = Response<&'a RawValue, &'a RawValue>;
 
 impl BorrowedResponse<'_> {

@@ -19,6 +19,16 @@ pub struct Request<Params> {
     pub id: Id,
 }
 
+/// A [`Request`] that has been partially serialized. The request parameters
+/// have been serialized, and are represented as a boxed [`RawValue`]. This is
+/// useful for collections containing many requests, as it erases the `Param`
+/// type. It can be created with [`Request::box_params()`].
+///
+/// See the [top-level docs] for more info.
+///
+/// [top-level docs]: crate
+pub type ParitallySerializedRequest = Request<Box<RawValue>>;
+
 impl<Params> Request<Params>
 where
     Params: RpcParam,
@@ -28,7 +38,7 @@ where
     /// # Panics
     ///
     /// If serialization of the params fails.
-    pub fn box_params(self) -> Request<Box<RawValue>> {
+    pub fn box_params(self) -> ParitallySerializedRequest {
         Request {
             method: self.method,
             params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),

@@ -20,6 +20,10 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
 /// A [`ErrorPayload`] that has been partially deserialized, borrowing its
 /// contents from the deserializer. This is used primarily for intermediate
 /// deserialization. Most users will not require it.
+///
+/// See the [top-level docs] for more info.
+///
+/// [top-level docs]: crate
 pub type BorrowedErrorPayload<'a> = ErrorPayload<&'a RawValue>;
 
 impl BorrowedErrorPayload<'_> {

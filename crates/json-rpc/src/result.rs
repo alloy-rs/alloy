@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{borrow::Borrow, fmt::Debug};
 
@@ -29,6 +30,10 @@ pub enum RpcResult<T, ErrData, E> {
 /// A [`RpcResult`] that has been partially deserialized, borrowing its
 /// contents from the deserializer. This is used primarily for intermediate
 /// deserialization. Most users will not require it.
+///
+/// See the [top-level docs] for more info.
+///
+/// [top-level docs]: crate
 pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, &'a RawValue, E>;
 
 impl<'a, E> BorrowedRpcResult<'a, E> {
@@ -181,6 +186,21 @@ impl<B, ErrData, E> RpcResult<B, ErrData, E>
 where
     B: Borrow<RawValue>,
 {
+    /// Deserialize a response, if it is `Success`.
+    ///
+    /// # Returns
+    /// - `None` if the response is not `Success`.
+    /// - `Some(Ok(Resp))` if the response is `Success` and the
+    ///   `result` field can be deserialized.
+    /// - `Some(Err(err))` if the response is `Success` and the `result` field
+    ///   can't be deserialized.
+    pub fn try_success_as<'a, Resp: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<Resp>> {
+        match self {
+            Self::Success(val) => Some(serde_json::from_str(val.borrow().get())),
+            _ => None,
+        }
+    }
+
     /// Deserialize the inner value, if it is `Ok`. Pass through other values.
     pub fn deserialize_success<Resp: RpcReturn>(self) -> Result<RpcResult<Resp, ErrData, E>, Self> {
         match self {
@@ -219,6 +239,23 @@ impl<T, B, E> RpcResult<T, B, E>
 where
     B: Borrow<RawValue>,
 {
+    /// Deserialize a response, if it is `Failure`.
+    ///
+    /// # Returns
+    /// - `None` if the response is not `Failure`
+    /// - `Some(Ok(ErrorPayload))` if the response is `Failure` and the
+    ///   `data` field can be deserialized.
+    /// - `Some(Err(err))` if the response is `Failure` and the `data` field
+    ///   can't be deserialized.
+    pub fn try_failure_as<'a, ErrData: Deserialize<'a>>(
+        &'a self,
+    ) -> Option<serde_json::Result<ErrData>> {
+        match self {
+            RpcResult::Failure(err) => err.try_data_as::<ErrData>(),
+            _ => None,
+        }
+    }
+
     /// Deserialize the inner value, if it is `Failure`. Pass through other
     /// values.
     pub fn deserialize_failure<ErrData: RpcReturn>(self) -> Result<RpcResult<T, ErrData, E>, Self> {
