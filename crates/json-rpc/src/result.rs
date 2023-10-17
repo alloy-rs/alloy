@@ -133,7 +133,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         self.map(|_| ())
     }
 
-    /// Converts from `RpcResult<T, E>` to `Option<T>`.
+    /// Converts from `RpcResult<T, ErrData, E>` to `Option<T>`.
     pub fn ok(self) -> Option<T> {
         match self {
             RpcResult::Ok(val) => Some(val),
@@ -141,7 +141,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         }
     }
 
-    /// Converts from `RpcResult<T, E>` to `Option<ErrorPayload>`.
+    /// Converts from `RpcResult<T, ErrData, E>` to `Option<ErrorPayload>`.
     pub fn err_resp(self) -> Option<ErrorPayload<ErrData>> {
         match self {
             RpcResult::ErrResp(err) => Some(err),
@@ -149,7 +149,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
         }
     }
 
-    /// Converts from `RpcResult<T, E>` to `Option<E>`.
+    /// Converts from `RpcResult<T, ErrData, E>` to `Option<E>`.
     pub fn err(self) -> Option<E> {
         match self {
             RpcResult::Err(err) => Some(err),
@@ -162,6 +162,13 @@ impl<B, ErrData, E> RpcResult<B, ErrData, E>
 where
     B: Borrow<RawValue>,
 {
+    /// Deserialize the inner value, if it is `Ok`. Pass through other values.
+    ///
+    /// # Returns
+    /// - `Ok` if the inner value is `Ok` and deserialization succeeds.
+    /// - `Err` if the inner value is an `Err`, or if the value is an `Ok` and
+    ///   deserialization fails.
+    /// - `ErrResp` if the inner value is `ErrResp`.
     pub fn deser_ok<Resp: RpcReturn>(self) -> RpcResult<Resp, ErrData, E>
     where
         E: From<serde_json::Error>,
