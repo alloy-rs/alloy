@@ -166,14 +166,7 @@ where
     where
         E: From<serde_json::Error>,
     {
-        match self {
-            RpcResult::Ok(val) => match serde_json::from_str(val.borrow().get()) {
-                Ok(val) => RpcResult::Ok(val),
-                Err(err) => RpcResult::Err(err.into()),
-            },
-            Self::ErrResp(er) => RpcResult::ErrResp(er),
-            Self::Err(e) => RpcResult::Err(e),
-        }
+        self.deser_ok_or_else::<Resp, _>(|e, _| e.into())
     }
 
     #[doc(hidden)]

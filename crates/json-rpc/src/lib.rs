@@ -3,11 +3,6 @@
 //! This crate provides data types for use with the JSON-RPC 2.0 protocol. It
 //! does not provide any functionality for actually sending or receiving
 //! JSON-RPC data.
-//!
-//! This crate is aimed at simplifying client implementations. It is not
-//! well-suited to in-server applications.
-
-use serde::{de::DeserializeOwned, Serialize};
 
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
@@ -29,6 +24,8 @@ pub use common::Id;
 
 mod result;
 pub use result::RpcResult;
+
+use serde::{de::DeserializeOwned, Serialize};
 
 /// An object that can be used as a JSON-RPC parameter.
 ///
