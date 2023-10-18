@@ -1,15 +1,28 @@
 use std::collections::HashSet;
 
-use serde::{ser::SerializeSeq, Serialize};
+use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::{Id, Response, SerializedRequest};
 
 /// A [`RequestPacket`] is a [`SerializedRequest`] or a batch of serialized
 /// request.
+#[derive(Debug, Clone)]
 pub enum RequestPacket {
     Single(SerializedRequest),
     Batch(Vec<SerializedRequest>),
+}
+
+impl FromIterator<SerializedRequest> for RequestPacket {
+    fn from_iter<T: IntoIterator<Item = SerializedRequest>>(iter: T) -> Self {
+        Self::Batch(iter.into_iter().collect())
+    }
+}
+
+impl From<SerializedRequest> for RequestPacket {
+    fn from(req: SerializedRequest) -> Self {
+        Self::Single(req)
+    }
 }
 
 impl Serialize for RequestPacket {
@@ -53,9 +66,29 @@ impl RequestPacket {
                 .collect(),
         }
     }
+
+    /// Push a request into the packet.
+    pub fn push(&mut self, req: SerializedRequest) {
+        if let Self::Batch(batch) = self {
+            batch.push(req);
+            return;
+        }
+        if matches!(self, Self::Single(_)) {
+            let old = std::mem::replace(self, Self::Batch(Vec::with_capacity(10)));
+            match old {
+                Self::Single(single) => {
+                    self.push(single);
+                }
+                _ => unreachable!(),
+            }
+            self.push(req);
+        }
+    }
 }
 
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Single(Response<Payload, ErrData>),
     Batch(Vec<Response<Payload, ErrData>>),

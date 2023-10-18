@@ -4,10 +4,15 @@ use crate::{
     RpcFut,
 };
 
-use alloy_json_rpc::{Request, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
 use core::panic;
 use serde_json::value::RawValue;
-use std::{future::Future, marker::PhantomData, pin::Pin, task};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    pin::Pin,
+    task::{self, Poll::Ready},
+};
 use tower::{Layer, Service};
 
 /// The states of the [`RpcCall`] future.
@@ -24,7 +29,7 @@ where
     },
     AwaitingResponse {
         #[pin]
-        fut: <JsonRpcService<Conn> as Service<Request<Params>>>::Future,
+        fut: <JsonRpcService<Conn> as Service<RequestPacket>>::Future,
     },
     Complete,
 }
@@ -47,12 +52,22 @@ where
                 unreachable!("Called poll_prepared in incorrect state")
             };
 
-            if let Err(e) = task::ready!(Service::<Request<Params>>::poll_ready(connection, cx)) {
+            if let Err(e) = task::ready!(Service::<RequestPacket>::poll_ready(connection, cx)) {
                 self.set(CallState::Complete);
-                return task::Poll::Ready(RpcResult::Err(e));
+                return Ready(RpcResult::Err(e));
             }
-            let request = request.take().expect("No request. This is a bug.");
-            connection.call(request)
+            let request = request
+                .take()
+                .expect("No request. This is a bug.")
+                .serialize();
+
+            match request {
+                Ok(request) => connection.call(request.into()),
+                Err(err) => {
+                    self.set(CallState::Complete);
+                    return Ready(RpcResult::Err(TransportError::ser_err(err)));
+                }
+            }
         };
 
         self.set(CallState::AwaitingResponse { fut });
@@ -69,9 +84,11 @@ where
             unreachable!("Called poll_awaiting in incorrect state")
         };
 
-        let res = task::ready!(fut.poll(cx));
-
-        task::Poll::Ready(RpcResult::from(res))
+        match task::ready!(fut.poll(cx)) {
+            Ok(ResponsePacket::Single(res)) => Ready(RpcResult::from(res)),
+            Err(e) => Ready(RpcResult::Err(e)),
+            _ => panic!("received batch response from single request"),
+        }
     }
 }
 
@@ -182,7 +199,7 @@ where
 
         let resp = task::ready!(this.state.poll(cx));
 
-        task::Poll::Ready(
+        Ready(
             resp.try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
         )
     }

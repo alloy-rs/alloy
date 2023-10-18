@@ -11,7 +11,9 @@ use futures_channel::oneshot;
 use serde_json::value::RawValue;
 
 use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
-use alloy_json_rpc::{Id, Request, Response, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{
+    Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
+};
 
 type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
 type ChannelMap = HashMap<Id, Channel>;
@@ -25,7 +27,7 @@ pub struct BatchRequest<'a, T> {
     transport: &'a RpcClient<T>,
 
     /// The requests to be sent.
-    requests: Vec<Box<RawValue>>,
+    requests: RequestPacket,
 
     /// The channels to send the responses through.
     channels: ChannelMap,
@@ -75,7 +77,7 @@ where
 {
     Prepared {
         transport: Conn,
-        requests: Vec<Box<RawValue>>,
+        requests: RequestPacket,
         channels: ChannelMap,
     },
     SerError(Option<TransportError>),
@@ -91,18 +93,17 @@ impl<'a, T> BatchRequest<'a, T> {
     pub fn new(transport: &'a RpcClient<T>) -> Self {
         Self {
             transport,
-            requests: Vec::with_capacity(10),
+            requests: RequestPacket::Batch(Vec::with_capacity(10)),
             channels: HashMap::with_capacity(10),
         }
     }
 
     fn push_raw(
         &mut self,
-        id: Id,
-        request: Box<RawValue>,
+        request: SerializedRequest,
     ) -> oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>> {
         let (tx, rx) = oneshot::channel();
-        self.channels.insert(id, tx);
+        self.channels.insert(request.id().clone(), tx);
         self.requests.push(request);
         rx
     }
@@ -111,7 +112,8 @@ impl<'a, T> BatchRequest<'a, T> {
         &mut self,
         request: Request<Params>,
     ) -> Result<Waiter<Resp>, TransportError> {
-        to_json_raw_value(&request).map(|rv| self.push_raw(request.meta.id, rv).into())
+        let ser = request.serialize().map_err(TransportError::ser_err)?;
+        Ok(self.push_raw(ser).into())
     }
 }
 
@@ -181,7 +183,7 @@ where
         // We only have mut refs, and we want ownership, so we just replace
         // with 0-capacity collections.
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
-        let req = std::mem::replace(requests, Vec::with_capacity(0));
+        let req = std::mem::replace(requests, RequestPacket::Batch(Vec::with_capacity(0)));
 
         let req = match to_json_raw_value(&req) {
             Ok(req) => req,
@@ -214,7 +216,7 @@ where
             }
         };
 
-        let responses: Vec<Response> = match serde_json::from_str(responses.get()) {
+        let responses: ResponsePacket = match serde_json::from_str(responses.get()) {
             Ok(responses) => responses,
             Err(err) => {
                 self.set(BatchFuture::Complete);
@@ -222,11 +224,19 @@ where
             }
         };
 
-        // Send the responses via the channels by removing the channels from
-        // the map.
-        for response in responses {
-            if let Some(tx) = channels.remove(&response.id) {
-                let _ = tx.send(RpcResult::from(response));
+        // Send all responses via channels
+        match responses {
+            ResponsePacket::Single(single) => {
+                if let Some(tx) = channels.remove(&single.id) {
+                    let _ = tx.send(RpcResult::from(single));
+                }
+            }
+            ResponsePacket::Batch(responses) => {
+                for response in responses.into_iter() {
+                    if let Some(tx) = channels.remove(&response.id) {
+                        let _ = tx.send(RpcResult::from(response));
+                    }
+                }
             }
         }
 
