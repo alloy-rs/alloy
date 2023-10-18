@@ -15,14 +15,26 @@ where
         .map_err(TransportError::ser_err)
 }
 
-pub trait Spawn {
-    #[cfg(not(target_arch = "wasm32"))]
-    fn spawn_task(fut: impl Future<Output = ()> + Send + 'static) {
-        tokio::spawn(fut);
-    }
+pub(crate) trait Spawnable {
+    fn spawn_task(self);
+}
 
-    #[cfg(target_arch = "wasm32")]
-    fn spawn_task(fut: impl Future<Output = ()> + 'static) {
-        wasm_bindgen_futures::spawn_local(fut);
+#[cfg(not(target_arch = "wasm32"))]
+impl<T> Spawnable for T
+where
+    T: Future<Output = ()> + Send + 'static,
+{
+    fn spawn_task(self) {
+        tokio::spawn(self);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl<T> Spawnable for T
+where
+    T: Future<Output = ()> + 'static,
+{
+    fn spawn_task(self) {
+        wasm_bindgen_futures::spawn_local(self);
     }
 }
