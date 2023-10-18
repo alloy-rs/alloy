@@ -16,6 +16,10 @@ where
 }
 
 pub(crate) trait Spawnable {
+    /// Spawn the future as a task.
+    ///
+    /// In WASM this will be a `wasm-bindgen-futures::spawn_local` call, while
+    /// in native it will be a `tokio::spawn` call.
     fn spawn_task(self);
 }
 

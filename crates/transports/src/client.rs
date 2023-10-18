@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use crate::{BatchRequest, BoxTransport, Http, RpcCall, Transport};
+use crate::{BatchRequest, BoxTransport, RpcCall, Transport};
 
 /// A JSON-RPC client.
 ///
@@ -190,10 +190,10 @@ impl<L> ClientBuilder<L> {
     #[cfg(feature = "reqwest")]
     pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
-        L: Layer<Http<reqwest::Client>>,
+        L: Layer<crate::Http<reqwest::Client>>,
         L::Service: Transport,
     {
-        let transport = Http::new(url);
+        let transport = crate::Http::new(url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
@@ -204,10 +204,10 @@ impl<L> ClientBuilder<L> {
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
-        L: Layer<Http<hyper::client::Client<hyper::client::HttpConnector>>>,
+        L: Layer<crate::Http<hyper::client::Client<hyper::client::HttpConnector>>>,
         L::Service: Transport,
     {
-        let transport = Http::new(url);
+        let transport = crate::Http::new(url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)

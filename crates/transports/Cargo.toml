@@ -34,6 +34,10 @@ version = "0.14.27"
 optional = true
 features = ["full"]
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
+version = "1.33.0"
+features = ["sync", "rt"]
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4.37"
 
