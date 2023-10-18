@@ -5,7 +5,8 @@ use serde_json::value::RawValue;
 
 use crate::{Id, Response, SerializedRequest};
 
-/// A [`RequestPacket`] is a [`Request`] or a batch of requests.
+/// A [`RequestPacket`] is a [`SerializedRequest`] or a batch of serialized
+/// request.
 pub enum RequestPacket {
     Single(SerializedRequest),
     Batch(Vec<SerializedRequest>),
