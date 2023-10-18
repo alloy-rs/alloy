@@ -121,7 +121,7 @@ impl<'a, Conn> BatchRequest<'a, Conn>
 where
     Conn: Transport + Clone,
 {
-    #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless its batch is sent."]
+    #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless the batch is sent!"]
     /// Add a call to the batch.
     ///
     /// ### Errors
