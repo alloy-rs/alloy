@@ -1,4 +1,4 @@
-use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
+use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
@@ -62,9 +62,11 @@ impl<T> RpcClient<T> {
         params: Cow<'a, Params>,
     ) -> Request<Cow<'a, Params>> {
         Request {
-            method,
+            meta: RequestMeta {
+                method,
+                id: self.next_id(),
+            },
             params,
-            id: self.next_id(),
         }
     }
 

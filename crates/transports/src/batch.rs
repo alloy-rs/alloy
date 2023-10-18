@@ -111,7 +111,7 @@ impl<'a, T> BatchRequest<'a, T> {
         &mut self,
         request: Request<Params>,
     ) -> Result<Waiter<Resp>, TransportError> {
-        to_json_raw_value(&request).map(|rv| self.push_raw(request.id, rv).into())
+        to_json_raw_value(&request).map(|rv| self.push_raw(request.meta.id, rv).into())
     }
 }
 

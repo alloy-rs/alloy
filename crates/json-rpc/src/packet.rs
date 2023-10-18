@@ -1,55 +1,54 @@
 use std::collections::HashSet;
 
+use serde::{ser::SerializeSeq, Serialize};
 use serde_json::value::RawValue;
 
-use crate::{Id, Request, Response, RpcParam};
+use crate::{Id, Response, SerializedRequest};
 
 /// A [`RequestPacket`] is a [`Request`] or a batch of requests.
-pub enum RequestPacket<Params> {
-    Single(Request<Params>),
-    Batch(Vec<Request<Params>>),
+pub enum RequestPacket {
+    Single(SerializedRequest),
+    Batch(Vec<SerializedRequest>),
 }
 
-impl<Params> RequestPacket<Params>
-where
-    Params: RpcParam,
-{
-    /// Serialize request paramaters as a boxed [`RawValue`].
-    ///
-    /// # Panics
-    ///
-    /// If serialization of the params fails.
-    pub fn box_params(self) -> RequestPacket<Box<RawValue>> {
+impl Serialize for RequestPacket {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         match self {
-            Self::Single(req) => RequestPacket::Single(req.box_params()),
-            Self::Batch(batch) => {
-                RequestPacket::Batch(batch.into_iter().map(Request::box_params).collect())
+            RequestPacket::Single(single) => single.request().serialize(serializer),
+            RequestPacket::Batch(batch) => {
+                let mut seq = serializer.serialize_seq(Some(batch.len()))?;
+                for req in batch {
+                    seq.serialize_element(req.request())?;
+                }
+                seq.end()
             }
         }
     }
+}
 
+impl RequestPacket {
     /// Serialize the packet as a boxed [`RawValue`].
     pub fn serialize(&self) -> serde_json::Result<Box<RawValue>> {
-        match self {
-            Self::Single(req) => serde_json::to_string(req).and_then(RawValue::from_string),
-            Self::Batch(batch) => serde_json::to_string(batch).and_then(RawValue::from_string),
-        }
+        serde_json::to_string(self).and_then(RawValue::from_string)
     }
 
     /// Get the request IDs of all subscription requests in the packet.
-    pub fn subscription_request_ids(&self) -> HashSet<Id> {
+    pub fn subscription_request_ids(&self) -> HashSet<&Id> {
         match self {
             RequestPacket::Single(single) => {
                 let mut hs = HashSet::with_capacity(1);
-                if single.method == "eth_subscribe" {
-                    hs.insert(single.id.clone());
+                if single.method() == "eth_subscribe" {
+                    hs.insert(single.id());
                 }
                 hs
             }
             RequestPacket::Batch(batch) => batch
                 .iter()
-                .filter(|req| req.method == "eth_subscribe")
-                .map(|req| req.id.clone())
+                .filter(|req| req.method() == "eth_subscribe")
+                .map(|req| req.id())
                 .collect(),
         }
     }
