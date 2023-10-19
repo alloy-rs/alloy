@@ -13,6 +13,12 @@ pub(crate) struct JsonRpcService<S> {
     pub(crate) inner: S,
 }
 
+impl<S> From<S> for JsonRpcService<S> {
+    fn from(inner: S) -> Self {
+        JsonRpcService { inner }
+    }
+}
+
 /// Layer for [`JsonRpcService`]
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct JsonRpcLayer;

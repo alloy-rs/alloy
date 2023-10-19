@@ -44,6 +44,11 @@ impl Serialize for RequestPacket {
 }
 
 impl RequestPacket {
+    /// Create a new empty packet with the given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::Batch(Vec::with_capacity(capacity))
+    }
+
     /// Serialize the packet as a boxed [`RawValue`].
     pub fn serialize(&self) -> serde_json::Result<Box<RawValue>> {
         serde_json::to_string(self).and_then(RawValue::from_string)
@@ -65,6 +70,19 @@ impl RequestPacket {
                 .map(|req| req.id())
                 .collect(),
         }
+    }
+
+    /// Get the number of requests in the packet.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Single(_) => 1,
+            Self::Batch(batch) => batch.len(),
+        }
+    }
+
+    /// Check if the packet is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Push a request into the packet.

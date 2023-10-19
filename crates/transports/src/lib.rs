@@ -1,3 +1,6 @@
+mod batch;
+pub use batch::BatchRequest;
+
 mod call;
 pub use call::RpcCall;
 
@@ -10,9 +13,6 @@ pub use client::{ClientBuilder, RpcClient};
 
 mod error;
 pub use error::TransportError;
-
-mod batch;
-pub use batch::BatchRequest;
 
 mod transports;
 pub use transports::{BoxTransport, Http, Transport};

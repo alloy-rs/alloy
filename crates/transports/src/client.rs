@@ -1,12 +1,11 @@
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
-use tower::{
-    layer::util::{Identity, Stack},
-    Layer, ServiceBuilder,
-};
-
 use std::{
     borrow::Cow,
     sync::atomic::{AtomicU64, Ordering},
+};
+use tower::{
+    layer::util::{Identity, Stack},
+    Layer, ServiceBuilder,
 };
 
 use crate::{BatchRequest, BoxTransport, RpcCall, Transport};

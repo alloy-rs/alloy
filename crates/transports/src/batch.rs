@@ -15,8 +15,8 @@ use alloy_json_rpc::{
     Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
 };
 
-type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
-type ChannelMap = HashMap<Id, Channel>;
+pub(crate) type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
+pub(crate) type ChannelMap = HashMap<Id, Channel>;
 
 /// A batch JSON-RPC request, used to bundle requests into a single transport
 /// call.
