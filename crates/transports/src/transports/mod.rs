@@ -1,4 +1,6 @@
 mod connect;
+pub use connect::{BoxTransportConnect, TransportConnect};
+
 mod http;
 pub use http::Http;
 

@@ -110,16 +110,20 @@ impl Service<Box<RawValue>> for BoxTransport {
     }
 }
 
-/// checks trait + send + sync + 'static
-fn __compile_check() {
-    fn inner<T: CloneTransport>() {
-        todo!()
+#[cfg(test)]
+mod test {
+    use super::*;
+    /// checks trait + send + sync + 'static
+    fn __compile_check() {
+        fn inner<T: CloneTransport>() {
+            todo!()
+        }
+        fn inner_2<T: Transport>() {
+            todo!()
+        }
+        inner::<BoxTransport>();
+        inner::<BoxTransport>();
     }
-    fn inner_2<T: Transport>() {
-        todo!()
-    }
-    inner::<BoxTransport>();
-    inner::<BoxTransport>();
 }
 
 mod private {

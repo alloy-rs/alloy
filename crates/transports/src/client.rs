@@ -8,7 +8,7 @@ use tower::{
     Layer, ServiceBuilder,
 };
 
-use crate::{BatchRequest, BoxTransport, RpcCall, Transport};
+use crate::{transports::TransportConnect, BatchRequest, BoxTransport, RpcCall, Transport};
 
 /// A JSON-RPC client.
 ///
@@ -48,6 +48,14 @@ impl<T> RpcClient<T> {
             is_local,
             id: AtomicU64::new(0),
         }
+    }
+
+    /// Connect to a transport via a [`TransportConnect`] implementor.
+    pub fn connect<C: TransportConnect<Transport = T>>(connect: C) -> Self
+    where
+        C: Transport,
+    {
+        connect.client()
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
