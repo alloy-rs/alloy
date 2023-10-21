@@ -9,6 +9,7 @@ use tower::Service;
 /// A service layer that transforms [`RequestPacket`] into [`ResponsePacket`]
 /// by wrapping an inner service that implements [`Transport`].
 #[derive(Debug, Clone)]
+#[repr(transparent)]
 pub(crate) struct JsonRpcService<S> {
     pub(crate) inner: S,
 }
@@ -42,7 +43,7 @@ where
     type Future = JsonRpcFuture<S::Future, Self::Response>;
 
     fn poll_ready(&mut self, cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: RequestPacket) -> Self::Future {

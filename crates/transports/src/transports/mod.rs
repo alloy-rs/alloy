@@ -1,3 +1,4 @@
+mod connect;
 mod http;
 pub use http::Http;
 
