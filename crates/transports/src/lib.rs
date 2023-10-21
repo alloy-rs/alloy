@@ -7,8 +7,7 @@ pub use call::RpcCall;
 mod common;
 pub use common::Authorization;
 
-/// [`RpcClient`] and [`ClientBuilder`].
-pub mod client;
+mod client;
 pub use client::{ClientBuilder, RpcClient};
 
 mod error;
