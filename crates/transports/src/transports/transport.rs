@@ -115,14 +115,14 @@ mod test {
     use super::*;
     /// checks trait + send + sync + 'static
     fn __compile_check() {
-        fn inner<T: CloneTransport>() {
+        fn inner<T: CloneTransport>(_: Option<T>) {
             todo!()
         }
-        fn inner_2<T: Transport>() {
+        fn inner_2<T: Transport>(_: Option<T>) {
             todo!()
         }
-        inner::<BoxTransport>();
-        inner::<BoxTransport>();
+        inner::<BoxTransport>(None);
+        inner::<BoxTransport>(None);
     }
 }
 
