@@ -1,15 +1,17 @@
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
+use std::{
+    borrow::Cow,
+    sync::atomic::{AtomicU64, Ordering},
+};
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
 };
 
-use std::{
-    borrow::Cow,
-    sync::atomic::{AtomicU64, Ordering},
+use crate::{
+    BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport, TransportConnect,
+    TransportError,
 };
-
-use crate::{BatchRequest, BoxTransport, Http, RpcCall, Transport};
 
 /// A JSON-RPC client.
 ///
@@ -49,6 +51,14 @@ impl<T> RpcClient<T> {
             is_local,
             id: AtomicU64::new(0),
         }
+    }
+
+    /// Connect to a transport via a [`TransportConnect`] implementor.
+    pub fn connect<C: TransportConnect<Transport = T>>(connect: C) -> Result<Self, TransportError>
+    where
+        C: Transport,
+    {
+        connect.connect()
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -151,6 +161,9 @@ where
 /// This is a wrapper around [`tower::ServiceBuilder`]. It allows you to
 /// configure middleware layers that will be applied to the transport, and has
 /// some shortcuts for common layers and transports.
+///
+/// A builder accumulates Layers, and then is finished via the
+/// [`ClientBuilder::connect`] method, which produces an RPC client.
 pub struct ClientBuilder<L> {
     builder: ServiceBuilder<L>,
 }
@@ -176,7 +189,7 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
-    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
+    fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
     where
         L: Layer<T>,
         T: Transport,
@@ -185,32 +198,56 @@ impl<L> ClientBuilder<L> {
         RpcClient::new(self.builder.service(transport), is_local)
     }
 
-    /// Create a new [`RpcClient`] with a [`reqwest`] HTTP transport connecting
-    /// to the given URL and the configured layers.
+    /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
+    /// HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
-        L: Layer<Http<reqwest::Client>>,
+        L: Layer<crate::Http<reqwest::Client>>,
         L::Service: Transport,
     {
-        let transport = Http::new(url);
+        let transport = crate::Http::new(url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
     }
 
-    /// Create a new [`RpcClient`] with a [`hyper`] HTTP transport connecting
-    /// to the given URL and the configured layers.
+    /// Convenience function to create a new [`RpcClient`] with a [`hyper`]
+    /// HTTP transport.
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
-        L: Layer<Http<hyper::client::Client<hyper::client::HttpConnector>>>,
+        L: Layer<crate::Http<hyper::client::Client<hyper::client::HttpConnector>>>,
         L::Service: Transport,
     {
-        let transport = Http::new(url);
+        let transport = crate::Http::new(url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
+    }
+
+    /// Connect a transport, producing an [`RpcClient`] with the provided
+    /// connection.
+    pub fn connect<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
+    where
+        C: TransportConnect,
+        L: Layer<C::Transport>,
+        L::Service: Transport,
+    {
+        let transport = connect.to_transport()?;
+        Ok(self.transport(transport, connect.is_local()))
+    }
+
+    /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
+    /// connection.
+    pub fn connect_boxed<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
+    where
+        C: BoxTransportConnect,
+        L: Layer<BoxTransport>,
+        L::Service: Transport,
+    {
+        let transport = connect.to_boxed_transport()?;
+        Ok(self.transport(transport, connect.is_local()))
     }
 }
 
