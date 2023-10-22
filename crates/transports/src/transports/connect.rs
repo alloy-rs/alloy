@@ -10,7 +10,7 @@ pub trait TransportConnect {
     /// The transport type that is returned by `connect`.
     type Transport: Transport;
 
-    /// Returns true if the transport is a local transport.
+    /// Returns `true`` if the transport is a local transport.
     fn is_local(&self) -> bool {
         false
     }
@@ -35,6 +35,9 @@ pub trait TransportConnect {
 /// transports or clients at once. E.g.
 /// `Vec<&dyn BoxTransportConnect>.into_iter().map(|t| t.connect_boxed())`.
 pub trait BoxTransportConnect {
+    /// Returns `true`` if the transport is a local transport.
+    fn is_local(&self) -> bool;
+
     /// Connect to a transport, and box it.
     fn connect_boxed(&self) -> Result<BoxTransport, TransportError>;
 
@@ -47,6 +50,10 @@ where
     T: TransportConnect,
     T::Transport: Clone,
 {
+    fn is_local(&self) -> bool {
+        TransportConnect::is_local(self)
+    }
+
     fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
         self.connect().map(Transport::boxed)
     }
