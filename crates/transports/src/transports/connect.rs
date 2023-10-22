@@ -31,9 +31,9 @@ pub trait TransportConnect {
 /// produce a boxable transport. It can be used to create a boxed transport
 /// without knowing the exact type of the transport.
 ///
-/// This trait separate from TransportConnect to hide the associated type in
-/// boxed instances. It is intended to allow creation of several unlike
-/// transports or clients at once. E.g.
+/// This trait is separate from `TransportConnect`` to hide the associated type
+/// in when this trait is a trai object. It is intended to allow creation of
+/// several unlike transports or clients at once. E.g.
 /// `Vec<&dyn BoxTransportConnect>.into_iter().map(|t| t.connect_boxed())`.
 pub trait BoxTransportConnect {
     /// Returns `true`` if the transport is a local transport.
