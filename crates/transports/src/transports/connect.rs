@@ -1,6 +1,11 @@
-use crate::{BoxTransport, RpcClient, Transport};
+use crate::{BoxTransport, RpcClient, Transport, TransportError};
 
-/// Connection details for a transport. This ob
+/// Connection details for a transport. This object captures the details
+/// necessary to establish a simple transport.
+///
+/// ### Note on Fallibity
+///
+
 pub trait TransportConnect {
     /// The transport type that is returned by `connect`.
     type Transport: Transport;
@@ -11,12 +16,11 @@ pub trait TransportConnect {
     }
 
     /// Connect to the transport, returning a `Transport` instance.
-    fn connect(&self) -> Self::Transport;
+    fn connect(&self) -> Result<Self::Transport, TransportError>;
 
     /// Connect to the transport, wrapping it into a `RpcClient` instance.
-    fn client(&self) -> RpcClient<Self::Transport> {
-        let is_local = self.is_local();
-        RpcClient::new(self.connect(), is_local)
+    fn client(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
+        self.connect().map(|t| RpcClient::new(t, self.is_local()))
     }
 }
 
@@ -26,15 +30,16 @@ pub trait TransportConnect {
 /// produce a boxable transport. It can be used to create a boxed transport
 /// without knowing the exact type of the transport.
 ///
-/// This trait is object safe. It is intended to allow creation of several
-/// unlike transports or clients at once. E.g. `Vec<&dyn BoxTransportConnect>.
-/// into_iter().map(|t| t.connect_boxed())`.
+/// This trait separate from TransportConnect to hide the associated type in
+/// boxed instances. It is intended to allow creation of several unlike
+/// transports or clients at once. E.g.
+/// `Vec<&dyn BoxTransportConnect>.into_iter().map(|t| t.connect_boxed())`.
 pub trait BoxTransportConnect {
     /// Connect to a transport, and box it.
-    fn connect_boxed(&self) -> BoxTransport;
+    fn connect_boxed(&self) -> Result<BoxTransport, TransportError>;
 
     /// Connect to a transport, and box it, wrapping it into a `RpcClient`.
-    fn client_boxed(&self) -> RpcClient<BoxTransport>;
+    fn client_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError>;
 }
 
 impl<T> BoxTransportConnect for T
@@ -42,13 +47,13 @@ where
     T: TransportConnect,
     T::Transport: Clone,
 {
-    fn connect_boxed(&self) -> BoxTransport {
-        self.connect().boxed()
+    fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
+        self.connect().map(Transport::boxed)
     }
 
-    fn client_boxed(&self) -> RpcClient<BoxTransport> {
-        let is_local = self.is_local();
-        RpcClient::new(self.connect_boxed(), is_local)
+    fn client_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError> {
+        self.connect_boxed()
+            .map(|boxed| RpcClient::new(boxed, self.is_local()))
     }
 }
 
