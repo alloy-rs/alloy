@@ -160,6 +160,9 @@ where
 /// This is a wrapper around [`tower::ServiceBuilder`]. It allows you to
 /// configure middleware layers that will be applied to the transport, and has
 /// some shortcuts for common layers and transports.
+///
+/// A builder accumulates Layers, and then is finished via the
+/// [`ClientBuilder::connect`] method, which produces an RPC client.
 pub struct ClientBuilder<L> {
     builder: ServiceBuilder<L>,
 }
@@ -185,7 +188,7 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
-    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
+    fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
     where
         L: Layer<T>,
         T: Transport,
@@ -194,8 +197,8 @@ impl<L> ClientBuilder<L> {
         RpcClient::new(self.builder.service(transport), is_local)
     }
 
-    /// Create a new [`RpcClient`] with a [`reqwest`] HTTP transport connecting
-    /// to the given URL and the configured layers.
+    /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
+    /// HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
     where
@@ -208,8 +211,8 @@ impl<L> ClientBuilder<L> {
         self.transport(transport, is_local)
     }
 
-    /// Create a new [`RpcClient`] with a [`hyper`] HTTP transport connecting
-    /// to the given URL and the configured layers.
+    /// Convenience function to create a new [`RpcClient`] with a [`hyper`]
+    /// HTTP transport.
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
@@ -220,6 +223,18 @@ impl<L> ClientBuilder<L> {
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
+    }
+
+    /// Connect a transport, producing a [`RpcClient`] with the provided
+    /// connection.
+    pub fn connect<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
+    where
+        C: TransportConnect,
+        L: Layer<C::Transport>,
+        L::Service: Transport,
+    {
+        let transport = connect.connect()?;
+        Ok(self.transport(transport, connect.is_local()))
     }
 }
 
