@@ -14,7 +14,7 @@ mod error;
 pub use error::TransportError;
 
 mod transports;
-pub use transports::{BoxTransport, Http, Transport};
+pub use transports::{BoxTransport, BoxTransportConnect, Http, Transport, TransportConnect};
 
 pub use alloy_json_rpc::RpcResult;
 

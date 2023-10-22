@@ -9,8 +9,8 @@ use tower::{
 };
 
 use crate::{
-    transports::{BoxTransportConnect, TransportConnect},
-    BatchRequest, BoxTransport, RpcCall, Transport, TransportError,
+    BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport, TransportConnect,
+    TransportError,
 };
 
 /// A JSON-RPC client.
@@ -58,7 +58,7 @@ impl<T> RpcClient<T> {
     where
         C: Transport,
     {
-        connect.client()
+        connect.connect()
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -234,7 +234,7 @@ impl<L> ClientBuilder<L> {
         L: Layer<C::Transport>,
         L::Service: Transport,
     {
-        let transport = connect.connect()?;
+        let transport = connect.to_transport()?;
         Ok(self.transport(transport, connect.is_local()))
     }
 
@@ -246,7 +246,7 @@ impl<L> ClientBuilder<L> {
         L: Layer<BoxTransport>,
         L::Service: Transport,
     {
-        let transport = connect.connect_boxed()?;
+        let transport = connect.to_boxed_transport()?;
         Ok(self.transport(transport, connect.is_local()))
     }
 }

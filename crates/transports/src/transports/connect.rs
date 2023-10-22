@@ -16,11 +16,12 @@ pub trait TransportConnect {
     }
 
     /// Connect to the transport, returning a `Transport` instance.
-    fn connect(&self) -> Result<Self::Transport, TransportError>;
+    fn to_transport(&self) -> Result<Self::Transport, TransportError>;
 
     /// Connect to the transport, wrapping it into a `RpcClient` instance.
-    fn client(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
-        self.connect().map(|t| RpcClient::new(t, self.is_local()))
+    fn connect(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
+        self.to_transport()
+            .map(|t| RpcClient::new(t, self.is_local()))
     }
 }
 
@@ -39,10 +40,10 @@ pub trait BoxTransportConnect {
     fn is_local(&self) -> bool;
 
     /// Connect to a transport, and box it.
-    fn connect_boxed(&self) -> Result<BoxTransport, TransportError>;
+    fn to_boxed_transport(&self) -> Result<BoxTransport, TransportError>;
 
     /// Connect to a transport, and box it, wrapping it into a `RpcClient`.
-    fn client_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError>;
+    fn connect_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError>;
 }
 
 impl<T> BoxTransportConnect for T
@@ -54,12 +55,12 @@ where
         TransportConnect::is_local(self)
     }
 
-    fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
-        self.connect().map(Transport::boxed)
+    fn to_boxed_transport(&self) -> Result<BoxTransport, TransportError> {
+        self.to_transport().map(Transport::boxed)
     }
 
-    fn client_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError> {
-        self.connect_boxed()
+    fn connect_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError> {
+        self.to_boxed_transport()
             .map(|boxed| RpcClient::new(boxed, self.is_local()))
     }
 }
