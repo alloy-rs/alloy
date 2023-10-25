@@ -1,3 +1,6 @@
+mod boxed;
+pub use boxed::BoxTransport;
+
 mod connect;
 pub use connect::{BoxTransportConnect, TransportConnect};
 
@@ -8,4 +11,4 @@ mod json;
 pub(crate) use json::{JsonRpcLayer, JsonRpcService};
 
 mod transport;
-pub use transport::{BoxTransport, Transport};
+pub use transport::Transport;

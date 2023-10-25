@@ -2,10 +2,6 @@ use crate::{BoxTransport, RpcClient, Transport, TransportError};
 
 /// Connection details for a transport. This object captures the details
 /// necessary to establish a simple transport.
-///
-/// ### Note on Fallibity
-///
-
 pub trait TransportConnect {
     /// The transport type that is returned by `connect`.
     type Transport: Transport;
@@ -22,6 +18,12 @@ pub trait TransportConnect {
     fn connect(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
         self.to_transport()
             .map(|t| RpcClient::new(t, self.is_local()))
+    }
+
+    /// Reconnect to the transport. Override this to add custom reconnection
+    /// logic to your connector.
+    fn try_reconnect(&self) -> Result<Self::Transport, TransportError> {
+        self.to_transport()
     }
 }
 
