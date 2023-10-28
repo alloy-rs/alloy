@@ -1,10 +1,21 @@
 use crate::{BoxTransport, RpcClient, Transport, TransportError};
 
-/// Connection details for a transport. This object captures the details
-/// necessary to establish a simple transport.
+/// Connection details for a transport.
+///
+/// This object captures the information necessary to establish a transport,
+/// and may encapsulate reconnection logic.
+///
+/// ## Why implement `TransportConnect`?
+///
+/// Users may want to implement transport-connect for the following reasons:
+/// - You want to customize a [`reqwest::Client`] before using it.
+/// - You need to provide special authentication information to a remote
+///   provider.
+/// - You have implemented a custom [`Transport`].
+/// - You require a specific websocket reconnection strategy.
 pub trait TransportConnect {
     /// The transport type that is returned by `connect`.
-    type Transport: Transport;
+    type Transport: Transport + Clone;
 
     /// Returns `true`` if the transport is a local transport.
     fn is_local(&self) -> bool {
@@ -20,8 +31,11 @@ pub trait TransportConnect {
             .map(|t| RpcClient::new(t, self.is_local()))
     }
 
-    /// Reconnect to the transport. Override this to add custom reconnection
-    /// logic to your connector.
+    /// Attempt to reconnect the transport.
+    ///
+    /// Override this to add custom reconnection logic to your connector. This
+    /// will be used by PubSub connection managers in the event the connection
+    /// fails.
     fn try_reconnect(&self) -> Result<Self::Transport, TransportError> {
         self.to_transport()
     }
@@ -51,7 +65,6 @@ pub trait BoxTransportConnect {
 impl<T> BoxTransportConnect for T
 where
     T: TransportConnect,
-    T::Transport: Clone,
 {
     fn is_local(&self) -> bool {
         TransportConnect::is_local(self)
