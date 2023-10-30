@@ -32,7 +32,10 @@ impl AccessList {
         self.0.into_iter().map(|item| {
             (
                 item.address,
-                item.storage_keys.into_iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
+                item.storage_keys
+                    .into_iter()
+                    .map(|slot| U256::from_be_bytes(slot.0))
+                    .collect(),
             )
         })
     }
@@ -42,7 +45,10 @@ impl AccessList {
         self.0.iter().map(|item| {
             (
                 item.address,
-                item.storage_keys.iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
+                item.storage_keys
+                    .iter()
+                    .map(|slot| U256::from_be_bytes(slot.0))
+                    .collect(),
             )
         })
     }
@@ -65,8 +71,14 @@ mod tests {
     #[test]
     fn access_list_serde() {
         let list = AccessList(vec![
-            AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
-            AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+            AccessListItem {
+                address: Address::ZERO,
+                storage_keys: vec![B256::ZERO],
+            },
+            AccessListItem {
+                address: Address::ZERO,
+                storage_keys: vec![B256::ZERO],
+            },
         ]);
         let json = serde_json::to_string(&list).unwrap();
         let list2 = serde_json::from_str::<AccessList>(&json).unwrap();
@@ -77,8 +89,14 @@ mod tests {
     fn access_list_with_gas_used() {
         let list = AccessListWithGasUsed {
             access_list: AccessList(vec![
-                AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
-                AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+                AccessListItem {
+                    address: Address::ZERO,
+                    storage_keys: vec![B256::ZERO],
+                },
+                AccessListItem {
+                    address: Address::ZERO,
+                    storage_keys: vec![B256::ZERO],
+                },
             ]),
             gas_used: U256::from(100),
         };

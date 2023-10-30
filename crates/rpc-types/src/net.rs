@@ -56,7 +56,7 @@ impl NodeRecord {
         if let IpAddr::V6(v6) = self.address {
             if let Some(v4) = v6.to_ipv4_mapped() {
                 self.address = v4.into();
-                return true
+                return true;
             }
         }
         false
@@ -71,7 +71,12 @@ impl NodeRecord {
     /// Creates a new record from a socket addr and peer id.
     #[allow(unused)]
     pub fn new(addr: SocketAddr, id: PeerId) -> Self {
-        Self { address: addr.ip(), tcp_port: addr.port(), udp_port: addr.port(), id }
+        Self {
+            address: addr.ip(),
+            tcp_port: addr.port(),
+            udp_port: addr.port(),
+            id,
+        }
     }
 
     /// The TCP socket address of this node
@@ -141,7 +146,11 @@ impl FromStr for NodeRecord {
                 Ipv4Addr::from_str(ip)
                     .map_err(|e| NodeRecordParseError::InvalidUrl(e.to_string()))?,
             ),
-            _ => return Err(NodeRecordParseError::InvalidUrl(format!("invalid host: {url:?}"))),
+            _ => {
+                return Err(NodeRecordParseError::InvalidUrl(format!(
+                    "invalid host: {url:?}"
+                )))
+            }
         };
         let port = url
             .port()
@@ -151,7 +160,9 @@ impl FromStr for NodeRecord {
             .query_pairs()
             .find_map(|(maybe_disc, port)| (maybe_disc.as_ref() == "discport").then_some(port))
         {
-            discovery_port.parse::<u16>().map_err(NodeRecordParseError::Discport)?
+            discovery_port
+                .parse::<u16>()
+                .map_err(NodeRecordParseError::Discport)?
         } else {
             port
         };
@@ -161,7 +172,12 @@ impl FromStr for NodeRecord {
             .parse::<PeerId>()
             .map_err(|e| NodeRecordParseError::InvalidId(e.to_string()))?;
 
-        Ok(Self { address, id, tcp_port: port, udp_port })
+        Ok(Self {
+            address,
+            id,
+            tcp_port: port,
+            udp_port,
+        })
     }
 }
 

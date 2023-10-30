@@ -9,7 +9,7 @@ use std::{
 /// Represents the `admin_nodeInfo` response, which can be queried for all the information
 /// known about the running node at the networking granularity.
 ///
-/// Note: this format is not standardized. Reth follows Geth's format,
+/// Note: this format is not standardized. Alloy follows Geth's format,
 /// see: <https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-admin>
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NodeInfo {
@@ -38,9 +38,15 @@ impl NodeInfo {
             id: enr.id,
             ip: enr.address,
             listen_addr: enr.tcp_addr(),
-            ports: Ports { discovery: enr.udp_port, listener: enr.tcp_port },
+            ports: Ports {
+                discovery: enr.udp_port,
+                listener: enr.tcp_port,
+            },
             name: status.client_version,
-            protocols: Protocols { eth: status.eth_protocol_info, other: Default::default() },
+            protocols: Protocols {
+                eth: status.eth_protocol_info,
+                other: Default::default(),
+            },
         }
     }
 }

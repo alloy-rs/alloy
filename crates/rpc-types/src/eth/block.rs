@@ -179,7 +179,10 @@ pub struct Header {
     #[serde(rename = "excessBlobGas", skip_serializing_if = "Option::is_none")]
     pub excess_blob_gas: Option<U64>,
     /// Parent beacon block root
-    #[serde(rename = "parentBeaconBlockRoot", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "parentBeaconBlockRoot",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub parent_beacon_block_root: Option<B256>,
 }
 
@@ -201,7 +204,10 @@ pub struct RpcBlockHash {
 impl RpcBlockHash {
     /// Returns an [RpcBlockHash] from a [B256].
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
-        RpcBlockHash { block_hash, require_canonical }
+        RpcBlockHash {
+            block_hash,
+            require_canonical,
+        }
     }
 }
 
@@ -418,13 +424,19 @@ impl From<BlockNumberOrTag> for BlockId {
 
 impl From<B256> for BlockId {
     fn from(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
+        BlockId::Hash(RpcBlockHash {
+            block_hash,
+            require_canonical: None,
+        })
     }
 }
 
 impl From<(B256, Option<bool>)> for BlockId {
     fn from(hash_can: (B256, Option<bool>)) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
+        BlockId::Hash(RpcBlockHash {
+            block_hash: hash_can.0,
+            require_canonical: hash_can.1,
+        })
     }
 }
 
@@ -434,7 +446,10 @@ impl Serialize for BlockId {
         S: Serializer,
     {
         match *self {
-            BlockId::Hash(RpcBlockHash { ref block_hash, ref require_canonical }) => {
+            BlockId::Hash(RpcBlockHash {
+                ref block_hash,
+                ref require_canonical,
+            }) => {
                 let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
                 s.serialize_field("blockHash", block_hash)?;
                 if let Some(require_canonical) = require_canonical {
@@ -468,10 +483,14 @@ impl<'de> Deserialize<'de> for BlockId {
                 // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
                 // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
                 if v.len() == 66 {
-                    Ok(BlockId::Hash(v.parse::<B256>().map_err(serde::de::Error::custom)?.into()))
+                    Ok(BlockId::Hash(
+                        v.parse::<B256>().map_err(serde::de::Error::custom)?.into(),
+                    ))
                 } else {
                     // quantity hex string or tag
-                    Ok(BlockId::Number(v.parse().map_err(serde::de::Error::custom)?))
+                    Ok(BlockId::Number(
+                        v.parse().map_err(serde::de::Error::custom)?,
+                    ))
                 }
             }
 
@@ -521,7 +540,10 @@ impl<'de> Deserialize<'de> for BlockId {
                 if let Some(number) = number {
                     Ok(BlockId::Number(number))
                 } else if let Some(block_hash) = block_hash {
-                    Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
+                    Ok(BlockId::Hash(RpcBlockHash {
+                        block_hash,
+                        require_canonical,
+                    }))
                 } else {
                     Err(serde::de::Error::custom(
                         "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
@@ -548,7 +570,10 @@ pub type ForkBlock = BlockNumHash;
 
 impl std::fmt::Debug for BlockNumHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("").field(&self.number).field(&self.hash).finish()
+        f.debug_tuple("")
+            .field(&self.number)
+            .field(&self.hash)
+            .finish()
     }
 }
 
@@ -574,13 +599,19 @@ impl BlockNumHash {
 
 impl From<(BlockNumber, BlockHash)> for BlockNumHash {
     fn from(val: (BlockNumber, BlockHash)) -> Self {
-        BlockNumHash { number: val.0, hash: val.1 }
+        BlockNumHash {
+            number: val.0,
+            hash: val.1,
+        }
     }
 }
 
 impl From<(BlockHash, BlockNumber)> for BlockNumHash {
     fn from(val: (BlockHash, BlockNumber)) -> Self {
-        BlockNumHash { hash: val.0, number: val.1 }
+        BlockNumHash {
+            hash: val.0,
+            number: val.1,
+        }
     }
 }
 
@@ -692,7 +723,10 @@ pub type RichBlock = Rich<Block>;
 
 impl From<Block> for RichBlock {
     fn from(block: Block) -> Self {
-        Rich { inner: block, extra_info: Default::default() }
+        Rich {
+            inner: block,
+            extra_info: Default::default(),
+        }
     }
 }
 
@@ -701,7 +735,10 @@ pub type RichHeader = Rich<Header>;
 
 impl From<Header> for RichHeader {
     fn from(header: Header) -> Self {
-        Rich { inner: header, extra_info: Default::default() }
+        Rich {
+            inner: header,
+            extra_info: Default::default(),
+        }
     }
 }
 
@@ -729,7 +766,7 @@ impl<T: Serialize> Serialize for Rich<T> {
         S: Serializer,
     {
         if self.extra_info.is_empty() {
-            return self.inner.serialize(serializer)
+            return self.inner.serialize(serializer);
         }
 
         let inner = serde_json::to_value(&self.inner);
@@ -741,7 +778,9 @@ impl<T: Serialize> Serialize for Rich<T> {
             value.extend(extras);
             value.serialize(serializer)
         } else {
-            Err(S::Error::custom("Unserializable structures: expected objects"))
+            Err(S::Error::custom(
+                "Unserializable structures: expected objects",
+            ))
         }
     }
 }
@@ -755,7 +794,11 @@ pub struct BlockOverrides {
     /// For `eth_callMany` this will be the block number of the first simulated block. Each
     /// following block increments its block number by 1
     // Note: geth uses `number`, erigon uses `blockNumber`
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "blockNumber")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "blockNumber"
+    )]
     pub number: Option<U256>,
     /// Overrides the difficulty of the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]

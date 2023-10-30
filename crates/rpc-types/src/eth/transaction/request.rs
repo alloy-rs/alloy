@@ -80,8 +80,8 @@ impl TransactionRequest {
                 }))
             }
             // EIP2930
-            (_, None, Some(access_list)) => {
-                Some(TypedTransactionRequest::EIP2930(EIP2930TransactionRequest {
+            (_, None, Some(access_list)) => Some(TypedTransactionRequest::EIP2930(
+                EIP2930TransactionRequest {
                     nonce: nonce.unwrap_or_default(),
                     gas_price: gas_price.unwrap_or_default(),
                     gas_limit: gas.unwrap_or_default(),
@@ -93,25 +93,27 @@ impl TransactionRequest {
                     },
                     chain_id: 0,
                     access_list,
-                }))
-            }
+                },
+            )),
             // EIP1559
             (None, Some(_), access_list) | (None, None, access_list @ None) => {
                 // Empty fields fall back to the canonical transaction schema.
-                Some(TypedTransactionRequest::EIP1559(EIP1559TransactionRequest {
-                    nonce: nonce.unwrap_or_default(),
-                    max_fee_per_gas: max_fee_per_gas.unwrap_or_default(),
-                    max_priority_fee_per_gas: max_priority_fee_per_gas.unwrap_or_default(),
-                    gas_limit: gas.unwrap_or_default(),
-                    value: value.unwrap_or_default(),
-                    input: data.unwrap_or_default(),
-                    kind: match to {
-                        Some(to) => TransactionKind::Call(to),
-                        None => TransactionKind::Create,
+                Some(TypedTransactionRequest::EIP1559(
+                    EIP1559TransactionRequest {
+                        nonce: nonce.unwrap_or_default(),
+                        max_fee_per_gas: max_fee_per_gas.unwrap_or_default(),
+                        max_priority_fee_per_gas: max_priority_fee_per_gas.unwrap_or_default(),
+                        gas_limit: gas.unwrap_or_default(),
+                        value: value.unwrap_or_default(),
+                        input: data.unwrap_or_default(),
+                        kind: match to {
+                            Some(to) => TransactionKind::Call(to),
+                            None => TransactionKind::Create,
+                        },
+                        chain_id: 0,
+                        access_list: access_list.unwrap_or_default(),
                     },
-                    chain_id: 0,
-                    access_list: access_list.unwrap_or_default(),
-                }))
+                ))
             }
 
             _ => None,

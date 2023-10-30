@@ -142,11 +142,11 @@ impl<'a> Deserialize<'a> for Params {
         let v = serde_json::Value::deserialize(deserializer)?;
 
         if v.is_null() {
-            return Ok(Params::None)
+            return Ok(Params::None);
         }
 
         if let Some(val) = v.as_bool() {
-            return Ok(Params::Bool(val))
+            return Ok(Params::Bool(val));
         }
 
         serde_json::from_value(v)

@@ -104,7 +104,10 @@ impl From<Block> for OtsBlock {
             BlockTransactions::Uncle => 0,
         };
 
-        Self { block, transaction_count }
+        Self {
+            block,
+            transaction_count,
+        }
     }
 }
 

@@ -28,7 +28,11 @@ pub struct Signature {
 /// This will be serialized as "0x0" if false, and "0x1" if true.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Parity(
-    #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
+    #[serde(
+        serialize_with = "serialize_parity",
+        deserialize_with = "deserialize_parity"
+    )]
+    pub bool,
 );
 
 fn serialize_parity<S>(parity: &bool, serializer: S) -> Result<S::Ok, S::Error>

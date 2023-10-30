@@ -45,7 +45,10 @@ pub struct Inclusion {
 impl Inclusion {
     /// Creates a new inclusion with the given min block..
     pub fn at_block(block: u64) -> Self {
-        Self { block: U64::from(block), max_block: None }
+        Self {
+            block: U64::from(block),
+            max_block: None,
+        }
     }
 
     /// Returns the block number of the first block the bundle is valid for.
@@ -364,7 +367,10 @@ impl SendBundleRequest {
     ) -> Self {
         Self {
             protocol_version,
-            inclusion: Inclusion { block: block_num, max_block },
+            inclusion: Inclusion {
+                block: block_num,
+                max_block,
+            },
             bundle_body,
             validity: None,
             privacy: None,
@@ -390,7 +396,10 @@ pub struct PrivateTransactionRequest {
     /// be included.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_block_number: Option<U64>,
-    #[serde(default, skip_serializing_if = "PrivateTransactionPreferences::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "PrivateTransactionPreferences::is_empty"
+    )]
     pub preferences: PrivateTransactionPreferences,
 }
 
@@ -667,13 +676,14 @@ mod u256_numeric_string {
         match val {
             serde_json::Value::String(s) => {
                 if let Ok(val) = s.parse::<u128>() {
-                    return Ok(U256::from(val))
+                    return Ok(U256::from(val));
                 }
                 U256::from_str(&s).map_err(de::Error::custom)
             }
-            serde_json::Value::Number(num) => {
-                num.as_u64().map(U256::from).ok_or_else(|| de::Error::custom("invalid u256"))
-            }
+            serde_json::Value::Number(num) => num
+                .as_u64()
+                .map(U256::from)
+                .ok_or_else(|| de::Error::custom("invalid u256")),
             _ => Err(de::Error::custom("invalid u256")),
         }
     }
@@ -776,20 +786,28 @@ mod tests {
 
         let validity = Some(Validity {
             refund_config: Some(vec![RefundConfig {
-                address: "0x8EC1237b1E80A6adf191F40D4b7D095E21cdb18f".parse().unwrap(),
+                address: "0x8EC1237b1E80A6adf191F40D4b7D095E21cdb18f"
+                    .parse()
+                    .unwrap(),
                 percent: 100,
             }]),
             ..Default::default()
         });
 
         let privacy = Some(Privacy {
-            hints: Some(PrivacyHint { calldata: true, ..Default::default() }),
+            hints: Some(PrivacyHint {
+                calldata: true,
+                ..Default::default()
+            }),
             ..Default::default()
         });
 
         let bundle = SendBundleRequest {
             protocol_version: ProtocolVersion::V0_1,
-            inclusion: Inclusion { block: U64::from(1), max_block: None },
+            inclusion: Inclusion {
+                block: U64::from(1),
+                max_block: None,
+            },
             bundle_body,
             validity,
             privacy,
@@ -944,8 +962,12 @@ mod tests {
             ),
         ];
 
-        let strip_whitespaces =
-            |input: &str| input.chars().filter(|&c| !c.is_whitespace()).collect::<String>();
+        let strip_whitespaces = |input: &str| {
+            input
+                .chars()
+                .filter(|&c| !c.is_whitespace())
+                .collect::<String>()
+        };
 
         for (serialized, deserialized) in fixtures {
             // Check de-serialization
@@ -954,7 +976,10 @@ mod tests {
 
             // Check serialization
             let serialized_expected = &serde_json::to_string(&deserialized).unwrap();
-            assert_eq!(strip_whitespaces(serialized), strip_whitespaces(serialized_expected));
+            assert_eq!(
+                strip_whitespaces(serialized),
+                strip_whitespaces(serialized_expected)
+            );
         }
     }
 }

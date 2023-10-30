@@ -74,7 +74,11 @@ pub struct StructLog {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stack: Option<Vec<U256>>,
     /// Last call's return data. Enabled via enableReturnData
-    #[serde(default, rename = "returnData", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "returnData",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub return_data: Option<Bytes>,
     /// Storage slots of current contract read from and written to. Only emitted for SLOAD and
     /// SSTORE. Disabled via disableStorage
@@ -219,7 +223,7 @@ impl GethDebugTracerConfig {
     /// Returns the [CallConfig] if it is a call config.
     pub fn into_call_config(self) -> Result<CallConfig, serde_json::Error> {
         if self.0.is_null() {
-            return Ok(Default::default())
+            return Ok(Default::default());
         }
         self.from_value()
     }
@@ -232,7 +236,7 @@ impl GethDebugTracerConfig {
     /// Returns the [PreStateConfig] if it is a call config.
     pub fn into_pre_state_config(self) -> Result<PreStateConfig, serde_json::Error> {
         if self.0.is_null() {
-            return Ok(Default::default())
+            return Ok(Default::default());
         }
         self.from_value()
     }
@@ -441,7 +445,9 @@ impl GethDefaultTracingOptions {
 
     /// Returns `true` if memory capture is enabled
     pub fn is_memory_enabled(&self) -> bool {
-        self.enable_memory.or_else(|| self.disable_memory.map(|disable| !disable)).unwrap_or(false)
+        self.enable_memory
+            .or_else(|| self.disable_memory.map(|disable| !disable))
+            .unwrap_or(false)
     }
 
     /// Returns `true` if stack capture is enabled
@@ -500,7 +506,9 @@ mod tests {
         let opts = serde_json::from_str::<GethDebugTracingOptions>(s).unwrap();
         assert_eq!(
             opts.tracer,
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer))
+            Some(GethDebugTracerType::BuiltInTracer(
+                GethDebugBuiltInTracerType::CallTracer
+            ))
         );
         let _call_config = opts.tracer_config.clone().into_call_config().unwrap();
         let _prestate_config = opts.tracer_config.into_pre_state_config().unwrap();

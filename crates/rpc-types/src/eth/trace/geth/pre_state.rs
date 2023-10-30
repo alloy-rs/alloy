@@ -81,7 +81,7 @@ impl DiffMode {
                 if entry.get() == pre {
                     // remove unchanged account state from both sets
                     entry.remove();
-                    return false
+                    return false;
                 }
             }
 
@@ -236,10 +236,14 @@ mod tests {
     fn test_serialize_pre_state_trace() {
         let mut opts = GethDebugTracingCallOptions::default();
         opts.tracing_options.config.disable_storage = Some(false);
-        opts.tracing_options.tracer =
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::PreStateTracer));
-        opts.tracing_options.tracer_config =
-            serde_json::to_value(PreStateConfig { diff_mode: Some(true) }).unwrap().into();
+        opts.tracing_options.tracer = Some(GethDebugTracerType::BuiltInTracer(
+            GethDebugBuiltInTracerType::PreStateTracer,
+        ));
+        opts.tracing_options.tracer_config = serde_json::to_value(PreStateConfig {
+            diff_mode: Some(true),
+        })
+        .unwrap()
+        .into();
 
         assert_eq!(
             serde_json::to_string(&opts).unwrap(),
@@ -257,15 +261,24 @@ mod tests {
         let _trace: PreStateFrame = serde_json::from_str(LEGACY).unwrap();
         let trace: PreStateFrame = serde_json::from_str(DIFF_MODE).unwrap();
         match trace {
-            PreStateFrame::Diff(DiffMode { pre: _pre, post: _post }) => {}
+            PreStateFrame::Diff(DiffMode {
+                pre: _pre,
+                post: _post,
+            }) => {}
             _ => unreachable!(),
         }
     }
 
     #[test]
     fn test_is_diff_mode() {
-        assert!(PreStateConfig { diff_mode: Some(true) }.is_diff_mode());
-        assert!(!PreStateConfig { diff_mode: Some(false) }.is_diff_mode());
+        assert!(PreStateConfig {
+            diff_mode: Some(true)
+        }
+        .is_diff_mode());
+        assert!(!PreStateConfig {
+            diff_mode: Some(false)
+        }
+        .is_diff_mode());
         assert!(!PreStateConfig { diff_mode: None }.is_diff_mode());
     }
 

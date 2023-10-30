@@ -90,11 +90,17 @@ pub struct ForkchoiceUpdated {
 
 impl ForkchoiceUpdated {
     pub fn new(payload_status: PayloadStatus) -> Self {
-        Self { payload_status, payload_id: None }
+        Self {
+            payload_status,
+            payload_id: None,
+        }
     }
 
     pub fn from_status(status: PayloadStatusEnum) -> Self {
-        Self { payload_status: PayloadStatus::from_status(status), payload_id: None }
+        Self {
+            payload_status: PayloadStatus::from_status(status),
+            payload_id: None,
+        }
     }
 
     pub fn with_latest_valid_hash(mut self, hash: B256) -> Self {

@@ -21,10 +21,14 @@ mod tests {
     #[test]
     fn test_serialize_four_byte_trace() {
         let mut opts = GethDebugTracingCallOptions::default();
-        opts.tracing_options.tracer =
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::FourByteTracer));
+        opts.tracing_options.tracer = Some(GethDebugTracerType::BuiltInTracer(
+            GethDebugBuiltInTracerType::FourByteTracer,
+        ));
 
-        assert_eq!(serde_json::to_string(&opts).unwrap(), r#"{"tracer":"4byteTracer"}"#);
+        assert_eq!(
+            serde_json::to_string(&opts).unwrap(),
+            r#"{"tracer":"4byteTracer"}"#
+        );
     }
 
     #[test]

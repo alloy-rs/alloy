@@ -19,10 +19,14 @@ mod tests {
     #[test]
     fn test_serialize_noop_trace() {
         let mut opts = GethDebugTracingCallOptions::default();
-        opts.tracing_options.tracer =
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::NoopTracer));
+        opts.tracing_options.tracer = Some(GethDebugTracerType::BuiltInTracer(
+            GethDebugBuiltInTracerType::NoopTracer,
+        ));
 
-        assert_eq!(serde_json::to_string(&opts).unwrap(), r#"{"tracer":"noopTracer"}"#);
+        assert_eq!(
+            serde_json::to_string(&opts).unwrap(),
+            r#"{"tracer":"noopTracer"}"#
+        );
     }
 
     #[test]

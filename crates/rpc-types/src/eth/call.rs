@@ -136,7 +136,10 @@ impl CallRequest {
     /// Returns true if the request has a `blobVersionedHashes` field but it is empty.
     #[inline]
     pub fn has_empty_blob_hashes(&self) -> bool {
-        self.blob_versioned_hashes.as_ref().map(|blobs| blobs.is_empty()).unwrap_or(false)
+        self.blob_versioned_hashes
+            .as_ref()
+            .map(|blobs| blobs.is_empty())
+            .unwrap_or(false)
     }
 }
 
@@ -199,7 +202,10 @@ impl CallInput {
 
 impl From<Bytes> for CallInput {
     fn from(input: Bytes) -> Self {
-        Self { input: Some(input), data: None }
+        Self {
+            input: Some(input),
+            data: None,
+        }
     }
 }
 

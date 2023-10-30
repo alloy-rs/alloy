@@ -208,7 +208,11 @@ impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
                 (commitments, proofs, blobs)
             },
         );
-        Self { commitments, proofs, blobs }
+        Self {
+            commitments,
+            proofs,
+            blobs,
+        }
     }
 }
 
@@ -449,11 +453,17 @@ pub struct PayloadStatus {
 
 impl PayloadStatus {
     pub fn new(status: PayloadStatusEnum, latest_valid_hash: Option<B256>) -> Self {
-        Self { status, latest_valid_hash }
+        Self {
+            status,
+            latest_valid_hash,
+        }
     }
 
     pub fn from_status(status: PayloadStatusEnum) -> Self {
-        Self { status, latest_valid_hash: None }
+        Self {
+            status,
+            latest_valid_hash: None,
+        }
     }
 
     pub fn with_latest_valid_hash(mut self, latest_valid_hash: B256) -> Self {
@@ -507,7 +517,9 @@ impl Serialize for PayloadStatus {
 
 impl From<PayloadError> for PayloadStatusEnum {
     fn from(error: PayloadError) -> Self {
-        PayloadStatusEnum::Invalid { validation_error: error.to_string() }
+        PayloadStatusEnum::Invalid {
+            validation_error: error.to_string(),
+        }
     }
 }
 

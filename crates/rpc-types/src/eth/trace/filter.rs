@@ -37,7 +37,11 @@ impl TraceFilter {
     pub fn matcher(&self) -> TraceFilterMatcher {
         let from_addresses = self.from_address.iter().cloned().collect();
         let to_addresses = self.to_address.iter().cloned().collect();
-        TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
+        TraceFilterMatcher {
+            mode: self.mode,
+            from_addresses,
+            to_addresses,
+        }
     }
 }
 
@@ -65,12 +69,12 @@ impl TraceFilterMatcher {
     pub fn matches(&self, from: Address, to: Option<Address>) -> bool {
         match self.mode {
             TraceFilterMode::Union => {
-                self.from_addresses.contains(&from) ||
-                    to.map_or(false, |to| self.to_addresses.contains(&to))
+                self.from_addresses.contains(&from)
+                    || to.map_or(false, |to| self.to_addresses.contains(&to))
             }
             TraceFilterMode::Intersection => {
-                self.from_addresses.contains(&from) &&
-                    to.map_or(false, |to| self.to_addresses.contains(&to))
+                self.from_addresses.contains(&from)
+                    && to.map_or(false, |to| self.to_addresses.contains(&to))
             }
         }
     }

@@ -24,9 +24,13 @@ impl Serialize for Work {
         S: Serializer,
     {
         match self.number.as_ref() {
-            Some(num) => {
-                (&self.pow_hash, &self.seed_hash, &self.target, U256::from(*num)).serialize(s)
-            }
+            Some(num) => (
+                &self.pow_hash,
+                &self.seed_hash,
+                &self.target,
+                U256::from(*num),
+            )
+                .serialize(s),
             None => (&self.pow_hash, &self.seed_hash, &self.target).serialize(s),
         }
     }
@@ -60,7 +64,12 @@ impl<'a> Deserialize<'a> for Work {
                     .next_element::<B256>()?
                     .ok_or_else(|| A::Error::custom("missing target"))?;
                 let number = seq.next_element::<u64>()?;
-                Ok(Work { pow_hash, seed_hash, target, number })
+                Ok(Work {
+                    pow_hash,
+                    seed_hash,
+                    target,
+                    number,
+                })
             }
         }
 
