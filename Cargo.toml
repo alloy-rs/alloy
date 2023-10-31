@@ -21,6 +21,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-transports = { version = "0.1.0", path = "crates/transports" }
 alloy-networks = { version = "0.1.0", path = "crates/networks" }
+alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 
 alloy-primitives = { version = "0.4.2", features = ["serde"] }
 alloy-rlp = "0.3.0"
