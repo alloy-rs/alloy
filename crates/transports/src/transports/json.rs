@@ -1,6 +1,6 @@
 use crate::{utils::to_json_raw_value, Transport, TransportError};
 
-use alloy_json_rpc::{RequestPacket, ResponsePacket};
+use alloy_json_rpc::{RequestPacket, Response};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
@@ -36,7 +36,7 @@ impl<S> Service<RequestPacket> for JsonRpcService<S>
 where
     S: Transport + Clone,
 {
-    type Response = ResponsePacket;
+    type Response = Response;
 
     type Error = TransportError;
 
@@ -49,7 +49,6 @@ where
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let replacement = self.inner.clone();
         let mut client = std::mem::replace(&mut self.inner, replacement);
-
         match to_json_raw_value(&req) {
             Ok(raw) => JsonRpcFuture {
                 state: States::Pending {
