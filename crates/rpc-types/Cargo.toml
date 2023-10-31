@@ -23,7 +23,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_with = "3.3"
 serde_json.workspace = true
 jsonrpsee-types = { version = "0.20", optional = true }
-alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-primitives = { workspace = true, features = ["serde"] }
 c-kzg = { version = "0.1.1", features = ["serde"] }
 url = "2.3"
 secp256k1 = { version = "0.27.0", default-features = false, features = [
