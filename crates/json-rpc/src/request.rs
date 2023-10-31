@@ -153,4 +153,20 @@ impl SerializedRequest {
     pub fn request(&self) -> &RawValue {
         &self.request
     }
+
+    pub fn payload(&self) -> Payload {
+        Payload {
+            id: self.id().clone(),
+            method: self.method(),
+            params: self.request(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Payload<'a> {
+    id: Id,
+    method: &'static str,
+    #[serde(borrow)]
+    params: &'a RawValue,
 }
