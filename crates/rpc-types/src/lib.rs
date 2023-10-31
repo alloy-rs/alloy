@@ -12,20 +12,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-// mod admin;
 mod eth;
-// mod mev;
-// mod net;
-// mod otterscan;
-// mod peer;
 mod rpc;
 mod serde_helpers;
 
-// pub use admin::*;
 pub use eth::*;
-// pub use mev::*;
-// pub use net::*;
-// pub use otterscan::*;
-// pub use peer::*;
 pub use rpc::*;
 pub use serde_helpers::*;
