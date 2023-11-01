@@ -52,7 +52,7 @@ where
 
     /// Serialize the request, including the request parameters.
     pub fn serialize(self) -> serde_json::Result<SerializedRequest> {
-        let request = serde_json::to_string(&self.params)?;
+        let request = serde_json::to_string(&self)?;
         Ok(SerializedRequest {
             meta: self.meta,
             request: RawValue::from_string(request)?,
@@ -153,28 +153,4 @@ impl SerializedRequest {
     pub fn request(&self) -> &RawValue {
         &self.request
     }
-
-    pub fn payload(&self) -> Payload {
-        let params = if self.request.get() == "null" {
-            None
-        } else {
-            Some(self.request())
-        };
-        Payload {
-            id: self.id().clone(),
-            method: self.method(),
-            jsonrpc: "2.0",
-            params,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Payload<'a> {
-    id: Id,
-    method: &'static str,
-    jsonrpc: &'static str,
-    #[serde(borrow)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    params: Option<&'a RawValue>,
 }

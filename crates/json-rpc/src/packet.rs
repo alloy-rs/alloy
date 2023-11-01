@@ -31,7 +31,7 @@ impl Serialize for RequestPacket {
         S: serde::Serializer,
     {
         match self {
-            RequestPacket::Single(single) => single.payload().serialize(serializer),
+            RequestPacket::Single(single) => single.request().serialize(serializer),
             RequestPacket::Batch(batch) => {
                 let mut seq = serializer.serialize_seq(Some(batch.len()))?;
                 for req in batch {
