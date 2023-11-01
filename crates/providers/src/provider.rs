@@ -2,8 +2,8 @@
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256, U64};
 use alloy_rpc_types::{
-    Block, BlockId, BlockNumberOrTag, CallRequest, FeeHistory, Filter, Log, RpcBlockHash,
-    SyncStatus, Transaction, TransactionReceipt,
+    Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
+    Transaction, TransactionReceipt, TransactionRequest,
 };
 use alloy_transports::{BoxTransport, Http, RpcClient, RpcResult, Transport, TransportError};
 use reqwest::Client;
@@ -288,10 +288,10 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             .await
     }
 
-    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
     pub async fn call(
         &self,
-        tx: CallRequest,
+        tx: TransactionRequest,
         block: Option<BlockId>,
     ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
     where
@@ -300,7 +300,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         self.inner
             .prepare(
                 "eth_call",
-                Cow::<(CallRequest, BlockId)>::Owned((
+                Cow::<(TransactionRequest, BlockId)>::Owned((
                     tx,
                     block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
                 )),
@@ -311,17 +311,17 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     /// Estimate the gas needed for a transaction.
     pub async fn estimate_gas(
         &self,
-        tx: CallRequest,
+        tx: TransactionRequest,
         block: Option<BlockId>,
     ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
         if let Some(block_id) = block {
-            let params = Cow::<(CallRequest, BlockId)>::Owned((tx, block_id));
+            let params = Cow::<(TransactionRequest, BlockId)>::Owned((tx, block_id));
             self.inner.prepare("eth_estimateGas", params).await
         } else {
-            let params = Cow::<CallRequest>::Owned(tx);
+            let params = Cow::<TransactionRequest>::Owned(tx);
             self.inner.prepare("eth_estimateGas", params).await
         }
     }
