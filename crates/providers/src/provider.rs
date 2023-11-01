@@ -160,7 +160,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             .await
     }
 
-    /// Retrieves a [Vec<Log>] with the given [Filter].
+    /// Retrieves a [`Vec<Log>`] with the given [Filter].
     pub async fn get_logs(
         &self,
         filter: Filter,
