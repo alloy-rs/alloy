@@ -326,6 +326,19 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         }
     }
 
+    /// Sends an already-signed transaction.
+    pub async fn send_raw_transaction(
+        &self,
+        tx: Bytes,
+    ) -> RpcResult<TxHash, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare("eth_sendRawTransaction", Cow::<Bytes>::Owned(tx))
+            .await
+    }
+
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     /// Receives an optional [EstimatorFunction] that can be used to modify
     /// how to estimate these fees.
