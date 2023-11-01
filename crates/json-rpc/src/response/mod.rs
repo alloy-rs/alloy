@@ -2,7 +2,7 @@ mod error;
 pub use error::{BorrowedErrorPayload, ErrorPayload};
 
 mod payload;
-pub mod response;
+pub mod rpc_response;
 pub use payload::{BorrowedResponsePayload, ResponsePayload};
 
 use std::{borrow::Borrow, fmt, marker::PhantomData};

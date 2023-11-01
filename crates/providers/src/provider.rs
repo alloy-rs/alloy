@@ -161,7 +161,10 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Retrieves a [Vec<Log>] with the given [Filter].
-    pub async fn get_logs(&self, filter: Filter) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
+    pub async fn get_logs(
+        &self,
+        filter: Filter,
+    ) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
