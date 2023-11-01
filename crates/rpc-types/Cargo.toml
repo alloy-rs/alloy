@@ -1,0 +1,44 @@
+[package]
+name = "alloy-rpc-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+authors.workspace = true
+repository.workspace = true
+exclude.workspace = true
+description = """
+Alloy RPC types
+"""
+
+[dependencies]
+# # ethereum
+alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
+
+# misc
+thiserror.workspace = true
+itertools = "0.11"
+serde = { workspace = true, features = ["derive"] }
+serde_with = "3.3"
+serde_json.workspace = true
+jsonrpsee-types = { version = "0.20", optional = true }
+alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+url = "2.3"
+bytes = "1.5"
+
+arbitrary = { version = "1.1", features = ["derive"], optional = true }
+proptest = { version = "1.0", optional = true }
+proptest-derive = { version = "0.4", optional = true }
+
+[features]
+default = ["jsonrpsee-types"]
+arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+
+[dev-dependencies]
+# misc
+alloy-primitives = { workspace = true, features = ["rlp", "serde", "arbitrary"] }
+arbitrary = { version = "1.1", features = ["derive"] }
+proptest = "1.0"
+proptest-derive = "0.4"
+similar-asserts = "1.4"

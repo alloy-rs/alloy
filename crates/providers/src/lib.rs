@@ -7,6 +7,9 @@ use alloy_primitives::Address;
 use alloy_transports::{BoxTransport, RpcClient, Transport, TransportError};
 use serde_json::value::RawValue;
 
+pub mod provider;
+pub mod utils;
+
 use std::{borrow::Cow, marker::PhantomData};
 
 /// A network-wrapped RPC client.
