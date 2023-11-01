@@ -6,7 +6,7 @@ use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
 
-/// A service layer that transforms [`RequestPacket`] into [`ResponsePacket`]
+/// A service layer that transforms [`RequestPacket`] into [`Response`]
 /// by wrapping an inner service that implements [`Transport`].
 #[derive(Debug, Clone)]
 #[repr(transparent)]
