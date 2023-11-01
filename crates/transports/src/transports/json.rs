@@ -49,7 +49,6 @@ where
     fn call(&mut self, req: RequestPacket) -> Self::Future {
         let replacement = self.inner.clone();
         let mut client = std::mem::replace(&mut self.inner, replacement);
-
         match to_json_raw_value(&req) {
             Ok(raw) => JsonRpcFuture {
                 state: States::Pending {

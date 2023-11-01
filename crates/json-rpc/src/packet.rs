@@ -105,11 +105,67 @@ impl RequestPacket {
 }
 
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Single(Response<Payload, ErrData>),
     Batch(Vec<Response<Payload, ErrData>>),
+}
+
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use std::fmt;
+use std::marker::PhantomData;
+
+impl<'de, Payload, ErrData> Deserialize<'de> for ResponsePacket<Payload, ErrData>
+where
+    Payload: Deserialize<'de>,
+    ErrData: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ResponsePacketVisitor<Payload, ErrData> {
+            marker: PhantomData<fn() -> ResponsePacket<Payload, ErrData>>,
+        }
+
+        impl<'de, Payload, ErrData> Visitor<'de> for ResponsePacketVisitor<Payload, ErrData>
+        where
+            Payload: Deserialize<'de>,
+            ErrData: Deserialize<'de>,
+        {
+            type Value = ResponsePacket<Payload, ErrData>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a single response or a batch of responses")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut responses = Vec::new();
+
+                while let Some(response) = seq.next_element()? {
+                    responses.push(response);
+                }
+
+                Ok(ResponsePacket::Batch(responses))
+            }
+
+            fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let response =
+                    Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(ResponsePacket::Single(response))
+            }
+        }
+
+        deserializer.deserialize_any(ResponsePacketVisitor {
+            marker: PhantomData,
+        })
+    }
 }
 
 /// A [`BorrowedResponsePacket`] is a [`ResponsePacket`] that has been partially
