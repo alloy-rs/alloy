@@ -23,6 +23,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+      - name: Install Anvil
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - uses: Swatinem/rust-cache@v2
       - name: test
         run: cargo test --workspace ${{ matrix.flags }}
