@@ -4,7 +4,7 @@ use crate::{
     RpcFut,
 };
 
-use alloy_json_rpc::{Request, RequestPacket, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
 use core::panic;
 use serde_json::value::RawValue;
 use std::{
@@ -84,9 +84,11 @@ where
             unreachable!("Called poll_awaiting in incorrect state")
         };
 
-        let res = task::ready!(fut.poll(cx));
-
-        task::Poll::Ready(RpcResult::from(res))
+        match task::ready!(fut.poll(cx)) {
+            Ok(ResponsePacket::Single(res)) => Ready(RpcResult::from(res)),
+            Err(e) => Ready(RpcResult::Err(e)),
+            _ => panic!("received batch response from single request"),
+        }
     }
 }
 

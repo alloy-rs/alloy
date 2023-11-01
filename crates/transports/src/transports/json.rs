@@ -1,12 +1,12 @@
 use crate::{utils::to_json_raw_value, Transport, TransportError};
 
-use alloy_json_rpc::{RequestPacket, Response};
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin, task};
 use tower::Service;
 
-/// A service layer that transforms [`RequestPacket`] into [`Response`]
+/// A service layer that transforms [`RequestPacket`] into [`ResponsePacket`]
 /// by wrapping an inner service that implements [`Transport`].
 #[derive(Debug, Clone)]
 #[repr(transparent)]
@@ -36,7 +36,7 @@ impl<S> Service<RequestPacket> for JsonRpcService<S>
 where
     S: Transport + Clone,
 {
-    type Response = Response;
+    type Response = ResponsePacket;
 
     type Error = TransportError;
 
