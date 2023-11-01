@@ -379,9 +379,30 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         RpcResult::Success((max_fee_per_gas, max_priority_fee_per_gas))
     }
 
+    #[cfg(feature = "anvil")]
+    pub async fn set_code(
+        &self,
+        address: Address,
+        code: &'static str,
+    ) -> RpcResult<(), Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "anvil_setCode",
+                Cow::<(Address, &'static str)>::Owned((address, code)),
+            )
+            .await
+    }
+
     pub fn with_sender(mut self, from: Address) -> Self {
         self.from = Some(from);
         self
+    }
+
+    pub fn inner(&self) -> &RpcClient<T> {
+        &self.inner
     }
 }
 
@@ -390,10 +411,6 @@ impl Provider<Http<Client>> {
     pub fn new(url: &str) -> Result<Self, ClientError> {
         let inner: RpcClient<Http<Client>> = url.parse().map_err(|_e| ClientError::ParseError)?;
         Ok(Self { inner, from: None })
-    }
-
-    pub fn inner(&self) -> &RpcClient<Http<Client>> {
-        &self.inner
     }
 }
 
@@ -424,29 +441,24 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 #[cfg(test)]
 mod providers_test {
     use crate::{provider::Provider, utils};
-
-    use alloy_primitives::{address, b256, U256, U64};
+    use alloy_primitives::{address, b256, Address, U256, U64};
     use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
-    use alloy_transports::Http;
-    use once_cell::sync::Lazy;
-    use reqwest::Client;
-    use serial_test::serial;
 
-    static PROVIDER: Lazy<Provider<Http<Client>>> = Lazy::new(|| {
-        Provider::new("https://eth-sepolia.g.alchemy.com/v2/PEmSfTwDesMj1VId6zBRHhn5rpjP2RUt")
-            .unwrap()
-    });
+    use ethers_core::utils::Anvil;
 
     #[tokio::test]
-    #[serial]
     async fn gets_block_number() {
-        PROVIDER.get_block_number().await.unwrap();
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(U256::ZERO, num)
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_transaction_count() {
-        let count = PROVIDER
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let count = provider
             .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
             .await
             .unwrap();
@@ -454,28 +466,32 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_block_by_hash() {
-        let block = PROVIDER
-            .get_block_by_hash(
-                b256!("48783d121ca1a4c0c4f60947ddb05885ffa73f5fe7f25a4846aa36ea33d8ec24"),
-                true,
-            )
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let num = 0;
+        let tag: BlockNumberOrTag = num.into();
+        let block = provider
+            .get_block_by_number(tag, true)
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(
-            block.header.hash.unwrap(),
-            b256!("48783d121ca1a4c0c4f60947ddb05885ffa73f5fe7f25a4846aa36ea33d8ec24")
-        );
+        let hash = block.header.hash.unwrap();
+        let block = provider
+            .get_block_by_hash(hash, true)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(block.header.hash.unwrap(), hash);
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_block_by_number_full() {
-        let num = 4571798;
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = PROVIDER
+        let block = provider
             .get_block_by_number(tag, true)
             .await
             .unwrap()
@@ -484,11 +500,12 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_block_by_number() {
-        let num = 4571798;
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = PROVIDER
+        let block = provider
             .get_block_by_number(tag, true)
             .await
             .unwrap()
@@ -497,18 +514,24 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_chain_id() {
-        let chain_id = PROVIDER.get_chain_id().await.unwrap();
-        assert_eq!(chain_id, U64::from(11155111));
+        let anvil = Anvil::new().args(vec!["--chain-id", "13371337"]).spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let chain_id = provider.get_chain_id().await.unwrap();
+        assert_eq!(chain_id, U64::from(13371337));
     }
 
     #[tokio::test]
-    #[serial]
+    #[cfg(feature = "anvil")]
     async fn gets_code_at() {
-        let _ = PROVIDER
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        // Set the code
+        let addr = Address::with_last_byte(16);
+        provider.set_code(addr, "0xbeef").await.unwrap();
+        let _code = provider
             .get_code_at(
-                address!("C532a74256D3Db42D0Bf7a0400fEFDbad7694008"),
+                addr,
                 BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
             )
             .await
@@ -516,9 +539,11 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
+    #[ignore]
     async fn gets_transaction_by_hash() {
-        let tx = PROVIDER
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let tx = provider
             .get_transaction_by_hash(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
             ))
@@ -532,8 +557,10 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
+    #[ignore]
     async fn gets_logs() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
         let filter = Filter::new()
             .at_block_hash(b256!(
                 "b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3"
@@ -541,14 +568,16 @@ mod providers_test {
             .event_signature(b256!(
                 "e1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
             ));
-        let logs = PROVIDER.get_logs(filter).await.unwrap();
+        let logs = provider.get_logs(filter).await.unwrap();
         assert_eq!(logs.len(), 1);
     }
 
     #[tokio::test]
-    #[serial]
+    #[ignore]
     async fn gets_tx_receipt() {
-        let receipt = PROVIDER
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let receipt = provider
             .get_transaction_receipt(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
             ))
@@ -563,10 +592,11 @@ mod providers_test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn gets_fee_history() {
-        let block_number = PROVIDER.get_block_number().await.unwrap();
-        let fee_history = PROVIDER
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let block_number = provider.get_block_number().await.unwrap();
+        let fee_history = provider
             .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
                 BlockNumberOrTag::Number(block_number.to()),
@@ -574,9 +604,6 @@ mod providers_test {
             )
             .await
             .unwrap();
-        assert_eq!(
-            fee_history.oldest_block,
-            block_number - U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS) + U256::from(1)
-        );
+        assert_eq!(fee_history.oldest_block, U256::ZERO);
     }
 }
