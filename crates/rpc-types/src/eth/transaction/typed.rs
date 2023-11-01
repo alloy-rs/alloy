@@ -4,9 +4,8 @@
 //! it can be converted into the container type [`TypedTransactionRequest`].
 
 use crate::eth::transaction::AccessList;
-use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
+use alloy_primitives::{Address, Bytes, U128, U256, U64};
 use alloy_rlp::{BufMut, Decodable, Encodable, Error as RlpError};
-use c_kzg::{Blob, Bytes48};
 use serde::{Deserialize, Serialize};
 
 /// Container type for various Ethereum transaction requests
@@ -20,7 +19,6 @@ pub enum TypedTransactionRequest {
     Legacy(LegacyTransactionRequest),
     EIP2930(EIP2930TransactionRequest),
     EIP1559(EIP1559TransactionRequest),
-    EIP4844(Eip4844TransactionRequest),
 }
 
 /// Represents a legacy transaction request
@@ -60,24 +58,6 @@ pub struct EIP1559TransactionRequest {
     pub value: U256,
     pub input: Bytes,
     pub access_list: AccessList,
-}
-
-/// Represents an EIP-4844 transaction request
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Eip4844TransactionRequest {
-    pub chain_id: u64,
-    pub nonce: U64,
-    pub max_priority_fee_per_gas: U128,
-    pub max_fee_per_gas: U128,
-    pub gas_limit: U256,
-    pub kind: TransactionKind,
-    pub value: U256,
-    pub input: Bytes,
-    pub access_list: AccessList,
-    pub max_fee_per_blob_gas: U128,
-    pub blob_versioned_hashes: Vec<B256>,
-    pub gas_price: U128,
-    pub sidecar: BlobTransactionSidecar,
 }
 
 /// Represents the `to` field of a transaction request
@@ -132,15 +112,4 @@ impl Decodable for TransactionKind {
             Err(RlpError::InputTooShort)
         }
     }
-}
-
-/// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct BlobTransactionSidecar {
-    /// The blob data.
-    pub blobs: Vec<Blob>,
-    /// The blob commitments.
-    pub commitments: Vec<Bytes48>,
-    /// The blob proofs.
-    pub proofs: Vec<Bytes48>,
 }
