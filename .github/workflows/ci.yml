@@ -23,18 +23,24 @@ jobs:
             - rust: "1.65" # MSRV
               flags: "--all-features" 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-      - name: Install Anvil
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-      - uses: Swatinem/rust-cache@v2
-      - name: test
-        run: cargo test --workspace ${{ matrix.flags }}
-
+        - uses: actions/checkout@v3
+        - uses: dtolnay/rust-toolchain@master
+          with:
+              toolchain: ${{ matrix.rust }}
+        - name: Install Anvil
+          uses: foundry-rs/foundry-toolchain@v1
+          with:
+            version: nightly
+        - uses: Swatinem/rust-cache@v2
+          with:
+              cache-on-failure: true
+        # Only run tests on latest stable and above
+        - name: build
+          if: ${{ matrix.rust == '1.65' }} # MSRV
+          run: cargo build --workspace ${{ matrix.flags }}
+        - name: test
+          if: ${{ matrix.rust != '1.65' }} # MSRV
+          run: cargo test --workspace ${{ matrix.flags }}
   wasm:
     name: check WASM
     runs-on: ubuntu-latest
