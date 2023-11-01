@@ -155,10 +155,16 @@ impl SerializedRequest {
     }
 
     pub fn payload(&self) -> Payload {
+        let params = if self.request.get() == "null" {
+            None
+        } else {
+            Some(self.request())
+        };
         Payload {
             id: self.id().clone(),
             method: self.method(),
-            params: self.request(),
+            jsonrpc: "2.0",
+            params,
         }
     }
 }
@@ -167,6 +173,8 @@ impl SerializedRequest {
 pub struct Payload<'a> {
     id: Id,
     method: &'static str,
+    jsonrpc: &'static str,
     #[serde(borrow)]
-    params: &'a RawValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    params: Option<&'a RawValue>,
 }
