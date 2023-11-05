@@ -1,11 +1,13 @@
 //! Alloy main Provider abstraction.
 
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
 };
 use alloy_transports::{BoxTransport, Http, RpcClient, RpcResult, Transport, TransportError};
+use async_trait::async_trait;
+use auto_impl::auto_impl;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -31,15 +33,214 @@ pub struct Provider<T: Transport = BoxTransport> {
     from: Option<Address>,
 }
 
+// todo: docs explaining that this is patchwork
+#[async_trait]
+#[auto_impl(&, Arc, Box)]
+pub trait TempProvider: Send + Sync {
+    /// Gets the transaction count of the corresponding address.
+    async fn get_transaction_count(
+        &self,
+        address: Address,
+        tag: Option<BlockNumberOrTag>,
+    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the last block number available.
+    async fn get_block_number(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the balance of the account at the specified tag, which defaults to latest.
+    async fn get_balance(
+        &self,
+        address: Address,
+        tag: Option<BlockId>,
+    ) -> RpcResult<U256, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets a block by its [BlockHash], with full transactions or only hashes.
+    async fn get_block_by_hash(
+        &self,
+        hash: BlockHash,
+        full: bool,
+    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets a block by [BlockNumberOrTag], with full transactions or only hashes.
+    async fn get_block_by_number<B: Into<BlockNumberOrTag> + Send + Sync>(
+        &self,
+        number: B,
+        full: bool,
+    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the chain ID.
+    async fn get_chain_id(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the specified storage value from [Address].
+    async fn get_storage_at(
+        &self,
+        address: Address,
+        key: StorageKey,
+        tag: Option<BlockId>,
+    ) -> RpcResult<StorageValue, Box<RawValue>, TransportError>;
+
+    /// Gets the bytecode located at the corresponding [Address].
+    async fn get_code_at<B: Into<BlockId> + Send + Sync>(
+        &self,
+        address: Address,
+        tag: B,
+    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets a [Transaction] by its [TxHash].
+    async fn get_transaction_by_hash(
+        &self,
+        hash: TxHash,
+    ) -> RpcResult<Transaction, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Retrieves a [`Vec<Log>`] with the given [Filter].
+    async fn get_logs(&self, filter: Filter) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the accounts in the remote node. This is usually empty unless you're using a local node.
+    async fn get_accounts(&self) -> RpcResult<Vec<Address>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the current gas price.
+    async fn get_gas_price(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
+    async fn get_transaction_receipt(
+        &self,
+        hash: TxHash,
+    ) -> RpcResult<Option<TransactionReceipt>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Returns a collection of historical gas information [FeeHistory] which
+    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
+    async fn get_fee_history<B: Into<BlockNumberOrTag> + Send + Sync>(
+        &self,
+        block_count: U256,
+        last_block: B,
+        reward_percentiles: &[f64],
+    ) -> RpcResult<FeeHistory, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the selected block [BlockNumberOrTag] receipts.
+    async fn get_block_receipts(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> RpcResult<Vec<TransactionReceipt>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets an uncle block through the tag [BlockId] and index [U64].
+    async fn get_uncle<B: Into<BlockId> + Send + Sync>(
+        &self,
+        tag: B,
+        idx: U64,
+    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets syncing info.
+    async fn syncing(&self) -> RpcResult<SyncStatus, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    async fn call(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Estimate the gas needed for a transaction.
+    async fn estimate_gas(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Sends an already-signed transaction.
+    async fn send_raw_transaction(
+        &self,
+        tx: Bytes,
+    ) -> RpcResult<TxHash, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    /// Receives an optional [EstimatorFunction] that can be used to modify
+    /// how to estimate these fees.
+    async fn estimate_eip1559_fees(
+        &self,
+        estimator: Option<EstimatorFunction>,
+    ) -> RpcResult<(U256, U256), Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    #[cfg(feature = "anvil")]
+    async fn set_code(
+        &self,
+        address: Address,
+        code: &'static str,
+    ) -> RpcResult<(), Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+}
+
+impl<T: Transport + Clone + Send + Sync> Provider<T> {
+    pub fn new(transport: T) -> Self {
+        Self {
+            // todo(onbjerg): do we just default to false
+            inner: RpcClient::new(transport, false),
+            from: None,
+        }
+    }
+
+    pub fn with_sender(mut self, from: Address) -> Self {
+        self.from = Some(from);
+        self
+    }
+
+    pub fn inner(&self) -> &RpcClient<T> {
+        &self.inner
+    }
+}
+
+// todo: validate usage of BlockId vs BlockNumberOrTag vs Option<BlockId> etc.
 // Simple JSON-RPC bindings.
 // In the future, this will be replaced by a Provider trait,
 // but as the interface is not stable yet, we define the bindings ourselves
 // until we can use the trait and the client abstraction that will use it.
-impl<T: Transport + Clone + Send + Sync> Provider<T> {
+#[async_trait]
+impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Gets the transaction count of the corresponding address.
-    pub async fn get_transaction_count(
+    async fn get_transaction_count(
         &self,
         address: Address,
+        tag: Option<BlockNumberOrTag>,
     ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
@@ -47,13 +248,16 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                Cow::<(Address, &'static str)>::Owned((address, "latest")),
+                Cow::<(Address, BlockNumberOrTag)>::Owned((
+                    address,
+                    tag.unwrap_or(BlockNumberOrTag::Latest),
+                )),
             )
             .await
     }
 
     /// Gets the last block number available.
-    pub async fn get_block_number(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    async fn get_block_number(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -63,7 +267,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    pub async fn get_balance(
+    async fn get_balance(
         &self,
         address: Address,
         tag: Option<BlockId>,
@@ -83,7 +287,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
-    pub async fn get_block_by_hash(
+    async fn get_block_by_hash(
         &self,
         hash: BlockHash,
         full: bool,
@@ -100,7 +304,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets a block by [BlockNumberOrTag], with full transactions or only hashes.
-    pub async fn get_block_by_number<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_block_by_number<B: Into<BlockNumberOrTag> + Send + Sync>(
         &self,
         number: B,
         full: bool,
@@ -117,7 +321,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the chain ID.
-    pub async fn get_chain_id(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
+    async fn get_chain_id(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -125,8 +329,28 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             .prepare("eth_chainId", Cow::<()>::Owned(()))
             .await
     }
+
+    /// Gets the specified storage value from [Address].
+    async fn get_storage_at(
+        &self,
+        address: Address,
+        key: StorageKey,
+        tag: Option<BlockId>,
+    ) -> RpcResult<StorageValue, Box<RawValue>, TransportError> {
+        self.inner
+            .prepare(
+                "eth_getStorageAt",
+                Cow::<(Address, StorageKey, BlockId)>::Owned((
+                    address,
+                    key,
+                    tag.unwrap_or(BlockNumberOrTag::Latest.into()),
+                )),
+            )
+            .await
+    }
+
     /// Gets the bytecode located at the corresponding [Address].
-    pub async fn get_code_at<B: Into<BlockId> + Send + Sync>(
+    async fn get_code_at<B: Into<BlockId> + Send + Sync>(
         &self,
         address: Address,
         tag: B,
@@ -143,7 +367,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets a [Transaction] by its [TxHash].
-    pub async fn get_transaction_by_hash(
+    async fn get_transaction_by_hash(
         &self,
         hash: TxHash,
     ) -> RpcResult<Transaction, Box<RawValue>, TransportError>
@@ -161,10 +385,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-    pub async fn get_logs(
-        &self,
-        filter: Filter,
-    ) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
+    async fn get_logs(&self, filter: Filter) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -174,7 +395,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local node.
-    pub async fn get_accounts(&self) -> RpcResult<Vec<Address>, Box<RawValue>, TransportError>
+    async fn get_accounts(&self) -> RpcResult<Vec<Address>, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -184,7 +405,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the current gas price.
-    pub async fn get_gas_price(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    async fn get_gas_price(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -194,7 +415,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
-    pub async fn get_transaction_receipt(
+    async fn get_transaction_receipt(
         &self,
         hash: TxHash,
     ) -> RpcResult<Option<TransactionReceipt>, Box<RawValue>, TransportError>
@@ -211,7 +432,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 
     /// Returns a collection of historical gas information [FeeHistory] which
     /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
-    pub async fn get_fee_history<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_fee_history<B: Into<BlockNumberOrTag> + Send + Sync>(
         &self,
         block_count: U256,
         last_block: B,
@@ -233,7 +454,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
-    pub async fn get_block_receipts(
+    async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
     ) -> RpcResult<Vec<TransactionReceipt>, Box<RawValue>, TransportError>
@@ -249,7 +470,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    pub async fn get_uncle<B: Into<BlockId> + Send + Sync>(
+    async fn get_uncle<B: Into<BlockId> + Send + Sync>(
         &self,
         tag: B,
         idx: U64,
@@ -279,7 +500,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets syncing info.
-    pub async fn syncing(&self) -> RpcResult<SyncStatus, Box<RawValue>, TransportError>
+    async fn syncing(&self) -> RpcResult<SyncStatus, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -289,7 +510,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
-    pub async fn call(
+    async fn call(
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
@@ -309,7 +530,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Estimate the gas needed for a transaction.
-    pub async fn estimate_gas(
+    async fn estimate_gas(
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
@@ -327,7 +548,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Sends an already-signed transaction.
-    pub async fn send_raw_transaction(
+    async fn send_raw_transaction(
         &self,
         tx: Bytes,
     ) -> RpcResult<TxHash, Box<RawValue>, TransportError>
@@ -342,7 +563,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     /// Receives an optional [EstimatorFunction] that can be used to modify
     /// how to estimate these fees.
-    pub async fn estimate_eip1559_fees(
+    async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> RpcResult<(U256, U256), Box<RawValue>, TransportError>
@@ -393,7 +614,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     #[cfg(feature = "anvil")]
-    pub async fn set_code(
+    async fn set_code(
         &self,
         address: Address,
         code: &'static str,
@@ -408,30 +629,14 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             )
             .await
     }
-
-    pub fn with_sender(mut self, from: Address) -> Self {
-        self.from = Some(from);
-        self
-    }
-
-    pub fn inner(&self) -> &RpcClient<T> {
-        &self.inner
-    }
-}
-
-// HTTP Transport Provider implementation
-impl Provider<Http<Client>> {
-    pub fn new(url: &str) -> Result<Self, ClientError> {
-        let inner: RpcClient<Http<Client>> = url.parse().map_err(|_e| ClientError::ParseError)?;
-        Ok(Self { inner, from: None })
-    }
 }
 
 impl TryFrom<&str> for Provider<Http<Client>> {
     type Error = ClientError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Provider::new(value)
+        let inner: RpcClient<Http<Client>> = value.parse().map_err(|_e| ClientError::ParseError)?;
+        Ok(Self { inner, from: None })
     }
 }
 
@@ -453,16 +658,18 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 
 #[cfg(test)]
 mod providers_test {
-    use crate::{provider::Provider, utils};
+    use crate::{
+        provider::{Provider, TempProvider},
+        utils,
+    };
     use alloy_primitives::{address, b256, Address, U256, U64};
     use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
-
     use ethers_core::utils::Anvil;
 
     #[tokio::test]
     async fn gets_block_number() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(U256::ZERO, num)
     }
@@ -470,9 +677,12 @@ mod providers_test {
     #[tokio::test]
     async fn gets_transaction_count() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let count = provider
-            .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
+            .get_transaction_count(
+                address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
+                Some(BlockNumberOrTag::Latest),
+            )
             .await
             .unwrap();
         assert_eq!(count, U256::from(0));
@@ -481,7 +691,7 @@ mod providers_test {
     #[tokio::test]
     async fn gets_block_by_hash() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider
@@ -501,7 +711,7 @@ mod providers_test {
     #[tokio::test]
     async fn gets_block_by_number_full() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider
@@ -515,7 +725,7 @@ mod providers_test {
     #[tokio::test]
     async fn gets_block_by_number() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider
@@ -529,7 +739,7 @@ mod providers_test {
     #[tokio::test]
     async fn gets_chain_id() {
         let anvil = Anvil::new().args(vec!["--chain-id", "13371337"]).spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let chain_id = provider.get_chain_id().await.unwrap();
         assert_eq!(chain_id, U64::from(13371337));
     }
@@ -538,7 +748,7 @@ mod providers_test {
     #[cfg(feature = "anvil")]
     async fn gets_code_at() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
@@ -555,7 +765,7 @@ mod providers_test {
     #[ignore]
     async fn gets_transaction_by_hash() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let tx = provider
             .get_transaction_by_hash(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
@@ -573,7 +783,7 @@ mod providers_test {
     #[ignore]
     async fn gets_logs() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let filter = Filter::new()
             .at_block_hash(b256!(
                 "b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3"
@@ -589,7 +799,7 @@ mod providers_test {
     #[ignore]
     async fn gets_tx_receipt() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let receipt = provider
             .get_transaction_receipt(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
@@ -607,7 +817,7 @@ mod providers_test {
     #[tokio::test]
     async fn gets_fee_history() {
         let anvil = Anvil::new().spawn();
-        let provider = Provider::new(&anvil.endpoint()).unwrap();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let block_number = provider.get_block_number().await.unwrap();
         let fee_history = provider
             .get_fee_history(
