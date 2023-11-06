@@ -27,7 +27,11 @@ pin-project.workspace = true
 
 # feature deps
 reqwest = { version = "0.11.18", features = ["serde_json", "json"], optional = true }
-tokio = { version = "1.33.0", features = ["sync"] }
+tokio = { version = "1.33.0", features = ["sync", "macros"] }
+alloy-primitives.workspace = true
+bimap = "0.6.3"
+tracing = "0.1.40"
+futures = "0.3.29"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
 version = "0.14.27"
@@ -40,6 +44,10 @@ features = ["sync", "rt"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4.37"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio-tungstenite = "0.20.1"
+
 
 [features]
 default = ["reqwest", "hyper"]

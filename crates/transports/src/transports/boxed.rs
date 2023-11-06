@@ -1,4 +1,4 @@
-use serde_json::value::RawValue;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::fmt::Debug;
 use tower::Service;
 
@@ -61,8 +61,8 @@ where
     }
 }
 
-impl Service<Box<RawValue>> for BoxTransport {
-    type Response = Box<RawValue>;
+impl Service<RequestPacket> for BoxTransport {
+    type Response = ResponsePacket;
 
     type Error = TransportError;
 
@@ -75,7 +75,7 @@ impl Service<Box<RawValue>> for BoxTransport {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.inner.call(req)
     }
 }

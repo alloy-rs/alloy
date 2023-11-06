@@ -31,11 +31,11 @@ impl Serialize for RequestPacket {
         S: serde::Serializer,
     {
         match self {
-            RequestPacket::Single(single) => single.request().serialize(serializer),
+            RequestPacket::Single(single) => single.serialized().serialize(serializer),
             RequestPacket::Batch(batch) => {
                 let mut seq = serializer.serialize_seq(Some(batch.len()))?;
                 for req in batch {
-                    seq.serialize_element(req.request())?;
+                    seq.serialize_element(req.serialized())?;
                 }
                 seq.end()
             }
@@ -109,6 +109,36 @@ impl RequestPacket {
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     Single(Response<Payload, ErrData>),
     Batch(Vec<Response<Payload, ErrData>>),
+}
+
+impl<Payload, ErrData> FromIterator<Response<Payload, ErrData>>
+    for ResponsePacket<Payload, ErrData>
+{
+    fn from_iter<T: IntoIterator<Item = Response<Payload, ErrData>>>(iter: T) -> Self {
+        let mut iter = iter.into_iter().peekable();
+        // return single if iter has exactly one element, else make a batch
+        if let Some(first) = iter.next() {
+            if iter.peek().is_none() {
+                return Self::Single(first);
+            } else {
+                let mut batch = Vec::new();
+                batch.push(first);
+                batch.extend(iter);
+                return Self::Batch(batch);
+            }
+        }
+        Self::Batch(vec![])
+    }
+}
+
+impl<Payload, ErrData> From<Vec<Response<Payload, ErrData>>> for ResponsePacket<Payload, ErrData> {
+    fn from(value: Vec<Response<Payload, ErrData>>) -> Self {
+        if value.len() == 1 {
+            Self::Single(value.into_iter().next().unwrap())
+        } else {
+            Self::Batch(value)
+        }
+    }
 }
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};

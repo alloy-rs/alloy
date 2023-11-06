@@ -13,21 +13,19 @@ use crate::{BoxTransport, RpcClient, Transport, TransportError};
 ///   provider.
 /// - You have implemented a custom [`Transport`].
 /// - You require a specific websocket reconnection strategy.
-pub trait TransportConnect {
+pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// The transport type that is returned by `connect`.
     type Transport: Transport + Clone;
 
     /// Returns `true`` if the transport is a local transport.
-    fn is_local(&self) -> bool {
-        false
-    }
+    fn is_local(&self) -> bool;
 
     /// Connect to the transport, returning a `Transport` instance.
-    fn to_transport(&self) -> Result<Self::Transport, TransportError>;
+    fn get_transport(&self) -> Result<Self::Transport, TransportError>;
 
     /// Connect to the transport, wrapping it into a `RpcClient` instance.
     fn connect(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
-        self.to_transport()
+        self.get_transport()
             .map(|t| RpcClient::new(t, self.is_local()))
     }
 
@@ -37,7 +35,7 @@ pub trait TransportConnect {
     /// will be used by PubSub connection managers in the event the connection
     /// fails.
     fn try_reconnect(&self) -> Result<Self::Transport, TransportError> {
-        self.to_transport()
+        self.get_transport()
     }
 }
 
@@ -71,7 +69,7 @@ where
     }
 
     fn to_boxed_transport(&self) -> Result<BoxTransport, TransportError> {
-        self.to_transport().map(Transport::boxed)
+        self.get_transport().map(Transport::boxed)
     }
 
     fn connect_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError> {

@@ -1,4 +1,4 @@
-use serde_json::value::RawValue;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use tower::Service;
 
 use crate::{BoxTransport, TransportError, TransportFut};
@@ -38,8 +38,8 @@ use crate::{BoxTransport, TransportError, TransportFut};
 pub trait Transport:
     private::Sealed
     + Service<
-        Box<RawValue>,
-        Response = Box<RawValue>,
+        RequestPacket,
+        Response = ResponsePacket,
         Error = TransportError,
         Future = TransportFut<'static>,
     > + Send
@@ -58,8 +58,8 @@ pub trait Transport:
 impl<T> Transport for T where
     T: private::Sealed
         + Service<
-            Box<RawValue>,
-            Response = Box<RawValue>,
+            RequestPacket,
+            Response = ResponsePacket,
             Error = TransportError,
             Future = TransportFut<'static>,
         > + Send
@@ -74,8 +74,8 @@ mod private {
     pub trait Sealed {}
     impl<T> Sealed for T where
         T: Service<
-                Box<RawValue>,
-                Response = Box<RawValue>,
+                RequestPacket,
+                Response = ResponsePacket,
                 Error = TransportError,
                 Future = TransportFut<'static>,
             > + Send

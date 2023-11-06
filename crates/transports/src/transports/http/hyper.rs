@@ -1,5 +1,5 @@
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use hyper::client::{connect::Connect, Client};
-use serde_json::value::RawValue;
 use std::task;
 use tower::Service;
 
@@ -10,15 +10,17 @@ where
     C: Connect + Clone + Send + Sync + 'static,
 {
     /// Make a request.
-    fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
+    fn request(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
+            let ser = req.serialize().map_err(TransportError::ser_err)?;
+
             // convert the Box<RawValue> into a hyper request<B>
             let req = hyper::Request::builder()
                 .method(hyper::Method::POST)
                 .uri(this.url.as_str())
                 .header("content-type", "application/json")
-                .body(hyper::Body::from(req.get().to_owned()))
+                .body(hyper::Body::from(ser.get().to_owned()))
                 .expect("request parts are valid");
 
             let resp = this.client.request(req).await?;
@@ -36,11 +38,11 @@ where
     }
 }
 
-impl<C> Service<Box<RawValue>> for &Http<Client<C>>
+impl<C> Service<RequestPacket> for &Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
-    type Response = Box<RawValue>;
+    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
@@ -51,16 +53,16 @@ where
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.request(req)
     }
 }
 
-impl<C> Service<Box<RawValue>> for Http<Client<C>>
+impl<C> Service<RequestPacket> for Http<Client<C>>
 where
     C: Connect + Clone + Send + Sync + 'static,
 {
-    type Response = Box<RawValue>;
+    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
@@ -71,7 +73,7 @@ where
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.request(req)
     }
 }

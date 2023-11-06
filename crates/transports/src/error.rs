@@ -18,15 +18,24 @@ pub enum TransportError {
     #[error("Missing response in batch request")]
     MissingBatchResponse,
 
-    /// Hyper http transport
+    /// Reqwest http transport.
     #[error(transparent)]
     #[cfg(feature = "reqwest")]
     Reqwest(#[from] reqwest::Error),
 
-    /// Hyper http transport
+    /// Hyper http transport.
     #[error(transparent)]
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     Hyper(#[from] hyper::Error),
+
+    /// Tungstenite websocket transport.
+    #[error(transparent)]
+    #[cfg(not(target_arch = "wasm32"))]
+    Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
+
+    /// PubSub backend connection task has stopped.
+    #[error("PubSub backend connection task has stopped.")]
+    BackendGone,
 
     /// Custom error
     #[error(transparent)]

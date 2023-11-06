@@ -10,7 +10,7 @@ use std::{
 use futures_channel::oneshot;
 use serde_json::value::RawValue;
 
-use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
+use crate::{error::TransportError, transports::Transport, RpcClient};
 use alloy_json_rpc::{
     Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
 };
@@ -185,14 +185,6 @@ where
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
         let req = std::mem::replace(requests, RequestPacket::Batch(Vec::with_capacity(0)));
 
-        let req = match to_json_raw_value(&req) {
-            Ok(req) => req,
-            Err(e) => {
-                self.set(BatchFuture::Complete);
-                return Poll::Ready(Err(e));
-            }
-        };
-
         let fut = transport.call(req);
         self.set(BatchFuture::AwaitingResponse { channels, fut });
         cx.waker().wake_by_ref();
@@ -213,14 +205,6 @@ where
             Err(e) => {
                 self.set(BatchFuture::Complete);
                 return Poll::Ready(Err(e));
-            }
-        };
-
-        let responses: ResponsePacket = match serde_json::from_str(responses.get()) {
-            Ok(responses) => responses,
-            Err(err) => {
-                self.set(BatchFuture::Complete);
-                return Poll::Ready(Err(TransportError::deser_err(err, responses.get())));
             }
         };
 

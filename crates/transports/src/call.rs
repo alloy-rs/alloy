@@ -1,8 +1,4 @@
-use crate::{
-    error::TransportError,
-    transports::{JsonRpcLayer, JsonRpcService, Transport},
-    RpcFut,
-};
+use crate::{error::TransportError, transports::Transport, RpcFut};
 
 use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
 use core::panic;
@@ -13,7 +9,7 @@ use std::{
     pin::Pin,
     task::{self, Poll::Ready},
 };
-use tower::{Layer, Service};
+use tower::Service;
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -25,11 +21,11 @@ where
 {
     Prepared {
         request: Option<Request<Params>>,
-        connection: JsonRpcService<Conn>,
+        connection: Conn,
     },
     AwaitingResponse {
         #[pin]
-        fut: <JsonRpcService<Conn> as Service<RequestPacket>>::Future,
+        fut: <Conn as Service<RequestPacket>>::Future,
     },
     Complete,
 }
@@ -152,7 +148,7 @@ where
         Self {
             state: CallState::Prepared {
                 request: Some(req),
-                connection: JsonRpcLayer.layer(connection),
+                connection,
             },
             _pd: PhantomData,
         }

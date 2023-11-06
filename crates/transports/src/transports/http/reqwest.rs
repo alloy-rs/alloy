@@ -1,4 +1,4 @@
-use serde_json::value::RawValue;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::task;
 use tower::Service;
 
@@ -6,19 +6,19 @@ use crate::{Http, TransportError, TransportFut};
 
 impl Http<reqwest::Client> {
     /// Make a request.
-    fn request(&self, req: Box<RawValue>) -> TransportFut<'static> {
+    fn request(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             let resp = this.client.post(this.url).json(&req).send().await?;
             let json = resp.text().await?;
 
-            RawValue::from_string(json).map_err(|err| TransportError::deser_err(err, ""))
+            serde_json::from_str(&json).map_err(|err| TransportError::deser_err(err, &json))
         })
     }
 }
 
-impl Service<Box<RawValue>> for Http<reqwest::Client> {
-    type Response = Box<RawValue>;
+impl Service<RequestPacket> for Http<reqwest::Client> {
+    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
@@ -29,13 +29,13 @@ impl Service<Box<RawValue>> for Http<reqwest::Client> {
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.request(req)
     }
 }
 
-impl Service<Box<RawValue>> for &Http<reqwest::Client> {
-    type Response = Box<RawValue>;
+impl Service<RequestPacket> for &Http<reqwest::Client> {
+    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
@@ -46,7 +46,7 @@ impl Service<Box<RawValue>> for &Http<reqwest::Client> {
     }
 
     #[inline]
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.request(req)
     }
 }

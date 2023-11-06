@@ -1,5 +1,6 @@
 use crate::{common::Id, RpcParam};
 
+use alloy_primitives::{keccak256, B256};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
@@ -150,7 +151,45 @@ impl SerializedRequest {
         self.meta.method
     }
     /// Get the serialized request.
-    pub fn request(&self) -> &RawValue {
+    pub fn serialized(&self) -> &RawValue {
         &self.request
+    }
+
+    /// Consumes the serialized request, returning the underlying [`RawValue`]
+    /// and the [`RequestMeta`].
+    pub fn decompose(self) -> (RequestMeta, Box<RawValue>) {
+        (self.meta, self.request)
+    }
+
+    /// Take the serialized request, consuming the [`SerializedRequest`].
+    pub fn take_request(self) -> Box<RawValue> {
+        self.request
+    }
+
+    /// Get a reference to the serialized request's params.
+    ///
+    /// This partially deserializes the request, and should be avoided if
+    /// possible.
+    pub fn params<'a>(&'a self) -> Option<&'a RawValue> {
+        #[derive(Deserialize)]
+        struct Req<'a> {
+            #[serde(borrow)]
+            params: Option<&'a RawValue>,
+        }
+
+        let req: Req = serde_json::from_str(self.request.get()).unwrap();
+        req.params
+    }
+
+    /// Get the hash of the serialized request's params.
+    ///
+    /// This partially deserializes the request, and should be avoided if
+    /// possible.
+    pub fn params_hash(&self) -> B256 {
+        if let Some(params) = self.params() {
+            keccak256(params.get())
+        } else {
+            keccak256("")
+        }
     }
 }

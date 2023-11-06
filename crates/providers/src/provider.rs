@@ -454,8 +454,8 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 #[cfg(test)]
 mod providers_test {
     use crate::{provider::Provider, utils};
-    use alloy_primitives::{address, b256, Address, U256, U64};
-    use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
+    use alloy_primitives::{address, b256, U256, U64};
+    use alloy_rpc_types::{BlockNumberOrTag, Filter};
 
     use ethers_core::utils::Anvil;
 

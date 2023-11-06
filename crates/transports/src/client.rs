@@ -234,7 +234,7 @@ impl<L> ClientBuilder<L> {
         L: Layer<C::Transport>,
         L::Service: Transport,
     {
-        let transport = connect.to_transport()?;
+        let transport = connect.get_transport()?;
         Ok(self.transport(transport, connect.is_local()))
     }
 
@@ -253,7 +253,7 @@ impl<L> ClientBuilder<L> {
 
 #[cfg(all(test, feature = "reqwest"))]
 mod test {
-    use crate::transports::Http;
+    use crate::{pubsub::PubSubFrontend, transports::Http, BoxPubSub};
 
     use super::RpcClient;
 
@@ -262,5 +262,13 @@ mod test {
         let h: RpcClient<Http<reqwest::Client>> = "http://localhost:8545".parse().unwrap();
 
         assert!(h.is_local());
+    }
+
+    fn __compile_check_a() -> RpcClient<PubSubFrontend> {
+        todo!()
+    }
+
+    fn __compile_check_2() {
+        let _ = __compile_check_a().new_batch();
     }
 }

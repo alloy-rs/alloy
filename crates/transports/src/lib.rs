@@ -13,6 +13,9 @@ pub use client::{ClientBuilder, RpcClient};
 mod error;
 pub use error::TransportError;
 
+mod pubsub;
+pub use pubsub::{BoxPubSub, ConnectionHandle, ConnectionInterface, PubSub};
+
 mod transports;
 pub use transports::{BoxTransport, BoxTransportConnect, Http, Transport, TransportConnect};
 
@@ -24,13 +27,13 @@ pub use type_aliases::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod type_aliases {
-    use alloy_json_rpc::RpcResult;
+    use alloy_json_rpc::{ResponsePacket, RpcResult};
     use serde_json::value::RawValue;
 
     use crate::TransportError;
 
     /// Future for Transport-level requests.
-    pub type TransportFut<'a, T = Box<serde_json::value::RawValue>, E = TransportError> =
+    pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>>;
 
     /// Future for RPC-level requests.
@@ -41,13 +44,13 @@ mod type_aliases {
 
 #[cfg(target_arch = "wasm32")]
 mod type_aliases {
-    use alloy_json_rpc::RpcResult;
+    use alloy_json_rpc::{ResponsePacket, RpcResult};
     use serde_json::value::RawValue;
 
     use crate::TransportError;
 
     /// Future for Transport-level requests.
-    pub type TransportFut<'a, T = Box<serde_json::value::RawValue>, E = TransportError> =
+    pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'a>>;
 
     /// Future for RPC-level requests.
