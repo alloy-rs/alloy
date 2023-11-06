@@ -33,7 +33,9 @@ pub struct Provider<T: Transport = BoxTransport> {
     from: Option<Address>,
 }
 
-// todo: docs explaining that this is patchwork
+/// Temporary Provider trait to be used until the new Provider trait with
+/// the Network abstraction is stable.
+/// Once the new Provider trait is stable, this trait will be removed.
 #[async_trait]
 #[auto_impl(&, Arc, Box)]
 pub trait TempProvider: Send + Sync {
