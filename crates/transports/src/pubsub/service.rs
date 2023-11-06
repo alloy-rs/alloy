@@ -42,7 +42,7 @@ where
 {
     /// Reconnect by dropping the backend and creating a new one.
     async fn get_new_backend(&mut self) -> Result<ConnectionHandle, TransportError> {
-        let mut handle = self.connector.get_transport()?;
+        let mut handle = self.connector.try_reconnect()?;
         std::mem::swap(&mut self.handle, &mut handle);
         Ok(handle)
     }
