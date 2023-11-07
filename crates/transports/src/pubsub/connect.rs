@@ -22,10 +22,8 @@ pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// Attempt to reconnect the transport.
     ///
     /// Override this to add custom reconnection logic to your connector. This
-    /// will be used by [`PubSubService`] connection managers in the event the
+    /// will be used by the internal pubsub connection managers in the event the
     /// connection fails.
-    ///
-    /// [`PubSubService`]: crate::pubsub::service::PubSubService
     fn try_reconnect<'a: 'b, 'b>(&'a self) -> Pbf<'b, ConnectionHandle, TransportError> {
         self.connect()
     }

@@ -1,16 +1,19 @@
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
+use alloy_primitives::U256;
+use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
     sync::atomic::{AtomicU64, Ordering},
 };
+use tokio::sync::broadcast;
 use tower::{
     layer::util::{Identity, Stack},
     Layer, ServiceBuilder,
 };
 
 use crate::{
-    BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport, TransportConnect,
-    TransportError,
+    pubsub::PubSubFrontend, BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport,
+    TransportConnect, TransportError,
 };
 
 /// A JSON-RPC client.
@@ -155,6 +158,13 @@ where
             is_local: self.is_local,
             id: self.id,
         }
+    }
+}
+
+impl RpcClient<PubSubFrontend> {
+    /// Get a [`broadcast::Receiver`] for the given subscription ID.
+    pub async fn get_watcher(&self, id: U256) -> broadcast::Receiver<Box<RawValue>> {
+        self.transport.get_subscription(id).await.unwrap()
     }
 }
 
