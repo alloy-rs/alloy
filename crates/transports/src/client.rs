@@ -12,8 +12,8 @@ use tower::{
 };
 
 use crate::{
-    pubsub::PubSubFrontend, BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport,
-    TransportConnect, TransportError,
+    pubsub::PubSubFrontend, BatchRequest, BoxTransport, BoxTransportConnect, Http, RpcCall,
+    Transport, TransportConnect, TransportError,
 };
 
 /// A JSON-RPC client.
@@ -118,12 +118,6 @@ impl<T> RpcClient<T>
 where
     T: Transport + Clone,
 {
-    /// Create a new [`BatchRequest`] builder.
-    #[inline]
-    pub fn new_batch(&self) -> BatchRequest<T> {
-        BatchRequest::new(self)
-    }
-
     /// Prepare an [`RpcCall`].
     ///
     /// This function reserves an ID for the request, however the request
@@ -165,6 +159,14 @@ impl RpcClient<PubSubFrontend> {
     /// Get a [`broadcast::Receiver`] for the given subscription ID.
     pub async fn get_watcher(&self, id: U256) -> broadcast::Receiver<Box<RawValue>> {
         self.transport.get_subscription(id).await.unwrap()
+    }
+}
+
+impl<T> RpcClient<Http<T>> {
+    /// Create a new [`BatchRequest`] builder.
+    #[inline]
+    pub fn new_batch(&self) -> BatchRequest<Http<T>> {
+        BatchRequest::new(self)
     }
 }
 
@@ -260,27 +262,5 @@ impl<L> ClientBuilder<L> {
     {
         let transport = connect.get_boxed_transport().await?;
         Ok(self.transport(transport, connect.is_local()))
-    }
-}
-
-#[cfg(all(test, feature = "reqwest"))]
-mod test {
-    use crate::{pubsub::PubSubFrontend, transports::Http};
-
-    use super::RpcClient;
-
-    #[test]
-    fn basic_instantiation() {
-        let h: RpcClient<Http<reqwest::Client>> = "http://localhost:8545".parse().unwrap();
-
-        assert!(h.is_local());
-    }
-
-    fn __compile_check_a() -> RpcClient<PubSubFrontend> {
-        todo!()
-    }
-
-    fn __compile_check_2() {
-        let _ = __compile_check_a().new_batch();
     }
 }
