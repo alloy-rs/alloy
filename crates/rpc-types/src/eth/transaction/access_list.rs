@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
 
 /// A list of addresses and storage keys that the transaction plans to access.
@@ -9,7 +9,7 @@ pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
-    pub storage_keys: Vec<B256>,
+    pub storage_keys: Vec<U256>,
 }
 
 /// AccessList as defined in EIP-2930
@@ -29,28 +29,16 @@ impl AccessList {
 
     /// Consumes the type and returns an iterator over the list's addresses and storage keys.
     pub fn into_flatten(self) -> impl Iterator<Item = (Address, Vec<U256>)> {
-        self.0.into_iter().map(|item| {
-            (
-                item.address,
-                item.storage_keys
-                    .into_iter()
-                    .map(|slot| U256::from_be_bytes(slot.0))
-                    .collect(),
-            )
-        })
+        self.0
+            .into_iter()
+            .map(|item| (item.address, item.storage_keys))
     }
 
     /// Returns an iterator over the list's addresses and storage keys.
     pub fn flatten(&self) -> impl Iterator<Item = (Address, Vec<U256>)> + '_ {
-        self.0.iter().map(|item| {
-            (
-                item.address,
-                item.storage_keys
-                    .iter()
-                    .map(|slot| U256::from_be_bytes(slot.0))
-                    .collect(),
-            )
-        })
+        self.0
+            .iter()
+            .map(|item| (item.address, item.storage_keys.clone()))
     }
 }
 
@@ -73,11 +61,11 @@ mod tests {
         let list = AccessList(vec![
             AccessListItem {
                 address: Address::ZERO,
-                storage_keys: vec![B256::ZERO],
+                storage_keys: vec![U256::ZERO],
             },
             AccessListItem {
                 address: Address::ZERO,
-                storage_keys: vec![B256::ZERO],
+                storage_keys: vec![U256::ZERO],
             },
         ]);
         let json = serde_json::to_string(&list).unwrap();
@@ -91,11 +79,11 @@ mod tests {
             access_list: AccessList(vec![
                 AccessListItem {
                     address: Address::ZERO,
-                    storage_keys: vec![B256::ZERO],
+                    storage_keys: vec![U256::ZERO],
                 },
                 AccessListItem {
                     address: Address::ZERO,
-                    storage_keys: vec![B256::ZERO],
+                    storage_keys: vec![U256::ZERO],
                 },
             ]),
             gas_used: U256::from(100),
