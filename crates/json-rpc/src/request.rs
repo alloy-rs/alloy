@@ -155,8 +155,8 @@ impl SerializedRequest {
         &self.request
     }
 
-    /// Consumes the serialized request, returning the underlying [`RawValue`]
-    /// and the [`RequestMeta`].
+    /// Consumes the serialized request, returning the underlying
+    /// [`RequestMeta`] and the [`RawValue`].
     pub fn decompose(self) -> (RequestMeta, Box<RawValue>) {
         (self.meta, self.request)
     }
