@@ -19,7 +19,9 @@ pub struct AccessList(pub Vec<AccessListItem>);
 impl AccessList {
     /// Converts the list into a vec, expected by revm
     pub fn flattened(&self) -> Vec<(Address, Vec<U256>)> {
-        self.flatten().collect()
+        self.flatten()
+            .map(|(addr, keys)| (addr, keys.to_vec()))
+            .collect()
     }
 
     /// Consumes the type and converts the list into a vec, expected by revm
@@ -35,10 +37,10 @@ impl AccessList {
     }
 
     /// Returns an iterator over the list's addresses and storage keys.
-    pub fn flatten(&self) -> impl Iterator<Item = (Address, Vec<U256>)> + '_ {
+    pub fn flatten(&self) -> impl Iterator<Item = (Address, &[U256])> + '_ {
         self.0
             .iter()
-            .map(|item| (item.address, item.storage_keys.clone()))
+            .map(|item| (item.address, item.storage_keys.as_slice()))
     }
 }
 
