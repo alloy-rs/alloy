@@ -54,11 +54,13 @@ impl<T> RpcClient<T> {
     }
 
     /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub fn connect<C: TransportConnect<Transport = T>>(connect: C) -> Result<Self, TransportError>
+    pub async fn connect<C: TransportConnect<Transport = T>>(
+        connect: C,
+    ) -> Result<Self, TransportError>
     where
         C: Transport,
     {
-        connect.connect()
+        connect.connect().await
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -228,32 +230,32 @@ impl<L> ClientBuilder<L> {
 
     /// Connect a transport, producing an [`RpcClient`] with the provided
     /// connection.
-    pub fn connect<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
+    pub async fn connect<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
     where
         C: TransportConnect,
         L: Layer<C::Transport>,
         L::Service: Transport,
     {
-        let transport = connect.get_transport()?;
+        let transport = connect.get_transport().await?;
         Ok(self.transport(transport, connect.is_local()))
     }
 
     /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
     /// connection.
-    pub fn connect_boxed<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
+    pub async fn connect_boxed<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
     where
         C: BoxTransportConnect,
         L: Layer<BoxTransport>,
         L::Service: Transport,
     {
-        let transport = connect.to_boxed_transport()?;
+        let transport = connect.get_boxed_transport().await?;
         Ok(self.transport(transport, connect.is_local()))
     }
 }
 
 #[cfg(all(test, feature = "reqwest"))]
 mod test {
-    use crate::{pubsub::PubSubFrontend, transports::Http, BoxPubSub};
+    use crate::{pubsub::PubSubFrontend, transports::Http};
 
     use super::RpcClient;
 

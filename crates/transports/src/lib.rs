@@ -14,10 +14,12 @@ mod error;
 pub use error::TransportError;
 
 mod pubsub;
-pub use pubsub::{BoxPubSub, ConnectionHandle, ConnectionInterface, PubSub};
+pub use pubsub::{BoxPubSub, PubSub};
 
 mod transports;
-pub use transports::{BoxTransport, BoxTransportConnect, Http, Transport, TransportConnect};
+pub use transports::{
+    BoxTransport, BoxTransportConnect, Http, Transport, TransportConnect, WsBackend, WsConnect,
+};
 
 pub use alloy_json_rpc::RpcResult;
 
@@ -31,6 +33,9 @@ mod type_aliases {
     use serde_json::value::RawValue;
 
     use crate::TransportError;
+
+    pub type Pbf<'a, T, E> =
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>>;
 
     /// Future for Transport-level requests.
     pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =
@@ -48,6 +53,9 @@ mod type_aliases {
     use serde_json::value::RawValue;
 
     use crate::TransportError;
+
+    pub type Pbf<'a, T, E> =
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'a>>;
 
     /// Future for Transport-level requests.
     pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =

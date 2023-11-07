@@ -32,6 +32,7 @@ alloy-primitives.workspace = true
 bimap = "0.6.3"
 tracing = "0.1.40"
 futures = "0.3.29"
+http = "0.2.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
 version = "0.14.27"
@@ -44,9 +45,10 @@ features = ["sync", "rt"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4.37"
+ws_stream_wasm = "0.7.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio-tungstenite = "0.20.1"
+tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"]}
 
 
 [features]

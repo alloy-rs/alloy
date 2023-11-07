@@ -34,7 +34,7 @@ impl Eq for ActiveSubscription {}
 
 impl PartialOrd for ActiveSubscription {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 

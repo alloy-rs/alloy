@@ -4,7 +4,7 @@ mod hyper;
 #[cfg(feature = "reqwest")]
 mod reqwest;
 
-use crate::client::RpcClient;
+use crate::{client::RpcClient, utils::guess_local_url};
 
 use std::{str::FromStr, sync::atomic::AtomicU64};
 use url::Url;
@@ -57,9 +57,7 @@ impl<T> Http<T> {
     /// possible. It simply returns `true` if the connection has no hostname,
     /// or the hostname is `localhost` or `127.0.0.1`.
     pub fn guess_local(&self) -> bool {
-        self.url
-            .host_str()
-            .map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+        guess_local_url(&self.url)
     }
 
     /// Get a reference to the client.

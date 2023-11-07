@@ -1,10 +1,7 @@
 use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
-use tokio::{
-    sync::{broadcast, oneshot},
-    task::JoinHandle,
-};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
     pubsub::{
@@ -12,14 +9,16 @@ use crate::{
         ix::PubSubInstruction,
         managers::{InFlight, RequestManager, SubscriptionManager},
     },
-    utils::to_json_raw_value,
-    TransportConnect, TransportError,
+    utils::{to_json_raw_value, Spawnable},
+    TransportError,
 };
+
+use super::{PubSubConnect, PubSubFrontend};
 
 #[derive(Debug)]
 /// The service contains the backend handle, a subscription manager, and the
 /// configuration details required to reconnect.
-pub struct PubSubService<T> {
+pub(crate) struct PubSubService<T> {
     /// The backend handle.
     pub(crate) handle: ConnectionHandle,
 
@@ -27,7 +26,7 @@ pub struct PubSubService<T> {
     pub(crate) connector: T,
 
     /// The inbound requests.
-    pub(crate) reqs: tokio::sync::mpsc::UnboundedReceiver<PubSubInstruction>,
+    pub(crate) reqs: mpsc::UnboundedReceiver<PubSubInstruction>,
 
     /// The subscription manager.
     pub(crate) subs: SubscriptionManager,
@@ -38,18 +37,34 @@ pub struct PubSubService<T> {
 
 impl<T> PubSubService<T>
 where
-    T: TransportConnect<Transport = ConnectionHandle>,
+    T: PubSubConnect,
 {
+    /// Create a new service from a connector.
+    pub(crate) async fn connect(connector: T) -> Result<PubSubFrontend, TransportError> {
+        let handle = connector.connect().await?;
+
+        let (tx, reqs) = mpsc::unbounded_channel();
+        let this = Self {
+            handle,
+            connector,
+            reqs,
+            subs: Default::default(),
+            in_flights: Default::default(),
+        };
+        this.spawn();
+        Ok(PubSubFrontend::new(tx))
+    }
+
     /// Reconnect by dropping the backend and creating a new one.
     async fn get_new_backend(&mut self) -> Result<ConnectionHandle, TransportError> {
-        let mut handle = self.connector.try_reconnect()?;
+        let mut handle = self.connector.try_reconnect().await?;
         std::mem::swap(&mut self.handle, &mut handle);
         Ok(handle)
     }
 
     /// Reconnect the backend, re-issue pending requests, and re-start active
     /// subscriptions.
-    pub async fn reconnect(&mut self) -> Result<(), TransportError> {
+    async fn reconnect(&mut self) -> Result<(), TransportError> {
         tracing::info!("Reconnecting pubsub service backend.");
 
         let mut old_handle = self
@@ -198,8 +213,8 @@ where
     }
 
     /// Spawn the service.
-    pub fn spawn(mut self) -> JoinHandle<()> {
-        tokio::spawn(async move {
+    pub fn spawn(mut self) {
+        let fut = async move {
             let result: Result<(), TransportError> = loop {
                 // We bias the loop so that we always handle new messages before
                 // reconnecting, and always reconnect before dispatching new
@@ -240,6 +255,7 @@ where
             if let Err(err) = result {
                 tracing::error!(%err, "pubsub service reconnection error");
             }
-        })
+        };
+        fut.spawn_task();
     }
 }

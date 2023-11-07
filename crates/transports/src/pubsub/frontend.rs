@@ -8,7 +8,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{
     pubsub::{ix::PubSubInstruction, managers::InFlight},
-    TransportError,
+    TransportError, TransportFut,
 };
 
 #[derive(Debug, Clone)]
@@ -81,7 +81,7 @@ impl PubSubFrontend {
 impl tower::Service<RequestPacket> for PubSubFrontend {
     type Response = ResponsePacket;
     type Error = TransportError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = TransportFut<'static>;
 
     #[inline]
     fn poll_ready(

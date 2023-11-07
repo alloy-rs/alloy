@@ -170,7 +170,7 @@ impl SerializedRequest {
     ///
     /// This partially deserializes the request, and should be avoided if
     /// possible.
-    pub fn params<'a>(&'a self) -> Option<&'a RawValue> {
+    pub fn params(&self) -> Option<&RawValue> {
         #[derive(Deserialize)]
         struct Req<'a> {
             #[serde(borrow)]

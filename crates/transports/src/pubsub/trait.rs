@@ -1,6 +1,6 @@
 use crate::{Transport, TransportError, TransportFut};
 
-use alloy_json_rpc::{Id, RequestPacket, Response, ResponsePacket};
+use alloy_json_rpc::{Id, RequestPacket, ResponsePacket};
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
 use tokio::sync::broadcast;

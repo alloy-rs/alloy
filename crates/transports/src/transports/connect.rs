@@ -1,4 +1,4 @@
-use crate::{BoxTransport, RpcClient, Transport, TransportError};
+use crate::{BoxTransport, Pbf, RpcClient, Transport, TransportError};
 
 /// Connection details for a transport.
 ///
@@ -17,25 +17,19 @@ pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// The transport type that is returned by `connect`.
     type Transport: Transport + Clone;
 
-    /// Returns `true`` if the transport is a local transport.
+    /// Returns `true`` if the transport connects to a local resource.
     fn is_local(&self) -> bool;
 
     /// Connect to the transport, returning a `Transport` instance.
-    fn get_transport(&self) -> Result<Self::Transport, TransportError>;
-
-    /// Attempt to reconnect the transport.
-    ///
-    /// Override this to add custom reconnection logic to your connector. This
-    /// will be used by PubSub connection managers in the event the connection
-    /// fails.
-    fn try_reconnect(&self) -> Result<Self::Transport, TransportError> {
-        self.get_transport()
-    }
+    fn get_transport<'a: 'b, 'b>(&self) -> Pbf<'b, Self::Transport, TransportError>;
 
     /// Connect to the transport, wrapping it into a `RpcClient` instance.
-    fn connect(&self) -> Result<RpcClient<Self::Transport>, TransportError> {
-        self.get_transport()
-            .map(|t| RpcClient::new(t, self.is_local()))
+    fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, RpcClient<Self::Transport>, TransportError> {
+        Box::pin(async move {
+            self.get_transport()
+                .await
+                .map(|t| RpcClient::new(t, self.is_local()))
+        })
     }
 }
 
@@ -54,10 +48,10 @@ pub trait BoxTransportConnect {
     fn is_local(&self) -> bool;
 
     /// Connect to a transport, and box it.
-    fn to_boxed_transport(&self) -> Result<BoxTransport, TransportError>;
+    fn get_boxed_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, BoxTransport, TransportError>;
 
     /// Connect to a transport, and box it, wrapping it into a `RpcClient`.
-    fn connect_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError>;
+    fn connect_boxed<'a: 'b, 'b>(&'a self) -> Pbf<'b, RpcClient<BoxTransport>, TransportError>;
 }
 
 impl<T> BoxTransportConnect for T
@@ -68,13 +62,16 @@ where
         TransportConnect::is_local(self)
     }
 
-    fn to_boxed_transport(&self) -> Result<BoxTransport, TransportError> {
-        self.get_transport().map(Transport::boxed)
+    fn get_boxed_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, BoxTransport, TransportError> {
+        Box::pin(async move { self.get_transport().await.map(Transport::boxed) })
     }
 
-    fn connect_boxed(&self) -> Result<RpcClient<BoxTransport>, TransportError> {
-        self.to_boxed_transport()
-            .map(|boxed| RpcClient::new(boxed, self.is_local()))
+    fn connect_boxed<'a: 'b, 'b>(&'a self) -> Pbf<'b, RpcClient<BoxTransport>, TransportError> {
+        Box::pin(async move {
+            self.get_boxed_transport()
+                .await
+                .map(|boxed| RpcClient::new(boxed, self.is_local()))
+        })
     }
 }
 

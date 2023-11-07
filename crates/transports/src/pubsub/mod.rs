@@ -24,15 +24,19 @@
 //!   the precise connection details, and for spawning the **backend** task.
 //!   Users should ALWAYS call [`PubSubConnect::into_service`] to get a running
 //!   service with a running backend.
-//! - [ConnectionHandle]: A handle to a running **backend**. This type is
+//! - [`ConnectionHandle`]: A handle to a running **backend**. This type is
 //!   returned by [PubSubConnect::connect], and owned by the **service**.
 //!   Dropping the handle will shut down the **backend**.
-//! - [ConnectionInterface]: The reciprocal of [ConnectionHandle]. This type is
-//!   owned by the **backend**, and is used to communicate with the **service**.
-//!   Dropping the interface will notify the **service** of a terminal error.
-//! - [PubSubFrontend]: The **frontend**. A handle to a running PubSub
+//! - [`ConnectionInterface`]: The reciprocal of [ConnectionHandle]. This type
+//!   is owned by the **backend**, and is used to communicate with the
+//!   **service**. Dropping the interface will notify the **service** of a
+//!   terminal error.
+//! - [`PubSubFrontend`]: The **frontend**. A handle to a running PubSub
 //!   **service**. It is used to issue requests and subscription lifecycle
 //!   instructions to the **service**.
+
+mod connect;
+pub use connect::PubSubConnect;
 
 mod frontend;
 pub use frontend::PubSubFrontend;
@@ -40,11 +44,11 @@ pub use frontend::PubSubFrontend;
 mod ix;
 
 mod handle;
+pub use handle::{ConnectionHandle, ConnectionInterface};
 
 mod managers;
 
 mod service;
-pub use handle::{ConnectionHandle, ConnectionInterface};
 
 mod r#trait;
 pub use r#trait::{BoxPubSub, PubSub};
