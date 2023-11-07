@@ -53,7 +53,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the last block number available.
-    pub async fn get_block_number(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    pub async fn get_block_number(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
@@ -464,7 +464,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
-        assert_eq!(U256::ZERO, num)
+        assert_eq!(U64::ZERO, num)
     }
 
     #[tokio::test]
