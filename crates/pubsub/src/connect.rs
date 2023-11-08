@@ -14,7 +14,7 @@ pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// This function MUST create a long-lived task containing a
     /// [`ConnectionInterface`], and return the corresponding handle.
     ///
-    /// [`ConnectionInterface`]: crate::pubsub::ConnectionInterface
+    /// [`ConnectionInterface`]: crate::ConnectionInterface
     fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, ConnectionHandle, TransportError>;
 
     /// Attempt to reconnect the transport.

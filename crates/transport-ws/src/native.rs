@@ -51,10 +51,9 @@ impl WsBackend<TungsteniteStream> {
             tokio::pin!(keepalive);
             loop {
                 // We bias the loop as follows
-                // 1. Shutdown channels.
-                // 2. New dispatch to server.
-                // 3. Keepalive.
-                // 4. Response or notification from server.
+                // 1. New dispatch to server.
+                // 2. Keepalive.
+                // 3. Response or notification from server.
                 // This ensures that keepalive is sent only if no other messages
                 // have been sent in the last 10 seconds. And prioritizes new
                 // dispatches over responses from the server. This will fail if

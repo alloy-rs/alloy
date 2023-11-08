@@ -55,15 +55,6 @@ impl ConnectionHandle {
 }
 
 /// The reciprocal of [`ConnectionHandle`].
-///
-/// [`ConnectionInterface`] implements [`Stream`] for receiving requests from
-/// the frontend. The [`Stream`] implementation will return `None` permanently
-/// when the shutdown channel from the frontend has resolved.
-///
-///  It sends responses to the frontend via the `send_to_frontend`
-/// method. It also notifies the frontend of a terminal error via the `error`
-/// channel.
-
 pub struct ConnectionInterface {
     /// Inbound channel from frontend.
     pub(crate) from_frontend: mpsc::UnboundedReceiver<Box<RawValue>>,
@@ -87,7 +78,9 @@ impl ConnectionInterface {
         self.to_frontend.send(item)
     }
 
-    /// Receive a request from the frontend.
+    /// Receive a request from the frontend. Ensures that if the frontend has
+    /// dropped or issued a shutdown instruction, the backend sees no more
+    /// requests.
     pub async fn recv_from_frontend(&mut self) -> Option<Box<RawValue>> {
         match self.shutdown.try_recv() {
             Ok(_) => return None,

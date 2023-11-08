@@ -6,7 +6,7 @@ use crate::{Transport, TransportError, TransportFut};
 
 /// A boxed, Clone-able [`Transport`] trait object.
 ///
-/// This type allows [`RpcClient`] to use a type-erased transport. It is
+/// This type allows RPC clients to use a type-erased transport. It is
 /// [`Clone`] and [`Send`] + [`Sync`], and implementes [`Transport`]. This
 /// allows for complex behavior abstracting across several different clients
 /// with different transport types.

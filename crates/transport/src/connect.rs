@@ -8,7 +8,7 @@ use crate::{BoxTransport, Pbf, Transport, TransportError};
 /// ## Why implement `TransportConnect`?
 ///
 /// Users may want to implement transport-connect for the following reasons:
-/// - You want to customize a [`reqwest::Client`] before using it.
+/// - You want to customize a `reqwest::Client` before using it.
 /// - You need to provide special authentication information to a remote
 ///   provider.
 /// - You have implemented a custom [`Transport`].

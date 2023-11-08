@@ -17,7 +17,7 @@ use tracing::{debug, error, trace};
 /// Users should NEVER instantiate a backend directly. Instead, they should use
 /// [`PubSubConnect`] to get a running service with a running backend.
 ///
-/// [`PubSubConnect`]: crate::PubSubConnect
+/// [`PubSubConnect`]: alloy_pubsub::PubSubConnect
 pub struct WsBackend<T> {
     pub(crate) socket: T,
 
