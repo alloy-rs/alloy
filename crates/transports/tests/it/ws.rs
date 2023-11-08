@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 #[test_log::test(tokio::test)]
 async fn it_makes_a_request() {
-    let infura = std::env::var("INFURA_WS").unwrap();
+    let infura = std::env::var("WS_PROVIDER_URL").unwrap();
 
     let connector = WsConnect {
         url: infura.parse().unwrap(),
