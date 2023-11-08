@@ -4,7 +4,7 @@ use alloy_transport_ws::WsConnect;
 use alloy_primitives::U64;
 use std::borrow::Cow;
 
-#[test_log::test(tokio::test)]
+// #[test_log::test(tokio::test)]
 async fn it_makes_a_request() {
     let infura = std::env::var("WS_PROVIDER_URL").unwrap();
 

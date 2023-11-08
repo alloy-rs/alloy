@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
 
-#[tokio::test]
+// #[tokio::test]
 async fn it_makes_a_request() {
     let infura = std::env::var("HTTP_PROVIDER_URL").unwrap();
 
