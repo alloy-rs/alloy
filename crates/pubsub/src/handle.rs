@@ -1,9 +1,9 @@
-use std::task::Poll;
-
 use alloy_json_rpc::PubSubItem;
-use futures::{FutureExt, Stream};
 use serde_json::value::RawValue;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{
+    mpsc,
+    oneshot::{self, error::TryRecvError},
+};
 
 #[derive(Debug)]
 /// A handle to a backend. Communicates to a `ConnectionInterface` on the
@@ -44,7 +44,6 @@ impl ConnectionHandle {
             to_frontend,
             error: error_tx,
             shutdown: shutdown_rx,
-            dead: false,
         };
         (handle, interface)
     }
@@ -77,9 +76,6 @@ pub struct ConnectionInterface {
 
     /// Causes local shutdown when sender is triggered or dropped.
     pub(crate) shutdown: oneshot::Receiver<()>,
-
-    /// True when the shutdown command has been received
-    dead: bool,
 }
 
 impl ConnectionInterface {
@@ -93,31 +89,21 @@ impl ConnectionInterface {
 
     /// Receive a request from the frontend.
     pub async fn recv_from_frontend(&mut self) -> Option<Box<RawValue>> {
+        match self.shutdown.try_recv() {
+            Ok(_) => return None,
+            Err(TryRecvError::Closed) => return None,
+            Err(TryRecvError::Empty) => {}
+        }
+
+        if self.shutdown.try_recv().is_ok() {
+            return None;
+        }
+
         self.from_frontend.recv().await
     }
 
     /// Close the interface, sending an error to the frontend.
     pub fn close_with_error(self) {
         let _ = self.error.send(());
-    }
-}
-
-impl Stream for ConnectionInterface {
-    type Item = Box<RawValue>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        if self.dead {
-            return Poll::Ready(None);
-        }
-
-        if self.shutdown.poll_unpin(cx).is_ready() {
-            self.dead = true;
-            return Poll::Ready(None);
-        }
-
-        self.from_frontend.poll_recv(cx)
     }
 }

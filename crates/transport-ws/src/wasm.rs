@@ -1,5 +1,5 @@
 use super::WsBackend;
-use crate::utils::Spawnable;
+use alloy_transport::utils::Spawnable;
 
 use futures::{
     sink::SinkExt,
@@ -42,15 +42,10 @@ impl WsBackend<Fuse<WsStream>> {
                 // probably not a big deal.
                 tokio::select! {
                     biased;
-                    // break on shutdown recv, or on shutdown recv error
-                    _ = &mut self.interface.shutdown => {
-                        self.interface.from_frontend.close();
-                        break
-                    },
                     // we've received a new dispatch, so we send it via
                     // websocket. We handle new work before processing any
                     // responses from the server.
-                    inst = self.interface.from_frontend.recv() => {
+                    inst = self.interface.recv_from_frontend() => {
                         match inst {
                             Some(msg) => {
                                 if let Err(e) = self.send(msg).await {
@@ -81,7 +76,7 @@ impl WsBackend<Fuse<WsStream>> {
                 }
             }
             if err {
-                let _ = self.interface.error.send(());
+                self.interface.close_with_error();
             }
         };
         fut.spawn_task();
