@@ -12,11 +12,7 @@ async fn it_makes_a_request() {
         auth: None,
     };
 
-    dbg!("have connector");
-
     let client = ClientBuilder::default().connect(connector).await.unwrap();
-
-    dbg!("have client");
 
     let params: Cow<'static, _> = Cow::Owned(());
 
