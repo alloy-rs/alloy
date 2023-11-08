@@ -20,8 +20,5 @@ async fn it_makes_a_request() {
 
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
 
-    let res = timeout.await;
-
-    dbg!(&res);
-    res.unwrap().unwrap();
+    timeout.await.unwrap().unwrap();
 }
