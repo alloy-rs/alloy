@@ -4,7 +4,7 @@ use serde::{
     Deserialize, Serialize,
 };
 
-use crate::Response;
+use crate::{Response, ResponsePayload};
 
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.
@@ -85,13 +85,14 @@ impl<'de> Deserialize<'de> for PubSubItem {
                         ));
                     }
 
-                    let payload = if error.is_some() {
-                        crate::ResponsePayload::Failure(error.unwrap())
+                    let payload = if let Some(error) = error {
+                        ResponsePayload::Failure(error)
+                    } else if let Some(result) = result {
+                        ResponsePayload::Success(result)
                     } else {
-                        if result.is_none() {
-                            return Err(serde::de::Error::missing_field("result"));
-                        }
-                        crate::ResponsePayload::Success(result.unwrap())
+                        return Err(serde::de::Error::custom(
+                            "missing `result` or `error` field in response",
+                        ));
                     };
                     Ok(PubSubItem::Response(Response { id, payload }))
                 } else {
