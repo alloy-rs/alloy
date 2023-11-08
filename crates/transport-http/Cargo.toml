@@ -1,5 +1,5 @@
 [package]
-name = "alloy-networks"
+name = "alloy-transport-http"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,12 +8,26 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-json-rpc.workspace = true
-alloy-primitives.workspace = true
-alloy-rlp.workspace = true
 alloy-transport.workspace = true
-pin-project.workspace = true
+
+url.workspace = true
+serde_json.workspace = true
 tower.workspace = true
+
+reqwest = { workspace = true, features = ["serde_json", "json"], optional = true }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
+version = "0.14.27"
+optional = true
+features = ["full"]
+
+[features]
+default = ["reqwest"]
+reqwest = ["dep:reqwest"]
+hyper = ["dep:hyper"]

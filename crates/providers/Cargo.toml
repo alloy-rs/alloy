@@ -15,8 +15,11 @@ exclude.workspace = true
 alloy-json-rpc.workspace = true
 alloy-networks.workspace = true
 alloy-primitives.workspace = true
-alloy-transports.workspace = true
+alloy-transport.workspace = true
+alloy-transport-http.workspace = true
 alloy-rpc-types.workspace = true
+alloy-rpc-client.workspace = true
+
 async-trait = "0.1.73"
 futures-util = "0.3.28"
 serde_json = { workspace = true, features = ["raw_value"] }

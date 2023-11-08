@@ -1,5 +1,5 @@
 [package]
-name = "alloy-networks"
+name = "alloy-transport"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,12 +8,20 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-json-rpc.workspace = true
+
 alloy-primitives.workspace = true
-alloy-rlp.workspace = true
-alloy-transport.workspace = true
-pin-project.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["raw_value"] }
+thiserror.workspace = true
+url.workspace = true
+tokio.workspace = true
 tower.workspace = true
+tracing.workspace = true
+
+base64 = "0.21.0"
+

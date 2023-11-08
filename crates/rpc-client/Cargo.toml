@@ -1,0 +1,41 @@
+[package]
+name = "alloy-rpc-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alloy-json-rpc.workspace = true
+alloy-transport.workspace = true
+alloy-transport-http.workspace = true
+
+alloy-primitives.workspace = true
+
+futures.workspace = true
+pin-project.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+tower.workspace = true
+
+reqwest = { workspace = true, optional = true }
+alloy-pubsub = { workspace = true, optional = true }
+alloy-transport-ws = { workspace = true, optional = true }
+
+[dev-dependencies]
+alloy-transport-ws.workspace = true
+test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
+tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
+
+[features]
+default = ["reqwest", "ws"]
+reqwest = ["dep:reqwest"]
+pubsub = ["dep:alloy-pubsub"]
+ws = ["pubsub", "dep:alloy-transport-ws"]

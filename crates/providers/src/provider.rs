@@ -1,11 +1,13 @@
 //! Alloy main Provider abstraction.
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256, U64};
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
 };
-use alloy_transports::{BoxTransport, Http, RpcClient, RpcResult, Transport, TransportError};
+use alloy_transport::{BoxTransport, RpcResult, Transport, TransportError};
+use alloy_transport_http::Http;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -422,7 +424,9 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 // HTTP Transport Provider implementation
 impl Provider<Http<Client>> {
     pub fn new(url: &str) -> Result<Self, ClientError> {
-        let inner: RpcClient<Http<Client>> = url.parse().map_err(|_e| ClientError::ParseError)?;
+        let url = url.parse().map_err(|_e| ClientError::ParseError)?;
+        let inner = ClientBuilder::default().reqwest_http(url);
+
         Ok(Self { inner, from: None })
     }
 }
