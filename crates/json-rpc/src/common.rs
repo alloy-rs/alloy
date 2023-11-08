@@ -23,8 +23,11 @@ use serde::{de::Visitor, Deserialize, Serialize};
 /// [`HashSet`]: std::collections::HashSet
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Id {
+    /// A number.
     Number(u64),
+    /// A string.
     String(String),
+    /// Null.
     None,
 }
 
@@ -48,7 +51,7 @@ impl<'de> Deserialize<'de> for Id {
         impl<'de> Visitor<'de> for IdVisitor {
             type Value = Id;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(formatter, "a string, a number, or null")
             }
 

@@ -16,12 +16,12 @@ pub(crate) struct SubscriptionManager {
 
 impl SubscriptionManager {
     /// Get an iterator over the subscriptions.
-    pub fn iter(&self) -> impl Iterator<Item = (&B256, &ActiveSubscription)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&B256, &ActiveSubscription)> {
         self.local_to_sub.iter()
     }
 
     /// Get the number of subscriptions.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.local_to_sub.len()
     }
 
@@ -39,7 +39,7 @@ impl SubscriptionManager {
     }
 
     /// Insert or update the server_id for a subscription.
-    pub fn upsert(
+    pub(crate) fn upsert(
         &mut self,
         request: SerializedRequest,
         server_id: U256,
@@ -57,12 +57,12 @@ impl SubscriptionManager {
     }
 
     /// De-alias an alias, getting the original ID.
-    pub fn local_id_for(&self, server_id: U256) -> Option<B256> {
+    pub(crate) fn local_id_for(&self, server_id: U256) -> Option<B256> {
         self.local_to_server.get_by_right(&server_id).copied()
     }
 
     /// Drop all server_ids.
-    pub fn drop_server_ids(&mut self) {
+    pub(crate) fn drop_server_ids(&mut self) {
         self.local_to_server.clear();
     }
 
@@ -72,7 +72,7 @@ impl SubscriptionManager {
     }
 
     /// Remove a subscription by its local_id.
-    pub fn remove_sub(&mut self, local_id: B256) {
+    pub(crate) fn remove_sub(&mut self, local_id: B256) {
         let _ = self.local_to_sub.remove_by_left(&local_id);
         let _ = self.local_to_server.remove_by_left(&local_id);
     }
@@ -80,7 +80,7 @@ impl SubscriptionManager {
     /// Notify the subscription channel of a new value, if the sub is known,
     /// and if any receiver exists. If the sub id is unknown, or no receiver
     /// exists, the notification is dropped.
-    pub fn notify(&mut self, notification: EthNotification) {
+    pub(crate) fn notify(&mut self, notification: EthNotification) {
         if let Some(local_id) = self.local_id_for(notification.subscription) {
             if let Some((_, mut sub)) = self.local_to_sub.remove_by_left(&local_id) {
                 sub.notify(notification.result);
@@ -90,7 +90,7 @@ impl SubscriptionManager {
     }
 
     /// Get a receiver for a subscription.
-    pub fn get_rx(&self, local_id: B256) -> Option<broadcast::Receiver<Box<RawValue>>> {
+    pub(crate) fn get_rx(&self, local_id: B256) -> Option<broadcast::Receiver<Box<RawValue>>> {
         let sub = self.local_to_sub.get_by_left(&local_id)?;
         Some(sub.tx.subscribe())
     }

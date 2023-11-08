@@ -55,6 +55,7 @@ impl ConnectionHandle {
 }
 
 /// The reciprocal of [`ConnectionHandle`].
+#[derive(Debug)]
 pub struct ConnectionInterface {
     /// Inbound channel from frontend.
     pub(crate) from_frontend: mpsc::UnboundedReceiver<Box<RawValue>>,

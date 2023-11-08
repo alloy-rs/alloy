@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, oneshot};
 use crate::managers::InFlight;
 
 /// Instructions for the pubsub service.
-pub enum PubSubInstruction {
+pub(crate) enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
     /// Get the subscription ID for a local ID.

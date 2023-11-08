@@ -21,7 +21,9 @@ use crate::common::Id;
 /// mirrored from the response.
 #[derive(Debug, Clone)]
 pub struct Response<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
+    /// The ID of the request that this response is responding to.
     pub id: Id,
+    /// The response payload.
     pub payload: ResponsePayload<Payload, ErrData>,
 }
 
@@ -149,7 +151,7 @@ where
                 impl<'de> serde::de::Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                         formatter.write_str("`result`, `error` and `id`")
                     }
 
@@ -178,7 +180,7 @@ where
         {
             type Value = Response<Payload, ErrData>;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str(
                     "a JSON-RPC response object, consisting of either a result or an error",
                 )
@@ -243,7 +245,7 @@ where
 #[cfg(test)]
 mod test {
     #[test]
-    pub fn deser_success() {
+    fn deser_success() {
         let response = r#"{
             "jsonrpc": "2.0",
             "result": "california",
@@ -258,7 +260,7 @@ mod test {
     }
 
     #[test]
-    pub fn deser_err() {
+    fn deser_err() {
         let response = r#"{
             "jsonrpc": "2.0",
             "error": {
@@ -276,7 +278,7 @@ mod test {
     }
 
     #[test]
-    pub fn deser_complex_success() {
+    fn deser_complex_success() {
         let response = r#"{
             "result": {
                 "name": "california",

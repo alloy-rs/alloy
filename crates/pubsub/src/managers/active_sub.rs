@@ -9,11 +9,11 @@ use tokio::sync::broadcast;
 /// An active subscription.
 pub(crate) struct ActiveSubscription {
     /// Cached hash of the request, used for sorting and equality.
-    pub local_id: B256,
+    pub(crate) local_id: B256,
     /// The serialized subscription request.
-    pub request: SerializedRequest,
+    pub(crate) request: SerializedRequest,
     /// The channel via which notifications are broadcast.
-    pub tx: broadcast::Sender<Box<RawValue>>,
+    pub(crate) tx: broadcast::Sender<Box<RawValue>>,
 }
 
 // NB: We implement this to prevent any incorrect future implementations.
@@ -57,7 +57,7 @@ impl std::fmt::Debug for ActiveSubscription {
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub fn new(request: SerializedRequest) -> (Self, broadcast::Receiver<Box<RawValue>>) {
+    pub(crate) fn new(request: SerializedRequest) -> (Self, broadcast::Receiver<Box<RawValue>>) {
         let local_id = request.params_hash();
         let (tx, rx) = broadcast::channel(16);
         (
@@ -73,13 +73,13 @@ impl ActiveSubscription {
     /// Serialize the request as a boxed [`RawValue`].
     ///
     /// This is used to (re-)send the request over the transport.
-    pub fn request(&self) -> &SerializedRequest {
+    pub(crate) fn request(&self) -> &SerializedRequest {
         &self.request
     }
 
     /// Notify the subscription channel of a new value, if any receiver exists.
     /// If no receiver exists, the notification is dropped.
-    pub fn notify(&mut self, notification: Box<RawValue>) {
+    pub(crate) fn notify(&mut self, notification: Box<RawValue>) {
         if self.tx.receiver_count() > 0 {
             let _ = self.tx.send(notification);
         }

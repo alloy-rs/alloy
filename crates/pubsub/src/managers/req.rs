@@ -6,23 +6,23 @@ use crate::managers::InFlight;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]
-pub struct RequestManager {
+pub(crate) struct RequestManager {
     reqs: BTreeMap<Id, InFlight>,
 }
 
 impl RequestManager {
     /// Get the number of in-flight requests.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.reqs.len()
     }
 
     /// Get an iterator over the in-flight requests.
-    pub fn iter(&self) -> impl Iterator<Item = (&Id, &InFlight)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Id, &InFlight)> {
         self.reqs.iter()
     }
 
     /// Insert a new in-flight request.
-    pub fn insert(&mut self, in_flight: InFlight) {
+    pub(crate) fn insert(&mut self, in_flight: InFlight) {
         self.reqs.insert(in_flight.request.id().clone(), in_flight);
     }
 
@@ -31,7 +31,7 @@ impl RequestManager {
     /// If the request created a new subscription, this function returns the
     /// subscription ID and the in-flight request for conversion to an
     /// `ActiveSubscription`.
-    pub fn handle_response(&mut self, resp: Response) -> Option<(U256, InFlight)> {
+    pub(crate) fn handle_response(&mut self, resp: Response) -> Option<(U256, InFlight)> {
         if let Some(in_flight) = self.reqs.remove(&resp.id) {
             return in_flight.fulfill(resp);
         }

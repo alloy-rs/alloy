@@ -9,7 +9,9 @@ use crate::{Id, Response, SerializedRequest};
 /// request.
 #[derive(Debug, Clone)]
 pub enum RequestPacket {
+    /// A single request.
     Single(SerializedRequest),
+    /// A batch of requests.
     Batch(Vec<SerializedRequest>),
 }
 
@@ -107,7 +109,9 @@ impl RequestPacket {
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
 #[derive(Debug, Clone)]
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
+    /// A single response.
     Single(Response<Payload, ErrData>),
+    /// A batch of responses.
     Batch(Vec<Response<Payload, ErrData>>),
 }
 
@@ -165,7 +169,7 @@ where
         {
             type Value = ResponsePacket<Payload, ErrData>;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a single response or a batch of responses")
             }
 

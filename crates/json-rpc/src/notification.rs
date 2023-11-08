@@ -10,7 +10,9 @@ use crate::{Response, ResponsePayload};
 /// notification.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
+    /// The subscription ID.
     pub subscription: U256,
+    /// The notification payload.
     pub result: T,
 }
 
@@ -19,7 +21,9 @@ pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
 /// transport may be a JSON-RPC response or an Ethereum-style notification.
 #[derive(Debug, Clone)]
 pub enum PubSubItem {
+    /// A [`Response`] to a JSON-RPC request.
     Response(Response),
+    /// An Ethereum-style notification.
     Notification(EthNotification),
 }
 
@@ -33,7 +37,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
         impl<'de> Visitor<'de> for PubSubItemVisitor {
             type Value = PubSubItem;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("a JSON-RPC response or an Ethereum-style notification")
             }
 

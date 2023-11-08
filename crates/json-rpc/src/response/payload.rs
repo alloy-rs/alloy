@@ -19,7 +19,9 @@ use crate::ErrorPayload;
 /// [`Response`]: crate::Response
 #[derive(Debug, Clone)]
 pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
+    /// A successful response payload.
     Success(Payload),
+    /// An error response payload.
     Failure(ErrorPayload<ErrData>),
 }
 

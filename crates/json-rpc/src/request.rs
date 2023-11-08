@@ -4,9 +4,12 @@ use alloy_primitives::{keccak256, B256};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
+/// `RequestMeta` contains the [`Id`] and method name of a request.
 #[derive(Debug, Clone)]
 pub struct RequestMeta {
+    /// The method name.
     pub method: &'static str,
+    /// The request ID.
     pub id: Id,
 }
 
@@ -21,7 +24,9 @@ pub struct RequestMeta {
 /// The value of `method` should be known at compile time.
 #[derive(Debug, Clone)]
 pub struct Request<Params> {
+    /// The request metadata (ID and method).
     pub meta: RequestMeta,
+    /// The request parameters.
     pub params: Params,
 }
 
@@ -177,7 +182,7 @@ impl SerializedRequest {
             params: Option<&'a RawValue>,
         }
 
-        let req: Req = serde_json::from_str(self.request.get()).unwrap();
+        let req: Req<'_> = serde_json::from_str(self.request.get()).unwrap();
         req.params
     }
 

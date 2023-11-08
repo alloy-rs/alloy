@@ -213,7 +213,7 @@ where
     }
 
     /// Spawn the service.
-    pub fn spawn(mut self) {
+    pub(crate) fn spawn(mut self) {
         let fut = async move {
             let result: Result<(), TransportError> = loop {
                 // We bias the loop so that we always handle new messages before

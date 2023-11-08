@@ -9,6 +9,10 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use crate::{ix::PubSubInstruction, managers::InFlight};
 use alloy_transport::{TransportError, TransportFut};
 
+/// A `PubSubFrontend` is [`Transport`] composed of a channel to a running
+/// PubSub service.
+///
+/// [`Transport`]: alloy_transport::Transport
 #[derive(Debug, Clone)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
