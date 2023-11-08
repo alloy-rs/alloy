@@ -1,8 +1,21 @@
-//! Alloy Transports
-//!
-//! ## Transport
-//!
-//!
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
+//! alloy-transports
+
 mod boxed;
 pub use boxed::BoxTransport;
 
@@ -20,6 +33,7 @@ pub use r#trait::Transport;
 
 pub use alloy_json_rpc::RpcResult;
 
+/// Misc. utilities for building transports.
 pub mod utils;
 
 pub use type_aliases::*;
@@ -31,6 +45,7 @@ mod type_aliases {
 
     use crate::TransportError;
 
+    /// Pin-boxed future.
     pub type Pbf<'a, T, E> =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>>;
 
@@ -51,6 +66,7 @@ mod type_aliases {
 
     use crate::TransportError;
 
+    /// Pin-boxed future.
     pub type Pbf<'a, T, E> =
         std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'a>>;
 

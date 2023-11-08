@@ -146,6 +146,7 @@ where
 /// requests with different `Param` types, while the `RpcCall` may do so lazily.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
+#[derive(Debug)]
 pub struct RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,

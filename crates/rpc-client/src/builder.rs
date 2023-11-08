@@ -16,6 +16,7 @@ use tower::{
 ///
 /// A builder accumulates Layers, and then is finished via the
 /// [`ClientBuilder::connect`] method, which produces an RPC client.
+#[derive(Debug)]
 pub struct ClientBuilder<L> {
     pub(crate) builder: ServiceBuilder<L>,
 }

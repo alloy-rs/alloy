@@ -35,9 +35,10 @@ pub struct BatchRequest<'a, T> {
 
 /// Awaits a single response for a request that has been included in a batch.
 #[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
+#[derive(Debug)]
 pub struct Waiter<Resp> {
     rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
-    _resp: PhantomData<Resp>,
+    _resp: PhantomData<fn() -> Resp>,
 }
 
 impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>>
@@ -71,6 +72,7 @@ where
 }
 
 #[pin_project::pin_project(project = CallStateProj)]
+#[derive(Debug)]
 pub enum BatchFuture<Conn>
 where
     Conn: Transport,
@@ -90,6 +92,7 @@ where
 }
 
 impl<'a, T> BatchRequest<'a, T> {
+    /// Create a new batch request.
     pub fn new(transport: &'a RpcClient<T>) -> Self {
         Self {
             transport,

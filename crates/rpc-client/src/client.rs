@@ -32,6 +32,7 @@ pub struct RpcClient<T> {
 }
 
 impl RpcClient<Identity> {
+    /// Create a new [`ClientBuilder`].
     pub fn builder() -> ClientBuilder<Identity> {
         ClientBuilder {
             builder: ServiceBuilder::new(),
@@ -167,7 +168,7 @@ mod pubsub_impl {
 impl<T> RpcClient<Http<T>> {
     /// Create a new [`BatchRequest`] builder.
     #[inline]
-    pub fn new_batch(&self) -> BatchRequest<Http<T>> {
+    pub fn new_batch(&self) -> BatchRequest<'_, Http<T>> {
         BatchRequest::new(self)
     }
 }

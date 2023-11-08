@@ -9,8 +9,10 @@ pub enum TransportError {
     /// SerdeJson (de)ser
     #[error("{err}")]
     SerdeJson {
+        /// The underlying serde_json error.
         #[source]
         err: serde_json::Error,
+        /// For deser errors, the text that failed to deserialize.
         text: Option<String>,
     },
 
