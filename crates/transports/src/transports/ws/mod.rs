@@ -10,7 +10,7 @@ pub use wasm::WsConnect;
 
 use crate::pubsub::ConnectionInterface;
 
-use tracing::{error, trace};
+use tracing::{debug, error, trace};
 
 /// An ongoing connection to a backend.
 ///
@@ -25,8 +25,9 @@ pub struct WsBackend<T> {
 }
 
 impl<T> WsBackend<T> {
+    #[tracing::instrument(skip(self))]
     pub async fn handle_text(&mut self, t: String) -> Result<(), ()> {
-        trace!(text = t, "Received message");
+        debug!(text = t, "Received message from websocket");
 
         match serde_json::from_str(&t) {
             Ok(item) => {

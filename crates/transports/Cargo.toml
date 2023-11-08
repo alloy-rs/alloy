@@ -55,3 +55,8 @@ tokio-tungstenite = { version = "0.20.1", features = ["rustls-tls-webpki-roots"]
 default = ["reqwest", "hyper"]
 reqwest = ["dep:reqwest"]
 hyper = ["dep:hyper", "hyper/client"]
+
+[dev-dependencies]
+test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
+tracing-subscriber = "0.3.17"
+tracing-test = "0.2.4"
