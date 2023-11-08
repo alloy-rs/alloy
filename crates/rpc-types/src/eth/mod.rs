@@ -10,6 +10,7 @@ pub mod raw_log;
 mod syncing;
 mod transaction;
 pub mod withdrawal;
+pub mod state;
 
 pub use block::*;
 pub use call::{Bundle, CallInput, CallInputError, CallRequest, EthCallResponse, StateContext};
