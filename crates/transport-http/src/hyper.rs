@@ -1,9 +1,10 @@
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
+use alloy_transport::{TransportError, TransportFut};
 use hyper::client::{connect::Connect, Client};
 use std::task;
 use tower::Service;
 
-use crate::{Http, TransportError, TransportFut};
+use crate::Http;
 
 impl<C> Http<Client<C>>
 where
@@ -23,10 +24,16 @@ where
                 .body(hyper::Body::from(ser.get().to_owned()))
                 .expect("request parts are valid");
 
-            let resp = this.client.request(req).await?;
+            let resp = this
+                .client
+                .request(req)
+                .await
+                .map_err(TransportError::custom)?;
 
             // unpack json from the response body
-            let body = hyper::body::to_bytes(resp.into_body()).await?;
+            let body = hyper::body::to_bytes(resp.into_body())
+                .await
+                .map_err(TransportError::custom)?;
 
             // Deser a Box<RawValue> from the body. If deser fails, return the
             // body as a string in the error. If the body is not UTF8, this will
