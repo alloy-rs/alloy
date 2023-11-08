@@ -113,7 +113,7 @@ impl Stream for ConnectionInterface {
             return Poll::Ready(None);
         }
 
-        if let Poll::Ready(_) = self.shutdown.poll_unpin(cx) {
+        if self.shutdown.poll_unpin(cx).is_ready() {
             self.dead = true;
             return Poll::Ready(None);
         }

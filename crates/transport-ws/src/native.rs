@@ -114,7 +114,7 @@ impl WsBackend<TungsteniteStream> {
                 }
             }
             if err {
-                let _ = self.interface.close_with_error();
+                self.interface.close_with_error();
             }
         };
         fut.spawn_task()
