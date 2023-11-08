@@ -544,12 +544,12 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         // Set the code
-        let addr = Address::with_last_byte(16);
+        let addr = alloy_primitives::Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
         let _code = provider
             .get_code_at(
                 addr,
-                BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
+                crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
             )
             .await
             .unwrap();
