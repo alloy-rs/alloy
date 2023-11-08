@@ -35,7 +35,7 @@ test-log = { version = "0.2.13", default-features = false, features = ["trace"] 
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 
 [features]
-default = ["reqwest", "ws"]
+default = ["reqwest"]
 reqwest = ["dep:reqwest"]
 pubsub = ["dep:alloy-pubsub"]
 ws = ["pubsub", "dep:alloy-transport-ws"]
