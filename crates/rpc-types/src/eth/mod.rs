@@ -7,6 +7,7 @@ mod filter;
 mod log;
 pub mod pubsub;
 pub mod raw_log;
+pub mod state;
 mod syncing;
 mod transaction;
 pub mod withdrawal;
