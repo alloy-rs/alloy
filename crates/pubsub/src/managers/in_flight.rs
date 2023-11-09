@@ -41,14 +41,14 @@ impl InFlight {
     }
 
     /// Get the method
-    pub(crate) fn method(&self) -> &'static str {
+    pub(crate) const fn method(&self) -> &'static str {
         self.request.method()
     }
 
     /// Get a reference to the serialized request.
     ///
     /// This is used to (re-)send the request over the transport.
-    pub(crate) fn request(&self) -> &SerializedRequest {
+    pub(crate) const fn request(&self) -> &SerializedRequest {
         &self.request
     }
 

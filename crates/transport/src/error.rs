@@ -32,7 +32,7 @@ pub enum TransportError {
 impl TransportError {
     /// Instantiate a new `TransportError` from a [`serde_json::Error`]. This
     /// should be called when the error occurs during serialization.
-    pub fn ser_err(err: serde_json::Error) -> Self {
+    pub const fn ser_err(err: serde_json::Error) -> Self {
         Self::SerdeJson { err, text: None }
     }
 

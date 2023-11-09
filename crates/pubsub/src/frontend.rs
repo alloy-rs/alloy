@@ -20,7 +20,7 @@ pub struct PubSubFrontend {
 
 impl PubSubFrontend {
     /// Create a new frontend.
-    pub(crate) fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
+    pub(crate) const fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
         Self { tx }
     }
 

@@ -73,7 +73,7 @@ impl ActiveSubscription {
     /// Serialize the request as a boxed [`RawValue`].
     ///
     /// This is used to (re-)send the request over the transport.
-    pub(crate) fn request(&self) -> &SerializedRequest {
+    pub(crate) const fn request(&self) -> &SerializedRequest {
         &self.request
     }
 

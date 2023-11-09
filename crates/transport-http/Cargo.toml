@@ -21,7 +21,6 @@ tower.workspace = true
 
 reqwest = { workspace = true, features = ["serde_json", "json"], optional = true }
 
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
 version = "0.14.27"
 optional = true

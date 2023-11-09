@@ -1,3 +1,21 @@
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
+//! alloy-transport-http
+
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
@@ -37,7 +55,7 @@ impl<T> Http<T> {
     }
 
     /// Create a new [`Http`] transport with a custom client.
-    pub fn with_client(client: T, url: Url) -> Self {
+    pub const fn with_client(client: T, url: Url) -> Self {
         Self { client, url }
     }
 
@@ -61,7 +79,7 @@ impl<T> Http<T> {
     }
 
     /// Get a reference to the client.
-    pub fn client(&self) -> &T {
+    pub const fn client(&self) -> &T {
         &self.client
     }
 

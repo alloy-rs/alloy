@@ -50,17 +50,17 @@ impl<'a, E> BorrowedRpcResult<'a, E> {
 
 impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     /// `true` if the result is an `Ok` value.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         matches!(self, RpcResult::Success(_))
     }
 
     /// `true` if the result is an `Failure` value.
-    pub fn is_failure(&self) -> bool {
+    pub const fn is_failure(&self) -> bool {
         matches!(self, RpcResult::Failure(_))
     }
 
     /// `true` if the result is an `Err` value.
-    pub fn is_err(&self) -> bool {
+    pub const fn is_err(&self) -> bool {
         matches!(self, RpcResult::Err(_))
     }
 
@@ -158,6 +158,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     }
 
     /// Converts from `RpcResult<T, ErrData, E>` to `Option<T>`.
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn success(self) -> Option<T> {
         match self {
             RpcResult::Success(val) => Some(val),
@@ -166,6 +167,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     }
 
     /// Converts from `RpcResult<T, ErrData, E>` to `Option<ErrorPayload>`.
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn failure(self) -> Option<ErrorPayload<ErrData>> {
         match self {
             RpcResult::Failure(err) => Some(err),
@@ -174,6 +176,7 @@ impl<T, ErrData, E> RpcResult<T, ErrData, E> {
     }
 
     /// Converts from `RpcResult<T, ErrData, E>` to `Option<E>`.
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn err(self) -> Option<E> {
         match self {
             RpcResult::Err(err) => Some(err),

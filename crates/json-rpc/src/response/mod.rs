@@ -49,12 +49,12 @@ impl BorrowedResponse<'_> {
 
 impl<Payload, ErrData> Response<Payload, ErrData> {
     /// Returns `true` if the response is a success.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.payload.is_success()
     }
 
     /// Returns `true` if the response is an error.
-    pub fn is_error(&self) -> bool {
+    pub const fn is_error(&self) -> bool {
         self.payload.is_error()
     }
 }

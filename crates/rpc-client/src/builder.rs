@@ -80,6 +80,8 @@ impl<L> ClientBuilder<L> {
     }
 
     #[cfg(feature = "pubsub")]
+    /// Connect a pubsub transport, producing an [`RpcClient`] with the provided
+    /// connection.
     pub async fn pubsub<C>(self, pubsub_connect: C) -> Result<RpcClient<L::Service>, TransportError>
     where
         C: alloy_pubsub::PubSubConnect,
@@ -89,6 +91,20 @@ impl<L> ClientBuilder<L> {
         let is_local = pubsub_connect.is_local();
         let transport = pubsub_connect.into_service().await?;
         Ok(self.transport(transport, is_local))
+    }
+
+    #[cfg(feature = "ws")]
+    /// Connect a WS transport, producing an [`RpcClient`] with the provided
+    /// connection
+    pub async fn ws(
+        self,
+        ws_connect: alloy_transport_ws::WsConnect,
+    ) -> Result<RpcClient<L::Service>, TransportError>
+    where
+        L: Layer<alloy_pubsub::PubSubFrontend>,
+        L::Service: Transport,
+    {
+        self.pubsub(ws_connect).await
     }
 
     /// Connect a transport, producing an [`RpcClient`] with the provided

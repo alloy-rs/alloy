@@ -42,7 +42,7 @@ impl RpcClient<Identity> {
 
 impl<T> RpcClient<T> {
     /// Create a new [`RpcClient`] with the given transport.
-    pub fn new(t: T, is_local: bool) -> Self {
+    pub const fn new(t: T, is_local: bool) -> Self {
         Self {
             transport: t,
             is_local,
@@ -85,7 +85,7 @@ impl<T> RpcClient<T> {
     /// a URL or other external input, this value is set on a best-efforts
     /// basis and may be incorrect.
     #[inline]
-    pub fn is_local(&self) -> bool {
+    pub const fn is_local(&self) -> bool {
         self.is_local
     }
 

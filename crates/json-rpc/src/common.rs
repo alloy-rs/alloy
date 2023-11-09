@@ -115,22 +115,22 @@ impl Ord for Id {
 
 impl Id {
     /// Returns `true` if the ID is a number.
-    pub fn is_number(&self) -> bool {
+    pub const fn is_number(&self) -> bool {
         matches!(self, Id::Number(_))
     }
 
     /// Returns `true` if the ID is a string.
-    pub fn is_string(&self) -> bool {
+    pub const fn is_string(&self) -> bool {
         matches!(self, Id::String(_))
     }
 
     /// Returns `true` if the ID is `None`.
-    pub fn is_none(&self) -> bool {
+    pub const fn is_none(&self) -> bool {
         matches!(self, Id::None)
     }
 
     /// Returns the ID as a number, if it is one.
-    pub fn as_number(&self) -> Option<u64> {
+    pub const fn as_number(&self) -> Option<u64> {
         match self {
             Id::Number(n) => Some(*n),
             _ => None,

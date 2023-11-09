@@ -23,9 +23,13 @@ serde_json.workspace = true
 tracing.workspace = true
 tower.workspace = true
 
-reqwest = { workspace = true, optional = true }
+alloy-primitives = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
+hyper = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives.workspace = true
@@ -35,6 +39,7 @@ tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 
 [features]
 default = ["reqwest"]
-reqwest = ["dep:reqwest"]
-pubsub = ["dep:alloy-pubsub"]
+reqwest = ["dep:reqwest", "alloy-transport-http/reqwest"]
+hyper = ["dep:hyper", "alloy-transport-http/hyper"]
+pubsub = ["dep:alloy-pubsub", "dep:alloy-primitives"]
 ws = ["pubsub", "dep:alloy-transport-ws"]

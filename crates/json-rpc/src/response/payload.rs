@@ -47,7 +47,7 @@ impl BorrowedResponsePayload<'_> {
 
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Fallible conversion to the succesful payload.
-    pub fn as_success(&self) -> Option<&Payload> {
+    pub const fn as_success(&self) -> Option<&Payload> {
         match self {
             ResponsePayload::Success(payload) => Some(payload),
             _ => None,
@@ -55,7 +55,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     }
 
     /// Fallible conversion to the error object.
-    pub fn as_error(&self) -> Option<&ErrorPayload<ErrData>> {
+    pub const fn as_error(&self) -> Option<&ErrorPayload<ErrData>> {
         match self {
             ResponsePayload::Failure(payload) => Some(payload),
             _ => None,
@@ -63,12 +63,12 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     }
 
     /// Returns `true` if the response payload is a success.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         matches!(self, ResponsePayload::Success(_))
     }
 
     /// Returns `true` if the response payload is an error.
-    pub fn is_error(&self) -> bool {
+    pub const fn is_error(&self) -> bool {
         matches!(self, ResponsePayload::Failure(_))
     }
 }

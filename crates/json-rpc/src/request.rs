@@ -144,29 +144,31 @@ where
 
 impl SerializedRequest {
     /// Get the request metadata (ID and Method)
-    pub fn meta(&self) -> &RequestMeta {
+    pub const fn meta(&self) -> &RequestMeta {
         &self.meta
     }
     /// Get the request ID.
-    pub fn id(&self) -> &Id {
+    pub const fn id(&self) -> &Id {
         &self.meta.id
     }
     /// Get the request method.
-    pub fn method(&self) -> &'static str {
+    pub const fn method(&self) -> &'static str {
         self.meta.method
     }
     /// Get the serialized request.
-    pub fn serialized(&self) -> &RawValue {
+    pub const fn serialized(&self) -> &RawValue {
         &self.request
     }
 
     /// Consumes the serialized request, returning the underlying
     /// [`RequestMeta`] and the [`RawValue`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn decompose(self) -> (RequestMeta, Box<RawValue>) {
         (self.meta, self.request)
     }
 
     /// Take the serialized request, consuming the [`SerializedRequest`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn take_request(self) -> Box<RawValue> {
         self.request
     }
