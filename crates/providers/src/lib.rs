@@ -4,7 +4,8 @@ pub use builder::{ProviderBuilder, ProviderLayer, Stack};
 use alloy_json_rpc::RpcResult;
 use alloy_networks::{Network, Transaction};
 use alloy_primitives::Address;
-use alloy_transports::{BoxTransport, RpcClient, Transport, TransportError};
+use alloy_rpc_client::RpcClient;
+use alloy_transport::{BoxTransport, Transport, TransportError};
 use serde_json::value::RawValue;
 
 pub mod provider;

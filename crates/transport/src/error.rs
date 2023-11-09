@@ -9,8 +9,10 @@ pub enum TransportError {
     /// SerdeJson (de)ser
     #[error("{err}")]
     SerdeJson {
+        /// The underlying serde_json error.
         #[source]
         err: serde_json::Error,
+        /// For deser errors, the text that failed to deserialize.
         text: Option<String>,
     },
 
@@ -18,15 +20,9 @@ pub enum TransportError {
     #[error("Missing response in batch request")]
     MissingBatchResponse,
 
-    /// Hyper http transport
-    #[error(transparent)]
-    #[cfg(feature = "reqwest")]
-    Reqwest(#[from] reqwest::Error),
-
-    /// Hyper http transport
-    #[error(transparent)]
-    #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-    Hyper(#[from] hyper::Error),
+    /// PubSub backend connection task has stopped.
+    #[error("PubSub backend connection task has stopped.")]
+    BackendGone,
 
     /// Custom error
     #[error(transparent)]
@@ -36,7 +32,7 @@ pub enum TransportError {
 impl TransportError {
     /// Instantiate a new `TransportError` from a [`serde_json::Error`]. This
     /// should be called when the error occurs during serialization.
-    pub fn ser_err(err: serde_json::Error) -> Self {
+    pub const fn ser_err(err: serde_json::Error) -> Self {
         Self::SerdeJson { err, text: None }
     }
 

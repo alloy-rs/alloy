@@ -1,11 +1,15 @@
 use crate::{common::Id, RpcParam};
 
+use alloy_primitives::{keccak256, B256};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
+/// `RequestMeta` contains the [`Id`] and method name of a request.
 #[derive(Debug, Clone)]
 pub struct RequestMeta {
+    /// The method name.
     pub method: &'static str,
+    /// The request ID.
     pub id: Id,
 }
 
@@ -20,7 +24,9 @@ pub struct RequestMeta {
 /// The value of `method` should be known at compile time.
 #[derive(Debug, Clone)]
 pub struct Request<Params> {
+    /// The request metadata (ID and method).
     pub meta: RequestMeta,
+    /// The request parameters.
     pub params: Params,
 }
 
@@ -138,19 +144,59 @@ where
 
 impl SerializedRequest {
     /// Get the request metadata (ID and Method)
-    pub fn meta(&self) -> &RequestMeta {
+    pub const fn meta(&self) -> &RequestMeta {
         &self.meta
     }
     /// Get the request ID.
-    pub fn id(&self) -> &Id {
+    pub const fn id(&self) -> &Id {
         &self.meta.id
     }
     /// Get the request method.
-    pub fn method(&self) -> &'static str {
+    pub const fn method(&self) -> &'static str {
         self.meta.method
     }
     /// Get the serialized request.
-    pub fn request(&self) -> &RawValue {
+    pub const fn serialized(&self) -> &RawValue {
         &self.request
+    }
+
+    /// Consumes the serialized request, returning the underlying
+    /// [`RequestMeta`] and the [`RawValue`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
+    pub fn decompose(self) -> (RequestMeta, Box<RawValue>) {
+        (self.meta, self.request)
+    }
+
+    /// Take the serialized request, consuming the [`SerializedRequest`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
+    pub fn take_request(self) -> Box<RawValue> {
+        self.request
+    }
+
+    /// Get a reference to the serialized request's params.
+    ///
+    /// This partially deserializes the request, and should be avoided if
+    /// possible.
+    pub fn params(&self) -> Option<&RawValue> {
+        #[derive(Deserialize)]
+        struct Req<'a> {
+            #[serde(borrow)]
+            params: Option<&'a RawValue>,
+        }
+
+        let req: Req<'_> = serde_json::from_str(self.request.get()).unwrap();
+        req.params
+    }
+
+    /// Get the hash of the serialized request's params.
+    ///
+    /// This partially deserializes the request, and should be avoided if
+    /// possible.
+    pub fn params_hash(&self) -> B256 {
+        if let Some(params) = self.params() {
+            keccak256(params.get())
+        } else {
+            keccak256("")
+        }
     }
 }

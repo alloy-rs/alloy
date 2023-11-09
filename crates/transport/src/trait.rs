@@ -1,4 +1,4 @@
-use serde_json::value::RawValue;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use tower::Service;
 
 use crate::{BoxTransport, TransportError, TransportFut};
@@ -27,19 +27,18 @@ use crate::{BoxTransport, TransportError, TransportFut};
 ///
 /// [`Clone`] is not a bound on `Transport`, however, transports generally may
 /// not be used as expected unless they implement `Clone`. For example, only
-/// cloneable transports may be used by the [`RpcClient::prepare`] to send RPC
-/// requests, and [`BoxTransport`] may only be used to type-erase Cloneable
-/// transports.
+/// cloneable transports may be used by the `RpcClient` in `alloy-rpc-client`
+/// to send RPC requests, and [`BoxTransport`] may only be used to type-erase
+/// Cloneable transports.
 ///
 /// If you are implementing a transport, make sure it is [`Clone`].
 ///
 /// [`TransportConnect`]: crate::TransportConnect
-/// [`RpcClient::prepare`]: crate::RpcClient::prepare
 pub trait Transport:
     private::Sealed
     + Service<
-        Box<RawValue>,
-        Response = Box<RawValue>,
+        RequestPacket,
+        Response = ResponsePacket,
         Error = TransportError,
         Future = TransportFut<'static>,
     > + Send
@@ -58,8 +57,8 @@ pub trait Transport:
 impl<T> Transport for T where
     T: private::Sealed
         + Service<
-            Box<RawValue>,
-            Response = Box<RawValue>,
+            RequestPacket,
+            Response = ResponsePacket,
             Error = TransportError,
             Future = TransportFut<'static>,
         > + Send
@@ -74,8 +73,8 @@ mod private {
     pub trait Sealed {}
     impl<T> Sealed for T where
         T: Service<
-                Box<RawValue>,
-                Response = Box<RawValue>,
+                RequestPacket,
+                Response = ResponsePacket,
                 Error = TransportError,
                 Future = TransportFut<'static>,
             > + Send

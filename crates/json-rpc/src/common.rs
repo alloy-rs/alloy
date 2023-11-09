@@ -23,8 +23,11 @@ use serde::{de::Visitor, Deserialize, Serialize};
 /// [`HashSet`]: std::collections::HashSet
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Id {
+    /// A number.
     Number(u64),
+    /// A string.
     String(String),
+    /// Null.
     None,
 }
 
@@ -48,7 +51,7 @@ impl<'de> Deserialize<'de> for Id {
         impl<'de> Visitor<'de> for IdVisitor {
             type Value = Id;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(formatter, "a string, a number, or null")
             }
 
@@ -112,22 +115,22 @@ impl Ord for Id {
 
 impl Id {
     /// Returns `true` if the ID is a number.
-    pub fn is_number(&self) -> bool {
+    pub const fn is_number(&self) -> bool {
         matches!(self, Id::Number(_))
     }
 
     /// Returns `true` if the ID is a string.
-    pub fn is_string(&self) -> bool {
+    pub const fn is_string(&self) -> bool {
         matches!(self, Id::String(_))
     }
 
     /// Returns `true` if the ID is `None`.
-    pub fn is_none(&self) -> bool {
+    pub const fn is_none(&self) -> bool {
         matches!(self, Id::None)
     }
 
     /// Returns the ID as a number, if it is one.
-    pub fn as_number(&self) -> Option<u64> {
+    pub const fn as_number(&self) -> Option<u64> {
         match self {
             Id::Number(n) => Some(*n),
             _ => None,

@@ -1,19 +1,37 @@
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
+//! alloy-transport-http
+
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
 #[cfg(feature = "reqwest")]
 mod reqwest;
 
-use crate::client::RpcClient;
-
-use std::{str::FromStr, sync::atomic::AtomicU64};
+use alloy_transport::utils::guess_local_url;
 use url::Url;
 
 /// An Http transport.
 ///
 /// The user must provide an internal http client and a URL to which to
-/// connect. It implements `Service<Box<RawValue>>`, and can be used directly
-/// by an [`RpcClient`].
+/// connect. It implements `Service<Box<RawValue>>`, and therefore
+/// [`Transport`].
+///
+/// [`Transport`]: alloy_transport::Transport
 ///
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]
@@ -37,7 +55,7 @@ impl<T> Http<T> {
     }
 
     /// Create a new [`Http`] transport with a custom client.
-    pub fn with_client(client: T, url: Url) -> Self {
+    pub const fn with_client(client: T, url: Url) -> Self {
         Self { client, url }
     }
 
@@ -57,45 +75,16 @@ impl<T> Http<T> {
     /// possible. It simply returns `true` if the connection has no hostname,
     /// or the hostname is `localhost` or `127.0.0.1`.
     pub fn guess_local(&self) -> bool {
-        self.url
-            .host_str()
-            .map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+        guess_local_url(&self.url)
     }
 
     /// Get a reference to the client.
-    pub fn client(&self) -> &T {
+    pub const fn client(&self) -> &T {
         &self.client
     }
 
     /// Get a reference to the URL.
     pub fn url(&self) -> &str {
         self.url.as_ref()
-    }
-}
-
-impl<T> RpcClient<Http<T>>
-where
-    T: Default,
-{
-    /// Create a new [`RpcClient`] from a URL.
-    pub fn new_http(url: Url) -> Self {
-        let transport = Http::new(url);
-        let is_local = transport.guess_local();
-        Self {
-            transport,
-            is_local,
-            id: AtomicU64::new(0),
-        }
-    }
-}
-
-impl<T> FromStr for RpcClient<Http<T>>
-where
-    T: Default,
-{
-    type Err = <Url as FromStr>::Err;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self::new_http)
     }
 }

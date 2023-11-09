@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 
 use alloy_networks::Network;
-use alloy_transports::{RpcClient, Transport};
+use alloy_rpc_client::RpcClient;
+use alloy_transport::Transport;
 
 use crate::{NetworkRpcClient, Provider};
 

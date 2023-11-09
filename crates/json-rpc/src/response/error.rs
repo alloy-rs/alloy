@@ -12,8 +12,11 @@ use std::{borrow::Borrow, fmt, marker::PhantomData};
 /// included in the `message` field of the response payload.
 #[derive(Debug, Clone)]
 pub struct ErrorPayload<ErrData = Box<RawValue>> {
+    /// The error code.
     pub code: i64,
+    /// The error message (if any).
     pub message: String,
+    /// The error data (if any).
     pub data: Option<ErrData>,
 }
 
@@ -60,7 +63,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
                 impl<'de> serde::de::Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                         formatter.write_str("`code`, `message` and `data`")
                     }
 
@@ -88,7 +91,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
         {
             type Value = ErrorPayload<Data>;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(formatter, "a JSON-RPC2.0 error object")
             }
 
@@ -128,7 +131,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
                 }
                 Ok(ErrorPayload {
                     code: code.ok_or_else(|| serde::de::Error::missing_field("code"))?,
-                    message: message.ok_or_else(|| serde::de::Error::missing_field("message"))?,
+                    message: message.unwrap_or_default(),
                     data,
                 })
             }
@@ -184,7 +187,7 @@ mod test {
     #[test]
     fn smooth_borrowing() {
         let json = r#"{ "code": -32000, "message": "b", "data": null }"#;
-        let payload: BorrowedErrorPayload = serde_json::from_str(json).unwrap();
+        let payload: BorrowedErrorPayload<'_> = serde_json::from_str(json).unwrap();
 
         assert_eq!(payload.code, -32000);
         assert_eq!(payload.message, "b");
@@ -201,7 +204,7 @@ mod test {
 
         let json = r#"{ "code": -32000, "message": "b", "data": { "a": 5, "b": null } }"#;
 
-        let payload: BorrowedErrorPayload = serde_json::from_str(json).unwrap();
+        let payload: BorrowedErrorPayload<'_> = serde_json::from_str(json).unwrap();
         let data: TestData = payload.try_data_as().unwrap().unwrap();
         assert_eq!(data, TestData { a: 5, b: None });
     }

@@ -1,17 +1,13 @@
+use crate::{BatchRequest, ClientBuilder, RpcCall};
+
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
+use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
+use alloy_transport_http::Http;
 use std::{
     borrow::Cow,
     sync::atomic::{AtomicU64, Ordering},
 };
-use tower::{
-    layer::util::{Identity, Stack},
-    Layer, ServiceBuilder,
-};
-
-use crate::{
-    BatchRequest, BoxTransport, BoxTransportConnect, RpcCall, Transport, TransportConnect,
-    TransportError,
-};
+use tower::{layer::util::Identity, ServiceBuilder};
 
 /// A JSON-RPC client.
 ///
@@ -36,6 +32,7 @@ pub struct RpcClient<T> {
 }
 
 impl RpcClient<Identity> {
+    /// Create a new [`ClientBuilder`].
     pub fn builder() -> ClientBuilder<Identity> {
         ClientBuilder {
             builder: ServiceBuilder::new(),
@@ -45,7 +42,7 @@ impl RpcClient<Identity> {
 
 impl<T> RpcClient<T> {
     /// Create a new [`RpcClient`] with the given transport.
-    pub fn new(t: T, is_local: bool) -> Self {
+    pub const fn new(t: T, is_local: bool) -> Self {
         Self {
             transport: t,
             is_local,
@@ -54,11 +51,12 @@ impl<T> RpcClient<T> {
     }
 
     /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub fn connect<C: TransportConnect<Transport = T>>(connect: C) -> Result<Self, TransportError>
+    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
     where
-        C: Transport,
+        T: Transport,
+        C: TransportConnect<Transport = T>,
     {
-        connect.connect()
+        ClientBuilder::default().connect(connect).await
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -87,7 +85,7 @@ impl<T> RpcClient<T> {
     /// a URL or other external input, this value is set on a best-efforts
     /// basis and may be incorrect.
     #[inline]
-    pub fn is_local(&self) -> bool {
+    pub const fn is_local(&self) -> bool {
         self.is_local
     }
 
@@ -113,12 +111,6 @@ impl<T> RpcClient<T>
 where
     T: Transport + Clone,
 {
-    /// Create a new [`BatchRequest`] builder.
-    #[inline]
-    pub fn new_batch(&self) -> BatchRequest<T> {
-        BatchRequest::new(self)
-    }
-
     /// Prepare an [`RpcCall`].
     ///
     /// This function reserves an ID for the request, however the request
@@ -156,111 +148,27 @@ where
     }
 }
 
-/// A builder for the transport  [`RpcClient`].
-///
-/// This is a wrapper around [`tower::ServiceBuilder`]. It allows you to
-/// configure middleware layers that will be applied to the transport, and has
-/// some shortcuts for common layers and transports.
-///
-/// A builder accumulates Layers, and then is finished via the
-/// [`ClientBuilder::connect`] method, which produces an RPC client.
-pub struct ClientBuilder<L> {
-    builder: ServiceBuilder<L>,
-}
+#[cfg(feature = "pubsub")]
+mod pubsub_impl {
+    use super::*;
+    use alloy_pubsub::PubSubFrontend;
+    use tokio::sync::broadcast;
 
-impl Default for ClientBuilder<Identity> {
-    fn default() -> Self {
-        Self {
-            builder: ServiceBuilder::new(),
+    impl RpcClient<PubSubFrontend> {
+        /// Get a [`broadcast::Receiver`] for the given subscription ID.
+        pub async fn get_watcher(
+            &self,
+            id: alloy_primitives::U256,
+        ) -> broadcast::Receiver<Box<serde_json::value::RawValue>> {
+            self.transport.get_subscription(id).await.unwrap()
         }
     }
 }
 
-impl<L> ClientBuilder<L> {
-    /// Add a middleware layer to the stack.
-    ///
-    /// This is a wrapper around [`tower::ServiceBuilder::layer`]. Layers that
-    /// are added first will be called with the request first.
-    pub fn layer<M>(self, layer: M) -> ClientBuilder<Stack<M, L>> {
-        ClientBuilder {
-            builder: self.builder.layer(layer),
-        }
-    }
-
-    /// Create a new [`RpcClient`] with the given transport and the configured
-    /// layers.
-    fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
-    where
-        L: Layer<T>,
-        T: Transport,
-        L::Service: Transport,
-    {
-        RpcClient::new(self.builder.service(transport), is_local)
-    }
-
-    /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
-    /// HTTP transport.
-    #[cfg(feature = "reqwest")]
-    pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
-    where
-        L: Layer<crate::Http<reqwest::Client>>,
-        L::Service: Transport,
-    {
-        let transport = crate::Http::new(url);
-        let is_local = transport.guess_local();
-
-        self.transport(transport, is_local)
-    }
-
-    /// Convenience function to create a new [`RpcClient`] with a [`hyper`]
-    /// HTTP transport.
-    #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-    pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
-    where
-        L: Layer<crate::Http<hyper::client::Client<hyper::client::HttpConnector>>>,
-        L::Service: Transport,
-    {
-        let transport = crate::Http::new(url);
-        let is_local = transport.guess_local();
-
-        self.transport(transport, is_local)
-    }
-
-    /// Connect a transport, producing an [`RpcClient`] with the provided
-    /// connection.
-    pub fn connect<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
-    where
-        C: TransportConnect,
-        L: Layer<C::Transport>,
-        L::Service: Transport,
-    {
-        let transport = connect.to_transport()?;
-        Ok(self.transport(transport, connect.is_local()))
-    }
-
-    /// Connect a transport, producing an [`RpcClient`] with a [`BoxTransport`]
-    /// connection.
-    pub fn connect_boxed<C>(self, connect: C) -> Result<RpcClient<L::Service>, TransportError>
-    where
-        C: BoxTransportConnect,
-        L: Layer<BoxTransport>,
-        L::Service: Transport,
-    {
-        let transport = connect.to_boxed_transport()?;
-        Ok(self.transport(transport, connect.is_local()))
-    }
-}
-
-#[cfg(all(test, feature = "reqwest"))]
-mod test {
-    use crate::transports::Http;
-
-    use super::RpcClient;
-
-    #[test]
-    fn basic_instantiation() {
-        let h: RpcClient<Http<reqwest::Client>> = "http://localhost:8545".parse().unwrap();
-
-        assert!(h.is_local());
+impl<T> RpcClient<Http<T>> {
+    /// Create a new [`BatchRequest`] builder.
+    #[inline]
+    pub fn new_batch(&self) -> BatchRequest<'_, Http<T>> {
+        BatchRequest::new(self)
     }
 }

@@ -1,37 +1,48 @@
-use crate::{
-    error::TransportError,
-    transports::{JsonRpcLayer, JsonRpcService, Transport},
-    RpcFut,
-};
-
 use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
+use alloy_transport::{RpcFut, Transport, TransportError};
 use core::panic;
 use serde_json::value::RawValue;
 use std::{
+    fmt::Debug,
     future::Future,
     marker::PhantomData,
     pin::Pin,
     task::{self, Poll::Ready},
 };
-use tower::{Layer, Service};
+use tower::Service;
+use tracing::{instrument, trace};
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project(project = CallStateProj)]
 enum CallState<Params, Conn>
 where
-    Conn: Transport + Clone,
     Params: RpcParam,
+    Conn: Transport + Clone,
 {
     Prepared {
         request: Option<Request<Params>>,
-        connection: JsonRpcService<Conn>,
+        connection: Conn,
     },
     AwaitingResponse {
         #[pin]
-        fut: <JsonRpcService<Conn> as Service<RequestPacket>>::Future,
+        fut: <Conn as Service<RequestPacket>>::Future,
     },
     Complete,
+}
+
+impl<Params, Conn> Debug for CallState<Params, Conn>
+where
+    Params: RpcParam,
+    Conn: Transport + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Prepared { .. } => f.debug_struct("Prepared").finish(),
+            Self::AwaitingResponse { .. } => f.debug_struct("AwaitingResponse").finish(),
+            Self::Complete => write!(f, "Complete"),
+        }
+    }
 }
 
 impl<Params, Conn> CallState<Params, Conn>
@@ -43,6 +54,7 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
+        trace!("Polling prepared");
         let fut = {
             let CallStateProj::Prepared {
                 connection,
@@ -80,6 +92,7 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
+        trace!("Polling awaiting");
         let CallStateProj::AwaitingResponse { fut } = self.as_mut().project() else {
             unreachable!("Called poll_awaiting in incorrect state")
         };
@@ -99,6 +112,7 @@ where
 {
     type Output = RpcResult<Box<RawValue>, Box<RawValue>, TransportError>;
 
+    #[instrument(skip(self, cx))]
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         if matches!(*self.as_mut(), CallState::Prepared { .. }) {
             return self.poll_prepared(cx);
@@ -132,6 +146,7 @@ where
 /// requests with different `Param` types, while the `RpcCall` may do so lazily.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
+#[derive(Debug)]
 pub struct RpcCall<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
@@ -152,7 +167,7 @@ where
         Self {
             state: CallState::Prepared {
                 request: Some(req),
-                connection: JsonRpcLayer.layer(connection),
+                connection,
             },
             _pd: PhantomData,
         }
@@ -195,6 +210,7 @@ where
     type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        tracing::trace!(?self.state, "Polling RpcCall");
         let this = self.project();
 
         let resp = task::ready!(this.state.poll(cx));

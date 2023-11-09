@@ -1,11 +1,13 @@
 //! Alloy main Provider abstraction.
 
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256, U64};
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
 };
-use alloy_transports::{BoxTransport, Http, RpcClient, RpcResult, Transport, TransportError};
+use alloy_transport::{BoxTransport, RpcResult, Transport, TransportError};
+use alloy_transport_http::Http;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -422,7 +424,9 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 // HTTP Transport Provider implementation
 impl Provider<Http<Client>> {
     pub fn new(url: &str) -> Result<Self, ClientError> {
-        let inner: RpcClient<Http<Client>> = url.parse().map_err(|_e| ClientError::ParseError)?;
+        let url = url.parse().map_err(|_e| ClientError::ParseError)?;
+        let inner = ClientBuilder::default().reqwest_http(url);
+
         Ok(Self { inner, from: None })
     }
 }
@@ -454,8 +458,8 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 #[cfg(test)]
 mod providers_test {
     use crate::{provider::Provider, utils};
-    use alloy_primitives::{address, b256, Address, U256, U64};
-    use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
+    use alloy_primitives::{address, b256, U256, U64};
+    use alloy_rpc_types::{BlockNumberOrTag, Filter};
 
     use ethers_core::utils::Anvil;
 
@@ -540,12 +544,12 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         // Set the code
-        let addr = Address::with_last_byte(16);
+        let addr = alloy_primitives::Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
         let _code = provider
             .get_code_at(
                 addr,
-                BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
+                crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
             )
             .await
             .unwrap();

@@ -1,3 +1,11 @@
+use crate::RpcClient;
+
+use alloy_json_rpc::{
+    Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
+};
+use alloy_transport::{Transport, TransportError};
+use futures::channel::oneshot;
+use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -5,14 +13,6 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     task::{self, ready, Poll},
-};
-
-use futures_channel::oneshot;
-use serde_json::value::RawValue;
-
-use crate::{error::TransportError, transports::Transport, utils::to_json_raw_value, RpcClient};
-use alloy_json_rpc::{
-    Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
 };
 
 pub(crate) type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
@@ -35,9 +35,10 @@ pub struct BatchRequest<'a, T> {
 
 /// Awaits a single response for a request that has been included in a batch.
 #[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
+#[derive(Debug)]
 pub struct Waiter<Resp> {
     rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
-    _resp: PhantomData<Resp>,
+    _resp: PhantomData<fn() -> Resp>,
 }
 
 impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>>
@@ -71,6 +72,7 @@ where
 }
 
 #[pin_project::pin_project(project = CallStateProj)]
+#[derive(Debug)]
 pub enum BatchFuture<Conn>
 where
     Conn: Transport,
@@ -90,6 +92,7 @@ where
 }
 
 impl<'a, T> BatchRequest<'a, T> {
+    /// Create a new batch request.
     pub fn new(transport: &'a RpcClient<T>) -> Self {
         Self {
             transport,
@@ -185,14 +188,6 @@ where
         let channels = std::mem::replace(channels, HashMap::with_capacity(0));
         let req = std::mem::replace(requests, RequestPacket::Batch(Vec::with_capacity(0)));
 
-        let req = match to_json_raw_value(&req) {
-            Ok(req) => req,
-            Err(e) => {
-                self.set(BatchFuture::Complete);
-                return Poll::Ready(Err(e));
-            }
-        };
-
         let fut = transport.call(req);
         self.set(BatchFuture::AwaitingResponse { channels, fut });
         cx.waker().wake_by_ref();
@@ -213,14 +208,6 @@ where
             Err(e) => {
                 self.set(BatchFuture::Complete);
                 return Poll::Ready(Err(e));
-            }
-        };
-
-        let responses: ResponsePacket = match serde_json::from_str(responses.get()) {
-            Ok(responses) => responses,
-            Err(err) => {
-                self.set(BatchFuture::Complete);
-                return Poll::Ready(Err(TransportError::deser_err(err, responses.get())));
             }
         };
 

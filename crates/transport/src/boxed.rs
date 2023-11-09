@@ -1,4 +1,4 @@
-use serde_json::value::RawValue;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::fmt::Debug;
 use tower::Service;
 
@@ -6,7 +6,7 @@ use crate::{Transport, TransportError, TransportFut};
 
 /// A boxed, Clone-able [`Transport`] trait object.
 ///
-/// This type allows [`RpcClient`] to use a type-erased transport. It is
+/// This type allows RPC clients to use a type-erased transport. It is
 /// [`Clone`] and [`Send`] + [`Sync`], and implementes [`Transport`]. This
 /// allows for complex behavior abstracting across several different clients
 /// with different transport types.
@@ -61,8 +61,8 @@ where
     }
 }
 
-impl Service<Box<RawValue>> for BoxTransport {
-    type Response = Box<RawValue>;
+impl Service<RequestPacket> for BoxTransport {
+    type Response = ResponsePacket;
 
     type Error = TransportError;
 
@@ -75,7 +75,7 @@ impl Service<Box<RawValue>> for BoxTransport {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Box<RawValue>) -> Self::Future {
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
         self.inner.call(req)
     }
 }

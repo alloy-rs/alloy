@@ -9,7 +9,9 @@ use crate::{Id, Response, SerializedRequest};
 /// request.
 #[derive(Debug, Clone)]
 pub enum RequestPacket {
+    /// A single request.
     Single(SerializedRequest),
+    /// A batch of requests.
     Batch(Vec<SerializedRequest>),
 }
 
@@ -31,11 +33,11 @@ impl Serialize for RequestPacket {
         S: serde::Serializer,
     {
         match self {
-            RequestPacket::Single(single) => single.request().serialize(serializer),
+            RequestPacket::Single(single) => single.serialized().serialize(serializer),
             RequestPacket::Batch(batch) => {
                 let mut seq = serializer.serialize_seq(Some(batch.len()))?;
                 for req in batch {
-                    seq.serialize_element(req.request())?;
+                    seq.serialize_element(req.serialized())?;
                 }
                 seq.end()
             }
@@ -107,8 +109,40 @@ impl RequestPacket {
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
 #[derive(Debug, Clone)]
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
+    /// A single response.
     Single(Response<Payload, ErrData>),
+    /// A batch of responses.
     Batch(Vec<Response<Payload, ErrData>>),
+}
+
+impl<Payload, ErrData> FromIterator<Response<Payload, ErrData>>
+    for ResponsePacket<Payload, ErrData>
+{
+    fn from_iter<T: IntoIterator<Item = Response<Payload, ErrData>>>(iter: T) -> Self {
+        let mut iter = iter.into_iter().peekable();
+        // return single if iter has exactly one element, else make a batch
+        if let Some(first) = iter.next() {
+            if iter.peek().is_none() {
+                return Self::Single(first);
+            } else {
+                let mut batch = Vec::new();
+                batch.push(first);
+                batch.extend(iter);
+                return Self::Batch(batch);
+            }
+        }
+        Self::Batch(vec![])
+    }
+}
+
+impl<Payload, ErrData> From<Vec<Response<Payload, ErrData>>> for ResponsePacket<Payload, ErrData> {
+    fn from(value: Vec<Response<Payload, ErrData>>) -> Self {
+        if value.len() == 1 {
+            Self::Single(value.into_iter().next().unwrap())
+        } else {
+            Self::Batch(value)
+        }
+    }
 }
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
@@ -135,7 +169,7 @@ where
         {
             type Value = ResponsePacket<Payload, ErrData>;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a single response or a batch of responses")
             }
 
