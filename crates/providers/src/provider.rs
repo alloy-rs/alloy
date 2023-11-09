@@ -43,7 +43,7 @@ pub trait TempProvider: Send + Sync {
     async fn get_transaction_count(
         &self,
         address: Address,
-        tag: Option<BlockNumberOrTag>,
+        tag: Option<BlockId>,
     ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
     where
         Self: Sync;
@@ -242,7 +242,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn get_transaction_count(
         &self,
         address: Address,
-        tag: Option<BlockNumberOrTag>,
+        tag: Option<BlockId>,
     ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
@@ -250,9 +250,9 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                Cow::<(Address, BlockNumberOrTag)>::Owned((
+                Cow::<(Address, BlockId)>::Owned((
                     address,
-                    tag.unwrap_or(BlockNumberOrTag::Latest),
+                    tag.unwrap_or(BlockNumberOrTag::Latest.into()),
                 )),
             )
             .await
