@@ -54,7 +54,7 @@ impl<L> ClientBuilder<L> {
     /// Convenience function to create a new [`RpcClient`] with a [`reqwest`]
     /// HTTP transport.
     #[cfg(feature = "reqwest")]
-    pub fn reqwest_http(self, url: reqwest::Url) -> RpcClient<L::Service>
+    pub fn reqwest_http(self, url: url::Url) -> RpcClient<L::Service>
     where
         L: Layer<alloy_transport_http::Http<reqwest::Client>>,
         L::Service: Transport,
