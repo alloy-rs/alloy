@@ -75,7 +75,7 @@ where
     ///
     /// # Returns
     ///
-    /// - `Ok(Response<T, ErrData>)`` if the payload is a success and can be
+    /// - `Ok(Response<T, ErrData>)` if the payload is a success and can be
     ///   deserialized as T, or if the payload is an error.
     /// - `Err(self)` if the payload is a success and can't be deserialized.
     pub fn deser_success<T: DeserializeOwned>(self) -> Result<Response<T, ErrData>, Self> {

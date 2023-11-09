@@ -17,7 +17,7 @@ pub trait TransportConnect: Sized + Send + Sync + 'static {
     /// The transport type that is returned by `connect`.
     type Transport: Transport + Clone;
 
-    /// Returns `true`` if the transport connects to a local resource.
+    /// Returns `true` if the transport connects to a local resource.
     fn is_local(&self) -> bool;
 
     /// Connect to the transport, returning a `Transport` instance.
@@ -33,9 +33,9 @@ pub trait TransportConnect: Sized + Send + Sync + 'static {
 /// This trait is separate from `TransportConnect`` to hide the associated type
 /// in when this trait is a trai object. It is intended to allow creation of
 /// several unlike transports or clients at once. E.g.
-/// `Vec<&dyn BoxTransportConnect>.into_iter().map(|t| t.connect_boxed())`.
+/// in something like `Vec<&dyn BoxTransportConnect>.
 pub trait BoxTransportConnect {
-    /// Returns `true`` if the transport is a local transport.
+    /// Returns `true` if the transport is a local transport.
     fn is_local(&self) -> bool;
 
     /// Connect to a transport, and box it.

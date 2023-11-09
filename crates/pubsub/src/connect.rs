@@ -6,7 +6,7 @@ use alloy_transport::{Pbf, TransportError};
 /// Implementers should contain configuration options for the underlying
 /// transport.
 pub trait PubSubConnect: Sized + Send + Sync + 'static {
-    /// Returns `true`` if the transport connects to a local resource.
+    /// Returns `true` if the transport connects to a local resource.
     fn is_local(&self) -> bool;
 
     /// Spawn the backend, returning a handle to it.
