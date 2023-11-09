@@ -480,12 +480,12 @@ impl Filter {
     }
 
     /// Returns the numeric value of the `toBlock` field
-    pub fn get_to_block(&self) -> Option<u64> {
+    pub fn get_to_block(&self) -> Option<U64> {
         self.block_option.get_to_block().and_then(|b| b.as_number())
     }
 
     /// Returns the numeric value of the `fromBlock` field
-    pub fn get_from_block(&self) -> Option<u64> {
+    pub fn get_from_block(&self) -> Option<U64> {
         self.block_option
             .get_from_block()
             .and_then(|b| b.as_number())
@@ -798,7 +798,7 @@ impl FilteredParams {
     }
 
     /// Returns true if the filter matches the given block number
-    pub fn filter_block_range(&self, block_number: u64) -> bool {
+    pub fn filter_block_range(&self, block_number: U64) -> bool {
         if self.filter.is_none() {
             return true;
         }
