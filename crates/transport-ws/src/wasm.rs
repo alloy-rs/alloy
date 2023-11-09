@@ -1,15 +1,47 @@
 use super::WsBackend;
-use alloy_transport::utils::Spawnable;
 
+use alloy_pubsub::PubSubConnect;
+use alloy_transport::{utils::Spawnable, Pbf, TransportError};
 use futures::{
     sink::SinkExt,
     stream::{Fuse, StreamExt},
 };
 use serde_json::value::RawValue;
 use tracing::error;
-use ws_stream_wasm::{WsErr, WsMessage, WsStream};
+use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
+
+/// Simple connection info for the websocket.
+#[derive(Debug, Clone)]
+pub struct WsConnect {
+    /// The URL to connect to.
+    pub url: String,
+}
+
+impl PubSubConnect for WsConnect {
+    fn is_local(&self) -> bool {
+        alloy_transport::utils::guess_local_url(&self.url)
+    }
+
+    fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
+        Box::pin(async move {
+            let socket = WsMeta::connect(&self.url, None)
+                .await
+                .map_err(TransportError::custom)?
+                .1
+                .fuse();
+
+            let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
+            let backend = WsBackend { socket, interface };
+
+            backend.spawn();
+
+            Ok(handle)
+        })
+    }
+}
 
 impl WsBackend<Fuse<WsStream>> {
+    /// Handle a message from the websocket.
     pub async fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
         match item {
             WsMessage::Text(text) => self.handle_text(text).await,
@@ -20,12 +52,14 @@ impl WsBackend<Fuse<WsStream>> {
         }
     }
 
+    /// Send a message to the websocket.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), WsErr> {
         self.socket
             .send(WsMessage::Text(msg.get().to_owned()))
             .await
     }
 
+    /// Spawn this backend on a loop.
     pub fn spawn(mut self) {
         let fut = async move {
             let mut err = false;
@@ -79,9 +113,4 @@ impl WsBackend<Fuse<WsStream>> {
         };
         fut.spawn_task();
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct WsConnect {
-    pub url: String,
 }

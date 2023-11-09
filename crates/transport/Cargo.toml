@@ -18,7 +18,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["raw_value"] }
 thiserror.workspace = true
 url.workspace = true
-tokio.workspace = true
 tower.workspace = true
 
 base64 = "0.21.0"

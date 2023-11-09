@@ -1,11 +1,11 @@
 use crate::WsBackend;
 
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, TransportError};
+use alloy_transport::{utils::Spawnable, Authorization, Pbf, TransportError};
 
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
-use std::{future::Future, pin::Pin, time::Duration};
+use std::time::Duration;
 use tokio::time::sleep;
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
@@ -17,7 +17,57 @@ type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 const KEEPALIVE: u64 = 10;
 
+/// Simple connection details for a websocket connection.
+#[derive(Debug, Clone)]
+pub struct WsConnect {
+    /// The URL to connect to.
+    pub url: String,
+    /// The authorization header to use.
+    pub auth: Option<Authorization>,
+}
+
+impl IntoClientRequest for WsConnect {
+    fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
+        let mut request: http::Request<()> = self.url.into_client_request()?;
+        if let Some(auth) = self.auth {
+            let mut auth_value = http::HeaderValue::from_str(&auth.to_string())?;
+            auth_value.set_sensitive(true);
+
+            request
+                .headers_mut()
+                .insert(http::header::AUTHORIZATION, auth_value);
+        }
+
+        request.into_client_request()
+    }
+}
+
+impl PubSubConnect for WsConnect {
+    fn is_local(&self) -> bool {
+        alloy_transport::utils::guess_local_url(&self.url)
+    }
+
+    fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
+        let request = self.clone().into_client_request();
+
+        Box::pin(async move {
+            let req = request.map_err(TransportError::custom)?;
+            let (socket, _) = tokio_tungstenite::connect_async(req)
+                .await
+                .map_err(TransportError::custom)?;
+
+            let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
+            let backend = WsBackend { socket, interface };
+
+            backend.spawn();
+
+            Ok(handle)
+        })
+    }
+}
+
 impl WsBackend<TungsteniteStream> {
+    /// Handle a message from the server.
     pub async fn handle(&mut self, msg: Message) -> Result<(), ()> {
         match msg {
             Message::Text(text) => self.handle_text(text).await,
@@ -39,6 +89,7 @@ impl WsBackend<TungsteniteStream> {
         }
     }
 
+    /// Send a message to the server.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), tungstenite::Error> {
         self.socket.send(Message::Text(msg.get().to_owned())).await
     }
@@ -117,57 +168,5 @@ impl WsBackend<TungsteniteStream> {
             }
         };
         fut.spawn_task()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WsConnect {
-    pub url: String,
-    pub auth: Option<Authorization>,
-}
-
-impl IntoClientRequest for WsConnect {
-    fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
-        let mut request: http::Request<()> = self.url.into_client_request()?;
-        if let Some(auth) = self.auth {
-            let mut auth_value = http::HeaderValue::from_str(&auth.to_string())?;
-            auth_value.set_sensitive(true);
-
-            request
-                .headers_mut()
-                .insert(http::header::AUTHORIZATION, auth_value);
-        }
-
-        request.into_client_request()
-    }
-}
-
-impl PubSubConnect for WsConnect {
-    fn is_local(&self) -> bool {
-        alloy_transport::utils::guess_local_url(&self.url)
-    }
-
-    fn connect<'a: 'b, 'b>(
-        &'a self,
-    ) -> Pin<
-        Box<
-            dyn Future<Output = Result<alloy_pubsub::ConnectionHandle, TransportError>> + Send + 'b,
-        >,
-    > {
-        let request = self.clone().into_client_request();
-
-        Box::pin(async move {
-            let req = request.map_err(TransportError::custom)?;
-            let (socket, _) = tokio_tungstenite::connect_async(req)
-                .await
-                .map_err(TransportError::custom)?;
-
-            let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-            let backend = WsBackend { socket, interface };
-
-            backend.spawn();
-
-            Ok(handle)
-        })
     }
 }
