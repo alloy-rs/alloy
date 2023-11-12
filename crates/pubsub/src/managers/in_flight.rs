@@ -57,7 +57,7 @@ impl InFlight {
     /// error, the subscription ID and the in-flight request are returned.
     pub(crate) fn fulfill(self, resp: Response) -> Option<(U256, Self)> {
         if self.method() == "eth_subscribe" {
-            if let ResponsePayload::Success(val) = resp.payload {
+            if let ResponsePayload::Ok(val) = resp.payload {
                 let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
                 match sub_id {
                     Ok(alias) => return Some((alias, self)),

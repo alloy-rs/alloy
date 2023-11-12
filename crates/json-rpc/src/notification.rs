@@ -93,9 +93,9 @@ impl<'de> Deserialize<'de> for PubSubItem {
                     }
                     // We need to differentiate error vs result here.
                     let payload = if let Some(error) = error {
-                        ResponsePayload::Failure(error)
+                        ResponsePayload::Err(error)
                     } else if let Some(result) = result {
-                        ResponsePayload::Success(result)
+                        ResponsePayload::Ok(result)
                     } else {
                         return Err(serde::de::Error::custom(
                             "missing `result` or `error` field in response",

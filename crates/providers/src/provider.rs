@@ -353,19 +353,18 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     {
         let base_fee_per_gas = match self
             .get_block_by_number(BlockNumberOrTag::Latest, false)
-            .await
+            .await?
         {
-            RpcResult::Success(Some(block)) => match block.header.base_fee_per_gas {
+            Ok(Some(block)) => match block.header.base_fee_per_gas {
                 Some(base_fee_per_gas) => base_fee_per_gas,
                 None => {
                     return RpcResult::Err(TransportError::Custom("EIP-1559 not activated".into()))
                 }
             },
-            RpcResult::Success(None) => {
+            Ok(None) => {
                 return RpcResult::Err(TransportError::Custom("Latest block not found".into()))
             }
-            RpcResult::Err(err) => return RpcResult::Err(err),
-            RpcResult::Failure(err) => return RpcResult::Failure(err),
+            Err(err) => return RpcResult::Ok(Err(err)),
         };
 
         let fee_history = match self
@@ -374,11 +373,10 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
-            .await
+            .await?
         {
-            RpcResult::Success(fee_history) => fee_history,
-            RpcResult::Err(err) => return RpcResult::Err(err),
-            RpcResult::Failure(err) => return RpcResult::Failure(err),
+            Ok(fee_history) => fee_history,
+            Err(err) => return Ok(Err(err)),
         };
 
         // use the provided fee estimator function, or fallback to the default implementation.
@@ -391,7 +389,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             )
         };
 
-        RpcResult::Success((max_fee_per_gas, max_priority_fee_per_gas))
+        Ok(Ok((max_fee_per_gas, max_priority_fee_per_gas)))
     }
 
     #[cfg(feature = "anvil")]
@@ -467,7 +465,7 @@ mod providers_test {
     async fn gets_block_number() {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
-        let num = provider.get_block_number().await.unwrap();
+        let num = provider.get_block_number().await.unwrap().unwrap();
         assert_eq!(U64::ZERO, num)
     }
 
@@ -478,6 +476,7 @@ mod providers_test {
         let count = provider
             .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(count, U256::from(0));
     }
@@ -492,11 +491,13 @@ mod providers_test {
             .get_block_by_number(tag, true)
             .await
             .unwrap()
+            .unwrap()
             .unwrap();
         let hash = block.header.hash.unwrap();
         let block = provider
             .get_block_by_hash(hash, true)
             .await
+            .unwrap()
             .unwrap()
             .unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
@@ -512,6 +513,7 @@ mod providers_test {
             .get_block_by_number(tag, true)
             .await
             .unwrap()
+            .unwrap()
             .unwrap();
         assert_eq!(block.header.number.unwrap(), U256::from(num));
     }
@@ -526,6 +528,7 @@ mod providers_test {
             .get_block_by_number(tag, true)
             .await
             .unwrap()
+            .unwrap()
             .unwrap();
         assert_eq!(block.header.number.unwrap(), U256::from(num));
     }
@@ -534,7 +537,7 @@ mod providers_test {
     async fn gets_chain_id() {
         let anvil = Anvil::new().args(vec!["--chain-id", "13371337"]).spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
-        let chain_id = provider.get_chain_id().await.unwrap();
+        let chain_id = provider.get_chain_id().await.unwrap().unwrap();
         assert_eq!(chain_id, U64::from(13371337));
     }
 
@@ -544,7 +547,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         // Set the code
-        let addr = alloy_primitives::Address::with_last_byte(16);
+        let addr = alloy_primitivesAddress::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
         let _code = provider
             .get_code_at(
@@ -552,6 +555,7 @@ mod providers_test {
                 crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
             )
             .await
+            .unwrap()
             .unwrap();
     }
 
@@ -565,6 +569,7 @@ mod providers_test {
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
             ))
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(
             tx.block_hash.unwrap(),
@@ -585,7 +590,7 @@ mod providers_test {
             .event_signature(b256!(
                 "e1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
             ));
-        let logs = provider.get_logs(filter).await.unwrap();
+        let logs = provider.get_logs(filter).await.unwrap().unwrap();
         assert_eq!(logs.len(), 1);
     }
 
@@ -599,6 +604,7 @@ mod providers_test {
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
             ))
             .await
+            .unwrap()
             .unwrap();
         assert!(receipt.is_some());
         let receipt = receipt.unwrap();
@@ -612,7 +618,7 @@ mod providers_test {
     async fn gets_fee_history() {
         let anvil = Anvil::new().spawn();
         let provider = Provider::new(&anvil.endpoint()).unwrap();
-        let block_number = provider.get_block_number().await.unwrap();
+        let block_number = provider.get_block_number().await.unwrap().unwrap();
         let fee_history = provider
             .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
@@ -620,6 +626,7 @@ mod providers_test {
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
             .await
+            .unwrap()
             .unwrap();
         assert_eq!(fee_history.oldest_block, U256::ZERO);
     }

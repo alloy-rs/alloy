@@ -32,10 +32,10 @@ pub type BorrowedErrorPayload<'a> = ErrorPayload<&'a RawValue>;
 impl BorrowedErrorPayload<'_> {
     /// Convert this borrowed error payload into an owned payload by copying
     /// the data from the deserializer (if necessary).
-    pub fn into_owned(self) -> ErrorPayload {
+    pub fn to_owned(&self) -> ErrorPayload {
         ErrorPayload {
             code: self.code,
-            message: self.message,
+            message: self.message.clone(),
             data: self.data.map(|data| data.to_owned()),
         }
     }

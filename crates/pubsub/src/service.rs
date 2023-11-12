@@ -206,7 +206,7 @@ where
         // We don't care if the channel is dead.
         let _ = in_flight.tx.send(Ok(Response {
             id,
-            payload: ResponsePayload::Success(ser_alias),
+            payload: ResponsePayload::Ok(ser_alias),
         }));
 
         Ok(())

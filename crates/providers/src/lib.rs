@@ -108,9 +108,10 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
         &self,
         tx: &mut N::TransactionRequest,
     ) -> RpcResult<(), Box<RawValue>, TransportError> {
-        let gas = self.estimate_gas(&*tx).await;
+        let gas = self.estimate_gas(&*tx).await?;
 
-        gas.map(|gas| tx.set_gas(gas))
+        let _ = gas.map(|gas| tx.set_gas(gas));
+        Ok(Ok(()))
     }
 }
 

@@ -63,11 +63,23 @@ where
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
 
-        Poll::Ready(match resp {
-            Ok(resp) => resp
-                .try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
-            Err(e) => RpcResult::Err(TransportError::Custom(Box::new(e))),
-        })
+        let resp = match resp {
+            Ok(Ok(resp)) => resp,
+            Ok(Err(e)) => return Poll::Ready(Err(e)),
+            Err(_) => return Poll::Ready(Err(TransportError::BackendGone)),
+        };
+
+        match resp {
+            Ok(val) => {
+                let text = val.get();
+                match serde_json::from_str(text).map_err(|err| TransportError::deser_err(err, text))
+                {
+                    Ok(val) => Poll::Ready(Ok(val)),
+                    Err(err) => Poll::Ready(Err(err)),
+                }
+            }
+            Err(err) => Poll::Ready(Ok(Err(err))),
+        }
     }
 }
 
@@ -101,6 +113,8 @@ impl<'a, T> BatchRequest<'a, T> {
         }
     }
 
+    /// Push a serialized request into the batch, returning a oneshot channel
+    /// that should (eventually) produce the response.
     fn push_raw(
         &mut self,
         request: SerializedRequest,
@@ -111,6 +125,8 @@ impl<'a, T> BatchRequest<'a, T> {
         rx
     }
 
+    /// Push a request into the batch, returning a waiter that should
+    /// (eventually) produce the response.
     fn push<Params: RpcParam, Resp: RpcReturn>(
         &mut self,
         request: Request<Params>,
@@ -215,13 +231,13 @@ where
         match responses {
             ResponsePacket::Single(single) => {
                 if let Some(tx) = channels.remove(&single.id) {
-                    let _ = tx.send(RpcResult::from(single));
+                    let _ = tx.send(single.into());
                 }
             }
             ResponsePacket::Batch(responses) => {
                 for response in responses.into_iter() {
                     if let Some(tx) = channels.remove(&response.id) {
-                        let _ = tx.send(RpcResult::from(response));
+                        let _ = tx.send(response.into());
                     }
                 }
             }

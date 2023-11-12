@@ -216,9 +216,9 @@ impl BorrowedResponsePacket<'_> {
     /// the data from the deserializer (if necessary).
     pub fn into_owned(self) -> ResponsePacket {
         match self {
-            Self::Single(single) => ResponsePacket::Single(single.into_owned()),
+            Self::Single(single) => ResponsePacket::Single(single.to_owned()),
             Self::Batch(batch) => {
-                ResponsePacket::Batch(batch.into_iter().map(Response::into_owned).collect())
+                ResponsePacket::Batch(batch.into_iter().map(|r| r.to_owned()).collect())
             }
         }
     }

@@ -1,4 +1,6 @@
-use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
+use alloy_json_rpc::{
+    Request, RequestPacket, ResponsePacket, ResponsePayload, RpcParam, RpcResult, RpcReturn,
+};
 use alloy_transport::{RpcFut, Transport, TransportError};
 use core::panic;
 use serde_json::value::RawValue;
@@ -98,7 +100,7 @@ where
         };
 
         match task::ready!(fut.poll(cx)) {
-            Ok(ResponsePacket::Single(res)) => Ready(RpcResult::from(res)),
+            Ok(ResponsePacket::Single(res)) => Ready(res.into()),
             Err(e) => Ready(RpcResult::Err(e)),
             _ => panic!("received batch response from single request"),
         }
@@ -207,7 +209,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
 {
-    type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
+    type Output = Result<ResponsePayload<Resp>, TransportError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         tracing::trace!(?self.state, "Polling RpcCall");
@@ -215,8 +217,21 @@ where
 
         let resp = task::ready!(this.state.poll(cx));
 
-        Ready(
-            resp.try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
-        )
+        let resp = match resp {
+            Ok(resp) => resp,
+            Err(e) => return Ready(Err(e)),
+        };
+
+        match resp {
+            Ok(payload) => {
+                let text = payload.get();
+                match serde_json::from_str(text).map_err(|err| TransportError::deser_err(err, text))
+                {
+                    Ok(resp) => Ready(Ok(ResponsePayload::Ok(resp))),
+                    Err(e) => Ready(Err(e)),
+                }
+            }
+            Err(e) => return Ready(Ok(ResponsePayload::Err(e))),
+        }
     }
 }

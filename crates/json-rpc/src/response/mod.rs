@@ -12,7 +12,7 @@ use serde::{
 };
 use serde_json::value::RawValue;
 
-use crate::common::Id;
+use crate::{common::Id, RpcResult};
 /// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
 ///
 /// This object is used to represent a JSONRPC-2.0 response. It may contain
@@ -27,6 +27,15 @@ pub struct Response<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     pub payload: ResponsePayload<Payload, ErrData>,
 }
 
+impl<Payload, ErrData, E> Into<RpcResult<Payload, ErrData, E>> for Response<Payload, ErrData> {
+    fn into(self) -> RpcResult<Payload, ErrData, E> {
+        match self.payload {
+            ResponsePayload::Ok(payload) => Ok(Ok(payload)),
+            ResponsePayload::Err(payload) => Ok(Err(payload)),
+        }
+    }
+}
+
 /// A [`Response`] that has been partially deserialized, borrowing its contents
 /// from the deserializer. This is used primarily for intermediate
 /// deserialization. Most users will not require it.
@@ -39,23 +48,63 @@ pub type BorrowedResponse<'a> = Response<&'a RawValue, &'a RawValue>;
 impl BorrowedResponse<'_> {
     /// Convert this borrowed response to an owned response by copying the data
     /// from the deserializer (if necessary).
-    pub fn into_owned(self) -> Response {
+    pub fn to_owned(&self) -> Response {
+        let payload = self
+            .payload
+            .as_deref()
+            .map(|r| r.to_owned())
+            .map_err(|e| e.to_owned());
+
         Response {
             id: self.id.clone(),
-            payload: self.payload.into_owned(),
+            payload,
         }
     }
 }
 
 impl<Payload, ErrData> Response<Payload, ErrData> {
     /// Returns `true` if the response is a success.
-    pub const fn is_success(&self) -> bool {
-        self.payload.is_success()
+    pub const fn is_ok(&self) -> bool {
+        self.payload.is_ok()
     }
 
     /// Returns `true` if the response is an error.
-    pub const fn is_error(&self) -> bool {
-        self.payload.is_error()
+    pub const fn is_err(&self) -> bool {
+        self.payload.is_err()
+    }
+
+    /// Fallible conversion to the succesful payload.
+    pub const fn as_ok(&self) -> Option<&Payload> {
+        match self.payload {
+            ResponsePayload::Ok(ref payload) => Some(payload),
+            _ => None,
+        }
+    }
+
+    /// Fallible conversion to the error object.
+    pub const fn as_err(&self) -> Option<&ErrorPayload<ErrData>> {
+        match self.payload {
+            ResponsePayload::Err(ref payload) => Some(payload),
+            _ => None,
+        }
+    }
+
+    /// Take the success payload, if any.
+    pub fn take_success(self) -> Option<Payload> {
+        if let ResponsePayload::Ok(payload) = self.payload {
+            Some(payload)
+        } else {
+            None
+        }
+    }
+
+    /// Take the failure payload, if any.
+    pub fn take_failure(self) -> Option<ErrorPayload<ErrData>> {
+        if let ResponsePayload::Err(payload) = self.payload {
+            Some(payload)
+        } else {
+            None
+        }
     }
 }
 
@@ -66,9 +115,17 @@ where
     /// Attempt to deserialize the success payload, borrowing from the payload
     /// if necessary.
     ///
-    /// See [`ResponsePayload::try_success_as`].
+    /// ## Returns
+    /// - `Some(Ok(T))` if the payload is a success and can be deserialized as
+    ///   `T`.
+    /// - `Some(Err(err))` if the payload is a success and can't be
+    ///   deserialized as `T`
+    /// - `None` if the payload is an error response
     pub fn try_success_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
-        self.payload.try_success_as()
+        match &self.payload {
+            Ok(val) => Some(serde_json::from_str(val.as_ref().get())),
+            Err(_) => None,
+        }
     }
 
     /// Attempt to deserialize the Success payload, transforming this type.
@@ -78,17 +135,32 @@ where
     /// - `Ok(Response<T, ErrData>)` if the payload is a success and can be
     ///   deserialized as T, or if the payload is an error.
     /// - `Err(self)` if the payload is a success and can't be deserialized.
-    pub fn deser_success<T: DeserializeOwned>(self) -> Result<Response<T, ErrData>, Self> {
-        match self.payload.deserialize_success() {
-            Ok(payload) => Ok(Response {
-                id: self.id,
-                payload,
-            }),
-            Err(payload) => Err(Response {
-                id: self.id,
-                payload,
-            }),
+    pub fn deserialize_success<T: DeserializeOwned>(self) -> Result<Response<T, ErrData>, Self> {
+        if self.is_ok() {
+            let val = self.try_success_as().unwrap();
+            match val {
+                Ok(val) => {
+                    return Ok(Response {
+                        id: self.id,
+                        payload: ResponsePayload::Ok(val),
+                    })
+                }
+                Err(_) => return Err(self),
+            }
         }
+
+        let Response {
+            id,
+            payload: ResponsePayload::Err(payload),
+        } = self
+        else {
+            unreachable!()
+        };
+
+        Ok(Response {
+            id,
+            payload: ResponsePayload::Err(payload),
+        })
     }
 }
 
@@ -99,9 +171,12 @@ where
     /// Attempt to deserialize the error payload, borrowing from the payload if
     /// necesary.
     ///
-    /// See [`ResponsePayload::try_error_as`].
+    /// See [`ErrorPayload::try_data_as`].
     pub fn try_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
-        self.payload.try_error_as()
+        match &self.payload {
+            Ok(_) => None,
+            Err(val) => val.try_data_as(),
+        }
     }
 
     /// Attempt to deserialize the Error payload, transforming this type.
@@ -112,16 +187,29 @@ where
     ///   deserialized as `T`, or if the payload is a success.
     /// - `Err(self)` if the payload is an error and can't be deserialized.
     pub fn deser_err<T: DeserializeOwned>(self) -> Result<Response<Payload, T>, Self> {
-        match self.payload.deserialize_error() {
-            Ok(payload) => Ok(Response {
-                id: self.id,
-                payload,
-            }),
-            Err(payload) => Err(Response {
-                id: self.id,
-                payload,
-            }),
+        if self.is_err() {
+            let val = self.try_error_as().unwrap();
+            match val {
+                Ok(val) => {
+                    return Ok(Response {
+                        id: self.id,
+                        payload: ResponsePayload::Err(val),
+                    })
+                }
+                Err(_) => return Err(self),
+            }
         }
+        let Response {
+            id,
+            payload: ResponsePayload::Ok(val),
+        } = self
+        else {
+            unreachable!()
+        };
+        Ok(Response {
+            id,
+            payload: ResponsePayload::Ok(val),
+        })
     }
 }
 
@@ -224,11 +312,11 @@ where
                 match (result, error) {
                     (Some(result), None) => Ok(Response {
                         id,
-                        payload: ResponsePayload::Success(result),
+                        payload: ResponsePayload::Ok(result),
                     }),
                     (None, Some(error)) => Ok(Response {
                         id,
-                        payload: ResponsePayload::Failure(error),
+                        payload: ResponsePayload::Err(error),
                     }),
                     (None, None) => Err(serde::de::Error::missing_field("result or error")),
                     (Some(_), Some(_)) => Err(serde::de::Error::custom(
@@ -253,10 +341,7 @@ mod test {
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::Number(1));
-        assert!(matches!(
-            response.payload,
-            super::ResponsePayload::Success(_)
-        ));
+        assert!(matches!(response.payload, super::ResponsePayload::Ok(_)));
     }
 
     #[test]
@@ -271,10 +356,7 @@ mod test {
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
-        assert!(matches!(
-            response.payload,
-            super::ResponsePayload::Failure(_)
-        ));
+        assert!(matches!(response.payload, super::ResponsePayload::Err(_)));
     }
 
     #[test]
@@ -291,10 +373,7 @@ mod test {
         }"#;
         let response: super::Response = serde_json::from_str(response).unwrap();
         assert_eq!(response.id, super::Id::None);
-        assert!(matches!(
-            response.payload,
-            super::ResponsePayload::Success(_)
-        ));
+        assert!(matches!(response.payload, super::ResponsePayload::Ok(_)));
     }
 }
 
