@@ -46,15 +46,10 @@
 //! objects in collections (e.g. in a batch request). This is useful for
 //! implementing a client.
 //!
-//! Allowing partial deserialization lets learn request status, and associate
+//! Allowing partial deserialization lets us learn request status, and associate
 //! the raw response data with the corresponding client request before doing
 //! full deserialization work. This is useful for implementing a client.
-//!
-//! In general, partially deserialized responses can be further deserialized.
-//! E.g. an [`BorrowedRpcResult`] may have success responses deserialized
-//! with [`RpcResult::deserialize_success::<U>`], which will transform it to an
-//! [`RpcResult<U>`]. Or the caller may use [`RpcResult::try_success_as::<U>`]
-//! to attempt to deserialize without transforming the [`RpcResult`].
+
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
 
