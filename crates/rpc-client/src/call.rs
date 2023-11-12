@@ -231,7 +231,7 @@ where
                     Err(e) => Ready(Err(e)),
                 }
             }
-            Err(e) => return Ready(Ok(ResponsePayload::Err(e))),
+            Err(e) => Ready(Ok(ResponsePayload::Err(e))),
         }
     }
 }

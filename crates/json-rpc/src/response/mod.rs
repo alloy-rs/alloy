@@ -27,9 +27,9 @@ pub struct Response<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     pub payload: ResponsePayload<Payload, ErrData>,
 }
 
-impl<Payload, ErrData, E> Into<RpcResult<Payload, ErrData, E>> for Response<Payload, ErrData> {
-    fn into(self) -> RpcResult<Payload, ErrData, E> {
-        match self.payload {
+impl<Payload, ErrData, E> From<Response<Payload, ErrData>> for RpcResult<Payload, ErrData, E> {
+    fn from(value: Response<Payload, ErrData>) -> Self {
+        match value.payload {
             ResponsePayload::Ok(payload) => Ok(Ok(payload)),
             ResponsePayload::Err(payload) => Ok(Err(payload)),
         }
@@ -86,24 +86,6 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
         match self.payload {
             ResponsePayload::Err(ref payload) => Some(payload),
             _ => None,
-        }
-    }
-
-    /// Take the success payload, if any.
-    pub fn take_success(self) -> Option<Payload> {
-        if let ResponsePayload::Ok(payload) = self.payload {
-            Some(payload)
-        } else {
-            None
-        }
-    }
-
-    /// Take the failure payload, if any.
-    pub fn take_failure(self) -> Option<ErrorPayload<ErrData>> {
-        if let ResponsePayload::Err(payload) = self.payload {
-            Some(payload)
-        } else {
-            None
         }
     }
 }
