@@ -21,5 +21,5 @@ async fn it_makes_a_request() {
 
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
 
-    timeout.await.unwrap().unwrap();
+    timeout.await.unwrap().unwrap().unwrap();
 }

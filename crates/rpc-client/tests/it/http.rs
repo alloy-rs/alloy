@@ -12,5 +12,5 @@ async fn it_makes_a_request() {
     let params: Cow<'static, _> = Cow::Owned(());
 
     let req: RpcCall<_, Cow<'static, ()>, U64> = client.prepare("eth_blockNumber", params);
-    req.await.unwrap();
+    req.await.unwrap().unwrap();
 }
