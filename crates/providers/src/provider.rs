@@ -60,6 +60,18 @@ pub trait TempProvider: Send + Sync {
     where
         Self: Sync;
 
+    /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
+    async fn get_block(
+        &self,
+        id: BlockId,
+        full: bool,
+    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError> {
+        match id {
+            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
+            BlockId::Number(number) => self.get_block_by_number(number, full).await,
+        }
+    }
+
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
     async fn get_block_by_hash(
         &self,
@@ -601,7 +613,7 @@ mod providers_test {
         let count = provider
             .get_transaction_count(
                 address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
-                Some(BlockNumberOrTag::Latest),
+                Some(BlockNumberOrTag::Latest.into()),
             )
             .await
             .unwrap();
