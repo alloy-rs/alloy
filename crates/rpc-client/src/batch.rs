@@ -46,10 +46,7 @@ impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, Transp
     fn from(
         rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
     ) -> Self {
-        Self {
-            rx,
-            _resp: PhantomData,
-        }
+        Self { rx, _resp: PhantomData }
     }
 }
 
@@ -168,11 +165,7 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> Poll<<Self as Future>::Output> {
-        let CallStateProj::Prepared {
-            transport,
-            requests,
-            channels,
-        } = self.as_mut().project()
+        let CallStateProj::Prepared { transport, requests, channels } = self.as_mut().project()
         else {
             unreachable!("Called poll_prepared in incorrect state")
         };

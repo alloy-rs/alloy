@@ -22,9 +22,7 @@ pub struct ClientBuilder<L> {
 
 impl Default for ClientBuilder<Identity> {
     fn default() -> Self {
-        Self {
-            builder: ServiceBuilder::new(),
-        }
+        Self { builder: ServiceBuilder::new() }
     }
 }
 
@@ -34,9 +32,7 @@ impl<L> ClientBuilder<L> {
     /// This is a wrapper around [`tower::ServiceBuilder::layer`]. Layers that
     /// are added first will be called with the request first.
     pub fn layer<M>(self, layer: M) -> ClientBuilder<Stack<M, L>> {
-        ClientBuilder {
-            builder: self.builder.layer(layer),
-        }
+        ClientBuilder { builder: self.builder.layer(layer) }
     }
 
     /// Create a new [`RpcClient`] with the given transport and the configured

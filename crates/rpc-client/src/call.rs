@@ -55,11 +55,7 @@ where
     ) -> task::Poll<<Self as Future>::Output> {
         trace!("Polling prepared");
         let fut = {
-            let CallStateProj::Prepared {
-                connection,
-                request,
-            } = self.as_mut().project()
-            else {
+            let CallStateProj::Prepared { connection, request } = self.as_mut().project() else {
                 unreachable!("Called poll_prepared in incorrect state")
             };
 
@@ -67,10 +63,7 @@ where
                 self.set(CallState::Complete);
                 return Ready(RpcResult::Err(e));
             }
-            let request = request
-                .take()
-                .expect("No request. This is a bug.")
-                .serialize();
+            let request = request.take().expect("No request. This is a bug.").serialize();
 
             match request {
                 Ok(request) => connection.call(request.into()),
@@ -163,13 +156,7 @@ where
 {
     #[doc(hidden)]
     pub fn new(req: Request<Params>, connection: Conn) -> Self {
-        Self {
-            state: CallState::Prepared {
-                request: Some(req),
-                connection,
-            },
-            _pd: PhantomData,
-        }
+        Self { state: CallState::Prepared { request: Some(req), connection }, _pd: PhantomData }
     }
 
     /// Get a mutable reference to the params of the request.
@@ -178,10 +165,7 @@ where
     /// prepared.
     pub fn params(&mut self) -> &mut Params {
         if let CallState::Prepared { request, .. } = &mut self.state {
-            &mut request
-                .as_mut()
-                .expect("No params in prepared. This is a bug")
-                .params
+            &mut request.as_mut().expect("No params in prepared. This is a bug").params
         } else {
             panic!("Cannot get params after request has been sent");
         }

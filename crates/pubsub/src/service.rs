@@ -65,10 +65,7 @@ where
     async fn reconnect(&mut self) -> Result<(), TransportError> {
         tracing::info!("Reconnecting pubsub service backend.");
 
-        let mut old_handle = self
-            .get_new_backend()
-            .await
-            .map_err(TransportError::custom)?;
+        let mut old_handle = self.get_new_backend().await.map_err(TransportError::custom)?;
 
         tracing::debug!("Draining old backend to_handle");
 
@@ -106,11 +103,7 @@ where
 
     /// Dispatch a request to the socket.
     fn dispatch_request(&mut self, brv: Box<RawValue>) -> Result<(), TransportError> {
-        self.handle
-            .to_socket
-            .send(brv)
-            .map(drop)
-            .map_err(|_| TransportError::BackendGone)
+        self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportError::BackendGone)
     }
 
     /// Service a request.
@@ -147,10 +140,7 @@ where
     fn service_unsubscribe(&mut self, local_id: U256) -> Result<(), TransportError> {
         let local_id = local_id.into();
         let req = Request {
-            meta: RequestMeta {
-                id: Id::None,
-                method: "eth_unsubscribe",
-            },
+            meta: RequestMeta { id: Id::None, method: "eth_unsubscribe" },
             params: [local_id],
         };
         let brv = req.serialize().expect("no ser error").take_request();
@@ -202,10 +192,8 @@ where
 
         // We send back a success response with the new subscription ID.
         // We don't care if the channel is dead.
-        let _ = in_flight.tx.send(Ok(Response {
-            id,
-            payload: ResponsePayload::Success(ser_alias),
-        }));
+        let _ =
+            in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
 
         Ok(())
     }

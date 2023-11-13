@@ -58,9 +58,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_blockNumber", Cow::<()>::Owned(()))
-            .await
+        self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -93,10 +91,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare(
-                "eth_getBlockByHash",
-                Cow::<(BlockHash, bool)>::Owned((hash, full)),
-            )
+            .prepare("eth_getBlockByHash", Cow::<(BlockHash, bool)>::Owned((hash, full)))
             .await
     }
 
@@ -122,9 +117,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_chainId", Cow::<()>::Owned(()))
-            .await
+        self.inner.prepare("eth_chainId", Cow::<()>::Owned(())).await
     }
     /// Gets the bytecode located at the corresponding [Address].
     pub async fn get_code_at<B: Into<BlockId> + Send + Sync>(
@@ -136,10 +129,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare(
-                "eth_getCode",
-                Cow::<(Address, BlockId)>::Owned((address, tag.into())),
-            )
+            .prepare("eth_getCode", Cow::<(Address, BlockId)>::Owned((address, tag.into())))
             .await
     }
 
@@ -169,19 +159,16 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_getLogs", Cow::<Vec<Filter>>::Owned(vec![filter]))
-            .await
+        self.inner.prepare("eth_getLogs", Cow::<Vec<Filter>>::Owned(vec![filter])).await
     }
 
-    /// Gets the accounts in the remote node. This is usually empty unless you're using a local node.
+    /// Gets the accounts in the remote node. This is usually empty unless you're using a local
+    /// node.
     pub async fn get_accounts(&self) -> RpcResult<Vec<Address>, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_accounts", Cow::<()>::Owned(()))
-            .await
+        self.inner.prepare("eth_accounts", Cow::<()>::Owned(())).await
     }
 
     /// Gets the current gas price.
@@ -189,9 +176,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_gasPrice", Cow::<()>::Owned(()))
-            .await
+        self.inner.prepare("eth_gasPrice", Cow::<()>::Owned(())).await
     }
 
     /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
@@ -202,12 +187,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare(
-                "eth_getTransactionReceipt",
-                Cow::<Vec<TxHash>>::Owned(vec![hash]),
-            )
-            .await
+        self.inner.prepare("eth_getTransactionReceipt", Cow::<Vec<TxHash>>::Owned(vec![hash])).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -241,12 +221,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare(
-                "eth_getBlockReceipts",
-                Cow::<BlockNumberOrTag>::Owned(block),
-            )
-            .await
+        self.inner.prepare("eth_getBlockReceipts", Cow::<BlockNumberOrTag>::Owned(block)).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
@@ -284,9 +259,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_syncing", Cow::<()>::Owned(()))
-            .await
+        self.inner.prepare("eth_syncing", Cow::<()>::Owned(())).await
     }
 
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
@@ -335,9 +308,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("eth_sendRawTransaction", Cow::<Bytes>::Owned(tx))
-            .await
+        self.inner.prepare("eth_sendRawTransaction", Cow::<Bytes>::Owned(tx)).await
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -350,9 +321,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     where
         Self: Sync,
     {
-        let base_fee_per_gas = match self
-            .get_block_by_number(BlockNumberOrTag::Latest, false)
-            .await
+        let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
         {
             RpcResult::Success(Some(block)) => match block.header.base_fee_per_gas {
                 Some(base_fee_per_gas) => base_fee_per_gas,
@@ -403,10 +372,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare(
-                "anvil_setCode",
-                Cow::<(Address, &'static str)>::Owned((address, code)),
-            )
+            .prepare("anvil_setCode", Cow::<(Address, &'static str)>::Owned((address, code)))
             .await
     }
 
@@ -487,17 +453,9 @@ mod providers_test {
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider
-            .get_block_by_number(tag, true)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
-        let block = provider
-            .get_block_by_hash(hash, true)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_hash(hash, true).await.unwrap().unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
     }
 
@@ -507,11 +465,7 @@ mod providers_test {
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider
-            .get_block_by_number(tag, true)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         assert_eq!(block.header.number.unwrap(), U256::from(num));
     }
 
@@ -521,11 +475,7 @@ mod providers_test {
         let provider = Provider::new(&anvil.endpoint()).unwrap();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
-        let block = provider
-            .get_block_by_number(tag, true)
-            .await
-            .unwrap()
-            .unwrap();
+        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         assert_eq!(block.header.number.unwrap(), U256::from(num));
     }
 

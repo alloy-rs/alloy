@@ -81,19 +81,18 @@ where
     /// # Returns
     /// - `None` if the payload is an error
     /// - `Some(Ok(T))` if the payload is a success and can be deserialized
-    /// - `Some(Err(serde_json::Error))` if the payload is a success and can't
-    ///   be deserialized as `T`
+    /// - `Some(Err(serde_json::Error))` if the payload is a success and can't be deserialized as
+    ///   `T`
     pub fn try_success_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
-        self.as_success()
-            .map(|payload| serde_json::from_str(payload.as_ref().get()))
+        self.as_success().map(|payload| serde_json::from_str(payload.as_ref().get()))
     }
 
     /// Deserialize a Success payload, if possible, transforming this type.
     ///
     /// # Returns
     ///
-    /// - `Ok(ResponsePayload<T>)` if the payload is an error, or if the
-    ///   payload is a success and can be deserialized as `T`
+    /// - `Ok(ResponsePayload<T>)` if the payload is an error, or if the payload is a success and
+    ///   can be deserialized as `T`
     /// - `Err(self)` if the payload is a success and can't be deserialized
     pub fn deserialize_success<T: DeserializeOwned>(
         self,
@@ -120,8 +119,7 @@ where
     /// # Returns
     /// - `None` if the payload is a success
     /// - `Some(Ok(T))` if the payload is an error and can be deserialized
-    /// - `Some(Err(serde_json::Error))` if the payload is an error and can't
-    ///   be deserialized as `T`
+    /// - `Some(Err(serde_json::Error))` if the payload is an error and can't be deserialized as `T`
     pub fn try_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
         self.as_error().and_then(|error| error.try_data_as::<T>())
     }
@@ -130,8 +128,8 @@ where
     ///
     /// # Returns
     ///
-    /// - `Ok(ResponsePayload<Payload, T>)` if the payload is an error, or if
-    ///   the payload is an error and can be deserialized as `T`.
+    /// - `Ok(ResponsePayload<Payload, T>)` if the payload is an error, or if the payload is an
+    ///   error and can be deserialized as `T`.
     /// - `Err(self)` if the payload is an error and can't be deserialized.
     pub fn deserialize_error<T: DeserializeOwned>(
         self,

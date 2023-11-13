@@ -151,14 +151,10 @@ where
     /// # Returns
     ///
     /// - `None` if the error has no `data` field.
-    /// - `Some(Ok(data))` if the error has a `data` field that can be
-    ///   deserialized.
-    /// - `Some(Err(err))` if the error has a `data` field that can't be
-    ///   deserialized.
+    /// - `Some(Ok(data))` if the error has a `data` field that can be deserialized.
+    /// - `Some(Err(err))` if the error has a `data` field that can't be deserialized.
     pub fn try_data_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {
-        self.data
-            .as_ref()
-            .map(|data| serde_json::from_str(data.borrow().get()))
+        self.data.as_ref().map(|data| serde_json::from_str(data.borrow().get()))
     }
 
     /// Attempt to deserialize the data field.
@@ -166,15 +162,12 @@ where
     /// # Returns
     ///
     /// - `Ok(ErrorPayload<T>)` if the data field can be deserialized
-    /// - `Err(self)` if the data field can't be deserialized, or if there
-    ///   is no data field.
+    /// - `Err(self)` if the data field can't be deserialized, or if there is no data field.
     pub fn deser_data<T: DeserializeOwned>(self) -> Result<ErrorPayload<T>, Self> {
         match self.try_data_as::<T>() {
-            Some(Ok(data)) => Ok(ErrorPayload {
-                code: self.code,
-                message: self.message,
-                data: Some(data),
-            }),
+            Some(Ok(data)) => {
+                Ok(ErrorPayload { code: self.code, message: self.message, data: Some(data) })
+            }
             _ => Err(self),
         }
     }

@@ -28,9 +28,7 @@ impl PubSubFrontend {
         id: U256,
     ) -> Result<broadcast::Receiver<Box<RawValue>>, TransportError> {
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(PubSubInstruction::GetSub(id, tx))
-            .map_err(|_| TransportError::BackendGone)?;
+        self.tx.send(PubSubInstruction::GetSub(id, tx)).map_err(|_| TransportError::BackendGone)?;
         rx.await.map_err(|_| TransportError::BackendGone)
     }
 

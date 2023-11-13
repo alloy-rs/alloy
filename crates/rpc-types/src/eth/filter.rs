@@ -92,11 +92,7 @@ impl<T: Eq + Hash> FilterSet<T> {
 impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
     /// Returns a list of Bloom (BloomFilter) corresponding to the filter's values
     pub fn to_bloom_filter(&self) -> BloomFilter {
-        self.0
-            .iter()
-            .map(|a| BloomInput::Raw(a.as_ref()).into())
-            .collect::<Vec<Bloom>>()
-            .into()
+        self.0.iter().map(|a| BloomInput::Raw(a.as_ref()).into()).collect::<Vec<Bloom>>().into()
     }
 }
 
@@ -110,9 +106,7 @@ impl<T: Clone + Eq + Hash> FilterSet<T> {
         let mut values = self.0.iter().cloned().collect::<Vec<T>>();
         match values.len() {
             0 => None,
-            1 => Some(ValueOrArray::Value(
-                values.pop().expect("values length is one"),
-            )),
+            1 => Some(ValueOrArray::Value(values.pop().expect("values length is one"))),
             _ => Some(ValueOrArray::Array(values)),
         }
     }
@@ -163,10 +157,9 @@ impl FilterBlockOption {
     /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
     pub fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
-            FilterBlockOption::Range {
-                from_block,
-                to_block,
-            } => (from_block.as_ref(), to_block.as_ref()),
+            FilterBlockOption::Range { from_block, to_block } => {
+                (from_block.as_ref(), to_block.as_ref())
+            }
             FilterBlockOption::AtBlockHash(_) => (None, None),
         }
     }
@@ -175,10 +168,7 @@ impl FilterBlockOption {
 impl From<BlockNumberOrTag> for FilterBlockOption {
     fn from(block: BlockNumberOrTag) -> Self {
         let block = Some(block);
-        FilterBlockOption::Range {
-            from_block: block,
-            to_block: block,
-        }
+        FilterBlockOption::Range { from_block: block, to_block: block }
     }
 }
 
@@ -198,30 +188,21 @@ impl<T: Into<BlockNumberOrTag>> From<Range<T>> for FilterBlockOption {
     fn from(r: Range<T>) -> Self {
         let from_block = Some(r.start.into());
         let to_block = Some(r.end.into());
-        FilterBlockOption::Range {
-            from_block,
-            to_block,
-        }
+        FilterBlockOption::Range { from_block, to_block }
     }
 }
 
 impl<T: Into<BlockNumberOrTag>> From<RangeTo<T>> for FilterBlockOption {
     fn from(r: RangeTo<T>) -> Self {
         let to_block = Some(r.end.into());
-        FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Earliest),
-            to_block,
-        }
+        FilterBlockOption::Range { from_block: Some(BlockNumberOrTag::Earliest), to_block }
     }
 }
 
 impl<T: Into<BlockNumberOrTag>> From<RangeFrom<T>> for FilterBlockOption {
     fn from(r: RangeFrom<T>) -> Self {
         let from_block = Some(r.start.into());
-        FilterBlockOption::Range {
-            from_block,
-            to_block: Some(BlockNumberOrTag::Latest),
-        }
+        FilterBlockOption::Range { from_block, to_block: Some(BlockNumberOrTag::Latest) }
     }
 }
 
@@ -233,10 +214,7 @@ impl From<B256> for FilterBlockOption {
 
 impl Default for FilterBlockOption {
     fn default() -> Self {
-        FilterBlockOption::Range {
-            from_block: None,
-            to_block: None,
-        }
+        FilterBlockOption::Range { from_block: None, to_block: None }
     }
 }
 
@@ -244,31 +222,19 @@ impl FilterBlockOption {
     /// Sets the block number this range filter should start at.
     #[must_use]
     pub fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
-        let to_block = if let FilterBlockOption::Range { to_block, .. } = self {
-            *to_block
-        } else {
-            None
-        };
+        let to_block =
+            if let FilterBlockOption::Range { to_block, .. } = self { *to_block } else { None };
 
-        FilterBlockOption::Range {
-            from_block: Some(block),
-            to_block,
-        }
+        FilterBlockOption::Range { from_block: Some(block), to_block }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
     pub fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
-        let from_block = if let FilterBlockOption::Range { from_block, .. } = self {
-            *from_block
-        } else {
-            None
-        };
+        let from_block =
+            if let FilterBlockOption::Range { from_block, .. } = self { *from_block } else { None };
 
-        FilterBlockOption::Range {
-            from_block,
-            to_block: Some(block),
-        }
+        FilterBlockOption::Range { from_block, to_block: Some(block) }
     }
 
     /// Pins the block hash this filter should target.
@@ -400,7 +366,8 @@ impl Filter {
     /// # use alloy_primitives::Address;
     /// # use alloy_rpc_types::Filter;
     /// # fn main() {
-    /// let filter = Filter::new().address("0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap());
+    /// let filter = Filter::new()
+    ///     .address("0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap());
     /// # }
     /// ```
     ///
@@ -411,7 +378,10 @@ impl Filter {
     /// # use alloy_primitives::Address;
     /// # use alloy_rpc_types::Filter;
     /// # fn main() {
-    /// let addresses = vec!["0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap(),"0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8".parse::<Address>().unwrap()];
+    /// let addresses = vec![
+    ///     "0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap(),
+    ///     "0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8".parse::<Address>().unwrap(),
+    /// ];
     /// let filter = Filter::new().address(addresses);
     /// # }
     /// ```
@@ -431,10 +401,7 @@ impl Filter {
     /// Hashes all event signatures and sets them as array to event_signature(topic0)
     #[must_use]
     pub fn events(self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
-        let events = events
-            .into_iter()
-            .map(|e| keccak256(e.as_ref()))
-            .collect::<Vec<_>>();
+        let events = events.into_iter().map(|e| keccak256(e.as_ref())).collect::<Vec<_>>();
         self.event_signature(events)
     }
 
@@ -486,9 +453,7 @@ impl Filter {
 
     /// Returns the numeric value of the `fromBlock` field
     pub fn get_from_block(&self) -> Option<U64> {
-        self.block_option
-            .get_from_block()
-            .and_then(|b| b.as_number())
+        self.block_option.get_from_block().and_then(|b| b.as_number())
     }
 
     /// Returns the numeric value of the `fromBlock` field
@@ -512,10 +477,7 @@ impl Serialize for Filter {
     {
         let mut s = serializer.serialize_struct("Filter", 5)?;
         match self.block_option {
-            FilterBlockOption::Range {
-                from_block,
-                to_block,
-            } => {
+            FilterBlockOption::Range { from_block, to_block } => {
                 if let Some(ref from_block) = from_block {
                     s.serialize_field("fromBlock", from_block)?;
                 }
@@ -654,17 +616,10 @@ impl<'de> Deserialize<'de> for Filter {
                 let block_option = if let Some(block_hash) = block_hash {
                     FilterBlockOption::AtBlockHash(block_hash)
                 } else {
-                    FilterBlockOption::Range {
-                        from_block,
-                        to_block,
-                    }
+                    FilterBlockOption::Range { from_block, to_block }
                 };
 
-                Ok(Filter {
-                    block_option,
-                    address,
-                    topics,
-                })
+                Ok(Filter { block_option, address, topics })
             }
         }
 
@@ -756,9 +711,7 @@ impl FilteredParams {
     /// for matching
     pub fn new(filter: Option<Filter>) -> Self {
         if let Some(filter) = filter {
-            FilteredParams {
-                filter: Some(filter),
-            }
+            FilteredParams { filter: Some(filter) }
         } else {
             Default::default()
         }
@@ -839,10 +792,7 @@ impl FilteredParams {
 
     /// Returns `true` if the filter matches the given log.
     pub fn filter_address(&self, log: &Log) -> bool {
-        self.filter
-            .as_ref()
-            .map(|f| f.address.matches(&log.address))
-            .unwrap_or(true)
+        self.filter.as_ref().map(|f| f.address.matches(&log.address)).unwrap_or(true)
     }
 
     /// Returns `true` if the log matches the filter's topics
@@ -1066,16 +1016,12 @@ mod tests {
             value: ValueOrArray<U256>,
         }
 
-        let item = Item {
-            value: ValueOrArray::Value(U256::from(1u64)),
-        };
+        let item = Item { value: ValueOrArray::Value(U256::from(1u64)) };
         let json = serde_json::to_value(item.clone()).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
 
-        let item = Item {
-            value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]),
-        };
+        let item = Item { value: ValueOrArray::Array(vec![U256::from(1u64), U256::ZERO]) };
         let json = serde_json::to_value(item.clone()).unwrap();
         let deserialized: Item = serde_json::from_value(json).unwrap();
         assert_eq!(item, deserialized);
@@ -1125,38 +1071,23 @@ mod tests {
 
         // 3
         let ser = serialize(&filter.clone().topic3(t3));
-        assert_eq!(
-            ser,
-            json!({ "address" : addr, "topics": [t0, null, null, t3_padded]})
-        );
+        assert_eq!(ser, json!({ "address" : addr, "topics": [t0, null, null, t3_padded]}));
 
         // 1 & 2
         let ser = serialize(&filter.clone().topic1(t1).topic2(t2));
-        assert_eq!(
-            ser,
-            json!({ "address" : addr, "topics": [t0, t1_padded, t2]})
-        );
+        assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, t2]}));
 
         // 1 & 3
         let ser = serialize(&filter.clone().topic1(t1).topic3(t3));
-        assert_eq!(
-            ser,
-            json!({ "address" : addr, "topics": [t0, t1_padded, null, t3_padded]})
-        );
+        assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, null, t3_padded]}));
 
         // 2 & 3
         let ser = serialize(&filter.clone().topic2(t2).topic3(t3));
-        assert_eq!(
-            ser,
-            json!({ "address" : addr, "topics": [t0, null, t2, t3_padded]})
-        );
+        assert_eq!(ser, json!({ "address" : addr, "topics": [t0, null, t2, t3_padded]}));
 
         // 1 & 2 & 3
         let ser = serialize(&filter.topic1(t1).topic2(t2).topic3(t3));
-        assert_eq!(
-            ser,
-            json!({ "address" : addr, "topics": [t0, t1_padded, t2, t3_padded]})
-        );
+        assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, t2, t3_padded]}));
     }
 
     #[test]

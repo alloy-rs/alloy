@@ -30,9 +30,7 @@ impl IntoClientRequest for WsConnect {
             let mut auth_value = http::HeaderValue::from_str(&auth.to_string())?;
             auth_value.set_sensitive(true);
 
-            request
-                .headers_mut()
-                .insert(http::header::AUTHORIZATION, auth_value);
+            request.headers_mut().insert(http::header::AUTHORIZATION, auth_value);
         }
 
         request.into_client_request()
@@ -49,9 +47,8 @@ impl PubSubConnect for WsConnect {
 
         Box::pin(async move {
             let req = request.map_err(TransportError::custom)?;
-            let (socket, _) = tokio_tungstenite::connect_async(req)
-                .await
-                .map_err(TransportError::custom)?;
+            let (socket, _) =
+                tokio_tungstenite::connect_async(req).await.map_err(TransportError::custom)?;
 
             let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
             let backend = WsBackend { socket, interface };

@@ -22,11 +22,7 @@ pub struct Stack<T, Inner, Outer> {
 impl<T, Inner, Outer> Stack<T, Inner, Outer> {
     /// Create a new `Stack`.
     pub fn new(inner: Inner, outer: Outer) -> Self {
-        Stack {
-            inner,
-            outer,
-            _pd: std::marker::PhantomData,
-        }
+        Stack { inner, outer, _pd: std::marker::PhantomData }
     }
 }
 
@@ -92,11 +88,7 @@ impl<L, N, T> ProviderBuilder<L, N, T> {
     /// builder.network::<Arbitrum>()
     /// ```
     pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net, T> {
-        ProviderBuilder {
-            layer: self.layer,
-            transport: self.transport,
-            network: PhantomData,
-        }
+        ProviderBuilder { layer: self.layer, transport: self.transport, network: PhantomData }
     }
 
     /// Finish the layer stack by providing a root [`RpcClient`], outputting

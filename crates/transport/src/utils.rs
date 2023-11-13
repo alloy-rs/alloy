@@ -12,8 +12,7 @@ use url::Url;
 pub fn guess_local_url(s: impl AsRef<str>) -> bool {
     fn _guess_local_url(url: &str) -> bool {
         if let Ok(url) = url.parse::<Url>() {
-            url.host_str()
-                .map_or(true, |host| host == "localhost" || host == "127.0.0.1")
+            url.host_str().map_or(true, |host| host == "localhost" || host == "127.0.0.1")
         } else {
             false
         }

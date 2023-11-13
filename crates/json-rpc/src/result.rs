@@ -192,10 +192,9 @@ where
     ///
     /// # Returns
     /// - `None` if the response is not `Success`.
-    /// - `Some(Ok(Resp))` if the response is `Success` and the
-    ///   `result` field can be deserialized.
-    /// - `Some(Err(err))` if the response is `Success` and the `result` field
-    ///   can't be deserialized.
+    /// - `Some(Ok(Resp))` if the response is `Success` and the `result` field can be deserialized.
+    /// - `Some(Err(err))` if the response is `Success` and the `result` field can't be
+    ///   deserialized.
     pub fn try_success_as<'a, Resp: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<Resp>> {
         match self {
             Self::Success(val) => Some(serde_json::from_str(val.borrow().get())),
@@ -245,10 +244,9 @@ where
     ///
     /// # Returns
     /// - `None` if the response is not `Failure`
-    /// - `Some(Ok(ErrorPayload))` if the response is `Failure` and the
-    ///   `data` field can be deserialized.
-    /// - `Some(Err(err))` if the response is `Failure` and the `data` field
-    ///   can't be deserialized.
+    /// - `Some(Ok(ErrorPayload))` if the response is `Failure` and the `data` field can be
+    ///   deserialized.
+    /// - `Some(Err(err))` if the response is `Failure` and the `data` field can't be deserialized.
     pub fn try_failure_as<'a, ErrData: Deserialize<'a>>(
         &'a self,
     ) -> Option<serde_json::Result<ErrData>> {
@@ -263,10 +261,9 @@ where
     pub fn deserialize_failure<ErrData: RpcReturn>(self) -> Result<RpcResult<T, ErrData, E>, Self> {
         match self {
             RpcResult::Success(ok) => Ok(RpcResult::Success(ok)),
-            RpcResult::Failure(err_resp) => err_resp
-                .deser_data::<ErrData>()
-                .map(RpcResult::Failure)
-                .map_err(RpcResult::Failure),
+            RpcResult::Failure(err_resp) => {
+                err_resp.deser_data::<ErrData>().map(RpcResult::Failure).map_err(RpcResult::Failure)
+            }
             RpcResult::Err(err) => Ok(RpcResult::Err(err)),
         }
     }
@@ -296,11 +293,7 @@ where
                     data: Some(data),
                 })),
                 Some(Err(e)) => {
-                    let text = err_resp
-                        .data
-                        .as_ref()
-                        .map(|d| d.borrow().get())
-                        .unwrap_or("");
+                    let text = err_resp.data.as_ref().map(|d| d.borrow().get()).unwrap_or("");
                     Err(f(e, text))
                 }
             },
