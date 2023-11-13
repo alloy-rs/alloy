@@ -56,6 +56,8 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use serde::{de::DeserializeOwned, Serialize};
+
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
 
@@ -77,13 +79,12 @@ pub use common::Id;
 mod result;
 pub use result::{BorrowedRpcResult, RpcResult};
 
-use serde::{de::DeserializeOwned, Serialize};
-
 /// An object that can be used as a JSON-RPC parameter.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
 /// used to indicate that a type can be used as a JSON-RPC parameter.
 pub trait RpcParam: Serialize + Clone + Send + Sync + Unpin {}
+
 impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
 
 /// An object that can be used as a JSON-RPC return value.
@@ -97,6 +98,7 @@ impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
 /// This is a simplification that makes it easier to use the types in client
 /// code. It is not suitable for use in server code.
 pub trait RpcReturn: DeserializeOwned + Send + Sync + Unpin + 'static {}
+
 impl<T> RpcReturn for T where T: DeserializeOwned + Send + Sync + Unpin + 'static {}
 
 /// An object that can be used as a JSON-RPC parameter and return value.
@@ -105,4 +107,5 @@ impl<T> RpcReturn for T where T: DeserializeOwned + Send + Sync + Unpin + 'stati
 /// used to indicate that a type can be used as both a JSON-RPC parameter and
 /// return value.
 pub trait RpcObject: RpcParam + RpcReturn {}
+
 impl<T> RpcObject for T where T: RpcParam + RpcReturn {}

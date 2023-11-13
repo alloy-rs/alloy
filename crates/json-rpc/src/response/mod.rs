@@ -1,18 +1,17 @@
+use crate::common::Id;
+use serde::{
+    de::{DeserializeOwned, MapAccess, Visitor},
+    Deserialize, Deserializer,
+};
+use serde_json::value::RawValue;
+use std::{borrow::Borrow, fmt, marker::PhantomData};
+
 mod error;
 pub use error::{BorrowedErrorPayload, ErrorPayload};
 
 mod payload;
 pub use payload::{BorrowedResponsePayload, ResponsePayload};
 
-use std::{borrow::Borrow, fmt, marker::PhantomData};
-
-use serde::{
-    de::{DeserializeOwned, MapAccess, Visitor},
-    Deserialize, Deserializer,
-};
-use serde_json::value::RawValue;
-
-use crate::common::Id;
 /// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
 ///
 /// This object is used to represent a JSONRPC-2.0 response. It may contain

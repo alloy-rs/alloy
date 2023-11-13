@@ -5,7 +5,6 @@ use serde::{Deserialize, Deserializer, Serializer};
 
 pub mod json_u256;
 pub mod num;
-/// Storage related helpers.
 pub mod storage;
 pub mod u64_hex;
 

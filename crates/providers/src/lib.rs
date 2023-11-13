@@ -16,20 +16,19 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod builder;
-pub use builder::{ProviderBuilder, ProviderLayer, Stack};
-
 use alloy_json_rpc::RpcResult;
 use alloy_networks::{Network, Transaction};
 use alloy_primitives::Address;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::{BoxTransport, Transport, TransportError};
 use serde_json::value::RawValue;
+use std::{borrow::Cow, marker::PhantomData};
+
+mod builder;
+pub use builder::{ProviderBuilder, ProviderLayer, Stack};
 
 pub mod provider;
 pub mod utils;
-
-use std::{borrow::Cow, marker::PhantomData};
 
 /// A network-wrapped RPC client.
 ///

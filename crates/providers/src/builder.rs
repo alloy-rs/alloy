@@ -1,10 +1,8 @@
-use std::marker::PhantomData;
-
+use crate::{NetworkRpcClient, Provider};
 use alloy_networks::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
-
-use crate::{NetworkRpcClient, Provider};
+use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///

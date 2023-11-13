@@ -1,8 +1,7 @@
+use crate::managers::InFlight;
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
 use tokio::sync::{broadcast, oneshot};
-
-use crate::managers::InFlight;
 
 /// Instructions for the pubsub service.
 pub(crate) enum PubSubInstruction {

@@ -1,9 +1,10 @@
-use std::collections::HashSet;
-
+use crate::{Id, Response, SerializedRequest};
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use serde_json::value::RawValue;
-
-use crate::{Id, Response, SerializedRequest};
+use std::collections::HashSet;
+use std::fmt;
+use std::marker::PhantomData;
 
 /// A [`RequestPacket`] is a [`SerializedRequest`] or a batch of serialized
 /// request.
@@ -144,10 +145,6 @@ impl<Payload, ErrData> From<Vec<Response<Payload, ErrData>>> for ResponsePacket<
         }
     }
 }
-
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
-use std::fmt;
-use std::marker::PhantomData;
 
 impl<'de, Payload, ErrData> Deserialize<'de> for ResponsePacket<Payload, ErrData>
 where

@@ -1,8 +1,7 @@
+use crate::{Transport, TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::fmt::Debug;
 use tower::Service;
-
-use crate::{Transport, TransportError, TransportFut};
 
 /// A boxed, Clone-able [`Transport`] trait object.
 ///

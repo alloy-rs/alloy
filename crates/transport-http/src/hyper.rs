@@ -1,10 +1,9 @@
+use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportFut};
 use hyper::client::{connect::Connect, Client};
 use std::task;
 use tower::Service;
-
-use crate::Http;
 
 impl<C> Http<Client<C>>
 where

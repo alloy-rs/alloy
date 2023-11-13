@@ -1,8 +1,7 @@
-use std::hash::Hash;
-
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
 use serde_json::value::RawValue;
+use std::hash::Hash;
 use tokio::sync::broadcast;
 
 #[derive(Clone)]

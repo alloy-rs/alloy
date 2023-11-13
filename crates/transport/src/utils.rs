@@ -1,10 +1,8 @@
+use crate::error::TransportError;
 use serde::Serialize;
 use serde_json::{self, value::RawValue};
-use url::Url;
-
 use std::future::Future;
-
-use crate::error::TransportError;
+use url::Url;
 
 /// Guess whether the URL is local, based on the hostname.
 ///

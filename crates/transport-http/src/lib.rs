@@ -15,14 +15,14 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use alloy_transport::utils::guess_local_url;
+use url::Url;
+
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
 #[cfg(feature = "reqwest")]
 mod reqwest;
-
-use alloy_transport::utils::guess_local_url;
-use url::Url;
 
 /// An Http transport.
 ///

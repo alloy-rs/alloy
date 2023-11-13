@@ -1,8 +1,7 @@
+use crate::{ErrorPayload, Response, ResponsePayload, RpcReturn};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use std::{borrow::Borrow, fmt::Debug};
-
-use crate::{ErrorPayload, Response, ResponsePayload, RpcReturn};
 
 /// The result of a JSON-RPC request.
 ///

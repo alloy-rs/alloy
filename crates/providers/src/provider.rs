@@ -1,5 +1,6 @@
 //! Alloy main Provider abstraction.
 
+use crate::utils::{self, EstimatorFunction};
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256, U64};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
@@ -13,8 +14,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 use thiserror::Error;
-
-use crate::utils::{self, EstimatorFunction};
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum ClientError {

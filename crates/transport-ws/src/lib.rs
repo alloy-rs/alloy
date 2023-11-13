@@ -18,6 +18,8 @@
 #[macro_use]
 extern crate tracing;
 
+use alloy_pubsub::ConnectionInterface;
+
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
 #[cfg(not(target_arch = "wasm32"))]
@@ -27,8 +29,6 @@ pub use native::WsConnect;
 mod wasm;
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WsConnect;
-
-use alloy_pubsub::ConnectionInterface;
 
 /// An ongoing connection to a backend.
 ///

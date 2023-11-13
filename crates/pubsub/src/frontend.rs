@@ -1,13 +1,11 @@
-use std::{future::Future, pin::Pin};
-
+use crate::{ix::PubSubInstruction, managers::InFlight};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::U256;
+use alloy_transport::{TransportError, TransportFut};
 use futures::future::try_join_all;
 use serde_json::value::RawValue;
+use std::{future::Future, pin::Pin};
 use tokio::sync::{broadcast, mpsc, oneshot};
-
-use crate::{ix::PubSubInstruction, managers::InFlight};
-use alloy_transport::{TransportError, TransportFut};
 
 /// A `PubSubFrontend` is [`Transport`] composed of a channel to a running
 /// PubSub service.

@@ -1,7 +1,6 @@
+use crate::{BoxTransport, TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use tower::Service;
-
-use crate::{BoxTransport, TransportError, TransportFut};
 
 /// A `Transport` manages the JSON-RPC request/response lifecycle.
 ///

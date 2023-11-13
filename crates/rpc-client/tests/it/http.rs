@@ -1,7 +1,6 @@
-use std::borrow::Cow;
-
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
+use std::borrow::Cow;
 
 // #[tokio::test]
 async fn it_makes_a_request() {

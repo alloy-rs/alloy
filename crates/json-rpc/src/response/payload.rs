@@ -1,9 +1,7 @@
-use std::borrow::Borrow;
-
+use crate::ErrorPayload;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::value::RawValue;
-
-use crate::ErrorPayload;
+use std::borrow::Borrow;
 
 /// A JSONRPC-2.0 response payload.
 ///
