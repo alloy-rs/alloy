@@ -43,7 +43,7 @@ pub trait TempProvider: Send + Sync {
     async fn get_transaction_count(
         &self,
         address: Address,
-        tag: Option<BlockNumberOrTag>,
+        tag: Option<BlockId>,
     ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
     where
         Self: Sync;
@@ -61,6 +61,18 @@ pub trait TempProvider: Send + Sync {
     ) -> RpcResult<U256, Box<RawValue>, TransportError>
     where
         Self: Sync;
+
+    /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
+    async fn get_block(
+        &self,
+        id: BlockId,
+        full: bool,
+    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError> {
+        match id {
+            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
+            BlockId::Number(number) => self.get_block_by_number(number, full).await,
+        }
+    }
 
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
     async fn get_block_by_hash(
@@ -242,7 +254,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn get_transaction_count(
         &self,
         address: Address,
-        tag: Option<BlockNumberOrTag>,
+        tag: Option<BlockId>,
     ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
@@ -250,9 +262,9 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                Cow::<(Address, BlockNumberOrTag)>::Owned((
+                Cow::<(Address, BlockId)>::Owned((
                     address,
-                    tag.unwrap_or(BlockNumberOrTag::Latest),
+                    tag.unwrap_or(BlockNumberOrTag::Latest.into()),
                 )),
             )
             .await
@@ -673,7 +685,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
-        assert_eq!(U256::ZERO, num)
+        assert_eq!(U64::ZERO, num)
     }
 
     #[tokio::test]
@@ -683,7 +695,7 @@ mod providers_test {
         let count = provider
             .get_transaction_count(
                 address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
-                Some(BlockNumberOrTag::Latest),
+                Some(BlockNumberOrTag::Latest.into()),
             )
             .await
             .unwrap();
