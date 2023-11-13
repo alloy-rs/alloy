@@ -19,6 +19,7 @@ body:
         - transports
         - networks
         - providers
+        - rpc-types
     validations:
       required: true
   - type: input
