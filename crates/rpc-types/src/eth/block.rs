@@ -435,7 +435,7 @@ impl From<u64> for BlockId {
 
 impl From<U64> for BlockId {
     fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num.to::<u64>()).into()
+        BlockNumberOrTag::Number(num).into()
     }
 }
 
