@@ -9,7 +9,7 @@
     // missing_debug_implementations,
     // missing_docs,
     unreachable_pub,
-    clippy::missing_const_for_fn,
+    // clippy::missing_const_for_fn,
     rustdoc::all
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
