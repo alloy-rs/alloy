@@ -1,5 +1,7 @@
 [package]
 name = "alloy-transport"
+description = "Transport implementations for Alloy providers"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,22 +11,18 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 alloy-json-rpc.workspace = true
 
-serde = { workspace = true, features = ["derive"] }
+base64.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
+serde.workspace = true
 thiserror.workspace = true
-url.workspace = true
 tower.workspace = true
-
-base64 = "0.21.0"
+url.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4.37"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-workspace = true
-features = ["rt"]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["rt"] }

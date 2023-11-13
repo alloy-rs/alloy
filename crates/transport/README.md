@@ -1,8 +1,8 @@
-## alloy-transports
+# alloy-transports
 
 <!-- TODO: More links and real doctests -->
 
-Transport implementations for Alloy providers
+Transport implementations for Alloy providers.
 
 This crate handles RPC connection and request management. It builds an
 `RpcClient` on top of the [tower `Service`] abstraction, and provides

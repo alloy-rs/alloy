@@ -1,5 +1,4 @@
 use super::WsBackend;
-
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Pbf, TransportError};
 use futures::{
@@ -7,7 +6,6 @@ use futures::{
     stream::{Fuse, StreamExt},
 };
 use serde_json::value::RawValue;
-use tracing::error;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 
 /// Simple connection info for the websocket.

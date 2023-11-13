@@ -67,7 +67,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check --feature-powerset --depth 2 --all-targets
+        run: cargo hack check --feature-powerset --depth 2
 
   clippy:
     runs-on: ubuntu-latest

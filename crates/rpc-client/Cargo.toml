@@ -1,5 +1,7 @@
 [package]
 name = "alloy-rpc-client"
+description = "RPC client"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,19 +11,16 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 alloy-json-rpc.workspace = true
-alloy-transport.workspace = true
 alloy-transport-http.workspace = true
-
+alloy-transport.workspace = true
 
 futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
-tracing.workspace = true
 tower.workspace = true
+tracing.workspace = true
 
 alloy-primitives = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }

@@ -2,7 +2,7 @@
 
 <!-- TODO: links, docs, examples, etc -->
 
-RPC Providers for Alloy apps.
+Ethereum JSON-RPC providers.
 
 This crate contains the `Provider` trait, which exposes Ethereum JSON-RPC
 methods. Providers in alloy are similar to ethers.js Providers. They manage an

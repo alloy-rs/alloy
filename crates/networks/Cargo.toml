@@ -1,5 +1,7 @@
 [package]
 name = "alloy-networks"
+description = "Ethereum blockchain RPC behavior abstraction"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,12 +10,8 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rlp.workspace = true
-alloy-transport.workspace = true
-pin-project.workspace = true
-tower.workspace = true

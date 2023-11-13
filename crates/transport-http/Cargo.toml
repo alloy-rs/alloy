@@ -1,5 +1,7 @@
 [package]
 name = "alloy-transport-http"
+description = "HTTP transport implementation"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,8 +10,6 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-json-rpc.workspace = true
@@ -21,10 +21,8 @@ tower.workspace = true
 
 reqwest = { workspace = true, features = ["serde_json", "json"], optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.hyper]
-version = "0.14.27"
-optional = true
-features = ["full"]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+hyper = { workspace = true, features = ["full"], optional = true }
 
 [features]
 default = ["reqwest"]

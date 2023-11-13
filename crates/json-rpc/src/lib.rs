@@ -1,19 +1,3 @@
-#![doc(
-    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
-    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
-)]
-#![warn(
-    missing_copy_implementations,
-    missing_debug_implementations,
-    missing_docs,
-    unreachable_pub,
-    clippy::missing_const_for_fn,
-    rustdoc::all
-)]
-#![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![deny(unused_must_use, rust_2018_idioms)]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
-
 //! Alloy JSON-RPC data types.
 //!
 //! This crate provides data types for use with the JSON-RPC 2.0 protocol. It
@@ -55,6 +39,23 @@
 //! with [`RpcResult::deserialize_success::<U>`], which will transform it to an
 //! [`RpcResult<U>`]. Or the caller may use [`RpcResult::try_success_as::<U>`]
 //! to attempt to deserialize without transforming the [`RpcResult`].
+
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
 

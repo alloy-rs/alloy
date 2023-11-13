@@ -1,8 +1,6 @@
 use crate::WsBackend;
-
 use alloy_pubsub::PubSubConnect;
 use alloy_transport::{utils::Spawnable, Authorization, Pbf, TransportError};
-
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -11,7 +9,6 @@ use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
-use tracing::error;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 

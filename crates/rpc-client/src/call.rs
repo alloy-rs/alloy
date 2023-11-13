@@ -10,7 +10,6 @@ use std::{
     task::{self, Poll::Ready},
 };
 use tower::Service;
-use tracing::{instrument, trace};
 
 /// The states of the [`RpcCall`] future.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
