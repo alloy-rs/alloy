@@ -88,7 +88,7 @@ impl<'de> Deserialize<'de> for TransactionIndex {
 }
 
 /// Call request for `eth_call` and adjacent methods.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CallRequest {
     /// From
@@ -150,7 +150,7 @@ impl CallRequest {
 ///
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct CallInput {
     /// Transaction data
     pub input: Option<Bytes>,
