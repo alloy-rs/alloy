@@ -54,9 +54,6 @@ where
     T: AsRef<str>,
 {
     fn from((err, text): (serde_json::Error, T)) -> Self {
-        Self::SerdeJson {
-            err,
-            text: Some(text.as_ref().to_string()),
-        }
+        Self::SerdeJson { err, text: Some(text.as_ref().to_string()) }
     }
 }

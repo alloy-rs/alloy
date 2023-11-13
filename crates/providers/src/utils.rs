@@ -19,11 +19,7 @@ pub const EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE: i64 = 200;
 pub type EstimatorFunction = fn(U256, Vec<Vec<U256>>) -> (U256, U256);
 
 fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
-    let mut rewards: Vec<U256> = rewards
-        .iter()
-        .map(|r| r[0])
-        .filter(|r| *r > U256::ZERO)
-        .collect();
+    let mut rewards: Vec<U256> = rewards.iter().map(|r| r[0]).filter(|r| *r > U256::ZERO).collect();
     if rewards.is_empty() {
         return U256::ZERO;
     }
@@ -51,10 +47,7 @@ fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
 
     // Fetch the max of the percentage change, and that element's index.
     let max_change = percentage_change.iter().max().unwrap();
-    let max_change_index = percentage_change
-        .iter()
-        .position(|&c| c == *max_change)
-        .unwrap();
+    let max_change_index = percentage_change.iter().position(|&c| c == *max_change).unwrap();
 
     // If we encountered a big change in fees at a certain position, then consider only
     // the values >= it.

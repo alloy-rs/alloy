@@ -33,12 +33,7 @@ impl ConnectionHandle {
         let (error_tx, error_rx) = oneshot::channel();
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
-        let handle = Self {
-            to_socket,
-            from_socket,
-            error: error_rx,
-            shutdown: shutdown_tx,
-        };
+        let handle = Self { to_socket, from_socket, error: error_rx, shutdown: shutdown_tx };
         let interface = ConnectionInterface {
             from_frontend,
             to_frontend,

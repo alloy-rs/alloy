@@ -8,10 +8,7 @@ use std::borrow::Cow;
 async fn it_makes_a_request() {
     let infura = std::env::var("WS_PROVIDER_URL").unwrap();
 
-    let connector = WsConnect {
-        url: infura.parse().unwrap(),
-        auth: None,
-    };
+    let connector = WsConnect { url: infura.parse().unwrap(), auth: None };
 
     let client = ClientBuilder::default().pubsub(connector).await.unwrap();
 

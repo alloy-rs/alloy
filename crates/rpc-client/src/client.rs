@@ -34,20 +34,14 @@ pub struct RpcClient<T> {
 impl RpcClient<Identity> {
     /// Create a new [`ClientBuilder`].
     pub fn builder() -> ClientBuilder<Identity> {
-        ClientBuilder {
-            builder: ServiceBuilder::new(),
-        }
+        ClientBuilder { builder: ServiceBuilder::new() }
     }
 }
 
 impl<T> RpcClient<T> {
     /// Create a new [`RpcClient`] with the given transport.
     pub const fn new(t: T, is_local: bool) -> Self {
-        Self {
-            transport: t,
-            is_local,
-            id: AtomicU64::new(0),
-        }
+        Self { transport: t, is_local, id: AtomicU64::new(0) }
     }
 
     /// Connect to a transport via a [`TransportConnect`] implementor.
@@ -69,13 +63,7 @@ impl<T> RpcClient<T> {
         method: &'static str,
         params: Cow<'a, Params>,
     ) -> Request<Cow<'a, Params>> {
-        Request {
-            meta: RequestMeta {
-                method,
-                id: self.next_id(),
-            },
-            params,
-        }
+        Request { meta: RequestMeta { method, id: self.next_id() }, params }
     }
 
     /// `true` if the client believes the transport is local.
@@ -140,11 +128,7 @@ where
     /// `RpcClient<Ws>` you can put both into a `Vec<RpcClient<BoxTransport>>`.
     #[inline]
     pub fn boxed(self) -> RpcClient<BoxTransport> {
-        RpcClient {
-            transport: self.transport.boxed(),
-            is_local: self.is_local,
-            id: self.id,
-        }
+        RpcClient { transport: self.transport.boxed(), is_local: self.is_local, id: self.id }
     }
 }
 
