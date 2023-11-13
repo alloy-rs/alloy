@@ -18,15 +18,10 @@ pub(crate) struct InFlight {
 
 impl std::fmt::Debug for InFlight {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let channel_desc = format!(
-            "Channel status: {}",
-            if self.tx.is_closed() { "closed" } else { "ok" }
-        );
+        let channel_desc =
+            format!("Channel status: {}", if self.tx.is_closed() { "closed" } else { "ok" });
 
-        f.debug_struct("InFlight")
-            .field("req", &self.request)
-            .field("tx", &channel_desc)
-            .finish()
+        f.debug_struct("InFlight").field("req", &self.request).field("tx", &channel_desc).finish()
     }
 }
 

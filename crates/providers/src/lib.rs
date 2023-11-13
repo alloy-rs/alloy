@@ -42,10 +42,7 @@ where
     T: Transport,
 {
     fn from(client: RpcClient<T>) -> Self {
-        Self {
-            network: PhantomData,
-            client,
-        }
+        Self { network: PhantomData, client }
     }
 }
 

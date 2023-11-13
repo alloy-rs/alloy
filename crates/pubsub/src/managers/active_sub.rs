@@ -60,14 +60,7 @@ impl ActiveSubscription {
     pub(crate) fn new(request: SerializedRequest) -> (Self, broadcast::Receiver<Box<RawValue>>) {
         let local_id = request.params_hash();
         let (tx, rx) = broadcast::channel(16);
-        (
-            Self {
-                request,
-                local_id,
-                tx,
-            },
-            rx,
-        )
+        (Self { request, local_id, tx }, rx)
     }
 
     /// Serialize the request as a boxed [`RawValue`].

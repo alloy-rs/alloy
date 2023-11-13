@@ -159,9 +159,7 @@ mod test {
     fn it_serializes_and_deserializes() {
         let cases = [
             TestCase { id: Id::Number(1) },
-            TestCase {
-                id: Id::String("foo".to_string()),
-            },
+            TestCase { id: Id::String("foo".to_string()) },
             TestCase { id: Id::None },
         ];
 

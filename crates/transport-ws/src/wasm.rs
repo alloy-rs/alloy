@@ -24,11 +24,8 @@ impl PubSubConnect for WsConnect {
 
     fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
         Box::pin(async move {
-            let socket = WsMeta::connect(&self.url, None)
-                .await
-                .map_err(TransportError::custom)?
-                .1
-                .fuse();
+            let socket =
+                WsMeta::connect(&self.url, None).await.map_err(TransportError::custom)?.1.fuse();
 
             let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
             let backend = WsBackend { socket, interface };
@@ -54,9 +51,7 @@ impl WsBackend<Fuse<WsStream>> {
 
     /// Send a message to the websocket.
     pub async fn send(&mut self, msg: Box<RawValue>) -> Result<(), WsErr> {
-        self.socket
-            .send(WsMessage::Text(msg.get().to_owned()))
-            .await
+        self.socket.send(WsMessage::Text(msg.get().to_owned())).await
     }
 
     /// Spawn this backend on a loop.

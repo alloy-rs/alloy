@@ -33,14 +33,13 @@
 //! actual data being passed to and from the RPC. We can achieve partial
 //! (de)serialization by making them generic over a `serde_json::RawValue`.
 //!
-//! - For [`Request`] - [`PartiallySerializedRequest`] is a
-//!   `Request<Box<RawValue>`. It represents a `Request` whose parameters have
-//!   been serialized. [`SerializedRequest`], on the other hand is a request
-//!   that has been totally serialized. For client-development purposes, its
-//!   [`Id`] and method have been preserved.
-//! - For [`Response`] - [`BorrowedResponse`] is a `Response<&RawValue>`. It
-//!   represents a Response whose [`Id`] and return status (success or failure)
-//!   have been deserialized, but whose payload has not.
+//! - For [`Request`] - [`PartiallySerializedRequest`] is a `Request<Box<RawValue>`. It represents a
+//!   `Request` whose parameters have been serialized. [`SerializedRequest`], on the other hand is a
+//!   request that has been totally serialized. For client-development purposes, its [`Id`] and
+//!   method have been preserved.
+//! - For [`Response`] - [`BorrowedResponse`] is a `Response<&RawValue>`. It represents a Response
+//!   whose [`Id`] and return status (success or failure) have been deserialized, but whose payload
+//!   has not.
 //!
 //! Allowing partial serialization lets us include many unlike [`Request`]
 //! objects in collections (e.g. in a batch request). This is useful for

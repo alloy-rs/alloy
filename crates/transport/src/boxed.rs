@@ -27,9 +27,7 @@ impl BoxTransport {
     where
         T: Transport + Clone + Send + Sync,
     {
-        Self {
-            inner: Box::new(inner),
-        }
+        Self { inner: Box::new(inner) }
     }
 }
 
@@ -41,9 +39,7 @@ impl Debug for BoxTransport {
 
 impl Clone for BoxTransport {
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone_box(),
-        }
+        Self { inner: self.inner.clone_box() }
     }
 }
 

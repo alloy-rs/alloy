@@ -59,10 +59,7 @@ where
     /// Serialize the request, including the request parameters.
     pub fn serialize(self) -> serde_json::Result<SerializedRequest> {
         let request = serde_json::to_string(&self)?;
-        Ok(SerializedRequest {
-            meta: self.meta,
-            request: RawValue::from_string(request)?,
-        })
+        Ok(SerializedRequest { meta: self.meta, request: RawValue::from_string(request)? })
     }
 }
 

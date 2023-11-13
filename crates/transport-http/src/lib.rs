@@ -48,10 +48,7 @@ impl<T> Http<T> {
     where
         T: Default,
     {
-        Self {
-            client: Default::default(),
-            url,
-        }
+        Self { client: Default::default(), url }
     }
 
     /// Create a new [`Http`] transport with a custom client.
