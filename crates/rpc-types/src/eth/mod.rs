@@ -11,6 +11,8 @@ mod syncing;
 mod transaction;
 pub mod withdrawal;
 pub mod state;
+pub mod trace;
+pub mod txpool;
 
 pub use block::*;
 pub use call::{Bundle, CallInput, CallInputError, CallRequest, EthCallResponse, StateContext};
@@ -21,3 +23,4 @@ pub use raw_log::{logs_bloom, Log as RawLog};
 pub use syncing::*;
 pub use transaction::*;
 pub use withdrawal::Withdrawal;
+pub use txpool::*;

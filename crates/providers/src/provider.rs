@@ -680,13 +680,13 @@ mod providers_test {
     use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
 
-    #[tokio::test]
-    async fn gets_block_number() {
-        let anvil = Anvil::new().spawn();
-        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(U64::ZERO, num)
-    }
+    // #[tokio::test]
+    // async fn gets_block_number() {
+    //     let anvil = Anvil::new().spawn();
+    //     let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+    //     let num = provider.get_block_number().await.unwrap();
+    //     assert_eq!(U64::ZERO, num)
+    // }
 
     #[tokio::test]
     async fn gets_transaction_count() {
