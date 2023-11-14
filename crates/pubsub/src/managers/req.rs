@@ -1,8 +1,7 @@
+use crate::managers::InFlight;
 use alloy_json_rpc::{Id, Response};
 use alloy_primitives::U256;
 use std::collections::BTreeMap;
-
-use crate::managers::InFlight;
 
 /// Manages in-flight requests.
 #[derive(Debug, Default)]

@@ -1,6 +1,6 @@
 # alloy-networks
 
-Ethereum blockchain RPC behavior abstraction for Alloy.
+Ethereum blockchain RPC behavior abstraction.
 
 This crate contains a simple abstraction of the RPC behavior of an
 Ethereum-like blockchain. It is intended to be used by the Alloy client to

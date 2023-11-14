@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
@@ -14,16 +15,14 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-//! alloy-transport-http
+use alloy_transport::utils::guess_local_url;
+use url::Url;
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
 #[cfg(feature = "reqwest")]
 mod reqwest;
-
-use alloy_transport::utils::guess_local_url;
-use url::Url;
 
 /// An Http transport.
 ///

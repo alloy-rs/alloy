@@ -1,10 +1,9 @@
+use crate::managers::ActiveSubscription;
 use alloy_json_rpc::{EthNotification, SerializedRequest};
 use alloy_primitives::{B256, U256};
 use bimap::BiBTreeMap;
 use serde_json::value::RawValue;
 use tokio::sync::broadcast;
-
-use crate::managers::ActiveSubscription;
 
 #[derive(Default, Debug)]
 pub(crate) struct SubscriptionManager {

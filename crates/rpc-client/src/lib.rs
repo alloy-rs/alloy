@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
@@ -14,7 +15,8 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-//! alloy-rpc-client
+#[macro_use]
+extern crate tracing;
 
 mod batch;
 pub use batch::BatchRequest;

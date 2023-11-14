@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
@@ -14,7 +15,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-//! alloy-transports-ws
+#[macro_use]
+extern crate tracing;
+
+use alloy_pubsub::ConnectionInterface;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
@@ -25,10 +29,6 @@ pub use native::WsConnect;
 mod wasm;
 #[cfg(target_arch = "wasm32")]
 pub use wasm::WsConnect;
-
-use alloy_pubsub::ConnectionInterface;
-
-use tracing::{debug, error, trace};
 
 /// An ongoing connection to a backend.
 ///

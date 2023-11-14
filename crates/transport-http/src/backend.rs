@@ -1,8 +1,7 @@
+use crate::{HttpTransport, TransportError, TransportFut};
 use serde_json::value::RawValue;
 use std::task;
 use tower::Service;
-
-use crate::{HttpTransport, TransportError, TransportFut};
 
 impl HttpTransport<reqwest::Client> {
     /// Make a request.

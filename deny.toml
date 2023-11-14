@@ -37,8 +37,6 @@ exceptions = [
     # so we prefer to not have dependencies using it
     # https://tldrlegal.com/license/creative-commons-cc0-1.0-universal
     { allow = ["CC0-1.0"], name = "tiny-keccak" },
-    { allow = ["CC0-1.0"], name = "secp256k1-sys" },
-    { allow = ["CC0-1.0"], name = "secp256k1" },
 ]
 
 [[licenses.clarify]]
@@ -54,4 +52,3 @@ license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-

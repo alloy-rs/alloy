@@ -895,7 +895,7 @@ pub enum FilterId {
     Str(String),
 }
 
-#[cfg(feature = "jsonrpsee-types")]
+#[cfg(feature = "jsonrpsee")]
 impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     fn from(value: FilterId) -> Self {
         match value {
@@ -905,7 +905,7 @@ impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     }
 }
 
-#[cfg(feature = "jsonrpsee-types")]
+#[cfg(feature = "jsonrpsee")]
 impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
     fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
         match value {

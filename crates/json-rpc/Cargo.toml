@@ -1,5 +1,7 @@
 [package]
 name = "alloy-json-rpc"
+description = "Core types for JSON-RPC2.0 clients"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,9 +11,7 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 alloy-primitives.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json = { version = "1.0.103", features = ["raw_value"] }
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }

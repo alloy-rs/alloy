@@ -1,5 +1,4 @@
 use crate::{BatchRequest, ClientBuilder, RpcCall};
-
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;

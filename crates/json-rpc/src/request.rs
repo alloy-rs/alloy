@@ -1,5 +1,4 @@
 use crate::{common::Id, RpcParam};
-
 use alloy_primitives::{keccak256, B256};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;

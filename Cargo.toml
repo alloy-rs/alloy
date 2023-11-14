@@ -27,23 +27,21 @@ alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 
 alloy-primitives = { version = "0.4.2", features = ["serde"] }
-alloy-rlp = "0.3.0"
+alloy-rlp = "0.3"
 
-# futures
+async-trait = "0.1.74"
+base64 = "0.21"
+bimap = "0.6"
 futures = "0.3.29"
-
-# serde
-serde = { version = "1.0", default-features = false, features = ["alloc"] }
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-
-# thiserror
-thiserror = "1.0"
-
-# transports
-url = "2.4.0"
-pin-project = "1.1.2"
-reqwest = "0.11.18"
 hyper = "0.14.27"
+itertools = "0.11"
+pin-project = "1.1"
+reqwest = "0.11.18"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.4"
+thiserror = "1.0"
+tokio = { version = "1.33", features = ["sync", "macros"] }
 tower = { version = "0.4.13", features = ["util"] }
-tokio = { version = "1.33.0", features = ["sync", "macros"] }
 tracing = "0.1.40"
+url = "2.4"

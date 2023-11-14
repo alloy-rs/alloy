@@ -1,9 +1,8 @@
+use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportFut};
 use std::task;
 use tower::Service;
-
-use crate::Http;
 
 impl Http<reqwest::Client> {
     /// Make a request.

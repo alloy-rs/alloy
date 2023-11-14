@@ -1,6 +1,6 @@
-* @danipopes @gakonst @prestwich @evalir
+* @danipopes @evalir @gakonst @prestwich
 
 crates/json-rpc     @prestwich
-crates/transports   @prestwich @evalir
+crates/transports   @evalir @prestwich
 crates/networks     @prestwich
-crates/providers    @prestwich @evalir
+crates/providers    @evalir @prestwich

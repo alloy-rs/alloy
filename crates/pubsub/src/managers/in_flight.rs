@@ -1,8 +1,7 @@
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::U256;
-use tokio::sync::oneshot;
-
 use alloy_transport::TransportError;
+use tokio::sync::oneshot;
 
 /// An in-flight JSON-RPC request.
 ///

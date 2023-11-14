@@ -1,10 +1,9 @@
+use crate::{Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde::{
     de::{MapAccess, Visitor},
     Deserialize, Serialize,
 };
-
-use crate::{Response, ResponsePayload};
 
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.

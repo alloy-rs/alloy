@@ -1,5 +1,4 @@
 use crate::RpcClient;
-
 use alloy_json_rpc::{
     Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
 };

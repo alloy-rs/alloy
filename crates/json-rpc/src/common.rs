@@ -158,23 +158,16 @@ mod test {
     #[test]
     fn it_serializes_and_deserializes() {
         let cases = [
-            TestCase { id: Id::Number(1) },
-            TestCase { id: Id::String("foo".to_string()) },
-            TestCase { id: Id::None },
+            (TestCase { id: Id::Number(1) }, r#"{"id":1}"#),
+            (TestCase { id: Id::String("foo".to_string()) }, r#"{"id":"foo"}"#),
+            (TestCase { id: Id::None }, r#"{"id":null}"#),
         ];
-
-        let serialized = [r#"{"id":1}"#, r#"{"id":"foo"}"#, r#"{"id":null}"#];
-
-        for i in 0..3 {
-            let case = &cases[i];
-            let expected = serialized[i];
-            dbg!(&expected);
-
-            let serialized = serde_json::to_string(case).unwrap();
+        for (case, expected) in cases {
+            let serialized = serde_json::to_string(&case).unwrap();
             assert_eq!(serialized, expected);
 
             let deserialized: TestCase = serde_json::from_str(expected).unwrap();
-            assert_eq!(&deserialized, case);
+            assert_eq!(deserialized, case);
         }
     }
 }

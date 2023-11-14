@@ -4,16 +4,14 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend,
 };
-
 use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
 use alloy_primitives::U256;
-use serde_json::value::RawValue;
-use tokio::sync::{broadcast, mpsc, oneshot};
-
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
     TransportError,
 };
+use serde_json::value::RawValue;
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 #[derive(Debug)]
 /// The service contains the backend handle, a subscription manager, and the

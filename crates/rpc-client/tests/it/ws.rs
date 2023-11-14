@@ -1,7 +1,6 @@
+use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
 use alloy_transport_ws::WsConnect;
-
-use alloy_primitives::U64;
 use std::borrow::Cow;
 
 // #[test_log::test(tokio::test)]

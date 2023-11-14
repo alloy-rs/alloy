@@ -1,5 +1,4 @@
 use crate::RpcClient;
-
 use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportConnect, TransportError,
 };
