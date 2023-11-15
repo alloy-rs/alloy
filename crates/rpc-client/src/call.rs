@@ -1,5 +1,5 @@
 use alloy_json_rpc::{
-    transform_response, try_deserialize_success, Request, RequestPacket, ResponsePacket, RpcParam,
+    transform_response, try_deserialize_ok, Request, RequestPacket, ResponsePacket, RpcParam,
     RpcResult, RpcReturn,
 };
 use alloy_transport::{RpcFut, Transport, TransportError, TransportResult};
@@ -201,6 +201,6 @@ where
 
         let result = task::ready!(this.state.poll(cx));
 
-        Ready(try_deserialize_success(result))
+        Ready(try_deserialize_ok(result))
     }
 }

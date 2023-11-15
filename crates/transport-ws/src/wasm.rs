@@ -1,6 +1,6 @@
 use super::WsBackend;
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Pbf, TransportError};
+use alloy_transport::{utils::Spawnable, Pbf, TransportError, TransportErrorKind};
 use futures::{
     sink::SinkExt,
     stream::{Fuse, StreamExt},
@@ -22,8 +22,11 @@ impl PubSubConnect for WsConnect {
 
     fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
         Box::pin(async move {
-            let socket =
-                WsMeta::connect(&self.url, None).await.map_err(TransportError::custom)?.1.fuse();
+            let socket = WsMeta::connect(&self.url, None)
+                .await
+                .map_err(TransportErrorKind::custom)?
+                .1
+                .fuse();
 
             let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
             let backend = WsBackend { socket, interface };

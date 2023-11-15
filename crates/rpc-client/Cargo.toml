@@ -35,7 +35,6 @@ alloy-primitives.workspace = true
 alloy-transport-ws.workspace = true
 test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
-tokio.workspace = true
 
 [features]
 default = ["reqwest"]

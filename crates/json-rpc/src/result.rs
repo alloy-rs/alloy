@@ -22,6 +22,9 @@ pub type RpcResult<T, E, ErrResp = Box<RawValue>> = Result<T, RpcError<E, ErrRes
 pub type BorrowedRpcResult<'a, E> = RpcResult<&'a RawValue, E, &'a RawValue>;
 
 /// Transform a transport response into an [`RpcResult`], discarding the [`Id`].
+///
+/// [`Id`]: crate::Id
+#[allow(clippy::missing_const_for_fn)] // false positive
 pub fn transform_response<T, E, ErrResp>(
     response: Response<T, ErrResp>,
 ) -> Result<T, RpcError<E, ErrResp>>
@@ -52,7 +55,7 @@ where
 }
 
 /// Attempt to deserialize the `Ok(_)` variant of an [`RpcResult`].
-pub fn try_deserialize_success<'a, J, T, E, ErrResp>(
+pub fn try_deserialize_ok<'a, J, T, E, ErrResp>(
     result: RpcResult<J, E, ErrResp>,
 ) -> RpcResult<T, E, ErrResp>
 where

@@ -35,9 +35,8 @@
 //!
 //! In general, partially deserialized responses can be further deserialized.
 //! E.g. an [`BorrowedRpcResult`] may have success responses deserialized
-//! with [`RpcResult::deserialize_success::<U>`], which will transform it to an
-//! [`RpcResult<U>`]. Or the caller may use [`RpcResult::try_success_as::<U>`]
-//! to attempt to deserialize without transforming the [`RpcResult`].
+//! with [`crate::try_deserialize_ok::<U>`], which will transform it to an
+//! [`RpcResult<U>`].
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
@@ -78,7 +77,7 @@ pub use response::{
 
 mod result;
 pub use result::{
-    transform_response, transform_result, try_deserialize_success, BorrowedRpcResult, RpcResult,
+    transform_response, transform_result, try_deserialize_ok, BorrowedRpcResult, RpcResult,
 };
 
 use serde::{de::DeserializeOwned, Serialize};

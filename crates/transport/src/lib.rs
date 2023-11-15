@@ -74,5 +74,5 @@ mod type_aliases {
 
     /// Future for RPC-level requests.
     pub type RpcFut<'a, T> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = TransportResult<T>> + Send + 'a>>;
+        std::pin::Pin<Box<dyn std::future::Future<Output = TransportResult<T>> + 'a>>;
 }

@@ -314,9 +314,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
                 None => return Err(TransportErrorKind::custom_str("EIP-1559 not activated")),
             },
 
-            Ok(None) => {
-                return Err(TransportErrorKind::custom_str("Latest block not found".into()))
-            }
+            Ok(None) => return Err(TransportErrorKind::custom_str("Latest block not found")),
 
             Err(err) => return Err(err),
         };

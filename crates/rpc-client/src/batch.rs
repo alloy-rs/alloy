@@ -1,8 +1,8 @@
 use crate::RpcClient;
 
 use alloy_json_rpc::{
-    transform_response, try_deserialize_success, Id, Request, RequestPacket, ResponsePacket,
-    RpcParam, RpcReturn, SerializedRequest,
+    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
+    RpcReturn, SerializedRequest,
 };
 use alloy_transport::{Transport, TransportError, TransportErrorKind, TransportResult};
 use futures::channel::oneshot;
@@ -58,7 +58,7 @@ where
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
 
         Poll::Ready(match resp {
-            Ok(resp) => try_deserialize_success(resp),
+            Ok(resp) => try_deserialize_ok(resp),
 
             Err(e) => Err(TransportErrorKind::custom(e)),
         })
