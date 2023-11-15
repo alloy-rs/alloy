@@ -64,4 +64,32 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
     pub fn deser_err(err: serde_json::Error, text: impl AsRef<str>) -> Self {
         Self::DeserError { err, text: text.as_ref().to_owned() }
     }
+
+    /// Check if the error is a serialization error.
+    pub const fn is_ser_error(&self) -> bool {
+        matches!(self, Self::SerError(_))
+    }
+
+    /// Check if the error is a deserialization error.
+    pub const fn is_deser_error(&self) -> bool {
+        matches!(self, Self::DeserError { .. })
+    }
+
+    /// Check if the error is a transport error.
+    pub const fn is_transport_error(&self) -> bool {
+        matches!(self, Self::Transport(_))
+    }
+
+    /// Check if the error is an error response.
+    pub const fn is_error_resp(&self) -> bool {
+        matches!(self, Self::ErrorResp(_))
+    }
+
+    /// Fallible conversion to an error response.
+    pub const fn as_error_resp(&self) -> Option<&ErrorPayload<ErrResp>> {
+        match self {
+            Self::ErrorResp(err) => Some(err),
+            _ => None,
+        }
+    }
 }

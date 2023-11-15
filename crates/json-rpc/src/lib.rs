@@ -11,6 +11,34 @@
 //!
 //! [`alloy-transports`]: https://docs.rs/alloy-transports/latest/alloy-transports
 //!
+//! ## Usage
+//!
+//! This crate models the JSON-RPC 2.0 protocol data-types. It is intended to
+//! be used to build JSON-RPC clients or servers. Most users will not need to
+//! import this crate.
+//!
+//! This crate provides the following low-level data types:
+//!
+//! - [`Request`] - A JSON-RPC request.
+//! - [`Response`] - A JSON-RPC response.
+//! - [`ErrorPayload`] - A JSON-RPC error response payload, including code and message.
+//! - [`ResponsePayload`] - The payload of a JSON-RPC response, either a success payload, or an
+//!   [`ErrorPayload`].
+//!
+//! For client-side Rust ergonomics, we want to map responses to [`Result`]s.
+//! To that end, we provide the following types:
+//!
+//! - [`RpcError`] - An error that can occur during JSON-RPC communication. This type aggregates
+//!   errors that are common to all transports, such as (de)serialization, error responses, and
+//!   includes a generic transport error.
+//! - [`RpcResult`] - A result modeling an Rpc outcome as `Result<T,
+//! RpcError<E>>`.
+//!
+//! We recommend that transport implementors use [`RpcResult`] as the return
+//! type for their transport methods, parameterized by their transport error
+//! type. This will allow them to return either a successful response or an
+//! error.
+//!
 //! ## Note On (De)Serialization
 //!
 //! [`Request`], [`Response`], and similar types are generic over the
