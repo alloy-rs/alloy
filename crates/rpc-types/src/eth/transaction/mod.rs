@@ -13,6 +13,7 @@ mod receipt;
 mod request;
 mod signature;
 mod typed;
+mod other;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +72,9 @@ pub struct Transaction {
     /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U64>,
+    /// Captures unknown fields such as additional fields used by L2s
+    #[serde(flatten)]
+    pub other: other::OtherFields,
 }
 
 #[cfg(test)]
@@ -105,6 +109,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
+            ..Default::default()
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
@@ -142,6 +147,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
+            ..Default::default()
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
