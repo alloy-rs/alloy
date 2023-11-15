@@ -4,7 +4,7 @@ use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
 
 /// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
-pub type TransportError = RpcError<TransportErrorKind>;
+pub type TransportError<ErrResp = Box<RawValue>> = RpcError<TransportErrorKind, ErrResp>;
 
 /// A transport result is a [`Result`] containing a [`TransportError`].
 pub type TransportResult<T, ErrResp = Box<RawValue>> = RpcResult<T, TransportErrorKind, ErrResp>;
