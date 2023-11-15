@@ -1,6 +1,6 @@
 use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use alloy_transport::{TransportError, TransportFut};
+use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
 use hyper::client::{connect::Connect, Client};
 use std::task;
 use tower::Service;
@@ -23,11 +23,12 @@ where
                 .body(hyper::Body::from(ser.get().to_owned()))
                 .expect("request parts are valid");
 
-            let resp = this.client.request(req).await.map_err(TransportError::custom)?;
+            let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
 
             // unpack json from the response body
-            let body =
-                hyper::body::to_bytes(resp.into_body()).await.map_err(TransportError::custom)?;
+            let body = hyper::body::to_bytes(resp.into_body())
+                .await
+                .map_err(TransportErrorKind::custom)?;
 
             // Deser a Box<RawValue> from the body. If deser fails, return the
             // body as a string in the error. If the body is not UTF8, this will

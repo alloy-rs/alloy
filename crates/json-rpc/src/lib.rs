@@ -55,7 +55,11 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use serde::{de::DeserializeOwned, Serialize};
+mod common;
+pub use common::Id;
+
+mod error;
+pub use error::RpcError;
 
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
@@ -72,11 +76,12 @@ pub use response::{
     ResponsePayload,
 };
 
-mod common;
-pub use common::Id;
-
 mod result;
-pub use result::{BorrowedRpcResult, RpcResult};
+pub use result::{
+    transform_response, transform_result, try_deserialize_success, BorrowedRpcResult, RpcResult,
+};
+
+use serde::{de::DeserializeOwned, Serialize};
 
 /// An object that can be used as a JSON-RPC parameter.
 ///

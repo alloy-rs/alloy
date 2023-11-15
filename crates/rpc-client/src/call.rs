@@ -1,5 +1,8 @@
-use alloy_json_rpc::{Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn};
-use alloy_transport::{RpcFut, Transport, TransportError};
+use alloy_json_rpc::{
+    transform_response, try_deserialize_success, Request, RequestPacket, ResponsePacket, RpcParam,
+    RpcResult, RpcReturn,
+};
+use alloy_transport::{RpcFut, Transport, TransportError, TransportResult};
 use core::panic;
 use serde_json::value::RawValue;
 use std::{
@@ -90,7 +93,7 @@ where
         };
 
         match task::ready!(fut.poll(cx)) {
-            Ok(ResponsePacket::Single(res)) => Ready(RpcResult::from(res)),
+            Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
             Err(e) => Ready(RpcResult::Err(e)),
             _ => panic!("received batch response from single request"),
         }
@@ -102,7 +105,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
 {
-    type Output = RpcResult<Box<RawValue>, Box<RawValue>, TransportError>;
+    type Output = TransportResult<Box<RawValue>>;
 
     #[instrument(skip(self, cx))]
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -190,16 +193,14 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
 {
-    type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
+    type Output = TransportResult<Resp>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         tracing::trace!(?self.state, "Polling RpcCall");
         let this = self.project();
 
-        let resp = task::ready!(this.state.poll(cx));
+        let result = task::ready!(this.state.poll(cx));
 
-        Ready(
-            resp.try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
-        )
+        Ready(try_deserialize_success(result))
     }
 }

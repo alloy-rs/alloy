@@ -1,8 +1,19 @@
-use crate::error::TransportError;
 use serde::Serialize;
 use serde_json::{self, value::RawValue};
 use std::future::Future;
 use url::Url;
+
+use crate::{TransportError, TransportResult};
+
+/// Convert to a `Box<RawValue>` from a `Serialize` type, mapping the error
+/// to a `TransportError`.
+pub fn to_json_raw_value<S>(s: &S) -> TransportResult<Box<RawValue>>
+where
+    S: Serialize,
+{
+    RawValue::from_string(serde_json::to_string(s).map_err(TransportError::ser_err)?)
+        .map_err(TransportError::ser_err)
+}
 
 /// Guess whether the URL is local, based on the hostname.
 ///
@@ -18,16 +29,6 @@ pub fn guess_local_url(s: impl AsRef<str>) -> bool {
         }
     }
     _guess_local_url(s.as_ref())
-}
-
-/// Convert to a `Box<RawValue>` from a `Serialize` type, mapping the error
-/// to a `TransportError`.
-pub fn to_json_raw_value<S>(s: &S) -> Result<Box<RawValue>, TransportError>
-where
-    S: Serialize,
-{
-    RawValue::from_string(serde_json::to_string(s).map_err(TransportError::ser_err)?)
-        .map_err(TransportError::ser_err)
 }
 
 #[doc(hidden)]

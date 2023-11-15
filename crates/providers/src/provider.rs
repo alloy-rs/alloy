@@ -7,11 +7,10 @@ use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
 };
-use alloy_transport::{BoxTransport, RpcResult, Transport, TransportError};
+use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -41,7 +40,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError>
+    ) -> TransportResult<alloy_primitives::U256>
     where
         Self: Sync,
     {
@@ -54,7 +53,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the last block number available.
-    pub async fn get_block_number(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
+    pub async fn get_block_number(&self) -> TransportResult<U64>
     where
         Self: Sync,
     {
@@ -62,11 +61,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    pub async fn get_balance(
-        &self,
-        address: Address,
-        tag: Option<BlockId>,
-    ) -> RpcResult<U256, Box<RawValue>, TransportError>
+    pub async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
     where
         Self: Sync,
     {
@@ -86,7 +81,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         hash: BlockHash,
         full: bool,
-    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    ) -> TransportResult<Option<Block>>
     where
         Self: Sync,
     {
@@ -100,7 +95,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         number: B,
         full: bool,
-    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    ) -> TransportResult<Option<Block>>
     where
         Self: Sync,
     {
@@ -113,7 +108,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the chain ID.
-    pub async fn get_chain_id(&self) -> RpcResult<U64, Box<RawValue>, TransportError>
+    pub async fn get_chain_id(&self) -> TransportResult<U64>
     where
         Self: Sync,
     {
@@ -124,7 +119,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         address: Address,
         tag: B,
-    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    ) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
@@ -134,10 +129,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets a [Transaction] by its [TxHash].
-    pub async fn get_transaction_by_hash(
-        &self,
-        hash: TxHash,
-    ) -> RpcResult<Transaction, Box<RawValue>, TransportError>
+    pub async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
     where
         Self: Sync,
     {
@@ -152,10 +144,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-    pub async fn get_logs(
-        &self,
-        filter: Filter,
-    ) -> RpcResult<Vec<Log>, Box<RawValue>, TransportError>
+    pub async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>
     where
         Self: Sync,
     {
@@ -164,7 +153,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-    pub async fn get_accounts(&self) -> RpcResult<Vec<Address>, Box<RawValue>, TransportError>
+    pub async fn get_accounts(&self) -> TransportResult<Vec<Address>>
     where
         Self: Sync,
     {
@@ -172,7 +161,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the current gas price.
-    pub async fn get_gas_price(&self) -> RpcResult<U256, Box<RawValue>, TransportError>
+    pub async fn get_gas_price(&self) -> TransportResult<U256>
     where
         Self: Sync,
     {
@@ -183,7 +172,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> RpcResult<Option<TransactionReceipt>, Box<RawValue>, TransportError>
+    ) -> TransportResult<Option<TransactionReceipt>>
     where
         Self: Sync,
     {
@@ -197,7 +186,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         block_count: U256,
         last_block: B,
         reward_percentiles: &[f64],
-    ) -> RpcResult<FeeHistory, Box<RawValue>, TransportError>
+    ) -> TransportResult<FeeHistory>
     where
         Self: Sync,
     {
@@ -217,7 +206,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> RpcResult<Vec<TransactionReceipt>, Box<RawValue>, TransportError>
+    ) -> TransportResult<Vec<TransactionReceipt>>
     where
         Self: Sync,
     {
@@ -229,7 +218,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tag: B,
         idx: U64,
-    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError>
+    ) -> TransportResult<Option<Block>>
     where
         Self: Sync,
     {
@@ -255,7 +244,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets syncing info.
-    pub async fn syncing(&self) -> RpcResult<SyncStatus, Box<RawValue>, TransportError>
+    pub async fn syncing(&self) -> TransportResult<SyncStatus>
     where
         Self: Sync,
     {
@@ -267,7 +256,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
-    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    ) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
@@ -287,7 +276,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
-    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    ) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
@@ -301,10 +290,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Sends an already-signed transaction.
-    pub async fn send_raw_transaction(
-        &self,
-        tx: Bytes,
-    ) -> RpcResult<TxHash, Box<RawValue>, TransportError>
+    pub async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
     where
         Self: Sync,
     {
@@ -317,23 +303,22 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
-    ) -> RpcResult<(U256, U256), Box<RawValue>, TransportError>
+    ) -> TransportResult<(U256, U256)>
     where
         Self: Sync,
     {
         let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
         {
-            RpcResult::Success(Some(block)) => match block.header.base_fee_per_gas {
+            Ok(Some(block)) => match block.header.base_fee_per_gas {
                 Some(base_fee_per_gas) => base_fee_per_gas,
-                None => {
-                    return RpcResult::Err(TransportError::Custom("EIP-1559 not activated".into()))
-                }
+                None => return Err(TransportErrorKind::custom_str("EIP-1559 not activated")),
             },
-            RpcResult::Success(None) => {
-                return RpcResult::Err(TransportError::Custom("Latest block not found".into()))
+
+            Ok(None) => {
+                return Err(TransportErrorKind::custom_str("Latest block not found".into()))
             }
-            RpcResult::Err(err) => return RpcResult::Err(err),
-            RpcResult::Failure(err) => return RpcResult::Failure(err),
+
+            Err(err) => return Err(err),
         };
 
         let fee_history = match self
@@ -344,9 +329,8 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             )
             .await
         {
-            RpcResult::Success(fee_history) => fee_history,
-            RpcResult::Err(err) => return RpcResult::Err(err),
-            RpcResult::Failure(err) => return RpcResult::Failure(err),
+            Ok(fee_history) => fee_history,
+            Err(err) => return Err(err),
         };
 
         // use the provided fee estimator function, or fallback to the default implementation.
@@ -359,15 +343,11 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
             )
         };
 
-        RpcResult::Success((max_fee_per_gas, max_priority_fee_per_gas))
+        Ok((max_fee_per_gas, max_priority_fee_per_gas))
     }
 
     #[cfg(feature = "anvil")]
-    pub async fn set_code(
-        &self,
-        address: Address,
-        code: &'static str,
-    ) -> RpcResult<(), Box<RawValue>, TransportError>
+    pub async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
     where
         Self: Sync,
     {
