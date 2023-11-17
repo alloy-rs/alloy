@@ -15,6 +15,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use thiserror::Error;
+use alloy_rpc_client::ClientBuilder;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum ClientError {
@@ -567,8 +568,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 impl TryFrom<&str> for Provider<Http<Client>> {
     type Error = ClientError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Provider::new(value)
+    fn try_from(url: &str) -> Result<Self, Self::Error> {
+        let url = url.parse().map_err(|_e| ClientError::ParseError)?;
+        let inner = ClientBuilder::default().reqwest_http(url);
+
+        Ok(Self { inner, from: None })
     }
 }
 
