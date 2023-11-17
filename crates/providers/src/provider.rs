@@ -176,7 +176,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
+    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>
     where
         Self: Sync;
 
@@ -520,7 +520,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
+    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>
     where
         Self: Sync,
     {
