@@ -61,7 +61,7 @@ pub trait TempProvider: Send + Sync {
         &self,
         id: BlockId,
         full: bool,
-    ) -> RpcResult<Option<Block>, Box<RawValue>, TransportError> {
+    ) -> TransportResult<Option<Block>> {
         match id {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
             BlockId::Number(number) => self.get_block_by_number(number, full).await,
