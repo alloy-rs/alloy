@@ -67,7 +67,7 @@ where
     Params: Clone,
 {
     /// Clone the request, including the request parameters.
-    pub fn to_owned_params(self) -> Request<Params> {
+    pub fn into_owned_params(self) -> Request<Params> {
         Request { meta: self.meta, params: self.params.clone() }
     }
 }

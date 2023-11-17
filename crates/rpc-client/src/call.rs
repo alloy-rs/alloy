@@ -181,9 +181,10 @@ where
     Params: RpcParam + Clone,
 {
     /// Convert this call into one with owned params, by cloning the params.
-    pub fn to_owned_params(self) -> RpcCall<Conn, Params, Resp> {
+    pub fn into_owned_params(self) -> RpcCall<Conn, Params, Resp> {
         if let CallState::Prepared { request, connection } = self.state {
-            let request = request.expect("No params in prepared. This is a bug").to_owned_params();
+            let request =
+                request.expect("No params in prepared. This is a bug").into_owned_params();
             RpcCall::new(request, connection)
         } else {
             panic!("Cannot get params after request has been sent");
