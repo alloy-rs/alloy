@@ -1,9 +1,7 @@
+#![allow(missing_docs)]
 //! The [`TransactionRequest`][crate::TransactionRequest] is a universal representation for a
 //! transaction deserialized from the json input of an RPC call. Depending on what fields are set,
 //! it can be converted into the container type [`TypedTransactionRequest`].
-
-// TODO:
-#![allow(missing_docs)]
 
 use crate::eth::transaction::AccessList;
 use alloy_primitives::{Address, Bytes, U128, U256, U64};
@@ -18,8 +16,11 @@ use serde::{Deserialize, Serialize};
 /// 3. EIP1559 [`EIP1559TransactionRequest`]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TypedTransactionRequest {
+    /// A Legacy Transaction request.
     Legacy(LegacyTransactionRequest),
+    /// An EIP2930 transaction request.
     EIP2930(EIP2930TransactionRequest),
+    /// An EIP1559 Transaction Request.
     EIP1559(EIP1559TransactionRequest),
 }
 

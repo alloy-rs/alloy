@@ -131,6 +131,13 @@ pub struct Block {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
+impl Block {
+    /// Converts a block with Tx hashes into a full block.
+    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+        Self { transactions: BlockTransactions::Full(txs), ..self }
+    }
+}
+
 /// Block header representation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "camelCase")]
@@ -412,6 +419,12 @@ impl BlockId {
 impl From<u64> for BlockId {
     fn from(num: u64) -> Self {
         BlockNumberOrTag::Number(U64::from(num)).into()
+    }
+}
+
+impl From<U64> for BlockId {
+    fn from(num: U64) -> Self {
+        BlockNumberOrTag::Number(num).into()
     }
 }
 
