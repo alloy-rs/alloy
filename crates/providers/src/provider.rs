@@ -36,8 +36,9 @@ pub struct Provider<T: Transport = BoxTransport> {
 /// Temporary Provider trait to be used until the new Provider trait with
 /// the Network abstraction is stable.
 /// Once the new Provider trait is stable, this trait will be removed.
-#[async_trait]
 #[auto_impl(&, Arc, Box)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait TempProvider: Send + Sync {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
@@ -228,6 +229,8 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 // but as the interface is not stable yet, we define the bindings ourselves
 // until we can use the trait and the client abstraction that will use it.
 #[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
