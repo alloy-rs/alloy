@@ -31,6 +31,12 @@ pub struct Parity(
     #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
 );
 
+impl From<bool> for Parity {
+    fn from(b: bool) -> Self {
+        Self(b)
+    }
+}
+
 fn serialize_parity<S>(parity: &bool, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,

@@ -1,4 +1,4 @@
-//! Ethereum types for pub-sub.
+//! Ethereum types for pub-sub
 
 use crate::{
     eth::{Filter, Transaction},

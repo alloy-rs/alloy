@@ -1,4 +1,4 @@
-//! Bindings for `eth_call` state overrides.
+//! bindings for state overrides in eth_call
 
 use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use serde::{Deserialize, Serialize};
