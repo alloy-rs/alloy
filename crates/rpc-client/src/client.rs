@@ -2,10 +2,7 @@ use crate::{BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
-use std::{
-    borrow::Cow,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tower::{layer::util::Identity, ServiceBuilder};
 
 /// A JSON-RPC client.
@@ -60,8 +57,8 @@ impl<T> RpcClient<T> {
     pub fn make_request<'a, Params: RpcParam>(
         &self,
         method: &'static str,
-        params: Cow<'a, Params>,
-    ) -> Request<Cow<'a, Params>> {
+        params: Params,
+    ) -> Request<Params> {
         Request { meta: RequestMeta { method, id: self.next_id() }, params }
     }
 
@@ -111,8 +108,8 @@ where
     pub fn prepare<'a, Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
-        params: Cow<'a, Params>,
-    ) -> RpcCall<T, Cow<'a, Params>, Resp> {
+        params: Params,
+    ) -> RpcCall<T, Params, Resp> {
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
     }
