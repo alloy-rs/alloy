@@ -4,8 +4,10 @@ use crate::utils::{self, EstimatorFunction};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
-    Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
-    Transaction, TransactionReceipt, TransactionRequest,
+    trace::{GethDebugTracingOptions, GethTrace, LocalizedTransactionTrace},
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
+    EIP1186AccountProofResponse, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus, Transaction,
+    TransactionReceipt, TransactionRequest,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
@@ -199,6 +201,46 @@ pub trait TempProvider: Send + Sync {
 
     #[cfg(feature = "anvil")]
     async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
+    where
+        Self: Sync;
+
+    async fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+        block: Option<BlockId>,
+    ) -> TransportResult<EIP1186AccountProofResponse>
+    where
+        Self: Sync;
+
+    async fn create_access_list(
+        &self,
+        request: CallRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<AccessListWithGasUsed>
+    where
+        Self: Sync;
+
+    /// Parity trace transaction.
+    async fn trace_transaction(
+        &self,
+        hash: TxHash,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
+    where
+        Self: Sync;
+
+    async fn debug_trace_transaction(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<GethTrace>
+    where
+        Self: Sync;
+
+    async fn trace_block(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
     where
         Self: Sync;
 }
@@ -552,6 +594,83 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         };
 
         Ok((max_fee_per_gas, max_priority_fee_per_gas))
+    }
+
+    async fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+        block: Option<BlockId>,
+    ) -> TransportResult<EIP1186AccountProofResponse>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "eth_getProof",
+                Cow::<(Address, Vec<StorageKey>, BlockId)>::Owned((
+                    address,
+                    keys,
+                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
+                )),
+            )
+            .await
+    }
+
+    async fn create_access_list(
+        &self,
+        request: CallRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<AccessListWithGasUsed>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "eth_createAccessList",
+                Cow::<(CallRequest, BlockId)>::Owned((
+                    request,
+                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
+                )),
+            )
+            .await
+    }
+
+    /// Parity trace transaction.
+    async fn trace_transaction(
+        &self,
+        hash: TxHash,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
+    where
+        Self: Sync,
+    {
+        self.inner.prepare("trace_transaction", Cow::<Vec<TxHash>>::Owned(vec![hash])).await
+    }
+
+    async fn debug_trace_transaction(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<GethTrace>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "debug_traceTransaction",
+                Cow::<(TxHash, GethDebugTracingOptions)>::Owned((hash, trace_options)),
+            )
+            .await
+    }
+
+    async fn trace_block(
+        &self,
+        block: BlockNumberOrTag,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
+    where
+        Self: Sync,
+    {
+        self.inner.prepare("trace_block", Cow::<BlockNumberOrTag>::Owned(block)).await
     }
 
     #[cfg(feature = "anvil")]
