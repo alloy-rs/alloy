@@ -227,7 +227,8 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
 // In the future, this will be replaced by a Provider trait,
 // but as the interface is not stable yet, we define the bindings ourselves
 // until we can use the trait and the client abstraction that will use it.
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
