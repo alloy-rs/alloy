@@ -1,8 +1,8 @@
 //! Alloy main Provider abstraction.
 
 use crate::utils::{self, EstimatorFunction};
-use alloy_rpc_client::{ RpcClient};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
+use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
@@ -52,11 +52,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    async fn get_balance(
-        &self,
-        address: Address,
-        tag: Option<BlockId>,
-    ) -> TransportResult<U256>
+    async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
     where
         Self: Sync;
 
@@ -113,10 +109,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Gets a [Transaction] by its [TxHash].
-    async fn get_transaction_by_hash(
-        &self,
-        hash: TxHash,
-    ) -> TransportResult<Transaction>
+    async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
     where
         Self: Sync;
 
@@ -125,7 +118,8 @@ pub trait TempProvider: Send + Sync {
     where
         Self: Sync;
 
-    /// Gets the accounts in the remote node. This is usually empty unless you're using a local node.
+    /// Gets the accounts in the remote node. This is usually empty unless you're using a local
+    /// node.
     async fn get_accounts(&self) -> TransportResult<Vec<Address>>
     where
         Self: Sync;
@@ -177,11 +171,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
-    async fn call(
-        &self,
-        tx: TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync;
 
@@ -195,10 +185,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Sends an already-signed transaction.
-    async fn send_raw_transaction(
-        &self,
-        tx: Bytes,
-    ) -> TransportResult<TxHash>
+    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
     where
         Self: Sync;
 
@@ -213,11 +200,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     #[cfg(feature = "anvil")]
-    async fn set_code(
-        &self,
-        address: Address,
-        code: &'static str,
-    ) -> TransportResult<()>
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
     where
         Self: Sync;
 }
@@ -269,7 +252,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the last block number available.
-     async fn get_block_number(&self) -> TransportResult<U64>
+    async fn get_block_number(&self) -> TransportResult<U64>
     where
         Self: Sync,
     {
@@ -277,7 +260,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-     async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
+    async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
     where
         Self: Sync,
     {
@@ -293,11 +276,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
-    async fn get_block_by_hash(
-        &self,
-        hash: BlockHash,
-        full: bool,
-    ) -> TransportResult<Option<Block>>
+    async fn get_block_by_hash(&self, hash: BlockHash, full: bool) -> TransportResult<Option<Block>>
     where
         Self: Sync,
     {
@@ -324,7 +303,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the chain ID.
-     async fn get_chain_id(&self) -> TransportResult<U64>
+    async fn get_chain_id(&self) -> TransportResult<U64>
     where
         Self: Sync,
     {
@@ -365,7 +344,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets a [Transaction] by its [TxHash].
-     async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
+    async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
     where
         Self: Sync,
     {
@@ -380,7 +359,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-     async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>
+    async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>
     where
         Self: Sync,
     {
@@ -389,7 +368,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-     async fn get_accounts(&self) -> TransportResult<Vec<Address>>
+    async fn get_accounts(&self) -> TransportResult<Vec<Address>>
     where
         Self: Sync,
     {
@@ -397,7 +376,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the current gas price.
-     async fn get_gas_price(&self) -> TransportResult<U256>
+    async fn get_gas_price(&self) -> TransportResult<U256>
     where
         Self: Sync,
     {
@@ -480,7 +459,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets syncing info.
-     async fn syncing(&self) -> TransportResult<SyncStatus>
+    async fn syncing(&self) -> TransportResult<SyncStatus>
     where
         Self: Sync,
     {
@@ -488,11 +467,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
-    async fn call(
-        &self,
-        tx: TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
@@ -526,7 +501,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Sends an already-signed transaction.
-     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
+    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
     where
         Self: Sync,
     {
@@ -593,7 +568,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
 #[cfg(test)]
 mod providers_test {
-    use crate::{provider::{TempProvider, Provider}, utils};
+    use crate::{
+        provider::{Provider, TempProvider},
+        utils,
+    };
     use alloy_primitives::{address, b256, Address, U256, U64};
     use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
