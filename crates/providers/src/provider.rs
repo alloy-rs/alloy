@@ -597,7 +597,7 @@ mod providers_test {
         provider::{Provider, TempProvider},
         utils,
     };
-    use alloy_primitives::{address, b256, Address, U256, U64};
+    use alloy_primitives::{address, b256, U256, U64};
     use alloy_rpc_types::{BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
 
