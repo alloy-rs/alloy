@@ -22,7 +22,6 @@ async-trait.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 reqwest.workspace = true
-serial_test = "2.0.0"
 auto_impl = "1.1.0"
 
 [dev-dependencies]
