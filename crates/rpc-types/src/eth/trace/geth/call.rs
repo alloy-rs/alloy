@@ -19,7 +19,11 @@ pub struct CallFrame {
     pub output: Option<Bytes>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    #[serde(default, rename = "revertReason", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "revertReason",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub revert_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<CallFrame>,
@@ -82,12 +86,15 @@ mod tests {
     fn test_serialize_call_trace() {
         let mut opts = GethDebugTracingCallOptions::default();
         opts.tracing_options.config.disable_storage = Some(false);
-        opts.tracing_options.tracer =
-            Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::CallTracer));
-        opts.tracing_options.tracer_config =
-            serde_json::to_value(CallConfig { only_top_call: Some(true), with_log: Some(true) })
-                .unwrap()
-                .into();
+        opts.tracing_options.tracer = Some(GethDebugTracerType::BuiltInTracer(
+            GethDebugBuiltInTracerType::CallTracer,
+        ));
+        opts.tracing_options.tracer_config = serde_json::to_value(CallConfig {
+            only_top_call: Some(true),
+            with_log: Some(true),
+        })
+        .unwrap()
+        .into();
 
         assert_eq!(
             serde_json::to_string(&opts).unwrap(),

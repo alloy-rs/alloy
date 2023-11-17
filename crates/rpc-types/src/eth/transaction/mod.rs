@@ -9,11 +9,11 @@ pub use typed::*;
 
 mod access_list;
 mod common;
+mod other;
 mod receipt;
 mod request;
 mod signature;
 mod typed;
-mod other;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]

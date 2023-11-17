@@ -135,9 +135,7 @@ impl Block {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
         Self {
-            transactions: BlockTransactions::Full(
-                txs
-            ),
+            transactions: BlockTransactions::Full(txs),
             ..self
         }
     }

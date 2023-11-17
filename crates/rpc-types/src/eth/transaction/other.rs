@@ -47,7 +47,10 @@ impl OtherFields {
         &self,
         key: impl AsRef<str>,
     ) -> Option<serde_json::Result<V>> {
-        self.inner.get(key.as_ref()).cloned().map(serde_json::from_value)
+        self.inner
+            .get(key.as_ref())
+            .cloned()
+            .map(serde_json::from_value)
     }
 
     /// Removes the deserialized value of the field, if it exists

@@ -41,6 +41,14 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
     }
 }
 
+impl<T: Eq + Hash> Hash for FilterSet<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for value in &self.0 {
+            value.hash(state);
+        }
+    }
+}
+
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
         FilterSet(HashSet::from_iter(src.into_iter().map(Into::into)))
@@ -278,8 +286,8 @@ impl FilterBlockOption {
     }
 }
 
-/// Filter for
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
+/// Filter for logs.
+#[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should
     /// match.

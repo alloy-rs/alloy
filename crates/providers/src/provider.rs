@@ -2,8 +2,10 @@
 
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_types::{
-    Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
-    Transaction, TransactionReceipt, TransactionRequest,
+    trace::{GethDebugTracingOptions, GethTrace, LocalizedTransactionTrace},
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
+    EIP1186AccountProofResponse, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus, Transaction,
+    TransactionReceipt,
 };
 use alloy_transports::{BoxTransport, Http, RpcClient, RpcResult, Transport, TransportError};
 use async_trait::async_trait;
@@ -181,7 +183,7 @@ pub trait TempProvider: Send + Sync {
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
     async fn call(
         &self,
-        tx: TransactionRequest,
+        tx: CallRequest,
         block: Option<BlockId>,
     ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
     where
@@ -190,9 +192,9 @@ pub trait TempProvider: Send + Sync {
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(
         &self,
-        tx: TransactionRequest,
+        tx: CallRequest,
         block: Option<BlockId>,
-    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    ) -> RpcResult<U256, Box<RawValue>, TransportError>
     where
         Self: Sync;
 
@@ -211,6 +213,44 @@ pub trait TempProvider: Send + Sync {
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> RpcResult<(U256, U256), Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Gets the EIP-1186 proof for the given address and keys.
+    async fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+        block: Option<BlockId>,
+    ) -> RpcResult<EIP1186AccountProofResponse, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    async fn create_access_list(
+        &self,
+        request: CallRequest,
+        block: Option<BlockId>,
+    ) -> RpcResult<AccessListWithGasUsed, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    /// Parity trace transaction.
+    async fn trace_transaction(
+        &self,
+        hash: TxHash,
+    ) -> RpcResult<Vec<LocalizedTransactionTrace>, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+
+    async fn debug_trace_transaction(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> RpcResult<GethTrace, Box<RawValue>, TransportError>
+    where
+        Self: Sync;
+    
+    async fn trace_block(&self, block: BlockNumberOrTag) -> RpcResult<Vec<LocalizedTransactionTrace>, Box<RawValue>, TransportError>
     where
         Self: Sync;
 
@@ -526,7 +566,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
     async fn call(
         &self,
-        tx: TransactionRequest,
+        tx: CallRequest,
         block: Option<BlockId>,
     ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
     where
@@ -535,7 +575,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_call",
-                Cow::<(TransactionRequest, BlockId)>::Owned((
+                Cow::<(CallRequest, BlockId)>::Owned((
                     tx,
                     block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
                 )),
@@ -546,17 +586,17 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(
         &self,
-        tx: TransactionRequest,
+        tx: CallRequest,
         block: Option<BlockId>,
-    ) -> RpcResult<Bytes, Box<RawValue>, TransportError>
+    ) -> RpcResult<U256, Box<RawValue>, TransportError>
     where
         Self: Sync,
     {
         if let Some(block_id) = block {
-            let params = Cow::<(TransactionRequest, BlockId)>::Owned((tx, block_id));
+            let params = Cow::<(CallRequest, BlockId)>::Owned((tx, block_id));
             self.inner.prepare("eth_estimateGas", params).await
         } else {
-            let params = Cow::<TransactionRequest>::Owned(tx);
+            let params = Cow::<CallRequest>::Owned(tx);
             self.inner.prepare("eth_estimateGas", params).await
         }
     }
@@ -625,6 +665,84 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         };
 
         RpcResult::Success((max_fee_per_gas, max_priority_fee_per_gas))
+    }
+
+    async fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+        block: Option<BlockId>,
+    ) -> RpcResult<EIP1186AccountProofResponse, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "eth_getProof",
+                Cow::<(Address, Vec<StorageKey>, BlockId)>::Owned((
+                    address,
+                    keys,
+                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
+                )),
+            )
+            .await
+    }
+
+    async fn create_access_list(
+        &self,
+        request: CallRequest,
+        block: Option<BlockId>,
+    ) -> RpcResult<AccessListWithGasUsed, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "eth_createAccessList",
+                Cow::<(CallRequest, BlockId)>::Owned((
+                    request,
+                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
+                )),
+            )
+            .await
+    }
+
+    /// Parity trace transaction.
+    async fn trace_transaction(
+        &self,
+        hash: TxHash,
+    ) -> RpcResult<Vec<LocalizedTransactionTrace>, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare("trace_transaction", Cow::<Vec<TxHash>>::Owned(vec![hash]))
+            .await
+    }
+
+    async fn debug_trace_transaction(
+        &self,
+        hash: TxHash,
+        trace_options: GethDebugTracingOptions,
+    ) -> RpcResult<GethTrace, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare(
+                "debug_traceTransaction",
+                Cow::<Vec<TxHash>>::Owned(vec![hash]),
+            )
+            .await
+    }
+
+    async fn trace_block(&self, block: BlockNumberOrTag) -> RpcResult<Vec<LocalizedTransactionTrace>, Box<RawValue>, TransportError>
+    where
+        Self: Sync,
+    {
+        self.inner
+            .prepare("trace_block", Cow::<BlockNumberOrTag>::Owned(block))
+            .await
     }
 
     #[cfg(feature = "anvil")]

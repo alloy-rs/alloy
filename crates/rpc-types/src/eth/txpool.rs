@@ -39,19 +39,27 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
     {
         let addr_split: Vec<&str> = value.split(": ").collect();
         if addr_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: to"))
+            return Err(de::Error::custom(
+                "invalid format for TxpoolInspectSummary: to",
+            ));
         }
         let value_split: Vec<&str> = addr_split[1].split(" wei + ").collect();
         if value_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit"))
+            return Err(de::Error::custom(
+                "invalid format for TxpoolInspectSummary: gasLimit",
+            ));
         }
         let gas_split: Vec<&str> = value_split[1].split(" gas × ").collect();
         if gas_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas"))
+            return Err(de::Error::custom(
+                "invalid format for TxpoolInspectSummary: gas",
+            ));
         }
         let gas_price_split: Vec<&str> = gas_split[1].split(" wei").collect();
         if gas_price_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"))
+            return Err(de::Error::custom(
+                "invalid format for TxpoolInspectSummary: gas_price",
+            ));
         }
         let addr = match addr_split[0] {
             "" => None,
@@ -65,7 +73,12 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
         let gas = U256::from_str(gas_split[0]).map_err(de::Error::custom)?;
         let gas_price = U256::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
-        Ok(TxpoolInspectSummary { to: addr, value, gas, gas_price })
+        Ok(TxpoolInspectSummary {
+            to: addr,
+            value,
+            gas,
+            gas_price,
+        })
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
@@ -354,7 +367,10 @@ mod tests {
         let origin: serde_json::Value = serde_json::from_str(txpool_content_json).unwrap();
         let serialized_value = serde_json::to_value(deserialized.clone()).unwrap();
         assert_eq!(origin, serialized_value);
-        assert_eq!(deserialized, serde_json::from_str::<TxpoolContent>(&serialized).unwrap());
+        assert_eq!(
+            deserialized,
+            serde_json::from_str::<TxpoolContent>(&serialized).unwrap()
+        );
     }
 
     #[test]
@@ -515,6 +531,9 @@ mod tests {
             queued_map_inner,
         );
 
-        TxpoolInspect { pending: pending_map, queued: queued_map }
+        TxpoolInspect {
+            pending: pending_map,
+            queued: queued_map,
+        }
     }
 }

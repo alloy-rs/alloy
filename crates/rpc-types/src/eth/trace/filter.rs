@@ -37,7 +37,11 @@ impl TraceFilter {
     pub fn matcher(&self) -> TraceFilterMatcher {
         let from_addresses = self.from_address.iter().cloned().collect();
         let to_addresses = self.to_address.iter().cloned().collect();
-        TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
+        TraceFilterMatcher {
+            mode: self.mode,
+            from_addresses,
+            to_addresses,
+        }
     }
 }
 
@@ -69,12 +73,12 @@ impl TraceFilterMatcher {
             (true, false) => to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr)),
             (false, false) => match self.mode {
                 TraceFilterMode::Union => {
-                    self.from_addresses.contains(&from) ||
-                        to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
+                    self.from_addresses.contains(&from)
+                        || to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
                 }
                 TraceFilterMode::Intersection => {
-                    self.from_addresses.contains(&from) &&
-                        to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
+                    self.from_addresses.contains(&from)
+                        && to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
                 }
             },
         }
@@ -96,8 +100,12 @@ mod tests {
 
     #[test]
     fn test_filter_matcher_addresses_unspecified() {
-        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
-        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d"
+            .parse()
+            .unwrap();
         let filter_json = json!({
             "fromBlock": "0x3",
             "toBlock": "0x5",
@@ -113,8 +121,12 @@ mod tests {
 
     #[test]
     fn test_filter_matcher_from_address() {
-        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
-        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d"
+            .parse()
+            .unwrap();
         let filter_json = json!({
             "fromBlock": "0x3",
             "toBlock": "0x5",
@@ -130,8 +142,12 @@ mod tests {
 
     #[test]
     fn test_filter_matcher_to_address() {
-        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
-        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d"
+            .parse()
+            .unwrap();
         let filter_json = json!({
             "fromBlock": "0x3",
             "toBlock": "0x5",
@@ -146,8 +162,12 @@ mod tests {
 
     #[test]
     fn test_filter_matcher_both_addresses_union() {
-        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
-        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d"
+            .parse()
+            .unwrap();
         let filter_json = json!({
             "fromBlock": "0x3",
             "toBlock": "0x5",
@@ -164,8 +184,12 @@ mod tests {
 
     #[test]
     fn test_filter_matcher_both_addresses_intersection() {
-        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
-        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d"
+            .parse()
+            .unwrap();
         let filter_json = json!({
             "fromBlock": "0x3",
             "toBlock": "0x5",
