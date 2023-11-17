@@ -7,7 +7,7 @@ use alloy_rpc_types::{
     trace::{GethDebugTracingOptions, GethTrace, LocalizedTransactionTrace},
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
     EIP1186AccountProofResponse, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus, Transaction,
-    TransactionReceipt, TransactionRequest,
+    TransactionReceipt,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
@@ -170,17 +170,13 @@ pub trait TempProvider: Send + Sync {
     where
         Self: Sync;
 
-    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
-    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>
+    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
+    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync;
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(
-        &self,
-        tx: TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
+    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync;
 
@@ -507,15 +503,15 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_syncing", Cow::<()>::Owned(())).await
     }
 
-    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
-    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>
+    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
+    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
         self.inner
             .prepare(
                 "eth_call",
-                Cow::<(TransactionRequest, BlockId)>::Owned((
+                Cow::<(CallRequest, BlockId)>::Owned((
                     tx,
                     block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
                 )),
@@ -524,19 +520,15 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(
-        &self,
-        tx: TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
+    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
     where
         Self: Sync,
     {
         if let Some(block_id) = block {
-            let params = Cow::<(TransactionRequest, BlockId)>::Owned((tx, block_id));
+            let params = Cow::<(CallRequest, BlockId)>::Owned((tx, block_id));
             self.inner.prepare("eth_estimateGas", params).await
         } else {
-            let params = Cow::<TransactionRequest>::Owned(tx);
+            let params = Cow::<CallRequest>::Owned(tx);
             self.inner.prepare("eth_estimateGas", params).await
         }
     }
