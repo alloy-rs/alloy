@@ -8,8 +8,10 @@ use alloy_rpc_types::{
     Transaction, TransactionReceipt, TransactionRequest,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport_http::Http;
 use async_trait::async_trait;
 use auto_impl::auto_impl;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use thiserror::Error;
@@ -562,6 +564,30 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 }
 
+impl TryFrom<&str> for Provider<Http<Client>> {
+    type Error = ClientError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Provider::new(value)
+    }
+}
+
+impl TryFrom<String> for Provider<Http<Client>> {
+    type Error = ClientError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Provider::try_from(value.as_str())
+    }
+}
+
+impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
+    type Error = ClientError;
+
+    fn try_from(value: &'a String) -> Result<Self, Self::Error> {
+        Provider::try_from(value.as_str())
+    }
+}
+
 #[cfg(test)]
 mod providers_test {
     use crate::{
@@ -569,7 +595,7 @@ mod providers_test {
         utils,
     };
     use alloy_primitives::{address, b256, Address, U256, U64};
-    use alloy_rpc_types::{BlockId, BlockNumberOrTag, Filter};
+    use alloy_rpc_types::{BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
 
     #[tokio::test]
