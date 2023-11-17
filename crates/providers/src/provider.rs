@@ -9,7 +9,6 @@ use alloy_rpc_types::{
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
-use async_trait::async_trait;
 use auto_impl::auto_impl;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -38,6 +37,7 @@ pub struct Provider<T: Transport = BoxTransport> {
 /// Once the new Provider trait is stable, this trait will be removed.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[auto_impl(&, Arc, Box)]
 pub trait TempProvider: Send + Sync {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
