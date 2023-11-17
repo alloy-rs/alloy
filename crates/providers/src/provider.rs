@@ -556,7 +556,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     #[cfg(feature = "anvil")]
-    pub async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
     where
         Self: Sync,
     {
