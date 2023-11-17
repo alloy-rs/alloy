@@ -36,7 +36,6 @@ pub struct Provider<T: Transport = BoxTransport> {
 /// Temporary Provider trait to be used until the new Provider trait with
 /// the Network abstraction is stable.
 /// Once the new Provider trait is stable, this trait will be removed.
-#[auto_impl(&, Arc, Box)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait TempProvider: Send + Sync {
