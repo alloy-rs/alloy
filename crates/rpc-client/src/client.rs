@@ -54,7 +54,7 @@ impl<T> RpcClient<T> {
     /// This function reserves an ID for the request, however the request
     /// is not sent. To send a request, use [`RpcClient::prepare`] and await
     /// the returned [`RpcCall`].
-    pub fn make_request<'a, Params: RpcParam>(
+    pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
         params: Params,
@@ -105,7 +105,7 @@ where
     /// Serialization is done lazily. It will not be performed until the call
     /// is awaited. This means that if a serializer error occurs, it will not
     /// be caught until the call is awaited.
-    pub fn prepare<'a, Params: RpcParam, Resp: RpcReturn>(
+    pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
         params: Params,
