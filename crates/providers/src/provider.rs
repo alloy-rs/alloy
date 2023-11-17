@@ -57,11 +57,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
-    async fn get_block(
-        &self,
-        id: BlockId,
-        full: bool,
-    ) -> TransportResult<Option<Block>> {
+    async fn get_block(&self, id: BlockId, full: bool) -> TransportResult<Option<Block>> {
         match id {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
             BlockId::Number(number) => self.get_block_by_number(number, full).await,
