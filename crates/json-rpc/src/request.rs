@@ -62,6 +62,16 @@ where
     }
 }
 
+impl<Params> Request<&Params>
+where
+    Params: Clone,
+{
+    /// Clone the request, including the request parameters.
+    pub fn to_owned_params(self) -> Request<Params> {
+        Request { meta: self.meta, params: self.params.clone() }
+    }
+}
+
 impl<'a, Params> Request<Params>
 where
     Params: AsRef<RawValue> + 'a,
