@@ -21,6 +21,7 @@ alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
+alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
 alloy-networks = { version = "0.1.0", path = "crates/networks" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }

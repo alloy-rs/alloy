@@ -1,0 +1,22 @@
+[package]
+name = "alloy-transport-ipc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alloy-transport.workspace = true
+alloy-pubsub.workspace = true
+
+
+tokio = { workspace = true, features = ["io-util", "sync", "rt"] }
+winapi = "0.3.9"
+tracing.workspace = true
+serde_json.workspace = true
