@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{de::Visitor, Deserialize, Serialize};
 
 /// A JSON-RPC 2.0 ID object. This may be a number, a string, or null.
@@ -29,6 +31,16 @@ pub enum Id {
     String(String),
     /// Null.
     None,
+}
+
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Id::Number(n) => write!(f, "{}", n),
+            Id::String(s) => write!(f, "{}", s),
+            Id::None => write!(f, "null"),
+        }
+    }
 }
 
 impl Serialize for Id {

@@ -1,59 +1,54 @@
+use alloy_json_rpc::{Id, RpcError, RpcResult};
+use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
+
+/// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
+pub type TransportError<ErrResp = Box<RawValue>> = RpcError<TransportErrorKind, ErrResp>;
+
+/// A transport result is a [`Result`] containing a [`TransportError`].
+pub type TransportResult<T, ErrResp = Box<RawValue>> = RpcResult<T, TransportErrorKind, ErrResp>;
 
 /// Transport error.
 ///
 /// All transport errors are wrapped in this enum.
 #[derive(Error, Debug)]
-pub enum TransportError {
-    /// SerdeJson (de)ser
-    #[error("{err}")]
-    SerdeJson {
-        /// The underlying serde_json error.
-        #[source]
-        err: serde_json::Error,
-        /// For deser errors, the text that failed to deserialize.
-        text: Option<String>,
-    },
-
-    /// Missing batch response
-    #[error("Missing response in batch request")]
-    MissingBatchResponse,
+pub enum TransportErrorKind {
+    /// Missing batch response.
+    ///
+    /// This error is returned when a batch request is sent and the response
+    /// does not contain a response for a request. For convenience the ID is
+    /// specified.
+    #[error("Missing response for request with ID {0}.")]
+    MissingBatchResponse(Id),
 
     /// PubSub backend connection task has stopped.
     #[error("PubSub backend connection task has stopped.")]
     BackendGone,
 
     /// Custom error
-    #[error(transparent)]
-    Custom(Box<dyn StdError + Send + Sync + 'static>),
+    #[error("{0}")]
+    Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
 }
 
-impl TransportError {
-    /// Instantiate a new `TransportError` from a [`serde_json::Error`]. This
-    /// should be called when the error occurs during serialization.
-    pub const fn ser_err(err: serde_json::Error) -> Self {
-        Self::SerdeJson { err, text: None }
-    }
-
-    /// Instantiate a new `TransportError` from a [`serde_json::Error`] and the
-    /// text. This should be called when the error occurs during
-    /// deserialization.
-    pub fn deser_err(err: serde_json::Error, text: impl AsRef<str>) -> Self {
-        Self::from((err, text))
+impl TransportErrorKind {
+    /// Instantiate a new `TransportError` from a custom error.
+    pub fn custom_str(err: &str) -> TransportError {
+        RpcError::Transport(Self::Custom(err.into()))
     }
 
     /// Instantiate a new `TransportError` from a custom error.
-    pub fn custom(err: impl StdError + Send + Sync + 'static) -> Self {
-        Self::Custom(Box::new(err))
+    pub fn custom(err: impl StdError + Send + Sync + 'static) -> TransportError {
+        RpcError::Transport(Self::Custom(Box::new(err)))
     }
-}
 
-impl<T> From<(serde_json::Error, T)> for TransportError
-where
-    T: AsRef<str>,
-{
-    fn from((err, text): (serde_json::Error, T)) -> Self {
-        Self::SerdeJson { err, text: Some(text.as_ref().to_string()) }
+    /// Instantiate a new `TransportError` from a missing ID.
+    pub const fn missing_batch_response(id: Id) -> TransportError {
+        RpcError::Transport(Self::MissingBatchResponse(id))
+    }
+
+    /// Instantiate a new `TransportError::BackendGone`.
+    pub const fn backend_gone() -> TransportError {
+        RpcError::Transport(Self::BackendGone)
     }
 }

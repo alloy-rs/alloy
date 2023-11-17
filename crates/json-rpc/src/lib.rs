@@ -11,6 +11,34 @@
 //!
 //! [`alloy-transports`]: https://docs.rs/alloy-transports/latest/alloy-transports
 //!
+//! ## Usage
+//!
+//! This crate models the JSON-RPC 2.0 protocol data-types. It is intended to
+//! be used to build JSON-RPC clients or servers. Most users will not need to
+//! import this crate.
+//!
+//! This crate provides the following low-level data types:
+//!
+//! - [`Request`] - A JSON-RPC request.
+//! - [`Response`] - A JSON-RPC response.
+//! - [`ErrorPayload`] - A JSON-RPC error response payload, including code and message.
+//! - [`ResponsePayload`] - The payload of a JSON-RPC response, either a success payload, or an
+//!   [`ErrorPayload`].
+//!
+//! For client-side Rust ergonomics, we want to map responses to [`Result`]s.
+//! To that end, we provide the following types:
+//!
+//! - [`RpcError`] - An error that can occur during JSON-RPC communication. This type aggregates
+//!   errors that are common to all transports, such as (de)serialization, error responses, and
+//!   includes a generic transport error.
+//! - [`RpcResult`] - A result modeling an Rpc outcome as `Result<T,
+//! RpcError<E>>`.
+//!
+//! We recommend that transport implementors use [`RpcResult`] as the return
+//! type for their transport methods, parameterized by their transport error
+//! type. This will allow them to return either a successful response or an
+//! error.
+//!
 //! ## Note On (De)Serialization
 //!
 //! [`Request`], [`Response`], and similar types are generic over the
@@ -35,9 +63,8 @@
 //!
 //! In general, partially deserialized responses can be further deserialized.
 //! E.g. an [`BorrowedRpcResult`] may have success responses deserialized
-//! with [`RpcResult::deserialize_success::<U>`], which will transform it to an
-//! [`RpcResult<U>`]. Or the caller may use [`RpcResult::try_success_as::<U>`]
-//! to attempt to deserialize without transforming the [`RpcResult`].
+//! with [`crate::try_deserialize_ok::<U>`], which will transform it to an
+//! [`RpcResult<U>`].
 
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
@@ -55,7 +82,11 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use serde::{de::DeserializeOwned, Serialize};
+mod common;
+pub use common::Id;
+
+mod error;
+pub use error::RpcError;
 
 mod notification;
 pub use notification::{EthNotification, PubSubItem};
@@ -72,11 +103,12 @@ pub use response::{
     ResponsePayload,
 };
 
-mod common;
-pub use common::Id;
-
 mod result;
-pub use result::{BorrowedRpcResult, RpcResult};
+pub use result::{
+    transform_response, transform_result, try_deserialize_ok, BorrowedRpcResult, RpcResult,
+};
+
+use serde::{de::DeserializeOwned, Serialize};
 
 /// An object that can be used as a JSON-RPC parameter.
 ///

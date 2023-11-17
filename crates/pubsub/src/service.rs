@@ -4,11 +4,12 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend,
 };
+
 use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportError,
+    TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -62,10 +63,10 @@ where
 
     /// Reconnect the backend, re-issue pending requests, and re-start active
     /// subscriptions.
-    async fn reconnect(&mut self) -> Result<(), TransportError> {
+    async fn reconnect(&mut self) -> TransportResult<()> {
         tracing::info!("Reconnecting pubsub service backend.");
 
-        let mut old_handle = self.get_new_backend().await.map_err(TransportError::custom)?;
+        let mut old_handle = self.get_new_backend().await?;
 
         tracing::debug!("Draining old backend to_handle");
 
@@ -102,12 +103,12 @@ where
     }
 
     /// Dispatch a request to the socket.
-    fn dispatch_request(&mut self, brv: Box<RawValue>) -> Result<(), TransportError> {
-        self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportError::BackendGone)
+    fn dispatch_request(&mut self, brv: Box<RawValue>) -> TransportResult<()> {
+        self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
     }
 
     /// Service a request.
-    fn service_request(&mut self, in_flight: InFlight) -> Result<(), TransportError> {
+    fn service_request(&mut self, in_flight: InFlight) -> TransportResult<()> {
         let brv = in_flight.request();
 
         self.dispatch_request(brv.serialized().to_owned())?;
@@ -126,7 +127,7 @@ where
         &mut self,
         local_id: U256,
         tx: oneshot::Sender<broadcast::Receiver<Box<RawValue>>>,
-    ) -> Result<(), TransportError> {
+    ) -> TransportResult<()> {
         let local_id = local_id.into();
 
         if let Some(rx) = self.subs.get_rx(local_id) {
@@ -137,7 +138,7 @@ where
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, local_id: U256) -> Result<(), TransportError> {
+    fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
         let local_id = local_id.into();
         let req = Request {
             meta: RequestMeta { id: Id::None, method: "eth_unsubscribe" },
@@ -151,7 +152,7 @@ where
     }
 
     /// Service an instruction
-    fn service_ix(&mut self, ix: PubSubInstruction) -> Result<(), TransportError> {
+    fn service_ix(&mut self, ix: PubSubInstruction) -> TransportResult<()> {
         tracing::trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
@@ -161,7 +162,7 @@ where
     }
 
     /// Handle an item from the backend.
-    fn handle_item(&mut self, item: PubSubItem) -> Result<(), TransportError> {
+    fn handle_item(&mut self, item: PubSubItem) -> TransportResult<()> {
         match item {
             PubSubItem::Response(resp) => match self.in_flights.handle_response(resp) {
                 Some((server_id, in_flight)) => self.handle_sub_response(in_flight, server_id),
@@ -175,11 +176,7 @@ where
     }
 
     /// Rewrite the subscription id and insert into the subscriptions manager
-    fn handle_sub_response(
-        &mut self,
-        in_flight: InFlight,
-        server_id: U256,
-    ) -> Result<(), TransportError> {
+    fn handle_sub_response(&mut self, in_flight: InFlight, server_id: U256) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
 
@@ -201,7 +198,7 @@ where
     /// Spawn the service.
     pub(crate) fn spawn(mut self) {
         let fut = async move {
-            let result: Result<(), TransportError> = loop {
+            let result: TransportResult<()> = loop {
                 // We bias the loop so that we always handle new messages before
                 // reconnecting, and always reconnect before dispatching new
                 // requests.
@@ -214,14 +211,14 @@ where
                                 break Err(e)
                             }
                         } else if let Err(e) = self.reconnect().await {
-                            break Err(TransportError::Custom(Box::new(e)))
+                            break Err(e)
                         }
                     }
 
                     _ = &mut self.handle.error => {
                         tracing::error!("Pubsub service backend error.");
                         if let Err(e) = self.reconnect().await {
-                            break Err(TransportError::Custom(Box::new(e)))
+                            break Err(e)
                         }
                     }
 

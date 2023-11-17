@@ -20,6 +20,18 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
     pub data: Option<ErrData>,
 }
 
+impl<ErrData> std::fmt::Display for ErrorPayload<ErrData> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ErrorPayload code {}, message: \"{}\", contains payload: {}",
+            self.code,
+            self.message,
+            self.data.is_some()
+        )
+    }
+}
+
 /// A [`ErrorPayload`] that has been partially deserialized, borrowing its
 /// contents from the deserializer. This is used primarily for intermediate
 /// deserialization. Most users will not require it.

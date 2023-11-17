@@ -16,12 +16,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_json_rpc::RpcResult;
 use alloy_networks::{Network, Transaction};
 use alloy_primitives::Address;
 use alloy_rpc_client::RpcClient;
-use alloy_transport::{BoxTransport, Transport, TransportError};
-use serde_json::value::RawValue;
+use alloy_transport::{BoxTransport, Transport, TransportResult};
 use std::{borrow::Cow, marker::PhantomData};
 
 mod builder;
@@ -93,7 +91,7 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     async fn estimate_gas(
         &self,
         tx: &N::TransactionRequest,
-    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError> {
+    ) -> TransportResult<alloy_primitives::U256> {
         self.inner().estimate_gas(tx).await
     }
 
@@ -104,24 +102,18 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     async fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError> {
+    ) -> TransportResult<alloy_primitives::U256> {
         self.inner().get_transaction_count(address).await
     }
 
     /// Send a transaction to the network.
     ///
     /// The transaction type is defined by the network.
-    async fn send_transaction(
-        &self,
-        tx: &N::TransactionRequest,
-    ) -> RpcResult<N::Receipt, Box<RawValue>, TransportError> {
+    async fn send_transaction(&self, tx: &N::TransactionRequest) -> TransportResult<N::Receipt> {
         self.inner().send_transaction(tx).await
     }
 
-    async fn populate_gas(
-        &self,
-        tx: &mut N::TransactionRequest,
-    ) -> RpcResult<(), Box<RawValue>, TransportError> {
+    async fn populate_gas(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let gas = self.estimate_gas(&*tx).await;
 
         gas.map(|gas| tx.set_gas(gas))
@@ -142,14 +134,14 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
     async fn estimate_gas(
         &self,
         tx: &<N as Network>::TransactionRequest,
-    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError> {
+    ) -> TransportResult<alloy_primitives::U256> {
         self.prepare("eth_estimateGas", Cow::Borrowed(tx)).await
     }
 
     async fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcResult<alloy_primitives::U256, Box<RawValue>, TransportError> {
+    ) -> TransportResult<alloy_primitives::U256> {
         self.prepare(
             "eth_getTransactionCount",
             Cow::<(Address, String)>::Owned((address, "latest".to_string())),
@@ -157,10 +149,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
         .await
     }
 
-    async fn send_transaction(
-        &self,
-        tx: &N::TransactionRequest,
-    ) -> RpcResult<N::Receipt, Box<RawValue>, TransportError> {
+    async fn send_transaction(&self, tx: &N::TransactionRequest) -> TransportResult<N::Receipt> {
         self.prepare("eth_sendTransaction", Cow::Borrowed(tx)).await
     }
 }

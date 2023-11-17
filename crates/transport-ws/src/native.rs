@@ -1,6 +1,6 @@
 use crate::WsBackend;
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, Pbf, TransportError};
+use alloy_transport::{utils::Spawnable, Authorization, Pbf, TransportError, TransportErrorKind};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -46,9 +46,9 @@ impl PubSubConnect for WsConnect {
         let request = self.clone().into_client_request();
 
         Box::pin(async move {
-            let req = request.map_err(TransportError::custom)?;
+            let req = request.map_err(TransportErrorKind::custom)?;
             let (socket, _) =
-                tokio_tungstenite::connect_async(req).await.map_err(TransportError::custom)?;
+                tokio_tungstenite::connect_async(req).await.map_err(TransportErrorKind::custom)?;
 
             let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
             let backend = WsBackend { socket, interface };

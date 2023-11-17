@@ -1,7 +1,7 @@
 use crate::{ix::PubSubInstruction, managers::InFlight};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::U256;
-use alloy_transport::{TransportError, TransportFut};
+use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
 use futures::future::try_join_all;
 use serde_json::value::RawValue;
 use std::{future::Future, pin::Pin};
@@ -28,15 +28,17 @@ impl PubSubFrontend {
         id: U256,
     ) -> Result<broadcast::Receiver<Box<RawValue>>, TransportError> {
         let (tx, rx) = oneshot::channel();
-        self.tx.send(PubSubInstruction::GetSub(id, tx)).map_err(|_| TransportError::BackendGone)?;
-        rx.await.map_err(|_| TransportError::BackendGone)
+        self.tx
+            .send(PubSubInstruction::GetSub(id, tx))
+            .map_err(|_| TransportErrorKind::backend_gone())?;
+        rx.await.map_err(|_| TransportErrorKind::backend_gone())
     }
 
     /// Unsubscribe from a subscription.
     pub async fn unsubscribe(&self, id: U256) -> Result<(), TransportError> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))
-            .map_err(|_| TransportError::BackendGone)?;
+            .map_err(|_| TransportErrorKind::backend_gone())?;
         Ok(())
     }
 
@@ -50,8 +52,8 @@ impl PubSubFrontend {
         let tx = self.tx.clone();
 
         Box::pin(async move {
-            tx.send(ix).map_err(|_| TransportError::BackendGone)?;
-            rx.await.map_err(|_| TransportError::BackendGone)?
+            tx.send(ix).map_err(|_| TransportErrorKind::backend_gone())?;
+            rx.await.map_err(|_| TransportErrorKind::backend_gone())?
         })
     }
 
@@ -87,7 +89,7 @@ impl tower::Service<RequestPacket> for PubSubFrontend {
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         if self.tx.is_closed() {
-            return std::task::Poll::Ready(Err(TransportError::BackendGone));
+            return std::task::Poll::Ready(Err(TransportErrorKind::backend_gone()));
         }
         std::task::Poll::Ready(Ok(()))
     }
@@ -109,7 +111,7 @@ impl tower::Service<RequestPacket> for &PubSubFrontend {
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
         if self.tx.is_closed() {
-            return std::task::Poll::Ready(Err(TransportError::BackendGone));
+            return std::task::Poll::Ready(Err(TransportErrorKind::backend_gone()));
         }
         std::task::Poll::Ready(Ok(()))
     }

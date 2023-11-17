@@ -1,8 +1,10 @@
 use crate::RpcClient;
+
 use alloy_json_rpc::{
-    Id, Request, RequestPacket, ResponsePacket, RpcParam, RpcResult, RpcReturn, SerializedRequest,
+    transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
+    RpcReturn, SerializedRequest,
 };
-use alloy_transport::{Transport, TransportError};
+use alloy_transport::{Transport, TransportError, TransportErrorKind, TransportResult};
 use futures::channel::oneshot;
 use serde_json::value::RawValue;
 use std::{
@@ -14,7 +16,7 @@ use std::{
     task::{self, ready, Poll},
 };
 
-pub(crate) type Channel = oneshot::Sender<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>;
+pub(crate) type Channel = oneshot::Sender<TransportResult<Box<RawValue>>>;
 pub(crate) type ChannelMap = HashMap<Id, Channel>;
 
 /// A batch JSON-RPC request, used to bundle requests into a single transport
@@ -36,16 +38,12 @@ pub struct BatchRequest<'a, T> {
 #[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
 #[derive(Debug)]
 pub struct Waiter<Resp> {
-    rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
+    rx: oneshot::Receiver<TransportResult<Box<RawValue>>>,
     _resp: PhantomData<fn() -> Resp>,
 }
 
-impl<Resp> From<oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>>
-    for Waiter<Resp>
-{
-    fn from(
-        rx: oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>>,
-    ) -> Self {
+impl<Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>> for Waiter<Resp> {
+    fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
         Self { rx, _resp: PhantomData }
     }
 }
@@ -54,15 +52,15 @@ impl<Resp> std::future::Future for Waiter<Resp>
 where
     Resp: RpcReturn,
 {
-    type Output = RpcResult<Resp, Box<RawValue>, TransportError>;
+    type Output = TransportResult<Resp>;
 
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         let resp = ready!(Pin::new(&mut self.rx).poll(cx));
 
         Poll::Ready(match resp {
-            Ok(resp) => resp
-                .try_deserialize_success_or_else(|err, text| TransportError::deser_err(err, text)),
-            Err(e) => RpcResult::Err(TransportError::Custom(Box::new(e))),
+            Ok(resp) => try_deserialize_ok(resp),
+
+            Err(e) => Err(TransportErrorKind::custom(e)),
         })
     }
 }
@@ -100,7 +98,7 @@ impl<'a, T> BatchRequest<'a, T> {
     fn push_raw(
         &mut self,
         request: SerializedRequest,
-    ) -> oneshot::Receiver<RpcResult<Box<RawValue>, Box<RawValue>, TransportError>> {
+    ) -> oneshot::Receiver<TransportResult<Box<RawValue>>> {
         let (tx, rx) = oneshot::channel();
         self.channels.insert(request.id().clone(), tx);
         self.requests.push(request);
@@ -207,13 +205,13 @@ where
         match responses {
             ResponsePacket::Single(single) => {
                 if let Some(tx) = channels.remove(&single.id) {
-                    let _ = tx.send(RpcResult::from(single));
+                    let _ = tx.send(transform_response(single));
                 }
             }
             ResponsePacket::Batch(responses) => {
                 for response in responses.into_iter() {
                     if let Some(tx) = channels.remove(&response.id) {
-                        let _ = tx.send(RpcResult::from(response));
+                        let _ = tx.send(transform_response(response));
                     }
                 }
             }
@@ -221,8 +219,8 @@ where
 
         // Any channels remaining in the map are missing responses. To avoid
         // hanging futures, we send an error.
-        channels.drain().for_each(|(_, tx)| {
-            let _ = tx.send(RpcResult::Err(TransportError::MissingBatchResponse));
+        channels.drain().for_each(|(id, tx)| {
+            let _ = tx.send(Err(TransportErrorKind::missing_batch_response(id)));
         });
 
         self.set(BatchFuture::Complete);
