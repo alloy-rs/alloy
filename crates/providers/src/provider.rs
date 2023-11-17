@@ -2,7 +2,7 @@
 
 use crate::utils::{self, EstimatorFunction};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
-use alloy_rpc_client::RpcClient;
+use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
     Block, BlockId, BlockNumberOrTag, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus,
     Transaction, TransactionReceipt, TransactionRequest,
@@ -15,7 +15,6 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use thiserror::Error;
-use alloy_rpc_client::ClientBuilder;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum ClientError {
