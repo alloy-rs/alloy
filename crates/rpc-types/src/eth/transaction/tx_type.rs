@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 /// typed.
 pub const LEGACY_TX_TYPE_ID: u8 = 0;
 
-/// Identifier for [TxEip2930](crate::TxEip2930) transaction.
+/// Identifier for an EIP2930 transaction.
 pub const EIP2930_TX_TYPE_ID: u8 = 1;
 
-/// Identifier for [TxEip1559](crate::TxEip1559) transaction.
+/// Identifier for an EIP1559 transaction.
 pub const EIP1559_TX_TYPE_ID: u8 = 2;
 
-/// Identifier for [TxEip4844](crate::TxEip4844) transaction.
+/// Identifier for an EIP4844 transaction.
 pub const EIP4844_TX_TYPE_ID: u8 = 3;
 
 /// Transaction Type
