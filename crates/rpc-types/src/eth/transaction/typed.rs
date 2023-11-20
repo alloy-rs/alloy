@@ -3,11 +3,11 @@
 //! transaction deserialized from the json input of an RPC call. Depending on what fields are set,
 //! it can be converted into the container type [`TypedTransactionRequest`].
 
-use std::mem;
+use std::{mem, cmp::Ordering};
 
 use crate::{eth::transaction::AccessList, Signature, TxType};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U128, U256, U64};
-use alloy_rlp::{bytes, length_of_length, BufMut, Decodable, Encodable, Error as RlpError, Header};
+use alloy_rlp::{bytes, length_of_length, BufMut, Decodable, Encodable, Error as RlpError, Header, EMPTY_LIST_CODE, Buf};
 use serde::{Deserialize, Serialize};
 
 /// Container type for various Ethereum transaction requests
@@ -26,6 +26,76 @@ pub enum TypedTransactionRequest {
     EIP1559(EIP1559TransactionRequest),
 }
 
+impl Encodable for TypedTransactionRequest {
+    fn encode(&self, out: &mut dyn BufMut) {
+        match self {
+            // Just encode as such
+            TypedTransactionRequest::Legacy(tx) => tx.encode(out),
+            // For EIP2930 and EIP1559 txs, we need to "envelop" the RLP encoding with the tx type.
+            // For EIP2930, it's 1.
+            TypedTransactionRequest::EIP2930(tx) => {
+                let id = 1 as u8;
+                id.encode(out);
+                tx.encode(out)
+            },
+            // For EIP1559, it's 2.
+            TypedTransactionRequest::EIP1559(tx) => {
+                let id = 2 as u8;
+                id.encode(out);
+                tx.encode(out)
+            },
+        }
+    }
+
+    fn length(&self) -> usize {
+        match self {
+            TypedTransactionRequest::Legacy(tx) => tx.length(),
+            TypedTransactionRequest::EIP2930(tx) => tx.length(),
+            TypedTransactionRequest::EIP1559(tx) => tx.length(),
+        }
+    }
+}
+
+impl Decodable for TypedTransactionRequest {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        // First, decode the tx type.
+        let tx_type = u8::decode(buf)?;
+        // Then, decode the tx based on the type.
+        match tx_type.cmp(&EMPTY_LIST_CODE) {
+            Ordering::Less => {
+                // strip out the string header
+                // NOTE: typed transaction encodings either contain a "rlp header" which contains
+                // the type of the payload and its length, or they do not contain a header and
+                // start with the tx type byte.
+                //
+                // This line works for both types of encodings because byte slices starting with
+                // 0x01 and 0x02 return a Header { list: false, payload_length: 1 } when input to
+                // Header::decode.
+                // If the encoding includes a header, the header will be properly decoded and
+                // consumed.
+                // Otherwise, header decoding will succeed but nothing is consumed.
+                let _header = Header::decode(buf)?;
+                let tx_type = *buf.first().ok_or(RlpError::Custom(
+                    "typed tx cannot be decoded from an empty slice",
+                ))?;
+                if tx_type == 0x01 {
+                    buf.advance(1);
+                    EIP2930TransactionRequest::decode(buf)
+                        .map(TypedTransactionRequest::EIP2930)
+                } else if tx_type == 0x02 {
+                    buf.advance(1);
+                    EIP1559TransactionRequest::decode(buf)
+                        .map(TypedTransactionRequest::EIP1559)
+                } else {
+                    Err(RlpError::Custom("invalid tx type"))
+                }
+            },
+            Ordering::Equal => Err(RlpError::Custom("an empty list is not a valid transaction encoding")),
+            Ordering::Greater => LegacyTransactionRequest::decode(buf).map(TypedTransactionRequest::Legacy),
+        }
+    }
+}
+
 /// Represents a legacy transaction request
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LegacyTransactionRequest {
@@ -36,6 +106,40 @@ pub struct LegacyTransactionRequest {
     pub value: U256,
     pub input: Bytes,
     pub chain_id: Option<u64>,
+}
+
+impl Encodable for LegacyTransactionRequest {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.nonce.encode(out);
+        self.gas_price.encode(out);
+        self.gas_limit.encode(out);
+        self.kind.encode(out);
+        self.value.encode(out);
+        self.input.0.encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.nonce.length() +
+        self.gas_price.length() +
+        self.gas_limit.length() +
+        self.kind.length() +
+        self.value.length() +
+        self.input.0.length()
+    }
+}
+
+impl Decodable for LegacyTransactionRequest {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            nonce: Decodable::decode(buf)?,
+            gas_price: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            kind: Decodable::decode(buf)?,
+            value: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            chain_id: None,
+        })
+    }
 }
 
 impl LegacyTransactionRequest {
@@ -140,6 +244,45 @@ pub struct EIP2930TransactionRequest {
     pub value: U256,
     pub input: Bytes,
     pub access_list: AccessList,
+}
+
+impl Encodable for EIP2930TransactionRequest {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.gas_price.encode(out);
+        self.gas_limit.encode(out);
+        self.kind.encode(out);
+        self.value.encode(out);
+        self.input.0.encode(out);
+        self.access_list.encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.chain_id.length() +
+        self.nonce.length() +
+        self.gas_price.length() +
+        self.gas_limit.length() +
+        self.kind.length() +
+        self.value.length() +
+        self.input.0.length() +
+        self.access_list.length()
+    }
+}
+
+impl Decodable for EIP2930TransactionRequest {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            chain_id: Decodable::decode(buf)?,
+            nonce: Decodable::decode(buf)?,
+            gas_price: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            kind: Decodable::decode(buf)?,
+            value: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            access_list: Decodable::decode(buf)?,
+        })
+    }
 }
 
 impl EIP2930TransactionRequest {
@@ -284,6 +427,48 @@ pub struct EIP1559TransactionRequest {
     pub value: U256,
     pub input: Bytes,
     pub access_list: AccessList,
+}
+
+impl Encodable for EIP1559TransactionRequest {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.max_priority_fee_per_gas.encode(out);
+        self.max_fee_per_gas.encode(out);
+        self.gas_limit.encode(out);
+        self.kind.encode(out);
+        self.value.encode(out);
+        self.input.0.encode(out);
+        self.access_list.encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.chain_id.length() +
+        self.nonce.length() +
+        self.max_priority_fee_per_gas.length() +
+        self.max_fee_per_gas.length() +
+        self.gas_limit.length() +
+        self.kind.length() +
+        self.value.length() +
+        self.input.0.length() +
+        self.access_list.length()
+    }
+}
+
+impl Decodable for EIP1559TransactionRequest {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            chain_id: Decodable::decode(buf)?,
+            nonce: Decodable::decode(buf)?,
+            max_priority_fee_per_gas: Decodable::decode(buf)?,
+            max_fee_per_gas: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            kind: Decodable::decode(buf)?,
+            value: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            access_list: Decodable::decode(buf)?,
+        })
+    }
 }
 
 impl EIP1559TransactionRequest {
