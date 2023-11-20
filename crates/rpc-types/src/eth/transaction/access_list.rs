@@ -1,9 +1,14 @@
+use std::mem;
+
 use alloy_primitives::{Address, U256};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default, RlpEncodable, RlpDecodable,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
@@ -12,8 +17,18 @@ pub struct AccessListItem {
     pub storage_keys: Vec<U256>,
 }
 
+impl AccessListItem {
+    /// Calculates a heuristic for the in-memory size of the [AccessListItem].
+    #[inline]
+    pub fn size(&self) -> usize {
+        mem::size_of::<Address>() + self.storage_keys.capacity() * mem::size_of::<U256>()
+    }
+}
+
 /// AccessList as defined in EIP-2930
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(
+    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default, RlpEncodable, RlpDecodable,
+)]
 pub struct AccessList(pub Vec<AccessListItem>);
 
 impl AccessList {
@@ -35,6 +50,14 @@ impl AccessList {
     /// Returns an iterator over the list's addresses and storage keys.
     pub fn flatten(&self) -> impl Iterator<Item = (Address, &[U256])> + '_ {
         self.0.iter().map(|item| (item.address, item.storage_keys.as_slice()))
+    }
+
+    /// Calculates a heuristic for the in-memory size of the [AccessList].
+    #[inline]
+    pub fn size(&self) -> usize {
+        // take into account capacity
+        self.0.iter().map(AccessListItem::size).sum::<usize>()
+            + self.0.capacity() * mem::size_of::<AccessListItem>()
     }
 }
 
