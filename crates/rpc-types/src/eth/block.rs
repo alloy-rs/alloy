@@ -247,12 +247,12 @@ pub enum BlockNumberOrTag {
     /// Pending block (not yet part of the blockchain)
     Pending,
     /// Block by number from canon chain
-    Number(U64),
+    Number(u64),
 }
 
 impl BlockNumberOrTag {
     /// Returns the numeric block number if explicitly set
-    pub const fn as_number(&self) -> Option<U64> {
+    pub const fn as_number(&self) -> Option<u64> {
         match *self {
             BlockNumberOrTag::Number(num) => Some(num),
             _ => None,
@@ -292,13 +292,13 @@ impl BlockNumberOrTag {
 
 impl From<u64> for BlockNumberOrTag {
     fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(U64::from(num))
+        BlockNumberOrTag::Number(num)
     }
 }
 
 impl From<U64> for BlockNumberOrTag {
     fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num)
+        num.to::<u64>().into()
     }
 }
 
@@ -342,7 +342,7 @@ impl FromStr for BlockNumberOrTag {
             "pending" => Self::Pending,
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
-                    let number = U64::from_str_radix(hex_val, 16);
+                    let number = u64::from_str_radix(hex_val, 16);
                     BlockNumberOrTag::Number(number?)
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
@@ -420,13 +420,13 @@ impl BlockId {
 
 impl From<u64> for BlockId {
     fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(U64::from(num)).into()
+        BlockNumberOrTag::Number(num).into()
     }
 }
 
 impl From<U64> for BlockId {
     fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num).into()
+        BlockNumberOrTag::Number(num.to()).into()
     }
 }
 
