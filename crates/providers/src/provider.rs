@@ -51,7 +51,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Gets the last block number available.
-    async fn get_block_number(&self) -> TransportResult<U64>
+    async fn get_block_number(&self) -> TransportResult<u64>
     where
         Self: Sync;
 
@@ -289,7 +289,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the last block number available.
-    async fn get_block_number(&self) -> TransportResult<U64>
+    async fn get_block_number(&self) -> TransportResult<u64>
     where
         Self: Sync,
     {
@@ -718,7 +718,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
-        assert_eq!(U64::ZERO, num)
+        assert_eq!(0, num)
     }
 
     #[tokio::test]
