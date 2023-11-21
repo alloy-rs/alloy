@@ -46,7 +46,6 @@ pub struct FeeHistory {
     /// # Note
     ///
     /// The `Option` is only for compatability with Erigon and Geth.
-    //#[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
     pub gas_used_ratio: Vec<f64>,
     /// Lowest number block of the returned range.
