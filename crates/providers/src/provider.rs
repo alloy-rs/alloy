@@ -289,11 +289,12 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the last block number available.
+    /// Gets the last block number available.
     async fn get_block_number(&self) -> TransportResult<u64>
-    where
-        Self: Sync,
+        where
+            Self: Sync,
     {
-        self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await.map(|num: U64| num.to::<u64>())
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
