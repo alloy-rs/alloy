@@ -308,9 +308,7 @@ impl Serialize for BlockNumberOrTag {
         S: Serializer,
     {
         match *self {
-            BlockNumberOrTag::Number(ref x) => {
-                serializer.serialize_str(&format!("0x{:x}", x.to::<u64>()))
-            },
+            BlockNumberOrTag::Number(ref x) => serializer.serialize_str(&format!("0x{x:x}")),
             BlockNumberOrTag::Latest => serializer.serialize_str("latest"),
             BlockNumberOrTag::Finalized => serializer.serialize_str("finalized"),
             BlockNumberOrTag::Safe => serializer.serialize_str("safe"),
