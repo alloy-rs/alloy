@@ -854,7 +854,7 @@ mod providers_test {
         let fee_history = provider
             .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
-                BlockNumberOrTag::Number(block_number.to()),
+                BlockNumberOrTag::Number(block_number),
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
             .await
