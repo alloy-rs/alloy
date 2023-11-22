@@ -6,7 +6,7 @@ use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_types::{
     trace::{GethDebugTracingOptions, GethTrace, LocalizedTransactionTrace},
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
-    EIP1186AccountProofResponse, FeeHistory, Filter, Log, RpcBlockHash, SyncStatus, Transaction,
+    EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
     TransactionReceipt,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
@@ -14,7 +14,6 @@ use alloy_transport_http::Http;
 use auto_impl::auto_impl;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use thiserror::Error;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
@@ -51,7 +50,7 @@ pub trait TempProvider: Send + Sync {
         Self: Sync;
 
     /// Gets the last block number available.
-    async fn get_block_number(&self) -> TransportResult<U64>
+    async fn get_block_number(&self) -> TransportResult<u64>
     where
         Self: Sync;
 
@@ -280,20 +279,21 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                Cow::<(Address, BlockId)>::Owned((
+                (
                     address,
                     tag.unwrap_or(BlockNumberOrTag::Latest.into()),
-                )),
+                ),
             )
             .await
     }
 
     /// Gets the last block number available.
-    async fn get_block_number(&self) -> TransportResult<U64>
-    where
-        Self: Sync,
+    /// Gets the last block number available.
+    async fn get_block_number(&self) -> TransportResult<u64>
+        where
+            Self: Sync,
     {
-        self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -304,10 +304,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getBalance",
-                Cow::<(Address, BlockId)>::Owned((
+                (
                     address,
                     tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
-                )),
+                ),
             )
             .await
     }
@@ -318,7 +318,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare("eth_getBlockByHash", Cow::<(BlockHash, bool)>::Owned((hash, full)))
+            .prepare("eth_getBlockByHash", (hash, full))
             .await
     }
 
@@ -334,7 +334,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getBlockByNumber",
-                Cow::<(BlockNumberOrTag, bool)>::Owned((number.into(), full)),
+                (number.into(), full),
             )
             .await
     }
@@ -344,7 +344,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_chainId", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_chainId", ()).await
     }
 
     /// Gets the specified storage value from [Address].
@@ -357,11 +357,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getStorageAt",
-                Cow::<(Address, StorageKey, BlockId)>::Owned((
+                (
                     address,
                     key,
                     tag.unwrap_or(BlockNumberOrTag::Latest.into()),
-                )),
+                ),
             )
             .await
     }
@@ -376,7 +376,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare("eth_getCode", Cow::<(Address, BlockId)>::Owned((address, tag.into())))
+            .prepare("eth_getCode", (address, tag.into()))
             .await
     }
 
@@ -388,9 +388,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionByHash",
-                // Force alloy-rs/alloy to encode this an array of strings,
-                // even if we only need to send one hash.
-                Cow::<Vec<TxHash>>::Owned(vec![hash]),
+                (hash,),
             )
             .await
     }
@@ -400,7 +398,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_getLogs", Cow::<Vec<Filter>>::Owned(vec![filter])).await
+        self.inner.prepare("eth_getLogs", vec![filter]).await
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
@@ -409,7 +407,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_accounts", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_accounts", ()).await
     }
 
     /// Gets the current gas price.
@@ -417,7 +415,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_gasPrice", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_gasPrice", ()).await
     }
 
     /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
@@ -428,7 +426,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_getTransactionReceipt", Cow::<Vec<TxHash>>::Owned(vec![hash])).await
+        self.inner.prepare("eth_getTransactionReceipt", (hash,)).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -445,11 +443,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_feeHistory",
-                Cow::<(U256, BlockNumberOrTag, Vec<f64>)>::Owned((
+                (
                     block_count,
                     last_block.into(),
-                    reward_percentiles.to_vec(),
-                )),
+                    reward_percentiles,
+                ),
             )
             .await
     }
@@ -462,7 +460,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_getBlockReceipts", Cow::<BlockNumberOrTag>::Owned(block)).await
+        self.inner.prepare("eth_getBlockReceipts", block).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
@@ -480,7 +478,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
                 self.inner
                     .prepare(
                         "eth_getUncleByBlockHashAndIndex",
-                        Cow::<(RpcBlockHash, U64)>::Owned((hash, idx)),
+                        (hash, idx),
                     )
                     .await
             }
@@ -488,7 +486,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
                 self.inner
                     .prepare(
                         "eth_getUncleByBlockNumberAndIndex",
-                        Cow::<(BlockNumberOrTag, U64)>::Owned((number, idx)),
+                        (number, idx),
                     )
                     .await
             }
@@ -500,7 +498,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_syncing", Cow::<()>::Owned(())).await
+        self.inner.prepare("eth_syncing", ()).await
     }
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
@@ -511,10 +509,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_call",
-                Cow::<(CallRequest, BlockId)>::Owned((
+                (
                     tx,
                     block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
-                )),
+                ),
             )
             .await
     }
@@ -525,20 +523,20 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         Self: Sync,
     {
         if let Some(block_id) = block {
-            let params = Cow::<(CallRequest, BlockId)>::Owned((tx, block_id));
+            let params = (tx, block_id);
             self.inner.prepare("eth_estimateGas", params).await
         } else {
-            let params = Cow::<CallRequest>::Owned(tx);
+            let params = tx;
             self.inner.prepare("eth_estimateGas", params).await
         }
     }
 
-    /// Sends an already-signed transaction.
+   /// Sends an already-signed transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_sendRawTransaction", Cow::<Bytes>::Owned(tx)).await
+        self.inner.prepare("eth_sendRawTransaction", tx).await
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -600,11 +598,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getProof",
-                Cow::<(Address, Vec<StorageKey>, BlockId)>::Owned((
+                (
                     address,
                     keys,
                     block.unwrap_or(BlockNumberOrTag::Latest.into()),
-                )),
+                ),
             )
             .await
     }
@@ -620,10 +618,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_createAccessList",
-                Cow::<(CallRequest, BlockId)>::Owned((
+                (
                     request,
                     block.unwrap_or(BlockNumberOrTag::Latest.into()),
-                )),
+                ),
             )
             .await
     }
@@ -636,7 +634,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("trace_transaction", Cow::<Vec<TxHash>>::Owned(vec![hash])).await
+        self.inner.prepare("trace_transaction", vec![hash]).await
     }
 
     async fn debug_trace_transaction(
@@ -650,7 +648,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "debug_traceTransaction",
-                Cow::<(TxHash, GethDebugTracingOptions)>::Owned((hash, trace_options)),
+                (hash, trace_options),
             )
             .await
     }
@@ -662,7 +660,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("trace_block", Cow::<BlockNumberOrTag>::Owned(block)).await
+        self.inner.prepare("trace_block", block).await
     }
 
     #[cfg(feature = "anvil")]
@@ -671,7 +669,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         Self: Sync,
     {
         self.inner
-            .prepare("anvil_setCode", Cow::<(Address, &'static str)>::Owned((address, code)))
+            .prepare("anvil_setCode", (address, code))
             .await
     }
 }
@@ -718,7 +716,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
-        assert_eq!(U64::ZERO, num)
+        assert_eq!(0, num)
     }
 
     #[tokio::test]
@@ -853,7 +851,7 @@ mod providers_test {
         let fee_history = provider
             .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
-                BlockNumberOrTag::Number(block_number.to()),
+                BlockNumberOrTag::Number(block_number),
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
             .await
