@@ -388,8 +388,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionByHash",
-                // Force alloy to encode this an array of strings
-                vec![hash],
+                [hash],
             )
             .await
     }
@@ -427,7 +426,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_getTransactionReceipt", vec![hash]).await
+        self.inner.prepare("eth_getTransactionReceipt", [hash]).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -447,7 +446,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
                 (
                     block_count,
                     last_block.into(),
-                    reward_percentiles.to_vec(),
+                    reward_percentiles,
                 ),
             )
             .await
