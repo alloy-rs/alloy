@@ -280,10 +280,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                Cow::<(Address, BlockId)>::Owned((
+                (
                     address,
                     tag.unwrap_or(BlockNumberOrTag::Latest.into()),
-                )),
+                ),
             )
             .await
     }
@@ -294,7 +294,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         where
             Self: Sync,
     {
-        self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await.map(|num: U64| num.to::<u64>())
+        self.inner.prepare("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -305,10 +305,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getBalance",
-                Cow::<(Address, BlockId)>::Owned((
+                (
                     address,
                     tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
-                )),
+                ),
             )
             .await
     }
