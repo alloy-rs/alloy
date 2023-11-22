@@ -388,7 +388,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionByHash",
-                [hash],
+                (hash,),
             )
             .await
     }
@@ -426,7 +426,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner.prepare("eth_getTransactionReceipt", [hash]).await
+        self.inner.prepare("eth_getTransactionReceipt", (hash,)).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
