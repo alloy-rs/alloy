@@ -5,19 +5,12 @@ Ethereum signer abstraction.
 You can implement the `Signer` trait to extend functionality to other signers
 such as Hardware Security Modules, KMS etc.
 
-The exposed interfaces return a recoverable signature. In order to convert the
-signature and the [`TransactionRequest`] to a [`Transaction`], look at the
-signing middleware.
-
 Supported signers:
 - [Private key](./src/wallet)
 - [Ledger](./src/ledger)
 - [Trezor](./src/trezor)
 - [YubiHSM2](./src/wallet/yubi.rs)
 - [AWS KMS](./src/aws)
-
-[`transaction`]: ethers_core::types::Transaction
-[`transactionrequest`]: ethers_core::types::TransactionRequest
 
 ## Examples
 
