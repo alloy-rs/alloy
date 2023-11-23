@@ -8,7 +8,7 @@ use k256::{
 };
 
 /// Applies [EIP-155](https://eips.ethereum.org/EIPS/eip-155).
-pub fn to_eip155_v(recovery_id: u8, chain_id: u64) -> u64 {
+pub const fn to_eip155_v(recovery_id: u8, chain_id: u64) -> u64 {
     (recovery_id as u64) + 35 + chain_id * 2
 }
 

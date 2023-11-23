@@ -1,11 +1,10 @@
+use crate::utils::public_key_to_address;
 use alloy_primitives::{keccak256, Address, B256};
 use elliptic_curve::NonZeroScalar;
 use k256::{
     ecdsa::{self, RecoveryId, VerifyingKey},
     Secp256k1,
 };
-
-use crate::utils::public_key_to_address;
 
 /// An Ethereum ECDSA signature.
 ///
@@ -22,7 +21,7 @@ pub struct Signature {
 
 impl Signature {
     /// Creates a new signature from the given inner signature and recovery ID.
-    pub fn new(inner: ecdsa::Signature, recid: RecoveryId) -> Self {
+    pub const fn new(inner: ecdsa::Signature, recid: RecoveryId) -> Self {
         Self { inner, recid }
     }
 
@@ -47,7 +46,7 @@ impl Signature {
 
     /// Returns the inner ECDSA signature.
     #[inline]
-    pub fn inner(&self) -> &ecdsa::Signature {
+    pub const fn inner(&self) -> &ecdsa::Signature {
         &self.inner
     }
 
@@ -59,19 +58,19 @@ impl Signature {
 
     /// Returns the inner ECDSA signature.
     #[inline]
-    pub fn into_inner(self) -> ecdsa::Signature {
+    pub const fn into_inner(self) -> ecdsa::Signature {
         self.inner
     }
 
     /// Returns the recovery ID.
     #[inline]
-    pub fn recid(&self) -> RecoveryId {
+    pub const fn recid(&self) -> RecoveryId {
         self.recid
     }
 
     #[doc(hidden)]
     #[deprecated(note = "use `Signature::recid` instead")]
-    pub fn recovery_id(&self) -> RecoveryId {
+    pub const fn recovery_id(&self) -> RecoveryId {
         self.recid
     }
 
@@ -89,7 +88,7 @@ impl Signature {
 
     /// Returns the recovery ID as a `u8`.
     #[inline]
-    pub fn v(&self) -> u8 {
+    pub const fn v(&self) -> u8 {
         self.recid.to_byte()
     }
 

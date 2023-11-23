@@ -58,7 +58,7 @@ pub struct Wallet<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> {
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
     /// Construct a new wallet with an external Signer
-    pub fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
+    pub const fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
         Wallet { signer, address, chain_id }
     }
 }
@@ -127,7 +127,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
     }
 
     /// Gets the wallet's signer
-    pub fn signer(&self) -> &D {
+    pub const fn signer(&self) -> &D {
         &self.signer
     }
 }

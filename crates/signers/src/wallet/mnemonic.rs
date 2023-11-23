@@ -97,7 +97,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn word_count(mut self, count: usize) -> Self {
+    pub const fn word_count(mut self, count: usize) -> Self {
         self.word_count = count;
         self
     }
@@ -105,7 +105,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
     pub fn index(self, index: u32) -> Result<Self, WalletError> {
-        self.derivation_path(&format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
+        self.derivation_path(format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 
     /// Sets the derivation path of the child key to be derived.
