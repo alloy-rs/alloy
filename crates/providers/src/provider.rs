@@ -13,7 +13,7 @@ use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResu
 use alloy_transport_http::Http;
 use auto_impl::auto_impl;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
@@ -237,6 +237,16 @@ pub trait TempProvider: Send + Sync {
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>
     where
+        Self: Sync;
+
+    async fn raw_request<P, R>(
+        &self,
+        method: &'static str,
+        params: P,
+    ) -> TransportResult<R>
+    where
+        P: Serialize + Send + Sync + Clone,
+        R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
         Self: Sync;
 }
 
@@ -663,6 +673,26 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("trace_block", block).await
     }
 
+    /// Sends a raw request with the methods and params specified to the internal connection,
+    /// and returns the result.
+    async fn raw_request<P, R>(
+        &self,
+        method: &'static str,
+        params: P,
+    ) -> TransportResult<R>
+    where
+        P: Serialize + Send + Sync + Clone,
+        R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
+        Self: Sync
+    {
+        let res = async move {
+            let res: R = self.inner.prepare(method, &params).await?;
+            Ok(res)
+        }.await;
+
+        res
+    }
+
     #[cfg(feature = "anvil")]
     async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
     where
@@ -708,7 +738,7 @@ mod providers_test {
         utils,
     };
     use alloy_primitives::{address, b256, U256, U64};
-    use alloy_rpc_types::{BlockNumberOrTag, Filter};
+    use alloy_rpc_types::{BlockNumberOrTag, Filter, Block};
     use ethers_core::utils::Anvil;
 
     #[tokio::test]
@@ -717,6 +747,14 @@ mod providers_test {
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num)
+    }
+
+    #[tokio::test]
+    async fn gets_block_number_with_raw_req() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let num: U64 = provider.raw_request("eth_blockNumber", ()).await.unwrap();
+        assert_eq!(0, num.to::<u64>())
     }
 
     #[tokio::test]
@@ -742,6 +780,18 @@ mod providers_test {
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
         let block = provider.get_block_by_hash(hash, true).await.unwrap().unwrap();
+        assert_eq!(block.header.hash.unwrap(), hash);
+    }
+
+    #[tokio::test]
+    async fn gets_block_by_hash_with_raw_req() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let num = 0;
+        let tag: BlockNumberOrTag = num.into();
+        let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
+        let hash = block.header.hash.unwrap();
+        let block: Block = provider.raw_request::<(alloy_primitives::FixedBytes<32>, bool), Block>("eth_getBlockByHash", (hash, true)).await.unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
     }
 
