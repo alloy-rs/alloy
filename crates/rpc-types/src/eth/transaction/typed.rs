@@ -286,7 +286,7 @@ impl Decodable for EIP2930TransactionRequest {
 }
 
 impl EIP2930TransactionRequest {
-    /// Calculates a heuristic for the in-memory size of the [TxEip2930] transaction.
+    /// Calculates a heuristic for the in-memory size of the transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<u64>() + // chain_id
@@ -299,7 +299,7 @@ impl EIP2930TransactionRequest {
         self.input.len() // input
     }
 
-    /// Decodes the inner [TxEip2930] fields from RLP bytes.
+    /// Decodes the inner fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -472,7 +472,7 @@ impl Decodable for EIP1559TransactionRequest {
 }
 
 impl EIP1559TransactionRequest {
-    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    /// Decodes the inner fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -569,7 +569,7 @@ impl EIP1559TransactionRequest {
         TxType::EIP1559
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip1559] transaction.
+    /// Calculates a heuristic for the in-memory size of the transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<u64>() + // chain_id
