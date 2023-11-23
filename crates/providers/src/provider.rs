@@ -685,12 +685,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
         Self: Sync
     {
-        let res = async move {
-            let res: R = self.inner.prepare(method, &params).await?;
-            Ok(res)
-        }.await;
-
-        res
+        let res: R = self.inner.prepare(method, &params).await?;
+        Ok(res)
     }
 
     #[cfg(feature = "anvil")]
