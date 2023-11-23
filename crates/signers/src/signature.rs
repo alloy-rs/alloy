@@ -12,6 +12,7 @@ use crate::utils::public_key_to_address;
 /// This is a wrapper around [`ecdsa::Signature`] and a [`RecoveryId`] to provide public key
 /// recovery functionality.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(missing_copy_implementations)]
 pub struct Signature {
     /// The inner ECDSA signature.
     inner: ecdsa::Signature,

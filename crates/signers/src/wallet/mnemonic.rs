@@ -36,6 +36,7 @@ pub struct MnemonicBuilder<W: Wordlist> {
 
 /// Error produced by the mnemonic wallet module
 #[derive(Error, Debug)]
+#[allow(missing_copy_implementations)]
 pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was expected but not found
     #[error("Expected phrase not found")]
@@ -103,7 +104,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
-    pub fn index(mut self, index: u32) -> Result<Self, WalletError> {
+    pub fn index(self, index: u32) -> Result<Self, WalletError> {
         self.derivation_path(&format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 

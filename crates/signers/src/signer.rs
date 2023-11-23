@@ -16,6 +16,7 @@ pub trait Signer: std::fmt::Debug + Send + Sync {
     async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error>;
 
     /// Signs the transaction.
+    #[cfg(TODO)]
     async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error>;
 
     /// Encodes and signs the typed data according [EIP-712].

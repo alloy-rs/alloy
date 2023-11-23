@@ -13,6 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives.workspace = true
+alloy-rpc-types.workspace = true
 
 # crypto
 coins-bip32 = "0.8.7"

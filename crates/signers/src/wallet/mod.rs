@@ -1,4 +1,4 @@
-use crate::{utils::to_eip155_v, Signature, Signer};
+use crate::{Signature, Signer};
 use alloy_primitives::{utils::eip191_hash_message, Address, B256};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
@@ -73,6 +73,7 @@ impl<D: Sync + Send + PrehashSigner<(ecdsa::Signature, RecoveryId)>> Signer for 
         self.sign_hash(message_hash)
     }
 
+    #[cfg(TODO)]
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature, Self::Error> {
         self.sign_transaction_sync(tx)
     }
@@ -106,6 +107,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
     /// Synchronously signs the provided transaction, normalizing the signature `v` value with
     /// EIP-155 using the transaction's `chain_id`, or the signer's `chain_id` if the transaction
     /// does not specify one.
+    #[cfg(TODO)]
     pub fn sign_transaction_sync(&self, tx: &TypedTransaction) -> Result<Signature, WalletError> {
         // rlp (for sighash) must have the same chain id as v in the signature
         let chain_id = tx.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
