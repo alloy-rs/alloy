@@ -34,13 +34,13 @@ impl Encodable for TypedTransactionRequest {
             // For EIP2930 and EIP1559 txs, we need to "envelop" the RLP encoding with the tx type.
             // For EIP2930, it's 1.
             TypedTransactionRequest::EIP2930(tx) => {
-                let id = 1 as u8;
+                let id = 1_u8;
                 id.encode(out);
                 tx.encode(out)
             },
             // For EIP1559, it's 2.
             TypedTransactionRequest::EIP1559(tx) => {
-                let id = 2 as u8;
+                let id = 2_u8;
                 id.encode(out);
                 tx.encode(out)
             },
