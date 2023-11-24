@@ -19,14 +19,14 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger)
 #[derive(Debug)]
-pub struct LedgerEthereum {
+pub struct LedgerSigner {
     transport: Mutex<Ledger>,
     derivation: DerivationType,
     pub(crate) chain_id: u64,
     pub(crate) address: Address,
 }
 
-impl std::fmt::Display for LedgerEthereum {
+impl std::fmt::Display for LedgerSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -36,7 +36,7 @@ impl std::fmt::Display for LedgerEthereum {
     }
 }
 
-impl LedgerEthereum {
+impl LedgerSigner {
     /// Instantiate the application by acquiring a lock on the ledger device.
     ///
     /// # Examples
@@ -296,7 +296,7 @@ mod tests {
     // Replace this with your ETH addresses.
     async fn test_get_address() {
         // Instantiate it with the default ledger derivation path
-        let ledger = LedgerEthereum::new(DerivationType::LedgerLive(0), 1).await.unwrap();
+        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
         assert_eq!(
             ledger.get_address().await.unwrap(),
             "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".parse().unwrap()
@@ -310,7 +310,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_tx() {
-        let ledger = LedgerEthereum::new(DerivationType::LedgerLive(0), 1).await.unwrap();
+        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -329,7 +329,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_version() {
-        let ledger = LedgerEthereum::new(DerivationType::LedgerLive(0), 1).await.unwrap();
+        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
 
         let version = ledger.version().await.unwrap();
         assert_eq!(version, "1.3.7");
@@ -338,7 +338,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let ledger = LedgerEthereum::new(DerivationType::Legacy(0), 1).await.unwrap();
+        let ledger = LedgerSigner::new(DerivationType::Legacy(0), 1).await.unwrap();
         let message = "hello world";
         let sig = ledger.sign_message(message).await.unwrap();
         let addr = ledger.get_address().await.unwrap();

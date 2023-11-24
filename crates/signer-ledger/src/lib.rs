@@ -19,23 +19,26 @@
 #[macro_use]
 extern crate tracing;
 
-mod app;
-pub use app::LedgerEthereum as Ledger;
-
-mod types;
-pub use types::{DerivationType as HDPath, LedgerError};
-
 use alloy_primitives::Address;
 use alloy_signer::{Signature, Signer};
-use app::LedgerEthereum;
 use async_trait::async_trait;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+mod app;
+pub use app::LedgerSigner;
+
+mod types;
+pub use types::{DerivationType as HDPath, LedgerError};
+
+#[doc(hidden)]
+#[deprecated(note = "use `LedgerSigner` instead")]
+pub type Ledger = LedgerSigner;
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for LedgerEthereum {
+impl Signer for LedgerSigner {
     type Error = LedgerError;
 
     async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {

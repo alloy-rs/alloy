@@ -15,7 +15,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor)
 #[derive(Debug)]
-pub struct TrezorEthereum {
+pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
     cache_dir: PathBuf,
@@ -31,7 +31,7 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 const SESSION_ID_LENGTH: usize = 32;
 const SESSION_FILE_NAME: &str = "trezor.session";
 
-impl TrezorEthereum {
+impl TrezorSigner {
     pub async fn new(
         derivation: DerivationType,
         chain_id: u64,
@@ -245,7 +245,7 @@ mod tests {
     async fn test_get_address() {
         // Instantiate it with the default trezor derivation path
         let trezor =
-            TrezorEthereum::new(DerivationType::TrezorLive(1), 1, Some(PathBuf::from("randomdir")))
+            TrezorSigner::new(DerivationType::TrezorLive(1), 1, Some(PathBuf::from("randomdir")))
                 .await
                 .unwrap();
         assert_eq!(
@@ -262,7 +262,7 @@ mod tests {
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_tx() {
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -282,7 +282,7 @@ mod tests {
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_big_data_tx() {
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
         // invalid data
         let big_data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string()+ &"ff".repeat(1032*2) + "aa").unwrap();
@@ -303,7 +303,7 @@ mod tests {
     async fn test_sign_empty_txes() {
         // Contract creation (empty `to`), requires data.
         // To test without the data field, we need to specify a `to` address.
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
         {
             let tx_req = Eip1559TransactionRequest::new()
                 .to("2ed7afa17473e17ac59908f088b4371d28585476".parse::<Address>().unwrap())
@@ -322,7 +322,7 @@ mod tests {
         // Contract creation (empty `to`, with data) should show on the trezor device as:
         //  ` "0 Wei ETH
         //  ` new contract?"
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
         {
             let tx_req = Eip1559TransactionRequest::new().data(data.clone()).into();
             let tx = trezor.sign_transaction(&tx_req).await.unwrap();
@@ -337,7 +337,7 @@ mod tests {
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_eip1559_tx() {
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -384,7 +384,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
         let message = "hello world";
         let sig = trezor.sign_message(message).await.unwrap();
         let addr = trezor.get_address().await.unwrap();

@@ -23,23 +23,26 @@
 // TODO: Needed to pin version.
 use protobuf as _;
 
-mod app;
-pub use app::TrezorEthereum as Trezor;
-
-mod types;
-pub use types::{DerivationType as TrezorHDPath, TrezorError};
-
 use alloy_primitives::Address;
 use alloy_signer::{Signature, Signer};
-use app::TrezorEthereum;
 use async_trait::async_trait;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+mod app;
+pub use app::TrezorSigner;
+
+mod types;
+pub use types::{DerivationType as TrezorHDPath, TrezorError};
+
+#[doc(hidden)]
+#[deprecated(note = "use `TrezorSigner` instead")]
+pub type Trezor = TrezorSigner;
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for TrezorEthereum {
+impl Signer for TrezorSigner {
     type Error = TrezorError;
 
     async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
