@@ -27,7 +27,8 @@ alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
 
-alloy-primitives = { version = "0.5.0", features = ["serde"] }
+alloy-primitives = { version = "0.5.0", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "0.5.0", default-features = false, features = ["std"] }
 alloy-rlp = "0.3"
 
 # crypto

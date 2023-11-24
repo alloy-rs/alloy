@@ -15,6 +15,8 @@ exclude.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
 
+alloy-sol-types.workspace = true
+
 # crypto
 coins-bip32 = "0.8.7"
 coins-bip39 = "0.8.7"
@@ -68,3 +70,4 @@ ledger = ["dep:coins-ledger", "dep:semver", "dep:futures-util"]
 trezor = ["dep:trezor-client", "dep:semver", "dep:home", "dep:protobuf", "dep:futures-util"]
 aws = ["dep:aws-config", "dep:aws-sdk-kms", "dep:spki"]
 yubi = ["dep:yubihsm"]
+eip712 = []

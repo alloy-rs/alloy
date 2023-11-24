@@ -4,6 +4,9 @@ use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
+#[cfg(feature = "eip712")]
+use alloy_sol_types::{Eip712Domain, SolStruct};
+
 mod mnemonic;
 pub use mnemonic::MnemonicBuilder;
 
@@ -24,11 +27,9 @@ mod yubi;
 /// prefix the message being hashed with the `Ethereum Signed Message` domain separator.
 ///
 /// ```
-/// use ethers_core::rand::thread_rng;
-/// use ethers_signers::{LocalWallet, Signer};
+/// use alloy_signers::{LocalWallet, Signer};
 ///
-/// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-/// let wallet = LocalWallet::new(&mut thread_rng());
+/// let wallet = LocalWallet::random();
 ///
 /// // Optionally, the wallet's chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
@@ -36,15 +37,14 @@ mod yubi;
 ///
 /// // The wallet can be used to sign messages
 /// let message = b"hello";
-/// let signature = wallet.sign_message(message).await?;
-/// assert_eq!(signature.recover(&message[..]).unwrap(), wallet.address());
+/// let signature = wallet.sign_message(message)?;
+/// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), wallet.address());
 ///
 /// // LocalWallet is clonable:
 /// let wallet_clone = wallet.clone();
-/// let signature2 = wallet_clone.sign_message(message).await?;
+/// let signature2 = wallet_clone.sign_message(message)?;
 /// assert_eq!(signature, signature2);
-/// # Ok(())
-/// # }
+/// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]
 pub struct Wallet<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> {
@@ -56,21 +56,13 @@ pub struct Wallet<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> {
     pub(crate) chain_id: u64,
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
-    /// Construct a new wallet with an external Signer
-    pub const fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
-        Wallet { signer, address, chain_id }
-    }
-}
-
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D: Sync + Send + PrehashSigner<(ecdsa::Signature, RecoveryId)>> Signer for Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
     type Error = WalletError;
 
     async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
-        let message_hash = eip191_hash_message(message);
-        self.sign_hash(message_hash)
+        self.sign_message(message)
     }
 
     #[cfg(TODO)]
@@ -78,15 +70,13 @@ impl<D: Sync + Send + PrehashSigner<(ecdsa::Signature, RecoveryId)>> Signer for 
         self.sign_transaction_sync(tx)
     }
 
-    #[cfg(TODO)]
-    async fn sign_typed_data<T: Eip712 + Send + Sync>(
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
+        domain: &Eip712Domain,
     ) -> Result<Signature, Self::Error> {
-        let encoded =
-            payload.encode_eip712().map_err(|e| Self::Error::Eip712Error(e.to_string()))?;
-
-        self.sign_hash(B256::from(encoded))
+        self.sign_hash(&payload.eip712_signing_hash(domain))
     }
 
     fn address(&self) -> Address {
@@ -103,7 +93,12 @@ impl<D: Sync + Send + PrehashSigner<(ecdsa::Signature, RecoveryId)>> Signer for 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
+    /// Construct a new wallet with an external Signer
+    pub const fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
+        Wallet { signer, address, chain_id }
+    }
+
     /// Synchronously signs the provided transaction, normalizing the signature `v` value with
     /// EIP-155 using the transaction's `chain_id`, or the signer's `chain_id` if the transaction
     /// does not specify one.
@@ -120,13 +115,20 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
         Ok(sig)
     }
 
+    /// Signs the provided message after prefixing it and hashing it according to [EIP-191].
+    ///
+    /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
+    pub fn sign_message<T: AsRef<[u8]>>(&self, msg: T) -> Result<Signature, WalletError> {
+        self.sign_hash(&eip191_hash_message(msg))
+    }
+
     /// Signs the provided hash.
-    pub fn sign_hash(&self, hash: B256) -> Result<Signature, WalletError> {
+    pub fn sign_hash(&self, hash: &B256) -> Result<Signature, WalletError> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
         Ok(Signature::new(recoverable_sig, recovery_id))
     }
 
-    /// Gets the wallet's signer
+    /// Returns this wallet's signer.
     pub const fn signer(&self) -> &D {
         &self.signer
     }

@@ -3,6 +3,9 @@ use alloy_primitives::Address;
 use async_trait::async_trait;
 use std::error::Error;
 
+#[cfg(feature = "eip712")]
+use alloy_sol_types::{Eip712Domain, SolStruct};
+
 /// Trait for signing transactions and messages.
 ///
 /// Implement this trait to support different signing modes, e.g. Ledger, hosted etc.
@@ -19,14 +22,17 @@ pub trait Signer: std::fmt::Debug + Send + Sync {
     #[cfg(TODO)]
     async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error>;
 
-    /// Encodes and signs the typed data according [EIP-712].
+    /// Encodes and signs the typed data according to [EIP-712].
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
-    #[cfg(TODO)]
-    async fn sign_typed_data<T: Eip712 + Send + Sync>(
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
-    ) -> Result<Signature, Self::Error>;
+        domain: &Eip712Domain,
+    ) -> Result<Signature, Self::Error>
+    where
+        Self: Sized;
 
     /// Returns the signer's Ethereum Address.
     fn address(&self) -> Address;

@@ -7,7 +7,7 @@ use coins_bip32::Bip32Error;
 use coins_bip39::MnemonicError;
 use k256::{
     ecdsa::{self, SigningKey},
-    SecretKey as K256SecretKey,
+    FieldBytes, SecretKey as K256SecretKey,
 };
 use rand::{CryptoRng, Rng};
 use std::str::FromStr;
@@ -45,17 +45,39 @@ pub enum WalletError {
     /// Error propagated from the mnemonic builder module.
     #[error(transparent)]
     MnemonicBuilderError(#[from] MnemonicBuilderError),
-    /// Error type from Eip712Error message
-    #[error("error encoding eip712 struct: {0:?}")]
-    Eip712Error(String),
 }
 
 impl Wallet<SigningKey> {
+    /// Creates a new Wallet instance from a raw scalar serialized as a byte array.
+    #[inline]
+    pub fn from_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
+        SigningKey::from_bytes(bytes).map(Self::_new)
+    }
+
+    /// Creates a new Wallet instance from a raw scalar serialized as a byte slice.
+    #[inline]
+    pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
+        SigningKey::from_slice(bytes).map(Self::_new)
+    }
+
+    /// Creates a new random keypair seeded with [`rand::thread_rng()`].
+    #[inline]
+    pub fn random() -> Self {
+        Self::random_with(&mut rand::thread_rng())
+    }
+
+    /// Creates a new random keypair seeded with the provided RNG.
+    #[inline]
+    pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
+        Self::_new(SigningKey::random(rng))
+    }
+
     /// Creates a new random encrypted JSON with the provided password and stores it in the
     /// provided directory. Returns a tuple (Wallet, String) of the wallet instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
     /// the keystore is stored as the stringified UUID.
     #[cfg(not(target_arch = "wasm32"))]
+    #[inline]
     pub fn new_keystore<P, R, S>(
         dir: P,
         rng: &mut R,
@@ -68,22 +90,19 @@ impl Wallet<SigningKey> {
         S: AsRef<[u8]>,
     {
         let (secret, uuid) = eth_keystore::new(dir, rng, password, name)?;
-        let signer = SigningKey::from_bytes(secret.as_slice().into())?;
-        let address = secret_key_to_address(&signer);
-        Ok((Self { signer, address, chain_id: 1 }, uuid))
+        Ok((Self::from_slice(&secret)?, uuid))
     }
 
     /// Decrypts an encrypted JSON from the provided path to construct a Wallet instance
     #[cfg(not(target_arch = "wasm32"))]
+    #[inline]
     pub fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<Self, WalletError>
     where
         P: AsRef<Path>,
         S: AsRef<[u8]>,
     {
         let secret = eth_keystore::decrypt_key(keypath, password)?;
-        let signer = SigningKey::from_bytes(secret.as_slice().into())?;
-        let address = secret_key_to_address(&signer);
-        Ok(Self { signer, address, chain_id: 1 })
+        Ok(Self::from_slice(&secret)?)
     }
 
     /// Creates a new encrypted JSON with the provided private key and password and stores it in the
@@ -91,6 +110,7 @@ impl Wallet<SigningKey> {
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
     /// the keystore is stored as the stringified UUID.
     #[cfg(not(target_arch = "wasm32"))]
+    #[inline]
     pub fn encrypt_keystore<P, R, B, S>(
         keypath: P,
         rng: &mut R,
@@ -104,24 +124,15 @@ impl Wallet<SigningKey> {
         B: AsRef<[u8]>,
         S: AsRef<[u8]>,
     {
-        let uuid = eth_keystore::encrypt_key(keypath, rng, &pk, password, name)?;
-        let signer = SigningKey::from_slice(pk.as_ref())?;
-        let address = secret_key_to_address(&signer);
-        Ok((Self { signer, address, chain_id: 1 }, uuid))
+        let pk = pk.as_ref();
+        let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
+        Ok((Self::from_slice(pk)?, uuid))
     }
 
-    /// Creates a new random keypair seeded with the provided RNG
-    pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        let signer = SigningKey::random(rng);
+    #[inline]
+    fn _new(signer: SigningKey) -> Self {
         let address = secret_key_to_address(&signer);
         Self { signer, address, chain_id: 1 }
-    }
-
-    /// Creates a new Wallet instance from a raw scalar value (big endian).
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, WalletError> {
-        let signer = SigningKey::from_bytes(bytes.into())?;
-        let address = secret_key_to_address(&signer);
-        Ok(Self { signer, address, chain_id: 1 })
     }
 }
 
@@ -134,19 +145,14 @@ impl PartialEq for Wallet<SigningKey> {
 }
 
 impl From<SigningKey> for Wallet<SigningKey> {
-    fn from(signer: SigningKey) -> Self {
-        let address = secret_key_to_address(&signer);
-
-        Self { signer, address, chain_id: 1 }
+    fn from(value: SigningKey) -> Self {
+        Self::_new(value)
     }
 }
 
 impl From<K256SecretKey> for Wallet<SigningKey> {
-    fn from(key: K256SecretKey) -> Self {
-        let signer = key.into();
-        let address = secret_key_to_address(&signer);
-
-        Self { signer, address, chain_id: 1 }
+    fn from(value: K256SecretKey) -> Self {
+        Self::_new(value.into())
     }
 }
 
@@ -154,14 +160,8 @@ impl FromStr for Wallet<SigningKey> {
     type Err = WalletError;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {
-        let src = hex::decode(src.strip_prefix("0X").unwrap_or(src))?;
-
-        if src.len() != 32 {
-            return Err(WalletError::HexError(hex::FromHexError::InvalidStringLength));
-        }
-
-        let sk = SigningKey::from_bytes(src.as_slice().into())?;
-        Ok(sk.into())
+        let array = hex::decode_to_array::<_, 32>(src)?;
+        Ok(Self::from_slice(&array)?)
     }
 }
 
@@ -185,8 +185,8 @@ impl TryFrom<String> for Wallet<SigningKey> {
 #[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
-    use crate::{LocalWallet, Signer};
-    use alloy_primitives::Address;
+    use crate::LocalWallet;
+    use alloy_primitives::address;
     use tempfile::tempdir;
 
     #[test]
@@ -206,35 +206,35 @@ mod tests {
         }
     }
 
-    async fn test_encrypted_json_keystore(key: Wallet<SigningKey>, uuid: &str, dir: &Path) {
+    fn test_encrypted_json_keystore(key: Wallet<SigningKey>, uuid: &str, dir: &Path) {
         // sign a message using the given key
         let message = "Some data";
-        let signature = key.sign_message(message.as_bytes()).await.unwrap();
+        let signature = key.sign_message(message.as_bytes()).unwrap();
 
         // read from the encrypted JSON keystore and decrypt it, while validating that the
         // signatures produced by both the keys should match
         let path = Path::new(dir).join(uuid);
         let key2 = Wallet::<SigningKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
 
-        let signature2 = key2.sign_message(message.as_bytes()).await.unwrap();
+        let signature2 = key2.sign_message(message.as_bytes()).unwrap();
         assert_eq!(signature, signature2);
 
         std::fs::remove_file(&path).unwrap();
     }
 
-    #[tokio::test]
-    async fn encrypted_json_keystore_new() {
+    #[test]
+    fn encrypted_json_keystore_new() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
         let mut rng = rand::thread_rng();
         let (key, uuid) =
             Wallet::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
-        test_encrypted_json_keystore(key, &uuid, dir.path()).await;
+        test_encrypted_json_keystore(key, &uuid, dir.path());
     }
 
-    #[tokio::test]
-    async fn encrypted_json_keystore_from_pk() {
+    #[test]
+    fn encrypted_json_keystore_from_pk() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
         let mut rng = rand::thread_rng();
@@ -247,18 +247,18 @@ mod tests {
             Wallet::<SigningKey>::encrypt_keystore(&dir, &mut rng, private_key, "randpsswd", None)
                 .unwrap();
 
-        test_encrypted_json_keystore(key, &uuid, dir.path()).await;
+        test_encrypted_json_keystore(key, &uuid, dir.path());
     }
 
-    #[tokio::test]
-    async fn signs_msg() {
+    #[test]
+    fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);
-        let key = Wallet::<SigningKey>::new(&mut rand::thread_rng());
+        let key = Wallet::<SigningKey>::random_with(&mut rand::thread_rng());
         let address = key.address;
 
         // sign a message
-        let signature = key.sign_message(message.as_bytes()).await.unwrap();
+        let signature = key.sign_message(message.as_bytes()).unwrap();
 
         // ecrecover via the message will hash internally
         let recovered = signature.recover_address_from_msg(message).unwrap();
@@ -363,28 +363,60 @@ mod tests {
         sig.verify(sighash, wallet.address).unwrap();
     }
 
+    #[tokio::test]
+    #[cfg(feature = "eip712")]
+    async fn typed_data() {
+        use crate::Signer;
+        use alloy_primitives::{keccak256, Address, I256, U256};
+        use alloy_sol_types::{eip712_domain, sol, SolStruct};
+
+        sol! {
+            #[derive(Debug)]
+            struct FooBar {
+                int256 foo;
+                uint256 bar;
+                bytes fizz;
+                bytes32 buzz;
+                string far;
+                address out;
+            }
+        }
+
+        let domain = eip712_domain! {
+            name: "Eip712Test",
+            version: "1",
+            chain_id: 1,
+            verifying_contract: address!("0000000000000000000000000000000000000001"),
+            salt: keccak256("eip712-test-75F0CCte"),
+        };
+        let foo_bar = FooBar {
+            foo: I256::try_from(10u64).unwrap(),
+            bar: U256::from(20u64),
+            fizz: b"fizz".into(),
+            buzz: keccak256("buzz"),
+            far: String::from("space"),
+            out: Address::ZERO,
+        };
+        let wallet = Wallet::random();
+        let hash = foo_bar.eip712_signing_hash(&domain);
+        let sig = wallet.sign_typed_data(&foo_bar, &domain).await.unwrap();
+        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
+        assert_eq!(wallet.sign_hash(&hash).unwrap(), sig);
+    }
+
     #[test]
     fn key_to_address() {
         let wallet: Wallet<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
-        assert_eq!(
-            wallet.address,
-            Address::from_str("7E5F4552091A69125d5DfCb7b8C2659029395Bdf").expect("Decoding failed")
-        );
+        assert_eq!(wallet.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
 
         let wallet: Wallet<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000002".parse().unwrap();
-        assert_eq!(
-            wallet.address,
-            Address::from_str("2B5AD5c4795c026514f8317c7a215E218DcCD6cF").expect("Decoding failed")
-        );
+        assert_eq!(wallet.address, address!("2B5AD5c4795c026514f8317c7a215E218DcCD6cF"));
 
         let wallet: Wallet<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
-        assert_eq!(
-            wallet.address,
-            Address::from_str("6813Eb9362372EEF6200f3b1dbC3f819671cBA69").expect("Decoding failed")
-        );
+        assert_eq!(wallet.address, address!("6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
     }
 
     #[test]
@@ -411,13 +443,6 @@ mod tests {
         assert_eq!(wallet.address, wallet_0x.address);
         assert_eq!(wallet.chain_id, wallet_0x.chain_id);
         assert_eq!(wallet.signer, wallet_0x.signer);
-
-        // Check FromStr and `0X`
-        let wallet_0x_cap: Wallet<SigningKey> =
-            "0X0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
-        assert_eq!(wallet.address, wallet_0x_cap.address);
-        assert_eq!(wallet.chain_id, wallet_0x_cap.chain_id);
-        assert_eq!(wallet.signer, wallet_0x_cap.signer);
 
         // Check TryFrom<&str>
         let wallet_0x_tryfrom_str: Wallet<SigningKey> =

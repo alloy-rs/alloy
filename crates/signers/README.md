@@ -14,8 +14,7 @@ Supported signers:
 
 ## Examples
 
-<!-- TODO -->
-
+<!-- TODO
 ```rust,no_run
 # use ethers_signers::{LocalWallet, Signer};
 # use ethers_core::{k256::ecdsa::SigningKey, types::TransactionRequest};
@@ -38,22 +37,22 @@ signature.verify("hello world", wallet.address()).unwrap();
 # Ok(())
 # }
 ```
+-->
 
-Sign an Ethereum prefixed message ([eip-712](https://eips.ethereum.org/EIPS/eip-712)):
+Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-712)):
 
-```rust,no_run
-# use ethers_signers::{Signer, LocalWallet};
-# async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+```rust
+use alloy_signers::{LocalWallet, Signer};
+
 let message = "Some data";
-let wallet = LocalWallet::new(&mut rand::thread_rng());
+let wallet = LocalWallet::random();
 
 // Sign the message
-let signature = wallet.sign_message(message).await?;
+let signature = wallet.sign_message(message)?;
 
 // Recover the signer from the message
-let recovered = signature.recover(message)?;
+let recovered = signature.recover_address_from_msg(message)?;
 
 assert_eq!(recovered, wallet.address());
-# Ok(())
-# }
+# Ok::<_, Box<dyn std::error::Error>>(())
 ```
