@@ -15,13 +15,13 @@ exclude.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
+async-trait.workspace = true
 coins-ledger = { version = "0.8.3", default-features = false }
-semver.workspace = true
 futures-executor.workspace = true
 futures-util.workspace = true
-tracing.workspace = true
-async-trait.workspace = true
+semver.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }

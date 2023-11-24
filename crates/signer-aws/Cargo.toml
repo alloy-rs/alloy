@@ -15,12 +15,12 @@ exclude.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-aws-sdk-kms = { version = "0.39", default-features = false }
-spki.workspace = true
-k256.workspace = true
-tracing.workspace = true
 async-trait.workspace = true
+aws-sdk-kms = { version = "0.39", default-features = false }
+k256.workspace = true
+spki.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
