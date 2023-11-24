@@ -1,7 +1,26 @@
-//! AWS KMS-based signer.
+#![doc = include_str!("../README.md")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![warn(
+    missing_copy_implementations,
+    missing_debug_implementations,
+    // TODO
+    // missing_docs,
+    unreachable_pub,
+    clippy::missing_const_for_fn,
+    rustdoc::all
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![deny(unused_must_use, rust_2018_idioms)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use super::Signer;
-use alloy_primitives::utils::eip191_hash_message;
+#[macro_use]
+extern crate tracing;
+
+use alloy_primitives::{hex, utils::eip191_hash_message, Address, B256};
+use alloy_signer::{Signature as EthSig, Signer};
 use aws_sdk_kms::{
     error::SdkError,
     operation::{
@@ -12,15 +31,11 @@ use aws_sdk_kms::{
     types::{MessageType, SigningAlgorithmSpec},
     Client,
 };
-use debug;
-use ethers_core::types::{
-    transaction::{eip2718::TypedTransaction, eip712::Eip712},
-    Address, Signature as EthSig, B256,
-};
-use instrument;
 use k256::ecdsa::{Error as K256Error, Signature as KSig, VerifyingKey};
 use std::fmt;
-use trace;
+
+#[cfg(feature = "eip712")]
+use alloy_sol_types::{Eip712Domain, SolStruct};
 
 mod utils;
 
@@ -36,10 +51,11 @@ mod utils;
 /// # Examples
 ///
 /// ```no_run
-/// # async fn test() {
+/// use alloy_signer::Signer;
+/// use alloy_signer_aws::AwsSigner;
 /// use aws_config::BehaviorVersion;
-/// use ethers_signers::{AwsSigner, Signer};
 ///
+/// # async fn test() {
 /// let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
 /// let client = aws_sdk_kms::Client::new(&config);
 ///
@@ -50,7 +66,7 @@ mod utils;
 /// let message = vec![0, 1, 2, 3];
 ///
 /// let sig = signer.sign_message(&message).await.unwrap();
-/// sig.verify(message, signer.address()).expect("valid sig");
+/// assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
 /// # }
 /// ```
 #[derive(Clone)]
@@ -70,12 +86,6 @@ impl fmt::Debug for AwsSigner {
             .field("pubkey", &hex::encode(self.pubkey.to_sec1_bytes()))
             .field("address", &self.address)
             .finish()
-    }
-}
-
-impl fmt::Display for AwsSigner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
     }
 }
 
@@ -120,7 +130,7 @@ impl AwsSigner {
         let key_id = key_id.as_ref();
         let resp = request_get_pubkey(&kms, key_id).await?;
         let pubkey = decode_pubkey(resp)?;
-        let address = ethers_core::utils::public_key_to_address(&pubkey);
+        let address = alloy_signer::utils::public_key_to_address(&pubkey);
 
         debug!(
             "Instantiated AWS signer with pubkey 0x{} and address {address:?}",
@@ -147,13 +157,13 @@ impl AwsSigner {
     pub async fn sign_digest_with_key<T: AsRef<str>>(
         &self,
         key_id: T,
-        digest: [u8; 32],
+        digest: &B256,
     ) -> Result<KSig, AwsSignerError> {
         request_sign_digest(&self.kms, key_id.as_ref(), digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: [u8; 32]) -> Result<KSig, AwsSignerError> {
+    pub async fn sign_digest(&self, digest: &B256) -> Result<KSig, AwsSignerError> {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
@@ -162,13 +172,12 @@ impl AwsSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_with_eip155(
         &self,
-        digest: B256,
+        digest: &B256,
         chain_id: u64,
     ) -> Result<EthSig, AwsSignerError> {
-        let sig = self.sign_digest(digest.into()).await?;
-        let mut sig =
-            utils::sig_from_digest_bytes_trial_recovery(&sig, digest.into(), &self.pubkey);
-        utils::apply_eip155(&mut sig, chain_id);
+        let sig = self.sign_digest(digest).await?;
+        let mut sig = utils::sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
+        sig.apply_eip155(chain_id);
         Ok(sig)
     }
 }
@@ -183,9 +192,10 @@ impl Signer for AwsSigner {
         let message_hash = eip191_hash_message(message);
         trace!(?message_hash, ?message);
 
-        self.sign_digest_with_eip155(message_hash, self.chain_id).await
+        self.sign_digest_with_eip155(&message_hash, self.chain_id).await
     }
 
+    #[cfg(TODO)]
     #[instrument(err)]
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<EthSig, Self::Error> {
         let mut tx_with_chain = tx.clone();
@@ -196,17 +206,15 @@ impl Signer for AwsSigner {
         self.sign_digest_with_eip155(sighash, chain_id).await
     }
 
-    #[cfg(TODO)]
-    async fn sign_typed_data<T: Eip712 + Send + Sync>(
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
+        domain: &Eip712Domain,
     ) -> Result<EthSig, Self::Error> {
-        let digest =
-            payload.encode_eip712().map_err(|e| Self::Error::Eip712Error(e.to_string()))?;
-
-        let sig = self.sign_digest(digest).await?;
-        let sig = utils::sig_from_digest_bytes_trial_recovery(&sig, digest, &self.pubkey);
-
+        let digest = payload.eip712_signing_hash(domain);
+        let sig = self.sign_digest(&digest).await?;
+        let sig = utils::sig_from_digest_bytes_trial_recovery(sig, &digest, &self.pubkey);
         Ok(sig)
     }
 
@@ -236,11 +244,11 @@ async fn request_get_pubkey(
 async fn request_sign_digest(
     kms: &Client,
     key_id: &str,
-    digest: [u8; 32],
+    digest: &B256,
 ) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
         .key_id(key_id)
-        .message(Blob::new(digest))
+        .message(Blob::new(digest.as_slice()))
         .message_type(MessageType::Digest)
         .signing_algorithm(SigningAlgorithmSpec::EcdsaSha256)
         .send()
@@ -289,6 +297,6 @@ mod tests {
         let message = vec![0, 1, 2, 3];
 
         let sig = signer.sign_message(&message).await.unwrap();
-        sig.verify(message, signer.address()).expect("valid sig");
+        assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
     }
 }

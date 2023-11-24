@@ -1,4 +1,4 @@
-use crate::utils::public_key_to_address;
+use crate::utils::{public_key_to_address, to_eip155_v};
 use alloy_primitives::{eip191_hash_message, hex, Address, B256};
 use elliptic_curve::NonZeroScalar;
 use k256::{
@@ -188,7 +188,15 @@ impl Signature {
     /// Sets the recovery ID by normalizing a `v` value.
     #[inline]
     pub fn set_v(&mut self, v: u64) {
-        self.recid = normalize_v(v);
+        self.set_recid(normalize_v(v));
+    }
+
+    /// Modifies the recovery ID by applying [EIP-155] to a `v` value.
+    ///
+    /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
+    #[inline]
+    pub fn apply_eip155(&mut self, chain_id: u64) {
+        self.set_v(to_eip155_v(self.recid.to_byte(), chain_id));
     }
 
     /// Recovers a [`VerifyingKey`] from this signature and the given message by first hashing the
@@ -245,6 +253,7 @@ const fn normalize_v(v: u64) -> RecoveryId {
         // Case 3: eip155 V value
         v @ 35.. => ((v - 1) % 2) as u8,
     };
+    debug_assert!(byte <= RecoveryId::MAX);
     match RecoveryId::from_byte(byte) {
         Some(recid) => recid,
         None => unsafe { core::hint::unreachable_unchecked() },

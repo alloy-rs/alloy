@@ -8,8 +8,9 @@ use k256::{
 };
 
 /// Applies [EIP-155](https://eips.ethereum.org/EIPS/eip-155).
-pub const fn to_eip155_v(recovery_id: u8, chain_id: u64) -> u64 {
-    (recovery_id as u64) + 35 + chain_id * 2
+#[inline]
+pub const fn to_eip155_v(v: u8, chain_id: u64) -> u64 {
+    (v as u64) + 35 + chain_id * 2
 }
 
 /// Converts an ECDSA private key to its corresponding Ethereum Address.

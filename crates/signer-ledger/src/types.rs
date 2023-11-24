@@ -4,6 +4,7 @@
 
 #![allow(clippy::upper_case_acronyms)]
 
+use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 
@@ -28,8 +29,8 @@ impl fmt::Display for DerivationType {
     }
 }
 
+/// Error when using the Ledger transport.
 #[derive(Error, Debug)]
-/// Error when using the Ledger transport
 pub enum LedgerError {
     /// Underlying ledger transport error
     #[error(transparent)]
@@ -57,12 +58,12 @@ pub enum LedgerError {
     EmptyPayload,
 }
 
-pub const P1_FIRST: u8 = 0x00;
+pub(crate) const P1_FIRST: u8 = 0x00;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-#[allow(non_camel_case_types)]
-pub enum INS {
+#[allow(non_camel_case_types, dead_code)]
+pub(crate) enum INS {
     GET_PUBLIC_KEY = 0x02,
     SIGN = 0x04,
     GET_APP_CONFIGURATION = 0x06,
@@ -85,7 +86,7 @@ impl std::fmt::Display for INS {
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[allow(non_camel_case_types)]
-pub enum P1 {
+pub(crate) enum P1 {
     NON_CONFIRM = 0x00,
     MORE = 0x80,
 }
@@ -93,6 +94,6 @@ pub enum P1 {
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[allow(non_camel_case_types)]
-pub enum P2 {
+pub(crate) enum P2 {
     NO_CHAINCODE = 0x00,
 }

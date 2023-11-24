@@ -1,21 +1,15 @@
-use super::types::*;
-use ethers_core::{
-    types::{
-        transaction::{eip2718::TypedTransaction, eip712::Eip712},
-        Address, NameOrAddress, Signature, Transaction, TransactionRequest, TxHash, B256, U256,
-    },
-    utils::keccak256,
-};
-use futures_executor::block_on;
-use futures_util::lock::Mutex;
+use super::types::{DerivationType, TrezorError};
+use alloy_primitives::{Address, U256};
+use alloy_signer::Signature;
 use std::{
     env, fs,
     io::{Read, Write},
-    path,
     path::PathBuf,
 };
-use thiserror::Error;
-use trezor_client::client::{AccessListItem as Trezor_AccessListItem, Trezor};
+use trezor_client::client::Trezor;
+
+#[cfg(feature = "eip712")]
+use alloy_sol_types::{Eip712Domain, SolStruct};
 
 /// A Trezor Ethereum App.
 ///
@@ -148,12 +142,11 @@ impl TrezorEthereum {
     ) -> Result<Address, TrezorError> {
         let mut client = self.get_client(self.session_id.clone())?;
         let address_str = client.ethereum_get_address(Self::convert_path(derivation))?;
-        let mut address_bytes = [0; 20];
-        hex::decode_to_slice(address_str, &mut address_bytes)?;
-        Ok(address_bytes.into())
+        Ok(address_str.parse()?)
     }
 
     /// Signs an Ethereum transaction (requires confirmation on the Trezor)
+    #[cfg(TODO)]
     pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, TrezorError> {
         let mut client = self.get_client(self.session_id.clone())?;
 
@@ -196,9 +189,9 @@ impl TrezorEthereum {
     }
 
     /// Signs an ethereum personal message
-    pub async fn sign_message<S: AsRef<[u8]>>(
+    pub async fn sign_message<S: AsRef<[u8]> + Send + Sync>(
         &self,
-        message: &[u8],
+        message: S,
     ) -> Result<Signature, TrezorError> {
         let message = message.as_ref();
         let mut client = self.get_client(self.session_id.clone())?;
@@ -206,14 +199,19 @@ impl TrezorEthereum {
 
         let signature = client.ethereum_sign_message(message.into(), apath)?;
 
-        Ok(Signature { r: signature.r, s: signature.s, v: signature.v })
+        let r = U256::from_limbs(signature.r.0);
+        let s = U256::from_limbs(signature.s.0);
+        // TODO: don't unwrap
+        Ok(Signature::from_scalars(r.into(), s.into(), signature.v).unwrap())
     }
 
     /// Signs an EIP712 encoded domain separator and message
-    pub async fn sign_typed_struct<T>(&self, payload: &T) -> Result<Signature, TrezorError>
-    where
-        T: Eip712,
-    {
+    #[cfg(feature = "eip712")]
+    pub async fn sign_typed_struct<T: SolStruct>(
+        &self,
+        _payload: &T,
+        _domain: &Eip712Domain,
+    ) -> Result<Signature, TrezorError> {
         unimplemented!()
     }
 
@@ -221,7 +219,6 @@ impl TrezorEthereum {
     fn convert_path(derivation: &DerivationType) -> Vec<u32> {
         let derivation = derivation.to_string();
         let elements = derivation.split('/').skip(1).collect::<Vec<_>>();
-        let depth = elements.len();
 
         let mut path = vec![];
         for derivation_index in elements {
@@ -237,15 +234,10 @@ impl TrezorEthereum {
     }
 }
 
-#[cfg(all(test, feature = "trezor"))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Signer;
-    use ethers_core::types::{
-        transaction::eip2930::{AccessList, AccessListItem},
-        Address, Eip1559TransactionRequest, TransactionRequest, I256, U256,
-    };
-    use std::str::FromStr;
+    use alloy_primitives::address;
 
     #[tokio::test]
     #[ignore]
@@ -258,16 +250,17 @@ mod tests {
                 .unwrap();
         assert_eq!(
             trezor.get_address().await.unwrap(),
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".parse().unwrap()
+            address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
         );
         assert_eq!(
             trezor.get_address_with_path(&DerivationType::TrezorLive(0)).await.unwrap(),
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".parse().unwrap()
+            address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
         );
     }
 
     #[tokio::test]
     #[ignore]
+    #[cfg(TODO)]
     async fn test_sign_tx() {
         let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
@@ -287,6 +280,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    #[cfg(TODO)]
     async fn test_sign_big_data_tx() {
         let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
@@ -305,6 +299,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    #[cfg(TODO)]
     async fn test_sign_empty_txes() {
         // Contract creation (empty `to`), requires data.
         // To test without the data field, we need to specify a `to` address.
@@ -340,6 +335,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    #[cfg(TODO)]
     async fn test_sign_eip1559_tx() {
         let trezor = TrezorEthereum::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
 
@@ -392,6 +388,6 @@ mod tests {
         let message = "hello world";
         let sig = trezor.sign_message(message).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
-        sig.verify(message, addr).unwrap();
+        assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
     }
 }

@@ -1,0 +1,35 @@
+[package]
+name = "alloy-signer-trezor"
+description = "Ethereum Trezor signer"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-signer.workspace = true
+
+# TODO: bump this and remove protobuf pin
+trezor-client = { version = "=0.1.0", default-features = false, features = ["ethereum"] }
+protobuf = "=3.2.0"
+
+async-trait.workspace = true
+home.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+# tracing.workspace = true
+
+# eip712
+alloy-sol-types = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]

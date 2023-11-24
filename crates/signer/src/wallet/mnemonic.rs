@@ -67,7 +67,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # Examples
     ///
     /// ```
-    /// use alloy_signers::{MnemonicBuilder, coins_bip39::English};
+    /// use alloy_signer::{MnemonicBuilder, coins_bip39::English};
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     ///
     /// let wallet = MnemonicBuilder::<English>::default()
@@ -88,7 +88,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # Examples
     ///
     /// ```
-    /// use alloy_signers::{coins_bip39::English, MnemonicBuilder};
+    /// use alloy_signer::{coins_bip39::English, MnemonicBuilder};
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     ///
     /// let mut rng = rand::thread_rng();

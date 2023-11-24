@@ -4,10 +4,9 @@
 
 #![allow(clippy::upper_case_acronyms)]
 
+use alloy_primitives::{hex, B256, U256};
 use std::fmt;
 use thiserror::Error;
-
-use ethers_core::types::{transaction::eip2718::TypedTransaction, NameOrAddress, U256};
 use trezor_client::client::AccessListItem as Trezor_AccessListItem;
 
 #[derive(Clone, Debug)]
@@ -58,26 +57,28 @@ pub enum TrezorError {
     CacheError(String),
 }
 
-/// Trezor Transaction Struct
-pub struct TrezorTransaction {
-    pub nonce: Vec<u8>,
-    pub gas: Vec<u8>,
-    pub gas_price: Vec<u8>,
-    pub value: Vec<u8>,
-    pub to: String,
-    pub data: Vec<u8>,
-    pub max_fee_per_gas: Vec<u8>,
-    pub max_priority_fee_per_gas: Vec<u8>,
-    pub access_list: Vec<Trezor_AccessListItem>,
+/// Trezor transaction.
+#[allow(dead_code)]
+pub(crate) struct TrezorTransaction {
+    pub(crate) nonce: Vec<u8>,
+    pub(crate) gas: Vec<u8>,
+    pub(crate) gas_price: Vec<u8>,
+    pub(crate) value: Vec<u8>,
+    pub(crate) to: String,
+    pub(crate) data: Vec<u8>,
+    pub(crate) max_fee_per_gas: Vec<u8>,
+    pub(crate) max_priority_fee_per_gas: Vec<u8>,
+    pub(crate) access_list: Vec<Trezor_AccessListItem>,
 }
 
 impl TrezorTransaction {
-    fn to_trimmed_big_endian(_value: &U256) -> Vec<u8> {
-        let mut trimmed_value = [0_u8; 32];
-        _value.to_big_endian(&mut trimmed_value);
-        trimmed_value[_value.leading_zeros() as usize / 8..].to_vec()
+    #[allow(dead_code)]
+    fn to_trimmed_big_endian(value: &U256) -> Vec<u8> {
+        let trimmed_value = B256::from(*value);
+        trimmed_value[value.leading_zeros() as usize / 8..].to_vec()
     }
 
+    #[cfg(TODO)]
     pub fn load(tx: &TypedTransaction) -> Result<Self, TrezorError> {
         let to: String = match tx.to() {
             Some(v) => match v {

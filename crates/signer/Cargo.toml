@@ -1,0 +1,46 @@
+[package]
+name = "alloy-signer"
+description = "Ethereum signer abstraction"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+# TODO
+# alloy-rpc-types.workspace = true
+
+alloy-sol-types = { workspace = true, optional = true }
+
+coins-bip32 = "0.8.7"
+coins-bip39 = "0.8.7"
+elliptic-curve.workspace = true
+k256.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+eth-keystore = "0.5.0"
+
+# yubi
+yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+tracing-subscriber.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+yubihsm = { version = "0.42", features = ["secp256k1", "usb", "mockhsm"] }
+
+[features]
+yubihsm = ["dep:yubihsm"]
+eip712 = ["dep:alloy-sol-types"]

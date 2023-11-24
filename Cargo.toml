@@ -22,7 +22,10 @@ alloy-networks = { version = "0.1.0", path = "crates/networks" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
-alloy-signers = { version = "0.1.0", path = "crates/signers" }
+alloy-signer = { version = "0.1.0", path = "crates/signer" }
+alloy-signer-aws = { version = "0.1.0", path = "crates/signer-aws" }
+alloy-signer-ledger = { version = "0.1.0", path = "crates/signer-ledger" }
+alloy-signer-trezor = { version = "0.1.0", path = "crates/signer-trezor" }
 alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
@@ -42,6 +45,7 @@ spki = { version = "0.7.2", default-features = false }
 async-trait = "0.1.74"
 futures = "0.3.29"
 futures-util = "0.3.29"
+futures-executor = "0.3.29"
 
 hyper = "0.14.27"
 tokio = { version = "1.33", features = ["sync", "macros"] }

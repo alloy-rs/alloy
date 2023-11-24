@@ -27,7 +27,7 @@ mod yubi;
 /// prefix the message being hashed with the `Ethereum Signed Message` domain separator.
 ///
 /// ```
-/// use alloy_signers::{LocalWallet, Signer};
+/// use alloy_signer::{LocalWallet, Signer};
 ///
 /// let wallet = LocalWallet::random();
 ///
