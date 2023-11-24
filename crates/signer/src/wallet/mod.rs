@@ -79,17 +79,19 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
         self.sign_hash(&payload.eip712_signing_hash(domain))
     }
 
+    #[inline]
     fn address(&self) -> Address {
         self.address
     }
 
+    #[inline]
     fn chain_id(&self) -> u64 {
         self.chain_id
     }
 
-    fn with_chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
-        self.chain_id = chain_id.into();
-        self
+    #[inline]
+    fn set_chain_id(&mut self, chain_id: u64) {
+        self.chain_id = chain_id;
     }
 }
 

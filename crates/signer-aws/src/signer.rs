@@ -194,17 +194,19 @@ impl Signer for AwsSigner {
         Ok(sig)
     }
 
+    #[inline]
     fn address(&self) -> Address {
         self.address
     }
 
+    #[inline]
     fn chain_id(&self) -> u64 {
         self.chain_id
     }
 
-    fn with_chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
-        self.chain_id = chain_id.into();
-        self
+    #[inline]
+    fn set_chain_id(&mut self, chain_id: u64) {
+        self.chain_id = chain_id;
     }
 }
 
