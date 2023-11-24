@@ -75,7 +75,7 @@ impl TrezorTransaction {
     #[allow(dead_code)]
     fn to_trimmed_big_endian(value: &U256) -> Vec<u8> {
         let trimmed_value = B256::from(*value);
-        trimmed_value[value.leading_zeros() as usize / 8..].to_vec()
+        trimmed_value[value.leading_zeros() / 8..].to_vec()
     }
 
     #[cfg(TODO)]

@@ -188,7 +188,6 @@ impl Signer for AwsSigner {
 
     #[instrument(err, skip(message))]
     async fn sign_message(&self, message: &[u8]) -> Result<EthSig, Self::Error> {
-        let message = message.as_ref();
         let message_hash = eip191_hash_message(message);
         trace!(?message_hash, ?message);
 

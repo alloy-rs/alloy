@@ -166,7 +166,7 @@ impl LedgerEthereum {
     }
 
     /// Signs an ethereum personal message
-    pub async fn sign_message(&self, message: &[u8]) -> Result<Signature, LedgerError> {
+    pub async fn sign_message<T: AsRef<[u8]>>(&self, message: T) -> Result<Signature, LedgerError> {
         let message = message.as_ref();
 
         let mut payload = Self::path_to_bytes(&self.derivation);
@@ -207,7 +207,7 @@ impl LedgerEthereum {
     pub async fn sign_payload(
         &self,
         command: INS,
-        payload: &Vec<u8>,
+        payload: &[u8],
     ) -> Result<Signature, LedgerError> {
         if payload.is_empty() {
             return Err(LedgerError::EmptyPayload);
