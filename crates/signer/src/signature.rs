@@ -81,15 +81,10 @@ impl Signature {
     ///
     /// [1]: https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki
     #[inline]
-    pub fn new(mut inner: ecdsa::Signature, mut recid: RecoveryId) -> Self {
-        // Normalize into "low S" form. See:
-        // - https://github.com/RustCrypto/elliptic-curves/issues/988
-        // - https://github.com/bluealloy/revm/pull/870
-        if let Some(normalized) = inner.normalize_s() {
-            inner = normalized;
-            recid = RecoveryId::from_byte(recid.to_byte() ^ 1).unwrap();
-        }
-        Self::new_not_normalized(inner, recid)
+    pub fn new(inner: ecdsa::Signature, recid: RecoveryId) -> Self {
+        let mut sig = Self::new_not_normalized(inner, recid);
+        sig.normalize_s();
+        sig
     }
 
     /// Creates a new signature from the given inner signature and recovery ID, without normalizing
@@ -97,6 +92,21 @@ impl Signature {
     #[inline]
     pub const fn new_not_normalized(inner: ecdsa::Signature, recid: RecoveryId) -> Self {
         Self { inner, recid }
+    }
+
+    /// Normalizes the signature into "low S" form as described in
+    /// [BIP 0062: Dealing with Malleability][1].
+    ///
+    /// [1]: https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki
+    #[inline]
+    pub fn normalize_s(&mut self) {
+        // Normalize into "low S" form. See:
+        // - https://github.com/RustCrypto/elliptic-curves/issues/988
+        // - https://github.com/bluealloy/revm/pull/870
+        if let Some(normalized) = self.inner.normalize_s() {
+            self.inner = normalized;
+            self.recid = RecoveryId::from_byte(self.recid.to_byte() ^ 1).unwrap();
+        }
     }
 
     /// Parses a signature from a byte slice.

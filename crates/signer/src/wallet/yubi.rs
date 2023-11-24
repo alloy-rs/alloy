@@ -2,7 +2,8 @@
 
 use super::Wallet;
 use crate::utils::raw_public_key_to_address;
-use k256::Secp256k1;
+use elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
+use k256::{PublicKey, Secp256k1};
 use yubihsm::{
     asymmetric::Algorithm::EcK256, ecdsa::Signer as YubiSigner, object, object::Label, Capability,
     Client, Connector, Credentials, Domain,
@@ -52,12 +53,12 @@ impl Wallet<YubiSigner<Secp256k1>> {
 
 impl From<YubiSigner<Secp256k1>> for Wallet<YubiSigner<Secp256k1>> {
     fn from(signer: YubiSigner<Secp256k1>) -> Self {
-        // TODO: ?
-        // let pubkey = PublicKey::from_encoded_point(signer.public_key()).unwrap();
-        // let pubkey = public_key.to_encoded_point(/* compress = */ false);
-        let pubkey = signer.public_key().as_bytes();
-        debug_assert_eq!(pubkey[0], 0x04);
-        let address = raw_public_key_to_address(&pubkey[1..]);
+        // Uncompress the public key.
+        let pubkey = PublicKey::from_encoded_point(signer.public_key()).unwrap();
+        let pubkey = pubkey.to_encoded_point(false);
+        let bytes = pubkey.as_bytes();
+        debug_assert_eq!(bytes[0], 0x04);
+        let address = raw_public_key_to_address(&bytes[1..]);
         Self::new_with_signer(signer, address, 1)
     }
 }
