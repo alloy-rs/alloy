@@ -170,19 +170,17 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 }
 
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
-
     use crate::coins_bip39::English;
     use tempfile::tempdir;
 
     const TEST_DERIVATION_PATH: &str = "m/44'/60'/0'/2/1";
 
-    #[tokio::test]
-    async fn mnemonic_deterministic() {
+    #[test]
+    fn mnemonic_deterministic() {
         // Testcases have been taken from MyCryptoWallet
-        const TESTCASES: [(&str, u32, Option<&str>, &str); 4] = [
+        let tests = [
             (
                 "work man father plunge mystery proud hollow address reunion sauce theory bonus",
                 0u32,
@@ -208,28 +206,19 @@ mod tests {
                 "0xFB78b25f69A8e941036fEE2A5EeAf349D81D4ccc",
             ),
         ];
-        TESTCASES.iter().for_each(|&(phrase, index, password, expected_addr)| {
-            let wallet = match password {
-                Some(psswd) => MnemonicBuilder::<English>::default()
-                    .phrase(phrase)
-                    .index(index)
-                    .unwrap()
-                    .password(psswd)
-                    .build()
-                    .unwrap(),
-                None => MnemonicBuilder::<English>::default()
-                    .phrase(phrase)
-                    .index(index)
-                    .unwrap()
-                    .build()
-                    .unwrap(),
-            };
+        for (phrase, index, password, expected_addr) in tests {
+            let mut builder =
+                MnemonicBuilder::<English>::default().phrase(phrase).index(index).unwrap();
+            if let Some(psswd) = password {
+                builder = builder.password(psswd);
+            }
+            let wallet = builder.build().unwrap();
             assert_eq!(&wallet.address.to_string(), expected_addr);
-        })
+        }
     }
 
-    #[tokio::test]
-    async fn mnemonic_write_read() {
+    #[test]
+    fn mnemonic_write_read() {
         let dir = tempdir().unwrap();
 
         // Construct a wallet from random mnemonic phrase and write it to the temp dir.
@@ -246,10 +235,11 @@ mod tests {
         let paths = std::fs::read_dir(dir.as_ref()).unwrap();
         assert_eq!(paths.count(), 1);
 
-        // Use the newly created file's path to instantiate wallet.
+        // Use the newly created mnemonic to instantiate wallet.
         let phrase_path = dir.as_ref().join(wallet1.address.to_string());
+        let phrase = std::fs::read_to_string(phrase_path).unwrap();
         let wallet2 = MnemonicBuilder::<English>::default()
-            .phrase(phrase_path.to_str().unwrap())
+            .phrase(phrase)
             .derivation_path(TEST_DERIVATION_PATH)
             .unwrap()
             .build()
