@@ -1,6 +1,7 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_primitives::{Address, U256};
-use alloy_signer::Signature;
+use alloy_signer::{Signature, Signer};
+use async_trait::async_trait;
 use std::{
     env, fs,
     io::{Read, Write},
@@ -11,9 +12,17 @@ use trezor_client::client::Trezor;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// A Trezor Ethereum App.
+// we need firmware that supports EIP-1559 and EIP-712
+const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
+const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
+
+// https://docs.trezor.io/trezor-firmware/common/communication/sessions.html
+const SESSION_ID_LENGTH: usize = 32;
+const SESSION_FILE_NAME: &str = "trezor.session";
+
+/// A Trezor Ethereum signer.
 ///
-/// This is a simple wrapper around the [Trezor transport](Trezor)
+/// This is a simple wrapper around the [Trezor transport](Trezor).
 #[derive(Debug)]
 pub struct TrezorSigner {
     derivation: DerivationType,
@@ -23,13 +32,47 @@ pub struct TrezorSigner {
     pub(crate) address: Address,
 }
 
-// we need firmware that supports EIP-1559 and EIP-712
-const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
-const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl Signer for TrezorSigner {
+    type Error = TrezorError;
 
-// https://docs.trezor.io/trezor-firmware/common/communication/sessions.html
-const SESSION_ID_LENGTH: usize = 32;
-const SESSION_FILE_NAME: &str = "trezor.session";
+    async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
+        self.sign_message(message).await
+    }
+
+    #[cfg(TODO)]
+    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error> {
+        let mut tx_with_chain = message.clone();
+        if tx_with_chain.chain_id().is_none() {
+            // in the case we don't have a chain_id, let's use the signer chain id instead
+            tx_with_chain.set_chain_id(self.chain_id);
+        }
+        self.sign_tx(&tx_with_chain).await
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Signature, Self::Error> {
+        self.sign_typed_struct(payload, domain).await
+    }
+
+    fn address(&self) -> Address {
+        self.address
+    }
+
+    fn with_chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
+        self.chain_id = chain_id.into();
+        self
+    }
+
+    fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+}
 
 impl TrezorSigner {
     pub async fn new(

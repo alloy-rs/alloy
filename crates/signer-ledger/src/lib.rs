@@ -19,15 +19,8 @@
 #[macro_use]
 extern crate tracing;
 
-use alloy_primitives::Address;
-use alloy_signer::{Signature, Signer};
-use async_trait::async_trait;
-
-#[cfg(feature = "eip712")]
-use alloy_sol_types::{Eip712Domain, SolStruct};
-
-mod app;
-pub use app::LedgerSigner;
+mod signer;
+pub use signer::LedgerSigner;
 
 mod types;
 pub use types::{DerivationType as HDPath, LedgerError};
@@ -35,45 +28,3 @@ pub use types::{DerivationType as HDPath, LedgerError};
 #[doc(hidden)]
 #[deprecated(note = "use `LedgerSigner` instead")]
 pub type Ledger = LedgerSigner;
-
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for LedgerSigner {
-    type Error = LedgerError;
-
-    async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
-        self.sign_message(message).await
-    }
-
-    #[cfg(TODO)]
-    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error> {
-        let mut tx_with_chain = message.clone();
-        if tx_with_chain.chain_id().is_none() {
-            // in the case we don't have a chain_id, let's use the signer chain id instead
-            tx_with_chain.set_chain_id(self.chain_id);
-        }
-        self.sign_tx(&tx_with_chain).await
-    }
-
-    #[cfg(feature = "eip712")]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
-        &self,
-        payload: &T,
-        domain: &Eip712Domain,
-    ) -> Result<Signature, Self::Error> {
-        self.sign_typed_struct(payload, domain).await
-    }
-
-    fn address(&self) -> Address {
-        self.address
-    }
-
-    fn with_chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
-        self.chain_id = chain_id.into();
-        self
-    }
-
-    fn chain_id(&self) -> u64 {
-        self.chain_id
-    }
-}
