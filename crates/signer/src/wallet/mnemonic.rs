@@ -35,14 +35,14 @@ pub struct MnemonicBuilder<W: Wordlist> {
 }
 
 /// Error produced by the mnemonic wallet module
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 #[allow(missing_copy_implementations)]
 pub enum MnemonicBuilderError {
-    /// Error suggests that a phrase (path or words) was expected but not found
-    #[error("Expected phrase not found")]
+    /// Error suggests that a phrase (path or words) was expected but not found.
+    #[error("expected phrase not found")]
     ExpectedPhraseNotFound,
-    /// Error suggests that a phrase (path or words) was not expected but found
-    #[error("Unexpected phrase found")]
+    /// Error suggests that a phrase (path or words) was not expected but found.
+    #[error("unexpected phrase found")]
     UnexpectedPhraseFound,
 }
 
@@ -172,7 +172,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::coins_bip39::English;
+    use coins_bip39::English;
     use tempfile::tempdir;
 
     const TEST_DERIVATION_PATH: &str = "m/44'/60'/0'/2/1";

@@ -2,8 +2,6 @@
 //!
 //! [Official Docs](https://docs.trezor.io/trezor-firmware/index.html)
 
-#![allow(clippy::upper_case_acronyms)]
-
 use alloy_primitives::{hex, B256, U256};
 use std::fmt;
 use thiserror::Error;
@@ -33,26 +31,28 @@ impl fmt::Display for DerivationType {
 #[derive(Error, Debug)]
 /// Error when using the Trezor transport
 pub enum TrezorError {
-    /// Underlying Trezor transport error
+    /// Underlying Trezor transport error.
     #[error(transparent)]
-    TrezorError(#[from] trezor_client::error::Error),
-    #[error("Trezor was not able to retrieve device features")]
-    FeaturesError,
-    #[error("Not able to unpack value for TrezorTransaction.")]
-    DataError,
-    /// Error when converting from a hex string
+    Client(#[from] trezor_client::error::Error),
+    /// Thrown when converting from a hex string.
     #[error(transparent)]
-    HexError(#[from] hex::FromHexError),
-    /// Error when converting a semver requirement
+    Hex(#[from] hex::FromHexError),
+    /// Thrown when converting a semver requirement.
     #[error(transparent)]
-    SemVerError(#[from] semver::Error),
-    /// Error when signing EIP712 struct with not compatible Trezor ETH app
-    #[error("Trezor ethereum app requires at least version: {0:?}")]
+    Semver(#[from] semver::Error),
+    /// [`ecdsa`](k256::ecdsa) error.
+    #[error(transparent)]
+    Ecdsa(#[from] k256::ecdsa::Error),
+    /// Thrown when trying to sign an EIP-712 struct with an incompatible Trezor Ethereum app
+    /// version.
+    #[error("Trezor Ethereum app requires at least version {0:?}")]
     UnsupportedFirmwareVersion(String),
-    #[error("Does not support ENS.")]
-    NoENSSupport,
-    #[error("Unable to access trezor cached session.")]
-    CacheError(String),
+    /// No ENS support.
+    #[error("Trezor does not support ENS")]
+    NoEnsSupport,
+    /// Could not retrieve device features.
+    #[error("could not retrieve device features")]
+    FeaturesError,
 }
 
 /// Trezor transaction.
@@ -80,7 +80,7 @@ impl TrezorTransaction {
     pub fn load(tx: &TypedTransaction) -> Result<Self, TrezorError> {
         let to: String = match tx.to() {
             Some(v) => match v {
-                NameOrAddress::Name(_) => return Err(TrezorError::NoENSSupport),
+                NameOrAddress::Name(_) => return Err(TrezorError::NoEnsSupport),
                 NameOrAddress::Address(value) => hex::encode_prefixed(value),
             },
             // Contract Creation

@@ -2,7 +2,7 @@
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
 use alloy_primitives::{hex, Address};
-use alloy_signer::{Signature, Signer};
+use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -21,8 +21,8 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
 ///
-/// Note that this signer only supports asynchronous operations by default. Enable the `"sync"`
-/// feature to enable synchronous operations through `tokio` runtime blocking.
+/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// will always return an error.
 #[derive(Debug)]
 pub struct LedgerSigner {
     transport: Mutex<Ledger>,
@@ -44,24 +44,21 @@ impl std::fmt::Display for LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
-    type Error = LedgerError;
-
     #[inline]
-    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature, Self::Error> {
+    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
         let message = message.as_ref();
 
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
         payload.extend_from_slice(message);
 
-        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload).await
+        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload)
+            .await
+            .map_err(alloy_signer::Error::other)
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction_async(
-        &self,
-        message: &TypedTransaction,
-    ) -> Result<Signature, Self::Error> {
+    async fn sign_transaction_async(&self, message: &TypedTransaction) -> Result<Signature> {
         let mut tx_with_chain = message.clone();
         if tx_with_chain.chain_id().is_none() {
             // in the case we don't have a chain_id, let's use the signer chain id instead
@@ -76,23 +73,8 @@ impl Signer for LedgerSigner {
         &self,
         payload: &T,
         domain: &Eip712Domain,
-    ) -> Result<Signature, Self::Error> {
-        // See comment for v1.6.0 requirement
-        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
-        const EIP712_MIN_VERSION: &str = ">=1.6.0";
-        let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
-        let version = semver::Version::parse(&self.version().await?)?;
-
-        // Enforce app version is greater than EIP712_MIN_VERSION
-        if !req.matches(&version) {
-            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
-        }
-
-        let mut data = Self::path_to_bytes(&self.derivation);
-        data.extend_from_slice(domain.separator().as_slice());
-        data.extend_from_slice(payload.eip712_hash_struct().as_slice());
-
-        self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
+    ) -> Result<Signature> {
+        self.sign_typed_data_(payload, domain).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -130,9 +112,6 @@ impl LedgerSigner {
 
         Ok(Self { transport: Mutex::new(transport), derivation, chain_id, address })
     }
-
-    /// Consume self and drop the ledger mutex
-    pub fn close(self) {}
 
     /// Get the account which corresponds to our derivation path
     pub async fn get_address(&self) -> Result<Address, LedgerError> {
@@ -240,6 +219,30 @@ impl LedgerSigner {
         Ok(signature)
     }
 
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data_<T: SolStruct>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Signature, LedgerError> {
+        // See comment for v1.6.0 requirement
+        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
+        const EIP712_MIN_VERSION: &str = ">=1.6.0";
+        let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
+        let version = semver::Version::parse(&self.version().await?)?;
+
+        // Enforce app version is greater than EIP712_MIN_VERSION
+        if !req.matches(&version) {
+            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
+        }
+
+        let mut data = Self::path_to_bytes(&self.derivation);
+        data.extend_from_slice(domain.separator().as_slice());
+        data.extend_from_slice(payload.eip712_hash_struct().as_slice());
+
+        self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
+    }
+
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
     #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
@@ -271,9 +274,7 @@ impl LedgerSigner {
             debug!("Dispatching packet to device");
 
             let ans = block_on(transport.exchange(&command))?;
-            let Some(data) = ans.data() else {
-                return Err(LedgerError::UnexpectedNullResponse);
-            };
+            let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
             debug!(response = hex::encode(data), "Received response from device");
             answer = Some(ans);
 

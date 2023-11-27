@@ -1,33 +1,23 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_primitives::{Address, U256};
-use alloy_signer::{Signature, Signer};
+use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
-use std::{
-    env, fs,
-    io::{Read, Write},
-    path::PathBuf,
-};
 use trezor_client::client::Trezor;
 
 // we need firmware that supports EIP-1559 and EIP-712
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
 const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 
-// https://docs.trezor.io/trezor-firmware/common/communication/sessions.html
-const SESSION_ID_LENGTH: usize = 32;
-const SESSION_FILE_NAME: &str = "trezor.session";
-
 /// A Trezor Ethereum signer.
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor).
 ///
-/// Note that this signer only supports asynchronous operations by default. Enable the `"sync"`
-/// feature to enable synchronous operations through `tokio` runtime blocking.
+/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// will always return an error.
 #[derive(Debug)]
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
-    cache_dir: PathBuf,
     pub(crate) chain_id: u64,
     pub(crate) address: Address,
 }
@@ -35,22 +25,12 @@ pub struct TrezorSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
-    type Error = TrezorError;
-
-    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature, Self::Error> {
-        let mut client = self.get_client(self.session_id.clone())?;
-        let apath = Self::convert_path(&self.derivation);
-
-        let signature = client.ethereum_sign_message(message.into(), apath)?;
-
-        let r = U256::from_limbs(signature.r.0);
-        let s = U256::from_limbs(signature.s.0);
-        // TODO: don't unwrap
-        Ok(Signature::from_scalars(r.into(), s.into(), signature.v).unwrap())
+    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
+        self.sign_message_(message).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error> {
+    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature> {
         let mut tx_with_chain = message.clone();
         if tx_with_chain.chain_id().is_none() {
             // in the case we don't have a chain_id, let's use the signer chain id instead
@@ -76,39 +56,20 @@ impl Signer for TrezorSigner {
 }
 
 impl TrezorSigner {
-    pub async fn new(
-        derivation: DerivationType,
-        chain_id: u64,
-        cache_dir: Option<PathBuf>,
-    ) -> Result<Self, TrezorError> {
-        let cache_dir = (match cache_dir.or_else(home::home_dir) {
-            Some(path) => path,
-            None => match env::current_dir() {
-                Ok(path) => path,
-                Err(e) => return Err(TrezorError::CacheError(e.to_string())),
-            },
-        })
-        .join(".ethers-rs")
-        .join("trezor")
-        .join("cache");
-
-        let mut blank = Self {
+    /// Instantiates a new Trezor signer.
+    pub async fn new(derivation: DerivationType, chain_id: u64) -> Result<Self, TrezorError> {
+        let mut signer = Self {
             derivation: derivation.clone(),
             chain_id,
-            cache_dir,
-            address: Address::from([0_u8; 20]),
+            address: Address::ZERO,
             session_id: vec![],
         };
-
-        // Check if reachable
-        blank.initate_session()?;
-        blank.address = blank.get_address_with_path(&derivation).await?;
-        Ok(blank)
+        signer.initate_session()?;
+        signer.address = signer.get_address_with_path(&derivation).await?;
+        Ok(signer)
     }
 
-    fn check_version(version: String) -> Result<(), TrezorError> {
-        let version = semver::Version::parse(&version)?;
-
+    fn check_version(version: semver::Version) -> Result<(), TrezorError> {
         let min_version = match version.major {
             1 => FIRMWARE_1_MIN_VERSION,
             2 => FIRMWARE_2_MIN_VERSION,
@@ -117,7 +78,7 @@ impl TrezorSigner {
             _ => return Ok(()),
         };
 
-        let req = semver::VersionReq::parse(min_version)?;
+        let req = semver::VersionReq::parse(min_version).unwrap();
         // Enforce firmware version is greater than "min_version"
         if !req.matches(&version) {
             return Err(TrezorError::UnsupportedFirmwareVersion(min_version.to_string()));
@@ -126,51 +87,26 @@ impl TrezorSigner {
         Ok(())
     }
 
-    fn get_cached_session(&self) -> Result<Option<Vec<u8>>, TrezorError> {
-        let mut session = [0; SESSION_ID_LENGTH];
-
-        if let Ok(mut file) = fs::File::open(self.cache_dir.join(SESSION_FILE_NAME)) {
-            file.read_exact(&mut session).map_err(|e| TrezorError::CacheError(e.to_string()))?;
-            Ok(Some(session.to_vec()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn save_session(&mut self, session_id: Vec<u8>) -> Result<(), TrezorError> {
-        fs::create_dir_all(&self.cache_dir).map_err(|e| TrezorError::CacheError(e.to_string()))?;
-
-        let mut file = fs::File::create(self.cache_dir.join(SESSION_FILE_NAME))
-            .map_err(|e| TrezorError::CacheError(e.to_string()))?;
-
-        file.write_all(&session_id).map_err(|e| TrezorError::CacheError(e.to_string()))?;
-
-        self.session_id = session_id;
-        Ok(())
-    }
-
     fn initate_session(&mut self) -> Result<(), TrezorError> {
         let mut client = trezor_client::unique(false)?;
-        client.init_device(self.get_cached_session()?)?;
+        client.init_device(None)?;
 
         let features = client.features().ok_or(TrezorError::FeaturesError)?;
+        let version = semver::Version::new(
+            features.major_version() as u64,
+            features.minor_version() as u64,
+            features.patch_version() as u64,
+        );
+        Self::check_version(version)?;
 
-        Self::check_version(format!(
-            "{}.{}.{}",
-            features.major_version(),
-            features.minor_version(),
-            features.patch_version()
-        ))?;
-
-        self.save_session(features.session_id().to_vec())?;
+        self.session_id = features.session_id().to_vec();
 
         Ok(())
     }
 
-    /// You need to drop(client) once you're done with it
-    fn get_client(&self, session_id: Vec<u8>) -> Result<Trezor, TrezorError> {
+    fn get_client(&self) -> Result<Trezor, TrezorError> {
         let mut client = trezor_client::unique(false)?;
-        client.init_device(Some(session_id))?;
+        client.init_device(Some(self.session_id.clone()))?;
         Ok(client)
     }
 
@@ -184,7 +120,7 @@ impl TrezorSigner {
         &self,
         derivation: &DerivationType,
     ) -> Result<Address, TrezorError> {
-        let mut client = self.get_client(self.session_id.clone())?;
+        let mut client = self.get_client()?;
         let address_str = client.ethereum_get_address(Self::convert_path(derivation))?;
         Ok(address_str.parse()?)
     }
@@ -192,7 +128,7 @@ impl TrezorSigner {
     /// Signs an Ethereum transaction (requires confirmation on the Trezor)
     #[cfg(TODO)]
     pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, TrezorError> {
-        let mut client = self.get_client(self.session_id.clone())?;
+        let mut client = self.get_client()?;
 
         let arr_path = Self::convert_path(&self.derivation);
 
@@ -232,6 +168,17 @@ impl TrezorSigner {
         Ok(Signature { r: signature.r, s: signature.s, v: signature.v })
     }
 
+    async fn sign_message_(&self, message: &[u8]) -> Result<Signature, TrezorError> {
+        let mut client = self.get_client()?;
+        let apath = Self::convert_path(&self.derivation);
+
+        let signature = client.ethereum_sign_message(message.into(), apath)?;
+
+        let r = U256::from_limbs(signature.r.0);
+        let s = U256::from_limbs(signature.s.0);
+        Signature::from_scalars(r.into(), s.into(), signature.v).map_err(Into::into)
+    }
+
     // helper which converts a derivation path to [u32]
     fn convert_path(derivation: &DerivationType) -> Vec<u32> {
         let derivation = derivation.to_string();
@@ -261,10 +208,7 @@ mod tests {
     // Replace this with your ETH addresses.
     async fn test_get_address() {
         // Instantiate it with the default trezor derivation path
-        let trezor =
-            TrezorSigner::new(DerivationType::TrezorLive(1), 1, Some(PathBuf::from("randomdir")))
-                .await
-                .unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), 1).await.unwrap();
         assert_eq!(
             trezor.get_address().await.unwrap(),
             address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
@@ -277,9 +221,19 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
+    async fn test_sign_message() {
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
+        let message = "hello world";
+        let sig = trezor.sign_message_async(message.as_bytes()).await.unwrap();
+        let addr = trezor.get_address().await.unwrap();
+        assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
+    }
+
+    #[tokio::test]
+    #[ignore]
     #[cfg(TODO)]
     async fn test_sign_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -299,7 +253,7 @@ mod tests {
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_big_data_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
         // invalid data
         let big_data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string()+ &"ff".repeat(1032*2) + "aa").unwrap();
@@ -339,7 +293,7 @@ mod tests {
         // Contract creation (empty `to`, with data) should show on the trezor device as:
         //  ` "0 Wei ETH
         //  ` new contract?"
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
         {
             let tx_req = Eip1559TransactionRequest::new().data(data.clone()).into();
             let tx = trezor.sign_transaction(&tx_req).await.unwrap();
@@ -354,7 +308,7 @@ mod tests {
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_eip1559_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -396,15 +350,5 @@ mod tests {
             .into();
 
         let tx = trezor.sign_transaction(&tx_req).await.unwrap();
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_sign_message() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
-        let message = "hello world";
-        let sig = trezor.sign_message_async(message.as_bytes()).await.unwrap();
-        let addr = trezor.get_address().await.unwrap();
-        assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
     }
 }

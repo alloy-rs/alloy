@@ -1,10 +1,8 @@
 //! Specific helper functions for loading an offline K256 Private Key stored on disk
 
-use super::{mnemonic::MnemonicBuilderError, Wallet};
+use super::Wallet;
 use crate::utils::secret_key_to_address;
 use alloy_primitives::hex;
-use coins_bip32::Bip32Error;
-use coins_bip39::MnemonicError;
 use k256::{
     ecdsa::{self, SigningKey},
     FieldBytes, SecretKey as K256SecretKey,
@@ -19,16 +17,6 @@ use {elliptic_curve::rand_core, eth_keystore::KeystoreError, std::path::Path};
 /// Error thrown by the Wallet module
 #[derive(Debug, Error)]
 pub enum WalletError {
-    /// Error propagated from the BIP-32 crate
-    #[error(transparent)]
-    Bip32Error(#[from] Bip32Error),
-    /// Error propagated from the BIP-39 crate
-    #[error(transparent)]
-    Bip39Error(#[from] MnemonicError),
-    /// Underlying eth keystore error
-    #[cfg(feature = "keystore")]
-    #[error(transparent)]
-    EthKeystoreError(#[from] KeystoreError),
     /// Error propagated from k256's ECDSA module
     #[error(transparent)]
     EcdsaError(#[from] ecdsa::Error),
@@ -38,22 +26,37 @@ pub enum WalletError {
     /// Error propagated by IO operations
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    /// Error propagated from the BIP-32 crate
+    #[error(transparent)]
+    #[cfg(feature = "mnemonic")]
+    Bip32Error(#[from] coins_bip32::Bip32Error),
+    /// Error propagated from the BIP-39 crate
+    #[error(transparent)]
+    #[cfg(feature = "mnemonic")]
+    Bip39Error(#[from] coins_bip39::MnemonicError),
     /// Error propagated from the mnemonic builder module.
     #[error(transparent)]
-    MnemonicBuilderError(#[from] MnemonicBuilderError),
+    #[cfg(feature = "mnemonic")]
+    MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
+
+    /// Underlying eth keystore error
+    #[cfg(feature = "keystore")]
+    #[error(transparent)]
+    EthKeystoreError(#[from] KeystoreError),
 }
 
 impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a raw scalar serialized as a byte array.
     #[inline]
     pub fn from_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_bytes(bytes).map(Self::_new)
+        SigningKey::from_bytes(bytes).map(Self::new_pk)
     }
 
     /// Creates a new Wallet instance from a raw scalar serialized as a byte slice.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_slice(bytes).map(Self::_new)
+        SigningKey::from_slice(bytes).map(Self::new_pk)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -65,11 +68,11 @@ impl Wallet<SigningKey> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        Self::_new(SigningKey::random(rng))
+        Self::new_pk(SigningKey::random(rng))
     }
 
     #[inline]
-    fn _new(signer: SigningKey) -> Self {
+    fn new_pk(signer: SigningKey) -> Self {
         let address = secret_key_to_address(&signer);
         Self { signer, address, chain_id: 1 }
     }
@@ -145,13 +148,13 @@ impl PartialEq for Wallet<SigningKey> {
 
 impl From<SigningKey> for Wallet<SigningKey> {
     fn from(value: SigningKey) -> Self {
-        Self::_new(value)
+        Self::new_pk(value)
     }
 }
 
 impl From<K256SecretKey> for Wallet<SigningKey> {
     fn from(value: K256SecretKey) -> Self {
-        Self::_new(value.into())
+        Self::new_pk(value.into())
     }
 }
 
@@ -164,30 +167,15 @@ impl FromStr for Wallet<SigningKey> {
     }
 }
 
-impl TryFrom<&str> for Wallet<SigningKey> {
-    type Error = WalletError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        value.parse()
-    }
-}
-
-impl TryFrom<String> for Wallet<SigningKey> {
-    type Error = WalletError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        value.parse()
-    }
-}
-
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
     use crate::{LocalWallet, Signer};
     use alloy_primitives::address;
-    use std::path::Path;
-    use tempfile::tempdir;
+
+    #[cfg(feature = "keystore")]
+    use {std::path::Path, tempfile::tempdir};
 
     #[test]
     fn parse_pk() {
@@ -446,25 +434,6 @@ mod tests {
         assert_eq!(wallet.address, wallet_0x.address);
         assert_eq!(wallet.chain_id, wallet_0x.chain_id);
         assert_eq!(wallet.signer, wallet_0x.signer);
-
-        // Check TryFrom<&str>
-        let wallet_0x_tryfrom_str: Wallet<SigningKey> =
-            "0x0000000000000000000000000000000000000000000000000000000000000001"
-                .try_into()
-                .unwrap();
-        assert_eq!(wallet.address, wallet_0x_tryfrom_str.address);
-        assert_eq!(wallet.chain_id, wallet_0x_tryfrom_str.chain_id);
-        assert_eq!(wallet.signer, wallet_0x_tryfrom_str.signer);
-
-        // Check TryFrom<String>
-        let wallet_0x_tryfrom_string: Wallet<SigningKey> =
-            "0x0000000000000000000000000000000000000000000000000000000000000001"
-                .to_string()
-                .try_into()
-                .unwrap();
-        assert_eq!(wallet.address, wallet_0x_tryfrom_string.address);
-        assert_eq!(wallet.chain_id, wallet_0x_tryfrom_string.chain_id);
-        assert_eq!(wallet.signer, wallet_0x_tryfrom_string.signer);
 
         // Must fail because of `0z`
         "0z0000000000000000000000000000000000000000000000000000000000000001"

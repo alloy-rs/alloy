@@ -1,16 +1,18 @@
-use crate::{Signature, Signer};
+use crate::{Result, Signature, Signer};
 use alloy_primitives::{Address, B256};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
+#[cfg(feature = "mnemonic")]
 mod mnemonic;
+#[cfg(feature = "mnemonic")]
 pub use mnemonic::MnemonicBuilder;
 
 mod private_key;
 pub use private_key::WalletError;
 
-#[cfg(all(feature = "yubihsm", not(target_arch = "wasm32")))]
+#[cfg(feature = "yubihsm")]
 mod yubi;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
@@ -57,26 +59,10 @@ pub struct Wallet<D> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
-    type Error = WalletError;
-
     #[inline]
-    fn sign_hash(&self, hash: &B256) -> Result<Signature, Self::Error> {
+    fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
         Ok(Signature::new(recoverable_sig, recovery_id))
-    }
-
-    #[cfg(TODO)]
-    #[inline]
-    fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature, Self::Error> {
-        // rlp (for sighash) must have the same chain id as v in the signature
-        let chain_id = tx.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
-        let mut tx = tx.clone();
-        tx.set_chain_id(chain_id);
-
-        let sighash = tx.sighash();
-        let mut sig = self.sign_hash(&sighash)?;
-        sig.apply_eip155(chain_id);
-        Ok(sig)
     }
 
     #[inline]

@@ -15,8 +15,8 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-// mod error;
-// pub use error::{SignerError, SignerResult};
+mod error;
+pub use error::{Error, Result, UnsupportedSignerOperation};
 
 mod signature;
 pub use signature::Signature;
@@ -25,14 +25,16 @@ mod signer;
 pub use signer::Signer;
 
 mod wallet;
-pub use wallet::{MnemonicBuilder, Wallet, WalletError};
+#[cfg(feature = "mnemonic")]
+pub use wallet::MnemonicBuilder;
+pub use wallet::{Wallet, WalletError};
 
 pub mod utils;
 
 #[cfg(feature = "yubihsm")]
 pub use yubihsm;
 
-/// Re-export the BIP-32 crate so that wordlists can be accessed conveniently.
+#[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
 /// A wallet instantiated with a locally stored private key

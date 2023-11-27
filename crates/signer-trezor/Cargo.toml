@@ -20,10 +20,9 @@ trezor-client = { version = "=0.1.0", default-features = false, features = ["eth
 protobuf = "=3.2.0"
 
 async-trait.workspace = true
-home.workspace = true
 semver.workspace = true
 thiserror.workspace = true
-# tracing.workspace = true
+k256.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

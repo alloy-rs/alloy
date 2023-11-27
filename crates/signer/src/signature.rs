@@ -256,12 +256,12 @@ impl Signature {
 #[inline]
 const fn normalize_v(v: u64) -> RecoveryId {
     let byte = match v {
-        // Case 0: raw/bare
-        v @ 0..=26 => (v % 4) as u8,
-        // Case 2: non-eip155 v value
-        v @ 27..=34 => ((v - 27) % 4) as u8,
-        // Case 3: eip155 V value
-        v @ 35.. => ((v - 1) % 2) as u8,
+        // Case 1: raw/bare
+        0..=26 => (v % 4) as u8,
+        // Case 2: non-EIP-155 v value
+        27..=34 => ((v - 27) % 4) as u8,
+        // Case 3: EIP-155 V value
+        35.. => ((v - 1) % 2) as u8,
     };
     debug_assert!(byte <= RecoveryId::MAX);
     match RecoveryId::from_byte(byte) {

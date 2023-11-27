@@ -36,7 +36,7 @@ pub enum LedgerError {
     #[error(transparent)]
     LedgerError(#[from] coins_ledger::errors::LedgerError),
     /// Device response was unexpectedly none
-    #[error("Received unexpected response from device. Expected data in response, found none.")]
+    #[error("received an unexpected empty response")]
     UnexpectedNullResponse,
     #[error(transparent)]
     /// [`hex`] error.
@@ -49,7 +49,12 @@ pub enum LedgerError {
     UnsupportedAppVersion(&'static str),
     /// Got a response, but it didn't contain as much data as expected
     #[error("bad response; got {got} bytes, expected {expected}")]
-    ShortResponse { got: usize, expected: usize },
+    ShortResponse {
+        /// Number of bytes received.
+        got: usize,
+        /// Number of bytes expected.
+        expected: usize,
+    },
 }
 
 pub(crate) const P1_FIRST: u8 = 0x00;
