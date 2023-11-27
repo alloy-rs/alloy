@@ -1,7 +1,8 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{hex, Address, U256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
+use std::fmt;
 use trezor_client::client::Trezor;
 
 // we need firmware that supports EIP-1559 and EIP-712
@@ -14,21 +15,32 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 ///
 /// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
-#[derive(Debug)]
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
     pub(crate) address: Address,
 }
 
+impl fmt::Debug for TrezorSigner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrezorSigner")
+            .field("derivation", &self.derivation)
+            .field("session_id", &hex::encode(&self.session_id))
+            .field("address", &self.address)
+            .finish()
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
+    #[inline]
     async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_(message).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(TODO)]
+    #[inline]
     async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(tx).await
     }
@@ -41,6 +53,7 @@ impl Signer for TrezorSigner {
 
 impl TrezorSigner {
     /// Instantiates a new Trezor signer.
+    #[instrument(ret)]
     pub async fn new(derivation: DerivationType) -> Result<Self, TrezorError> {
         let mut signer =
             Self { derivation: derivation.clone(), address: Address::ZERO, session_id: vec![] };
@@ -96,6 +109,7 @@ impl TrezorSigner {
     }
 
     /// Gets the account which corresponds to the provided derivation path
+    #[instrument(ret)]
     pub async fn get_address_with_path(
         &self,
         derivation: &DerivationType,
@@ -149,6 +163,7 @@ impl TrezorSigner {
         Ok(Signature { r: signature.r, s: signature.s, v: signature.v })
     }
 
+    #[instrument(skip(message), fields(message=hex::encode(message)), ret)]
     async fn sign_message_(&self, message: &[u8]) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let apath = Self::convert_path(&self.derivation);

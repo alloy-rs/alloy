@@ -45,6 +45,7 @@ impl Signer for LedgerSigner {
     }
 
     #[cfg(TODO)]
+    #[inline]
     async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(&tx).await.map_err(alloy_signer::Error::other)
     }
