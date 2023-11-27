@@ -17,10 +17,10 @@ pub use self::{
     },
 };
 
-pub mod call;
-pub mod four_byte;
-pub mod noop;
-pub mod pre_state;
+mod call;
+mod four_byte;
+mod noop;
+mod pre_state;
 
 /// Result type for geth style transaction trace
 pub type TraceResult = crate::trace::common::TraceResult<GethTrace, String>;
