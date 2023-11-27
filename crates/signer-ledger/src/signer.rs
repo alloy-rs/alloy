@@ -27,18 +27,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 pub struct LedgerSigner {
     transport: Mutex<Ledger>,
     derivation: DerivationType,
-    pub(crate) chain_id: u64,
     pub(crate) address: Address,
-}
-
-impl std::fmt::Display for LedgerSigner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "LedgerApp. Key at index {} with address {:?} on chain_id {}",
-            self.derivation, self.address, self.chain_id
-        )
-    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -58,13 +47,8 @@ impl Signer for LedgerSigner {
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction_async(&self, message: &TypedTransaction) -> Result<Signature> {
-        let mut tx_with_chain = message.clone();
-        if tx_with_chain.chain_id().is_none() {
-            // in the case we don't have a chain_id, let's use the signer chain id instead
-            tx_with_chain.set_chain_id(self.chain_id);
-        }
-        self.sign_tx(&tx_with_chain).await
+    async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
+        self.sign_tx(&tx).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(feature = "eip712")]
@@ -81,16 +65,6 @@ impl Signer for LedgerSigner {
     fn address(&self) -> Address {
         self.address
     }
-
-    #[inline]
-    fn chain_id(&self) -> u64 {
-        self.chain_id
-    }
-
-    #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
-        self.chain_id = chain_id;
-    }
 }
 
 impl LedgerSigner {
@@ -98,27 +72,29 @@ impl LedgerSigner {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_ledger::{HDPath, Ledger};
     ///
-    /// let ledger = Ledger::new(HDPath::LedgerLive(0), 1).await?;
+    /// let ledger = Ledger::new(HDPath::LedgerLive(0)).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn new(derivation: DerivationType, chain_id: u64) -> Result<Self, LedgerError> {
+    #[instrument(err)]
+    pub async fn new(derivation: DerivationType) -> Result<Self, LedgerError> {
         let transport = Ledger::init().await?;
         let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
-
-        Ok(Self { transport: Mutex::new(transport), derivation, chain_id, address })
+        Ok(Self { transport: Mutex::new(transport), derivation, address })
     }
 
-    /// Get the account which corresponds to our derivation path
+    /// Returns the account that corresponds to the current device.
+    #[inline]
     pub async fn get_address(&self) -> Result<Address, LedgerError> {
         self.get_address_with_path(&self.derivation).await
     }
 
-    /// Gets the account which corresponds to the provided derivation path
+    /// Returns the account that corresponds to the provided derivation path.
+    #[inline]
     pub async fn get_address_with_path(
         &self,
         derivation: &DerivationType,
@@ -184,38 +160,9 @@ impl LedgerSigner {
     /// Signs an Ethereum transaction (requires confirmation on the ledger)
     #[cfg(TODO)]
     pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, LedgerError> {
-        let mut tx_with_chain = tx.clone();
-        if tx_with_chain.chain_id().is_none() {
-            // in the case we don't have a chain_id, let's use the signer chain id instead
-            tx_with_chain.set_chain_id(self.chain_id);
-        }
         let mut payload = Self::path_to_bytes(&self.derivation);
-        payload.extend_from_slice(tx_with_chain.rlp().as_ref());
-
+        payload.extend_from_slice(tx.rlp().as_ref());
         let mut signature = self.sign_payload(INS::SIGN, &payload).await?;
-
-        // modify `v` value of signature to match EIP-155 for chains with large chain ID
-        // The logic is derived from Ledger's library
-        // https://github.com/LedgerHQ/ledgerjs/blob/e78aac4327e78301b82ba58d63a72476ecb842fc/packages/hw-app-eth/src/Eth.ts#L300
-        let eip155_chain_id = self.chain_id * 2 + 35;
-        if eip155_chain_id + 1 > 255 {
-            let one_byte_chain_id = eip155_chain_id % 256;
-            let ecc_parity = if signature.v > one_byte_chain_id {
-                signature.v - one_byte_chain_id
-            } else {
-                one_byte_chain_id - signature.v
-            };
-
-            signature.v = match tx {
-                TypedTransaction::Eip2930(_) | TypedTransaction::Eip1559(_) => {
-                    (ecc_parity % 2 != 1) as u64
-                }
-                TypedTransaction::Legacy(_) => eip155_chain_id + ecc_parity,
-                #[cfg(feature = "optimism")]
-                TypedTransaction::DepositTransaction(_) => 0,
-            };
-        }
-
         Ok(signature)
     }
 
@@ -245,7 +192,7 @@ impl LedgerSigner {
 
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
-    #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
+    #[instrument(skip_all, fields(command = %command, payload = hex::encode(payload)), ret)]
     async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
         let transport = self.transport.lock().await;
         let mut command = APDUCommand {

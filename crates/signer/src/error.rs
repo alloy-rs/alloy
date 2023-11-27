@@ -13,14 +13,6 @@ pub enum Error {
     /// This operation is not supported by the signer.
     #[error("operation `{0}` is not supported by the signer")]
     UnsupportedOperation(UnsupportedSignerOperation),
-    /// Mismatch between provided transaction chain ID and signer chain ID.
-    #[error("transaction chain ID ({tx}) does not match the signer's ({signer})")]
-    TransactionChainIdMismatch {
-        /// The signer's chain ID.
-        signer: u64,
-        /// The chain ID provided by the transaction.
-        tx: u64,
-    },
     /// [`ecdsa`] error.
     #[error(transparent)]
     Ecdsa(#[from] ecdsa::Error),

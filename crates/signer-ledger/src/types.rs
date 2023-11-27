@@ -8,8 +8,8 @@ use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 
+/// Ledger wallet type.
 #[derive(Clone, Debug)]
-/// Ledger wallet type
 pub enum DerivationType {
     /// Ledger Live-generated HD path
     LedgerLive(usize),

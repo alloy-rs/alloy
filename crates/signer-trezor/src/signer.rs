@@ -18,7 +18,6 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
-    pub(crate) chain_id: u64,
     pub(crate) address: Address,
 }
 
@@ -30,40 +29,21 @@ impl Signer for TrezorSigner {
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature> {
-        let mut tx_with_chain = message.clone();
-        if tx_with_chain.chain_id().is_none() {
-            // in the case we don't have a chain_id, let's use the signer chain id instead
-            tx_with_chain.set_chain_id(self.chain_id);
-        }
-        self.sign_tx(&tx_with_chain).await
+    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
+        self.sign_tx(tx).await
     }
 
     #[inline]
     fn address(&self) -> Address {
         self.address
     }
-
-    #[inline]
-    fn chain_id(&self) -> u64 {
-        self.chain_id
-    }
-
-    #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
-        self.chain_id = chain_id;
-    }
 }
 
 impl TrezorSigner {
     /// Instantiates a new Trezor signer.
-    pub async fn new(derivation: DerivationType, chain_id: u64) -> Result<Self, TrezorError> {
-        let mut signer = Self {
-            derivation: derivation.clone(),
-            chain_id,
-            address: Address::ZERO,
-            session_id: vec![],
-        };
+    pub async fn new(derivation: DerivationType) -> Result<Self, TrezorError> {
+        let mut signer =
+            Self { derivation: derivation.clone(), address: Address::ZERO, session_id: vec![] };
         signer.initate_session()?;
         signer.address = signer.get_address_with_path(&derivation).await?;
         Ok(signer)
@@ -134,7 +114,8 @@ impl TrezorSigner {
 
         let transaction = TrezorTransaction::load(tx)?;
 
-        let chain_id = tx.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
+        // TODO: error when no chain ID?
+        let chain_id = tx.chain_id().map(|id| id.as_u64()).unwrap_or(1);
 
         let signature = match tx {
             TypedTransaction::Eip2930(_) | TypedTransaction::Legacy(_) => client.ethereum_sign_tx(
@@ -208,7 +189,7 @@ mod tests {
     // Replace this with your ETH addresses.
     async fn test_get_address() {
         // Instantiate it with the default trezor derivation path
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), 1).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1)).await.unwrap();
         assert_eq!(
             trezor.get_address().await.unwrap(),
             address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
@@ -222,7 +203,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0)).await.unwrap();
         let message = "hello world";
         let sig = trezor.sign_message_async(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
