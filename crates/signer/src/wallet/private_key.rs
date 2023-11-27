@@ -84,7 +84,6 @@ impl Wallet<SigningKey> {
     /// provided directory. Returns a tuple (Wallet, String) of the wallet instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
     /// the keystore is stored as the stringified UUID.
-    #[cfg(not(target_arch = "wasm32"))]
     #[inline]
     pub fn new_keystore<P, R, S>(
         dir: P,
@@ -102,7 +101,6 @@ impl Wallet<SigningKey> {
     }
 
     /// Decrypts an encrypted JSON from the provided path to construct a Wallet instance
-    #[cfg(not(target_arch = "wasm32"))]
     #[inline]
     pub fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<Self, WalletError>
     where
@@ -117,7 +115,6 @@ impl Wallet<SigningKey> {
     /// provided directory. Returns a tuple (Wallet, String) of the wallet instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
     /// the keystore is stored as the stringified UUID.
-    #[cfg(not(target_arch = "wasm32"))]
     #[inline]
     pub fn encrypt_keystore<P, R, B, S>(
         keypath: P,
@@ -160,7 +157,6 @@ impl FromStr for Wallet<SigningKey> {
 }
 
 #[cfg(test)]
-#[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
     use crate::{LocalWallet, Signer};

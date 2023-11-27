@@ -48,12 +48,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: wasm32-unknown-unknown
       - uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check --target wasm32-unknown-unknown
+        run: |
+          cargo hack check --workspace --target wasm32-unknown-unknown \
+            --exclude alloy-signer \
+            --exclude alloy-signer-aws \
+            --exclude alloy-signer-ledger \
+            --exclude alloy-signer-trezor
 
   feature-checks:
     runs-on: ubuntu-latest

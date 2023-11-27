@@ -5,8 +5,7 @@ use crate::{utils::secret_key_to_address, Wallet, WalletError};
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
-use rand::Rng;
-use std::{fs::File, io::Write, marker::PhantomData, path::PathBuf, str::FromStr};
+use std::{marker::PhantomData, path::PathBuf};
 use thiserror::Error;
 
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
@@ -87,12 +86,11 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use alloy_signer::{coins_bip39::English, MnemonicBuilder};
-    /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     ///
-    /// let mut rng = rand::thread_rng();
-    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build_random(&mut rng)?;
+    /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
     ///
     /// # Ok(())
     /// # }
@@ -110,7 +108,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
     /// Sets the derivation path of the child key to be derived.
     pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, WalletError> {
-        self.derivation_path = DerivationPath::from_str(path.as_ref())?;
+        self.derivation_path = path.as_ref().parse()?;
         Ok(self)
     }
 
@@ -148,8 +146,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
         // Write the mnemonic phrase to storage if a directory has been provided.
         if let Some(dir) = &self.write_to {
-            let mut file = File::create(dir.as_path().join(wallet.address.to_string()))?;
-            file.write_all(mnemonic.to_phrase().as_bytes())?;
+            std::fs::write(dir.join(wallet.address.to_string()), mnemonic.to_phrase().as_bytes())?;
         }
 
         Ok(wallet)
