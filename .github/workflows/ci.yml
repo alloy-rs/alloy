@@ -16,11 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ["stable", "beta", "nightly", "1.65"] # MSRV
+        rust: ["stable", "beta", "nightly", "1.68"] # MSRV
         flags: ["--no-default-features", "", "--all-features"]
         exclude:
-          # Skip because some features have highest MSRV.
-          - rust: "1.65" # MSRV
+          # Some features have higher MSRV.
+          - rust: "1.68" # MSRV
             flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
@@ -36,10 +36,10 @@ jobs:
           cache-on-failure: true
       # Only run tests on latest stable and above
       - name: build
-        if: ${{ matrix.rust == '1.65' }} # MSRV
+        if: ${{ matrix.rust == '1.68' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
-        if: ${{ matrix.rust != '1.65' }} # MSRV
+        if: ${{ matrix.rust != '1.68' }} # MSRV
         run: cargo test --workspace ${{ matrix.flags }}
 
   wasm:
