@@ -5,6 +5,7 @@ use crate::{utils::secret_key_to_address, Wallet, WalletError};
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
+use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
 use thiserror::Error;
 
