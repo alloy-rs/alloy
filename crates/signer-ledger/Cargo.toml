@@ -26,7 +26,10 @@ tracing.workspace = true
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# https://github.com/summa-tx/coins/pull/127
+tokio = { workspace = true, features = ["rt"] }
+
+[dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]

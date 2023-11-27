@@ -22,7 +22,7 @@ spki.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+[dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 aws-config = { version = "1.0", default-features = false }
 
