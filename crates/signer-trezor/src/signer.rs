@@ -29,7 +29,7 @@ impl Signer for TrezorSigner {
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
+    async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(tx).await
     }
 

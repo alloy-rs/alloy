@@ -1,10 +1,9 @@
-use std::fmt;
-
 use alloy_primitives::hex;
 use k256::ecdsa;
+use std::fmt;
 use thiserror::Error;
 
-/// Result type alias for [`SignerError`].
+/// Result type alias for [`Error`](enum@Error).
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Generic error type for [`Signer`](crate::Signer) implementations.
@@ -16,7 +15,7 @@ pub enum Error {
     /// [`ecdsa`] error.
     #[error(transparent)]
     Ecdsa(#[from] ecdsa::Error),
-    /// [`hex`] error.
+    /// [`hex`](mod@hex) error.
     #[error(transparent)]
     HexError(#[from] hex::FromHexError),
     /// Generic error.

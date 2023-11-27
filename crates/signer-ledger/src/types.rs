@@ -39,7 +39,7 @@ pub enum LedgerError {
     #[error("received an unexpected empty response")]
     UnexpectedNullResponse,
     #[error(transparent)]
-    /// [`hex`] error.
+    /// [`hex`](mod@hex) error.
     HexError(#[from] hex::FromHexError),
     #[error(transparent)]
     /// [`semver`] error.

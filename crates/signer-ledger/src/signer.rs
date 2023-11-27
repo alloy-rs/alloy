@@ -35,8 +35,6 @@ pub struct LedgerSigner {
 impl Signer for LedgerSigner {
     #[inline]
     async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
-        let message = message.as_ref();
-
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
         payload.extend_from_slice(message);

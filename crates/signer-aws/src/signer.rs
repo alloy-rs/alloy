@@ -77,7 +77,7 @@ pub enum AwsSignerError {
     /// [`spki`] error.
     #[error(transparent)]
     Spki(#[from] spki::Error),
-    /// [`hex`] error.
+    /// [`hex`](mod@hex) error.
     #[error(transparent)]
     Hex(#[from] hex::FromHexError),
     /// Thrown when the AWS KMS API returns a response without a signature.
