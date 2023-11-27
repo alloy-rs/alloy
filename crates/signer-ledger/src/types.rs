@@ -32,30 +32,24 @@ impl fmt::Display for DerivationType {
 /// Error when using the Ledger transport.
 #[derive(Error, Debug)]
 pub enum LedgerError {
-    /// Underlying ledger transport error
+    /// Underlying Ledger transport error.
     #[error(transparent)]
     LedgerError(#[from] coins_ledger::errors::LedgerError),
     /// Device response was unexpectedly none
     #[error("Received unexpected response from device. Expected data in response, found none.")]
     UnexpectedNullResponse,
     #[error(transparent)]
-    /// Error when converting from a hex string
+    /// [`hex`] error.
     HexError(#[from] hex::FromHexError),
     #[error(transparent)]
-    /// Error when converting a semver requirement
+    /// [`semver`] error.
     SemVerError(#[from] semver::Error),
-    /// Error type from Eip712Error message
-    #[error("error encoding eip712 struct: {0:?}")]
-    Eip712Error(String),
-    /// Error when signing EIP712 struct with not compatible Ledger ETH app
-    #[error("Ledger ethereum app requires at least version {0}")]
+    /// Thrown when trying to sign using EIP-712 with an incompatible Ledger Ethereum app.
+    #[error("Ledger Ethereum app requires at least version {0}")]
     UnsupportedAppVersion(&'static str),
     /// Got a response, but it didn't contain as much data as expected
-    #[error("Cannot deserialize ledger response, insufficient bytes. Got {got} expected at least {at_least}")]
-    ShortResponse { got: usize, at_least: usize },
-    /// Payload is empty
-    #[error("Payload must not be empty")]
-    EmptyPayload,
+    #[error("bad response; got {got} bytes, expected {expected}")]
+    ShortResponse { got: usize, expected: usize },
 }
 
 pub(crate) const P1_FIRST: u8 = 0x00;

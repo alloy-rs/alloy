@@ -13,12 +13,8 @@ use rand::{CryptoRng, Rng};
 use std::str::FromStr;
 use thiserror::Error;
 
-#[cfg(not(target_arch = "wasm32"))]
-use elliptic_curve::rand_core;
-#[cfg(not(target_arch = "wasm32"))]
-use eth_keystore::KeystoreError;
-#[cfg(not(target_arch = "wasm32"))]
-use std::path::Path;
+#[cfg(feature = "keystore")]
+use {elliptic_curve::rand_core, eth_keystore::KeystoreError, std::path::Path};
 
 /// Error thrown by the Wallet module
 #[derive(Debug, Error)]
@@ -30,7 +26,7 @@ pub enum WalletError {
     #[error(transparent)]
     Bip39Error(#[from] MnemonicError),
     /// Underlying eth keystore error
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "keystore")]
     #[error(transparent)]
     EthKeystoreError(#[from] KeystoreError),
     /// Error propagated from k256's ECDSA module
@@ -72,6 +68,15 @@ impl Wallet<SigningKey> {
         Self::_new(SigningKey::random(rng))
     }
 
+    #[inline]
+    fn _new(signer: SigningKey) -> Self {
+        let address = secret_key_to_address(&signer);
+        Self { signer, address, chain_id: 1 }
+    }
+}
+
+#[cfg(feature = "keystore")]
+impl Wallet<SigningKey> {
     /// Creates a new random encrypted JSON with the provided password and stores it in the
     /// provided directory. Returns a tuple (Wallet, String) of the wallet instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
@@ -128,12 +133,6 @@ impl Wallet<SigningKey> {
         let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
         Ok((Self::from_slice(pk)?, uuid))
     }
-
-    #[inline]
-    fn _new(signer: SigningKey) -> Self {
-        let address = secret_key_to_address(&signer);
-        Self { signer, address, chain_id: 1 }
-    }
 }
 
 impl PartialEq for Wallet<SigningKey> {
@@ -185,8 +184,9 @@ impl TryFrom<String> for Wallet<SigningKey> {
 #[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
-    use crate::LocalWallet;
+    use crate::{LocalWallet, Signer};
     use alloy_primitives::address;
+    use std::path::Path;
     use tempfile::tempdir;
 
     #[test]
@@ -206,6 +206,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "keystore")]
     fn test_encrypted_json_keystore(key: Wallet<SigningKey>, uuid: &str, dir: &Path) {
         // sign a message using the given key
         let message = "Some data";
@@ -223,6 +224,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "keystore")]
     fn encrypted_json_keystore_new() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
@@ -234,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "keystore")]
     fn encrypted_json_keystore_from_pk() {
         // create and store an encrypted JSON keystore in this directory
         let dir = tempdir().unwrap();
@@ -363,9 +366,9 @@ mod tests {
         sig.verify(sighash, wallet.address).unwrap();
     }
 
-    #[tokio::test]
+    #[test]
     #[cfg(feature = "eip712")]
-    async fn typed_data() {
+    fn typed_data() {
         use crate::Signer;
         use alloy_primitives::{keccak256, Address, I256, U256};
         use alloy_sol_types::{eip712_domain, sol, SolStruct};
@@ -399,7 +402,7 @@ mod tests {
         };
         let wallet = Wallet::random();
         let hash = foo_bar.eip712_signing_hash(&domain);
-        let sig = wallet.sign_typed_data(&foo_bar, &domain).await.unwrap();
+        let sig = wallet.sign_typed_data(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
         assert_eq!(wallet.sign_hash(&hash).unwrap(), sig);
     }

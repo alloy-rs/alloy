@@ -1,6 +1,6 @@
 //! Helpers for interacting with the Ethereum Trezor App.
 //!
-//! [Official Docs](https://github.com/TrezorHQ/app-ethereum/blob/master/doc/ethapp.asc)
+//! [Official Docs](https://docs.trezor.io/trezor-firmware/index.html)
 
 #![allow(clippy::upper_case_acronyms)]
 
@@ -9,26 +9,24 @@ use std::fmt;
 use thiserror::Error;
 use trezor_client::client::AccessListItem as Trezor_AccessListItem;
 
+/// Trezor wallet type.
 #[derive(Clone, Debug)]
-/// Trezor wallet type
 pub enum DerivationType {
     /// Trezor Live-generated HD path
     TrezorLive(usize),
-    /// Any other path. Attention! Trezor by default forbids custom derivation paths
-    /// Run trezorctl set safety-checks prompt, to allow it
+    /// Any other path.
+    ///
+    /// **Warning**: Trezor by default forbids custom derivation paths;
+    /// run `trezorctl set safety-checks prompt` to enable them.
     Other(String),
 }
 
 impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "{}",
-            match self {
-                DerivationType::TrezorLive(index) => format!("m/44'/60'/{index}'/0/0"),
-                DerivationType::Other(inner) => inner.to_owned(),
-            }
-        )
+        match self {
+            DerivationType::TrezorLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
+            DerivationType::Other(inner) => f.write_str(inner),
+        }
     }
 }
 

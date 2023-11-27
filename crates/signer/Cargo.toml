@@ -16,8 +16,6 @@ alloy-primitives.workspace = true
 # TODO
 # alloy-rpc-types.workspace = true
 
-alloy-sol-types = { workspace = true, optional = true }
-
 coins-bip32 = "0.8.7"
 coins-bip39 = "0.8.7"
 elliptic-curve.workspace = true
@@ -26,8 +24,14 @@ rand.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-eth-keystore = "0.5.0"
+# eip712
+alloy-sol-types = { workspace = true, optional = true }
+
+# sync
+tokio = { workspace = true, features = ["macros", "rt"], optional = true }
+
+# keystore
+eth-keystore = { version = "0.5.0", default-features = false, optional = true }
 
 # yubi
 yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
@@ -36,11 +40,14 @@ yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional 
 serde_json.workspace = true
 tempfile.workspace = true
 tracing-subscriber.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-yubihsm = { version = "0.42", features = ["secp256k1", "usb", "mockhsm"] }
+
+# need mockhsm feature for tests
+yubihsm = { version = "0.42", features = ["mockhsm"] }
 
 [features]
-yubihsm = ["dep:yubihsm"]
 eip712 = ["dep:alloy-sol-types"]
+sync = ["dep:tokio"]
+
+keystore = ["dep:eth-keystore"]
+yubihsm = ["dep:yubihsm"]

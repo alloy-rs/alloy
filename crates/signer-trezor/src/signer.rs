@@ -9,9 +9,6 @@ use std::{
 };
 use trezor_client::client::Trezor;
 
-#[cfg(feature = "eip712")]
-use alloy_sol_types::{Eip712Domain, SolStruct};
-
 // we need firmware that supports EIP-1559 and EIP-712
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
 const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
@@ -23,6 +20,9 @@ const SESSION_FILE_NAME: &str = "trezor.session";
 /// A Trezor Ethereum signer.
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor).
+///
+/// Note that this signer only supports asynchronous operations by default. Enable the `"sync"`
+/// feature to enable synchronous operations through `tokio` runtime blocking.
 #[derive(Debug)]
 pub struct TrezorSigner {
     derivation: DerivationType,
@@ -37,8 +37,16 @@ pub struct TrezorSigner {
 impl Signer for TrezorSigner {
     type Error = TrezorError;
 
-    async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
-        self.sign_message(message).await
+    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature, Self::Error> {
+        let mut client = self.get_client(self.session_id.clone())?;
+        let apath = Self::convert_path(&self.derivation);
+
+        let signature = client.ethereum_sign_message(message.into(), apath)?;
+
+        let r = U256::from_limbs(signature.r.0);
+        let s = U256::from_limbs(signature.s.0);
+        // TODO: don't unwrap
+        Ok(Signature::from_scalars(r.into(), s.into(), signature.v).unwrap())
     }
 
     #[cfg(TODO)]
@@ -49,15 +57,6 @@ impl Signer for TrezorSigner {
             tx_with_chain.set_chain_id(self.chain_id);
         }
         self.sign_tx(&tx_with_chain).await
-    }
-
-    #[cfg(feature = "eip712")]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
-        &self,
-        payload: &T,
-        domain: &Eip712Domain,
-    ) -> Result<Signature, Self::Error> {
-        self.sign_typed_struct(payload, domain).await
     }
 
     #[inline]
@@ -233,33 +232,6 @@ impl TrezorSigner {
         Ok(Signature { r: signature.r, s: signature.s, v: signature.v })
     }
 
-    /// Signs an ethereum personal message
-    pub async fn sign_message<S: AsRef<[u8]> + Send + Sync>(
-        &self,
-        message: S,
-    ) -> Result<Signature, TrezorError> {
-        let message = message.as_ref();
-        let mut client = self.get_client(self.session_id.clone())?;
-        let apath = Self::convert_path(&self.derivation);
-
-        let signature = client.ethereum_sign_message(message.into(), apath)?;
-
-        let r = U256::from_limbs(signature.r.0);
-        let s = U256::from_limbs(signature.s.0);
-        // TODO: don't unwrap
-        Ok(Signature::from_scalars(r.into(), s.into(), signature.v).unwrap())
-    }
-
-    /// Signs an EIP712 encoded domain separator and message
-    #[cfg(feature = "eip712")]
-    pub async fn sign_typed_struct<T: SolStruct>(
-        &self,
-        _payload: &T,
-        _domain: &Eip712Domain,
-    ) -> Result<Signature, TrezorError> {
-        unimplemented!()
-    }
-
     // helper which converts a derivation path to [u32]
     fn convert_path(derivation: &DerivationType) -> Vec<u32> {
         let derivation = derivation.to_string();
@@ -431,7 +403,7 @@ mod tests {
     async fn test_sign_message() {
         let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1, None).await.unwrap();
         let message = "hello world";
-        let sig = trezor.sign_message(message).await.unwrap();
+        let sig = trezor.sign_message_async(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
     }

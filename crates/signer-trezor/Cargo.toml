@@ -25,11 +25,5 @@ semver.workspace = true
 thiserror.workspace = true
 # tracing.workspace = true
 
-# eip712
-alloy-sol-types = { workspace = true, optional = true }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-
-[features]
-eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]

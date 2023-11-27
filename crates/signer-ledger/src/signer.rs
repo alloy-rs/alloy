@@ -9,6 +9,7 @@ use coins_ledger::{
     transports::{Ledger, LedgerAsync},
 };
 use futures_util::lock::Mutex;
+use tracing::field;
 
 // TODO: Ledger futures aren't Send.
 use futures_executor::block_on;
@@ -19,6 +20,9 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// A Ledger Ethereum signer.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
+///
+/// Note that this signer only supports asynchronous operations by default. Enable the `"sync"`
+/// feature to enable synchronous operations through `tokio` runtime blocking.
 #[derive(Debug)]
 pub struct LedgerSigner {
     transport: Mutex<Ledger>,
@@ -42,12 +46,22 @@ impl std::fmt::Display for LedgerSigner {
 impl Signer for LedgerSigner {
     type Error = LedgerError;
 
-    async fn sign_message(&self, message: &[u8]) -> Result<Signature, Self::Error> {
-        self.sign_message(message).await
+    #[inline]
+    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature, Self::Error> {
+        let message = message.as_ref();
+
+        let mut payload = Self::path_to_bytes(&self.derivation);
+        payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
+        payload.extend_from_slice(message);
+
+        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload).await
     }
 
     #[cfg(TODO)]
-    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature, Self::Error> {
+    async fn sign_transaction_async(
+        &self,
+        message: &TypedTransaction,
+    ) -> Result<Signature, Self::Error> {
         let mut tx_with_chain = message.clone();
         if tx_with_chain.chain_id().is_none() {
             // in the case we don't have a chain_id, let's use the signer chain id instead
@@ -57,12 +71,28 @@ impl Signer for LedgerSigner {
     }
 
     #[cfg(feature = "eip712")]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+    #[inline]
+    async fn sign_typed_data_async<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
         domain: &Eip712Domain,
     ) -> Result<Signature, Self::Error> {
-        self.sign_typed_struct(payload, domain).await
+        // See comment for v1.6.0 requirement
+        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
+        const EIP712_MIN_VERSION: &str = ">=1.6.0";
+        let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
+        let version = semver::Version::parse(&self.version().await?)?;
+
+        // Enforce app version is greater than EIP712_MIN_VERSION
+        if !req.matches(&version) {
+            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
+        }
+
+        let mut data = Self::path_to_bytes(&self.derivation);
+        data.extend_from_slice(domain.separator().as_slice());
+        data.extend_from_slice(payload.eip712_hash_struct().as_slice());
+
+        self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
     }
 
     #[inline]
@@ -163,11 +193,11 @@ impl LedgerSigner {
 
         debug!("Dispatching get_version");
         let answer = block_on(transport.exchange(&command))?;
-        let result = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
-        if result.len() < 4 {
-            return Err(LedgerError::ShortResponse { got: result.len(), at_least: 4 });
+        let data = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
+        if data.len() != 4 {
+            return Err(LedgerError::ShortResponse { got: data.len(), expected: 4 });
         }
-        let version = format!("{}.{}.{}", result[1], result[2], result[3]);
+        let version = format!("{}.{}.{}", data[1], data[2], data[3]);
         debug!(version, "Retrieved version from device");
         Ok(version)
     }
@@ -210,53 +240,10 @@ impl LedgerSigner {
         Ok(signature)
     }
 
-    /// Signs an ethereum personal message
-    pub async fn sign_message<T: AsRef<[u8]>>(&self, message: T) -> Result<Signature, LedgerError> {
-        let message = message.as_ref();
-
-        let mut payload = Self::path_to_bytes(&self.derivation);
-        payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
-        payload.extend_from_slice(message);
-
-        self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload).await
-    }
-
-    /// Signs an EIP712 encoded domain separator and message
-    #[cfg(feature = "eip712")]
-    pub async fn sign_typed_struct<T: SolStruct>(
-        &self,
-        strukt: &T,
-        domain: &Eip712Domain,
-    ) -> Result<Signature, LedgerError> {
-        // See comment for v1.6.0 requirement
-        // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
-        const EIP712_MIN_VERSION: &str = ">=1.6.0";
-        let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
-        let version = semver::Version::parse(&self.version().await?)?;
-
-        // Enforce app version is greater than EIP712_MIN_VERSION
-        if !req.matches(&version) {
-            return Err(LedgerError::UnsupportedAppVersion(EIP712_MIN_VERSION));
-        }
-
-        let mut payload = Self::path_to_bytes(&self.derivation);
-        payload.extend_from_slice(domain.separator().as_slice());
-        payload.extend_from_slice(strukt.eip712_hash_struct().as_slice());
-
-        self.sign_payload(INS::SIGN_ETH_EIP_712, &payload).await
-    }
-
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
     /// structs.
     #[instrument(err, skip_all, fields(command = %command, payload = hex::encode(payload)))]
-    pub async fn sign_payload(
-        &self,
-        command: INS,
-        payload: &[u8],
-    ) -> Result<Signature, LedgerError> {
-        if payload.is_empty() {
-            return Err(LedgerError::EmptyPayload);
-        }
+    async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
         let transport = self.transport.lock().await;
         let mut command = APDUCommand {
             ins: command as u8,
@@ -273,37 +260,37 @@ impl LedgerSigner {
             (0..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
 
         // Iterate in 255 byte chunks
-        let span = debug_span!("send_loop", index = 0, chunk = "");
-        let guard = span.entered();
+        let span = debug_span!("send_loop", index = field::Empty, chunk = field::Empty).entered();
         for (index, chunk) in payload.chunks(chunk_size).enumerate() {
-            guard.record("index", index);
-            guard.record("chunk", hex::encode(chunk));
+            if !span.is_disabled() {
+                span.record("index", index);
+                span.record("chunk", hex::encode(chunk));
+            }
             command.data = APDUData::new(chunk);
 
             debug!("Dispatching packet to device");
-            answer = Some(block_on(transport.exchange(&command))?);
 
-            let data = answer.as_ref().expect("just assigned").data();
-            if data.is_none() {
+            let ans = block_on(transport.exchange(&command))?;
+            let Some(data) = ans.data() else {
                 return Err(LedgerError::UnexpectedNullResponse);
-            }
-            debug!(
-                response = hex::encode(data.expect("just checked")),
-                "Received response from device"
-            );
+            };
+            debug!(response = hex::encode(data), "Received response from device");
+            answer = Some(ans);
 
             // We need more data
             command.p1 = P1::MORE as u8;
         }
-        drop(guard);
-        let answer = answer.expect("payload is non-empty, therefore loop ran");
-        let result = answer.data().expect("check in loop");
-        if result.len() < 65 {
-            return Err(LedgerError::ShortResponse { got: result.len(), at_least: 65 });
+        drop(span);
+        drop(transport);
+
+        let answer = answer.unwrap();
+        let data = answer.data().unwrap();
+        if data.len() != 65 {
+            return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
 
         // TODO: don't unwrap
-        let sig = Signature::from_bytes(&result[1..], result[0] as u64).unwrap();
+        let sig = Signature::from_bytes(&data[1..], data[0] as u64).unwrap();
         debug!(?sig, "Received signature from device");
         Ok(sig)
     }

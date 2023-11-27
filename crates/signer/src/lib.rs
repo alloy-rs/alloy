@@ -15,6 +15,9 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+// mod error;
+// pub use error::{SignerError, SignerResult};
+
 mod signature;
 pub use signature::Signature;
 
@@ -26,7 +29,7 @@ pub use wallet::{MnemonicBuilder, Wallet, WalletError};
 
 pub mod utils;
 
-#[cfg(all(feature = "yubihsm", not(target_arch = "wasm32")))]
+#[cfg(feature = "yubihsm")]
 pub use yubihsm;
 
 /// Re-export the BIP-32 crate so that wordlists can be accessed conveniently.
@@ -36,5 +39,5 @@ pub use coins_bip39;
 pub type LocalWallet = Wallet<k256::ecdsa::SigningKey>;
 
 /// A wallet instantiated with a YubiHSM
-#[cfg(all(feature = "yubihsm", not(target_arch = "wasm32")))]
+#[cfg(feature = "yubihsm")]
 pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;

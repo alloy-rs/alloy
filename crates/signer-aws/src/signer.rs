@@ -1,5 +1,5 @@
-use alloy_primitives::{hex, utils::eip191_hash_message, Address, B256};
-use alloy_signer::{Signature as EthSig, Signature, Signer};
+use alloy_primitives::{hex, Address, B256};
+use alloy_signer::{Signature, Signer};
 use aws_sdk_kms::{
     error::SdkError,
     operation::{
@@ -10,20 +10,22 @@ use aws_sdk_kms::{
     types::{MessageType, SigningAlgorithmSpec},
     Client,
 };
-use k256::ecdsa::{self, Error as K256Error, RecoveryId, Signature as KSig, VerifyingKey};
+use k256::ecdsa::{self, RecoveryId, VerifyingKey};
 use std::fmt;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// An Ethers signer that uses keys held in Amazon Web Services Key Management Service (AWS KMS).
+/// Amazon Web Services Key Management Service (AWS KMS) Ethereum signer.
 ///
-/// The AWS Signer passes signing requests to the cloud service. AWS KMS keys
-/// are identified by a UUID, the `key_id`.
+/// The AWS Signer passes signing requests to the cloud service. AWS KMS keys are identified by a
+/// UUID, the `key_id`.
 ///
-/// Because the public key is unknown, we retrieve it on instantiation of the
-/// signer. This means that the new function is `async` and must be called
-/// within some runtime.
+/// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
+/// that the new function is `async` and must be called within some runtime.
+///
+/// Note that this signer only supports asynchronous operations by default. Enable the `"sync"`
+/// feature to enable synchronous operations through `tokio` runtime blocking.
 ///
 /// # Examples
 ///
@@ -74,15 +76,12 @@ pub enum AwsSignerError {
     #[error(transparent)]
     GetPublicKeyError(#[from] SdkError<GetPublicKeyError>),
     #[error(transparent)]
-    K256(#[from] K256Error),
+    K256(#[from] ecdsa::Error),
     #[error(transparent)]
     Spki(#[from] spki::Error),
     /// Error when converting from a hex string
     #[error(transparent)]
     HexError(#[from] hex::FromHexError),
-    /// Error type from Eip712Error message
-    #[error("failed encoding eip712 struct: {0:?}")]
-    Eip712Error(String),
     #[error("{0}")]
     Other(String),
 }
@@ -93,87 +92,26 @@ impl From<String> for AwsSignerError {
     }
 }
 
-impl AwsSigner {
-    /// Instantiate a new signer from an existing `Client` and key ID.
-    ///
-    /// This function retrieves the public key from AWS and calculates the
-    /// Etheruem address. It is therefore `async`.
-    #[instrument(err, skip_all, fields(key_id = %key_id.as_ref()))]
-    pub async fn new<T: AsRef<str>>(
-        kms: Client,
-        key_id: T,
-        chain_id: u64,
-    ) -> Result<AwsSigner, AwsSignerError> {
-        let key_id = key_id.as_ref();
-        let resp = request_get_pubkey(&kms, key_id).await?;
-        let pubkey = decode_pubkey(resp)?;
-        let address = alloy_signer::utils::public_key_to_address(&pubkey);
-
-        debug!(
-            "Instantiated AWS signer with pubkey 0x{} and address {address:?}",
-            hex::encode(pubkey.to_sec1_bytes()),
-        );
-
-        Ok(Self { kms, chain_id, key_id: key_id.into(), pubkey, address })
-    }
-
-    /// Fetch the pubkey associated with a key ID.
-    pub async fn get_pubkey_for_key<T>(&self, key_id: T) -> Result<VerifyingKey, AwsSignerError>
-    where
-        T: AsRef<str>,
-    {
-        request_get_pubkey(&self.kms, key_id.as_ref()).await.and_then(decode_pubkey)
-    }
-
-    /// Fetch the pubkey associated with this signer's key ID.
-    pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsSignerError> {
-        self.get_pubkey_for_key(&self.key_id).await
-    }
-
-    /// Sign a digest with the key associated with a key ID.
-    pub async fn sign_digest_with_key<T: AsRef<str>>(
-        &self,
-        key_id: T,
-        digest: &B256,
-    ) -> Result<KSig, AwsSignerError> {
-        request_sign_digest(&self.kms, key_id.as_ref(), digest).await.and_then(decode_signature)
-    }
-
-    /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: &B256) -> Result<KSig, AwsSignerError> {
-        self.sign_digest_with_key(self.key_id.clone(), digest).await
-    }
-
-    /// Sign a digest with this signer's key and add the eip155 `v` value
-    /// corresponding to the input chain_id
-    #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_with_eip155(
-        &self,
-        digest: &B256,
-        chain_id: u64,
-    ) -> Result<EthSig, AwsSignerError> {
-        let sig = self.sign_digest(digest).await?;
-        let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
-        sig.apply_eip155(chain_id);
-        Ok(sig)
-    }
-}
-
 #[async_trait::async_trait]
 impl Signer for AwsSigner {
     type Error = AwsSignerError;
 
-    #[instrument(err, skip(message))]
-    async fn sign_message(&self, message: &[u8]) -> Result<EthSig, Self::Error> {
-        let message_hash = eip191_hash_message(message);
-        trace!(?message_hash, ?message);
+    #[instrument(err)]
+    fn sign_hash(&self, hash: &B256) -> Result<Signature, Self::Error> {
+        todo!()
+    }
 
-        self.sign_digest_with_eip155(&message_hash, self.chain_id).await
+    #[instrument(err)]
+    async fn sign_hash_async(&self, hash: &B256) -> Result<Signature, Self::Error> {
+        self.sign_digest_with_eip155(hash, self.chain_id).await
     }
 
     #[cfg(TODO)]
     #[instrument(err)]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<EthSig, Self::Error> {
+    async fn sign_transaction_async(
+        &self,
+        tx: &TypedTransaction,
+    ) -> Result<Signature, Self::Error> {
         let mut tx_with_chain = tx.clone();
         let chain_id = tx_with_chain.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
         tx_with_chain.set_chain_id(chain_id);
@@ -183,11 +121,11 @@ impl Signer for AwsSigner {
     }
 
     #[cfg(feature = "eip712")]
-    async fn sign_typed_data<T: SolStruct + Send + Sync>(
+    async fn sign_typed_data_async<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
         domain: &Eip712Domain,
-    ) -> Result<EthSig, Self::Error> {
+    ) -> Result<Signature, Self::Error> {
         let digest = payload.eip712_signing_hash(domain);
         let sig = self.sign_digest(&digest).await?;
         let sig = sig_from_digest_bytes_trial_recovery(sig, &digest, &self.pubkey);
@@ -210,18 +148,80 @@ impl Signer for AwsSigner {
     }
 }
 
-#[instrument(err, skip(kms))]
+impl AwsSigner {
+    /// Instantiate a new signer from an existing `Client` and key ID.
+    ///
+    /// This function retrieves the public key from AWS and calculates the
+    /// Etheruem address. It is therefore `async`.
+    #[instrument(skip(kms), err)]
+    pub async fn new(
+        kms: Client,
+        key_id: String,
+        chain_id: u64,
+    ) -> Result<AwsSigner, AwsSignerError> {
+        let resp = request_get_pubkey(&kms, key_id.clone()).await?;
+        let pubkey = decode_pubkey(resp)?;
+        let address = alloy_signer::utils::public_key_to_address(&pubkey);
+
+        debug!(
+            "Instantiated AWS signer with pubkey 0x{} and address {address:?}",
+            hex::encode(pubkey.to_sec1_bytes()),
+        );
+
+        Ok(Self { kms, chain_id, key_id, pubkey, address })
+    }
+
+    /// Fetch the pubkey associated with a key ID.
+    pub async fn get_pubkey_for_key(&self, key_id: String) -> Result<VerifyingKey, AwsSignerError> {
+        request_get_pubkey(&self.kms, key_id).await.and_then(decode_pubkey)
+    }
+
+    /// Fetch the pubkey associated with this signer's key ID.
+    pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsSignerError> {
+        self.get_pubkey_for_key(self.key_id.clone()).await
+    }
+
+    /// Sign a digest with the key associated with a key ID.
+    pub async fn sign_digest_with_key(
+        &self,
+        key_id: String,
+        digest: &B256,
+    ) -> Result<ecdsa::Signature, AwsSignerError> {
+        request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
+    }
+
+    /// Sign a digest with this signer's key
+    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
+        self.sign_digest_with_key(self.key_id.clone(), digest).await
+    }
+
+    /// Sign a digest with this signer's key and add the eip155 `v` value
+    /// corresponding to the input chain_id
+    #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
+    async fn sign_digest_with_eip155(
+        &self,
+        digest: &B256,
+        chain_id: u64,
+    ) -> Result<Signature, AwsSignerError> {
+        let sig = self.sign_digest(digest).await?;
+        let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
+        sig.apply_eip155(chain_id);
+        Ok(sig)
+    }
+}
+
+#[instrument(skip(kms), err)]
 async fn request_get_pubkey(
     kms: &Client,
-    key_id: &str,
+    key_id: String,
 ) -> Result<GetPublicKeyOutput, AwsSignerError> {
     kms.get_public_key().key_id(key_id).send().await.map_err(Into::into)
 }
 
-#[instrument(err, skip(kms, digest), fields(digest = %hex::encode(digest)))]
+#[instrument(skip(kms, digest), fields(digest = %hex::encode(digest)), err)]
 async fn request_sign_digest(
     kms: &Client,
-    key_id: &str,
+    key_id: String,
     digest: &B256,
 ) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
@@ -248,13 +248,13 @@ fn decode_pubkey(resp: GetPublicKeyOutput) -> Result<VerifyingKey, AwsSignerErro
 }
 
 /// Decode an AWS KMS Signature response.
-fn decode_signature(resp: SignOutput) -> Result<KSig, AwsSignerError> {
+fn decode_signature(resp: SignOutput) -> Result<ecdsa::Signature, AwsSignerError> {
     let raw = resp
         .signature
         .as_ref()
         .ok_or_else(|| AwsSignerError::from("Signature not found in response".to_owned()))?;
 
-    let sig = KSig::from_der(raw.as_ref())?;
+    let sig = ecdsa::Signature::from_der(raw.as_ref())?;
     Ok(sig.normalize_s().unwrap_or(sig))
 }
 
@@ -262,15 +262,15 @@ fn decode_signature(resp: SignOutput) -> Result<KSig, AwsSignerError> {
 fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,
-    vk: &VerifyingKey,
+    pubkey: &VerifyingKey,
 ) -> Signature {
     let mut signature = Signature::new(sig, RecoveryId::from_byte(0).unwrap());
-    if check_candidate(&signature, hash, vk) {
+    if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
 
     signature.set_v(1);
-    if check_candidate(&signature, hash, vk) {
+    if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
 
@@ -278,8 +278,8 @@ fn sig_from_digest_bytes_trial_recovery(
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
-fn check_candidate(signature: &Signature, hash: &B256, vk: &VerifyingKey) -> bool {
-    signature.recover_from_prehash(hash).map(|key| key == *vk).unwrap_or(false)
+fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
+    signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -298,7 +298,7 @@ mod tests {
 
         let message = vec![0, 1, 2, 3];
 
-        let sig = signer.sign_message(&message).await.unwrap();
+        let sig = signer.sign_message_async(&message).await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
     }
 }
