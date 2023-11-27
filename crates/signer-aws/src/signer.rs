@@ -1,5 +1,6 @@
 use alloy_primitives::{hex, Address, B256};
 use alloy_signer::{Result, Signature, Signer};
+use async_trait::async_trait;
 use aws_sdk_kms::{
     error::SdkError,
     operation::{
@@ -88,7 +89,8 @@ pub enum AwsSignerError {
     PublicKeyNotFound,
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[inline]
     async fn sign_hash_async(&self, hash: &B256) -> Result<Signature> {
