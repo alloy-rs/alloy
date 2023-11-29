@@ -74,7 +74,7 @@ impl Wallet<SigningKey> {
     #[inline]
     fn new_pk(signer: SigningKey) -> Self {
         let address = secret_key_to_address(&signer);
-        Wallet::new_with_signer(signer, address)
+        Self { signer, address, chain_id: 1 }
     }
 }
 
@@ -132,6 +132,14 @@ impl Wallet<SigningKey> {
         let pk = pk.as_ref();
         let uuid = eth_keystore::encrypt_key(keypath, rng, pk, password, name)?;
         Ok((Self::from_slice(pk)?, uuid))
+    }
+}
+
+impl PartialEq for Wallet<SigningKey> {
+    fn eq(&self, other: &Self) -> bool {
+        self.signer.to_bytes().eq(&other.signer.to_bytes())
+            && self.address == other.address
+            && self.chain_id == other.chain_id
     }
 }
 
@@ -406,7 +414,9 @@ mod tests {
         let key_as_bytes = wallet.signer.to_bytes();
         let wallet_from_bytes = Wallet::from_bytes(&key_as_bytes).unwrap();
 
-        assert_eq!(wallet, wallet_from_bytes);
+        assert_eq!(wallet.address, wallet_from_bytes.address);
+        assert_eq!(wallet.chain_id, wallet_from_bytes.chain_id);
+        assert_eq!(wallet.signer, wallet_from_bytes.signer);
     }
 
     #[test]
@@ -417,7 +427,9 @@ mod tests {
         // Check FromStr and `0x`
         let wallet_0x: Wallet<SigningKey> =
             "0x0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
-        assert_eq!(wallet, wallet_0x);
+        assert_eq!(wallet.address, wallet_0x.address);
+        assert_eq!(wallet.chain_id, wallet_0x.chain_id);
+        assert_eq!(wallet.signer, wallet_0x.signer);
 
         // Must fail because of `0z`
         "0z0000000000000000000000000000000000000000000000000000000000000001"

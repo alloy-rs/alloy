@@ -31,6 +31,10 @@ mod yubi;
 ///
 /// let wallet = LocalWallet::random();
 ///
+/// // Optionally, the wallet's chain id can be set, in order to use EIP-155
+/// // replay protection with different chains
+/// let wallet = wallet.with_chain_id(1337u64);
+///
 /// // The wallet can be used to sign messages
 /// let message = b"hello";
 /// let signature = wallet.sign_message(message)?;
@@ -42,12 +46,14 @@ mod yubi;
 /// assert_eq!(signature, signature2);
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Wallet<D> {
     /// The wallet's private key.
     pub(crate) signer: D,
     /// The wallet's address.
     pub(crate) address: Address,
+    /// The wallet's chain ID (for EIP-155).
+    pub(crate) chain_id: u64,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -63,13 +69,23 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     fn address(&self) -> Address {
         self.address
     }
+
+    #[inline]
+    fn chain_id(&self) -> u64 {
+        self.chain_id
+    }
+
+    #[inline]
+    fn set_chain_id(&mut self, chain_id: u64) {
+        self.chain_id = chain_id;
+    }
 }
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
     /// Construct a new wallet with an external [`PrehashSigner`].
     #[inline]
-    pub const fn new_with_signer(signer: D, address: Address) -> Self {
-        Wallet { signer, address }
+    pub const fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
+        Wallet { signer, address, chain_id }
     }
 
     /// Returns this wallet's signer.
@@ -82,6 +98,9 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
 // do not log the signer
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for Wallet<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Wallet").field("address", &self.address).finish()
+        f.debug_struct("Wallet")
+            .field("address", &self.address)
+            .field("chain_id", &self.chain_id)
+            .finish()
     }
 }
