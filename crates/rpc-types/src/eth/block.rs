@@ -40,6 +40,11 @@ impl BlockTransactions {
     pub fn iter(&self) -> BlockTransactionsHashIterator<'_> {
         BlockTransactionsHashIterator::new(self)
     }
+
+    /// Returns an instance of BlockTransactions with the Uncle special case.
+    pub fn uncle() -> Self {
+        Self::Uncle
+    }
 }
 
 /// An Iterator over the transaction hashes of a block.
@@ -123,6 +128,7 @@ pub struct Block {
     pub uncles: Vec<B256>,
     /// Transactions
     #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
+    #[serde(default = "BlockTransactions::uncle")]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     pub size: Option<U256>,
