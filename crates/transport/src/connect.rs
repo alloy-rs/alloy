@@ -20,7 +20,7 @@ pub trait TransportConnect: Sized + Send + Sync + 'static {
     fn is_local(&self) -> bool;
 
     /// Connect to the transport, returning a `Transport` instance.
-    fn get_transport<'a: 'b, 'b>(&self) -> Pbf<'b, Self::Transport, TransportError>;
+    fn get_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, Self::Transport, TransportError>;
 }
 
 /// Connection details for a transport that can be boxed.
