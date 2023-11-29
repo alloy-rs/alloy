@@ -9,10 +9,6 @@ use coins_ledger::{
     transports::{Ledger, LedgerAsync},
 };
 use futures_util::lock::Mutex;
-use tracing::field;
-
-// TODO: Ledger futures aren't Send.
-use futures_executor::block_on;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
@@ -118,7 +114,7 @@ impl LedgerSigner {
         };
 
         debug!("Dispatching get_address request to ethereum app");
-        let answer = block_on(transport.exchange(&command))?;
+        let answer = transport.exchange(&command).await?;
         let result = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
 
         let address = {
@@ -134,7 +130,7 @@ impl LedgerSigner {
     }
 
     /// Returns the semver of the Ethereum ledger app
-    pub async fn version(&self) -> Result<String, LedgerError> {
+    pub async fn version(&self) -> Result<semver::Version, LedgerError> {
         let transport = self.transport.lock().await;
 
         let command = APDUCommand {
@@ -146,13 +142,13 @@ impl LedgerSigner {
         };
 
         debug!("Dispatching get_version");
-        let answer = block_on(transport.exchange(&command))?;
+        let answer = transport.exchange(&command).await?;
         let data = answer.data().ok_or(LedgerError::UnexpectedNullResponse)?;
-        if data.len() != 4 {
+        let &[_flags, major, minor, patch] = data else {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 4 });
-        }
-        let version = format!("{}.{}.{}", data[1], data[2], data[3]);
-        debug!(version, "Retrieved version from device");
+        };
+        let version = semver::Version::new(major as u64, minor as u64, patch as u64);
+        debug!(%version, "Retrieved version from device");
         Ok(version)
     }
 
@@ -175,7 +171,7 @@ impl LedgerSigner {
         // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
         const EIP712_MIN_VERSION: &str = ">=1.6.0";
         let req = semver::VersionReq::parse(EIP712_MIN_VERSION).unwrap();
-        let version = semver::Version::parse(&self.version().await?)?;
+        let version = self.version().await?;
 
         // Enforce app version is greater than EIP712_MIN_VERSION
         if !req.matches(&version) {
@@ -209,17 +205,12 @@ impl LedgerSigner {
             (0..=255).rev().find(|i| payload.len() % i != 3).expect("true for any length");
 
         // Iterate in 255 byte chunks
-        let span = debug_span!("send_loop", index = field::Empty, chunk = field::Empty).entered();
-        for (index, chunk) in payload.chunks(chunk_size).enumerate() {
-            if !span.is_disabled() {
-                span.record("index", index);
-                span.record("chunk", hex::encode(chunk));
-            }
+        for chunk in payload.chunks(chunk_size) {
             command.data = APDUData::new(chunk);
 
             debug!("Dispatching packet to device");
 
-            let ans = block_on(transport.exchange(&command))?;
+            let ans = transport.exchange(&command).await?;
             let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
             debug!(response = hex::encode(data), "Received response from device");
             answer = Some(ans);
@@ -227,7 +218,6 @@ impl LedgerSigner {
             // We need more data
             command.p1 = P1::MORE as u8;
         }
-        drop(span);
         drop(transport);
 
         let answer = answer.unwrap();

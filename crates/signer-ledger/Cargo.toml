@@ -16,8 +16,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-coins-ledger = { version = "0.9.0", default-features = false }
-futures-executor.workspace = true
+coins-ledger = { version = "0.9.1", default-features = false }
 futures-util.workspace = true
 semver.workspace = true
 thiserror.workspace = true
@@ -25,9 +24,6 @@ tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
-
-# https://github.com/summa-tx/coins/pull/127
-tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

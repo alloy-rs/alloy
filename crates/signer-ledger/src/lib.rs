@@ -18,9 +18,6 @@
 #[macro_use]
 extern crate tracing;
 
-// https://github.com/summa-tx/coins/pull/127
-use tokio as _;
-
 mod signer;
 pub use signer::LedgerSigner;
 
