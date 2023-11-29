@@ -26,6 +26,22 @@ pub struct Log {
     pub removed: bool,
 }
 
+impl TryFrom<Log> for alloy_primitives::Log {
+    type Error = LogError;
+
+    fn try_from(value: Log) -> Result<Self, Self::Error> {
+        alloy_primitives::Log::new(value.topics, value.data).ok_or(LogError::InvalidTopics)
+    }
+}
+
+/// Error that can occur when converting other types to logs
+#[derive(Debug, thiserror::Error)]
+pub enum LogError {
+    /// The topics are invalid
+    #[error("invalid topics")]
+    InvalidTopics,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
