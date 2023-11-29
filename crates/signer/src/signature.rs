@@ -11,8 +11,7 @@ use std::str::FromStr;
 ///
 /// This is a wrapper around [`ecdsa::Signature`] and a [`RecoveryId`] to provide public key
 /// recovery functionality.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[allow(missing_copy_implementations)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Signature {
     /// The inner ECDSA signature.
     inner: ecdsa::Signature,
