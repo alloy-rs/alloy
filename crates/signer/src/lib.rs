@@ -22,7 +22,7 @@ mod signature;
 pub use signature::Signature;
 
 mod signer;
-pub use signer::Signer;
+pub use signer::{Signer, SignerSync};
 
 mod wallet;
 #[cfg(feature = "mnemonic")]

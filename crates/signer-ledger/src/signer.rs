@@ -1,7 +1,7 @@
 //! Ledger Ethereum app wrapper.
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
-use alloy_primitives::{hex, Address};
+use alloy_primitives::{hex, Address, B256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
@@ -40,6 +40,12 @@ impl std::fmt::Display for LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
+    async fn sign_hash_async(&self, _hash: &B256) -> Result<Signature> {
+        Err(alloy_signer::Error::UnsupportedOperation(
+            alloy_signer::UnsupportedSignerOperation::SignHash,
+        ))
+    }
+
     #[inline]
     async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
         let mut payload = Self::path_to_bytes(&self.derivation);

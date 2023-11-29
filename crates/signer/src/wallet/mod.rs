@@ -1,4 +1,4 @@
-use crate::{Result, Signature, Signer};
+use crate::{Result, Signature, Signer, SignerSync};
 use alloy_primitives::{Address, B256};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
@@ -27,7 +27,7 @@ mod yubi;
 /// prefix the message being hashed with the `Ethereum Signed Message` domain separator.
 ///
 /// ```
-/// use alloy_signer::{LocalWallet, Signer};
+/// use alloy_signer::{LocalWallet, Signer, SignerSync};
 ///
 /// let wallet = LocalWallet::random();
 ///
@@ -59,10 +59,8 @@ pub struct Wallet<D> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
-    #[inline]
-    fn sign_hash(&self, hash: &B256) -> Result<Signature> {
-        let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
-        Ok(Signature::new(recoverable_sig, recovery_id))
+    async fn sign_hash_async(&self, hash: &B256) -> Result<Signature> {
+        self.sign_hash(hash)
     }
 
     #[inline]
@@ -78,6 +76,14 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     #[inline]
     fn set_chain_id(&mut self, chain_id: u64) {
         self.chain_id = chain_id;
+    }
+}
+
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> {
+    #[inline]
+    fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+        let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
+        Ok(Signature::new(recoverable_sig, recovery_id))
     }
 }
 

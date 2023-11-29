@@ -42,7 +42,7 @@ signature.verify("hello world", wallet.address()).unwrap();
 Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-712)):
 
 ```rust
-use alloy_signer::{LocalWallet, Signer};
+use alloy_signer::{LocalWallet, Signer, SignerSync};
 
 let message = "Some data";
 let wallet = LocalWallet::random();

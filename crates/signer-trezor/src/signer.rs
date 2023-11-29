@@ -1,5 +1,5 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_primitives::{hex, Address, U256};
+use alloy_primitives::{hex, Address, B256, U256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use std::fmt;
@@ -35,6 +35,12 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
+    async fn sign_hash_async(&self, _hash: &B256) -> Result<Signature> {
+        Err(alloy_signer::Error::UnsupportedOperation(
+            alloy_signer::UnsupportedSignerOperation::SignHash,
+        ))
+    }
+
     #[inline]
     async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_(message).await.map_err(alloy_signer::Error::other)

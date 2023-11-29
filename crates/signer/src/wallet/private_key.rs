@@ -167,7 +167,7 @@ impl FromStr for Wallet<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LocalWallet, Signer};
+    use crate::{LocalWallet, SignerSync};
     use alloy_primitives::address;
 
     #[cfg(feature = "keystore")]
