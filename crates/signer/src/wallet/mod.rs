@@ -59,6 +59,7 @@ pub struct Wallet<D> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
+    #[inline]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_hash_sync(hash)
     }

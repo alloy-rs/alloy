@@ -7,9 +7,12 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 
 /// Asynchronous Ethereum signer.
 ///
-/// All provided implementations rely on [`sign_hash`](Signer::sign_hash). If the signer is not able
-/// to implement this method, then all other methods must be implemented directly, or they will
-/// return [`UnsupportedOperation`](Error::UnsupportedOperation).
+/// All provided implementations rely on [`sign_hash`](Signer::sign_hash). A signer may not always
+/// be able to implement this method, in which case it should return
+/// [`UnsupportedOperation`](crate::Error::UnsupportedOperation), and implement all the signing
+/// methods directly.
+///
+/// Synchronous signers should implement both this trait and [`SignerSync`].
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Signer: Send + Sync {
@@ -69,6 +72,14 @@ pub trait Signer: Send + Sync {
 }
 
 /// Synchronous Ethereum signer.
+///
+/// All provided implementations rely on [`sign_hash_sync`](SignerSync::sign_hash_sync). A signer
+/// may not always be able to implement this method, in which case it should return
+/// [`UnsupportedOperation`](crate::Error::UnsupportedOperation), and implement all the signing
+/// methods directly.
+///
+/// Synchronous signers should also implement [`Signer`], as they are always able to by delegating
+/// the asynchronous methods to the synchronous ones.
 pub trait SignerSync {
     /// Signs the given hash.
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature>;
