@@ -194,14 +194,14 @@ mod tests {
     fn test_encrypted_json_keystore(key: Wallet<SigningKey>, uuid: &str, dir: &Path) {
         // sign a message using the given key
         let message = "Some data";
-        let signature = key.sign_message(message.as_bytes()).unwrap();
+        let signature = key.sign_message_sync(message.as_bytes()).unwrap();
 
         // read from the encrypted JSON keystore and decrypt it, while validating that the
         // signatures produced by both the keys should match
         let path = Path::new(dir).join(uuid);
         let key2 = Wallet::<SigningKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
 
-        let signature2 = key2.sign_message(message.as_bytes()).unwrap();
+        let signature2 = key2.sign_message_sync(message.as_bytes()).unwrap();
         assert_eq!(signature, signature2);
 
         std::fs::remove_file(&path).unwrap();
@@ -245,7 +245,7 @@ mod tests {
         let address = key.address;
 
         // sign a message
-        let signature = key.sign_message(message.as_bytes()).unwrap();
+        let signature = key.sign_message_sync(message.as_bytes()).unwrap();
 
         // ecrecover via the message will hash internally
         let recovered = signature.recover_address_from_msg(message).unwrap();
@@ -386,9 +386,9 @@ mod tests {
         };
         let wallet = Wallet::random();
         let hash = foo_bar.eip712_signing_hash(&domain);
-        let sig = wallet.sign_typed_data(&foo_bar, &domain).unwrap();
+        let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
-        assert_eq!(wallet.sign_hash(&hash).unwrap(), sig);
+        assert_eq!(wallet.sign_hash_sync(&hash).unwrap(), sig);
     }
 
     #[test]

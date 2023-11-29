@@ -37,12 +37,12 @@ mod yubi;
 ///
 /// // The wallet can be used to sign messages
 /// let message = b"hello";
-/// let signature = wallet.sign_message(message)?;
+/// let signature = wallet.sign_message_sync(message)?;
 /// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), wallet.address());
 ///
 /// // LocalWallet is clonable:
 /// let wallet_clone = wallet.clone();
-/// let signature2 = wallet_clone.sign_message(message)?;
+/// let signature2 = wallet_clone.sign_message_sync(message)?;
 /// assert_eq!(signature, signature2);
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
@@ -59,8 +59,8 @@ pub struct Wallet<D> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
-    async fn sign_hash_async(&self, hash: &B256) -> Result<Signature> {
-        self.sign_hash(hash)
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+        self.sign_hash_sync(hash)
     }
 
     #[inline]
@@ -81,7 +81,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> {
     #[inline]
-    fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
         Ok(Signature::new(recoverable_sig, recovery_id))
     }

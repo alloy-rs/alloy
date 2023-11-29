@@ -14,21 +14,21 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Signer: Send + Sync {
     /// Signs the given hash.
-    async fn sign_hash_async(&self, hash: &B256) -> Result<Signature>;
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
-        self.sign_hash_async(&eip191_hash_message(message)).await
+    async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
+        self.sign_hash(&eip191_hash_message(message)).await
     }
 
     /// Signs the transaction.
     #[cfg(TODO)]
     #[inline]
-    async fn sign_transaction_async(&self, message: &TypedTransaction) -> Result<Signature> {
-        self.sign_hash_async(&message.sighash()).await
+    async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature> {
+        self.sign_hash(&message.sighash()).await
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -36,7 +36,7 @@ pub trait Signer: Send + Sync {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
-    async fn sign_typed_data_async<T: SolStruct + Send + Sync>(
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
         domain: &Eip712Domain,
@@ -44,7 +44,7 @@ pub trait Signer: Send + Sync {
     where
         Self: Sized,
     {
-        self.sign_hash_async(&payload.eip712_signing_hash(domain)).await
+        self.sign_hash(&payload.eip712_signing_hash(domain)).await
     }
 
     /// Returns the signer's Ethereum Address.
@@ -71,21 +71,21 @@ pub trait Signer: Send + Sync {
 /// Synchronous Ethereum signer.
 pub trait SignerSync {
     /// Signs the given hash.
-    fn sign_hash(&self, hash: &B256) -> Result<Signature>;
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Signature>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        self.sign_hash(&eip191_hash_message(message))
+    fn sign_message_sync(&self, message: &[u8]) -> Result<Signature> {
+        self.sign_hash_sync(&eip191_hash_message(message))
     }
 
     /// Signs the transaction.
     #[cfg(TODO)]
     #[inline]
-    fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature> {
-        self.sign_hash(&message.sighash())
+    fn sign_transaction_sync(&self, message: &TypedTransaction) -> Result<Signature> {
+        self.sign_hash_sync(&message.sighash())
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -93,11 +93,15 @@ pub trait SignerSync {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
-    fn sign_typed_data<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Signature>
+    fn sign_typed_data_sync<T: SolStruct>(
+        &self,
+        payload: &T,
+        domain: &Eip712Domain,
+    ) -> Result<Signature>
     where
         Self: Sized,
     {
-        self.sign_hash(&payload.eip712_signing_hash(domain))
+        self.sign_hash_sync(&payload.eip712_signing_hash(domain))
     }
 }
 
@@ -124,42 +128,44 @@ mod tests {
             test_unsized_unimplemented_signer_sync(s);
 
             #[cfg(feature = "eip712")]
-            assert!(s.sign_typed_data(&Eip712Data::default(), &Eip712Domain::default()).is_err());
+            assert!(s
+                .sign_typed_data_sync(&Eip712Data::default(), &Eip712Domain::default())
+                .is_err());
             #[cfg(feature = "eip712")]
             assert!(s
-                .sign_typed_data_async(&Eip712Data::default(), &Eip712Domain::default())
+                .sign_typed_data(&Eip712Data::default(), &Eip712Domain::default())
                 .await
                 .is_err());
         }
 
         async fn test_unsized_unimplemented_signer<S: Signer + ?Sized>(s: &S) {
             assert_matches!(
-                s.sign_hash_async(&B256::ZERO).await,
+                s.sign_hash(&B256::ZERO).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
             assert_matches!(
-                s.sign_message_async(&[]).await,
+                s.sign_message(&[]).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
             #[cfg(TODO)]
-            assert!(s.sign_transaction_async(&TypedTransaction::default()).await.is_err());
+            assert!(s.sign_transaction(&TypedTransaction::default()).await.is_err());
         }
 
         fn test_unsized_unimplemented_signer_sync<S: SignerSync + ?Sized>(s: &S) {
             assert_matches!(
-                s.sign_hash(&B256::ZERO),
+                s.sign_hash_sync(&B256::ZERO),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
             assert_matches!(
-                s.sign_message(&[]),
+                s.sign_message_sync(&[]),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
             #[cfg(TODO)]
-            assert!(s.sign_transaction(&TypedTransaction::default()).is_err());
+            assert!(s.sign_transaction_sync(&TypedTransaction::default()).is_err());
         }
 
         struct UnimplementedSigner;
@@ -167,7 +173,7 @@ mod tests {
         #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
         #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
         impl Signer for UnimplementedSigner {
-            async fn sign_hash_async(&self, _hash: &B256) -> Result<Signature> {
+            async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             }
 
@@ -185,7 +191,7 @@ mod tests {
         }
 
         impl SignerSync for UnimplementedSigner {
-            fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
+            fn sign_hash_sync(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             }
         }

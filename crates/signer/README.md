@@ -48,7 +48,7 @@ let message = "Some data";
 let wallet = LocalWallet::random();
 
 // Sign the message
-let signature = wallet.sign_message(message.as_bytes())?;
+let signature = wallet.sign_message_sync(message.as_bytes())?;
 
 // Recover the signer from the message
 let recovered = signature.recover_address_from_msg(message)?;

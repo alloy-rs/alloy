@@ -42,7 +42,7 @@ use std::fmt;
 ///
 /// let message = vec![0, 1, 2, 3];
 ///
-/// let sig = signer.sign_message_async(&message).await.unwrap();
+/// let sig = signer.sign_message(&message).await.unwrap();
 /// assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
 /// # }
 /// ```
@@ -96,13 +96,13 @@ pub enum AwsSignerError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[instrument(err)]
-    async fn sign_hash_async(&self, hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(TODO)]
     #[instrument(err)]
-    async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         let mut tx_with_chain = tx.clone();
         let chain_id = tx_with_chain.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
         tx_with_chain.set_chain_id(chain_id);
@@ -262,7 +262,7 @@ mod tests {
 
         let message = vec![0, 1, 2, 3];
 
-        let sig = signer.sign_message_async(&message).await.unwrap();
+        let sig = signer.sign_message(&message).await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), signer.address());
     }
 }

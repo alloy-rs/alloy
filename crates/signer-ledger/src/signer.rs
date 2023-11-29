@@ -40,14 +40,14 @@ impl std::fmt::Display for LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
-    async fn sign_hash_async(&self, _hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
     }
 
     #[inline]
-    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
+    async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(&(message.len() as u32).to_be_bytes());
         payload.extend_from_slice(message);
@@ -59,13 +59,13 @@ impl Signer for LedgerSigner {
 
     #[cfg(TODO)]
     #[inline]
-    async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(&tx).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(feature = "eip712")]
     #[inline]
-    async fn sign_typed_data_async<T: SolStruct + Send + Sync>(
+    async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
         domain: &Eip712Domain,

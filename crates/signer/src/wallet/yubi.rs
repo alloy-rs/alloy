@@ -85,7 +85,7 @@ mod tests {
         );
 
         let msg = "Some data";
-        let sig = wallet.sign_message(msg.as_bytes()).unwrap();
+        let sig = wallet.sign_message_sync(msg.as_bytes()).unwrap();
         assert_eq!(sig.recover_address_from_msg(msg).unwrap(), wallet.address());
         assert_eq!(wallet.address(), address!("2DE2C386082Cff9b28D62E60983856CE1139eC49"));
     }
@@ -102,7 +102,7 @@ mod tests {
         );
 
         let msg = "Some data";
-        let sig = wallet.sign_message(msg.as_bytes()).unwrap();
+        let sig = wallet.sign_message_sync(msg.as_bytes()).unwrap();
         assert_eq!(sig.recover_address_from_msg(msg).unwrap(), wallet.address());
     }
 }

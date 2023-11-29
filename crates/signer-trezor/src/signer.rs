@@ -35,20 +35,20 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
-    async fn sign_hash_async(&self, _hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
     }
 
     #[inline]
-    async fn sign_message_async(&self, message: &[u8]) -> Result<Signature> {
+    async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_(message).await.map_err(alloy_signer::Error::other)
     }
 
     #[cfg(TODO)]
     #[inline]
-    async fn sign_transaction_async(&self, tx: &TypedTransaction) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(tx).await
     }
 
@@ -240,7 +240,7 @@ mod tests {
     async fn test_sign_message() {
         let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
         let message = "hello world";
-        let sig = trezor.sign_message_async(message.as_bytes()).await.unwrap();
+        let sig = trezor.sign_message(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
         assert_eq!(sig.recover_address_from_msg(message).unwrap(), addr);
     }
