@@ -208,8 +208,8 @@ impl Signature {
         self.set_v(to_eip155_v(self.recid.to_byte(), chain_id));
     }
 
-    /// Recovers a [`VerifyingKey`] from this signature and the given message by first hashing the
-    /// message with Keccak-256.
+    /// Recovers an [`Address`] from this signature and the given message by first prefixing and
+    /// hashing the message according to [EIP-191](eip191_hash_message).
     #[inline]
     pub fn recover_address_from_msg<T: AsRef<[u8]>>(
         &self,
@@ -218,7 +218,7 @@ impl Signature {
         self.recover_from_msg(msg).map(|pubkey| public_key_to_address(&pubkey))
     }
 
-    /// Recovers a [`VerifyingKey`] from this signature and the given prehashed message.
+    /// Recovers an [`Address`] from this signature and the given prehashed message.
     #[inline]
     pub fn recover_address_from_prehash(&self, prehash: &B256) -> Result<Address, ecdsa::Error> {
         self.recover_from_prehash(prehash).map(|pubkey| public_key_to_address(&pubkey))

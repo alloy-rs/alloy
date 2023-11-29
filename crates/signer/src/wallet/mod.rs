@@ -4,13 +4,15 @@ use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
+mod error;
+pub use error::WalletError;
+
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
 #[cfg(feature = "mnemonic")]
 pub use mnemonic::MnemonicBuilder;
 
 mod private_key;
-pub use private_key::WalletError;
 
 #[cfg(feature = "yubihsm")]
 mod yubi;

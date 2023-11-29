@@ -1,6 +1,6 @@
 //! Specific helper functions for loading an offline K256 Private Key stored on disk
 
-use super::Wallet;
+use super::{Wallet, WalletError};
 use crate::utils::secret_key_to_address;
 use alloy_primitives::hex;
 use k256::{
@@ -9,42 +9,9 @@ use k256::{
 };
 use rand::{CryptoRng, Rng};
 use std::str::FromStr;
-use thiserror::Error;
 
 #[cfg(feature = "keystore")]
-use {elliptic_curve::rand_core, eth_keystore::KeystoreError, std::path::Path};
-
-/// Error thrown by the Wallet module
-#[derive(Debug, Error)]
-pub enum WalletError {
-    /// Error propagated from k256's ECDSA module
-    #[error(transparent)]
-    EcdsaError(#[from] ecdsa::Error),
-    /// Error propagated from the hex crate.
-    #[error(transparent)]
-    HexError(#[from] hex::FromHexError),
-    /// Error propagated by IO operations
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-
-    /// Error propagated from the BIP-32 crate
-    #[error(transparent)]
-    #[cfg(feature = "mnemonic")]
-    Bip32Error(#[from] coins_bip32::Bip32Error),
-    /// Error propagated from the BIP-39 crate
-    #[error(transparent)]
-    #[cfg(feature = "mnemonic")]
-    Bip39Error(#[from] coins_bip39::MnemonicError),
-    /// Error propagated from the mnemonic builder module.
-    #[error(transparent)]
-    #[cfg(feature = "mnemonic")]
-    MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
-
-    /// Underlying eth keystore error
-    #[cfg(feature = "keystore")]
-    #[error(transparent)]
-    EthKeystoreError(#[from] KeystoreError),
-}
+use {elliptic_curve::rand_core, std::path::Path};
 
 impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a raw scalar serialized as a byte array.
