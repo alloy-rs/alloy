@@ -19,7 +19,7 @@ feature-parity in Alloy. No action is currently needed from devs.
 This repository contains the following crates:
 
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients.
-- [`alloy-transports`] - Transport implementations for JSON-RPC 2.0 clients.
+- [`alloy-transport`] - Transport implementations for JSON-RPC 2.0 clients.
 - [`alloy-networks`] - Network abstraction for RPC types. Allows capturing
   different RPC param and response types on a per-network basis.
 - [`alloy-providers`] - A client trait for interacting with Ethereum-like RPC
@@ -27,7 +27,7 @@ This repository contains the following crates:
   different RPC types on a per-network basis.
 
 [`alloy-json-rpc`]: ./crates/json-rpc
-[`alloy-transports`]: ./crates/transports
+[`alloy-transport`]: ./crates/transport
 [`alloy-networks`]: ./crates/networks
 [`alloy-providers`]: ./crates/providers
 
