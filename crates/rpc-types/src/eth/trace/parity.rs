@@ -315,6 +315,7 @@ pub struct CallOutput {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateOutput {
+    /// Address output.
     pub address: Address,
     /// Code data.
     pub code: Bytes,
