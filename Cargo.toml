@@ -26,7 +26,7 @@ alloy-networks = { version = "0.1.0", path = "crates/networks" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 
-alloy-primitives = { version = "0.4.2", features = ["serde"] }
+alloy-primitives = { version = "0.5.1", features = ["serde"] }
 alloy-rlp = "0.3"
 
 async-trait = "0.1.74"
@@ -34,7 +34,7 @@ base64 = "0.21"
 bimap = "0.6"
 futures = "0.3.29"
 hyper = "0.14.27"
-itertools = "0.11"
+itertools = "0.12"
 pin-project = "1.1"
 reqwest = "0.11.18"
 serde = { version = "1.0", features = ["derive"] }
