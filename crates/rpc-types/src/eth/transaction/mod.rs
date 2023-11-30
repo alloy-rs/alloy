@@ -51,6 +51,7 @@ pub struct Transaction {
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
+    #[serde(flatten)]
     pub signature: Signature,
     /// The chain id of the transaction, if any.
     pub chain_id: Option<U64>,
@@ -89,12 +90,12 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Some(Signature {
+            signature: Signature {
                 v: U256::from(14),
                 r: U256::from(14),
                 s: U256::from(14),
                 y_parity: None,
-            }),
+            },
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
@@ -126,12 +127,12 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Some(Signature {
+            signature: Signature {
                 v: U256::from(14),
                 r: U256::from(14),
                 s: U256::from(14),
                 y_parity: Some(Parity(true)),
-            }),
+            },
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
