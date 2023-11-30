@@ -40,10 +40,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_transaction_count(
         &self,
         address: Address,
-    ) -> TransportResult<alloy_primitives::U256>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<alloy_primitives::U256> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
@@ -53,18 +50,16 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the last block number available.
-    pub async fn get_block_number(&self) -> TransportResult<U64>
-    where
-        Self: Sync,
-    {
+    pub async fn get_block_number(&self) -> TransportResult<U64> {
         self.inner.prepare("eth_blockNumber", Cow::<()>::Owned(())).await
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    pub async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
-    where
-        Self: Sync,
-    {
+    pub async fn get_balance(
+        &self,
+        address: Address,
+        tag: Option<BlockId>,
+    ) -> TransportResult<U256> {
         self.inner
             .prepare(
                 "eth_getBalance",
@@ -81,10 +76,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         hash: BlockHash,
         full: bool,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Option<Block>> {
         self.inner
             .prepare("eth_getBlockByHash", Cow::<(BlockHash, bool)>::Owned((hash, full)))
             .await
@@ -95,10 +87,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         number: B,
         full: bool,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Option<Block>> {
         self.inner
             .prepare(
                 "eth_getBlockByNumber",
@@ -108,10 +97,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets the chain ID.
-    pub async fn get_chain_id(&self) -> TransportResult<U64>
-    where
-        Self: Sync,
-    {
+    pub async fn get_chain_id(&self) -> TransportResult<U64> {
         self.inner.prepare("eth_chainId", Cow::<()>::Owned(())).await
     }
     /// Gets the bytecode located at the corresponding [Address].
@@ -119,20 +105,14 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         address: Address,
         tag: B,
-    ) -> TransportResult<Bytes>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Bytes> {
         self.inner
             .prepare("eth_getCode", Cow::<(Address, BlockId)>::Owned((address, tag.into())))
             .await
     }
 
     /// Gets a [Transaction] by its [TxHash].
-    pub async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
-    where
-        Self: Sync,
-    {
+    pub async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction> {
         self.inner
             .prepare(
                 "eth_getTransactionByHash",
@@ -144,27 +124,18 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-    pub async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>
-    where
-        Self: Sync,
-    {
+    pub async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>> {
         self.inner.prepare("eth_getLogs", Cow::<Vec<Filter>>::Owned(vec![filter])).await
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-    pub async fn get_accounts(&self) -> TransportResult<Vec<Address>>
-    where
-        Self: Sync,
-    {
+    pub async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
         self.inner.prepare("eth_accounts", Cow::<()>::Owned(())).await
     }
 
     /// Gets the current gas price.
-    pub async fn get_gas_price(&self) -> TransportResult<U256>
-    where
-        Self: Sync,
-    {
+    pub async fn get_gas_price(&self) -> TransportResult<U256> {
         self.inner.prepare("eth_gasPrice", Cow::<()>::Owned(())).await
     }
 
@@ -172,10 +143,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<TransactionReceipt>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Option<TransactionReceipt>> {
         self.inner.prepare("eth_getTransactionReceipt", Cow::<Vec<TxHash>>::Owned(vec![hash])).await
     }
 
@@ -186,10 +154,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         block_count: U256,
         last_block: B,
         reward_percentiles: &[f64],
-    ) -> TransportResult<FeeHistory>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<FeeHistory> {
         self.inner
             .prepare(
                 "eth_feeHistory",
@@ -206,10 +171,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<TransactionReceipt>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Vec<TransactionReceipt>> {
         self.inner.prepare("eth_getBlockReceipts", Cow::<BlockNumberOrTag>::Owned(block)).await
     }
 
@@ -218,10 +180,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tag: B,
         idx: U64,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Option<Block>> {
         let tag = tag.into();
         match tag {
             BlockId::Hash(hash) => {
@@ -244,10 +203,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Gets syncing info.
-    pub async fn syncing(&self) -> TransportResult<SyncStatus>
-    where
-        Self: Sync,
-    {
+    pub async fn syncing(&self) -> TransportResult<SyncStatus> {
         self.inner.prepare("eth_syncing", Cow::<()>::Owned(())).await
     }
 
@@ -256,10 +212,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Bytes> {
         self.inner
             .prepare(
                 "eth_call",
@@ -276,10 +229,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         &self,
         tx: TransactionRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<Bytes>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Bytes> {
         if let Some(block_id) = block {
             let params = Cow::<(TransactionRequest, BlockId)>::Owned((tx, block_id));
             self.inner.prepare("eth_estimateGas", params).await
@@ -290,10 +240,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     /// Sends an already-signed transaction.
-    pub async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
-    where
-        Self: Sync,
-    {
+    pub async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash> {
         self.inner.prepare("eth_sendRawTransaction", Cow::<Bytes>::Owned(tx)).await
     }
 
@@ -303,10 +250,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     pub async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<(U256, U256)>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<(U256, U256)> {
         let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
         {
             Ok(Some(block)) => match block.header.base_fee_per_gas {
@@ -345,10 +289,7 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
     }
 
     #[cfg(feature = "anvil")]
-    pub async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
-    where
-        Self: Sync,
-    {
+    pub async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
         self.inner
             .prepare("anvil_setCode", Cow::<(Address, &'static str)>::Owned((address, code)))
             .await
