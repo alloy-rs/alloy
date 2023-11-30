@@ -23,7 +23,7 @@ pub enum WalletError {
     #[error(transparent)]
     #[cfg(feature = "mnemonic")]
     Bip39Error(#[from] coins_bip39::MnemonicError),
-    /// [`mnemonic`](super::mnemonic) error.
+    /// [`MnemonicBuilder`](super::mnemonic::MnemonicBuilder) error.
     #[error(transparent)]
     #[cfg(feature = "mnemonic")]
     MnemonicBuilderError(#[from] super::mnemonic::MnemonicBuilderError),
