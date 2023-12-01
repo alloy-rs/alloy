@@ -92,9 +92,10 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 // If it has an ID, it is a response.
                 if let Some(id) = id {
                     if subscription.is_some() {
-                        return Err(serde::de::Error::custom(
-                            format!("unexpected {} in pubsub item", SUBSCRIPTION),
-                        ));
+                        return Err(serde::de::Error::custom(format!(
+                            "unexpected {} in pubsub item",
+                            SUBSCRIPTION
+                        )));
                     }
                     // We need to differentiate error vs result here.
                     let payload = if let Some(error) = error {
@@ -102,9 +103,10 @@ impl<'de> Deserialize<'de> for PubSubItem {
                     } else if let Some(result) = result {
                         ResponsePayload::Success(result)
                     } else {
-                        return Err(serde::de::Error::custom(
-                            format!( "missing `{}` or `{}` field in response", RESULT, ERROR),
-                        ));
+                        return Err(serde::de::Error::custom(format!(
+                                "missing `{}` or `{}` field in response",
+                                RESULT, ERROR
+                        )));
                     };
                     Ok(PubSubItem::Response(Response { id, payload }))
                 } else {
