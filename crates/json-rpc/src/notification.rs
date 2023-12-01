@@ -1,9 +1,15 @@
+
 use crate::{Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde::{
     de::{MapAccess, Visitor},
     Deserialize, Serialize,
 };
+
+const ID: &str = "id";
+const SUBSCRIPTION: &str = "subscription";
+const RESULT: &str = "result";
+const ERROR: &str = "error";
 
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.
@@ -52,27 +58,27 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 // Drain the map into the appropriate fields.
                 while let Ok(Some(key)) = map.next_key() {
                     match key {
-                        "id" => {
+                        ID => {
                             if id.is_some() {
-                                return Err(serde::de::Error::duplicate_field("id"));
+                                return Err(serde::de::Error::duplicate_field(ID));
                             }
                             id = Some(map.next_value()?);
                         }
-                        "subscription" => {
+                        SUBSCRIPTION => {
                             if subscription.is_some() {
-                                return Err(serde::de::Error::duplicate_field("subscription"));
+                                return Err(serde::de::Error::duplicate_field(SUBSCRIPTION));
                             }
                             subscription = Some(map.next_value()?);
                         }
-                        "result" => {
+                        RESULT => {
                             if result.is_some() {
-                                return Err(serde::de::Error::duplicate_field("result"));
+                                return Err(serde::de::Error::duplicate_field(RESULT));
                             }
                             result = Some(map.next_value()?);
                         }
-                        "error" => {
+                        ERROR => {
                             if error.is_some() {
-                                return Err(serde::de::Error::duplicate_field("error"));
+                                return Err(serde::de::Error::duplicate_field(ERROR));
                             }
                             error = Some(map.next_value()?);
                         }
@@ -87,7 +93,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 if let Some(id) = id {
                     if subscription.is_some() {
                         return Err(serde::de::Error::custom(
-                            "unexpected subscription in pubsub item",
+                            format!("unexpected {} in pubsub item", SUBSCRIPTION),
                         ));
                     }
                     // We need to differentiate error vs result here.
@@ -97,7 +103,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
                         ResponsePayload::Success(result)
                     } else {
                         return Err(serde::de::Error::custom(
-                            "missing `result` or `error` field in response",
+                            format!( "missing `{}` or `{}` field in response", RESULT, ERROR),
                         ));
                     };
                     Ok(PubSubItem::Response(Response { id, payload }))
@@ -105,15 +111,15 @@ impl<'de> Deserialize<'de> for PubSubItem {
                     // Notifications cannot have an error.
                     if error.is_some() {
                         return Err(serde::de::Error::custom(
-                            "unexpected `error` field in subscription notification",
+                           format!( "unexpected `{}` field in {} notification", ERROR, SUBSCRIPTION),
                         ));
                     }
                     // Notifications must have a subscription and a result.
                     if subscription.is_none() {
-                        return Err(serde::de::Error::missing_field("subscription"));
+                        return Err(serde::de::Error::missing_field(SUBSCRIPTION));
                     }
                     if result.is_none() {
-                        return Err(serde::de::Error::missing_field("result"));
+                        return Err(serde::de::Error::missing_field(RESULT));
                     }
 
                     Ok(PubSubItem::Notification(EthNotification {
