@@ -138,7 +138,12 @@ impl futures::stream::Stream for ReadJsonStream {
                     this.items.push(response);
                 }
                 Some(Err(e)) => {
-                    tracing::error!(%e, "IPC response contained invalid JSON");
+                    tracing::error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
+                    tracing::trace!(
+                        buffer = %String::from_utf8_lossy(this.buf.as_ref()),
+                        "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
+                    );
+
                     return Ready(None);
                 }
                 None => {}
