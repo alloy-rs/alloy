@@ -73,7 +73,10 @@ impl IpcBackend {
                                 }
                             },
                             // dispatcher has gone away, or shutdown was received
-                            None => break false,
+                            None => {
+                                tracing::debug!("Frontend has gone away");
+                                break false;
+                            },
                         }
                     }
                     // Read from the socket.
@@ -81,11 +84,12 @@ impl IpcBackend {
                         match item {
                             Some(item) => {
                                 if self.interface.send_to_frontend(item).is_err() {
-                                    // frontend has gone away
+                                    tracing::debug!("Frontend has gone away");
                                     break false;
                                 }
                             }
                             None => {
+                                tracing::error!("Read stream has failed.");
                                 break true;
                             }
                         }
@@ -106,13 +110,12 @@ struct ReadJsonStream {
     #[pin]
     reader: OwnedReadHalf,
     buf: BytesMut,
-    done: bool,
     items: Vec<PubSubItem>,
 }
 
 impl ReadJsonStream {
     fn new(reader: OwnedReadHalf) -> Self {
-        Self { reader, buf: BytesMut::with_capacity(4096), done: false, items: vec![] }
+        Self { reader, buf: BytesMut::with_capacity(4096), items: vec![] }
     }
 }
 
@@ -123,10 +126,6 @@ impl futures::stream::Stream for ReadJsonStream {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        if self.done {
-            return Ready(None);
-        }
-
         let this = self.project();
 
         // Deserialize any buffered items.
@@ -139,8 +138,7 @@ impl futures::stream::Stream for ReadJsonStream {
                     this.items.push(response);
                 }
                 Some(Err(e)) => {
-                    tracing::error!(%e, "Failed to deserialize IPC response");
-                    *this.done = true;
+                    tracing::error!(%e, "IPC response contained invalid JSON");
                     return Ready(None);
                 }
                 None => {}
@@ -156,8 +154,12 @@ impl futures::stream::Stream for ReadJsonStream {
 
         let data = ready!(this.reader.poll_read(cx, this.buf));
         match data {
-            Ok(0) | Err(_) => {
-                *this.done = true;
+            Ok(0) => {
+                tracing::debug!("IPC socket closed");
+                return Ready(None);
+            }
+            Err(e) => {
+                tracing::error!(%e, "Failed to read from IPC socket");
                 return Ready(None);
             }
             _ => {
