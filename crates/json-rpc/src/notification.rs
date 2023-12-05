@@ -1,4 +1,3 @@
-
 use crate::{Response, ResponsePayload};
 use alloy_primitives::U256;
 use serde::{
@@ -104,17 +103,18 @@ impl<'de> Deserialize<'de> for PubSubItem {
                         ResponsePayload::Success(result)
                     } else {
                         return Err(serde::de::Error::custom(format!(
-                                "missing `{}` or `{}` field in response",
-                                RESULT, ERROR
+                            "missing `{}` or `{}` field in response",
+                            RESULT, ERROR
                         )));
                     };
                     Ok(PubSubItem::Response(Response { id, payload }))
                 } else {
                     // Notifications cannot have an error.
                     if error.is_some() {
-                        return Err(serde::de::Error::custom(
-                           format!( "unexpected `{}` field in {} notification", ERROR, SUBSCRIPTION),
-                        ));
+                        return Err(serde::de::Error::custom(format!(
+                            "unexpected `{}` field in {} notification",
+                            ERROR, SUBSCRIPTION
+                        )));
                     }
                     // Notifications must have a subscription and a result.
                     if subscription.is_none() {
