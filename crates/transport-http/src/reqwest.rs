@@ -6,7 +6,7 @@ use tower::Service;
 
 impl Http<reqwest::Client> {
     /// Make a request.
-    fn request(&self, req: RequestPacket) -> TransportFut<'static> {
+    pub fn request(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             let resp = this
