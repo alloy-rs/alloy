@@ -50,9 +50,7 @@ impl RequestPacket {
     pub fn serialize(self) -> serde_json::Result<Box<RawValue>> {
         match self {
             RequestPacket::Single(single) => Ok(single.take_request()),
-            RequestPacket::Batch(batch) => {
-                serde_json::to_string(&batch).and_then(RawValue::from_string)
-            }
+            RequestPacket::Batch(batch) => serde_json::value::to_raw_value(&batch),
         }
     }
 

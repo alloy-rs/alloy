@@ -49,16 +49,13 @@ where
     ///
     /// If serialization of the params fails.
     pub fn box_params(self) -> PartiallySerializedRequest {
-        Request {
-            meta: self.meta,
-            params: RawValue::from_string(serde_json::to_string(&self.params).unwrap()).unwrap(),
-        }
+        Request { meta: self.meta, params: serde_json::value::to_raw_value(&self.params).unwrap() }
     }
 
     /// Serialize the request, including the request parameters.
     pub fn serialize(self) -> serde_json::Result<SerializedRequest> {
-        let request = serde_json::to_string(&self)?;
-        Ok(SerializedRequest { meta: self.meta, request: RawValue::from_string(request)? })
+        let request = serde_json::value::to_raw_value(&self)?;
+        Ok(SerializedRequest { meta: self.meta, request })
     }
 }
 
