@@ -25,6 +25,7 @@ tracing.workspace = true
 alloy-primitives = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
+alloy-transport-ipc = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
@@ -35,6 +36,9 @@ alloy-primitives.workspace = true
 alloy-transport-ws.workspace = true
 test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
+ethers-core = "2.0.10"
+tempfile = "3"
+
 
 [features]
 default = ["reqwest"]
@@ -42,3 +46,4 @@ reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "dep:hyper", "alloy-transport-http/hyper"]
 pubsub = ["dep:tokio", "dep:alloy-pubsub", "dep:alloy-primitives"]
 ws = ["pubsub", "dep:alloy-transport-ws"]
+ipc = ["pubsub", "dep:alloy-transport-ipc"]
