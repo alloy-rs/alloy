@@ -20,9 +20,7 @@ main() {
         echo "$BIN_DIR" >> "$GITHUB_PATH"
     fi
 
-    install_geth &
-    g=$!
-    wait $g $!
+    install_geth
 
     echo ""
     echo "Installed Geth:"
