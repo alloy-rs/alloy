@@ -25,7 +25,6 @@ tracing.workspace = true
 alloy-primitives = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
-alloy-transport-ipc = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
@@ -45,4 +44,3 @@ reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "dep:hyper", "alloy-transport-http/hyper"]
 pubsub = ["dep:tokio", "dep:alloy-pubsub", "dep:alloy-primitives"]
 ws = ["pubsub", "dep:alloy-transport-ws"]
-ipc = ["pubsub", "dep:alloy-transport-ipc"]
