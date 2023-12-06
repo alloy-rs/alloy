@@ -54,7 +54,8 @@ jobs:
         with:
           cache-on-failure: true
       - name: check
-        run: cargo check --workspace --target wasm32-unknown-unknown
+        # Do not run WASM checks on IPC as it doesn't make sense
+        run: cargo check --workspace --target wasm32-unknown-unknown --exclude "alloy-transport-ipc"
 
   feature-checks:
     runs-on: ubuntu-latest
