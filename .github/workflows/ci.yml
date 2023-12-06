@@ -31,6 +31,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+      - name: Install test binaries
+        shell: bash
+        run: ./.github/scripts/install_test_binaries.sh
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
