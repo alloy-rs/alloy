@@ -161,7 +161,7 @@ mod tests {
             );
 
             #[cfg(TODO)]
-            assert!(s.sign_transaction(&TypedTransaction::default()).await.is_err());
+            assert!(s.sign_transaction(&Default::default()).await.is_err());
         }
 
         fn test_unsized_unimplemented_signer_sync<S: SignerSync + ?Sized>(s: &S) {
@@ -176,7 +176,7 @@ mod tests {
             );
 
             #[cfg(TODO)]
-            assert!(s.sign_transaction_sync(&TypedTransaction::default()).is_err());
+            assert!(s.sign_transaction_sync(&Default::default()).is_err());
         }
 
         struct UnimplementedSigner;

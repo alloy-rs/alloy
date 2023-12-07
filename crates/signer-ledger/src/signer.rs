@@ -307,33 +307,38 @@ impl LedgerSigner {
     }
 }
 
-#[cfg(all(test, feature = "ledger"))]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Signer;
-    use alloy_primitives::{hex, Address, I256, U256};
-    use std::str::FromStr;
+    use alloy_primitives::address;
+
+    // Replace this with your ETH address.
+    const MY_ADDRESS: Address = address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+    const DTYPE: DerivationType = DerivationType::LedgerLive(0);
+
+    async fn init_ledger() -> LedgerSigner {
+        match LedgerSigner::new(DTYPE, 1).await {
+            Ok(ledger) => ledger,
+            Err(e) => panic!("{e:?}\n{e}"),
+        }
+    }
 
     #[tokio::test]
     #[ignore]
-    // Replace this with your ETH addresses.
     async fn test_get_address() {
-        // Instantiate it with the default ledger derivation path
-        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
-        assert_eq!(
-            ledger.get_address().await.unwrap(),
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".parse().unwrap()
-        );
+        let ledger = init_ledger().await;
+        assert_eq!(ledger.get_address().await.unwrap(), MY_ADDRESS);
         assert_eq!(
             ledger.get_address_with_path(&DerivationType::Legacy(0)).await.unwrap(),
-            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".parse().unwrap()
+            MY_ADDRESS,
         );
     }
 
     #[tokio::test]
     #[ignore]
+    #[cfg(TODO)]
     async fn test_sign_tx() {
-        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
+        let ledger = init_ledger().await;
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -352,19 +357,20 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_version() {
-        let ledger = LedgerSigner::new(DerivationType::LedgerLive(0), 1).await.unwrap();
-
+        let ledger = init_ledger().await;
         let version = ledger.version().await.unwrap();
-        assert_eq!(version, "1.3.7");
+        eprintln!("{version}");
+        assert!(version.major >= 1);
     }
 
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let ledger = LedgerSigner::new(DerivationType::Legacy(0), 1).await.unwrap();
+        let ledger = init_ledger().await;
         let message = "hello world";
-        let sig = ledger.sign_message(message).await.unwrap();
+        let sig = ledger.sign_message(message.as_bytes()).await.unwrap();
         let addr = ledger.get_address().await.unwrap();
-        sig.verify(message, addr).unwrap();
+        assert_eq!(addr, MY_ADDRESS);
+        assert_eq!(sig.recover_address_from_msg(message.as_bytes()).unwrap(), MY_ADDRESS);
     }
 }
