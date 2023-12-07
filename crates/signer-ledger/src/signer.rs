@@ -311,12 +311,13 @@ impl LedgerSigner {
 mod tests {
     use super::*;
 
+    const DTYPE: DerivationType = DerivationType::LedgerLive(0);
+
     fn my_address() -> Address {
         std::env::var("LEDGER_ADDRESS").unwrap().parse().unwrap()
     }
 
     async fn init_ledger() -> LedgerSigner {
-        const DTYPE: DerivationType = DerivationType::LedgerLive(0);
         match LedgerSigner::new(DTYPE, 1).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
@@ -329,10 +330,7 @@ mod tests {
     async fn test_get_address() {
         let ledger = init_ledger().await;
         assert_eq!(ledger.get_address().await.unwrap(), my_address());
-        assert_eq!(
-            ledger.get_address_with_path(&DerivationType::Legacy(0)).await.unwrap(),
-            my_address(),
-        );
+        assert_eq!(ledger.get_address_with_path(&DTYPE).await.unwrap(), my_address(),);
     }
 
     #[tokio::test]
