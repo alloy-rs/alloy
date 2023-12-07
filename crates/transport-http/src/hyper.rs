@@ -1,7 +1,10 @@
 use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
-use hyper::client::{connect::Connect, Client};
+use hyper::{
+    body::Bytes,
+    client::{connect::Connect, Client},
+};
 use std::task;
 use tower::Service;
 
@@ -16,11 +19,13 @@ where
             let ser = req.serialize().map_err(TransportError::ser_err)?;
 
             // convert the Box<RawValue> into a hyper request<B>
+            let body: Box<str> = ser.into();
+            let body: Box<[u8]> = body.into();
             let req = hyper::Request::builder()
                 .method(hyper::Method::POST)
                 .uri(this.url.as_str())
                 .header("content-type", "application/json")
-                .body(hyper::Body::from(ser.get().to_owned()))
+                .body(hyper::Body::from(Bytes::from(body)))
                 .expect("request parts are valid");
 
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
