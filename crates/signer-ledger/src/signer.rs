@@ -310,13 +310,13 @@ impl LedgerSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::address;
 
-    // Replace this with your ETH address.
-    const MY_ADDRESS: Address = address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-    const DTYPE: DerivationType = DerivationType::LedgerLive(0);
+    fn my_address() -> Address {
+        std::env::var("LEDGER_ADDRESS").unwrap().parse().unwrap()
+    }
 
     async fn init_ledger() -> LedgerSigner {
+        const DTYPE: DerivationType = DerivationType::LedgerLive(0);
         match LedgerSigner::new(DTYPE, 1).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
@@ -327,10 +327,10 @@ mod tests {
     #[ignore]
     async fn test_get_address() {
         let ledger = init_ledger().await;
-        assert_eq!(ledger.get_address().await.unwrap(), MY_ADDRESS);
+        assert_eq!(ledger.get_address().await.unwrap(), my_address());
         assert_eq!(
             ledger.get_address_with_path(&DerivationType::Legacy(0)).await.unwrap(),
-            MY_ADDRESS,
+            my_address(),
         );
     }
 
@@ -370,7 +370,7 @@ mod tests {
         let message = "hello world";
         let sig = ledger.sign_message(message.as_bytes()).await.unwrap();
         let addr = ledger.get_address().await.unwrap();
-        assert_eq!(addr, MY_ADDRESS);
-        assert_eq!(sig.recover_address_from_msg(message.as_bytes()).unwrap(), MY_ADDRESS);
+        assert_eq!(addr, my_address());
+        assert_eq!(sig.recover_address_from_msg(message.as_bytes()).unwrap(), my_address());
     }
 }
