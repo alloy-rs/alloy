@@ -27,6 +27,7 @@ alloy-sol-types = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serial_test.workspace = true
 
 [features]
 eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]

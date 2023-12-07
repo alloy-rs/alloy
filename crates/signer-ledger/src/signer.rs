@@ -324,6 +324,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     #[ignore]
     async fn test_get_address() {
         let ledger = init_ledger().await;
@@ -335,6 +336,17 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
+    #[ignore]
+    async fn test_version() {
+        let ledger = init_ledger().await;
+        let version = ledger.version().await.unwrap();
+        eprintln!("{version}");
+        assert!(version.major >= 1);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
     #[ignore]
     #[cfg(TODO)]
     async fn test_sign_tx() {
@@ -355,15 +367,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn test_version() {
-        let ledger = init_ledger().await;
-        let version = ledger.version().await.unwrap();
-        eprintln!("{version}");
-        assert!(version.major >= 1);
-    }
-
-    #[tokio::test]
+    #[serial_test::serial]
     #[ignore]
     async fn test_sign_message() {
         let ledger = init_ledger().await;
