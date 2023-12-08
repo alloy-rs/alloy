@@ -29,3 +29,9 @@ pub use call::RpcCall;
 
 mod client;
 pub use client::RpcClient;
+
+#[cfg(feature = "ws")]
+pub use alloy_transport_ws::WsConnect;
+
+#[cfg(all(feature = "ipc", not(target_arch = "wasm32")))]
+pub use alloy_transport_ipc::IpcConnect;

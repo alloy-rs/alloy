@@ -31,6 +31,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+      - name: Install test binaries
+        shell: bash
+        run: ./.github/scripts/install_test_binaries.sh
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -54,7 +57,8 @@ jobs:
         with:
           cache-on-failure: true
       - name: check
-        run: cargo check --workspace --target wasm32-unknown-unknown
+        # Do not run WASM checks on IPC as it doesn't make sense
+        run: cargo check --workspace --target wasm32-unknown-unknown --exclude "alloy-transport-ipc"
 
   feature-checks:
     runs-on: ubuntu-latest
@@ -93,7 +97,16 @@ jobs:
           cache-on-failure: true
       - run: cargo doc --workspace --all-features --no-deps --document-private-items
         env:
-          RUSTDOCFLAGS: "--cfg docsrs -D warnings"
+          RUSTDOCFLAGS:
+            --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition
+            --enable-index-page -Zunstable-options
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/doc
+          force_orphan: true
 
   fmt:
     runs-on: ubuntu-latest

@@ -1,7 +1,6 @@
 use crate::{Id, Response, SerializedRequest};
 use serde::{
     de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
-    ser::SerializeSeq,
     Deserialize, Serialize,
 };
 use serde_json::value::RawValue;
@@ -35,14 +34,8 @@ impl Serialize for RequestPacket {
         S: serde::Serializer,
     {
         match self {
-            RequestPacket::Single(single) => single.serialized().serialize(serializer),
-            RequestPacket::Batch(batch) => {
-                let mut seq = serializer.serialize_seq(Some(batch.len()))?;
-                for req in batch {
-                    seq.serialize_element(req.serialized())?;
-                }
-                seq.end()
-            }
+            RequestPacket::Single(single) => single.serialize(serializer),
+            RequestPacket::Batch(batch) => batch.serialize(serializer),
         }
     }
 }
@@ -54,8 +47,11 @@ impl RequestPacket {
     }
 
     /// Serialize the packet as a boxed [`RawValue`].
-    pub fn serialize(&self) -> serde_json::Result<Box<RawValue>> {
-        serde_json::to_string(self).and_then(RawValue::from_string)
+    pub fn serialize(self) -> serde_json::Result<Box<RawValue>> {
+        match self {
+            RequestPacket::Single(single) => Ok(single.take_request()),
+            RequestPacket::Batch(batch) => serde_json::value::to_raw_value(&batch),
+        }
     }
 
     /// Get the request IDs of all subscription requests in the packet.

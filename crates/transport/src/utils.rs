@@ -1,5 +1,8 @@
 use serde::Serialize;
-use serde_json::{self, value::RawValue};
+use serde_json::{
+    self,
+    value::{to_raw_value, RawValue},
+};
 use std::future::Future;
 use url::Url;
 
@@ -11,8 +14,7 @@ pub fn to_json_raw_value<S>(s: &S) -> TransportResult<Box<RawValue>>
 where
     S: Serialize,
 {
-    RawValue::from_string(serde_json::to_string(s).map_err(TransportError::ser_err)?)
-        .map_err(TransportError::ser_err)
+    to_raw_value(s).map_err(TransportError::ser_err)
 }
 
 /// Guess whether the URL is local, based on the hostname.
