@@ -24,7 +24,6 @@ use tempfile::NamedTempFile;
 /// server.add_reply("hello");
 /// // Run the server. The first request will get "hello" as a response.
 /// MockIpcServer::new().spawn();
-///
 /// # Ok(())
 /// # }
 /// ```
