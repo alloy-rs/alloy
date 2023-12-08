@@ -14,8 +14,6 @@ async fn it_makes_a_request() {
 
     let _ = server.spawn().await;
 
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-
     let connector: IpcConnect<_> = path.into();
 
     let client = ClientBuilder::default().pubsub(connector).await.unwrap();
