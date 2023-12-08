@@ -98,13 +98,12 @@ impl Signature {
 
     /// Decodes the `y_parity`, `r`, `s` values without a RLP header.
     pub fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let mut sig =
-            Signature {
-                y_parity: Some(Decodable::decode(buf)?),
-                r: Decodable::decode(buf)?,
-                s: Decodable::decode(buf)?,
-                v: U256::ZERO,
-            };
+        let mut sig = Signature {
+            y_parity: Some(Decodable::decode(buf)?),
+            r: Decodable::decode(buf)?,
+            s: Decodable::decode(buf)?,
+            v: U256::ZERO,
+        };
         sig.v = sig.y_parity.unwrap().into();
         Ok(sig)
     }

@@ -17,8 +17,8 @@ pub const EIP4844_TX_TYPE_ID: u8 = 3;
 /// Transaction Type
 ///
 /// Currently being used as 2-bit type when encoding it to Compact on
-/// crate::TransactionSignedNoHash (see Reth's Compact encoding). Adding more transaction types will break the codec and
-/// database format on Reth.
+/// crate::TransactionSignedNoHash (see Reth's Compact encoding). Adding more transaction types will
+/// break the codec and database format on Reth.
 ///
 /// Other required changes when adding a new type can be seen on [PR#3953](https://github.com/paradigmxyz/reth/pull/3953/files).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]

@@ -13,7 +13,7 @@ use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResu
 use alloy_transport_http::Http;
 use auto_impl::auto_impl;
 use reqwest::Client;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
@@ -239,11 +239,7 @@ pub trait TempProvider: Send + Sync {
     where
         Self: Sync;
 
-    async fn raw_request<P, R>(
-        &self,
-        method: &'static str,
-        params: P,
-    ) -> TransportResult<R>
+    async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
     where
         P: Serialize + Send + Sync + Clone,
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
@@ -286,10 +282,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getTransactionCount",
-                (
-                    address,
-                    tag.unwrap_or(BlockNumberOrTag::Latest.into()),
-                ),
+                (address, tag.unwrap_or(BlockNumberOrTag::Latest.into())),
             )
             .await
     }
@@ -305,10 +298,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getBalance",
-                (
-                    address,
-                    tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
-                ),
+                (address, tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))),
             )
             .await
     }
@@ -319,9 +309,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         hash: BlockHash,
         full: bool,
     ) -> TransportResult<Option<Block>> {
-        self.inner
-            .prepare("eth_getBlockByHash", (hash, full))
-            .await
+        self.inner.prepare("eth_getBlockByHash", (hash, full)).await
     }
 
     /// Gets a block by [BlockNumberOrTag], with full transactions or only hashes.
@@ -330,12 +318,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         number: B,
         full: bool,
     ) -> TransportResult<Option<Block>> {
-        self.inner
-            .prepare(
-                "eth_getBlockByNumber",
-                (number.into(), full),
-            )
-            .await
+        self.inner.prepare("eth_getBlockByNumber", (number.into(), full)).await
     }
 
     /// Gets the chain ID.
@@ -353,11 +336,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getStorageAt",
-                (
-                    address,
-                    key,
-                    tag.unwrap_or(BlockNumberOrTag::Latest.into()),
-                ),
+                (address, key, tag.unwrap_or(BlockNumberOrTag::Latest.into())),
             )
             .await
     }
@@ -368,19 +347,12 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         address: Address,
         tag: B,
     ) -> TransportResult<Bytes> {
-        self.inner
-            .prepare("eth_getCode", (address, tag.into()))
-            .await
+        self.inner.prepare("eth_getCode", (address, tag.into())).await
     }
 
     /// Gets a [Transaction] by its [TxHash].
     pub async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction> {
-        self.inner
-            .prepare(
-                "eth_getTransactionByHash",
-                (hash,),
-            )
-            .await
+        self.inner.prepare("eth_getTransactionByHash", (hash,)).await
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
@@ -416,14 +388,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         reward_percentiles: &[f64],
     ) -> TransportResult<FeeHistory> {
         self.inner
-            .prepare(
-                "eth_feeHistory",
-                (
-                    block_count,
-                    last_block.into(),
-                    reward_percentiles,
-                ),
-            )
+            .prepare("eth_feeHistory", (block_count, last_block.into(), reward_percentiles))
             .await
     }
 
@@ -447,20 +412,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         let tag = tag.into();
         match tag {
             BlockId::Hash(hash) => {
-                self.inner
-                    .prepare(
-                        "eth_getUncleByBlockHashAndIndex",
-                        (hash, idx),
-                    )
-                    .await
+                self.inner.prepare("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
             }
             BlockId::Number(number) => {
-                self.inner
-                    .prepare(
-                        "eth_getUncleByBlockNumberAndIndex",
-                        (number, idx),
-                    )
-                    .await
+                self.inner.prepare("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
             }
         }
     }
@@ -473,13 +428,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
         self.inner
-            .prepare(
-                "eth_call",
-                (
-                    tx,
-                    block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest)),
-                ),
-            )
+            .prepare("eth_call", (tx, block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))))
             .await
     }
 
@@ -494,7 +443,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         }
     }
 
-   /// Sends an already-signed transaction.
+    /// Sends an already-signed transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
     where
         Self: Sync,
@@ -555,11 +504,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_getProof",
-                (
-                    address,
-                    keys,
-                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
-                ),
+                (address, keys, block.unwrap_or(BlockNumberOrTag::Latest.into())),
             )
             .await
     }
@@ -575,10 +520,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner
             .prepare(
                 "eth_createAccessList",
-                (
-                    request,
-                    block.unwrap_or(BlockNumberOrTag::Latest.into()),
-                ),
+                (request, block.unwrap_or(BlockNumberOrTag::Latest.into())),
             )
             .await
     }
@@ -602,12 +544,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare(
-                "debug_traceTransaction",
-                (hash, trace_options),
-            )
-            .await
+        self.inner.prepare("debug_traceTransaction", (hash, trace_options)).await
     }
 
     async fn trace_block(
@@ -622,15 +559,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     /// Sends a raw request with the methods and params specified to the internal connection,
     /// and returns the result.
-    async fn raw_request<P, R>(
-        &self,
-        method: &'static str,
-        params: P,
-    ) -> TransportResult<R>
+    async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
     where
         P: Serialize + Send + Sync + Clone,
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
-        Self: Sync
+        Self: Sync,
     {
         let res: R = self.inner.prepare(method, &params).await?;
         Ok(res)
@@ -641,9 +574,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         Self: Sync,
     {
-        self.inner
-            .prepare("anvil_setCode", (address, code))
-            .await
+        self.inner.prepare("anvil_setCode", (address, code)).await
     }
 }
 
@@ -681,7 +612,7 @@ mod providers_test {
         utils,
     };
     use alloy_primitives::{address, b256, U256, U64};
-    use alloy_rpc_types::{BlockNumberOrTag, Filter, Block};
+    use alloy_rpc_types::{Block, BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
 
     #[tokio::test]
@@ -734,7 +665,13 @@ mod providers_test {
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
-        let block: Block = provider.raw_request::<(alloy_primitives::FixedBytes<32>, bool), Block>("eth_getBlockByHash", (hash, true)).await.unwrap();
+        let block: Block = provider
+            .raw_request::<(alloy_primitives::FixedBytes<32>, bool), Block>(
+                "eth_getBlockByHash",
+                (hash, true),
+            )
+            .await
+            .unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
     }
 

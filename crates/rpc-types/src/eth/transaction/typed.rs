@@ -3,11 +3,14 @@
 //! transaction deserialized from the json input of an RPC call. Depending on what fields are set,
 //! it can be converted into the container type [`TypedTransactionRequest`].
 
-use std::{mem, cmp::Ordering};
+use std::{cmp::Ordering, mem};
 
 use crate::{eth::transaction::AccessList, Signature, TxType};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U128, U256, U64};
-use alloy_rlp::{bytes, length_of_length, BufMut, Decodable, Encodable, Error as RlpError, Header, EMPTY_LIST_CODE, Buf};
+use alloy_rlp::{
+    bytes, length_of_length, Buf, BufMut, Decodable, Encodable, Error as RlpError, Header,
+    EMPTY_LIST_CODE,
+};
 use serde::{Deserialize, Serialize};
 
 /// Container type for various Ethereum transaction requests
@@ -37,13 +40,13 @@ impl Encodable for TypedTransactionRequest {
                 let id = 1_u8;
                 id.encode(out);
                 tx.encode(out)
-            },
+            }
             // For EIP1559, it's 2.
             TypedTransactionRequest::EIP1559(tx) => {
                 let id = 2_u8;
                 id.encode(out);
                 tx.encode(out)
-            },
+            }
         }
     }
 
@@ -75,23 +78,25 @@ impl Decodable for TypedTransactionRequest {
                 // consumed.
                 // Otherwise, header decoding will succeed but nothing is consumed.
                 let _header = Header::decode(buf)?;
-                let tx_type = *buf.first().ok_or(RlpError::Custom(
-                    "typed tx cannot be decoded from an empty slice",
-                ))?;
+                let tx_type = *buf
+                    .first()
+                    .ok_or(RlpError::Custom("typed tx cannot be decoded from an empty slice"))?;
                 if tx_type == 0x01 {
                     buf.advance(1);
-                    EIP2930TransactionRequest::decode(buf)
-                        .map(TypedTransactionRequest::EIP2930)
+                    EIP2930TransactionRequest::decode(buf).map(TypedTransactionRequest::EIP2930)
                 } else if tx_type == 0x02 {
                     buf.advance(1);
-                    EIP1559TransactionRequest::decode(buf)
-                        .map(TypedTransactionRequest::EIP1559)
+                    EIP1559TransactionRequest::decode(buf).map(TypedTransactionRequest::EIP1559)
                 } else {
                     Err(RlpError::Custom("invalid tx type"))
                 }
-            },
-            Ordering::Equal => Err(RlpError::Custom("an empty list is not a valid transaction encoding")),
-            Ordering::Greater => LegacyTransactionRequest::decode(buf).map(TypedTransactionRequest::Legacy),
+            }
+            Ordering::Equal => {
+                Err(RlpError::Custom("an empty list is not a valid transaction encoding"))
+            }
+            Ordering::Greater => {
+                LegacyTransactionRequest::decode(buf).map(TypedTransactionRequest::Legacy)
+            }
         }
     }
 }
@@ -119,12 +124,12 @@ impl Encodable for LegacyTransactionRequest {
     }
 
     fn length(&self) -> usize {
-        self.nonce.length() +
-        self.gas_price.length() +
-        self.gas_limit.length() +
-        self.kind.length() +
-        self.value.length() +
-        self.input.0.length()
+        self.nonce.length()
+            + self.gas_price.length()
+            + self.gas_limit.length()
+            + self.kind.length()
+            + self.value.length()
+            + self.input.0.length()
     }
 }
 
@@ -259,14 +264,14 @@ impl Encodable for EIP2930TransactionRequest {
     }
 
     fn length(&self) -> usize {
-        self.chain_id.length() +
-        self.nonce.length() +
-        self.gas_price.length() +
-        self.gas_limit.length() +
-        self.kind.length() +
-        self.value.length() +
-        self.input.0.length() +
-        self.access_list.length()
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.gas_price.length()
+            + self.gas_limit.length()
+            + self.kind.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
     }
 }
 
@@ -443,15 +448,15 @@ impl Encodable for EIP1559TransactionRequest {
     }
 
     fn length(&self) -> usize {
-        self.chain_id.length() +
-        self.nonce.length() +
-        self.max_priority_fee_per_gas.length() +
-        self.max_fee_per_gas.length() +
-        self.gas_limit.length() +
-        self.kind.length() +
-        self.value.length() +
-        self.input.0.length() +
-        self.access_list.length()
+        self.chain_id.length()
+            + self.nonce.length()
+            + self.max_priority_fee_per_gas.length()
+            + self.max_fee_per_gas.length()
+            + self.gas_limit.length()
+            + self.kind.length()
+            + self.value.length()
+            + self.input.0.length()
+            + self.access_list.length()
     }
 }
 

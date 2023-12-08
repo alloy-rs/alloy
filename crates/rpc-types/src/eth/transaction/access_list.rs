@@ -1,7 +1,7 @@
-use std::mem;
+use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
-use alloy_primitives::{Address, U256, B256};
 use serde::{Deserialize, Serialize};
+use std::mem;
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
@@ -46,10 +46,7 @@ impl AccessList {
         self.0.into_iter().map(|item| {
             (
                 item.address,
-                item.storage_keys
-                    .into_iter()
-                    .map(|slot| U256::from_be_bytes(slot.0))
-                    .collect(),
+                item.storage_keys.into_iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
             )
         })
     }
@@ -59,10 +56,7 @@ impl AccessList {
         self.0.iter().map(|item| {
             (
                 item.address,
-                item.storage_keys
-                    .iter()
-                    .map(|slot| U256::from_be_bytes(slot.0))
-                    .collect(),
+                item.storage_keys.iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
             )
         })
     }
