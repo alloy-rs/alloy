@@ -71,10 +71,11 @@ impl MockIpcServer {
     /// Run the server.
     pub async fn spawn(mut self) {
         tokio::spawn(async move {
-            let socket =
-                interprocess::local_socket::tokio::LocalSocketStream::connect(self.path.into_temp_path().to_path_buf())
-                    .await
-                    .unwrap();
+            let socket = interprocess::local_socket::tokio::LocalSocketStream::connect(
+                self.path.into_temp_path().to_path_buf(),
+            )
+            .await
+            .unwrap();
 
             let (mut reader, mut writer) = socket.into_split();
 
