@@ -39,7 +39,7 @@ alloy-transport-ws.workspace = true
 test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 ethers-core = "2.0.10"
-alloy-transport-ipc.workspace = true
+alloy-transport-ipc = { workspace = true, features = ["mock"] }
 tempfile = "3"
 
 [features]
