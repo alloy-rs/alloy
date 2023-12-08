@@ -30,6 +30,9 @@ reqwest = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+alloy-transport-ipc = { workspace = true, optional = true }
+
 [dev-dependencies]
 alloy-primitives.workspace = true
 alloy-transport-ws.workspace = true
@@ -42,3 +45,4 @@ reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "dep:hyper", "alloy-transport-http/hyper"]
 pubsub = ["dep:tokio", "dep:alloy-pubsub", "dep:alloy-primitives"]
 ws = ["pubsub", "dep:alloy-transport-ws"]
+ipc = ["pubsub", "dep:alloy-transport-ipc"]
