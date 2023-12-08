@@ -20,6 +20,8 @@ pub use connect::IpcConnect;
 
 #[cfg(feature = "mock")]
 pub mod mock;
+#[cfg(feature = "mock")]
+pub use mock::MockIpcServer;
 
 use std::task::Poll::{Pending, Ready};
 

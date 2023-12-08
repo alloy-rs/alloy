@@ -7,6 +7,27 @@ use std::{collections::VecDeque, path::PathBuf};
 use tempfile::NamedTempFile;
 
 /// Mock IPC server.
+///
+/// Currently unix socket only, due to use of namedtempfile.
+///
+/// ## Example:
+///
+/// ```
+/// use alloy_transport_ipc::MockIpcServer;
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // Instantiate a new mock server.
+/// let mut server = MockIpcServer::new();
+/// // Get the path to the socket.
+/// let path = server.path();
+/// // Add a reply to the server. Can also use `add_raw_reply` to add a raw
+/// // byte vector, or `add_response` to add a json-rpc response.
+/// server.add_reply("hello");
+/// // Run the server. The first request will get "hello" as a response.
+/// MockIpcServer::new().spawn();
+///
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct MockIpcServer {
     /// Replies to send, in order
@@ -43,19 +64,21 @@ impl MockIpcServer {
     }
 
     /// Run the server.
-    pub async fn run(mut self) {
-        let socket =
-            interprocess::local_socket::tokio::LocalSocketStream::connect(self.path.path())
-                .await
-                .unwrap();
+    pub async fn spawn(mut self) {
+        tokio::spawn(async move {
+            let socket =
+                interprocess::local_socket::tokio::LocalSocketStream::connect(self.path.path())
+                    .await
+                    .unwrap();
 
-        let (mut reader, mut writer) = socket.into_split();
+            let (mut reader, mut writer) = socket.into_split();
 
-        let mut buf = [0u8; 4096];
-        loop {
-            reader.read(&mut buf).await.unwrap();
-            let reply = self.replies.pop_front().unwrap();
-            writer.write_all(&reply).await.unwrap();
-        }
+            let mut buf = [0u8; 4096];
+            loop {
+                reader.read(&mut buf).await.unwrap();
+                let reply = self.replies.pop_front().unwrap_or_default();
+                writer.write_all(&reply).await.unwrap();
+            }
+        });
     }
 }
