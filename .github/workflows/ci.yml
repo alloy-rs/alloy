@@ -31,6 +31,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+      - name: Install test binaries
+        shell: bash
+        run: ./.github/scripts/install_test_binaries.sh
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -54,7 +57,8 @@ jobs:
         with:
           cache-on-failure: true
       - name: check
-        run: cargo check --workspace --target wasm32-unknown-unknown
+        # Do not run WASM checks on IPC as it doesn't make sense
+        run: cargo check --workspace --target wasm32-unknown-unknown --exclude "alloy-transport-ipc"
 
   feature-checks:
     runs-on: ubuntu-latest

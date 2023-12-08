@@ -131,7 +131,7 @@ where
 #[cfg(feature = "pubsub")]
 mod pubsub_impl {
     use super::*;
-    use alloy_pubsub::PubSubFrontend;
+    use alloy_pubsub::{PubSubConnect, PubSubFrontend};
     use tokio::sync::broadcast;
 
     impl RpcClient<PubSubFrontend> {
@@ -141,6 +141,16 @@ mod pubsub_impl {
             id: alloy_primitives::U256,
         ) -> broadcast::Receiver<Box<serde_json::value::RawValue>> {
             self.transport.get_subscription(id).await.unwrap()
+        }
+
+        /// Connect to a transport via a [`PubSubConnect`] implementor.
+        pub async fn connect_pubsub<C>(
+            connect: C,
+        ) -> Result<RpcClient<PubSubFrontend>, TransportError>
+        where
+            C: PubSubConnect,
+        {
+            ClientBuilder::default().pubsub(connect).await
         }
     }
 }

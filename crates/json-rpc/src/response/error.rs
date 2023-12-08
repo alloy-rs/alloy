@@ -1,6 +1,6 @@
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
-    Deserialize, Deserializer,
+    Deserialize, Deserializer, Serialize,
 };
 use serde_json::value::RawValue;
 use std::{borrow::Borrow, fmt, marker::PhantomData};
@@ -10,7 +10,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData};
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
 /// included in the `message` field of the response payload.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ErrorPayload<ErrData = Box<RawValue>> {
     /// The error code.
     pub code: i64,

@@ -5,3 +5,6 @@ mod http;
 
 #[cfg(feature = "pubsub")]
 mod ws;
+
+#[cfg(feature = "pubsub")]
+mod ipc;
