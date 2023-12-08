@@ -36,6 +36,12 @@ pub struct MockIpcServer {
     path: NamedTempFile,
 }
 
+impl Default for MockIpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockIpcServer {
     /// Create a new mock IPC server.
     pub fn new() -> Self {
@@ -75,7 +81,7 @@ impl MockIpcServer {
 
             let mut buf = [0u8; 4096];
             loop {
-                reader.read(&mut buf).await.unwrap();
+                let _ = reader.read(&mut buf).await.unwrap();
                 let reply = self.replies.pop_front().unwrap_or_default();
                 writer.write_all(&reply).await.unwrap();
             }
