@@ -304,7 +304,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
-    pub async fn get_block_by_hash(
+    async fn get_block_by_hash(
         &self,
         hash: BlockHash,
         full: bool,
@@ -351,7 +351,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets a [Transaction] by its [TxHash].
-    pub async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction> {
+    async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction> {
         self.inner.prepare("eth_getTransactionByHash", (hash,)).await
     }
 
