@@ -16,6 +16,7 @@ alloy-primitives.workspace = true
 # TODO
 # alloy-rpc-types.workspace = true
 
+auto_impl.workspace = true
 elliptic-curve.workspace = true
 k256.workspace = true
 rand.workspace = true

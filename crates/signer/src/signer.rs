@@ -1,6 +1,7 @@
 use crate::{Result, Signature};
 use alloy_primitives::{eip191_hash_message, Address, B256};
 use async_trait::async_trait;
+use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
@@ -15,6 +16,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// Synchronous signers should implement both this trait and [`SignerSync`].
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[auto_impl(&mut, Box)]
 pub trait Signer: Send + Sync {
     /// Signs the given hash.
     async fn sign_hash(&self, hash: &B256) -> Result<Signature>;
@@ -62,6 +64,7 @@ pub trait Signer: Send + Sync {
     /// Sets the signer's chain ID and returns `self`.
     #[inline]
     #[must_use]
+    #[auto_impl(keep_default_for(&mut, Box))]
     fn with_chain_id(mut self, chain_id: u64) -> Self
     where
         Self: Sized,
@@ -80,6 +83,7 @@ pub trait Signer: Send + Sync {
 ///
 /// Synchronous signers should also implement [`Signer`], as they are always able to by delegating
 /// the asynchronous methods to the synchronous ones.
+#[auto_impl(&, &mut, Box, Rc, Arc)]
 pub trait SignerSync {
     /// Signs the given hash.
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature>;
