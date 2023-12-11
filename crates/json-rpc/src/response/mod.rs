@@ -1,7 +1,8 @@
 use crate::common::Id;
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
-    Deserialize, Deserializer,
+    ser::SerializeMap,
+    Deserialize, Deserializer, Serialize,
 };
 use serde_json::value::RawValue;
 use std::{borrow::Borrow, fmt, marker::PhantomData};
@@ -221,6 +222,30 @@ where
         }
 
         deserializer.deserialize_map(JsonRpcResponseVisitor(PhantomData))
+    }
+}
+
+impl<Payload, ErrData> Serialize for Response<Payload, ErrData>
+where
+    Payload: Serialize,
+    ErrData: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("jsonrpc", "2.0")?;
+        map.serialize_entry("id", &self.id)?;
+        match &self.payload {
+            ResponsePayload::Success(result) => {
+                map.serialize_entry("result", result)?;
+            }
+            ResponsePayload::Failure(error) => {
+                map.serialize_entry("error", error)?;
+            }
+        }
+        map.end()
     }
 }
 

@@ -28,6 +28,7 @@ alloy-signer-ledger = { version = "0.1.0", path = "crates/signer-ledger" }
 alloy-signer-trezor = { version = "0.1.0", path = "crates/signer-trezor" }
 alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
+alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
 
 alloy-primitives = { version = "0.5.1", default-features = false, features = ["std"] }
