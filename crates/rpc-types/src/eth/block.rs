@@ -181,7 +181,17 @@ pub struct Header {
     /// Extra data
     pub extra_data: Bytes,
     /// Mix Hash
-    pub mix_hash: B256,
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoF).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
+    pub mix_hash: Option<B256>,
     /// Nonce
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
@@ -852,7 +862,7 @@ mod tests {
                 logs_bloom: Bloom::default(),
                 timestamp: U256::from(12),
                 difficulty: U256::from(13),
-                mix_hash: B256::with_last_byte(14),
+                mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
                 base_fee_per_gas: Some(U256::from(20)),
                 blob_gas_used: None,
@@ -894,7 +904,7 @@ mod tests {
                 logs_bloom: Bloom::default(),
                 timestamp: U256::from(12),
                 difficulty: U256::from(13),
-                mix_hash: B256::with_last_byte(14),
+                mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
                 base_fee_per_gas: Some(U256::from(20)),
                 blob_gas_used: None,
