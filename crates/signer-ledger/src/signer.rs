@@ -57,7 +57,7 @@ impl Signer for LedgerSigner {
             .map_err(alloy_signer::Error::other)
     }
 
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(&tx).await.map_err(alloy_signer::Error::other)
@@ -178,7 +178,7 @@ impl LedgerSigner {
     }
 
     /// Signs an Ethereum transaction (requires confirmation on the ledger)
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, LedgerError> {
         let mut tx_with_chain = tx.clone();
         if tx_with_chain.chain_id().is_none() {
@@ -280,8 +280,7 @@ impl LedgerSigner {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
 
-        // TODO: don't unwrap
-        let sig = Signature::from_bytes(&data[1..], data[0] as u64).unwrap();
+        let sig = Signature::from_bytes(&data[1..], data[0] as u64)?;
         debug!(?sig, "Received signature from device");
         Ok(sig)
     }
@@ -346,7 +345,7 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     #[ignore]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_tx() {
         let ledger = init_ledger().await;
 

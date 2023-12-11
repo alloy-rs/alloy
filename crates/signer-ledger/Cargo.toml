@@ -18,6 +18,7 @@ alloy-signer.workspace = true
 async-trait.workspace = true
 coins-ledger = { version = "0.9.1", default-features = false }
 futures-util.workspace = true
+k256.workspace = true
 semver.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

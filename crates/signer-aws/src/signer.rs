@@ -100,7 +100,7 @@ impl Signer for AwsSigner {
         self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
     }
 
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     #[instrument(err)]
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         let mut tx_with_chain = tx.clone();

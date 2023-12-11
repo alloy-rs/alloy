@@ -28,7 +28,7 @@ pub trait Signer: Send + Sync {
     }
 
     /// Signs the transaction.
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
     async fn sign_transaction(&self, message: &TypedTransaction) -> Result<Signature> {
         self.sign_hash(&message.sighash()).await
@@ -93,7 +93,7 @@ pub trait SignerSync {
     }
 
     /// Signs the transaction.
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
     fn sign_transaction_sync(&self, message: &TypedTransaction) -> Result<Signature> {
         self.sign_hash_sync(&message.sighash())
@@ -160,7 +160,7 @@ mod tests {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
-            #[cfg(TODO)]
+            #[cfg(TODO)] // TODO: TypedTransaction
             assert!(s.sign_transaction(&Default::default()).await.is_err());
         }
 
@@ -175,7 +175,7 @@ mod tests {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
-            #[cfg(TODO)]
+            #[cfg(TODO)] // TODO: TypedTransaction
             assert!(s.sign_transaction_sync(&Default::default()).is_err());
         }
 

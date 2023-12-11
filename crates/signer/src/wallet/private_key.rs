@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn signs_tx() {
         // retrieved test vector from:
         // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn signs_tx_empty_chain_id() {
         // retrieved test vector from:
         // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     fn signs_tx_empty_chain_id_sync() {
         let chain_id = 1337u64;
         // retrieved test vector from:

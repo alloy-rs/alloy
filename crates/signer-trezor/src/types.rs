@@ -76,7 +76,7 @@ impl TrezorTransaction {
         trimmed_value[value.leading_zeros() / 8..].to_vec()
     }
 
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     pub fn load(tx: &TypedTransaction) -> Result<Self, TrezorError> {
         let to: String = match tx.to() {
             Some(v) => match v {

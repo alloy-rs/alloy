@@ -5,6 +5,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use alloy_primitives::hex;
+use k256::ecdsa;
 use std::fmt;
 use thiserror::Error;
 
@@ -35,15 +36,18 @@ pub enum LedgerError {
     /// Underlying Ledger transport error.
     #[error(transparent)]
     LedgerError(#[from] coins_ledger::errors::LedgerError),
-    /// Device response was unexpectedly none
+    /// Device response was unexpectedly empty.
     #[error("received an unexpected empty response")]
     UnexpectedNullResponse,
-    #[error(transparent)]
     /// [`hex`](mod@hex) error.
-    HexError(#[from] hex::FromHexError),
     #[error(transparent)]
+    HexError(#[from] hex::FromHexError),
     /// [`semver`] error.
+    #[error(transparent)]
     SemVerError(#[from] semver::Error),
+    /// [`ecdsa`] error.
+    #[error(transparent)]
+    Ecdsa(#[from] ecdsa::Error),
     /// Thrown when trying to sign using EIP-712 with an incompatible Ledger Ethereum app.
     #[error("Ledger Ethereum app requires at least version {0}")]
     UnsupportedAppVersion(&'static str),

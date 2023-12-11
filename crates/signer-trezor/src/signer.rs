@@ -46,7 +46,7 @@ impl Signer for TrezorSigner {
         self.sign_message_(message).await.map_err(alloy_signer::Error::other)
     }
 
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
     async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
         self.sign_tx(tx).await
@@ -141,7 +141,7 @@ impl TrezorSigner {
     }
 
     /// Signs an Ethereum transaction (requires confirmation on the Trezor)
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
 
@@ -247,7 +247,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_tx() {
         let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
@@ -267,7 +267,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_big_data_tx() {
         let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
@@ -286,7 +286,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_empty_txes() {
         // Contract creation (empty `to`), requires data.
         // To test without the data field, we need to specify a `to` address.
@@ -322,7 +322,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    #[cfg(TODO)]
+    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_eip1559_tx() {
         let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
 
