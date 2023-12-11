@@ -23,13 +23,12 @@ pub mod mock;
 #[cfg(feature = "mock")]
 pub use mock::MockIpcServer;
 
-use std::task::Poll::{Pending, Ready};
-
-use alloy_json_rpc::PubSubItem;
 use bytes::{Buf, BytesMut};
-use futures::{io::BufReader, ready, AsyncBufRead, AsyncRead, AsyncWriteExt, StreamExt};
+use futures::{ready, AsyncRead, AsyncWriteExt, StreamExt};
 use interprocess::local_socket::{tokio::LocalSocketStream, ToLocalSocketName};
+use std::task::Poll::Ready;
 use tokio::select;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 type Result<T> = std::result::Result<T, std::io::Error>;
 
@@ -113,11 +112,9 @@ impl IpcBackend {
 pub struct ReadJsonStream<T> {
     /// The underlying reader.
     #[pin]
-    reader: BufReader<T>,
-    /// A buffer of bytes read from the reader.
+    reader: tokio_util::compat::Compat<T>,
+    /// A buffer for reading data from the reader.
     buf: BytesMut,
-    /// A buffer of items deserialized from the reader.
-    items: Vec<PubSubItem>,
 }
 
 impl<T> ReadJsonStream<T>
@@ -125,7 +122,7 @@ where
     T: AsyncRead,
 {
     fn new(reader: T) -> Self {
-        Self { reader: BufReader::new(reader), buf: BytesMut::with_capacity(4096), items: vec![] }
+        Self { reader: reader.compat(), buf: BytesMut::with_capacity(4096) }
     }
 }
 
@@ -148,19 +145,23 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
-        let this = self.project();
+        use tokio_util::io::poll_read_buf;
 
-        // Deserialize any buffered items.
-        if !this.buf.is_empty() {
-            this.reader.consume(this.buf.len());
+        let mut this = self.project();
 
+        loop {
+            // try decoding from the buffer
             tracing::debug!(buf_len = this.buf.len(), "Deserializing buffered IPC data");
             let mut de = serde_json::Deserializer::from_slice(this.buf.as_ref()).into_iter();
 
             let item = de.next();
+
+            // advance the buffer
+            this.buf.advance(de.byte_offset());
+
             match item {
                 Some(Ok(response)) => {
-                    this.items.push(response);
+                    return Ready(Some(response));
                 }
                 Some(Err(e)) => {
                     tracing::error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
@@ -171,34 +172,20 @@ where
 
                     return Ready(None);
                 }
-                None => {}
+                None => {
+                    // nothing decoded
+                }
             }
-            this.buf.advance(de.byte_offset());
-            cx.waker().wake_by_ref();
-            return Pending;
-        }
 
-        // Return any buffered items, rewaking.
-        if !this.items.is_empty() {
-            // may have more work!
-            cx.waker().wake_by_ref();
-            return Ready(this.items.pop());
-        }
-
-        tracing::debug!(buf_len = this.buf.len(), "Polling IPC socket for data");
-
-        let data = ready!(this.reader.poll_fill_buf(cx));
-        match data {
-            Err(e) => {
-                tracing::error!(%e, "Failed to read from IPC socket, shutting down");
-                Ready(None)
-            }
-            Ok(data) => {
-                tracing::debug!(data_len = data.len(), "Read data from IPC socket");
-                this.buf.extend_from_slice(data);
-                // wake task to run deserialization
-                cx.waker().wake_by_ref();
-                Pending
+            // read more data into the buffer
+            match ready!(poll_read_buf(this.reader.as_mut(), cx, &mut this.buf)) {
+                Ok(data_len) => {
+                    tracing::debug!(%data_len, "Read data from IPC socket");
+                }
+                Err(e) => {
+                    tracing::error!(%e, "Failed to read from IPC socket, shutting down");
+                    return Ready(None);
+                }
             }
         }
     }
