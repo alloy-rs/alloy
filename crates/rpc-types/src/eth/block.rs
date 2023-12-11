@@ -1,5 +1,5 @@
 //! Contains types that represent ethereum types when used in RPC
-use crate::{Transaction, Withdrawal};
+use crate::{other::OtherFields, Transaction, Withdrawal};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
@@ -117,24 +117,27 @@ pub enum BlockError {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
-    /// Header of the block
+    /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
     /// Total difficulty, this field is None only if representing
     /// an Uncle block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,
-    /// Uncles' hashes
+    /// Uncles' hashes.
     pub uncles: Vec<B256>,
-    /// Transactions
+    /// Transactions.
     #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
     #[serde(default = "BlockTransactions::uncle")]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     pub size: Option<U256>,
-    /// Withdrawals in the block
+    /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<Vec<Withdrawal>>,
+    /// Support for arbitrary additional fields.
+    #[serde(flatten)]
+    pub other: OtherFields,
 }
 
 impl Block {
@@ -861,6 +864,7 @@ mod tests {
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -902,6 +906,7 @@ mod tests {
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
             withdrawals: None,
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(

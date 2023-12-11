@@ -1,4 +1,4 @@
-use crate::Log;
+use crate::{other::OtherFields, Log};
 use alloy_primitives::{Address, Bloom, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
@@ -51,4 +51,7 @@ pub struct TransactionReceipt {
     /// EIP-2718 Transaction type, Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type")]
     pub transaction_type: U8,
+    /// Support for arbitrary additional fields.
+    #[serde(flatten)]
+    pub other: OtherFields,
 }
