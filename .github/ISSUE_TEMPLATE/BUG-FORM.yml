@@ -16,10 +16,13 @@ body:
       multiple: true
       options:
         - json-rpc
-        - transports
         - networks
         - providers
+        - pubsub
+        - rpc-client
         - rpc-types
+        - signers
+        - transports
     validations:
       required: true
   - type: input

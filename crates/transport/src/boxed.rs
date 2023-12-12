@@ -1,6 +1,6 @@
 use crate::{Transport, TransportError, TransportFut};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use std::fmt::Debug;
+use std::fmt;
 use tower::Service;
 
 /// A boxed, Clone-able [`Transport`] trait object.
@@ -22,17 +22,14 @@ pub struct BoxTransport {
 
 impl BoxTransport {
     /// Instantiate a new box transport from a suitable transport.
-    pub fn new<T>(inner: T) -> Self
-    where
-        T: Transport + Clone + Send + Sync,
-    {
+    pub fn new<T: Transport + Clone + Send + Sync>(inner: T) -> Self {
         Self { inner: Box::new(inner) }
     }
 }
 
-impl Debug for BoxTransport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BoxTransport").finish()
+impl fmt::Debug for BoxTransport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BoxTransport").finish_non_exhaustive()
     }
 }
 

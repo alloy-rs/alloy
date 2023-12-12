@@ -1,0 +1,34 @@
+[package]
+name = "alloy-signer-ledger"
+description = "Ethereum Ledger signer"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-signer.workspace = true
+
+async-trait.workspace = true
+coins-ledger = { version = "0.9.1", default-features = false }
+futures-util.workspace = true
+k256.workspace = true
+semver.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# eip712
+alloy-sol-types = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serial_test.workspace = true
+
+[features]
+eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]
