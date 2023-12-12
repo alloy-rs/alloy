@@ -260,6 +260,11 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         self
     }
 
+    pub fn with_rpc_client(mut self, client: RpcClient<T>) -> Self {
+        self.inner = client;
+        self
+    }
+
     pub fn inner(&self) -> &RpcClient<T> {
         &self.inner
     }
