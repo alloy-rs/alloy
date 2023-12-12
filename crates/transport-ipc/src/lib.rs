@@ -115,6 +115,8 @@ pub struct ReadJsonStream<T> {
     reader: tokio_util::compat::Compat<T>,
     /// A buffer for reading data from the reader.
     buf: BytesMut,
+    /// Whether the buffer has been drained.
+    drained: bool,
 }
 
 impl<T> ReadJsonStream<T>
@@ -122,7 +124,7 @@ where
     T: AsyncRead,
 {
     fn new(reader: T) -> Self {
-        Self { reader: reader.compat(), buf: BytesMut::with_capacity(4096) }
+        Self { reader: reader.compat(), buf: BytesMut::with_capacity(4096), drained: true }
     }
 }
 
@@ -150,30 +152,33 @@ where
         let mut this = self.project();
 
         loop {
-            // try decoding from the buffer
-            tracing::debug!(buf_len = this.buf.len(), "Deserializing buffered IPC data");
-            let mut de = serde_json::Deserializer::from_slice(this.buf.as_ref()).into_iter();
+            // try decoding from the buffer, but only if we have new data
+            if !*this.drained {
+                tracing::debug!(buf_len = this.buf.len(), "Deserializing buffered IPC data");
+                let mut de = serde_json::Deserializer::from_slice(this.buf.as_ref()).into_iter();
 
-            let item = de.next();
+                let item = de.next();
 
-            // advance the buffer
-            this.buf.advance(de.byte_offset());
+                // advance the buffer
+                this.buf.advance(de.byte_offset());
 
-            match item {
-                Some(Ok(response)) => {
-                    return Ready(Some(response));
-                }
-                Some(Err(e)) => {
-                    tracing::error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
-                    tracing::trace!(
-                        buffer = %String::from_utf8_lossy(this.buf.as_ref()),
-                        "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
-                    );
+                match item {
+                    Some(Ok(response)) => {
+                        return Ready(Some(response));
+                    }
+                    Some(Err(e)) => {
+                        tracing::error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
+                        tracing::trace!(
+                            buffer = %String::from_utf8_lossy(this.buf.as_ref()),
+                            "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
+                        );
 
-                    return Ready(None);
-                }
-                None => {
-                    // nothing decoded
+                        return Ready(None);
+                    }
+                    None => {
+                        // nothing decoded
+                        *this.drained = true;
+                    }
                 }
             }
 
@@ -181,6 +186,9 @@ where
             match ready!(poll_read_buf(this.reader.as_mut(), cx, &mut this.buf)) {
                 Ok(data_len) => {
                     tracing::debug!(%data_len, "Read data from IPC socket");
+
+                    // can try decoding again
+                    *this.drained = false;
                 }
                 Err(e) => {
                     tracing::error!(%e, "Failed to read from IPC socket, shutting down");
