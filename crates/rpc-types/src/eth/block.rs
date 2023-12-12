@@ -485,7 +485,7 @@ impl<'de> Deserialize<'de> for BlockId {
         impl<'de> Visitor<'de> for BlockIdVisitor {
             type Value = BlockId;
 
-            fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
                 formatter.write_str("Block identifier following EIP-1898")
             }
 
@@ -574,8 +574,8 @@ pub struct BlockNumHash {
 /// Block number and hash of the forked block.
 pub type ForkBlock = BlockNumHash;
 
-impl std::fmt::Debug for BlockNumHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for BlockNumHash {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("").field(&self.number).field(&self.hash).finish()
     }
 }

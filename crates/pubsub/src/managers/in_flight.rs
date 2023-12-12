@@ -1,6 +1,7 @@
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::U256;
 use alloy_transport::TransportError;
+use std::fmt;
 use tokio::sync::oneshot;
 
 /// An in-flight JSON-RPC request.
@@ -15,12 +16,12 @@ pub(crate) struct InFlight {
     pub(crate) tx: oneshot::Sender<Result<Response, TransportError>>,
 }
 
-impl std::fmt::Debug for InFlight {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let channel_desc =
-            format!("Channel status: {}", if self.tx.is_closed() { "closed" } else { "ok" });
-
-        f.debug_struct("InFlight").field("req", &self.request).field("tx", &channel_desc).finish()
+impl fmt::Debug for InFlight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InFlight")
+            .field("request", &self.request)
+            .field("tx_is_closed", &self.tx.is_closed())
+            .finish()
     }
 }
 

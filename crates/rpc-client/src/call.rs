@@ -6,7 +6,7 @@ use alloy_transport::{RpcFut, Transport, TransportError, TransportResult};
 use core::panic;
 use serde_json::value::RawValue;
 use std::{
-    fmt::Debug,
+    fmt,
     future::Future,
     marker::PhantomData,
     pin::Pin,
@@ -33,17 +33,17 @@ where
     Complete,
 }
 
-impl<Params, Conn> Debug for CallState<Params, Conn>
+impl<Params, Conn> fmt::Debug for CallState<Params, Conn>
 where
     Params: RpcParam,
     Conn: Transport + Clone,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Prepared { .. } => f.debug_struct("Prepared").finish(),
-            Self::AwaitingResponse { .. } => f.debug_struct("AwaitingResponse").finish(),
-            Self::Complete => write!(f, "Complete"),
-        }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Prepared { .. } => "Prepared",
+            Self::AwaitingResponse { .. } => "AwaitingResponse",
+            Self::Complete => "Complete",
+        })
     }
 }
 
