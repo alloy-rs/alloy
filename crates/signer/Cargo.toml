@@ -1,0 +1,54 @@
+[package]
+name = "alloy-signer"
+description = "Ethereum signer abstraction"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+# TODO
+# alloy-rpc-types.workspace = true
+
+auto_impl.workspace = true
+elliptic-curve.workspace = true
+k256.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+
+# eip712
+alloy-sol-types = { workspace = true, optional = true }
+
+# keystore
+eth-keystore = { version = "0.5.0", default-features = false, optional = true }
+
+# mnemonic
+coins-bip32 = { version = "0.8.7", default-features = false, optional = true }
+coins-bip39 = { version = "0.8.7", default-features = false, optional = true }
+
+# yubi
+yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
+
+[dev-dependencies]
+assert_matches.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+# need to enable features for tests
+yubihsm = { version = "0.42", features = ["mockhsm"] }
+coins-bip39 = { version = "0.8.7", default-features = false, features = ["english"] }
+
+[features]
+eip712 = ["dep:alloy-sol-types"]
+
+keystore = ["dep:eth-keystore"]
+mnemonic = ["dep:coins-bip32", "dep:coins-bip39"]
+yubihsm = ["dep:yubihsm"]

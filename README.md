@@ -42,7 +42,7 @@ When updating this, also update:
 
 Alloy will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.65.0.
+released at least six months ago. The current MSRV is 1.68.
 
 Note that the MSRV is not increased automatically, and only as part of a minor
 release.
