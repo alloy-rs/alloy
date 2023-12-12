@@ -1,6 +1,7 @@
 use crate::managers::InFlight;
 use alloy_primitives::U256;
 use serde_json::value::RawValue;
+use std::fmt;
 use tokio::sync::{broadcast, oneshot};
 
 /// Instructions for the pubsub service.
@@ -13,8 +14,8 @@ pub(crate) enum PubSubInstruction {
     Unsubscribe(U256),
 }
 
-impl std::fmt::Debug for PubSubInstruction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for PubSubInstruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Request(arg0) => f.debug_tuple("Request").field(arg0).finish(),
             Self::GetSub(arg0, _) => f.debug_tuple("GetSub").field(arg0).finish(),
