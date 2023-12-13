@@ -255,6 +255,10 @@ impl<T: Transport + Clone + Send + Sync> Provider<T> {
         }
     }
 
+    pub fn new_with_client(client: RpcClient<T>) -> Self {
+        Self { inner: client, from: None }
+    }
+
     pub fn with_sender(mut self, from: Address) -> Self {
         self.from = Some(from);
         self
