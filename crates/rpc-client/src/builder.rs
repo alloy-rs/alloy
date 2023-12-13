@@ -37,7 +37,7 @@ impl<L> ClientBuilder<L> {
 
     /// Create a new [`RpcClient`] with the given transport and the configured
     /// layers.
-    fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
+    pub fn transport<T>(self, transport: T, is_local: bool) -> RpcClient<L::Service>
     where
         L: Layer<T>,
         T: Transport,
