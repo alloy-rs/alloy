@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(recovered, address);
 
         // if provided with a hash, it will skip hashing
-        let recovered2 = signature.recover_address_from_prehash(&hash).unwrap();
+        let recovered2 = signature.recover_address_from_prehash(hash).unwrap();
         assert_eq!(recovered2, address);
     }
 

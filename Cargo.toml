@@ -17,8 +17,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
+alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
-alloy-networks = { version = "0.1.0", path = "crates/networks" }
+alloy-network = { version = "0.1.0", path = "crates/network" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
@@ -74,3 +75,7 @@ serde_with = "3.4"
 serial_test = "2.0"
 thiserror = "1.0"
 url = "2.4"
+
+
+[patch.crates-io]
+alloy-primitives = { path = "../core/crates/primitives" }

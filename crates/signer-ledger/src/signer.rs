@@ -40,7 +40,7 @@ impl std::fmt::Display for LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
-    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
@@ -280,7 +280,7 @@ impl LedgerSigner {
             return Err(LedgerError::ShortResponse { got: data.len(), expected: 65 });
         }
 
-        let sig = Signature::from_bytes(&data[1..], data[0] as u64)?;
+        let sig = Signature::from_bytes_and_parity(&data[1..], data[0] as u64)?;
         debug!(?sig, "Received signature from device");
         Ok(sig)
     }

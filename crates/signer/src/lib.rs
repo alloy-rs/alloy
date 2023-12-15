@@ -18,9 +18,6 @@
 mod error;
 pub use error::{Error, Result, UnsupportedSignerOperation};
 
-mod signature;
-pub use signature::Signature;
-
 mod signer;
 pub use signer::{Signer, SignerSync};
 
@@ -30,6 +27,8 @@ pub use wallet::MnemonicBuilder;
 pub use wallet::{Wallet, WalletError};
 
 pub mod utils;
+
+pub use alloy_primitives::Signature;
 
 #[cfg(feature = "yubihsm")]
 pub use yubihsm;

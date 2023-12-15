@@ -1,5 +1,5 @@
 [package]
-name = "alloy-networks"
+name = "alloy-network"
 description = "Ethereum blockchain RPC behavior abstraction"
 
 version.workspace = true
@@ -15,3 +15,8 @@ exclude.workspace = true
 alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rlp.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+
+[features]
+k256 = ["alloy-primitives/k256"]

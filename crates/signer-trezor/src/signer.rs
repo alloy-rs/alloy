@@ -35,7 +35,7 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
-    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
@@ -192,7 +192,7 @@ impl TrezorSigner {
 
         let r = U256::from_limbs(signature.r.0);
         let s = U256::from_limbs(signature.s.0);
-        Signature::from_scalars(r.into(), s.into(), signature.v).map_err(Into::into)
+        Signature::from_scalars_and_parity(r.into(), s.into(), signature.v).map_err(Into::into)
     }
 
     // helper which converts a derivation path to [u32]

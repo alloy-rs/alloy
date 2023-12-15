@@ -96,8 +96,7 @@ pub enum AwsSignerError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)]
-    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
         self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
     }
 
@@ -159,13 +158,13 @@ impl AwsSigner {
     pub async fn sign_digest_with_key(
         &self,
         key_id: String,
-        digest: &B256,
+        digest: B256,
     ) -> Result<ecdsa::Signature, AwsSignerError> {
         request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
+    pub async fn sign_digest(&self, digest: B256) -> Result<ecdsa::Signature, AwsSignerError> {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
@@ -174,12 +173,12 @@ impl AwsSigner {
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
     async fn sign_digest_with_eip155(
         &self,
-        digest: &B256,
+        digest: B256,
         chain_id: u64,
     ) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
-        let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
-        sig.apply_eip155(chain_id);
+        let sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
+        sig.with_chain_id(chain_id);
         Ok(sig)
     }
 }
@@ -196,7 +195,7 @@ async fn request_get_pubkey(
 async fn request_sign_digest(
     kms: &Client,
     key_id: String,
-    digest: &B256,
+    digest: B256,
 ) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
         .key_id(key_id)
@@ -226,15 +225,15 @@ fn decode_signature(resp: SignOutput) -> Result<ecdsa::Signature, AwsSignerError
 /// Recover an rsig from a signature under a known key by trial/error.
 fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
-    hash: &B256,
+    hash: B256,
     pubkey: &VerifyingKey,
 ) -> Signature {
-    let mut signature = Signature::new(sig, RecoveryId::from_byte(0).unwrap());
+    let signature = Signature::from_signature_and_parity(sig, RecoveryId::from_byte(0).unwrap());
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
 
-    signature.set_v(1);
+    let signature = signature.with_parity(1);
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
@@ -243,7 +242,7 @@ fn sig_from_digest_bytes_trial_recovery(
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
-fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
+fn check_candidate(signature: &Signature, hash: B256, pubkey: &VerifyingKey) -> bool {
     signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
 }
 

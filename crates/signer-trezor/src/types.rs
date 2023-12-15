@@ -40,9 +40,9 @@ pub enum TrezorError {
     /// Thrown when converting a semver requirement.
     #[error(transparent)]
     Semver(#[from] semver::Error),
-    /// [`ecdsa`](k256::ecdsa) error.
+    /// Signature Error
     #[error(transparent)]
-    Ecdsa(#[from] k256::ecdsa::Error),
+    SignatureError(#[from] alloy_primitives::SignatureError),
     /// Thrown when trying to sign an EIP-712 struct with an incompatible Trezor Ethereum app
     /// version.
     #[error("Trezor Ethereum app requires at least version {0:?}")]
