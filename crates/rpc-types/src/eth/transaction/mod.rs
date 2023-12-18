@@ -51,8 +51,10 @@ pub struct Transaction {
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
-    #[serde(flatten)]
-    pub signature: Signature,
+    ///
+    /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
     pub chain_id: Option<U64>,
     /// Contains the blob hashes for eip-4844 transactions.
@@ -90,12 +92,12 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Signature {
+            signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
                 s: U256::from(14),
                 y_parity: None,
-            },
+            }),
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
@@ -127,12 +129,12 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Signature {
+            signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
                 s: U256::from(14),
                 y_parity: Some(Parity(true)),
-            },
+            }),
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
