@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Types for trace module.
 //!
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
@@ -59,26 +58,36 @@ impl TraceResults {
 #[serde(rename_all = "camelCase")]
 pub struct TraceResultsWithTransactionHash {
     #[serde(flatten)]
+    /// Full trace data.
     pub full_trace: TraceResults,
+    /// Transaction hash.
     pub transaction_hash: B256,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// Aux type for Diff::Changed.
 pub struct ChangedType<T> {
+    /// Previous value.
     pub from: T,
+    /// Current value.
     pub to: T,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// Delta type
 pub enum Delta<T> {
     #[default]
     #[serde(rename = "=")]
+    /// Unchanged variant.
     Unchanged,
     #[serde(rename = "+")]
+    /// Added variant.
     Added(T),
     #[serde(rename = "-")]
+    /// Removed variant.
     Removed(T),
     #[serde(rename = "*")]
+    /// Changed variant.
     Changed(ChangedType<T>),
 }
 
@@ -113,10 +122,16 @@ impl<T> Delta<T> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Serde-friendly `AccountDiff` shadow.
+
 pub struct AccountDiff {
+    /// Balance change.
     pub balance: Delta<U256>,
+    /// Code change.
     pub code: Delta<Bytes>,
+    /// Nonce change.
     pub nonce: Delta<U64>,
+    /// Storage changes.
     pub storage: BTreeMap<B256, Delta<B256>>,
 }
 
@@ -141,14 +156,18 @@ impl DerefMut for StateDiff {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type", content = "action")]
+/// Action
 pub enum Action {
+    /// Call
     Call(CallAction),
+    /// Create
     Create(CreateAction),
     /// Parity style traces never renamed suicide to selfdestruct: <https://eips.ethereum.org/EIPS/eip-6>
     ///
     /// For compatibility reasons, this is serialized as `suicide`: <https://github.com/paradigmxyz/reth/issues/3721>
     #[serde(rename = "suicide", alias = "selfdestruct")]
     Selfdestruct(SelfdestructAction),
+    /// Reward
     Reward(RewardAction),
 }
 
@@ -251,13 +270,17 @@ pub struct CreateAction {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Reward type.
 pub enum RewardType {
+    /// Block
     Block,
+    /// Uncle
     Uncle,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Reward Action.
 pub struct RewardAction {
     /// Author's address.
     pub author: Address,
@@ -281,16 +304,22 @@ pub struct SelfdestructAction {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Call out put type
 pub struct CallOutput {
+    /// Gas Used.
     pub gas_used: U64,
+    /// Output
     pub output: Bytes,
 }
-
+/// Represents the output of a create operation.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateOutput {
+    /// Address output.
     pub address: Address,
+    /// Code data.
     pub code: Bytes,
+    /// Resulting address.
     pub gas_used: U64,
 }
 
@@ -329,19 +358,26 @@ impl TraceOutput {
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     #[serde(flatten)]
+    /// Transaction action.
     pub action: Action,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Error message.
     pub error: Option<String>,
+    /// Execution result.
     pub result: Option<TraceOutput>,
+    /// Subtrace count.
     pub subtraces: usize,
+    /// Trace address path.
     pub trace_address: Vec<usize>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// Localized transaction trace.
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
+    /// Trace of the transaction and its result.
     pub trace: TransactionTrace,
     /// Hash of the block, if not pending.
     ///
@@ -428,7 +464,7 @@ pub struct VmTrace {
     /// All executed instructions.
     pub ops: Vec<VmInstruction>,
 }
-
+/// Vm instruction type.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VmInstruction {
@@ -444,6 +480,7 @@ pub struct VmInstruction {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub op: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Index.
     pub idx: Option<String>,
 }
 
@@ -475,7 +512,9 @@ pub struct MemoryDelta {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageDelta {
+    /// Key.
     pub key: U256,
+    /// Value.
     pub val: U256,
 }
 
