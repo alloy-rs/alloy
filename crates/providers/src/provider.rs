@@ -38,7 +38,7 @@ pub struct Provider<T: Transport = BoxTransport> {
 /// Once the new Provider trait is stable, this trait will be removed.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-#[auto_impl(&, Arc, Box)]
+#[auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait TempProvider: Send + Sync {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
