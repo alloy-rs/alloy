@@ -365,11 +365,9 @@ where {
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256> {
         if let Some(block_id) = block {
-            let params = (tx, block_id);
-            self.inner.prepare("eth_estimateGas", params).await
+            self.inner.prepare("eth_estimateGas", (tx, block_id)).await
         } else {
-            let params = tx;
-            self.inner.prepare("eth_estimateGas", params).await
+            self.inner.prepare("eth_estimateGas", (tx,)).await
         }
     }
 
