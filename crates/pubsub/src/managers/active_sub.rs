@@ -1,7 +1,7 @@
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
 use serde_json::value::RawValue;
-use std::hash::Hash;
+use std::{fmt, hash::Hash};
 use tokio::sync::broadcast;
 
 #[derive(Clone)]
@@ -43,13 +43,12 @@ impl Ord for ActiveSubscription {
     }
 }
 
-impl std::fmt::Debug for ActiveSubscription {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let channel_desc = format!("Channel status: {} subscribers", self.tx.receiver_count());
-
+impl fmt::Debug for ActiveSubscription {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ActiveSubscription")
-            .field("req", &self.request)
-            .field("tx", &channel_desc)
+            .field("local_id", &self.local_id)
+            .field("request", &self.request)
+            .field("subscribers", &self.tx.receiver_count())
             .finish()
     }
 }
