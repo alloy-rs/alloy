@@ -1,14 +1,14 @@
-//use crate::access_list::AccessList;
 use crate::{AccessList, BlockId, BlockOverrides};
 use alloy_primitives::{Address, Bytes, B256, U256, U64, U8};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 /// Bundle of transactions
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Bundle {
-    /// Transactions
+    /// All transactions to execute
     pub transactions: Vec<CallRequest>,
-    /// Block overides
+    /// Block overrides to apply
     pub block_override: Option<BlockOverrides>,
 }
 
@@ -26,12 +26,22 @@ pub struct StateContext {
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EthCallResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
     /// eth_call output (if no error)
-    pub output: Option<Bytes>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Bytes>,
     /// eth_call output (if error)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+impl EthCallResponse {
+    /// Returns the value if present, otherwise returns the error.
+    pub fn ensure_ok(self) -> Result<Bytes, String> {
+        match self.value {
+            Some(output) => Ok(output),
+            None => Err(self.error.unwrap_or_else(|| "Unknown error".to_string())),
+        }
+    }
 }
 
 /// Represents a transaction index where -1 means all transactions
@@ -88,7 +98,7 @@ impl<'de> Deserialize<'de> for TransactionIndex {
 }
 
 /// Call request for `eth_call` and adjacent methods.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CallRequest {
     /// From
@@ -115,12 +125,13 @@ pub struct CallRequest {
     /// AccessList
     pub access_list: Option<AccessList>,
     /// Max Fee per Blob gas for EIP-4844 transactions
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_per_blob_gas: Option<U256>,
     /// Blob Versioned Hashes for EIP-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP-2718 type
-    #[serde(rename = "type")]
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U8>,
 }
 
@@ -147,13 +158,15 @@ impl CallRequest {
 ///
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CallInput {
     /// Transaction data
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<Bytes>,
     /// Transaction data
     ///
     /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Bytes>,
 }
 
@@ -169,40 +182,31 @@ impl CallInput {
     }
 
     /// Consumes the type and returns the optional input data.
-    #[inline]
-    pub fn into_input(self) -> Option<Bytes> {
-        self.input.or(self.data)
+    ///
+    /// Returns an error if both `data` and `input` fields are set and not equal.
+    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, CallInputError> {
+        let Self { input, data } = self;
+        match (input, data) {
+            (Some(input), Some(data)) if input == data => Ok(Some(input)),
+            (Some(_), Some(_)) => Err(CallInputError::default()),
+            (Some(input), None) => Ok(Some(input)),
+            (None, Some(data)) => Ok(Some(data)),
+            (None, None) => Ok(None),
+        }
     }
 
     /// Consumes the type and returns the optional input data.
     ///
     /// Returns an error if both `data` and `input` fields are set and not equal.
-    #[inline]
-    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, CallInputError> {
-        self.check_unique_input().map(|()| self.into_input())
-    }
-
-    /// Returns the optional input data.
-    #[inline]
-    pub fn input(&self) -> Option<&Bytes> {
-        self.input.as_ref().or(self.data.as_ref())
-    }
-
-    /// Returns the optional input data.
-    ///
-    /// Returns an error if both `data` and `input` fields are set and not equal.
-    #[inline]
     pub fn unique_input(&self) -> Result<Option<&Bytes>, CallInputError> {
-        self.check_unique_input().map(|()| self.input())
-    }
-
-    fn check_unique_input(&self) -> Result<(), CallInputError> {
-        if let (Some(input), Some(data)) = (&self.input, &self.data) {
-            if input != data {
-                return Err(CallInputError::default());
-            }
+        let Self { input, data } = self;
+        match (input, data) {
+            (Some(input), Some(data)) if input == data => Ok(Some(input)),
+            (Some(_), Some(_)) => Err(CallInputError::default()),
+            (Some(input), None) => Ok(Some(input)),
+            (None, Some(data)) => Ok(Some(data)),
+            (None, None) => Ok(None),
         }
-        Ok(())
     }
 }
 

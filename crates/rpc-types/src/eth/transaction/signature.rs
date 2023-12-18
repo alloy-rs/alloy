@@ -1,6 +1,5 @@
 //! Signature related RPC values
 use alloy_primitives::U256;
-use alloy_rlp::{Bytes, Decodable, Encodable, Error as RlpError};
 use serde::{Deserialize, Serialize};
 
 /// Container type for all signature fields in RPC
@@ -24,183 +23,13 @@ pub struct Signature {
     pub y_parity: Option<Parity>,
 }
 
-impl Signature {
-    /// Output the length of the signature without the length of the RLP header, using the legacy
-    /// scheme with EIP-155 support depends on chain_id.
-    pub fn payload_len_with_eip155_chain_id(&self, chain_id: Option<u64>) -> usize {
-        self.v(chain_id).length() + self.r.length() + self.s.length()
-    }
-
-    /// Encode the `v`, `r`, `s` values without a RLP header.
-    /// Encodes the `v` value using the legacy scheme with EIP-155 support depends on chain_id.
-    pub fn encode_with_eip155_chain_id(
-        &self,
-        out: &mut dyn alloy_rlp::BufMut,
-        chain_id: Option<u64>,
-    ) {
-        self.v(chain_id).encode(out);
-        self.r.encode(out);
-        self.s.encode(out);
-    }
-
-    /// Output the `v` of the signature depends on chain_id
-    #[inline]
-    pub fn v(&self, chain_id: Option<u64>) -> u64 {
-        if let Some(chain_id) = chain_id {
-            // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
-            let y_parity = u64::from(self.y_parity.unwrap_or(Parity(false)));
-            y_parity + chain_id * 2 + 35
-        } else {
-            u64::from(self.y_parity.unwrap_or(Parity(false))) + 27
-        }
-    }
-
-    /// Decodes the `v`, `r`, `s` values without a RLP header.
-    /// This will return a chain ID if the `v` value is [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) compatible.
-    pub fn decode_with_eip155_chain_id(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Option<u64>)> {
-        let v = u64::decode(buf)?;
-        let r = Decodable::decode(buf)?;
-        let s = Decodable::decode(buf)?;
-        if v >= 35 {
-            // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
-            let y_parity = ((v - 35) % 2) != 0;
-            let chain_id = (v - 35) >> 1;
-            Ok((
-                Signature { r, s, y_parity: Some(Parity(y_parity)), v: U256::from(v) },
-                Some(chain_id),
-            ))
-        } else {
-            // non-EIP-155 legacy scheme, v = 27 for even y-parity, v = 28 for odd y-parity
-            if v != 27 && v != 28 {
-                return Err(RlpError::Custom("invalid Ethereum signature (V is not 27 or 28)"));
-            }
-            let y_parity = v == 28;
-            Ok((Signature { r, s, y_parity: Some(Parity(y_parity)), v: U256::from(v) }, None))
-        }
-    }
-
-    /// Output the length of the signature without the length of the RLP header
-    pub fn payload_len(&self) -> usize {
-        let y_parity_len = match self.y_parity {
-            Some(parity) => parity.0 as usize,
-            None => 0_usize,
-        };
-        y_parity_len + self.r.length() + self.s.length()
-    }
-
-    /// Encode the `y_parity`, `r`, `s` values without a RLP header.
-    /// Panics if the y parity is not set.
-    pub fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.y_parity.expect("y_parity not set").encode(out);
-        self.r.encode(out);
-        self.s.encode(out);
-    }
-
-    /// Decodes the `y_parity`, `r`, `s` values without a RLP header.
-    pub fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let mut sig = Signature {
-            y_parity: Some(Decodable::decode(buf)?),
-            r: Decodable::decode(buf)?,
-            s: Decodable::decode(buf)?,
-            v: U256::ZERO,
-        };
-        sig.v = sig.y_parity.unwrap().into();
-        Ok(sig)
-    }
-
-    /// Turn this signature into its byte
-    /// (hex) representation.
-    /// Panics: if the y_parity field is not set.
-    pub fn to_bytes(&self) -> [u8; 65] {
-        let mut sig = [0u8; 65];
-        sig[..32].copy_from_slice(&self.r.to_be_bytes::<32>());
-        sig[32..64].copy_from_slice(&self.s.to_be_bytes::<32>());
-        let v = u8::from(self.y_parity.expect("y_parity not set")) + 27;
-        sig[64] = v;
-        sig
-    }
-
-    /// Turn this signature into its hex-encoded representation.
-    pub fn to_hex_bytes(&self) -> Bytes {
-        alloy_primitives::hex::encode(self.to_bytes()).into()
-    }
-
-    /// Calculates a heuristic for the in-memory size of the [Signature].
-    #[inline]
-    pub fn size(&self) -> usize {
-        std::mem::size_of::<Self>()
-    }
-}
-
 /// Type that represents the signature parity byte, meant for use in RPC.
 ///
 /// This will be serialized as "0x0" if false, and "0x1" if true.
-#[derive(Copy, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Parity(
     #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
 );
-
-impl From<bool> for Parity {
-    fn from(b: bool) -> Self {
-        Self(b)
-    }
-}
-
-impl From<U256> for Parity {
-    fn from(value: U256) -> Self {
-        match value {
-            U256::ZERO => Self(false),
-            _ => Self(true),
-        }
-    }
-}
-
-impl From<Parity> for U256 {
-    fn from(p: Parity) -> Self {
-        if p.0 {
-            U256::from(1)
-        } else {
-            U256::ZERO
-        }
-    }
-}
-
-impl From<Parity> for u64 {
-    fn from(p: Parity) -> Self {
-        if p.0 {
-            1
-        } else {
-            0
-        }
-    }
-}
-
-impl From<Parity> for u8 {
-    fn from(value: Parity) -> Self {
-        match value.0 {
-            true => 1,
-            false => 0,
-        }
-    }
-}
-
-impl Encodable for Parity {
-    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        let v = u8::from(*self);
-        v.encode(out);
-    }
-
-    fn length(&self) -> usize {
-        1
-    }
-}
-
-impl Decodable for Parity {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let v = u8::decode(buf)?;
-        Ok(Self(v != 0))
-    }
-}
 
 fn serialize_parity<S>(parity: &bool, serializer: S) -> Result<S::Ok, S::Error>
 where

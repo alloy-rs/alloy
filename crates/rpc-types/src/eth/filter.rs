@@ -41,14 +41,6 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
     }
 }
 
-impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        for value in &self.0 {
-            value.hash(state);
-        }
-    }
-}
-
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
         FilterSet(HashSet::from_iter(src.into_iter().map(Into::into)))
@@ -252,8 +244,8 @@ impl FilterBlockOption {
     }
 }
 
-/// Filter for logs.
-#[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
+/// Filter for
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should
     /// match.
@@ -280,7 +272,7 @@ impl Filter {
     /// Match only a specific block
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(69u64);
     /// # }
@@ -290,8 +282,8 @@ impl Filter {
     /// Match the latest block only
     ///
     /// ```rust
-    /// # use alloy_rpc_types::BlockNumberOrTag;
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::BlockNumberOrTag;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(BlockNumberOrTag::Latest);
     /// # }
@@ -301,7 +293,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::B256;
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(B256::ZERO);
     /// # }
@@ -311,7 +303,7 @@ impl Filter {
     /// Match a range of blocks
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(0u64..100u64);
     /// # }
@@ -320,7 +312,7 @@ impl Filter {
     /// Match all blocks in range `(1337..BlockNumberOrTag::Latest)`
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(1337u64..);
     /// # }
@@ -329,7 +321,7 @@ impl Filter {
     /// Match all blocks in range `(BlockNumberOrTag::Earliest..1337)`
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(..1337u64);
     /// # }
@@ -372,7 +364,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::Address;
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let filter = Filter::new()
     ///     .address("0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap());
@@ -384,7 +376,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::Address;
-    /// # use alloy_rpc_types::Filter;
+    /// # use reth_rpc_types::Filter;
     /// # fn main() {
     /// let addresses = vec![
     ///     "0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap(),
@@ -903,7 +895,7 @@ pub enum FilterId {
     Str(String),
 }
 
-#[cfg(feature = "jsonrpsee")]
+#[cfg(feature = "jsonrpsee-types")]
 impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     fn from(value: FilterId) -> Self {
         match value {
@@ -913,7 +905,7 @@ impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     }
 }
 
-#[cfg(feature = "jsonrpsee")]
+#[cfg(feature = "jsonrpsee-types")]
 impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
     fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
         match value {
@@ -1096,6 +1088,182 @@ mod tests {
         // 1 & 2 & 3
         let ser = serialize(&filter.topic1(t1).topic2(t2).topic3(t3));
         assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, t2, t3_padded]}));
+    }
+
+    fn build_bloom(address: Address, topic1: B256, topic2: B256) -> Bloom {
+        let mut block_bloom = Bloom::default();
+        block_bloom.accrue(BloomInput::Raw(&address[..]));
+        block_bloom.accrue(BloomInput::Raw(&topic1[..]));
+        block_bloom.accrue(BloomInput::Raw(&topic2[..]));
+        block_bloom
+    }
+
+    fn topic_filter(topic1: B256, topic2: B256, topic3: B256) -> Filter {
+        Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                topic1.into(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        }
+    }
+
+    #[test]
+    fn can_detect_different_topics() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let topics = topic_filter(topic1, topic2, topic3).topics;
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(!FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_topic() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let topics = topic_filter(topic1, topic2, topic3).topics;
+        let _topics_bloom = FilteredParams::topics_filter(&topics);
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), topic1, topic2),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_empty_topics() {
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: Default::default(),
+        };
+        let topics = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_address_and_topics() {
+        let rng_address = Address::random();
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: [
+                topic1.into(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics = filter.topics;
+
+        let address_filter = FilteredParams::address_filter(&filter.address);
+        let topics_filter = FilteredParams::topics_filter(&topics);
+        assert!(
+            FilteredParams::matches_address(
+                build_bloom(rng_address, topic1, topic2),
+                &address_filter
+            ) && FilteredParams::matches_topics(
+                build_bloom(rng_address, topic1, topic2),
+                &topics_filter
+            )
+        );
+    }
+
+    #[test]
+    fn can_match_topics_wildcard() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                Default::default(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), topic1, topic2),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_topics_wildcard_mismatch() {
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                Default::default(),
+                vec![B256::random(), B256::random()].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics_input = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics_input);
+        assert!(!FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_address_filter() {
+        let rng_address = Address::random();
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: Default::default(),
+        };
+        let address_bloom = FilteredParams::address_filter(&filter.address);
+        assert!(FilteredParams::matches_address(
+            build_bloom(rng_address, B256::random(), B256::random(),),
+            &address_bloom
+        ));
+    }
+
+    #[test]
+    fn can_detect_different_address() {
+        let bloom_address = Address::random();
+        let rng_address = Address::random();
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: Default::default(),
+        };
+        let address_bloom = FilteredParams::address_filter(&filter.address);
+        assert!(!FilteredParams::matches_address(
+            build_bloom(bloom_address, B256::random(), B256::random(),),
+            &address_bloom
+        ));
     }
 
     #[test]

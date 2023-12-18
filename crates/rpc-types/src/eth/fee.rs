@@ -36,8 +36,7 @@ pub struct FeeHistory {
     ///
     /// # Note
     ///
-    /// The `Option` is only for compatability with Erigon and Geth.
-    /// Empty list is skipped only for compatability with Erigon and Geth.
+    /// Empty list is skipped only for compatibility with Erigon and Geth.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub base_fee_per_gas: Vec<U256>,
     /// An array of block gas used ratios. These are calculated as the ratio
@@ -51,6 +50,6 @@ pub struct FeeHistory {
     pub oldest_block: U256,
     /// An (optional) array of effective priority fee per gas data points from a single
     /// block. All zeroes are returned if the block is empty.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reward: Option<Vec<Vec<U256>>>,
 }
