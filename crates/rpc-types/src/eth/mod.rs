@@ -21,7 +21,7 @@ pub use block::*;
 pub use call::{Bundle, CallInput, CallInputError, CallRequest, EthCallResponse, StateContext};
 pub use fee::{FeeHistory, TxGasAndReward};
 pub use filter::*;
-pub use log::Log;
+pub use log::*;
 pub use raw_log::{logs_bloom, Log as RawLog};
 pub use syncing::*;
 pub use transaction::*;
