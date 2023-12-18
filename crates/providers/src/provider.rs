@@ -38,26 +38,20 @@ pub struct Provider<T: Transport = BoxTransport> {
 /// Once the new Provider trait is stable, this trait will be removed.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-#[auto_impl(&, Arc, Box)]
+#[auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait TempProvider: Send + Sync {
     /// Gets the transaction count of the corresponding address.
     async fn get_transaction_count(
         &self,
         address: Address,
         tag: Option<BlockId>,
-    ) -> TransportResult<alloy_primitives::U256>
-    where
-        Self: Sync;
+    ) -> TransportResult<alloy_primitives::U256>;
 
     /// Gets the last block number available.
-    async fn get_block_number(&self) -> TransportResult<u64>
-    where
-        Self: Sync;
+    async fn get_block_number(&self) -> TransportResult<u64>;
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>
-    where
-        Self: Sync;
+    async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256>;
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
     async fn get_block(&self, id: BlockId, full: bool) -> TransportResult<Option<Block>> {
@@ -72,23 +66,17 @@ pub trait TempProvider: Send + Sync {
         &self,
         hash: BlockHash,
         full: bool,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Option<Block>>;
 
     /// Gets a block by [BlockNumberOrTag], with full transactions or only hashes.
-    async fn get_block_by_number<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_block_by_number(
         &self,
-        number: B,
+        number: BlockNumberOrTag,
         full: bool,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Option<Block>>;
 
     /// Gets the chain ID.
-    async fn get_chain_id(&self) -> TransportResult<U64>
-    where
-        Self: Sync;
+    async fn get_chain_id(&self) -> TransportResult<U64>;
 
     /// Gets the specified storage value from [Address].
     async fn get_storage_at(
@@ -99,90 +87,56 @@ pub trait TempProvider: Send + Sync {
     ) -> TransportResult<StorageValue>;
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at<B: Into<BlockId> + Send + Sync>(
-        &self,
-        address: Address,
-        tag: B,
-    ) -> TransportResult<Bytes>
-    where
-        Self: Sync;
+    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes>;
 
     /// Gets a [Transaction] by its [TxHash].
-    async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>
-    where
-        Self: Sync;
+    async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>;
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-    async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>
-    where
-        Self: Sync;
+    async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>>;
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-    async fn get_accounts(&self) -> TransportResult<Vec<Address>>
-    where
-        Self: Sync;
+    async fn get_accounts(&self) -> TransportResult<Vec<Address>>;
 
     /// Gets the current gas price.
-    async fn get_gas_price(&self) -> TransportResult<U256>
-    where
-        Self: Sync;
+    async fn get_gas_price(&self) -> TransportResult<U256>;
 
     /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
     async fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<TransactionReceipt>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Option<TransactionReceipt>>;
 
     /// Returns a collection of historical gas information [FeeHistory] which
     /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
-    async fn get_fee_history<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_fee_history(
         &self,
         block_count: U256,
-        last_block: B,
+        last_block: BlockNumberOrTag,
         reward_percentiles: &[f64],
-    ) -> TransportResult<FeeHistory>
-    where
-        Self: Sync;
+    ) -> TransportResult<FeeHistory>;
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
     async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<TransactionReceipt>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Vec<TransactionReceipt>>;
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle<B: Into<BlockId> + Send + Sync>(
-        &self,
-        tag: B,
-        idx: U64,
-    ) -> TransportResult<Option<Block>>
-    where
-        Self: Sync;
+    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>>;
 
     /// Gets syncing info.
-    async fn syncing(&self) -> TransportResult<SyncStatus>
-    where
-        Self: Sync;
+    async fn syncing(&self) -> TransportResult<SyncStatus>;
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>
-    where
-        Self: Sync;
+    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>
-    where
-        Self: Sync;
+    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>;
 
     /// Sends an already-signed transaction.
-    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
-    where
-        Self: Sync;
+    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>;
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
     /// Receives an optional [EstimatorFunction] that can be used to modify
@@ -190,54 +144,40 @@ pub trait TempProvider: Send + Sync {
     async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<(U256, U256)>
-    where
-        Self: Sync;
+    ) -> TransportResult<(U256, U256)>;
 
     #[cfg(feature = "anvil")]
-    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
-    where
-        Self: Sync;
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>;
 
     async fn get_proof(
         &self,
         address: Address,
         keys: Vec<StorageKey>,
         block: Option<BlockId>,
-    ) -> TransportResult<EIP1186AccountProofResponse>
-    where
-        Self: Sync;
+    ) -> TransportResult<EIP1186AccountProofResponse>;
 
     async fn create_access_list(
         &self,
         request: CallRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<AccessListWithGasUsed>
-    where
-        Self: Sync;
+    ) -> TransportResult<AccessListWithGasUsed>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     async fn debug_trace_transaction(
         &self,
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<GethTrace>
-    where
-        Self: Sync;
+    ) -> TransportResult<GethTrace>;
 
     async fn trace_block(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync;
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
     where
@@ -317,12 +257,12 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets a block by [BlockNumberOrTag], with full transactions or only hashes.
-    async fn get_block_by_number<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_block_by_number(
         &self,
-        number: B,
+        number: BlockNumberOrTag,
         full: bool,
     ) -> TransportResult<Option<Block>> {
-        self.inner.prepare("eth_getBlockByNumber", (number.into(), full)).await
+        self.inner.prepare("eth_getBlockByNumber", (number, full)).await
     }
 
     /// Gets the chain ID.
@@ -346,12 +286,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at<B: Into<BlockId> + Send + Sync>(
-        &self,
-        address: Address,
-        tag: B,
-    ) -> TransportResult<Bytes> {
-        self.inner.prepare("eth_getCode", (address, tag.into())).await
+    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
+        self.inner.prepare("eth_getCode", (address, tag)).await
     }
 
     /// Gets a [Transaction] by its [TxHash].
@@ -385,15 +321,13 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     /// Returns a collection of historical gas information [FeeHistory] which
     /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
-    async fn get_fee_history<B: Into<BlockNumberOrTag> + Send + Sync>(
+    async fn get_fee_history(
         &self,
         block_count: U256,
-        last_block: B,
+        last_block: BlockNumberOrTag,
         reward_percentiles: &[f64],
     ) -> TransportResult<FeeHistory> {
-        self.inner
-            .prepare("eth_feeHistory", (block_count, last_block.into(), reward_percentiles))
-            .await
+        self.inner.prepare("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
@@ -401,19 +335,12 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<TransactionReceipt>>
-    where
-        Self: Sync,
-    {
+where {
         self.inner.prepare("eth_getBlockReceipts", block).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle<B: Into<BlockId> + Send + Sync>(
-        &self,
-        tag: B,
-        idx: U64,
-    ) -> TransportResult<Option<Block>> {
-        let tag = tag.into();
+    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
         match tag {
             BlockId::Hash(hash) => {
                 self.inner.prepare("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
@@ -431,27 +358,20 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
-        self.inner
-            .prepare("eth_call", (tx, block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))))
-            .await
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256> {
         if let Some(block_id) = block {
-            let params = (tx, block_id);
-            self.inner.prepare("eth_estimateGas", params).await
+            self.inner.prepare("eth_estimateGas", (tx, block_id)).await
         } else {
-            let params = tx;
-            self.inner.prepare("eth_estimateGas", params).await
+            self.inner.prepare("eth_estimateGas", (tx,)).await
         }
     }
 
     /// Sends an already-signed transaction.
-    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
-    where
-        Self: Sync,
-    {
+    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash> {
         self.inner.prepare("eth_sendRawTransaction", tx).await
     }
 
@@ -517,10 +437,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         request: CallRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<AccessListWithGasUsed>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<AccessListWithGasUsed> {
         self.inner
             .prepare(
                 "eth_createAccessList",
@@ -533,10 +450,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn trace_transaction(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.inner.prepare("trace_transaction", vec![hash]).await
     }
 
@@ -544,20 +458,14 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<GethTrace>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<GethTrace> {
         self.inner.prepare("debug_traceTransaction", (hash, trace_options)).await
     }
 
     async fn trace_block(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.inner.prepare("trace_block", block).await
     }
 
@@ -567,17 +475,13 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         P: Serialize + Send + Sync + Clone,
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
-        Self: Sync,
     {
         let res: R = self.inner.prepare(method, &params).await?;
         Ok(res)
     }
 
     #[cfg(feature = "anvil")]
-    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
-    where
-        Self: Sync,
-    {
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
         self.inner.prepare("anvil_setCode", (address, code)).await
     }
 }
