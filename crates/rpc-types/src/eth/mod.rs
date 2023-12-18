@@ -6,6 +6,7 @@ mod call;
 mod fee;
 mod filter;
 mod log;
+pub mod other;
 pub mod pubsub;
 pub mod raw_log;
 pub mod state;

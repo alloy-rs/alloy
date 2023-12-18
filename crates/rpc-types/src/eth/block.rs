@@ -1,6 +1,6 @@
 //! Block RPC types.
 
-use crate::{Transaction, Withdrawal};
+use crate::{other::OtherFields, Transaction, Withdrawal};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
@@ -63,6 +63,11 @@ impl BlockTransactions {
     #[inline]
     pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_> {
         BlockTransactionHashesMut::new(self)
+    }
+
+    /// Returns an instance of BlockTransactions with the Uncle special case.
+    pub fn uncle() -> Self {
+        Self::Uncle
     }
 }
 
@@ -245,23 +250,27 @@ pub enum BlockError {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
-    /// Header of the block
+    /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
     /// Total difficulty, this field is None only if representing
     /// an Uncle block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,
-    /// Uncles' hashes
+    /// Uncles' hashes.
     pub uncles: Vec<B256>,
-    /// Transactions
+    /// Transactions.
     #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
+    #[serde(default = "BlockTransactions::uncle")]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     pub size: Option<U256>,
-    /// Withdrawals in the block
+    /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<Vec<Withdrawal>>,
+    /// Support for arbitrary additional fields.
+    #[serde(flatten)]
+    pub other: OtherFields,
 }
 
 impl Block {
@@ -390,12 +399,12 @@ pub enum BlockNumberOrTag {
     /// Pending block (not yet part of the blockchain)
     Pending,
     /// Block by number from canon chain
-    Number(U64),
+    Number(u64),
 }
 
 impl BlockNumberOrTag {
     /// Returns the numeric block number if explicitly set
-    pub const fn as_number(&self) -> Option<U64> {
+    pub const fn as_number(&self) -> Option<u64> {
         match *self {
             BlockNumberOrTag::Number(num) => Some(num),
             _ => None,
@@ -435,13 +444,13 @@ impl BlockNumberOrTag {
 
 impl From<u64> for BlockNumberOrTag {
     fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(U64::from(num))
+        BlockNumberOrTag::Number(num)
     }
 }
 
 impl From<U64> for BlockNumberOrTag {
     fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num)
+        num.to::<u64>().into()
     }
 }
 
@@ -483,7 +492,7 @@ impl FromStr for BlockNumberOrTag {
             "pending" => Self::Pending,
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
-                    let number = U64::from_str_radix(hex_val, 16);
+                    let number = u64::from_str_radix(hex_val, 16);
                     BlockNumberOrTag::Number(number?)
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
@@ -559,15 +568,21 @@ impl BlockId {
     }
 }
 
+impl Default for BlockId {
+    fn default() -> Self {
+        BlockId::Number(BlockNumberOrTag::Latest)
+    }
+}
+
 impl From<u64> for BlockId {
     fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(U64::from(num)).into()
+        BlockNumberOrTag::Number(num).into()
     }
 }
 
 impl From<U64> for BlockId {
     fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num).into()
+        BlockNumberOrTag::Number(num.to()).into()
     }
 }
 
@@ -998,6 +1013,7 @@ mod tests {
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -1039,6 +1055,7 @@ mod tests {
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
             withdrawals: None,
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(

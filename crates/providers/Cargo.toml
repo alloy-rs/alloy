@@ -18,11 +18,11 @@ alloy-rpc-client.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport-http.workspace = true
 alloy-transport.workspace = true
-
 async-trait.workspace = true
-reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+reqwest.workspace = true
+auto_impl = "1.1.0"
 
 [dev-dependencies]
 tokio = { version = "1.33.0", features = ["macros"] }

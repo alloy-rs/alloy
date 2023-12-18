@@ -12,7 +12,12 @@ mod common;
 mod receipt;
 mod request;
 mod signature;
+mod tx_type;
 mod typed;
+
+pub use tx_type::*;
+
+use crate::other::OtherFields;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,11 +71,11 @@ pub struct Transaction {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_list: Option<Vec<AccessListItem>>,
     /// EIP2718
-    ///
-    /// Transaction type, Some(2) for EIP-1559 transaction,
-    /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U64>,
+    /// Arbitrary extra fields.
+    #[serde(flatten)]
+    pub other: OtherFields,
 }
 
 #[cfg(test)]
@@ -105,6 +110,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
@@ -142,6 +148,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
