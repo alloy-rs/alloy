@@ -401,9 +401,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<TransactionReceipt>>
-    where
-        Self: Sync,
-    {
+where {
         self.inner.prepare("eth_getBlockReceipts", block).await
     }
 
@@ -448,10 +446,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Sends an already-signed transaction.
-    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>
-    where
-        Self: Sync,
-    {
+    async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash> {
         self.inner.prepare("eth_sendRawTransaction", tx).await
     }
 
@@ -517,10 +512,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         request: CallRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<AccessListWithGasUsed>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<AccessListWithGasUsed> {
         self.inner
             .prepare(
                 "eth_createAccessList",
@@ -533,10 +525,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn trace_transaction(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.inner.prepare("trace_transaction", vec![hash]).await
     }
 
@@ -544,20 +533,14 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<GethTrace>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<GethTrace> {
         self.inner.prepare("debug_traceTransaction", (hash, trace_options)).await
     }
 
     async fn trace_block(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>>
-    where
-        Self: Sync,
-    {
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.inner.prepare("trace_block", block).await
     }
 
@@ -567,17 +550,13 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     where
         P: Serialize + Send + Sync + Clone,
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
-        Self: Sync,
     {
         let res: R = self.inner.prepare(method, &params).await?;
         Ok(res)
     }
 
     #[cfg(feature = "anvil")]
-    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()>
-    where
-        Self: Sync,
-    {
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
         self.inner.prepare("anvil_setCode", (address, code)).await
     }
 }
