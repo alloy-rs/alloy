@@ -568,6 +568,12 @@ impl BlockId {
     }
 }
 
+impl Default for BlockId {
+    fn default() -> Self {
+        BlockId::Number(BlockNumberOrTag::Latest)
+    }
+}
+
 impl From<u64> for BlockId {
     fn from(num: u64) -> Self {
         BlockNumberOrTag::Number(num).into()

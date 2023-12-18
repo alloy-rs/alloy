@@ -359,9 +359,7 @@ where {
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
-        self.inner
-            .prepare("eth_call", (tx, block.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))))
-            .await
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
     /// Estimate the gas needed for a transaction.
