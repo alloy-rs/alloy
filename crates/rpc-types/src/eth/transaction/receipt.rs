@@ -51,24 +51,26 @@ pub struct TransactionReceipt {
     /// EIP-2718 Transaction type, Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type")]
     pub transaction_type: U8,
+}
+
+
+/// Additional fields for Optimism transaction receipts
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith
-    #[cfg(feature = "optimism")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deposit_nonce: Option<U64>,
     /// L1 fee for the transaction
-    #[cfg(feature = "optimism")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_fee: Option<U256>,
     /// L1 fee scalar for the transaction
-    #[cfg(feature = "optimism")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_fee_scalar: Option<U256>,
     /// L1 gas price for the transaction
-    #[cfg(feature = "optimism")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_gas_price: Option<U256>,
     /// L1 gas used for the transaction
-    #[cfg(feature = "optimism")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_gas_used: Option<U256>,
 }

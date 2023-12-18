@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for TransactionIndex {
 }
 
 /// Call request for `eth_call` and adjacent methods.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CallRequest {
     /// From
@@ -158,7 +158,7 @@ impl CallRequest {
 ///
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct CallInput {
     /// Transaction data
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -182,31 +182,40 @@ impl CallInput {
     }
 
     /// Consumes the type and returns the optional input data.
-    ///
-    /// Returns an error if both `data` and `input` fields are set and not equal.
-    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, CallInputError> {
-        let Self { input, data } = self;
-        match (input, data) {
-            (Some(input), Some(data)) if input == data => Ok(Some(input)),
-            (Some(_), Some(_)) => Err(CallInputError::default()),
-            (Some(input), None) => Ok(Some(input)),
-            (None, Some(data)) => Ok(Some(data)),
-            (None, None) => Ok(None),
-        }
+    #[inline]
+    pub fn into_input(self) -> Option<Bytes> {
+        self.input.or(self.data)
     }
 
     /// Consumes the type and returns the optional input data.
     ///
     /// Returns an error if both `data` and `input` fields are set and not equal.
-    pub fn unique_input(&self) -> Result<Option<&Bytes>, CallInputError> {
-        let Self { input, data } = self;
-        match (input, data) {
-            (Some(input), Some(data)) if input == data => Ok(Some(input)),
-            (Some(_), Some(_)) => Err(CallInputError::default()),
-            (Some(input), None) => Ok(Some(input)),
-            (None, Some(data)) => Ok(Some(data)),
-            (None, None) => Ok(None),
+    #[inline]
+    pub fn try_into_unique_input(self) -> Result<Option<Bytes>, CallInputError> {
+        self.check_unique_input().map(|()| self.into_input())
         }
+
+    /// Returns the optional input data.
+    #[inline]
+    pub fn input(&self) -> Option<&Bytes> {
+        self.input.as_ref().or(self.data.as_ref())
+    }
+
+    /// Returns the optional input data.
+    ///
+    /// Returns an error if both `data` and `input` fields are set and not equal.
+    #[inline]
+    pub fn unique_input(&self) -> Result<Option<&Bytes>, CallInputError> {
+        self.check_unique_input().map(|()| self.input())
+    }
+
+    fn check_unique_input(&self) -> Result<(), CallInputError> {
+        if let (Some(input), Some(data)) = (&self.input, &self.data) {
+            if input != data {
+                return Err(CallInputError::default());
+        }
+    }
+        Ok(())
     }
 }
 

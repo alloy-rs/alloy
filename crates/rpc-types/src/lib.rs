@@ -1,4 +1,4 @@
-//! Reth RPC type definitions.
+//! Alloy RPC type definitions.
 //!
 //! Provides all relevant types for the various RPC endpoints, grouped by namespace.
 
