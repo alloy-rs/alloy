@@ -96,6 +96,7 @@ pub enum AwsSignerError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[instrument(err)]
+    #[allow(clippy::blocks_in_conditions)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
     }
