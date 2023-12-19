@@ -1,5 +1,6 @@
 use crate::utils::{public_key_to_address, to_eip155_v};
-use alloy_primitives::{eip191_hash_message, hex, Address, B256};
+use alloy_primitives::{eip191_hash_message, hex, Address, B256, U256};
+use alloy_rlp::{self, Decodable, Encodable};
 use elliptic_curve::NonZeroScalar;
 use k256::{
     ecdsa::{self, RecoveryId, VerifyingKey},
@@ -41,6 +42,29 @@ impl FromStr for Signature {
             Ok(bytes) => Self::try_from(&bytes[..]),
             Err(e) => Err(ecdsa::Error::from_source(e)),
         }
+    }
+}
+
+impl Decodable for Signature {
+    /// Decodes the provided byte buffer into a Signature instance
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let v = u64::decode(buf)?;
+        Self::from_scalars(U256::decode(buf)?.into(), U256::decode(buf)?.into(), v)
+            .map_err(|_| alloy_rlp::Error::Custom("Signature decoding error"))
+    }
+}
+
+impl Encodable for Signature {
+    /// Encodes the Signature components (`v`, `r`, and `s`) into the provided `out` buffer
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.v().encode(out);
+        B256::from_slice(&self.r().to_bytes().to_vec()).encode(out);
+        B256::from_slice(&self.s().to_bytes().to_vec()).encode(out);
+    }
+
+    /// Computes the total length of the encoded Signature components (`v`, `r`, and `s`)
+    fn length(&self) -> usize {
+        self.v().length() + self.r().to_bytes().length() + self.s().to_bytes().length()
     }
 }
 
@@ -321,5 +345,47 @@ mod tests {
         ).expect("could not parse non-prefixed signature");
 
         assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn signature_rlp_decode() {
+        // Given a hex-encoded byte sequence
+        let bytes = hex::decode("01a048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a010002cef538bc0c8e21c46080634a93e082408b0ad93f4a7207e63ec5463793d").unwrap();
+
+        // Decode the byte sequence into a Signature instance
+        let result = Signature::decode(&mut &bytes[..]).unwrap();
+
+        // Assert that the decoded Signature matches the expected Signature
+        assert_eq!(
+        result,
+        Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap()
+    );
+    }
+
+    #[test]
+    fn signature_rlp_encode() {
+        // Given a Signature instance
+        let sig = Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap();
+
+        // Initialize an empty buffer
+        let mut buf = vec![];
+
+        // Encode the Signature into the buffer
+        sig.encode(&mut buf);
+
+        // Define the expected hex-encoded string
+        let expected = "01a048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a010002cef538bc0c8e21c46080634a93e082408b0ad93f4a7207e63ec5463793d";
+
+        // Assert that the encoded buffer matches the expected hex-encoded string
+        assert_eq!(hex::encode(buf.clone()), expected);
+    }
+
+    #[test]
+    fn signature_rlp_length() {
+        // Given a Signature instance
+        let sig = Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap();
+
+        // Assert that the length of the Signature matches the expected length
+        assert_eq!(sig.length(), 67);
     }
 }

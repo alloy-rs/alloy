@@ -22,6 +22,7 @@ k256.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
+alloy-rlp.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
@@ -37,6 +38,7 @@ coins-bip39 = { version = "0.8.7", default-features = false, optional = true }
 yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = ["rlp"] }
 assert_matches.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
