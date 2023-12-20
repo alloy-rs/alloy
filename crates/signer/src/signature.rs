@@ -58,8 +58,8 @@ impl Encodable for Signature {
     /// Encodes the Signature components (`v`, `r`, and `s`) into the provided `out` buffer
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
         self.v().encode(out);
-        B256::from_slice(&self.r().to_bytes().to_vec()).encode(out);
-        B256::from_slice(&self.s().to_bytes().to_vec()).encode(out);
+        B256::from_slice(&self.r().to_bytes()).encode(out);
+        B256::from_slice(&self.s().to_bytes()).encode(out);
     }
 
     /// Computes the total length of the encoded Signature components (`v`, `r`, and `s`)
