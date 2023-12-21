@@ -153,7 +153,7 @@ impl From<NoopFrame> for GethTrace {
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub enum GethDebugBuiltInTracerType {
     /// The 4byteTracer collects the function selectors of every function executed in the lifetime
     /// of a transaction, along with the size of the supplied call data. The result is a
@@ -311,7 +311,7 @@ impl GethDebugTracingOptions {
 /// These are all known general purpose tracer options that may or not be supported by a given
 /// tracer. For example, the `enableReturnData` option is a noop on regular
 /// `debug_trace{Transaction,Block}` calls.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GethDefaultTracingOptions {
     /// enable memory capture
@@ -356,87 +356,88 @@ pub struct GethDefaultTracingOptions {
 
 impl GethDefaultTracingOptions {
     /// Enables memory capture.
-    pub fn enable_memory(self) -> Self {
+    pub const fn enable_memory(self) -> Self {
         self.with_enable_memory(true)
     }
 
     /// Disables memory capture.
-    pub fn disable_memory(self) -> Self {
+    pub const fn disable_memory(self) -> Self {
         self.with_disable_memory(true)
     }
 
     /// Disables stack capture.
-    pub fn disable_stack(self) -> Self {
+    pub const fn disable_stack(self) -> Self {
         self.with_disable_stack(true)
     }
 
     /// Disables storage capture.
-    pub fn disable_storage(self) -> Self {
+    pub const fn disable_storage(self) -> Self {
         self.with_disable_storage(true)
     }
 
     /// Enables return data capture.
-    pub fn enable_return_data(self) -> Self {
+    pub const fn enable_return_data(self) -> Self {
         self.with_enable_return_data(true)
     }
 
     /// Disables return data capture.
-    pub fn disable_return_data(self) -> Self {
+    pub const fn disable_return_data(self) -> Self {
         self.with_disable_return_data(true)
     }
 
     /// Enables debug mode.
-    pub fn debug(self) -> Self {
+    pub const fn debug(self) -> Self {
         self.with_debug(true)
     }
 
     /// Sets the enable_memory field.
-    pub fn with_enable_memory(mut self, enable: bool) -> Self {
+    pub const fn with_enable_memory(mut self, enable: bool) -> Self {
         self.enable_memory = Some(enable);
         self
     }
 
     /// Sets the disable_memory field.
-    pub fn with_disable_memory(mut self, disable: bool) -> Self {
+    pub const fn with_disable_memory(mut self, disable: bool) -> Self {
         self.disable_memory = Some(disable);
         self
     }
 
     /// Sets the disable_stack field.
-    pub fn with_disable_stack(mut self, disable: bool) -> Self {
+    pub const fn with_disable_stack(mut self, disable: bool) -> Self {
         self.disable_stack = Some(disable);
         self
     }
 
     /// Sets the disable_storage field.
-    pub fn with_disable_storage(mut self, disable: bool) -> Self {
+    pub const fn with_disable_storage(mut self, disable: bool) -> Self {
         self.disable_storage = Some(disable);
         self
     }
 
     /// Sets the enable_return_data field.
-    pub fn with_enable_return_data(mut self, enable: bool) -> Self {
+    pub const fn with_enable_return_data(mut self, enable: bool) -> Self {
         self.enable_return_data = Some(enable);
         self
     }
 
     /// Sets the disable_return_data field.
-    pub fn with_disable_return_data(mut self, disable: bool) -> Self {
+    pub const fn with_disable_return_data(mut self, disable: bool) -> Self {
         self.disable_return_data = Some(disable);
         self
     }
 
     /// Sets the debug field.
-    pub fn with_debug(mut self, debug: bool) -> Self {
+    pub const fn with_debug(mut self, debug: bool) -> Self {
         self.debug = Some(debug);
         self
     }
 
     /// Sets the limit field.
-    pub fn with_limit(mut self, limit: u64) -> Self {
+    pub const fn with_limit(mut self, limit: u64) -> Self {
         self.limit = Some(limit);
         self
     }
+
     /// Returns `true` if return data capture is enabled
     pub fn is_return_data_enabled(&self) -> bool {
         self.enable_return_data

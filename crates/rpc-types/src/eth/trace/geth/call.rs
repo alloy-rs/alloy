@@ -54,7 +54,7 @@ pub struct CallLogFrame {
     pub data: Option<Bytes>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallConfig {
     /// When set to true, this will only trace the primary (top-level) call and not any sub-calls.
@@ -67,13 +67,13 @@ pub struct CallConfig {
 
 impl CallConfig {
     /// Sets the only top call flag
-    pub fn only_top_call(mut self) -> Self {
+    pub const fn only_top_call(mut self) -> Self {
         self.only_top_call = Some(true);
         self
     }
 
     /// Sets the with log flag
-    pub fn with_log(mut self) -> Self {
+    pub const fn with_log(mut self) -> Self {
         self.with_log = Some(true);
         self
     }

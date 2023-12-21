@@ -2,7 +2,7 @@ use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
 
 /// Internal struct to calculate reward percentiles
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxGasAndReward {
     /// Gas used by the transaction
     pub gas_used: u64,

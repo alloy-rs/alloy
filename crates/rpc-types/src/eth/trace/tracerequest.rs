@@ -36,7 +36,7 @@ impl TraceCallRequest {
 
     /// Sets the [`BlockId`]
     /// Note: this is optional
-    pub fn with_block_id(mut self, block_id: BlockId) -> Self {
+    pub const fn with_block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = Some(block_id);
         self
     }

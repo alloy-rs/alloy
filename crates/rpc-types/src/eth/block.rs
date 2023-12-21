@@ -12,236 +12,6 @@ use serde::{
 };
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
-/// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
-/// or if used by `eth_getUncle*`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum BlockTransactions {
-    /// Only hashes
-    Hashes(Vec<B256>),
-    /// Full transactions
-    Full(Vec<Transaction>),
-    /// Special case for uncle response.
-    Uncle,
-}
-
-impl BlockTransactions {
-    /// Converts `self` into `Hashes`.
-    pub fn convert_to_hashes(&mut self) {
-        *self = Self::Hashes(self.hashes().copied().collect());
-    }
-
-    /// Converts `self` into `Hashes`.
-    pub fn into_hashes(mut self) -> Self {
-        self.convert_to_hashes();
-        self
-    }
-
-    /// Check if the enum variant is used for an uncle response.
-    pub const fn is_uncle(&self) -> bool {
-        matches!(self, Self::Uncle)
-    }
-
-    /// Returns an iterator over the transaction hashes.
-    #[deprecated = "use `hashes` instead"]
-    #[inline]
-    pub fn iter(&self) -> BlockTransactionHashes<'_> {
-        self.hashes()
-    }
-
-    /// Returns an iterator over references to the transaction hashes.
-    #[inline]
-    pub fn hashes(&self) -> BlockTransactionHashes<'_> {
-        BlockTransactionHashes::new(self)
-    }
-
-    /// Returns an iterator over mutable references to the transaction hashes.
-    #[inline]
-    pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_> {
-        BlockTransactionHashesMut::new(self)
-    }
-
-    /// Returns an instance of BlockTransactions with the Uncle special case.
-    pub fn uncle() -> Self {
-        Self::Uncle
-    }
-}
-
-/// An iterator over the transaction hashes of a block.
-///
-/// See [`BlockTransactions::hashes`].
-#[derive(Clone, Debug)]
-pub struct BlockTransactionHashes<'a>(BlockTransactionHashesInner<'a>);
-
-#[derive(Clone, Debug)]
-enum BlockTransactionHashesInner<'a> {
-    Hashes(std::slice::Iter<'a, B256>),
-    Full(std::slice::Iter<'a, Transaction>),
-    Uncle,
-}
-
-impl<'a> BlockTransactionHashes<'a> {
-    #[inline]
-    fn new(txs: &'a BlockTransactions) -> Self {
-        Self(match txs {
-            BlockTransactions::Hashes(txs) => BlockTransactionHashesInner::Hashes(txs.iter()),
-            BlockTransactions::Full(txs) => BlockTransactionHashesInner::Full(txs.iter()),
-            BlockTransactions::Uncle => BlockTransactionHashesInner::Uncle,
-        })
-    }
-}
-
-impl<'a> Iterator for BlockTransactionHashes<'a> {
-    type Item = &'a B256;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.next().map(|tx| &tx.hash),
-            BlockTransactionHashesInner::Hashes(txs) => txs.next(),
-            BlockTransactionHashesInner::Uncle => None,
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.size_hint(),
-            BlockTransactionHashesInner::Hashes(txs) => txs.size_hint(),
-            BlockTransactionHashesInner::Uncle => (0, Some(0)),
-        }
-    }
-}
-
-impl ExactSizeIterator for BlockTransactionHashes<'_> {
-    #[inline]
-    fn len(&self) -> usize {
-        match &self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.len(),
-            BlockTransactionHashesInner::Hashes(txs) => txs.len(),
-            BlockTransactionHashesInner::Uncle => 0,
-        }
-    }
-}
-
-impl DoubleEndedIterator for BlockTransactionHashes<'_> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.next_back().map(|tx| &tx.hash),
-            BlockTransactionHashesInner::Hashes(txs) => txs.next_back(),
-            BlockTransactionHashesInner::Uncle => None,
-        }
-            }
-}
-
-impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a> {}
-
-/// An Iterator over the transaction hashes of a block.
-///
-/// See [`BlockTransactions::hashes_mut`].
-#[derive(Debug)]
-pub struct BlockTransactionHashesMut<'a>(BlockTransactionHashesInnerMut<'a>);
-
-#[derive(Debug)]
-enum BlockTransactionHashesInnerMut<'a> {
-    Hashes(std::slice::IterMut<'a, B256>),
-    Full(std::slice::IterMut<'a, Transaction>),
-    Uncle,
-}
-
-impl<'a> BlockTransactionHashesMut<'a> {
-    #[inline]
-    fn new(txs: &'a mut BlockTransactions) -> Self {
-        Self(match txs {
-            BlockTransactions::Hashes(txs) => {
-                BlockTransactionHashesInnerMut::Hashes(txs.iter_mut())
-            }
-            BlockTransactions::Full(txs) => BlockTransactionHashesInnerMut::Full(txs.iter_mut()),
-            BlockTransactions::Uncle => BlockTransactionHashesInnerMut::Uncle,
-        })
-    }
-}
-
-impl<'a> Iterator for BlockTransactionHashesMut<'a> {
-    type Item = &'a mut B256;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.next().map(|tx| &mut tx.hash),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next(),
-            BlockTransactionHashesInnerMut::Uncle => None,
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.size_hint(),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.size_hint(),
-            BlockTransactionHashesInnerMut::Uncle => (0, Some(0)),
-        }
-            }
-}
-
-impl ExactSizeIterator for BlockTransactionHashesMut<'_> {
-    #[inline]
-    fn len(&self) -> usize {
-        match &self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.len(),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.len(),
-            BlockTransactionHashesInnerMut::Uncle => 0,
-        }
-    }
-        }
-
-impl DoubleEndedIterator for BlockTransactionHashesMut<'_> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.next_back().map(|tx| &mut tx.hash),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next_back(),
-            BlockTransactionHashesInnerMut::Uncle => None,
-    }
-}
-}
-
-impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
-
-/// Determines how the `transactions` field of [Block] should be filled.
-///
-/// This essentially represents the `full:bool` argument in RPC calls that determine whether the
-/// response should include full transaction objects or just the hashes.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum BlockTransactionsKind {
-    /// Only include hashes: [BlockTransactions::Hashes]
-    Hashes,
-    /// Include full transaction objects: [BlockTransactions::Full]
-    Full,
-}
-
-impl From<bool> for BlockTransactionsKind {
-    fn from(is_full: bool) -> Self {
-        if is_full {
-            BlockTransactionsKind::Full
-        } else {
-            BlockTransactionsKind::Hashes
-        }
-    }
-}
-
-/// Error that can occur when converting other types to blocks
-#[derive(Debug, thiserror::Error)]
-pub enum BlockError {
-    /// A transaction failed sender recovery
-    #[error("transaction failed sender recovery")]
-    InvalidSignature,
-    /// A raw block failed to decode
-    #[error("failed to decode raw block {0}")]
-    RlpDecodeRawBlock(alloy_rlp::Error),
-}
-
 /// Block representation
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -338,6 +108,236 @@ pub struct Header {
     /// Parent beacon block root
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+}
+
+/// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
+/// or if used by `eth_getUncle*`
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum BlockTransactions {
+    /// Only hashes
+    Hashes(Vec<B256>),
+    /// Full transactions
+    Full(Vec<Transaction>),
+    /// Special case for uncle response.
+    Uncle,
+}
+
+impl BlockTransactions {
+    /// Converts `self` into `Hashes`.
+    pub fn convert_to_hashes(&mut self) {
+        *self = Self::Hashes(self.hashes().copied().collect());
+    }
+
+    /// Converts `self` into `Hashes`.
+    pub fn into_hashes(mut self) -> Self {
+        self.convert_to_hashes();
+        self
+    }
+
+    /// Check if the enum variant is used for an uncle response.
+    pub const fn is_uncle(&self) -> bool {
+        matches!(self, Self::Uncle)
+    }
+
+    /// Returns an iterator over the transaction hashes.
+    #[deprecated = "use `hashes` instead"]
+    #[inline]
+    pub fn iter(&self) -> BlockTransactionHashes<'_> {
+        self.hashes()
+    }
+
+    /// Returns an iterator over references to the transaction hashes.
+    #[inline]
+    pub fn hashes(&self) -> BlockTransactionHashes<'_> {
+        BlockTransactionHashes::new(self)
+    }
+
+    /// Returns an iterator over mutable references to the transaction hashes.
+    #[inline]
+    pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_> {
+        BlockTransactionHashesMut::new(self)
+    }
+
+    /// Returns an instance of BlockTransactions with the Uncle special case.
+    pub const fn uncle() -> Self {
+        Self::Uncle
+    }
+}
+
+/// An iterator over the transaction hashes of a block.
+///
+/// See [`BlockTransactions::hashes`].
+#[derive(Clone, Debug)]
+pub struct BlockTransactionHashes<'a>(BlockTransactionHashesInner<'a>);
+
+#[derive(Clone, Debug)]
+enum BlockTransactionHashesInner<'a> {
+    Hashes(std::slice::Iter<'a, B256>),
+    Full(std::slice::Iter<'a, Transaction>),
+    Uncle,
+}
+
+impl<'a> BlockTransactionHashes<'a> {
+    #[inline]
+    fn new(txs: &'a BlockTransactions) -> Self {
+        Self(match txs {
+            BlockTransactions::Hashes(txs) => BlockTransactionHashesInner::Hashes(txs.iter()),
+            BlockTransactions::Full(txs) => BlockTransactionHashesInner::Full(txs.iter()),
+            BlockTransactions::Uncle => BlockTransactionHashesInner::Uncle,
+        })
+    }
+}
+
+impl<'a> Iterator for BlockTransactionHashes<'a> {
+    type Item = &'a B256;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            BlockTransactionHashesInner::Full(txs) => txs.next().map(|tx| &tx.hash),
+            BlockTransactionHashesInner::Hashes(txs) => txs.next(),
+            BlockTransactionHashesInner::Uncle => None,
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match &self.0 {
+            BlockTransactionHashesInner::Full(txs) => txs.size_hint(),
+            BlockTransactionHashesInner::Hashes(txs) => txs.size_hint(),
+            BlockTransactionHashesInner::Uncle => (0, Some(0)),
+        }
+    }
+}
+
+impl ExactSizeIterator for BlockTransactionHashes<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        match &self.0 {
+            BlockTransactionHashesInner::Full(txs) => txs.len(),
+            BlockTransactionHashesInner::Hashes(txs) => txs.len(),
+            BlockTransactionHashesInner::Uncle => 0,
+        }
+    }
+}
+
+impl DoubleEndedIterator for BlockTransactionHashes<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            BlockTransactionHashesInner::Full(txs) => txs.next_back().map(|tx| &tx.hash),
+            BlockTransactionHashesInner::Hashes(txs) => txs.next_back(),
+            BlockTransactionHashesInner::Uncle => None,
+        }
+    }
+}
+
+impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a> {}
+
+/// An Iterator over the transaction hashes of a block.
+///
+/// See [`BlockTransactions::hashes_mut`].
+#[derive(Debug)]
+pub struct BlockTransactionHashesMut<'a>(BlockTransactionHashesInnerMut<'a>);
+
+#[derive(Debug)]
+enum BlockTransactionHashesInnerMut<'a> {
+    Hashes(std::slice::IterMut<'a, B256>),
+    Full(std::slice::IterMut<'a, Transaction>),
+    Uncle,
+}
+
+impl<'a> BlockTransactionHashesMut<'a> {
+    #[inline]
+    fn new(txs: &'a mut BlockTransactions) -> Self {
+        Self(match txs {
+            BlockTransactions::Hashes(txs) => {
+                BlockTransactionHashesInnerMut::Hashes(txs.iter_mut())
+            }
+            BlockTransactions::Full(txs) => BlockTransactionHashesInnerMut::Full(txs.iter_mut()),
+            BlockTransactions::Uncle => BlockTransactionHashesInnerMut::Uncle,
+        })
+    }
+}
+
+impl<'a> Iterator for BlockTransactionHashesMut<'a> {
+    type Item = &'a mut B256;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            BlockTransactionHashesInnerMut::Full(txs) => txs.next().map(|tx| &mut tx.hash),
+            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next(),
+            BlockTransactionHashesInnerMut::Uncle => None,
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match &self.0 {
+            BlockTransactionHashesInnerMut::Full(txs) => txs.size_hint(),
+            BlockTransactionHashesInnerMut::Hashes(txs) => txs.size_hint(),
+            BlockTransactionHashesInnerMut::Uncle => (0, Some(0)),
+        }
+    }
+}
+
+impl ExactSizeIterator for BlockTransactionHashesMut<'_> {
+    #[inline]
+    fn len(&self) -> usize {
+        match &self.0 {
+            BlockTransactionHashesInnerMut::Full(txs) => txs.len(),
+            BlockTransactionHashesInnerMut::Hashes(txs) => txs.len(),
+            BlockTransactionHashesInnerMut::Uncle => 0,
+        }
+    }
+}
+
+impl DoubleEndedIterator for BlockTransactionHashesMut<'_> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match &mut self.0 {
+            BlockTransactionHashesInnerMut::Full(txs) => txs.next_back().map(|tx| &mut tx.hash),
+            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next_back(),
+            BlockTransactionHashesInnerMut::Uncle => None,
+        }
+    }
+}
+
+impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
+
+/// Determines how the `transactions` field of [Block] should be filled.
+///
+/// This essentially represents the `full:bool` argument in RPC calls that determine whether the
+/// response should include full transaction objects or just the hashes.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum BlockTransactionsKind {
+    /// Only include hashes: [BlockTransactions::Hashes]
+    Hashes,
+    /// Include full transaction objects: [BlockTransactions::Full]
+    Full,
+}
+
+impl From<bool> for BlockTransactionsKind {
+    fn from(is_full: bool) -> Self {
+        if is_full {
+            BlockTransactionsKind::Full
+        } else {
+            BlockTransactionsKind::Hashes
+        }
+    }
+}
+
+/// Error that can occur when converting other types to blocks
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+pub enum BlockError {
+    /// A transaction failed sender recovery
+    #[error("transaction failed sender recovery")]
+    InvalidSignature,
+    /// A raw block failed to decode
+    #[error("failed to decode raw block {0}")]
+    RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
 /// A block hash which may have
@@ -726,12 +726,12 @@ impl fmt::Debug for BlockNumHash {
 
 impl BlockNumHash {
     /// Creates a new `BlockNumHash` from a block number and hash.
-    pub fn new(number: BlockNumber, hash: BlockHash) -> Self {
+    pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
         Self { number, hash }
     }
 
     /// Consumes `Self` and returns [`BlockNumber`], [`BlockHash`]
-    pub fn into_components(self) -> (BlockNumber, BlockHash) {
+    pub const fn into_components(self) -> (BlockNumber, BlockHash) {
         (self.number, self.hash)
     }
 
@@ -774,7 +774,7 @@ pub enum BlockHashOrNumber {
 impl BlockHashOrNumber {
     /// Returns the block number if it is a [`BlockHashOrNumber::Number`].
     #[inline]
-    pub fn as_number(self) -> Option<u64> {
+    pub const fn as_number(self) -> Option<u64> {
         match self {
             BlockHashOrNumber::Hash(_) => None,
             BlockHashOrNumber::Number(num) => Some(num),

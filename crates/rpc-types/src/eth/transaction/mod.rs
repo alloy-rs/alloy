@@ -1,21 +1,18 @@
 //! RPC types for transactions
 
+use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
 pub use common::TransactionInfo;
 pub use receipt::TransactionReceipt;
-pub use request::TransactionRequest;
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
-pub use typed::*;
 
 mod access_list;
 mod common;
 pub mod kzg;
 mod receipt;
-mod request;
 mod signature;
-mod typed;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,15 +72,15 @@ pub struct Transaction {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U64>,
 
-    /// Optimism specific transaction fields
-    #[cfg(feature = "optimism")]
+    /// Arbitrary extra fields.
+    ///
+    /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
     #[serde(flatten)]
-    pub optimism: OptimismTransactionFields,
+    pub other: OtherFields,
 }
 
 /// Optimism specific transaction fields
-#[cfg(feature = "optimism")]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimismTransactionFields {
     /// Hash that uniquely identifies the source of the deposit.
     #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
@@ -95,6 +92,12 @@ pub struct OptimismTransactionFields {
     /// exempt from the L2 gas limit.
     #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
     pub is_system_tx: Option<bool>,
+}
+
+impl From<OptimismTransactionFields> for OtherFields {
+    fn from(value: OptimismTransactionFields) -> Self {
+        serde_json::to_value(value).unwrap().try_into().unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -129,8 +132,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
-            #[cfg(feature = "optimism")]
-            optimism: Default::default(),
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
@@ -168,8 +170,7 @@ mod tests {
             max_fee_per_gas: Some(U128::from(21)),
             max_priority_fee_per_gas: Some(U128::from(22)),
             max_fee_per_blob_gas: None,
-            #[cfg(feature = "optimism")]
-            optimism: Default::default(),
+            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(

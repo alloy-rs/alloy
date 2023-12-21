@@ -13,7 +13,7 @@ pub struct Bundle {
 }
 
 /// State context for callMany
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {
     /// Block Number
@@ -56,12 +56,12 @@ pub enum TransactionIndex {
 
 impl TransactionIndex {
     /// Returns true if this is the all variant
-    pub fn is_all(&self) -> bool {
+    pub const fn is_all(&self) -> bool {
         matches!(self, TransactionIndex::All)
     }
 
     /// Returns the index if this is the index variant
-    pub fn index(&self) -> Option<usize> {
+    pub const fn index(&self) -> Option<usize> {
         match self {
             TransactionIndex::All => None,
             TransactionIndex::Index(idx) => Some(*idx),
@@ -172,12 +172,12 @@ pub struct CallInput {
 
 impl CallInput {
     /// Creates a new instance with the given input data.
-    pub fn new(data: Bytes) -> Self {
+    pub const fn new(data: Bytes) -> Self {
         Self::maybe_input(Some(data))
     }
 
     /// Creates a new instance with the given input data.
-    pub fn maybe_input(input: Option<Bytes>) -> Self {
+    pub const fn maybe_input(input: Option<Bytes>) -> Self {
         Self { input, data: None }
     }
 
@@ -193,7 +193,7 @@ impl CallInput {
     #[inline]
     pub fn try_into_unique_input(self) -> Result<Option<Bytes>, CallInputError> {
         self.check_unique_input().map(|()| self.into_input())
-        }
+    }
 
     /// Returns the optional input data.
     #[inline]
@@ -213,8 +213,8 @@ impl CallInput {
         if let (Some(input), Some(data)) = (&self.input, &self.data) {
             if input != data {
                 return Err(CallInputError::default());
+            }
         }
-    }
         Ok(())
     }
 }

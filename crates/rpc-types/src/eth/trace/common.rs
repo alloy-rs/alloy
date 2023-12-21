@@ -27,7 +27,7 @@ pub enum TraceResult<Ok, Err> {
 
 impl<Ok, Err> TraceResult<Ok, Err> {
     /// Returns the hash of the transaction that was traced.
-    pub fn tx_hash(&self) -> Option<TxHash> {
+    pub const fn tx_hash(&self) -> Option<TxHash> {
         *match self {
             TraceResult::Success { tx_hash, .. } => tx_hash,
             TraceResult::Error { tx_hash, .. } => tx_hash,

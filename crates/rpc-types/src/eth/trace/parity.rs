@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Different Trace diagnostic targets.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TraceType {
     /// Default trace
@@ -97,27 +97,27 @@ pub enum Delta<T> {
 
 impl<T> Delta<T> {
     /// Creates a new [Delta::Changed] variant
-    pub fn changed(from: T, to: T) -> Self {
+    pub const fn changed(from: T, to: T) -> Self {
         Self::Changed(ChangedType { from, to })
     }
 
     /// Returns true if the value is unchanged
-    pub fn is_unchanged(&self) -> bool {
+    pub const fn is_unchanged(&self) -> bool {
         matches!(self, Delta::Unchanged)
     }
 
     /// Returns true if the value is added
-    pub fn is_added(&self) -> bool {
+    pub const fn is_added(&self) -> bool {
         matches!(self, Delta::Added(_))
     }
 
     /// Returns true if the value is removed
-    pub fn is_removed(&self) -> bool {
+    pub const fn is_removed(&self) -> bool {
         matches!(self, Delta::Removed(_))
     }
 
     /// Returns true if the value is changed
-    pub fn is_changed(&self) -> bool {
+    pub const fn is_changed(&self) -> bool {
         matches!(self, Delta::Changed(_))
     }
 }
@@ -174,26 +174,26 @@ pub enum Action {
 
 impl Action {
     /// Returns true if this is a call action
-    pub fn is_call(&self) -> bool {
+    pub const fn is_call(&self) -> bool {
         matches!(self, Action::Call(_))
     }
 
     /// Returns true if this is a create action
-    pub fn is_create(&self) -> bool {
+    pub const fn is_create(&self) -> bool {
         matches!(self, Action::Call(_))
     }
 
     /// Returns true if this is a selfdestruct action
-    pub fn is_selfdestruct(&self) -> bool {
+    pub const fn is_selfdestruct(&self) -> bool {
         matches!(self, Action::Selfdestruct(_))
     }
     /// Returns true if this is a reward action
-    pub fn is_reward(&self) -> bool {
+    pub const fn is_reward(&self) -> bool {
         matches!(self, Action::Reward(_))
     }
 
     /// Returns what kind of action this is
-    pub fn kind(&self) -> ActionType {
+    pub const fn kind(&self) -> ActionType {
         match self {
             Action::Call(_) => ActionType::Call,
             Action::Create(_) => ActionType::Create,
@@ -206,7 +206,7 @@ impl Action {
 /// An external action type.
 ///
 /// Used as enum identifier for [Action]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ActionType {
     /// Contract call.
@@ -221,7 +221,7 @@ pub enum ActionType {
 }
 
 /// Call type.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CallType {
     /// None
@@ -270,7 +270,7 @@ pub struct CreateAction {
 }
 
 /// What kind of reward.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RewardType {
     /// Block rewards
@@ -280,7 +280,7 @@ pub enum RewardType {
 }
 
 /// Recorded reward of a block.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RewardAction {
     /// Author's address.
@@ -292,7 +292,7 @@ pub struct RewardAction {
 }
 
 /// Represents a _selfdestruct_ action fka `suicide`.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SelfdestructAction {
     /// destroyed/suicided address.
@@ -339,7 +339,7 @@ pub enum TraceOutput {
 
 impl TraceOutput {
     /// Returns the gas used by this trace.
-    pub fn gas_used(&self) -> U64 {
+    pub const fn gas_used(&self) -> U64 {
         match self {
             TraceOutput::Call(call) => call.gas_used,
             TraceOutput::Create(create) => create.gas_used,
@@ -514,7 +514,7 @@ pub struct MemoryDelta {
 }
 
 /// A diff of some storage value.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageDelta {
     /// Storage key.

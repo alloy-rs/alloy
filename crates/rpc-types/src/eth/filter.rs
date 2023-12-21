@@ -147,7 +147,7 @@ pub enum FilterBlockOption {
 
 impl FilterBlockOption {
     /// Returns the `fromBlock` value, if any
-    pub fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
+    pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             FilterBlockOption::Range { to_block, .. } => to_block.as_ref(),
             FilterBlockOption::AtBlockHash(_) => None,
@@ -155,7 +155,7 @@ impl FilterBlockOption {
     }
 
     /// Returns the `toBlock` value, if any
-    pub fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
+    pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             FilterBlockOption::Range { from_block, .. } => from_block.as_ref(),
             FilterBlockOption::AtBlockHash(_) => None,
@@ -163,7 +163,7 @@ impl FilterBlockOption {
     }
 
     /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
-    pub fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
+    pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
             FilterBlockOption::Range { from_block, to_block } => {
                 (from_block.as_ref(), to_block.as_ref())
@@ -229,7 +229,7 @@ impl Default for FilterBlockOption {
 impl FilterBlockOption {
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
         let to_block =
             if let FilterBlockOption::Range { to_block, .. } = self { *to_block } else { None };
 
@@ -238,7 +238,7 @@ impl FilterBlockOption {
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
         let from_block =
             if let FilterBlockOption::Range { from_block, .. } = self { *from_block } else { None };
 
@@ -247,7 +247,7 @@ impl FilterBlockOption {
 
     /// Pins the block hash this filter should target.
     #[must_use]
-    pub fn set_hash(&self, hash: B256) -> Self {
+    pub const fn set_hash(&self, hash: B256) -> Self {
         FilterBlockOption::AtBlockHash(hash)
     }
 }
@@ -465,7 +465,7 @@ impl Filter {
     }
 
     /// Returns the numeric value of the `fromBlock` field
-    pub fn get_block_hash(&self) -> Option<B256> {
+    pub const fn get_block_hash(&self) -> Option<B256> {
         match self.block_option {
             FilterBlockOption::AtBlockHash(hash) => Some(hash),
             FilterBlockOption::Range { .. } => None,
