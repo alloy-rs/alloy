@@ -45,8 +45,8 @@ impl<'de> Deserialize<'de> for PubSubItem {
                 A: MapAccess<'de>,
             {
                 let mut id = None;
-                let mut subscription = None;
                 let mut result = None;
+                let mut params = None;
                 let mut error = None;
 
                 // Drain the map into the appropriate fields.
@@ -58,17 +58,17 @@ impl<'de> Deserialize<'de> for PubSubItem {
                             }
                             id = Some(map.next_value()?);
                         }
-                        "subscription" => {
-                            if subscription.is_some() {
-                                return Err(serde::de::Error::duplicate_field("subscription"));
-                            }
-                            subscription = Some(map.next_value()?);
-                        }
                         "result" => {
                             if result.is_some() {
                                 return Err(serde::de::Error::duplicate_field("result"));
                             }
                             result = Some(map.next_value()?);
+                        }
+                        "params" => {
+                            if params.is_some() {
+                                return Err(serde::de::Error::duplicate_field("params"));
+                            }
+                            params = Some(map.next_value()?);
                         }
                         "error" => {
                             if error.is_some() {
@@ -85,11 +85,6 @@ impl<'de> Deserialize<'de> for PubSubItem {
 
                 // If it has an ID, it is a response.
                 if let Some(id) = id {
-                    if subscription.is_some() {
-                        return Err(serde::de::Error::custom(
-                            "unexpected subscription in pubsub item",
-                        ));
-                    }
                     // We need to differentiate error vs result here.
                     let payload = if let Some(error) = error {
                         ResponsePayload::Failure(error)
@@ -108,18 +103,11 @@ impl<'de> Deserialize<'de> for PubSubItem {
                             "unexpected `error` field in subscription notification",
                         ));
                     }
-                    // Notifications must have a subscription and a result.
-                    if subscription.is_none() {
-                        return Err(serde::de::Error::missing_field("subscription"));
+                    if let Some(params) = params {
+                        Ok(PubSubItem::Notification(params))
+                    } else {
+                        Err(serde::de::Error::missing_field("params"))
                     }
-                    if result.is_none() {
-                        return Err(serde::de::Error::missing_field("result"));
-                    }
-
-                    Ok(PubSubItem::Notification(EthNotification {
-                        subscription: subscription.unwrap(),
-                        result: result.unwrap(),
-                    }))
                 }
             }
         }
