@@ -85,16 +85,15 @@ impl<'de> Deserialize<'de> for PubSubItem {
 
                 // If it has an ID, it is a response.
                 if let Some(id) = id {
-                    // We need to differentiate error vs result here.
-                    let payload = if let Some(error) = error {
-                        ResponsePayload::Failure(error)
-                    } else if let Some(result) = result {
-                        ResponsePayload::Success(result)
-                    } else {
-                        return Err(serde::de::Error::custom(
-                            "missing `result` or `error` field in response",
-                        ));
-                    };
+                    let payload = error
+                        .map(ResponsePayload::Failure)
+                        .or_else(|| result.map(ResponsePayload::Success))
+                        .ok_or_else(|| {
+                            serde::de::Error::custom(
+                                "missing `result` or `error` field in response",
+                            )
+                        })?;
+
                     Ok(PubSubItem::Response(Response { id, payload }))
                 } else {
                     // Notifications cannot have an error.
@@ -103,15 +102,36 @@ impl<'de> Deserialize<'de> for PubSubItem {
                             "unexpected `error` field in subscription notification",
                         ));
                     }
-                    if let Some(params) = params {
-                        Ok(PubSubItem::Notification(params))
-                    } else {
-                        Err(serde::de::Error::missing_field("params"))
-                    }
+                    params
+                        .map(PubSubItem::Notification)
+                        .ok_or_else(|| serde::de::Error::missing_field("params"))
                 }
             }
         }
 
         deserializer.deserialize_any(PubSubItemVisitor)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::{EthNotification, PubSubItem};
+
+    #[test]
+    fn deserializer_test() {
+        // https://geth.ethereum.org/docs/interacting-with-geth/rpc/pubsub
+        let notification = r#"{ "jsonrpc": "2.0", "method": "eth_subscription", "params": {"subscription": "0xcd0c3e8af590364c09d0fa6a1210faf5", "result": {"difficulty": "0xd9263f42a87", "uncles": []}} }
+        "#;
+
+        let deser = serde_json::from_str::<PubSubItem>(&notification).unwrap();
+
+        match deser {
+            PubSubItem::Notification(EthNotification { subscription, result }) => {
+                assert_eq!(subscription, "0xcd0c3e8af590364c09d0fa6a1210faf5".parse().unwrap());
+                assert_eq!(result.get(), r#"{"difficulty": "0xd9263f42a87", "uncles": []}"#);
+            }
+            _ => panic!("unexpected deserialization result"),
+        }
     }
 }
