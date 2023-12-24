@@ -86,7 +86,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> 
     #[inline]
     fn sign_hash_sync(&self, hash: B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
-        Ok(Signature::from_signature_and_parity(recoverable_sig, recovery_id))
+        Signature::from_signature_and_parity(recoverable_sig, recovery_id).map_err(Into::into)
     }
 }
 

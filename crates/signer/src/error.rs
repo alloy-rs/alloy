@@ -26,6 +26,9 @@ pub enum Error {
     /// [`hex`](mod@hex) error.
     #[error(transparent)]
     HexError(#[from] hex::FromHexError),
+    /// Signature error.
+    #[error(transparent)]
+    SignatureError(#[from] alloy_primitives::SignatureError),
     /// Generic error.
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),

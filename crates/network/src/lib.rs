@@ -57,7 +57,7 @@ pub trait Network: Sized + Send + Sync + 'static {
     };
 
     /// The JSON body of a transaction request.
-    type TransactionRequest: RpcObject; // + TransactionBuilder
+    type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
 
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;

@@ -11,7 +11,7 @@ use aws_sdk_kms::{
     types::{MessageType, SigningAlgorithmSpec},
     Client,
 };
-use k256::ecdsa::{self, RecoveryId, VerifyingKey};
+use k256::ecdsa::{self, VerifyingKey};
 use std::fmt;
 
 /// Amazon Web Services Key Management Service (AWS KMS) Ethereum signer.
@@ -228,12 +228,12 @@ fn sig_from_digest_bytes_trial_recovery(
     hash: B256,
     pubkey: &VerifyingKey,
 ) -> Signature {
-    let signature = Signature::from_signature_and_parity(sig, RecoveryId::from_byte(0).unwrap());
+    let signature = Signature::from_signature_and_parity(sig, false).unwrap();
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
 
-    let signature = signature.with_parity(1);
+    let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
