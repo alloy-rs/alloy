@@ -124,7 +124,7 @@ mod test {
         let notification = r#"{ "jsonrpc": "2.0", "method": "eth_subscription", "params": {"subscription": "0xcd0c3e8af590364c09d0fa6a1210faf5", "result": {"difficulty": "0xd9263f42a87", "uncles": []}} }
         "#;
 
-        let deser = serde_json::from_str::<PubSubItem>(&notification).unwrap();
+        let deser = serde_json::from_str::<PubSubItem>(notification).unwrap();
 
         match deser {
             PubSubItem::Notification(EthNotification { subscription, result }) => {
