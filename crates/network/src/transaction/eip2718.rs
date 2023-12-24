@@ -9,7 +9,7 @@ const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(thiserror::Error, Debug, Clone, Copy)]
+#[derive(thiserror::Error, Debug)]
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
     #[error(transparent)]
@@ -17,6 +17,9 @@ pub enum Eip2718Error {
     /// Got an unexpected type flag while decoding.
     #[error("Unexpected type flag. Got {0}.")]
     UnexpectedType(u8),
+    /// Some other error occurred.
+    #[error(transparent)]
+    Custom(#[from] Box<dyn std::error::Error>),
 }
 
 /// Decoding trait for [EIP-2718] envelopes.
@@ -51,6 +54,11 @@ pub trait Decodable2718: Sized {
     }
 
     /// Decode an EIP-2718 transaction in the network format.
+    ///
+    /// The network format is the RLP encoded string consisting of the
+    /// type-flag prepneded to an opaque inner encoding. The inner encoding is
+    /// RLP for all current Ethereum transaction types, but may not be in future
+    /// versions of the protocol.
     fn network_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
         let h_decode = &mut *buf;
         let h = Header::decode(h_decode)?;

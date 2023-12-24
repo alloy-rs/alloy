@@ -55,4 +55,24 @@ pub trait Transaction: Encodable + Send + Sync + 'static {
 }
 
 /// Captures getters and setters common across EIP-1559 transactions across all networks
-pub trait Eip1559Transaction: Transaction {}
+pub trait Eip1559Transaction: Transaction {
+    /// Get `max_priority_fee_per_gas`.
+    fn max_priority_fee_per_gas(&self) -> U256;
+    /// Set `max_priority_fee_per_gas`.
+    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256);
+
+    /// Get `max_fee_per_gas`.
+    fn max_fee_per_gas(&self) -> U256;
+    /// Set `max_fee_per_gas`.
+    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256);
+
+    /// Get `max_tip` (an alias for `max_priority_fee_per_gas`).
+    fn max_tip(&self) -> U256 {
+        self.max_priority_fee_per_gas()
+    }
+
+    /// Set max tip, (an alias for `max_priority_fee_per_gas`).
+    fn set_max_tip(&mut self, max_tip: U256) {
+        self.set_max_priority_fee_per_gas(max_tip)
+    }
+}
