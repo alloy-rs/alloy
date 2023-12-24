@@ -199,17 +199,17 @@ impl Transaction for TxEip2930 {
     {
         let mut buf = vec![];
         buf.put_u8(TxType::Eip2930 as u8);
-        self.encode_rlp_signed(&signature, &mut buf);
+        self.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
 
         Signed::new_unchecked(self, signature, hash)
     }
 
-    fn encode_rlp_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.encode_with_signature(signature, out)
     }
 
-    fn decode_rlp_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             dbg!(alloy_primitives::hex::encode(&buf));

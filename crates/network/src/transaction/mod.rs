@@ -15,11 +15,15 @@ pub trait Transaction: Encodable + Send + Sync + 'static {
     where
         Self: Sized;
 
-    /// Encode with a signature via RLP.
-    fn encode_rlp_signed(&self, signature: &Signature, out: &mut dyn BufMut);
+    /// Encode with a signature. This encoding is usually RLP, but may be
+    /// different for future EIP-2718 transaction types.
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut);
 
-    /// RLP decode a signed transaction.
-    fn decode_rlp_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>>
+    /// Decode a signed transaction. This decoding is usually RLP, but may be
+    /// different for future EIP-2718 transaction types.
+    ///
+    /// This MUST be the inverse of [`Transaction::encode_signed`].
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>>
     where
         Self: Sized;
 

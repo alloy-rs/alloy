@@ -219,11 +219,11 @@ impl Transaction for TxLegacy {
         Signed::new_unchecked(self, signature, hash)
     }
 
-    fn encode_rlp_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.encode_with_signature(signature, out);
     }
 
-    fn decode_rlp_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);

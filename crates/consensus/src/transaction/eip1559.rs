@@ -236,17 +236,17 @@ impl Transaction for TxEip1559 {
     {
         let mut buf = vec![];
         buf.put_u8(TxType::Eip1559 as u8);
-        self.encode_rlp_signed(&signature, &mut buf);
+        self.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
 
         Signed::new_unchecked(self, signature, hash)
     }
 
-    fn encode_rlp_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         TxEip1559::encode_with_signature(self, signature, out)
     }
 
-    fn decode_rlp_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);

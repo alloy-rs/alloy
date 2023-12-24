@@ -42,21 +42,21 @@ impl<T: Transaction> Signed<T> {
     }
 
     /// Output the signed RLP for the transaction.
-    pub fn encode_rlp_signed(&self, out: &mut dyn BufMut) {
-        self.tx.encode_rlp_signed(&self.signature, out);
+    pub fn encode_signed(&self, out: &mut dyn BufMut) {
+        self.tx.encode_signed(&self.signature, out);
     }
 
     /// Produce the RLP encoded signed transaction.
     pub fn rlp_signed(&self) -> Vec<u8> {
         let mut buf = vec![];
-        self.encode_rlp_signed(&mut buf);
+        self.encode_signed(&mut buf);
         buf
     }
 }
 
 impl<T: Transaction> alloy_rlp::Encodable for Signed<T> {
     fn encode(&self, out: &mut dyn BufMut) {
-        self.tx.encode_rlp_signed(&self.signature, out)
+        self.tx.encode_signed(&self.signature, out)
     }
 
     // TODO: impl length
@@ -64,7 +64,7 @@ impl<T: Transaction> alloy_rlp::Encodable for Signed<T> {
 
 impl<T: Transaction> alloy_rlp::Decodable for Signed<T> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        T::decode_rlp_signed(buf)
+        T::decode_signed(buf)
     }
 }
 
