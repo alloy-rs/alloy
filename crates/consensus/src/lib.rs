@@ -1,5 +1,5 @@
 mod header;
-mod log;
+
 mod receipt;
 
 pub mod transaction;
