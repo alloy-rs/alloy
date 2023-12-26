@@ -27,6 +27,7 @@ mod pure;
 pub use pure::{calc_blob_gasprice, calc_excess_blob_gas, calc_next_block_base_fee};
 
 mod receipt;
+pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 mod transaction;
 pub use transaction::{

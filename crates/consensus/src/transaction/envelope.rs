@@ -1,5 +1,5 @@
 use alloy_network::{Decodable2718, Eip2718Error, Encodable2718, Signed};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 use crate::{TxEip1559, TxEip2930, TxLegacy};
 
@@ -55,12 +55,6 @@ pub enum TxEnvelope {
     Eip1559(Signed<TxEip1559>),
 }
 
-impl From<Signed<TxLegacy>> for TxEnvelope {
-    fn from(v: Signed<TxLegacy>) -> Self {
-        Self::Legacy(v)
-    }
-}
-
 impl From<Signed<TxEip2930>> for TxEnvelope {
     fn from(v: Signed<TxEip2930>) -> Self {
         Self::Eip2930(v)
@@ -77,18 +71,18 @@ impl TxEnvelope {
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
         match self {
-            TxEnvelope::Legacy(_) | TxEnvelope::TaggedLegacy(_) => TxType::Legacy,
-            TxEnvelope::Eip2930(_) => TxType::Eip2930,
-            TxEnvelope::Eip1559(_) => TxType::Eip1559,
+            Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
+            Self::Eip2930(_) => TxType::Eip2930,
+            Self::Eip1559(_) => TxType::Eip1559,
         }
     }
 
     /// Return the length of the inner txn.
     pub fn inner_length(&self) -> usize {
         match self {
-            Self::Legacy(t) | TxEnvelope::TaggedLegacy(t) => t.length(),
-            TxEnvelope::Eip2930(t) => t.length(),
-            TxEnvelope::Eip1559(t) => t.length(),
+            Self::Legacy(t) | Self::TaggedLegacy(t) => t.length(),
+            Self::Eip2930(t) => t.length(),
+            Self::Eip1559(t) => t.length(),
         }
     }
 
@@ -110,8 +104,11 @@ impl Encodable for TxEnvelope {
     }
 
     fn length(&self) -> usize {
-        let payload_length = self.rlp_payload_length();
-        Header { list: true, payload_length }.length() + payload_length
+        let mut payload_length = self.rlp_payload_length();
+        if !self.is_legacy() {
+            payload_length += length_of_length(payload_length);
+        }
+        payload_length
     }
 }
 
@@ -142,10 +139,10 @@ impl Decodable2718 for TxEnvelope {
 impl Encodable2718 for TxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
-            TxEnvelope::Legacy(_) => None,
-            TxEnvelope::TaggedLegacy(_) => Some(TxType::Legacy as u8),
-            TxEnvelope::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            TxEnvelope::Eip1559(_) => Some(TxType::Eip1559 as u8),
+            Self::Legacy(_) => None,
+            Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
+            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
+            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
         }
     }
 

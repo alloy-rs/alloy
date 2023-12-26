@@ -97,6 +97,11 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     /// envelope.
     fn type_flag(&self) -> Option<u8>;
 
+    /// True if the envelope is the legacy variant.
+    fn is_legacy(&self) -> bool {
+        self.type_flag().is_none()
+    }
+
     /// The length of the 2718 encoded envelope. This is the length of the type
     /// flag + the length of the inner transaction RLP.
     fn encode_2718_len(&self) -> usize;
@@ -131,7 +136,10 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     /// Return the network encoding. This is the RLP encoding of the bytestring
     /// of the 2718 encoding.
     fn network_encode(&self, out: &mut dyn BufMut) {
-        Header { list: false, payload_length: self.encode_2718_len() }.encode(out);
+        if !self.is_legacy() {
+            Header { list: false, payload_length: self.encode_2718_len() }.encode(out);
+        }
+
         self.encode_2718(out);
     }
 }
