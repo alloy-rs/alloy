@@ -2,10 +2,10 @@ mod signed;
 pub use signed::Signed;
 
 use alloy_primitives::{Bytes, ChainId, Signature, B256, U256};
-use alloy_rlp::{BufMut, Encodable};
+use alloy_rlp::BufMut;
 
-/// Represents a transaction.
-pub trait Transaction: Encodable + Send + Sync + 'static {
+/// Represents a minimal EVM transaction.
+pub trait Transaction: Send + Sync + 'static {
     /// The signature type for this transaction. This is usually
     /// alloy_primitives::Signature, however, it may be different for future
     /// EIP-2718 transaction types, or in other networks. For example, in
