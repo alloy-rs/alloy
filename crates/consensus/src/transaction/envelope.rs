@@ -12,8 +12,11 @@ use crate::{TxEip1559, TxEip2930, TxLegacy};
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum TxType {
+    /// Wrapped legacy transaction type.
     Legacy = 0,
+    /// EIP-2930 transaction type.
     Eip2930 = 1,
+    /// EIP-1559 transaction type.
     Eip1559 = 2,
 }
 

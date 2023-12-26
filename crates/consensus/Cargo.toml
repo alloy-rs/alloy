@@ -14,7 +14,6 @@ alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
-thiserror.workspace = true
 
 [dev-dependencies]
 hex-literal = "0.4.1"
