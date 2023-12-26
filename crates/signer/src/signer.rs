@@ -32,7 +32,10 @@ pub trait Signer: Send + Sync {
 
     /// Signs the transaction.
     #[inline]
-    async fn sign_transaction(&self, message: &dyn Transaction) -> Result<Signature> {
+    async fn sign_transaction(
+        &self,
+        message: &dyn Transaction<Signature = Signature>,
+    ) -> Result<Signature> {
         self.sign_hash(message.signature_hash()).await
     }
 
@@ -98,7 +101,10 @@ pub trait SignerSync {
 
     /// Signs the transaction.
     #[inline]
-    fn sign_transaction_sync(&self, message: &dyn alloy_network::Transaction) -> Result<Signature> {
+    fn sign_transaction_sync(
+        &self,
+        message: &dyn alloy_network::Transaction<Signature = Signature>,
+    ) -> Result<Signature> {
         self.sign_hash_sync(message.signature_hash())
     }
 

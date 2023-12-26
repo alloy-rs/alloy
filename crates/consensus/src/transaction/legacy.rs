@@ -209,6 +209,8 @@ impl Decodable for TxLegacy {
 }
 
 impl Transaction for TxLegacy {
+    type Signature = Signature;
+
     fn into_signed(self, signature: Signature) -> Signed<Self>
     where
         Self: Sized,

@@ -4,9 +4,9 @@ use alloy_rlp::BufMut;
 
 /// A transaction with a signature and hash seal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Signed<T> {
+pub struct Signed<T, Sig = Signature> {
     tx: T,
-    signature: Signature,
+    signature: Sig,
     hash: B256,
 }
 
@@ -18,15 +18,15 @@ impl<T> std::ops::Deref for Signed<T> {
     }
 }
 
-impl<T> Signed<T> {
+impl<T, Sig> Signed<T, Sig> {
     /// Return a reference to the transactions
     pub const fn tx(&self) -> &T {
         &self.tx
     }
 
     /// Get a reference to the signature
-    pub const fn signature(&self) -> Signature {
-        self.signature
+    pub const fn signature(&self) -> &Sig {
+        &self.signature
     }
 
     /// Get the transaction hash.
@@ -69,7 +69,7 @@ impl<T: Transaction> alloy_rlp::Decodable for Signed<T> {
 }
 
 #[cfg(feature = "k256")]
-impl<T: Transaction> Signed<T> {
+impl<T: Transaction> Signed<T, Signature> {
     /// Recover the signer of the transaction
     pub fn recover_signer(
         &self,

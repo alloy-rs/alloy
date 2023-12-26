@@ -6,9 +6,12 @@ use alloy_rlp::{BufMut, Encodable};
 
 /// Represents a transaction.
 pub trait Transaction: Encodable + Send + Sync + 'static {
+    /// The signature type for this transaction.
+    type Signature;
+
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.
-    fn into_signed(self, signature: Signature) -> Signed<Self>
+    fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature>
     where
         Self: Sized;
 

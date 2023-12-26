@@ -230,6 +230,8 @@ impl Decodable for TxEip1559 {
 }
 
 impl Transaction for TxEip1559 {
+    type Signature = Signature;
+
     fn into_signed(self, signature: Signature) -> Signed<Self>
     where
         Self: Sized,
