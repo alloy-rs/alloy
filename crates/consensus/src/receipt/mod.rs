@@ -271,6 +271,44 @@ impl alloy_rlp::Decodable for ReceiptWithBloom {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for Receipt {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let success = bool::arbitrary(u)?;
+        let cumulative_gas_used = u64::arbitrary(u)?;
+        let logs = Vec::<Log>::arbitrary(u)?;
+
+        // Only receipts for deposit transactions may contain a deposit nonce
+        #[cfg(feature = "optimism")]
+        let deposit_nonce =
+            if tx_type == TxType::DEPOSIT { Option::<u64>::arbitrary(u)? } else { None };
+
+        Ok(Self {
+            success,
+            cumulative_gas_used,
+            logs,
+            #[cfg(feature = "optimism")]
+            deposit_nonce,
+        })
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for ReceiptEnvelope {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let tx_type = u.int_in_range(-1..=2)?;
+        let receipt = Receipt::arbitrary(u)?.with_bloom();
+
+        match tx_type {
+            -1 => Ok(Self::Legacy(receipt)),
+            0 => Ok(Self::TaggedLegacy(receipt)),
+            1 => Ok(Self::Eip2930(receipt)),
+            2 => Ok(Self::Eip1559(receipt)),
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

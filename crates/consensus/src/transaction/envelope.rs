@@ -20,6 +20,18 @@ pub enum TxType {
     Eip1559 = 2,
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for TxType {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        Ok(match u.int_in_range(0..=2)? {
+            0 => TxType::Legacy,
+            1 => TxType::Eip2930,
+            2 => TxType::Eip1559,
+            _ => unreachable!(),
+        })
+    }
+}
+
 impl TryFrom<u8> for TxType {
     type Error = Eip2718Error;
 
