@@ -1,6 +1,6 @@
 use std::mem;
 
-use alloy_network::Sealed;
+use alloy_network::Sealable;
 use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
 use alloy_rlp::{
     length_of_length, Buf, BufMut, BytesMut, Decodable, Encodable, EMPTY_LIST_CODE,
@@ -121,7 +121,15 @@ impl Default for Header {
     }
 }
 
+impl Sealable for Header {
+    fn hash(&self) -> B256 {
+        self.hash_slow()
+    }
+}
+
 impl Header {
+    // TODO: re-enable
+
     // /// Returns the parent block's number and hash
     // pub fn parent_num_hash(&self) -> BlockNumHash {
     //     BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
@@ -154,6 +162,8 @@ impl Header {
     pub fn transaction_root_is_empty(&self) -> bool {
         self.transactions_root == EMPTY_ROOT_HASH
     }
+
+    // TODO: re-enable
 
     // /// Converts all roots in the header to a [BlockBodyRoots] struct.
     // pub fn body_roots(&self) -> BlockBodyRoots {
@@ -198,22 +208,6 @@ impl Header {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
-    }
-
-    /// Seal the header with a known hash.
-    ///
-    /// WARNING: This method does not perform validation, and can be used to
-    /// create invalid sealed headers.
-    #[inline]
-    pub fn seal_unchecked(self, seal: B256) -> Sealed<Header> {
-        Sealed::new_unchecked(self, seal)
-    }
-
-    /// Calculate hash and seal the Header so that it can't be changed.
-    #[inline]
-    pub fn seal_slow(self) -> Sealed<Header> {
-        let hash = self.hash_slow();
-        self.seal_unchecked(hash)
     }
 
     /// Calculate a heuristic for the in-memory size of the [Header].
