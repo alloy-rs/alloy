@@ -3,7 +3,7 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header, Result};
 use std::mem;
 
-use crate::transaction::TxKind;
+use crate::{transaction::TxKind, ReceiptWithBloom};
 
 /// Legacy transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -210,6 +210,7 @@ impl Decodable for TxLegacy {
 
 impl Transaction for TxLegacy {
     type Signature = Signature;
+    type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self>
     where

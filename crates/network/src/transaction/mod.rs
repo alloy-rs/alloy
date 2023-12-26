@@ -4,6 +4,8 @@ pub use signed::Signed;
 use alloy_primitives::{Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::BufMut;
 
+use crate::Receipt;
+
 /// Represents a minimal EVM transaction.
 pub trait Transaction: Send + Sync + 'static {
     /// The signature type for this transaction. This is usually
@@ -11,6 +13,9 @@ pub trait Transaction: Send + Sync + 'static {
     /// EIP-2718 transaction types, or in other networks. For example, in
     /// Optimism, the deposit transaction signature is the unit type `()`.
     type Signature;
+
+    /// The receipt type for this transaction.
+    type Receipt: Receipt;
 
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.

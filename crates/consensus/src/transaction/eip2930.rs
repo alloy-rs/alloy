@@ -3,7 +3,10 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header};
 use std::mem;
 
-use crate::transaction::{AccessList, TxKind};
+use crate::{
+    transaction::{AccessList, TxKind},
+    ReceiptWithBloom,
+};
 
 use super::TxType;
 
@@ -194,6 +197,7 @@ impl Decodable for TxEip2930 {
 
 impl Transaction for TxEip2930 {
     type Signature = Signature;
+    type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self>
     where

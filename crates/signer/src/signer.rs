@@ -7,6 +7,25 @@ use auto_impl::auto_impl;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+/// Trait for a signable transaction.
+///
+/// This trait allows us to generically sign transactions without knowing the
+/// receipt type, and is blanket implemented for transactions which our signer
+/// trait can produce signatures for.
+pub trait SignableTx: Send + Sync + 'static {
+    /// Calculate the signing hash for the transaction.
+    fn signature_hash(&self) -> B256;
+}
+
+impl<T> SignableTx for T
+where
+    T: Transaction<Signature = Signature>,
+{
+    fn signature_hash(&self) -> B256 {
+        Transaction::signature_hash(self)
+    }
+}
+
 /// Asynchronous Ethereum signer.
 ///
 /// All provided implementations rely on [`sign_hash`](Signer::sign_hash). A signer may not always
@@ -32,10 +51,7 @@ pub trait Signer: Send + Sync {
 
     /// Signs the transaction.
     #[inline]
-    async fn sign_transaction(
-        &self,
-        message: &dyn Transaction<Signature = Signature>,
-    ) -> Result<Signature> {
+    async fn sign_transaction(&self, message: &dyn SignableTx) -> Result<Signature> {
         self.sign_hash(message.signature_hash()).await
     }
 
@@ -101,15 +117,12 @@ pub trait SignerSync {
 
     /// Signs the transaction.
     #[inline]
-    fn sign_transaction_sync(
-        &self,
-        message: &dyn alloy_network::Transaction<Signature = Signature>,
-    ) -> Result<Signature> {
+    fn sign_transaction_sync(&self, message: &dyn SignableTx) -> Result<Signature> {
         self.sign_hash_sync(message.signature_hash())
     }
 
     /// Signs the transaction.
-    fn sign_transaction_sync_generic<T: Transaction>(&self, message: &T) -> Result<Signature>
+    fn sign_transaction_sync_generic<T: SignableTx>(&self, message: &T) -> Result<Signature>
     where
         Self: Sized,
     {

@@ -3,7 +3,7 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header};
 use std::mem;
 
-use crate::{AccessList, TxKind, TxType};
+use crate::{AccessList, ReceiptWithBloom, TxKind, TxType};
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -231,6 +231,7 @@ impl Decodable for TxEip1559 {
 
 impl Transaction for TxEip1559 {
     type Signature = Signature;
+    type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self>
     where

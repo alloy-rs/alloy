@@ -56,6 +56,11 @@ pub trait Network: Sized + Send + Sync + 'static {
         assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
     };
 
+    /// The network transaction envelope type.
+    type TxEnvelope: Eip2718Envelope;
+    /// The network receipt envelope type.
+    type ReceiptEnvelope: Eip2718Envelope;
+
     /// The JSON body of a transaction request.
     type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
 
