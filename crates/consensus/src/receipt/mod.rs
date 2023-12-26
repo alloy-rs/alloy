@@ -280,6 +280,10 @@ impl alloy_network::Receipt for ReceiptWithBloom {
         self.bloom
     }
 
+    fn bloom_cheap(&self) -> Option<Bloom> {
+        Some(self.bloom)
+    }
+
     fn cumulative_gas_used(&self) -> u64 {
         self.receipt.cumulative_gas_used
     }
