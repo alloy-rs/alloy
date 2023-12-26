@@ -22,8 +22,8 @@ networking. The core model is as follows:
 ## Usage
 
 This crate is not intended to be used directly. It is used by the
-[alloy-providers] library to modify the input and output types of the RPC
-methods.
+[alloy-providers] library and reth to modify the input and output types of the
+RPC methods.
 
 This crate will primarily be used by blockchain maintainers to add bespoke RPC
 types to the Alloy provider. This is done by implementing the `Network` trait,

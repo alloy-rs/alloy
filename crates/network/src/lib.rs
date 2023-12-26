@@ -15,15 +15,14 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod sealed;
+mod eip2718;
+pub use eip2718::{Decodable2718, Eip2718Envelope, Eip2718Error, Encodable2718};
 
+mod sealed;
 pub use sealed::{Sealable, Sealed};
 
 mod transaction;
-pub use transaction::{
-    Decodable2718, Eip1559Transaction, Eip2718Envelope, Eip2718Error, Encodable2718, Signed,
-    Transaction,
-};
+pub use transaction::{Eip1559Transaction, Signed, Transaction};
 
 mod receipt;
 
