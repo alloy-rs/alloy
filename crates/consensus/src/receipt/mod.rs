@@ -187,16 +187,18 @@ impl From<Receipt> for ReceiptWithBloom {
 
 impl ReceiptWithBloom {
     /// Create new [ReceiptWithBloom]
-    pub fn new(receipt: Receipt, bloom: Bloom) -> Self {
+    pub const fn new(receipt: Receipt, bloom: Bloom) -> Self {
         Self { receipt, bloom }
     }
 
     /// Consume the structure, returning only the receipt
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_receipt(self) -> Receipt {
         self.receipt
     }
 
     /// Consume the structure, returning the receipt and the bloom filter
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_components(self) -> (Receipt, Bloom) {
         (self.receipt, self.bloom)
     }

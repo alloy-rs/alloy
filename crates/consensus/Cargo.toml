@@ -16,17 +16,13 @@ alloy-rlp.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-proptest = { workspace = true, optional = true }
-proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex-literal = "0.4.1"
 arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
 
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-network/k256"]
 serde = ["dep:serde"]
-arbitrary = ["dep:arbitrary", "dep:proptest", "dep:proptest-derive"]
+arbitrary = ["dep:arbitrary"]

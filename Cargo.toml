@@ -84,3 +84,5 @@ proptest-derive = "0.4"
 
 [patch.crates-io]
 alloy-primitives = { path = "../core/crates/primitives" }
+alloy-sol-types = { path = "../core/crates/sol-types" }
+alloy-sol-macro = { path = "../core/crates/sol-macro" }
