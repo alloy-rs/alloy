@@ -6,7 +6,10 @@ use alloy_rlp::{BufMut, Encodable};
 
 /// Represents a transaction.
 pub trait Transaction: Encodable + Send + Sync + 'static {
-    /// The signature type for this transaction.
+    /// The signature type for this transaction. This is usually
+    /// alloy_primitives::Signature, however, it may be different for future
+    /// EIP-2718 transaction types, or in other networks. For example, in
+    /// Optimism, the deposit transaction signature is the unit type `()`.
     type Signature;
 
     /// Convert to a signed transaction by adding a signature and computing the
