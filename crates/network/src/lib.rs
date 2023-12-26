@@ -25,6 +25,7 @@ mod transaction;
 pub use transaction::{Eip1559Transaction, Signed, Transaction};
 
 mod receipt;
+pub use receipt::Receipt;
 
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::B256;

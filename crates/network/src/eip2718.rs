@@ -1,4 +1,4 @@
-use alloy_primitives::keccak256;
+use alloy_primitives::{keccak256, B256};
 use alloy_rlp::{BufMut, Header};
 
 use crate::Sealed;
@@ -126,10 +126,14 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         out
     }
 
+    /// Compute the hash as committed to in the MPT trie.
+    fn trie_hash(&self) -> B256 {
+        keccak256(&self.encoded_2718())
+    }
+
     /// Seal the encodable, by encoding and hashing it.
     fn seal(self) -> Sealed<Self> {
-        let buf = self.encoded_2718();
-        let hash = keccak256(buf);
+        let hash = self.trie_hash();
         Sealed::new_unchecked(self, hash)
     }
 

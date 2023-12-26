@@ -164,6 +164,24 @@ impl Receipt {
     }
 }
 
+impl alloy_network::Receipt for Receipt {
+    fn success(&self) -> bool {
+        self.success
+    }
+
+    fn bloom(&self) -> Bloom {
+        self.bloom_slow()
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.cumulative_gas_used
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.logs
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -250,6 +268,24 @@ impl ReceiptWithBloom {
         }
         *buf = *b;
         Ok(this)
+    }
+}
+
+impl alloy_network::Receipt for ReceiptWithBloom {
+    fn success(&self) -> bool {
+        self.receipt.success
+    }
+
+    fn bloom(&self) -> Bloom {
+        self.bloom
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.receipt.cumulative_gas_used
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.receipt.logs
     }
 }
 
