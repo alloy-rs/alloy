@@ -24,6 +24,7 @@ alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-signer = { version = "0.1.0", path = "crates/signer" }
 alloy-signer-aws = { version = "0.1.0", path = "crates/signer-aws" }
+alloy-signer-gcp = { version = "0.1.0", path = "crates/signer-gcp" }
 alloy-signer-ledger = { version = "0.1.0", path = "crates/signer-ledger" }
 alloy-signer-trezor = { version = "0.1.0", path = "crates/signer-trezor" }
 alloy-transport = { version = "0.1.0", path = "crates/transport" }
