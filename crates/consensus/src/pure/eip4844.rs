@@ -7,7 +7,7 @@ use crate::constants::eip4844::{
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
+pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
     (parent_excess_blob_gas + parent_blob_gas_used).saturating_sub(TARGET_DATA_GAS_PER_BLOCK)
 }
 

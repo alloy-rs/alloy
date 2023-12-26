@@ -75,7 +75,7 @@ impl From<Signed<TxEip1559>> for TxEnvelope {
 
 impl TxEnvelope {
     /// Return the [`TxType`] of the inner txn.
-    pub fn tx_type(&self) -> TxType {
+    pub const fn tx_type(&self) -> TxType {
         match self {
             TxEnvelope::Legacy(_) | TxEnvelope::TaggedLegacy(_) => TxType::Legacy,
             TxEnvelope::Eip2930(_) => TxType::Eip2930,

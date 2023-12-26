@@ -140,7 +140,7 @@ impl TxEip2930 {
     }
 
     /// Get transaction type.
-    pub fn tx_type(&self) -> TxType {
+    pub const fn tx_type(&self) -> TxType {
         TxType::Eip2930
     }
 

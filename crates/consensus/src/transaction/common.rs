@@ -14,7 +14,7 @@ pub enum TxKind {
 
 impl TxKind {
     /// Returns the address of the contract that will be called or will receive the transfer.
-    pub fn to(self) -> Option<Address> {
+    pub const fn to(self) -> Option<Address> {
         match self {
             TxKind::Create => None,
             TxKind::Call(to) => Some(to),
@@ -23,19 +23,19 @@ impl TxKind {
 
     /// Returns true if the transaction is a contract creation.
     #[inline]
-    pub fn is_create(self) -> bool {
+    pub const fn is_create(self) -> bool {
         matches!(self, TxKind::Create)
     }
 
     /// Returns true if the transaction is a contract call.
     #[inline]
-    pub fn is_call(self) -> bool {
+    pub const fn is_call(self) -> bool {
         matches!(self, TxKind::Call(_))
     }
 
     /// Calculates a heuristic for the in-memory size of the [TransactionKind].
     #[inline]
-    pub(crate) fn size(self) -> usize {
+    pub(crate) const fn size(self) -> usize {
         std::mem::size_of::<Self>()
     }
 }
