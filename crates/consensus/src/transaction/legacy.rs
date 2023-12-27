@@ -321,8 +321,6 @@ mod tests {
 
         let signed_tx = tx.into_signed(sig);
 
-        dbg!(signed_tx.signature_hash());
-        dbg!(alloy_primitives::hex::encode(signed_tx.rlp_signed()));
         assert_eq!(signed_tx.hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
     }
