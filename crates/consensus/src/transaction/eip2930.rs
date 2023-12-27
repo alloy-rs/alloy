@@ -1,14 +1,10 @@
+use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header};
 use std::mem;
 
-use crate::{
-    transaction::{AccessList, TxKind},
-    ReceiptWithBloom,
-};
-
-use super::TxType;
+use crate::{transaction::TxKind, ReceiptWithBloom, TxType};
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

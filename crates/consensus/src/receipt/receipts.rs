@@ -184,17 +184,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Receipt {
         let cumulative_gas_used = u64::arbitrary(u)?;
         let logs = Vec::<Log>::arbitrary(u)?;
 
-        // Only receipts for deposit transactions may contain a deposit nonce
-        #[cfg(feature = "optimism")]
-        let deposit_nonce =
-            if tx_type == TxType::DEPOSIT { Option::<u64>::arbitrary(u)? } else { None };
-
-        Ok(Self {
-            success,
-            cumulative_gas_used,
-            logs,
-            #[cfg(feature = "optimism")]
-            deposit_nonce,
-        })
+        Ok(Self { success, cumulative_gas_used, logs })
     }
 }

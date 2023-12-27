@@ -1,6 +1,3 @@
-mod access_list;
-pub use access_list::{AccessList, AccessListItem};
-
 mod common;
 pub use common::TxKind;
 

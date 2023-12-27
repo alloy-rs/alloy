@@ -25,6 +25,13 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
+[dev-dependencies]
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"] }
+proptest = { workspace = true }
+proptest-derive = { workspace = true }
+
+
 [features]
 serde = ["dep:serde", "alloy-primitives/serde"]
 arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
