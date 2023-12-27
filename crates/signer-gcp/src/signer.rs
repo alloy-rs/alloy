@@ -9,13 +9,13 @@ use gcloud_sdk::{
             GetPublicKeyRequest, PublicKey,
         },
     },
+    tonic::{self, Request},
     GoogleApi, GoogleAuthMiddleware,
 };
 use k256::ecdsa::{self, RecoveryId, VerifyingKey};
 use spki::DecodePublicKey;
 use std::{fmt, fmt::Debug};
 use thiserror::Error;
-use tonic::Request;
 
 type Client = GoogleApi<KeyManagementServiceClient<GoogleAuthMiddleware>>;
 
