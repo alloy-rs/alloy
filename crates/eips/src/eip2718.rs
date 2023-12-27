@@ -1,3 +1,7 @@
+//! [EIP-2718] traits.
+//!
+//! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{BufMut, Header};
 

@@ -15,8 +15,16 @@ exclude.workspace = true
 alloy-primitives.workspace = true
 alloy-rlp.workspace = true
 
-serde = { workspace = true, optional = true }
 thiserror.workspace = true
+
+# serde
+serde = { workspace = true, optional = true }
+
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+proptest = { workspace = true, optional = true }
+proptest-derive = { workspace = true, optional = true }
 
 [features]
 serde = ["dep:serde", "alloy-primitives/serde"]
+arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]

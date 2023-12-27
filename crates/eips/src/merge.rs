@@ -1,3 +1,5 @@
+//! Constants related to the beacon chain consensus.
+
 use std::time::Duration;
 
 /// An EPOCH is a series of 32 slots.
