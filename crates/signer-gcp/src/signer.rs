@@ -202,7 +202,7 @@ impl GcpSigner {
         key_id: &str,
         key_version: u64,
     ) -> Result<VerifyingKey, GcpSignerError> {
-        let key_name = self.keyring_ref.to_key_version_ref(&key_id, key_version);
+        let key_name = self.keyring_ref.to_key_version_ref(key_id, key_version);
         request_get_pubkey(&self.client, key_name).await.and_then(decode_pubkey)
     }
 
