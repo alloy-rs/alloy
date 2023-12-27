@@ -139,8 +139,9 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         Sealed::new_unchecked(self, hash)
     }
 
-    /// Return the network encoding. This is the RLP encoding of the bytestring
-    /// of the 2718 encoding.
+    /// Return the network encoding. For non-legacy items, this is the RLP
+    /// encoding of the bytestring of the 2718 encoding. For legacy items it is
+    /// simply the legacy encoding.
     fn network_encode(&self, out: &mut dyn BufMut) {
         if !self.is_legacy() {
             Header { list: false, payload_length: self.encode_2718_len() }.encode(out);

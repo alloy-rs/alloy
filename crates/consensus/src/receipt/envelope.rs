@@ -109,7 +109,7 @@ impl Encodable2718 for ReceiptEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.inner_length() + 1
+        self.inner_length() + !self.is_legacy() as usize
     }
 
     fn encode_2718(&self, out: &mut dyn BufMut) {
