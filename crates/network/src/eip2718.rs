@@ -128,7 +128,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
 
     /// Compute the hash as committed to in the MPT trie.
     fn trie_hash(&self) -> B256 {
-        keccak256(&self.encoded_2718())
+        keccak256(self.encoded_2718())
     }
 
     /// Seal the encodable, by encoding and hashing it.

@@ -346,7 +346,7 @@ mod tests {
         let foo_bar = FooBar {
             foo: I256::try_from(10u64).unwrap(),
             bar: U256::from(20u64),
-            fizz: b"fizz".into(),
+            fizz: b"fizz".to_vec(),
             buzz: keccak256("buzz"),
             far: String::from("space"),
             out: Address::ZERO,
@@ -354,8 +354,8 @@ mod tests {
         let wallet = Wallet::random();
         let hash = foo_bar.eip712_signing_hash(&domain);
         let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
-        assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
-        assert_eq!(wallet.sign_hash_sync(&hash).unwrap(), sig);
+        assert_eq!(sig.recover_address_from_prehash(hash).unwrap(), wallet.address());
+        assert_eq!(wallet.sign_hash_sync(hash).unwrap(), sig);
     }
 
     #[test]
