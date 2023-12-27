@@ -1,4 +1,4 @@
-use alloy_network::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 use crate::{Receipt, ReceiptWithBloom, TxType};
@@ -122,7 +122,7 @@ impl Encodable2718 for ReceiptEnvelope {
 }
 
 impl Decodable2718 for ReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, alloy_network::Eip2718Error> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
         let receipt = Decodable::decode(buf)?;
         match ty.try_into()? {
             TxType::Legacy => Ok(Self::TaggedLegacy(receipt)),
@@ -131,7 +131,7 @@ impl Decodable2718 for ReceiptEnvelope {
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, alloy_network::Eip2718Error> {
+    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
         Ok(Self::Legacy(Decodable::decode(buf)?))
     }
 }

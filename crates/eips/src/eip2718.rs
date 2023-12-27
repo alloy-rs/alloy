@@ -1,7 +1,5 @@
-use alloy_primitives::{keccak256, B256};
+use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{BufMut, Header};
-
-use crate::Sealed;
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;

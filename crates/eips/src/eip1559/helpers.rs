@@ -1,12 +1,10 @@
-//! Helpers for working with EIP-1559 base fee
-
-use crate::basefee::BaseFeeParams;
+use crate::eip1559::BaseFeeParams;
 
 /// Calculate the base fee for the next block based on the EIP-1559 specification.
 ///
 /// This function calculates the base fee for the next block according to the rules defined in the
 /// EIP-1559. EIP-1559 introduces a new transaction pricing mechanism that includes a
-/// fixed-per-block network fee that is burned and dynamically adjusts block sizes to handle
+/// fixed-per-block network fee that is burned and dynamically adjusts block sizes to handlez
 /// transient congestion.
 ///
 /// For each block, the base fee per gas is determined by the gas used in the parent block and the
@@ -37,13 +35,13 @@ pub fn calc_next_block_base_fee(
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
         // same (no increase).
-        std::cmp::Ordering::Equal => base_fee,
+        core::cmp::Ordering::Equal => base_fee,
         // If the gas used in the current block is greater than the gas target, calculate a new
         // increased base fee.
-        std::cmp::Ordering::Greater => {
+        core::cmp::Ordering::Greater => {
             // Calculate the increase in base fee based on the formula defined by EIP-1559.
             base_fee
-                + (std::cmp::max(
+                + (core::cmp::max(
                     // Ensure a minimum increase of 1.
                     1,
                     base_fee as u128 * (gas_used - gas_target) as u128
@@ -52,7 +50,7 @@ pub fn calc_next_block_base_fee(
         }
         // If the gas used in the current block is less than the gas target, calculate a new
         // decreased base fee.
-        std::cmp::Ordering::Less => {
+        core::cmp::Ordering::Less => {
             // Calculate the decrease in base fee based on the formula defined by EIP-1559.
             base_fee.saturating_sub(
                 (base_fee as u128 * (gas_target - gas_used) as u128
@@ -65,7 +63,14 @@ pub fn calc_next_block_base_fee(
 
 #[cfg(test)]
 mod tests {
+    use crate::eip1559::constants::{MIN_PROTOCOL_BASE_FEE, MIN_PROTOCOL_BASE_FEE_U256};
+
     use super::*;
+
+    #[test]
+    fn min_protocol_sanity() {
+        assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
+    }
 
     #[test]
     fn calculate_base_fee_success() {

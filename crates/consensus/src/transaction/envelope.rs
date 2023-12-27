@@ -1,4 +1,5 @@
-use alloy_network::{Decodable2718, Eip2718Error, Encodable2718, Signed};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 use crate::{TxEip1559, TxEip2930, TxLegacy};

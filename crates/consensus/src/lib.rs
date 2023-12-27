@@ -15,16 +15,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod basefee;
-pub use basefee::BaseFeeParams;
-
 pub mod constants;
 
 mod header;
 pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
-
-mod pure;
-pub use pure::{calc_blob_gasprice, calc_excess_blob_gas, calc_next_block_base_fee};
 
 mod receipt;
 pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};

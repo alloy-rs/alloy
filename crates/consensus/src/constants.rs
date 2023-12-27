@@ -1,18 +1,6 @@
 //! Ethereum protocol-related constants
 use alloy_primitives::{address, b256, Address, B256};
 
-/// [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559) constants.
-pub mod eip1559;
-
-/// [EIP-4788](https://eips.ethereum.org/EIPS/eip-4788) constants.
-pub mod eip4788;
-
-/// [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#parameters) constants.
-pub mod eip4844;
-
-/// PoS constants.
-pub mod pos;
-
 /// The first four bytes of the call data for a function call specifies the function to be called.
 pub const SELECTOR_LEN: usize = 4;
 

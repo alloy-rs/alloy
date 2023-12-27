@@ -1,4 +1,4 @@
-use crate::constants::eip1559::{
+use crate::eip1559::constants::{
     DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR, DEFAULT_ELASTICITY_MULTIPLIER,
 };
 

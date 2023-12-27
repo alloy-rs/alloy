@@ -7,7 +7,7 @@ pub use receipts::{Receipt, ReceiptWithBloom};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::Encodable2718;
+    use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{address, b256, bytes, hex, Bytes, Log, LogData};
     use alloy_rlp::{Decodable, Encodable};
 

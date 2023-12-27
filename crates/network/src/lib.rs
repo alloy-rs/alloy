@@ -15,10 +15,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod eip2718;
-pub use eip2718::{Decodable2718, Eip2718Envelope, Eip2718Error, Encodable2718};
+pub use alloy_eips::eip2718;
 
 mod sealed;
+use alloy_eips::eip2718::Eip2718Envelope;
 pub use sealed::{Sealable, Sealed};
 
 mod transaction;
@@ -38,6 +38,8 @@ pub enum TransactionList<T> {
     Hashes(Vec<B256>),
     /// Hydrated tx objects.
     Hydrated(Vec<T>),
+    /// Special case for uncle response
+    Uncled,
 }
 
 /// A block response
@@ -56,20 +58,23 @@ pub trait Network: Sized + Send + Sync + 'static {
         assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
     };
 
+    // -- Consensus types --
+
     /// The network transaction envelope type.
     type TxEnvelope: Eip2718Envelope;
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
+    /// The network header type.
+    type Header;
+
+    // -- JSON RPC types --
 
     /// The JSON body of a transaction request.
     type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
-
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
-
     /// The JSON body of a transaction receipt.
     type ReceiptResponse: RpcObject;
-
     /// The JSON body of a header response, as flattened into
     /// [`BlockResponse`].
     type HeaderResponse: RpcObject;

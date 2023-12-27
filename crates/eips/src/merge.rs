@@ -7,10 +7,19 @@ pub const EPOCH_SLOTS: u64 = 32;
 ///
 /// This is the time period of 12 seconds in which a randomly chosen validator has time to propose a
 /// block.
-pub const SLOT_DURATION: Duration = Duration::from_secs(12);
+pub const SLOT_DURATION_SECS: u64 = 12;
 
 /// An EPOCH is a series of 32 slots (~6.4min).
-pub const EPOCH_DURATION: Duration = Duration::from_secs(12 * EPOCH_SLOTS);
+pub const EPOCH_DURATION_SECS: u64 = EPOCH_SLOTS * SLOT_DURATION_SECS;
+
+/// The duration of a slot in seconds.
+///
+/// This is the time period of 12 seconds in which a randomly chosen validator has time to propose a
+/// block.
+pub const SLOT_DURATION: Duration = Duration::from_secs(SLOT_DURATION_SECS);
+
+/// An EPOCH is a series of 32 slots (~6.4min).
+pub const EPOCH_DURATION: Duration = Duration::from_secs(EPOCH_DURATION_SECS);
 
 /// The default block nonce in the beacon consensus
 pub const BEACON_NONCE: u64 = 0u64;

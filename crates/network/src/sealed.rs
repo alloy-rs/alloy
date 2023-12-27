@@ -11,7 +11,7 @@ pub struct Sealed<T> {
     seal: B256,
 }
 
-impl<T> std::ops::Deref for Sealed<T> {
+impl<T> core::ops::Deref for Sealed<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {

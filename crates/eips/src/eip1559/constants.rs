@@ -28,13 +28,3 @@ pub const DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
 
 /// Elasticity multiplier as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
 pub const DEFAULT_ELASTICITY_MULTIPLIER: u64 = 2;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn min_protocol_sanity() {
-        assert_eq!(MIN_PROTOCOL_BASE_FEE_U256.to::<u64>(), MIN_PROTOCOL_BASE_FEE);
-    }
-}
