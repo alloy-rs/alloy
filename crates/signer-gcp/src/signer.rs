@@ -12,6 +12,7 @@ use gcloud_sdk::{
     GoogleApi, GoogleAuthMiddleware,
 };
 use k256::ecdsa::{self, RecoveryId, VerifyingKey};
+use spki::DecodePublicKey;
 use std::{fmt, fmt::Debug};
 use thiserror::Error;
 use tonic::Request;
@@ -137,16 +138,6 @@ pub enum GcpSignerError {
     /// [`ecdsa`] error.
     #[error(transparent)]
     K256(#[from] ecdsa::Error),
-
-    /// Thrown when failing to decode PEM.
-    #[error("failed to decode PEM: {0}")]
-    PemError(String),
-}
-
-impl From<pem::PemError> for GcpSignerError {
-    fn from(err: pem::PemError) -> GcpSignerError {
-        GcpSignerError::PemError(format!("{}", err))
-    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -288,8 +279,7 @@ async fn request_sign_digest(
 
 /// Parse the PEM-encoded public key returned by GCP KMS.
 fn decode_pubkey(key: PublicKey) -> Result<VerifyingKey, GcpSignerError> {
-    let pem = pem::parse(key.pem)?;
-    VerifyingKey::from_sec1_bytes(&pem.contents()).map_err(Into::into)
+    VerifyingKey::from_public_key_pem(&key.pem).map_err(Into::into)
 }
 
 /// Decode a raw GCP KMS Signature response.

@@ -16,11 +16,8 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-gcloud-sdk = { version = "0.23.1", features = [
-    "google-cloud-kms-v1",
-], default-features = false }
+gcloud-sdk = { version = "0.23.1", features = ["google-cloud-kms-v1"] }
 k256.workspace = true
-pem = { version = "3.0.3", default-features = false }
 spki.workspace = true
 thiserror.workspace = true
 tonic = { version = "0.10.2", default-features = false }
