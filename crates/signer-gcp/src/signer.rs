@@ -27,25 +27,31 @@ pub struct GcpKeyRingRef {
     /// The GCP location e.g. `global`.
     pub location: String,
     /// The GCP key ring name.
-    pub key_ring: String,
+    pub name: String,
 }
 
 impl GcpKeyRingRef {
     /// Create a new GCP KeyRing reference.
-    pub fn new(google_project_id: &str, location: &str, key_ring: &str) -> Self {
+    pub fn new(google_project_id: &str, location: &str, name: &str) -> Self {
         Self {
             google_project_id: google_project_id.to_string(),
             location: location.to_string(),
-            key_ring: key_ring.to_string(),
+            name: name.to_string(),
         }
     }
+}
 
-    /// Create a reference to a specific key version in this key ring.
-    fn to_key_version_ref(&self, key_id: &str, key_version: u64) -> String {
-        format!(
+/// Identifies a specific key version in the key ring.
+#[derive(Debug)]
+pub struct KeySpecifier(String);
+
+impl KeySpecifier {
+    /// Construct a new specifier for a key with a given keyring, id and version.
+    pub fn new(keyring: GcpKeyRingRef, key_id: &str, version: u64) -> Self {
+        Self(format!(
             "projects/{}/locations/{}/keyRings/{}/cryptoKeys/{}/cryptoKeyVersions/{}",
-            self.google_project_id, self.location, self.key_ring, key_id, key_version,
-        )
+            keyring.google_project_id, keyring.location, keyring.name, key_id, version,
+        ))
     }
 }
 
@@ -65,7 +71,7 @@ impl GcpKeyRingRef {
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_signer_gcp::{GcpKeyRingRef, GcpSigner};
+/// use alloy_signer_gcp::{GcpKeyRingRef, GcpSigner, KeySpecifier};
 /// use gcloud_sdk::{
 ///     google::cloud::kms::v1::key_management_service_client::KeyManagementServiceClient,
 ///     GoogleApi,
@@ -86,10 +92,11 @@ impl GcpKeyRingRef {
 /// .await
 /// .expect("Failed to create GCP KMS Client");
 ///
-/// let key_id = "..".to_string();
+/// let key_name = "...";
 /// let key_version = 1;
+/// let key_specifier = KeySpecifier::new(keyring, key_name, key_version);
 /// let chain_id = 1;
-/// let signer = GcpSigner::new(client, keyring, key_id, key_version, chain_id).await.unwrap();
+/// let signer = GcpSigner::new(client, key_specifier, chain_id).await.unwrap();
 ///
 /// let message = vec![0, 1, 2, 3];
 ///
@@ -100,10 +107,8 @@ impl GcpKeyRingRef {
 #[derive(Clone)]
 pub struct GcpSigner {
     client: Client,
-    keyring_ref: GcpKeyRingRef,
+    key_name: String,
     chain_id: u64,
-    key_version: u64,
-    key_id: String,
     pubkey: VerifyingKey,
     address: Address,
 }
@@ -111,8 +116,7 @@ pub struct GcpSigner {
 impl fmt::Debug for GcpSigner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("GcpSigner")
-            .field("key_id", &self.key_id)
-            .field("key_version", &self.key_version)
+            .field("key_name", &self.key_name)
             .field("chain_id", &self.chain_id)
             .field("pubkey", &hex::encode(self.pubkey.to_sec1_bytes()))
             .field("address", &self.address)
@@ -183,47 +187,25 @@ impl GcpSigner {
     #[instrument(skip(client), err)]
     pub async fn new(
         client: Client,
-        keyring_ref: GcpKeyRingRef,
-        key_id: String,
-        key_version: u64,
+        key_specifier: KeySpecifier,
         chain_id: u64,
     ) -> Result<GcpSigner, GcpSignerError> {
-        let key_name = keyring_ref.to_key_version_ref(&key_id, key_version);
-        let resp = request_get_pubkey(&client, key_name).await?;
+        let key_name = key_specifier.0;
+        let resp = request_get_pubkey(&client, &key_name).await?;
         let pubkey = decode_pubkey(resp)?;
         let address = alloy_signer::utils::public_key_to_address(&pubkey);
         debug!(?pubkey, %address, "instantiated GCP signer");
-        Ok(Self { client, keyring_ref, key_id, key_version, chain_id, pubkey, address })
-    }
-
-    /// Fetch the pubkey associated with a key ID and version.
-    pub async fn get_pubkey_for_key(
-        &self,
-        key_id: &str,
-        key_version: u64,
-    ) -> Result<VerifyingKey, GcpSignerError> {
-        let key_name = self.keyring_ref.to_key_version_ref(key_id, key_version);
-        request_get_pubkey(&self.client, key_name).await.and_then(decode_pubkey)
+        Ok(Self { client, key_name, chain_id, pubkey, address })
     }
 
     /// Fetch the pubkey associated with this signer's key.
     pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
-        self.get_pubkey_for_key(&self.key_id, self.key_version).await
-    }
-
-    /// Sign a digest with the key associated with a key name.
-    pub async fn sign_digest_with_key(
-        &self,
-        key_name: String,
-        digest: &B256,
-    ) -> Result<ecdsa::Signature, GcpSignerError> {
-        request_sign_digest(&self.client, key_name, digest).await.and_then(decode_signature)
+        request_get_pubkey(&self.client, &self.key_name).await.and_then(decode_pubkey)
     }
 
     /// Sign a digest with this signer's key
     pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, GcpSignerError> {
-        let key_name = self.keyring_ref.to_key_version_ref(&self.key_id, self.key_version);
-        self.sign_digest_with_key(key_name, digest).await
+        request_sign_digest(&self.client, &self.key_name, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key and add the eip155 `v` value
@@ -244,9 +226,9 @@ impl GcpSigner {
 #[instrument(skip(client), err)]
 async fn request_get_pubkey(
     client: &Client,
-    kms_key_name: String,
+    kms_key_name: &str,
 ) -> Result<PublicKey, GcpSignerError> {
-    let mut request = tonic::Request::new(GetPublicKeyRequest { name: kms_key_name.clone() });
+    let mut request = tonic::Request::new(GetPublicKeyRequest { name: kms_key_name.to_string() });
     request
         .metadata_mut()
         .insert("x-goog-request-params", format!("name={}", &kms_key_name).parse().unwrap());
@@ -256,11 +238,11 @@ async fn request_get_pubkey(
 #[instrument(skip(client, digest), fields(digest = %hex::encode(digest)), err)]
 async fn request_sign_digest(
     client: &Client,
-    kms_key_name: String,
+    kms_key_name: &str,
     digest: &B256,
 ) -> Result<Vec<u8>, GcpSignerError> {
     let mut request = Request::new(AsymmetricSignRequest {
-        name: kms_key_name.clone(),
+        name: kms_key_name.to_string(),
         digest: Some(kms::v1::Digest {
             digest: Some(kms::v1::digest::Digest::Sha256(digest.to_vec())),
         }),
@@ -336,10 +318,10 @@ mod tests {
         .await
         .expect("Failed to create GCP KMS Client");
         let chain_id = 1;
-        let key_id = 1;
+        let key_version = 1;
 
-        let signer =
-            GcpSigner::new(client, keyring, key_name, key_id, chain_id).await.expect("get key");
+        let specifier = KeySpecifier::new(keyring, &key_name, key_version);
+        let signer = GcpSigner::new(client, specifier, chain_id).await.expect("get key");
 
         let message = vec![0, 1, 2, 3];
         let sig = signer.sign_message(&message).await.unwrap();

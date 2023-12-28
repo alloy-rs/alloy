@@ -19,4 +19,4 @@
 extern crate tracing;
 
 mod signer;
-pub use signer::{GcpKeyRingRef, GcpSigner, GcpSignerError};
+pub use signer::{GcpKeyRingRef, GcpSigner, GcpSignerError, KeySpecifier};
