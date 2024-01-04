@@ -182,8 +182,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Receipt {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let success = bool::arbitrary(u)?;
         let cumulative_gas_used = u64::arbitrary(u)?;
-        let logs = Vec::<Log>::arbitrary(u)?;
-
+        let logs = u.arbitrary_iter()?.take(4).collect::<Result<Vec<_>, _>>()?;
         Ok(Self { success, cumulative_gas_used, logs })
     }
 }
