@@ -33,7 +33,7 @@ impl TxKind {
         matches!(self, TxKind::Call(_))
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TransactionKind].
+    /// Calculates a heuristic for the in-memory size of this object.
     #[inline]
     pub(crate) const fn size(self) -> usize {
         std::mem::size_of::<Self>()

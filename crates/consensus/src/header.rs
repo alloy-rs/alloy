@@ -1,16 +1,13 @@
-use std::mem;
-
-use alloy_network::Sealable;
-use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
-use alloy_rlp::{
-    length_of_length, Buf, BufMut, BytesMut, Decodable, Encodable, EMPTY_LIST_CODE,
-    EMPTY_STRING_CODE,
-};
-
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
 };
+use alloy_network::Sealable;
+use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use alloy_rlp::{
+    length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
+};
+use std::mem;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
@@ -136,9 +133,10 @@ impl Header {
     // }
 
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
-    /// Use [`Header::seal`], [`SealedHeader`] and unlock if you need hash to be persistent.
+    ///
+    /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.
     pub fn hash_slow(&self) -> B256 {
-        let mut out = BytesMut::new();
+        let mut out = Vec::<u8>::new();
         self.encode(&mut out);
         keccak256(&out)
     }

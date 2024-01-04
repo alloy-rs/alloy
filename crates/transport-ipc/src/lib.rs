@@ -15,6 +15,13 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use bytes::{Buf, BytesMut};
+use futures::{ready, AsyncRead, AsyncWriteExt, StreamExt};
+use interprocess::local_socket::{tokio::LocalSocketStream, ToLocalSocketName};
+use std::task::Poll::Ready;
+use tokio::select;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+
 mod connect;
 pub use connect::IpcConnect;
 
@@ -22,13 +29,6 @@ pub use connect::IpcConnect;
 pub mod mock;
 #[cfg(feature = "mock")]
 pub use mock::MockIpcServer;
-
-use bytes::{Buf, BytesMut};
-use futures::{ready, AsyncRead, AsyncWriteExt, StreamExt};
-use interprocess::local_socket::{tokio::LocalSocketStream, ToLocalSocketName};
-use std::task::Poll::Ready;
-use tokio::select;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 type Result<T> = std::result::Result<T, std::io::Error>;
 

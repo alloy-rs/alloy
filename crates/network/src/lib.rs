@@ -15,10 +15,11 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-pub use alloy_eips::eip2718;
+use alloy_eips::eip2718::Eip2718Envelope;
+use alloy_json_rpc::RpcObject;
+use alloy_primitives::B256;
 
 mod sealed;
-use alloy_eips::eip2718::Eip2718Envelope;
 pub use sealed::{Sealable, Sealed};
 
 mod transaction;
@@ -27,8 +28,7 @@ pub use transaction::{Eip1559Transaction, Signed, Transaction};
 mod receipt;
 pub use receipt::Receipt;
 
-use alloy_json_rpc::RpcObject;
-use alloy_primitives::B256;
+pub use alloy_eips::eip2718;
 
 /// A list of transactions, either hydrated or hashes.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

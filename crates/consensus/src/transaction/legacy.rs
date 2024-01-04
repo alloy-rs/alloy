@@ -1,9 +1,8 @@
+use crate::{transaction::TxKind, ReceiptWithBloom};
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header, Result};
 use std::mem;
-
-use crate::{transaction::TxKind, ReceiptWithBloom};
 
 /// Legacy transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -144,8 +143,7 @@ impl TxLegacy {
 
     /// Outputs the signature hash of the transaction by first encoding without a signature, then
     /// hashing.
-    ///
-    /// See [Self::encode_for_signing] for more information on the encoding format.
+    // See [`Self::encode_for_signing`] for more information on the encoding format.
     pub fn signature_hash(&self) -> B256 {
         let mut buf: BytesMut = BytesMut::with_capacity(self.payload_len_for_signature());
         self.encode_for_signing(&mut buf);

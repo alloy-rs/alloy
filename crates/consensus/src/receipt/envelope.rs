@@ -1,7 +1,6 @@
+use crate::{Receipt, ReceiptWithBloom, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
-
-use crate::{Receipt, ReceiptWithBloom, TxType};
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///

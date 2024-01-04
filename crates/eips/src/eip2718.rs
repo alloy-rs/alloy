@@ -35,18 +35,19 @@ pub trait Decodable2718: Sized {
         buf.first().copied().filter(|b| *b <= TX_TYPE_BYTE_MAX)
     }
 
-    /// Decode the appropriate variant, based on the type flag. This function
-    /// is invoked by [`Self::decode`] with the type byte, and the tail of the
+    /// Decode the appropriate variant, based on the type flag.
+    ///
+    /// This function is invoked by [`Self::decode_2718`] with the type byte, and the tail of the
     /// buffer.
     ///
     /// ## Note
     ///
-    /// This should be a simple match block that invokes an inner type's
-    /// RLP decoder.
+    /// This should be a simple match block that invokes an inner type's RLP decoder.
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
 
-    /// Decode the default variant. This function is invoked by
-    /// [`Self::decode`] when no type byte can be extracted.
+    /// Decode the default variant.
+    ///
+    /// This function is invoked by [`Self::decode_2718`] when no type byte can be extracted.
     fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
 
     /// Decode an EIP-2718 transaction into a concrete instance

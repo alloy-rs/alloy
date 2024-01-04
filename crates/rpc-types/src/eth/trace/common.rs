@@ -1,4 +1,4 @@
-//! Types used by tracing backends
+//! Types used by tracing backends.
 
 use alloy_primitives::TxHash;
 use serde::{Deserialize, Serialize};
