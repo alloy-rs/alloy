@@ -12,6 +12,7 @@ mod access_list;
 mod common;
 pub mod kzg;
 mod receipt;
+pub mod request;
 mod signature;
 
 /// Transaction object used in RPC
