@@ -1,5 +1,7 @@
 [package]
 name = "alloy-consensus"
+description = "Ethereum consensus interface"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

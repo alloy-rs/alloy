@@ -1,5 +1,7 @@
 [package]
 name = "alloy-eips"
+description = "Ethereum Improvement Proprosal (EIP) implementations"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-alloy-primitives.workspace = true
-alloy-rlp.workspace = true
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
 
 thiserror.workspace = true
 
@@ -26,11 +26,9 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
-# arbitrary
 arbitrary = { workspace = true, features = ["derive"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-
 
 [features]
 serde = ["dep:serde", "alloy-primitives/serde"]
