@@ -8,7 +8,7 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
     TransactionReceipt,
 };
-use alloy_trace_rpc_types::{
+use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::LocalizedTransactionTrace,
 };

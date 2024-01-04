@@ -1,5 +1,5 @@
 [package]
-name = "alloy-trace-rpc-types"
+name = "alloy-rpc-trace-types"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
