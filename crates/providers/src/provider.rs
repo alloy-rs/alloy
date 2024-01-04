@@ -3,14 +3,14 @@
 use crate::utils::{self, EstimatorFunction};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
+use alloy_rpc_trace_types::{
+    geth::{GethDebugTracingOptions, GethTrace},
+    parity::LocalizedTransactionTrace,
+};
 use alloy_rpc_types::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
     EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
     TransactionReceipt,
-};
-use alloy_rpc_trace_types::{
-    geth::{GethDebugTracingOptions, GethTrace},
-    parity::LocalizedTransactionTrace,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
