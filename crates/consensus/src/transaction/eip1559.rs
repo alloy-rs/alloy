@@ -314,11 +314,11 @@ impl Transaction for TxEip1559 {
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
-    use crate::{AccessList, TxKind};
+    use crate::TxKind;
+    use alloy_eips::eip2930::AccessList;
     use alloy_network::Transaction;
-    use alloy_primitives::{address, b256, Address, Signature, B256, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
     use alloy_rlp::Encodable;
-    use hex_literal::hex;
 
     #[test]
     fn recover_signer_eip1559() {

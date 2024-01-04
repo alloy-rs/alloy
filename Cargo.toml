@@ -80,15 +80,12 @@ serial_test = "2.0"
 thiserror = "1.0"
 url = "2.4"
 
-
-
 # testing
 arbitrary = "1.1"
 proptest = "1.0"
 proptest-derive = "0.4"
 
-
 [patch.crates-io]
-alloy-primitives = { path = "../core/crates/primitives" }
-alloy-sol-types = { path = "../core/crates/sol-types" }
-alloy-sol-macro = { path = "../core/crates/sol-macro" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core" }

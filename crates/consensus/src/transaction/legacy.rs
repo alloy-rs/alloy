@@ -295,8 +295,7 @@ mod tests {
     fn recover_signer_legacy() {
         use crate::transaction::{TxKind, TxLegacy};
         use alloy_network::Transaction;
-        use alloy_primitives::{b256, Address, Signature, B256, U256};
-        use hex_literal::hex;
+        use alloy_primitives::{b256, hex, Address, Signature, B256, U256};
 
         let signer: Address = hex!("398137383b3d25c92898c656696e41950e47316b").into();
         let hash: B256 =

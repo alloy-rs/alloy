@@ -1,10 +1,9 @@
-mod signed;
-pub use signed::Signed;
-
+use crate::Receipt;
 use alloy_primitives::{Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::BufMut;
 
-use crate::Receipt;
+mod signed;
+pub use signed::Signed;
 
 /// Represents a minimal EVM transaction.
 pub trait Transaction: Send + Sync + 'static {
