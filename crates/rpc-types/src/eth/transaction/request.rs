@@ -41,10 +41,6 @@ pub struct TransactionRequest {
 // == impl TransactionRequest ==
 
 impl TransactionRequest {
-    /// Converts the request into a [`TypedTransactionRequest`]
-    ///
-    /// Returns None if mutual exclusive fields `gasPrice` and `max_fee_per_gas` are either missing
-    /// or both set.
     /// Sets the gas limit for the transaction.
     pub fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas = Some(U256::from(gas_limit));
@@ -70,7 +66,7 @@ impl TransactionRequest {
     }
 
     /// Sets the recipient address for the transaction.
-    pub fn to(mut self, to: Address) -> Self {
+    pub const fn to(mut self, to: Address) -> Self {
         self.to = Some(to);
         self
     }
