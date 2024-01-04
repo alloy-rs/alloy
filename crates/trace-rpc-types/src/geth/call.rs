@@ -1,5 +1,5 @@
-use crate::serde_helpers::num::from_int_or_hex;
 use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_rpc_types::serde_helpers::num::from_int_or_hex;
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`
@@ -82,14 +82,13 @@ impl CallConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace::geth::*;
+    use crate::geth::*;
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
-    const DEFAULT: &str = include_str!("../../../../test_data/call_tracer/default.json");
-    const LEGACY: &str = include_str!("../../../../test_data/call_tracer/legacy.json");
-    const ONLY_TOP_CALL: &str =
-        include_str!("../../../../test_data/call_tracer/only_top_call.json");
-    const WITH_LOG: &str = include_str!("../../../../test_data/call_tracer/with_log.json");
+    const DEFAULT: &str = include_str!("../../test_data/call_tracer/default.json");
+    const LEGACY: &str = include_str!("../../test_data/call_tracer/legacy.json");
+    const ONLY_TOP_CALL: &str = include_str!("../../test_data/call_tracer/only_top_call.json");
+    const WITH_LOG: &str = include_str!("../../test_data/call_tracer/with_log.json");
 
     #[test]
     fn test_serialize_call_trace() {

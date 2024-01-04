@@ -1,9 +1,7 @@
 //! Builder style functions for `trace_call`
 
-use crate::{
-    eth::block::BlockId, state::StateOverride, trace::parity::TraceType, BlockOverrides,
-    CallRequest,
-};
+use crate::parity::TraceType;
+use alloy_rpc_types::{state::StateOverride, BlockId, BlockOverrides, CallRequest};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 

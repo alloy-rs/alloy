@@ -1,5 +1,5 @@
-use crate::serde_helpers::num::from_int_or_hex_opt;
 use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_rpc_types::serde_helpers::num::from_int_or_hex_opt;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map, BTreeMap};
 
@@ -225,12 +225,12 @@ impl PreStateConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace::geth::*;
+    use crate::geth::*;
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
-    const DEFAULT: &str = include_str!("../../../../test_data/pre_state_tracer/default.json");
-    const LEGACY: &str = include_str!("../../../../test_data/pre_state_tracer/legacy.json");
-    const DIFF_MODE: &str = include_str!("../../../../test_data/pre_state_tracer/diff_mode.json");
+    const DEFAULT: &str = include_str!("../../test_data/pre_state_tracer/default.json");
+    const LEGACY: &str = include_str!("../../test_data/pre_state_tracer/legacy.json");
+    const DIFF_MODE: &str = include_str!("../../test_data/pre_state_tracer/diff_mode.json");
 
     #[test]
     fn test_serialize_pre_state_trace() {
