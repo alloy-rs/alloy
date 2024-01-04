@@ -1,19 +1,19 @@
-//use crate::access_list::AccessList;
 use crate::{AccessList, BlockId, BlockOverrides};
 use alloy_primitives::{Address, Bytes, B256, U256, U64, U8};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 /// Bundle of transactions
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Bundle {
-    /// Transactions
+    /// All transactions to execute
     pub transactions: Vec<CallRequest>,
-    /// Block overides
+    /// Block overrides to apply
     pub block_override: Option<BlockOverrides>,
 }
 
 /// State context for callMany
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {
     /// Block Number
@@ -26,12 +26,22 @@ pub struct StateContext {
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EthCallResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
     /// eth_call output (if no error)
-    pub output: Option<Bytes>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<Bytes>,
     /// eth_call output (if error)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+impl EthCallResponse {
+    /// Returns the value if present, otherwise returns the error.
+    pub fn ensure_ok(self) -> Result<Bytes, String> {
+        match self.value {
+            Some(output) => Ok(output),
+            None => Err(self.error.unwrap_or_else(|| "Unknown error".to_string())),
+        }
+    }
 }
 
 /// Represents a transaction index where -1 means all transactions
@@ -46,12 +56,12 @@ pub enum TransactionIndex {
 
 impl TransactionIndex {
     /// Returns true if this is the all variant
-    pub fn is_all(&self) -> bool {
+    pub const fn is_all(&self) -> bool {
         matches!(self, TransactionIndex::All)
     }
 
     /// Returns the index if this is the index variant
-    pub fn index(&self) -> Option<usize> {
+    pub const fn index(&self) -> Option<usize> {
         match self {
             TransactionIndex::All => None,
             TransactionIndex::Index(idx) => Some(*idx),
@@ -115,12 +125,13 @@ pub struct CallRequest {
     /// AccessList
     pub access_list: Option<AccessList>,
     /// Max Fee per Blob gas for EIP-4844 transactions
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_per_blob_gas: Option<U256>,
     /// Blob Versioned Hashes for EIP-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP-2718 type
-    #[serde(rename = "type")]
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U8>,
 }
 
@@ -150,21 +161,23 @@ impl CallRequest {
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub struct CallInput {
     /// Transaction data
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub input: Option<Bytes>,
     /// Transaction data
     ///
     /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Bytes>,
 }
 
 impl CallInput {
     /// Creates a new instance with the given input data.
-    pub fn new(data: Bytes) -> Self {
+    pub const fn new(data: Bytes) -> Self {
         Self::maybe_input(Some(data))
     }
 
     /// Creates a new instance with the given input data.
-    pub fn maybe_input(input: Option<Bytes>) -> Self {
+    pub const fn maybe_input(input: Option<Bytes>) -> Self {
         Self { input, data: None }
     }
 

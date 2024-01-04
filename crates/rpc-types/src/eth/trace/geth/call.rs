@@ -7,30 +7,43 @@ use serde::{Deserialize, Serialize};
 /// <https://github.com/ethereum/go-ethereum/blob/91cb6f863a965481e51d5d9c0e5ccd54796fd967/eth/tracers/native/call.go#L44>
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallFrame {
+    /// The address of that initiated the call.
     pub from: Address,
+    /// How much gas was left before the call
     #[serde(default, deserialize_with = "from_int_or_hex")]
     pub gas: U256,
+    /// How much gas was used by the call
     #[serde(default, deserialize_with = "from_int_or_hex", rename = "gasUsed")]
     pub gas_used: U256,
+    /// The address of the contract that was called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<Address>,
+    /// Calldata input
     pub input: Bytes,
+    /// Output of the call, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<Bytes>,
+    /// Error message, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Why this call reverted, if it reverted.
     #[serde(default, rename = "revertReason", skip_serializing_if = "Option::is_none")]
     pub revert_reason: Option<String>,
+    /// Recorded child calls.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<CallFrame>,
+    /// Logs emitted by this call
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub logs: Vec<CallLogFrame>,
+    /// Value transferred
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<U256>,
+    /// The type of the call
     #[serde(rename = "type")]
     pub typ: String,
 }
 
+/// Represents a recorded call
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallLogFrame {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -41,7 +54,7 @@ pub struct CallLogFrame {
     pub data: Option<Bytes>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallConfig {
     /// When set to true, this will only trace the primary (top-level) call and not any sub-calls.
@@ -54,13 +67,13 @@ pub struct CallConfig {
 
 impl CallConfig {
     /// Sets the only top call flag
-    pub fn only_top_call(mut self) -> Self {
+    pub const fn only_top_call(mut self) -> Self {
         self.only_top_call = Some(true);
         self
     }
 
     /// Sets the with log flag
-    pub fn with_log(mut self) -> Self {
+    pub const fn with_log(mut self) -> Self {
         self.with_log = Some(true);
         self
     }

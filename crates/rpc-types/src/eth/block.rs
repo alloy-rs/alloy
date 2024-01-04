@@ -12,9 +12,103 @@ use serde::{
 };
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
-#[doc(hidden)]
-#[deprecated = "use `BlockTransactionHashes` instead"]
-pub type BlockTransactionsHashIterator<'a> = BlockTransactionHashes<'a>;
+/// Block representation
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Block {
+    /// Header of the block.
+    #[serde(flatten)]
+    pub header: Header,
+    /// Total difficulty, this field is None only if representing
+    /// an Uncle block.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_difficulty: Option<U256>,
+    /// Uncles' hashes.
+    pub uncles: Vec<B256>,
+    /// Transactions.
+    #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
+    pub transactions: BlockTransactions,
+    /// Integer the size of this block in bytes.
+    pub size: Option<U256>,
+    /// Withdrawals in the block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawals: Option<Vec<Withdrawal>>,
+    /// Support for arbitrary additional fields.
+    #[serde(flatten)]
+    pub other: OtherFields,
+}
+
+impl Block {
+    /// Converts a block with Tx hashes into a full block.
+    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+        Self { transactions: BlockTransactions::Full(txs), ..self }
+    }
+}
+
+/// Block header representation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "camelCase")]
+pub struct Header {
+    /// Hash of the block
+    pub hash: Option<B256>,
+    /// Hash of the parent
+    pub parent_hash: B256,
+    /// Hash of the uncles
+    #[serde(rename = "sha3Uncles")]
+    pub uncles_hash: B256,
+    /// Alias of `author`
+    pub miner: Address,
+    /// State root hash
+    pub state_root: B256,
+    /// Transactions root hash
+    pub transactions_root: B256,
+    /// Transactions receipts root hash
+    pub receipts_root: B256,
+    /// Logs bloom
+    pub logs_bloom: Bloom,
+    /// Difficulty
+    pub difficulty: U256,
+    /// Block number
+    pub number: Option<U256>,
+    /// Gas Limit
+    pub gas_limit: U256,
+    /// Gas Used
+    pub gas_used: U256,
+    /// Timestamp
+    pub timestamp: U256,
+    /// Extra data
+    pub extra_data: Bytes,
+    /// Mix Hash
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoF).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mix_hash: Option<B256>,
+    /// Nonce
+    pub nonce: Option<B64>,
+    /// Base fee per unit of gas (if past London)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_fee_per_gas: Option<U256>,
+    /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub withdrawals_root: Option<B256>,
+    /// Blob gas used
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blob_gas_used: Option<U64>,
+    /// Excess blob gas
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excess_blob_gas: Option<U64>,
+    /// Parent beacon block root
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_beacon_block_root: Option<B256>,
+}
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
@@ -66,7 +160,7 @@ impl BlockTransactions {
     }
 
     /// Returns an instance of BlockTransactions with the Uncle special case.
-    pub fn uncle() -> Self {
+    pub const fn uncle() -> Self {
         Self::Uncle
     }
 }
@@ -217,7 +311,7 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
 ///
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum BlockTransactionsKind {
     /// Only include hashes: [BlockTransactions::Hashes]
     Hashes,
@@ -236,7 +330,7 @@ impl From<bool> for BlockTransactionsKind {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 pub enum BlockError {
     /// A transaction failed sender recovery
     #[error("transaction failed sender recovery")]
@@ -244,104 +338,6 @@ pub enum BlockError {
     /// A raw block failed to decode
     #[error("failed to decode raw block {0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
-}
-
-/// Block representation
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Block {
-    /// Header of the block.
-    #[serde(flatten)]
-    pub header: Header,
-    /// Total difficulty, this field is None only if representing
-    /// an Uncle block.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_difficulty: Option<U256>,
-    /// Uncles' hashes.
-    pub uncles: Vec<B256>,
-    /// Transactions.
-    #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
-    #[serde(default = "BlockTransactions::uncle")]
-    pub transactions: BlockTransactions,
-    /// Integer the size of this block in bytes.
-    pub size: Option<U256>,
-    /// Withdrawals in the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Support for arbitrary additional fields.
-    #[serde(flatten)]
-    pub other: OtherFields,
-}
-
-impl Block {
-    /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
-        Self { transactions: BlockTransactions::Full(txs), ..self }
-    }
-}
-
-/// Block header representation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-#[serde(rename_all = "camelCase")]
-pub struct Header {
-    /// Hash of the block
-    pub hash: Option<B256>,
-    /// Hash of the parent
-    pub parent_hash: B256,
-    /// Hash of the uncles
-    #[serde(rename = "sha3Uncles")]
-    pub uncles_hash: B256,
-    /// Alias of `author`
-    pub miner: Address,
-    /// State root hash
-    pub state_root: B256,
-    /// Transactions root hash
-    pub transactions_root: B256,
-    /// Transactions receipts root hash
-    pub receipts_root: B256,
-    /// Logs bloom
-    pub logs_bloom: Bloom,
-    /// Difficulty
-    pub difficulty: U256,
-    /// Block number
-    pub number: Option<U256>,
-    /// Gas Limit
-    pub gas_limit: U256,
-    /// Gas Used
-    pub gas_used: U256,
-    /// Timestamp
-    pub timestamp: U256,
-    /// Extra data
-    pub extra_data: Bytes,
-    /// Mix Hash
-    ///
-    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
-    /// computation has been carried out on this block: the Proof-of-Work (PoF).
-    ///
-    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
-    ///
-    /// This is an Option because it is not always set by non-ethereum networks.
-    ///
-    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
-    /// And <https://github.com/ethereum/execution-apis/issues/328>
-    pub mix_hash: Option<B256>,
-    /// Nonce
-    pub nonce: Option<B64>,
-    /// Base fee per unit of gas (if past London)
-    #[serde(rename = "baseFeePerGas", skip_serializing_if = "Option::is_none")]
-    pub base_fee_per_gas: Option<U256>,
-    /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub withdrawals_root: Option<B256>,
-    /// Blob gas used
-    #[serde(rename = "blobGasUsed", skip_serializing_if = "Option::is_none")]
-    pub blob_gas_used: Option<U64>,
-    /// Excess blob gas
-    #[serde(rename = "excessBlobGas", skip_serializing_if = "Option::is_none")]
-    pub excess_blob_gas: Option<U64>,
-    /// Parent beacon block root
-    #[serde(rename = "parentBeaconBlockRoot", skip_serializing_if = "Option::is_none")]
-    pub parent_beacon_block_root: Option<B256>,
 }
 
 /// A block hash which may have
@@ -581,8 +577,8 @@ impl From<u64> for BlockId {
 }
 
 impl From<U64> for BlockId {
-    fn from(num: U64) -> Self {
-        BlockNumberOrTag::Number(num.to()).into()
+    fn from(value: U64) -> Self {
+        BlockNumberOrTag::Number(value.to()).into()
     }
 }
 
@@ -730,12 +726,12 @@ impl fmt::Debug for BlockNumHash {
 
 impl BlockNumHash {
     /// Creates a new `BlockNumHash` from a block number and hash.
-    pub fn new(number: BlockNumber, hash: BlockHash) -> Self {
+    pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
         Self { number, hash }
     }
 
     /// Consumes `Self` and returns [`BlockNumber`], [`BlockHash`]
-    pub fn into_components(self) -> (BlockNumber, BlockHash) {
+    pub const fn into_components(self) -> (BlockNumber, BlockHash) {
         (self.number, self.hash)
     }
 
@@ -778,7 +774,7 @@ pub enum BlockHashOrNumber {
 impl BlockHashOrNumber {
     /// Returns the block number if it is a [`BlockHashOrNumber::Number`].
     #[inline]
-    pub fn as_number(self) -> Option<u64> {
+    pub const fn as_number(self) -> Option<u64> {
         match self {
             BlockHashOrNumber::Hash(_) => None,
             BlockHashOrNumber::Number(num) => Some(num),
@@ -795,6 +791,12 @@ impl From<B256> for BlockHashOrNumber {
 impl From<u64> for BlockHashOrNumber {
     fn from(value: u64) -> Self {
         BlockHashOrNumber::Number(value)
+    }
+}
+
+impl From<U64> for BlockHashOrNumber {
+    fn from(value: U64) -> Self {
+        value.to::<u64>().into()
     }
 }
 
@@ -972,7 +974,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "jsonrpsee")]
+    #[cfg(feature = "jsonrpsee-types")]
     fn serde_json_header() {
         use jsonrpsee_types::SubscriptionResponse;
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscribe","params":{"subscription":"0x7eef37ff35d471f8825b1c8f67a5d3c0","result":{"hash":"0x7a7ada12e140961a32395059597764416499f4178daf1917193fad7bd2cc6386","parentHash":"0xdedbd831f496e705e7f2ec3c8dcb79051040a360bf1455dbd7eb8ea6ad03b751","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","number":"0x8","gasUsed":"0x0","gasLimit":"0x1c9c380","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x642aa48f","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000"}}}"#;
@@ -1103,5 +1105,12 @@ mod tests {
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
         assert_eq!(block, block2);
+    }
+
+    #[test]
+    fn compact_block_number_serde() {
+        let num: BlockNumberOrTag = 1u64.into();
+        let serialized = serde_json::to_string(&num).unwrap();
+        assert_eq!(serialized, "\"0x1\"");
     }
 }

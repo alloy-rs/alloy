@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 
 /// Syncing info
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
     /// Starting block
@@ -32,7 +32,7 @@ pub struct Peers {
 }
 
 /// Number of peers connected to.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PeerCount {
     /// Peer count as integer
@@ -99,7 +99,7 @@ pub struct PipProtocolInfo {
 }
 
 /// Sync status
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SyncStatus {
     /// Info when syncing
     Info(SyncInfo),
@@ -153,7 +153,7 @@ pub struct TransactionStats {
 }
 
 /// Chain status.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Copy, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChainStatus {
     /// Describes the gap in the blockchain, if there is one: (first, last)

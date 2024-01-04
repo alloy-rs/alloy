@@ -21,18 +21,18 @@ pub enum PreStateFrame {
 
 impl PreStateFrame {
     /// Returns true if this trace was requested without diffmode.
-    pub fn is_default(&self) -> bool {
+    pub const fn is_default(&self) -> bool {
         matches!(self, PreStateFrame::Default(_))
     }
 
     /// Returns true if this trace was requested with diffmode.
-    pub fn is_diff(&self) -> bool {
+    pub const fn is_diff(&self) -> bool {
         matches!(self, PreStateFrame::Diff(_))
     }
 
     /// Returns the account states after the transaction is executed if this trace was requested
     /// without diffmode.
-    pub fn as_default(&self) -> Option<&PreStateMode> {
+    pub const fn as_default(&self) -> Option<&PreStateMode> {
         match self {
             PreStateFrame::Default(mode) => Some(mode),
             _ => None,
@@ -41,7 +41,7 @@ impl PreStateFrame {
 
     /// Returns the account states before and after the transaction is executed if this trace was
     /// requested with diffmode.
-    pub fn as_diff(&self) -> Option<&DiffMode> {
+    pub const fn as_diff(&self) -> Option<&DiffMode> {
         match self {
             PreStateFrame::Diff(mode) => Some(mode),
             _ => None,
@@ -112,12 +112,12 @@ pub enum DiffStateKind {
 
 impl DiffStateKind {
     /// Returns true if this is the pre state of the [DiffMode]
-    pub fn is_pre(&self) -> bool {
+    pub const fn is_pre(&self) -> bool {
         matches!(self, DiffStateKind::Pre)
     }
 
     /// Returns true if this is the post state of the [DiffMode]
-    pub fn is_post(&self) -> bool {
+    pub const fn is_post(&self) -> bool {
         matches!(self, DiffStateKind::Post)
     }
 }
@@ -171,7 +171,7 @@ impl AccountState {
 }
 
 /// Helper type to track the kind of change of an [AccountState].
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountChangeKind {
     #[default]
     Modify,
@@ -181,17 +181,17 @@ pub enum AccountChangeKind {
 
 impl AccountChangeKind {
     /// Returns true if the account was created
-    pub fn is_created(&self) -> bool {
+    pub const fn is_created(&self) -> bool {
         matches!(self, AccountChangeKind::Create)
     }
 
     /// Returns true the account was modified
-    pub fn is_modified(&self) -> bool {
+    pub const fn is_modified(&self) -> bool {
         matches!(self, AccountChangeKind::Modify)
     }
 
     /// Returns true the account was modified
-    pub fn is_selfdestruct(&self) -> bool {
+    pub const fn is_selfdestruct(&self) -> bool {
         matches!(self, AccountChangeKind::SelfDestruct)
     }
 }
@@ -201,7 +201,7 @@ impl AccountChangeKind {
 /// If `diffMode` is set to true, the response frame includes all the account and storage diffs for
 /// the transaction. If it's missing or set to false it only returns the accounts and storage
 /// necessary to execute the transaction.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreStateConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]

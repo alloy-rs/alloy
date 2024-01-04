@@ -35,7 +35,8 @@ impl TryFrom<Log> for alloy_primitives::LogData {
 }
 
 /// Error that can occur when converting other types to logs
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[allow(missing_copy_implementations)]
 pub enum LogError {
     /// There are too many topics
     #[error("too many topics")]

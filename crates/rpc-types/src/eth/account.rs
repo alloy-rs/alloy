@@ -50,7 +50,7 @@ pub struct ExtAccountInfo {
 /// account derived from a signature
 /// as well as information that tells if it is valid for
 /// the current chain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoveredAccount {
     /// address of the recovered account

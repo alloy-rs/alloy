@@ -147,7 +147,7 @@ pub enum FilterBlockOption {
 
 impl FilterBlockOption {
     /// Returns the `fromBlock` value, if any
-    pub fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
+    pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             FilterBlockOption::Range { to_block, .. } => to_block.as_ref(),
             FilterBlockOption::AtBlockHash(_) => None,
@@ -155,7 +155,7 @@ impl FilterBlockOption {
     }
 
     /// Returns the `toBlock` value, if any
-    pub fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
+    pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             FilterBlockOption::Range { from_block, .. } => from_block.as_ref(),
             FilterBlockOption::AtBlockHash(_) => None,
@@ -163,7 +163,7 @@ impl FilterBlockOption {
     }
 
     /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
-    pub fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
+    pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
             FilterBlockOption::Range { from_block, to_block } => {
                 (from_block.as_ref(), to_block.as_ref())
@@ -229,7 +229,7 @@ impl Default for FilterBlockOption {
 impl FilterBlockOption {
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
         let to_block =
             if let FilterBlockOption::Range { to_block, .. } = self { *to_block } else { None };
 
@@ -238,7 +238,7 @@ impl FilterBlockOption {
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
         let from_block =
             if let FilterBlockOption::Range { from_block, .. } = self { *from_block } else { None };
 
@@ -247,7 +247,7 @@ impl FilterBlockOption {
 
     /// Pins the block hash this filter should target.
     #[must_use]
-    pub fn set_hash(&self, hash: B256) -> Self {
+    pub const fn set_hash(&self, hash: B256) -> Self {
         FilterBlockOption::AtBlockHash(hash)
     }
 }
@@ -465,7 +465,7 @@ impl Filter {
     }
 
     /// Returns the numeric value of the `fromBlock` field
-    pub fn get_block_hash(&self) -> Option<B256> {
+    pub const fn get_block_hash(&self) -> Option<B256> {
         match self.block_option {
             FilterBlockOption::AtBlockHash(hash) => Some(hash),
             FilterBlockOption::Range { .. } => None,
@@ -903,7 +903,7 @@ pub enum FilterId {
     Str(String),
 }
 
-#[cfg(feature = "jsonrpsee")]
+#[cfg(feature = "jsonrpsee-types")]
 impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     fn from(value: FilterId) -> Self {
         match value {
@@ -913,7 +913,7 @@ impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     }
 }
 
-#[cfg(feature = "jsonrpsee")]
+#[cfg(feature = "jsonrpsee-types")]
 impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
     fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
         match value {
@@ -996,6 +996,21 @@ mod tests {
                     .into(),
                 Default::default(),
             ]
+        );
+    }
+
+    #[test]
+    fn test_block_hash() {
+        let s =
+            r#"{"blockHash":"0x58dc57ab582b282c143424bd01e8d923cddfdcda9455bad02a29522f6274a948"}"#;
+        let filter = serde_json::from_str::<Filter>(s).unwrap();
+        similar_asserts::assert_eq!(
+            filter.block_option,
+            FilterBlockOption::AtBlockHash(
+                "0x58dc57ab582b282c143424bd01e8d923cddfdcda9455bad02a29522f6274a948"
+                    .parse()
+                    .unwrap()
+            )
         );
     }
 
@@ -1096,6 +1111,182 @@ mod tests {
         // 1 & 2 & 3
         let ser = serialize(&filter.topic1(t1).topic2(t2).topic3(t3));
         assert_eq!(ser, json!({ "address" : addr, "topics": [t0, t1_padded, t2, t3_padded]}));
+    }
+
+    fn build_bloom(address: Address, topic1: B256, topic2: B256) -> Bloom {
+        let mut block_bloom = Bloom::default();
+        block_bloom.accrue(BloomInput::Raw(&address[..]));
+        block_bloom.accrue(BloomInput::Raw(&topic1[..]));
+        block_bloom.accrue(BloomInput::Raw(&topic2[..]));
+        block_bloom
+    }
+
+    fn topic_filter(topic1: B256, topic2: B256, topic3: B256) -> Filter {
+        Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                topic1.into(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        }
+    }
+
+    #[test]
+    fn can_detect_different_topics() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let topics = topic_filter(topic1, topic2, topic3).topics;
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(!FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_topic() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let topics = topic_filter(topic1, topic2, topic3).topics;
+        let _topics_bloom = FilteredParams::topics_filter(&topics);
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), topic1, topic2),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_empty_topics() {
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: Default::default(),
+        };
+        let topics = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_address_and_topics() {
+        let rng_address = Address::random();
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: [
+                topic1.into(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics = filter.topics;
+
+        let address_filter = FilteredParams::address_filter(&filter.address);
+        let topics_filter = FilteredParams::topics_filter(&topics);
+        assert!(
+            FilteredParams::matches_address(
+                build_bloom(rng_address, topic1, topic2),
+                &address_filter
+            ) && FilteredParams::matches_topics(
+                build_bloom(rng_address, topic1, topic2),
+                &topics_filter
+            )
+        );
+    }
+
+    #[test]
+    fn can_match_topics_wildcard() {
+        let topic1 = B256::random();
+        let topic2 = B256::random();
+        let topic3 = B256::random();
+
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                Default::default(),
+                vec![topic2, topic3].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics);
+        assert!(FilteredParams::matches_topics(
+            build_bloom(Address::random(), topic1, topic2),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_topics_wildcard_mismatch() {
+        let filter = Filter {
+            block_option: Default::default(),
+            address: Default::default(),
+            topics: [
+                Default::default(),
+                vec![B256::random(), B256::random()].into(),
+                Default::default(),
+                Default::default(),
+            ],
+        };
+        let topics_input = filter.topics;
+
+        let topics_bloom = FilteredParams::topics_filter(&topics_input);
+        assert!(!FilteredParams::matches_topics(
+            build_bloom(Address::random(), B256::random(), B256::random()),
+            &topics_bloom
+        ));
+    }
+
+    #[test]
+    fn can_match_address_filter() {
+        let rng_address = Address::random();
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: Default::default(),
+        };
+        let address_bloom = FilteredParams::address_filter(&filter.address);
+        assert!(FilteredParams::matches_address(
+            build_bloom(rng_address, B256::random(), B256::random(),),
+            &address_bloom
+        ));
+    }
+
+    #[test]
+    fn can_detect_different_address() {
+        let bloom_address = Address::random();
+        let rng_address = Address::random();
+        let filter = Filter {
+            block_option: Default::default(),
+            address: rng_address.into(),
+            topics: Default::default(),
+        };
+        let address_bloom = FilteredParams::address_filter(&filter.address);
+        assert!(!FilteredParams::matches_address(
+            build_bloom(bloom_address, B256::random(), B256::random(),),
+            &address_bloom
+        ));
     }
 
     #[test]
