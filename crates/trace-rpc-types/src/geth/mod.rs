@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 //! Geth tracing types
 
-use crate::{state::StateOverride, BlockOverrides};
 use alloy_primitives::{Bytes, B256, U256};
+use alloy_rpc_types::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, time::Duration};
 
@@ -23,7 +23,7 @@ pub mod noop;
 pub mod pre_state;
 
 /// Result type for geth style transaction trace
-pub type TraceResult = crate::trace::common::TraceResult<GethTrace, String>;
+pub type TraceResult = crate::common::TraceResult<GethTrace, String>;
 
 /// blockTraceResult represents the results of tracing a single block when an entire chain is being
 /// traced. ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/eth/tracers/api.go#L218-L222>
@@ -48,7 +48,7 @@ pub struct DefaultFrame {
     /// How much gas was used.
     pub gas: u64,
     /// Output of the transaction
-    #[serde(serialize_with = "crate::serde_helpers::serialize_hex_string_no_prefix")]
+    #[serde(serialize_with = "alloy_rpc_types::serde_helpers::serialize_hex_string_no_prefix")]
     pub return_value: Bytes,
     /// Recorded traces of the transaction
     pub struct_logs: Vec<StructLog>,
@@ -548,7 +548,7 @@ mod tests {
     // <https://etherscan.io/tx/0xd01212e8ab48d2fd2ea9c4f33f8670fd1cf0cfb09d2e3c6ceddfaf54152386e5>
     #[test]
     fn serde_default_frame() {
-        let input = include_str!("../../../../test_data/default/structlogs_01.json");
+        let input = include_str!("../../test_data/default/structlogs_01.json");
         let _frame: DefaultFrame = serde_json::from_str(input).unwrap();
     }
 

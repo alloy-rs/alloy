@@ -13,7 +13,6 @@ pub mod pubsub;
 pub mod raw_log;
 pub mod state;
 mod syncing;
-pub mod trace;
 pub mod transaction;
 pub mod txpool;
 pub mod withdrawal;
