@@ -33,8 +33,8 @@ jsonrpsee-types = { version = "0.20", optional = true }
 
 
 [features]
-default = ["jsonrpsee-types"]
 arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+jsonrpsee = ["dep:jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz" ,"dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
 
 [dev-dependencies]

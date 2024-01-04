@@ -50,6 +50,6 @@ pub struct FeeHistory {
     pub oldest_block: U256,
     /// An (optional) array of effective priority fee per gas data points from a single
     /// block. All zeroes are returned if the block is empty.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reward: Option<Vec<Vec<U256>>>,
 }
