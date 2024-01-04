@@ -1,5 +1,3 @@
-//! Storage related helpers.
-
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::HashMap, fmt::Write};

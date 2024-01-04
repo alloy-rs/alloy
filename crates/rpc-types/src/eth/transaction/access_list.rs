@@ -1,13 +1,9 @@
 use alloy_primitives::{Address, B256, U256};
-use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
-use std::mem;
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
-#[derive(
-    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default, RlpEncodable, RlpDecodable,
-)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
@@ -16,24 +12,14 @@ pub struct AccessListItem {
     pub storage_keys: Vec<B256>,
 }
 
-impl AccessListItem {
-    /// Calculates a heuristic for the in-memory size of the [AccessListItem].
-    #[inline]
-    pub fn size(&self) -> usize {
-        mem::size_of::<Address>() + self.storage_keys.capacity() * mem::size_of::<U256>()
-    }
-}
-
 /// AccessList as defined in EIP-2930
-#[derive(
-    Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default, RlpEncodable, RlpDecodable,
-)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct AccessList(pub Vec<AccessListItem>);
 
 impl AccessList {
     /// Converts the list into a vec, expected by revm
     pub fn flattened(&self) -> Vec<(Address, Vec<U256>)> {
-        self.flatten().map(|(addr, keys)| (addr, keys.to_vec())).collect()
+        self.flatten().collect()
     }
 
     /// Consumes the type and converts the list into a vec, expected by revm
@@ -59,14 +45,6 @@ impl AccessList {
                 item.storage_keys.iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
             )
         })
-    }
-
-    /// Calculates a heuristic for the in-memory size of the [AccessList].
-    #[inline]
-    pub fn size(&self) -> usize {
-        // take into account capacity
-        self.0.iter().map(AccessListItem::size).sum::<usize>()
-            + self.0.capacity() * mem::size_of::<AccessListItem>()
     }
 }
 

@@ -1,10 +1,5 @@
-use crate::eth::transaction::{
-    typed::{
-        EIP1559TransactionRequest, EIP2930TransactionRequest, LegacyTransactionRequest,
-        TransactionKind, TypedTransactionRequest,
-    },
-    AccessList,
-};
+//! Alloy basic Transaction Request type.
+use crate::eth::transaction::AccessList;
 use alloy_primitives::{Address, Bytes, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
@@ -46,78 +41,6 @@ pub struct TransactionRequest {
 // == impl TransactionRequest ==
 
 impl TransactionRequest {
-    /// Converts the request into a [`TypedTransactionRequest`]
-    ///
-    /// Returns None if mutual exclusive fields `gasPrice` and `max_fee_per_gas` are either missing
-    /// or both set.
-    pub fn into_typed_request(self) -> Option<TypedTransactionRequest> {
-        let TransactionRequest {
-            to,
-            gas_price,
-            max_fee_per_gas,
-            max_priority_fee_per_gas,
-            gas,
-            value,
-            data,
-            nonce,
-            mut access_list,
-            ..
-        } = self;
-        match (gas_price, max_fee_per_gas, access_list.take()) {
-            // legacy transaction
-            (Some(_), None, None) => {
-                Some(TypedTransactionRequest::Legacy(LegacyTransactionRequest {
-                    nonce: nonce.unwrap_or_default(),
-                    gas_price: gas_price.unwrap_or_default(),
-                    gas_limit: gas.unwrap_or_default(),
-                    value: value.unwrap_or_default(),
-                    input: data.unwrap_or_default(),
-                    kind: match to {
-                        Some(to) => TransactionKind::Call(to),
-                        None => TransactionKind::Create,
-                    },
-                    chain_id: None,
-                }))
-            }
-            // EIP2930
-            (_, None, Some(access_list)) => {
-                Some(TypedTransactionRequest::EIP2930(EIP2930TransactionRequest {
-                    nonce: nonce.unwrap_or_default(),
-                    gas_price: gas_price.unwrap_or_default(),
-                    gas_limit: gas.unwrap_or_default(),
-                    value: value.unwrap_or_default(),
-                    input: data.unwrap_or_default(),
-                    kind: match to {
-                        Some(to) => TransactionKind::Call(to),
-                        None => TransactionKind::Create,
-                    },
-                    chain_id: 0,
-                    access_list,
-                }))
-            }
-            // EIP1559
-            (None, Some(_), access_list) | (None, None, access_list @ None) => {
-                // Empty fields fall back to the canonical transaction schema.
-                Some(TypedTransactionRequest::EIP1559(EIP1559TransactionRequest {
-                    nonce: nonce.unwrap_or_default(),
-                    max_fee_per_gas: max_fee_per_gas.unwrap_or_default(),
-                    max_priority_fee_per_gas: max_priority_fee_per_gas.unwrap_or_default(),
-                    gas_limit: gas.unwrap_or_default(),
-                    value: value.unwrap_or_default(),
-                    input: data.unwrap_or_default(),
-                    kind: match to {
-                        Some(to) => TransactionKind::Call(to),
-                        None => TransactionKind::Create,
-                    },
-                    chain_id: 0,
-                    access_list: access_list.unwrap_or_default(),
-                }))
-            }
-
-            _ => None,
-        }
-    }
-
     /// Sets the gas limit for the transaction.
     pub fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas = Some(U256::from(gas_limit));
@@ -143,7 +66,7 @@ impl TransactionRequest {
     }
 
     /// Sets the recipient address for the transaction.
-    pub fn to(mut self, to: Address) -> Self {
+    pub const fn to(mut self, to: Address) -> Self {
         self.to = Some(to);
         self
     }

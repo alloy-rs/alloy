@@ -10,7 +10,7 @@ use std::{
 };
 
 /// Different Trace diagnostic targets.
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TraceType {
     /// Default trace
@@ -57,37 +57,39 @@ impl TraceResults {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TraceResultsWithTransactionHash {
+    /// The recorded trace.
     #[serde(flatten)]
-    /// Full trace data.
     pub full_trace: TraceResults,
-    /// Transaction hash.
+    /// Hash of the traced transaction.
     pub transaction_hash: B256,
 }
 
+/// A changed value
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-/// Aux type for Diff::Changed.
 pub struct ChangedType<T> {
-    /// Previous value.
+    /// Original value
     pub from: T,
-    /// Current value.
+    /// New value
     pub to: T,
 }
 
+/// Represents how a value changed.
+///
+/// This is used for statediff.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-/// Delta type
 pub enum Delta<T> {
+    /// Existing value didn't change.
     #[default]
     #[serde(rename = "=")]
-    /// Unchanged variant.
     Unchanged,
+    /// New storage value added.
     #[serde(rename = "+")]
-    /// Added variant.
     Added(T),
+    /// Existing storage value removed.
     #[serde(rename = "-")]
-    /// Removed variant.
     Removed(T),
+    /// Existing storage value changed.
     #[serde(rename = "*")]
-    /// Changed variant.
     Changed(ChangedType<T>),
 }
 
@@ -95,43 +97,42 @@ pub enum Delta<T> {
 
 impl<T> Delta<T> {
     /// Creates a new [Delta::Changed] variant
-    pub fn changed(from: T, to: T) -> Self {
+    pub const fn changed(from: T, to: T) -> Self {
         Self::Changed(ChangedType { from, to })
     }
 
     /// Returns true if the value is unchanged
-    pub fn is_unchanged(&self) -> bool {
+    pub const fn is_unchanged(&self) -> bool {
         matches!(self, Delta::Unchanged)
     }
 
     /// Returns true if the value is added
-    pub fn is_added(&self) -> bool {
+    pub const fn is_added(&self) -> bool {
         matches!(self, Delta::Added(_))
     }
 
     /// Returns true if the value is removed
-    pub fn is_removed(&self) -> bool {
+    pub const fn is_removed(&self) -> bool {
         matches!(self, Delta::Removed(_))
     }
 
     /// Returns true if the value is changed
-    pub fn is_changed(&self) -> bool {
+    pub const fn is_changed(&self) -> bool {
         matches!(self, Delta::Changed(_))
     }
 }
 
+/// The diff of an account after a transaction
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// Serde-friendly `AccountDiff` shadow.
-
 pub struct AccountDiff {
-    /// Balance change.
+    /// How the balance changed, if at all
     pub balance: Delta<U256>,
-    /// Code change.
+    /// How the code changed, if at all
     pub code: Delta<Bytes>,
-    /// Nonce change.
+    /// How the nonce changed, if at all
     pub nonce: Delta<U64>,
-    /// Storage changes.
+    /// All touched/changed storage values
     pub storage: BTreeMap<B256, Delta<B256>>,
 }
 
@@ -154,45 +155,45 @@ impl DerefMut for StateDiff {
     }
 }
 
+/// Represents the various types of actions recorded during tracing
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type", content = "action")]
-/// Action
 pub enum Action {
-    /// Call
+    /// Regular call
     Call(CallAction),
-    /// Create
+    /// A CREATE call
     Create(CreateAction),
     /// Parity style traces never renamed suicide to selfdestruct: <https://eips.ethereum.org/EIPS/eip-6>
     ///
     /// For compatibility reasons, this is serialized as `suicide`: <https://github.com/paradigmxyz/reth/issues/3721>
     #[serde(rename = "suicide", alias = "selfdestruct")]
     Selfdestruct(SelfdestructAction),
-    /// Reward
+    /// Rewards if any (pre POS)
     Reward(RewardAction),
 }
 
 impl Action {
     /// Returns true if this is a call action
-    pub fn is_call(&self) -> bool {
+    pub const fn is_call(&self) -> bool {
         matches!(self, Action::Call(_))
     }
 
     /// Returns true if this is a create action
-    pub fn is_create(&self) -> bool {
+    pub const fn is_create(&self) -> bool {
         matches!(self, Action::Call(_))
     }
 
     /// Returns true if this is a selfdestruct action
-    pub fn is_selfdestruct(&self) -> bool {
+    pub const fn is_selfdestruct(&self) -> bool {
         matches!(self, Action::Selfdestruct(_))
     }
     /// Returns true if this is a reward action
-    pub fn is_reward(&self) -> bool {
+    pub const fn is_reward(&self) -> bool {
         matches!(self, Action::Reward(_))
     }
 
     /// Returns what kind of action this is
-    pub fn kind(&self) -> ActionType {
+    pub const fn kind(&self) -> ActionType {
         match self {
             Action::Call(_) => ActionType::Call,
             Action::Create(_) => ActionType::Create,
@@ -205,7 +206,7 @@ impl Action {
 /// An external action type.
 ///
 /// Used as enum identifier for [Action]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ActionType {
     /// Contract call.
@@ -220,7 +221,7 @@ pub enum ActionType {
 }
 
 /// Call type.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CallType {
     /// None
@@ -268,19 +269,19 @@ pub struct CreateAction {
     pub value: U256,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// What kind of reward.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// Reward type.
 pub enum RewardType {
-    /// Block
+    /// Block rewards
     Block,
-    /// Uncle
+    /// Reward for uncle block
     Uncle,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// Recorded reward of a block.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// Reward Action.
 pub struct RewardAction {
     /// Author's address.
     pub author: Address,
@@ -291,7 +292,7 @@ pub struct RewardAction {
 }
 
 /// Represents a _selfdestruct_ action fka `suicide`.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SelfdestructAction {
     /// destroyed/suicided address.
@@ -302,24 +303,25 @@ pub struct SelfdestructAction {
     pub refund_address: Address,
 }
 
+/// Outcome of a CALL.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// Call out put type
 pub struct CallOutput {
-    /// Gas Used.
+    /// Gas used by the call.
     pub gas_used: U64,
-    /// Output
+    /// The output data of the call.
     pub output: Bytes,
 }
-/// Represents the output of a create operation.
+
+/// Outcome of a CREATE.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateOutput {
-    /// Address output.
+    /// Address of the created contract.
     pub address: Address,
-    /// Code data.
+    /// Contract code.
     pub code: Bytes,
-    /// Resulting address.
+    /// Gas used by the call.
     pub gas_used: U64,
 }
 
@@ -337,7 +339,7 @@ pub enum TraceOutput {
 
 impl TraceOutput {
     /// Returns the gas used by this trace.
-    pub fn gas_used(&self) -> U64 {
+    pub const fn gas_used(&self) -> U64 {
         match self {
             TraceOutput::Call(call) => call.gas_used,
             TraceOutput::Create(create) => create.gas_used,
@@ -357,27 +359,29 @@ impl TraceOutput {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
+    /// Represents what kind of trace this is
     #[serde(flatten)]
-    /// Transaction action.
     pub action: Action,
+    /// The error message if the transaction failed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Error message.
     pub error: Option<String>,
-    /// Execution result.
+    /// Output of the trace, can be CALL or CREATE
     pub result: Option<TraceOutput>,
-    /// Subtrace count.
+    /// How many subtraces this trace has.
     pub subtraces: usize,
-    /// Trace address path.
+    /// The identifier of this transaction trace in the set.
+    ///
+    /// This gives the exact location in the call trace
+    /// [index in root CALL, index in first CALL, index in second CALL, …].
     pub trace_address: Vec<usize>,
 }
 
+/// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
-/// Localized transaction trace.
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
-    /// Trace of the transaction and its result.
     pub trace: TransactionTrace,
     /// Hash of the block, if not pending.
     ///
@@ -464,7 +468,8 @@ pub struct VmTrace {
     /// All executed instructions.
     pub ops: Vec<VmInstruction>,
 }
-/// Vm instruction type.
+
+/// A record of a single VM instruction, opcode level.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VmInstruction {
@@ -479,8 +484,8 @@ pub struct VmInstruction {
     /// Stringified opcode.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub op: Option<String>,
+    /// Index of the instruction in the set.
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// Index.
     pub idx: Option<String>,
 }
 
@@ -509,12 +514,12 @@ pub struct MemoryDelta {
 }
 
 /// A diff of some storage value.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageDelta {
-    /// Key.
+    /// Storage key.
     pub key: U256,
-    /// Value.
+    /// Storage value belonging to the key.
     pub val: U256,
 }
 

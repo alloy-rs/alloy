@@ -19,6 +19,11 @@ pub struct OtherFields {
 // === impl OtherFields ===
 
 impl OtherFields {
+    /// Creates a new instance
+    pub fn new(inner: BTreeMap<String, serde_json::Value>) -> Self {
+        Self { inner }
+    }
+
     /// Returns the deserialized value of the field, if it exists.
     /// Deserializes the value with the given closure
     pub fn get_with<F, V>(&self, key: impl AsRef<str>, with: F) -> Option<V>
@@ -74,6 +79,23 @@ impl OtherFields {
         let mut map = Map::with_capacity(self.inner.len());
         map.extend(self);
         serde_json::from_value(serde_json::Value::Object(map))
+    }
+}
+
+impl TryFrom<serde_json::Value> for OtherFields {
+    type Error = serde_json::Error;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(value).map(Self::new)
+    }
+}
+
+impl<K> FromIterator<(K, serde_json::Value)> for OtherFields
+where
+    K: Into<String>,
+{
+    fn from_iter<T: IntoIterator<Item = (K, serde_json::Value)>>(iter: T) -> Self {
+        Self { inner: iter.into_iter().map(|(key, value)| (key.into(), value)).collect() }
     }
 }
 
