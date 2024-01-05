@@ -27,8 +27,10 @@ pub struct Block {
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
-    #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
-    #[serde(default = "BlockTransactions::uncle")]
+    #[serde(
+        skip_serializing_if = "BlockTransactions::is_uncle",
+        default = "BlockTransactions::uncle"
+    )]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     pub size: Option<U256>,
