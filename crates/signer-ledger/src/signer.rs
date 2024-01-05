@@ -2,7 +2,7 @@
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
 use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{Result, SignableTx, Signature, Signer};
+use alloy_signer::{Result, SignableTx, Signature, Signer, TransactionExt};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -48,7 +48,7 @@ impl Signer for LedgerSigner {
     }
 
     #[inline]
-    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
         let chain_id = self.chain_id();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;

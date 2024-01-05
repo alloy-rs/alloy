@@ -75,6 +75,18 @@ pub trait Transaction: std::any::Any + Encodable + Send + Sync + 'static {
     fn set_gas_price(&mut self, price: U256);
 }
 
+// TODO: Remove in favor of dyn trait upcasting (1.76+)
+#[doc(hidden)]
+impl<S: 'static> dyn Transaction<Signature = S> {
+    pub fn __downcast_ref<T: std::any::Any>(&self) -> Option<&T> {
+        if std::any::Any::type_id(self) == std::any::TypeId::of::<T>() {
+            unsafe { Some(&*(self as *const _ as *const T)) }
+        } else {
+            None
+        }
+    }
+}
+
 /// Captures getters and setters common across EIP-1559 transactions across all networks
 pub trait Eip1559Transaction: Transaction {
     /// Get `max_priority_fee_per_gas`.

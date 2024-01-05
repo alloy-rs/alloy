@@ -7,11 +7,14 @@ use auto_impl::auto_impl;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// Trait for a signable transaction.
+/// A signable transaction.
+pub type SignableTx = dyn Transaction<Signature = Signature>;
+
+/// Extension trait for utilities for signable transactions.
 ///
 /// This trait is implemented for all types that implement [`Transaction`] with [`Signature`] as the
 /// signature associated type.
-pub trait SignableTx: Transaction<Signature = Signature> {
+pub trait TransactionExt: Transaction<Signature = Signature> {
     /// Encode the transaction.
     fn rlp_encode(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -39,7 +42,7 @@ pub trait SignableTx: Transaction<Signature = Signature> {
     }
 }
 
-impl<T: Transaction<Signature = Signature>> SignableTx for T {}
+impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
 
 /// Asynchronous Ethereum signer.
 ///
@@ -75,7 +78,7 @@ pub trait Signer: Send + Sync {
 
     /// Signs the transaction.
     #[inline]
-    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
         let chain_id = self.chain_id();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
@@ -158,7 +161,7 @@ pub trait SignerSync {
 
     /// Signs the transaction.
     #[inline]
-    fn sign_transaction_sync(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    fn sign_transaction_sync(&self, tx: &mut SignableTx) -> Result<Signature> {
         let chain_id = self.chain_id_sync();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;

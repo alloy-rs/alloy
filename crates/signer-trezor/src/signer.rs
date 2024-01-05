@@ -2,7 +2,7 @@ use super::types::{DerivationType, TrezorError};
 use alloy_consensus::TxEip1559;
 use alloy_network::{Transaction, TxKind};
 use alloy_primitives::{hex, Address, ChainId, Parity, B256, U256};
-use alloy_signer::{Result, SignableTx, Signature, Signer};
+use alloy_signer::{Result, SignableTx, Signature, Signer, TransactionExt};
 use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
@@ -50,7 +50,7 @@ impl Signer for TrezorSigner {
     }
 
     #[inline]
-    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
         // TODO: the Trezor Ethereum sign transaction protobufs don't require a chain ID, but the
         // trezor-client API does not reflect this.
         // https://github.com/trezor/trezor-firmware/pull/3482
@@ -186,8 +186,11 @@ impl TrezorSigner {
 
         let data = tx.input().to_vec();
 
-        let tx_any = tx as &dyn std::any::Any;
-        let signature = if let Some(tx) = tx_any.downcast_ref::<TxEip1559>() {
+        // TODO: Uncomment in 1.76
+        /*
+        let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
+        */
+        let signature = if let Some(tx) = tx.__downcast_ref::<TxEip1559>() {
             let max_gas_fee = tx.max_fee_per_gas;
             let max_gas_fee = u128_to_trezor(max_gas_fee);
 
