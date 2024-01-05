@@ -112,7 +112,7 @@ pub struct Header {
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BlockTransactions {
     /// Only hashes
@@ -120,6 +120,7 @@ pub enum BlockTransactions {
     /// Full transactions
     Full(Vec<Transaction>),
     /// Special case for uncle response.
+    #[default]
     Uncle,
 }
 
