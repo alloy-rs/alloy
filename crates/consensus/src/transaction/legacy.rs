@@ -210,10 +210,7 @@ impl Transaction for TxLegacy {
     type Signature = Signature;
     type Receipt = ReceiptWithBloom;
 
-    fn into_signed(self, signature: Signature) -> Signed<Self>
-    where
-        Self: Sized,
-    {
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
         self.encode_with_signature(&signature, &mut buf);
         let hash = keccak256(&buf);

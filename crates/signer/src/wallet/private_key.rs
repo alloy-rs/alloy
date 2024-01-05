@@ -41,7 +41,7 @@ impl Wallet<SigningKey> {
     #[inline]
     fn new_pk(signer: SigningKey) -> Self {
         let address = secret_key_to_address(&signer);
-        Self { signer, address, chain_id: 1 }
+        Self::new_with_signer(signer, address, None)
     }
 }
 
@@ -134,8 +134,9 @@ impl FromStr for Wallet<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LocalWallet, SignerSync};
-    use alloy_primitives::address;
+    use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
+    use alloy_consensus::TxLegacy;
+    use alloy_primitives::{address, ChainId, Signature, U256};
 
     #[cfg(feature = "keystore")]
     use {std::path::Path, tempfile::tempdir};
@@ -224,97 +225,78 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(TODO)] // TODO: TypedTransaction
     async fn signs_tx() {
-        // retrieved test vector from:
-        // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
-        let tx: TypedTransaction = TransactionRequest {
-            from: None,
-            to: Some("F0109fC8DF283027b6285cc889F5aA624EaC1F55".parse::<Address>().unwrap().into()),
-            value: Some(1_000_000_000.into()),
-            gas: Some(2_000_000.into()),
-            nonce: Some(0.into()),
-            gas_price: Some(21_000_000_000u128.into()),
-            data: None,
-            chain_id: Some(U64::one()),
+        async fn sign_tx_test(tx: &mut TxLegacy, chain_id: Option<ChainId>) -> Result<Signature> {
+            let mut before = tx.clone();
+            let sig = sign_dyn_tx_test(tx, chain_id).await?;
+            if let Some(chain_id) = chain_id {
+                assert_eq!(tx.chain_id, Some(chain_id), "chain ID was not set");
+                before.chain_id = Some(chain_id);
+            }
+            assert_eq!(*tx, before);
+            Ok(sig)
         }
-        .into();
-        let wallet: Wallet<SigningKey> =
-            "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-        let wallet = wallet.with_chain_id(tx.chain_id().unwrap().as_u64());
 
-        let sig = wallet.sign_transaction(&tx).await.unwrap();
-        let sighash = tx.sighash();
-        sig.verify(sighash, wallet.address).unwrap();
-    }
+        async fn sign_dyn_tx_test(
+            tx: &mut dyn SignableTx,
+            chain_id: Option<ChainId>,
+        ) -> Result<Signature> {
+            let mut wallet: Wallet<SigningKey> =
+                "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
+            wallet.set_chain_id(chain_id);
 
-    #[tokio::test]
-    #[cfg(TODO)] // TODO: TypedTransaction
-    async fn signs_tx_empty_chain_id() {
+            let sig = wallet.sign_transaction_sync(tx)?;
+            let sighash = tx.signature_hash();
+            assert_eq!(sig.recover_address_from_prehash(sighash).unwrap(), wallet.address);
+
+            let sig_async = wallet.sign_transaction(tx).await.unwrap();
+            assert_eq!(sig_async, sig);
+
+            Ok(sig)
+        }
+
         // retrieved test vector from:
         // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
-        let tx: TypedTransaction = TransactionRequest {
-            from: None,
-            to: Some("F0109fC8DF283027b6285cc889F5aA624EaC1F55".parse::<Address>().unwrap().into()),
-            value: Some(1_000_000_000.into()),
-            gas: Some(2_000_000.into()),
-            nonce: Some(0.into()),
-            gas_price: Some(21_000_000_000u128.into()),
-            data: None,
+        let mut tx = TxLegacy {
+            to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
+            value: U256::from(1_000_000_000),
+            gas_limit: 2_000_000,
+            nonce: 0,
+            gas_price: 21_000_000_000,
+            input: Default::default(),
             chain_id: None,
-        }
-        .into();
-        let wallet: Wallet<SigningKey> =
-            "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-        let wallet = wallet.with_chain_id(1u64);
+        };
+        let sig_none = sign_tx_test(&mut tx, None).await.unwrap();
 
-        // this should populate the tx chain_id as the signer's chain_id (1) before signing
-        let sig = wallet.sign_transaction(&tx).await.unwrap();
+        tx.chain_id = Some(1);
+        let sig_1 = sign_tx_test(&mut tx, None).await.unwrap();
+        let expected = "c9cf86333bcb065d140032ecaab5d9281bde80f21b9687b3e94161de42d51895727a108a0b8d101465414033c3f705a9c7b826e596766046ee1183dbc8aeaa6825".parse().unwrap();
+        assert_eq!(sig_1, expected);
+        assert_ne!(sig_1, sig_none);
 
-        // since we initialize with None we need to re-set the chain_id for the sighash to be
-        // correct
-        let mut tx = tx;
-        tx.set_chain_id(1);
-        let sighash = tx.sighash();
-        sig.verify(sighash, wallet.address).unwrap();
-    }
+        tx.chain_id = Some(2);
+        let sig_2 = sign_tx_test(&mut tx, None).await.unwrap();
+        assert_ne!(sig_2, sig_1);
+        assert_ne!(sig_2, sig_none);
 
-    #[test]
-    #[cfg(TODO)] // TODO: TypedTransaction
-    fn signs_tx_empty_chain_id_sync() {
-        let chain_id = 1337u64;
-        // retrieved test vector from:
-        // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
-        let tx: TypedTransaction = TransactionRequest {
-            from: None,
-            to: Some("F0109fC8DF283027b6285cc889F5aA624EaC1F55".parse::<Address>().unwrap().into()),
-            value: Some(1_000_000_000u64.into()),
-            gas: Some(2_000_000u64.into()),
-            nonce: Some(0u64.into()),
-            gas_price: Some(21_000_000_000u128.into()),
-            data: None,
-            chain_id: None,
-        }
-        .into();
-        let wallet: Wallet<SigningKey> =
-            "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-        let wallet = wallet.with_chain_id(chain_id);
+        // Sets chain ID.
+        tx.chain_id = None;
+        let sig_none_none = sign_tx_test(&mut tx, None).await.unwrap();
+        assert_eq!(sig_none_none, sig_none);
 
-        // this should populate the tx chain_id as the signer's chain_id (1337) before signing and
-        // normalize the v
-        let sig = wallet.sign_transaction_sync(&tx).unwrap();
+        tx.chain_id = None;
+        let sig_none_1 = sign_tx_test(&mut tx, Some(1)).await.unwrap();
+        assert_eq!(sig_none_1, sig_1);
 
-        // ensure correct v given the chain - first extract recid
-        let recid = (sig.v - 35) % 2;
-        // eip155 check
-        assert_eq!(sig.v, chain_id * 2 + 35 + recid);
+        tx.chain_id = None;
+        let sig_none_2 = sign_tx_test(&mut tx, Some(2)).await.unwrap();
+        assert_eq!(sig_none_2, sig_2);
 
-        // since we initialize with None we need to re-set the chain_id for the sighash to be
-        // correct
-        let mut tx = tx;
-        tx.set_chain_id(chain_id);
-        let sighash = tx.sighash();
-        sig.verify(sighash, wallet.address).unwrap();
+        // Errors on mismatch.
+        tx.chain_id = Some(2);
+        let error = sign_tx_test(&mut tx, Some(1)).await.unwrap_err();
+        let expected_error = crate::Error::TransactionChainIdMismatch { signer: 1, tx: 2 };
+        assert_eq!(error.to_string(), expected_error.to_string());
     }
 
     #[test]

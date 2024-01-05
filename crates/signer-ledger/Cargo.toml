@@ -26,6 +26,7 @@ tracing.workspace = true
 alloy-sol-types = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-consensus.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 serial_test.workspace = true
 

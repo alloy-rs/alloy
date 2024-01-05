@@ -1,8 +1,8 @@
 //! Ledger Ethereum app wrapper.
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
-use alloy_primitives::{hex, Address, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_primitives::{hex, Address, ChainId, B256};
+use alloy_signer::{Result, SignableTx, Signature, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -23,18 +23,8 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 pub struct LedgerSigner {
     transport: Mutex<Ledger>,
     derivation: DerivationType,
-    pub(crate) chain_id: u64,
+    pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
-}
-
-impl std::fmt::Display for LedgerSigner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "LedgerApp. Key at index {} with address {:?} on chain_id {}",
-            self.derivation, self.address, self.chain_id
-        )
-    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -57,10 +47,17 @@ impl Signer for LedgerSigner {
             .map_err(alloy_signer::Error::other)
     }
 
-    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
-        self.sign_tx(&tx).await.map_err(alloy_signer::Error::other)
+    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+        let chain_id = self.chain_id();
+        if let Some(chain_id) = chain_id {
+            tx.set_chain_id_checked(chain_id)?;
+        }
+        let mut sig = self.sign_tx(&tx.rlp_encode()).await.map_err(alloy_signer::Error::other)?;
+        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
     }
 
     #[cfg(feature = "eip712")]
@@ -79,12 +76,12 @@ impl Signer for LedgerSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> u64 {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -98,11 +95,14 @@ impl LedgerSigner {
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_ledger::{HDPath, Ledger};
     ///
-    /// let ledger = Ledger::new(HDPath::LedgerLive(0), 1).await?;
+    /// let ledger = Ledger::new(HDPath::LedgerLive(0), Some(1)).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn new(derivation: DerivationType, chain_id: u64) -> Result<Self, LedgerError> {
+    pub async fn new(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+    ) -> Result<Self, LedgerError> {
         let transport = Ledger::init().await?;
         let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
 
@@ -177,42 +177,13 @@ impl LedgerSigner {
         Ok(version)
     }
 
-    /// Signs an Ethereum transaction (requires confirmation on the ledger)
-    #[cfg(TODO)] // TODO: TypedTransaction
-    pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, LedgerError> {
-        let mut tx_with_chain = tx.clone();
-        if tx_with_chain.chain_id().is_none() {
-            // in the case we don't have a chain_id, let's use the signer chain id instead
-            tx_with_chain.set_chain_id(self.chain_id);
-        }
+    /// Signs an Ethereum transaction's RLP bytes (requires confirmation on the ledger).
+    ///
+    /// Note that this does not apply EIP-155.
+    async fn sign_tx(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation);
-        payload.extend_from_slice(tx_with_chain.rlp().as_ref());
-
-        let mut signature = self.sign_payload(INS::SIGN, &payload).await?;
-
-        // modify `v` value of signature to match EIP-155 for chains with large chain ID
-        // The logic is derived from Ledger's library
-        // https://github.com/LedgerHQ/ledgerjs/blob/e78aac4327e78301b82ba58d63a72476ecb842fc/packages/hw-app-eth/src/Eth.ts#L300
-        let eip155_chain_id = self.chain_id * 2 + 35;
-        if eip155_chain_id + 1 > 255 {
-            let one_byte_chain_id = eip155_chain_id % 256;
-            let ecc_parity = if signature.v > one_byte_chain_id {
-                signature.v - one_byte_chain_id
-            } else {
-                one_byte_chain_id - signature.v
-            };
-
-            signature.v = match tx {
-                TypedTransaction::Eip2930(_) | TypedTransaction::Eip1559(_) => {
-                    (ecc_parity % 2 != 1) as u64
-                }
-                TypedTransaction::Legacy(_) => eip155_chain_id + ecc_parity,
-                #[cfg(feature = "optimism")]
-                TypedTransaction::DepositTransaction(_) => 0,
-            };
-        }
-
-        Ok(signature)
+        payload.extend_from_slice(tx_rlp);
+        self.sign_payload(INS::SIGN, &payload).await
     }
 
     #[cfg(feature = "eip712")]
@@ -309,6 +280,7 @@ impl LedgerSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::{address, U256};
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
@@ -317,7 +289,7 @@ mod tests {
     }
 
     async fn init_ledger() -> LedgerSigner {
-        match LedgerSigner::new(DTYPE, 1).await {
+        match LedgerSigner::new(DTYPE, Some(1)).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
         }
@@ -345,22 +317,25 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     #[ignore]
-    #[cfg(TODO)] // TODO: TypedTransaction
     async fn test_sign_tx() {
         let ledger = init_ledger().await;
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
 
-        let tx_req = TransactionRequest::new()
-            .to("2ed7afa17473e17ac59908f088b4371d28585476".parse::<Address>().unwrap())
-            .gas(1000000)
-            .gas_price(400e9 as u64)
-            .nonce(5)
-            .data(data)
-            .value(alloy_primitives::utils::parse_ether(100).unwrap())
-            .into();
-        let tx = ledger.sign_transaction(&tx_req).await.unwrap();
+        let mut tx = alloy_consensus::TxLegacy {
+            nonce: 0,
+            gas_price: 400e9 as u128,
+            gas_limit: 1000000,
+            to: alloy_consensus::TxKind::Call(address!("2ed7afa17473e17ac59908f088b4371d28585476")),
+            input: data.into(),
+            value: U256::from(100e18 as u128),
+            chain_id: None,
+        };
+        let sighash = tx.signature_hash();
+        let sig = ledger.sign_transaction(&mut tx).await.unwrap();
+        assert_eq!(tx.chain_id, None);
+        assert_eq!(sig.recover_address_from_prehash(sighash).unwrap(), my_address());
     }
 
     #[tokio::test]

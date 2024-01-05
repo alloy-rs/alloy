@@ -2,7 +2,7 @@
 //!
 //! [Official Docs](https://docs.trezor.io/trezor-firmware/index.html)
 
-use alloy_primitives::{hex, B256, U256};
+use alloy_primitives::hex;
 use std::fmt;
 use thiserror::Error;
 use trezor_client::client::AccessListItem as Trezor_AccessListItem;
@@ -47,9 +47,6 @@ pub enum TrezorError {
     /// version.
     #[error("Trezor Ethereum app requires at least version {0:?}")]
     UnsupportedFirmwareVersion(String),
-    /// No ENS support.
-    #[error("Trezor does not support ENS")]
-    NoEnsSupport,
     /// Could not retrieve device features.
     #[error("could not retrieve device features")]
     FeaturesError,
@@ -70,21 +67,17 @@ pub(crate) struct TrezorTransaction {
 }
 
 impl TrezorTransaction {
-    #[allow(dead_code)]
+    #[cfg(TODO)]
     fn to_trimmed_big_endian(value: &U256) -> Vec<u8> {
         let trimmed_value = B256::from(*value);
         trimmed_value[value.leading_zeros() / 8..].to_vec()
     }
 
-    #[cfg(TODO)] // TODO: TypedTransaction
+    #[cfg(TODO)]
     pub fn load(tx: &TypedTransaction) -> Result<Self, TrezorError> {
         let to: String = match tx.to() {
-            Some(v) => match v {
-                NameOrAddress::Name(_) => return Err(TrezorError::NoEnsSupport),
-                NameOrAddress::Address(value) => hex::encode_prefixed(value),
-            },
-            // Contract Creation
-            None => "".to_string(),
+            TxKind::Call(address) => hex::encode_prefixed(address),
+            TxKind::Create => String::new(),
         };
 
         let nonce = tx.nonce().map_or(vec![], Self::to_trimmed_big_endian);

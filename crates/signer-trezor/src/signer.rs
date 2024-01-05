@@ -1,5 +1,5 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_primitives::{hex, Address, B256, U256};
+use alloy_primitives::{hex, Address, ChainId, B256, U256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use std::fmt;
@@ -18,7 +18,7 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 pub struct TrezorSigner {
     derivation: DerivationType,
     session_id: Vec<u8>,
-    pub(crate) chain_id: u64,
+    pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
 }
 
@@ -46,9 +46,9 @@ impl Signer for TrezorSigner {
         self.sign_message_(message).await.map_err(alloy_signer::Error::other)
     }
 
-    #[cfg(TODO)] // TODO: TypedTransaction
     #[inline]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
+    #[cfg(TODO)]
+    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
         self.sign_tx(tx).await
     }
 
@@ -58,12 +58,12 @@ impl Signer for TrezorSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> u64 {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -71,7 +71,10 @@ impl Signer for TrezorSigner {
 impl TrezorSigner {
     /// Instantiates a new Trezor signer.
     #[instrument(ret)]
-    pub async fn new(derivation: DerivationType, chain_id: u64) -> Result<Self, TrezorError> {
+    pub async fn new(
+        derivation: DerivationType,
+        chain_id: Option<ChainId>,
+    ) -> Result<Self, TrezorError> {
         let mut signer = Self {
             derivation: derivation.clone(),
             chain_id,
@@ -141,15 +144,15 @@ impl TrezorSigner {
     }
 
     /// Signs an Ethereum transaction (requires confirmation on the Trezor)
-    #[cfg(TODO)] // TODO: TypedTransaction
-    pub async fn sign_tx(&self, tx: &TypedTransaction) -> Result<Signature, TrezorError> {
+    #[cfg(TODO)]
+    async fn sign_tx(&self, tx: &mut dyn SignableTx) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
 
         let arr_path = Self::convert_path(&self.derivation);
 
         let transaction = TrezorTransaction::load(tx)?;
 
-        let chain_id = tx.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
+        let chain_id = tx.chain_id().unwrap_or(self.chain_id);
 
         let signature = match tx {
             TypedTransaction::Eip2930(_) | TypedTransaction::Legacy(_) => client.ethereum_sign_tx(
@@ -224,7 +227,7 @@ mod tests {
     // Replace this with your ETH addresses.
     async fn test_get_address() {
         // Instantiate it with the default trezor derivation path
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), 1).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), Some(1)).await.unwrap();
         assert_eq!(
             trezor.get_address().await.unwrap(),
             address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
@@ -238,7 +241,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), 1).await.unwrap();
+        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
         let message = "hello world";
         let sig = trezor.sign_message(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();

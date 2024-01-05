@@ -1,4 +1,4 @@
-use alloy_primitives::{hex, Address, B256};
+use alloy_primitives::{hex, Address, ChainId, B256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use aws_sdk_kms::{
@@ -37,7 +37,7 @@ use std::fmt;
 /// let client = aws_sdk_kms::Client::new(&config);
 ///
 /// let key_id = "...".to_string();
-/// let chain_id = 1;
+/// let chain_id = Some(1);
 /// let signer = AwsSigner::new(client, key_id, chain_id).await.unwrap();
 ///
 /// let message = vec![0, 1, 2, 3];
@@ -49,10 +49,10 @@ use std::fmt;
 #[derive(Clone)]
 pub struct AwsSigner {
     kms: Client,
-    chain_id: u64,
     key_id: String,
     pubkey: VerifyingKey,
     address: Address,
+    chain_id: Option<ChainId>,
 }
 
 impl fmt::Debug for AwsSigner {
@@ -96,20 +96,9 @@ pub enum AwsSignerError {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)]
+    #[allow(clippy::blocks_in_conditions)] // tracing::instrument on async fn
     async fn sign_hash(&self, hash: B256) -> Result<Signature> {
-        self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
-    }
-
-    #[cfg(TODO)] // TODO: TypedTransaction
-    #[instrument(err)]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
-        let mut tx_with_chain = tx.clone();
-        let chain_id = tx_with_chain.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
-        tx_with_chain.set_chain_id(chain_id);
-
-        let sighash = tx_with_chain.sighash();
-        self.sign_digest_with_eip155(sighash, chain_id).await
+        self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -118,12 +107,12 @@ impl Signer for AwsSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> u64 {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -136,7 +125,7 @@ impl AwsSigner {
     pub async fn new(
         kms: Client,
         key_id: String,
-        chain_id: u64,
+        chain_id: Option<ChainId>,
     ) -> Result<AwsSigner, AwsSignerError> {
         let resp = request_get_pubkey(&kms, key_id.clone()).await?;
         let pubkey = decode_pubkey(resp)?;
@@ -169,17 +158,14 @@ impl AwsSigner {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
-    /// Sign a digest with this signer's key and add the eip155 `v` value
-    /// corresponding to the input chain_id
+    /// Sign a digest with this signer's key and applies EIP-155.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_with_eip155(
-        &self,
-        digest: B256,
-        chain_id: u64,
-    ) -> Result<Signature, AwsSignerError> {
+    async fn sign_digest_inner(&self, digest: B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
-        let sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
-        sig.with_chain_id(chain_id);
+        let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
+        if let Some(chain_id) = self.chain_id {
+            sig = sig.with_chain_id(chain_id);
+        }
         Ok(sig)
     }
 }
@@ -258,8 +244,7 @@ mod tests {
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let client = aws_sdk_kms::Client::new(&config);
 
-        let chain_id = 1;
-        let signer = AwsSigner::new(client, key_id, chain_id).await.unwrap();
+        let signer = AwsSigner::new(client, key_id, Some(1)).await.unwrap();
 
         let message = vec![0, 1, 2, 3];
 

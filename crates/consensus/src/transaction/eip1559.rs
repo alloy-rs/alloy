@@ -233,10 +233,7 @@ impl Transaction for TxEip1559 {
     type Signature = Signature;
     type Receipt = ReceiptWithBloom;
 
-    fn into_signed(self, signature: Signature) -> Signed<Self>
-    where
-        Self: Sized,
-    {
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
         buf.put_u8(TxType::Eip1559 as u8);
         self.encode_signed(&signature, &mut buf);

@@ -1,5 +1,5 @@
 use crate::{Result, Signer, SignerSync};
-use alloy_primitives::{Address, Signature, B256};
+use alloy_primitives::{Address, ChainId, Signature, B256};
 use async_trait::async_trait;
 use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
@@ -35,7 +35,7 @@ mod yubi;
 ///
 /// // Optionally, the wallet's chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
-/// let wallet = wallet.with_chain_id(1337u64);
+/// let wallet = wallet.with_chain_id(Some(1337));
 ///
 /// // The wallet can be used to sign messages
 /// let message = b"hello";
@@ -55,7 +55,7 @@ pub struct Wallet<D> {
     /// The wallet's address.
     pub(crate) address: Address,
     /// The wallet's chain ID (for EIP-155).
-    pub(crate) chain_id: u64,
+    pub(crate) chain_id: Option<ChainId>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -72,12 +72,12 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     }
 
     #[inline]
-    fn chain_id(&self) -> u64 {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -86,14 +86,23 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> 
     #[inline]
     fn sign_hash_sync(&self, hash: B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
-        Signature::from_signature_and_parity(recoverable_sig, recovery_id).map_err(Into::into)
+        let mut sig = Signature::from_signature_and_parity(recoverable_sig, recovery_id)?;
+        if let Some(chain_id) = self.chain_id {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
+    }
+
+    #[inline]
+    fn chain_id_sync(&self) -> Option<ChainId> {
+        self.chain_id
     }
 }
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
     /// Construct a new wallet with an external [`PrehashSigner`].
     #[inline]
-    pub const fn new_with_signer(signer: D, address: Address, chain_id: u64) -> Self {
+    pub const fn new_with_signer(signer: D, address: Address, chain_id: Option<ChainId>) -> Self {
         Wallet { signer, address, chain_id }
     }
 
