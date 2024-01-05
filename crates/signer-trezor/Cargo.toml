@@ -12,6 +12,8 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-consensus.workspace = true
+alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 

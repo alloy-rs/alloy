@@ -1,4 +1,4 @@
-use crate::{transaction::TxKind, ReceiptWithBloom, TxType};
+use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
@@ -192,7 +192,7 @@ impl Decodable for TxEip2930 {
 
 impl Transaction for TxEip2930 {
     type Signature = Signature;
-    type Receipt = ReceiptWithBloom;
+    // type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
@@ -236,6 +236,14 @@ impl Transaction for TxEip2930 {
         self.input = input;
     }
 
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn set_to(&mut self, to: TxKind) {
+        self.to = to;
+    }
+
     fn value(&self) -> U256 {
         self.value
     }
@@ -267,13 +275,22 @@ impl Transaction for TxEip2930 {
     fn set_gas_limit(&mut self, limit: u64) {
         self.gas_limit = limit;
     }
+
+    fn gas_price(&self) -> Option<U256> {
+        Some(U256::from(self.gas_price))
+    }
+
+    fn set_gas_price(&mut self, price: U256) {
+        if let Ok(price) = price.try_into() {
+            self.gas_price = price;
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::TxEip2930;
-    use crate::{transaction::TxKind, TxEnvelope};
+    use crate::{TxEnvelope, TxKind};
     use alloy_network::{Signed, Transaction};
     use alloy_primitives::{Address, Bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};

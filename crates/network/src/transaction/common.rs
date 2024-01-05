@@ -35,7 +35,7 @@ impl TxKind {
 
     /// Calculates a heuristic for the in-memory size of this object.
     #[inline]
-    pub(crate) const fn size(self) -> usize {
+    pub const fn size(self) -> usize {
         std::mem::size_of::<Self>()
     }
 }

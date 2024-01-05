@@ -1,21 +1,20 @@
-use crate::Receipt;
 use alloy_primitives::{Bytes, ChainId, Signature, B256, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Encodable};
+
+mod common;
+pub use common::TxKind;
 
 mod signed;
 pub use signed::Signed;
 
 /// Represents a minimal EVM transaction.
-pub trait Transaction: Encodable + Decodable + Send + Sync + 'static {
+pub trait Transaction: std::any::Any + Encodable + Send + Sync + 'static {
     /// The signature type for this transaction.
     ///
     /// This is usually [`alloy_primitives::Signature`], however, it may be different for future
     /// EIP-2718 transaction types, or in other networks. For example, in Optimism, the deposit
     /// transaction signature is the unit type `()`.
     type Signature;
-
-    /// The receipt type for this transaction.
-    type Receipt: Receipt;
 
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.
@@ -45,6 +44,11 @@ pub trait Transaction: Encodable + Decodable + Send + Sync + 'static {
     /// Set `data`.
     fn set_input(&mut self, data: Bytes);
 
+    /// Get `to`.
+    fn to(&self) -> TxKind;
+    /// Set `to`.
+    fn set_to(&mut self, to: TxKind);
+
     /// Get `value`.
     fn value(&self) -> U256;
     /// Set `value`.
@@ -64,6 +68,11 @@ pub trait Transaction: Encodable + Decodable + Send + Sync + 'static {
     fn gas_limit(&self) -> u64;
     /// Set `gas_limit`.
     fn set_gas_limit(&mut self, limit: u64);
+
+    /// Get `gas_price`.
+    fn gas_price(&self) -> Option<U256>;
+    /// Set `gas_price`.
+    fn set_gas_price(&mut self, price: U256);
 }
 
 /// Captures getters and setters common across EIP-1559 transactions across all networks

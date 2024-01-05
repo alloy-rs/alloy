@@ -23,7 +23,7 @@ mod sealed;
 pub use sealed::{Sealable, Sealed};
 
 mod transaction;
-pub use transaction::{Eip1559Transaction, Signed, Transaction};
+pub use transaction::{Eip1559Transaction, Signed, Transaction, TxKind};
 
 mod receipt;
 pub use receipt::Receipt;
