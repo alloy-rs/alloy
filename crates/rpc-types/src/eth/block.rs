@@ -25,8 +25,10 @@ pub struct Block {
     pub total_difficulty: Option<U256>,
     /// Uncles' hashes.
     pub uncles: Vec<B256>,
-    /// Transactions.
+    /// Block Transactions. In the case of an uncle block, this field is not included in RPC
+    /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
     #[serde(skip_serializing_if = "BlockTransactions::is_uncle")]
+    #[serde(default = "BlockTransactions::uncle")]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     pub size: Option<U256>,
@@ -112,7 +114,7 @@ pub struct Header {
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
-#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BlockTransactions {
     /// Only hashes
@@ -120,7 +122,6 @@ pub enum BlockTransactions {
     /// Full transactions
     Full(Vec<Transaction>),
     /// Special case for uncle response.
-    #[default]
     Uncle,
 }
 
@@ -1022,6 +1023,48 @@ mod tests {
         assert_eq!(
             serialized,
             r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13","withdrawals":[]}"#
+        );
+        let deserialized: Block = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(block, deserialized);
+    }
+
+    #[test]
+    fn serde_uncle_block() {
+        let block = Block {
+            header: Header {
+                hash: Some(B256::with_last_byte(1)),
+                parent_hash: B256::with_last_byte(2),
+                uncles_hash: B256::with_last_byte(3),
+                miner: Address::with_last_byte(4),
+                state_root: B256::with_last_byte(5),
+                transactions_root: B256::with_last_byte(6),
+                receipts_root: B256::with_last_byte(7),
+                withdrawals_root: Some(B256::with_last_byte(8)),
+                number: Some(U256::from(9)),
+                gas_used: U256::from(10),
+                gas_limit: U256::from(11),
+                extra_data: Bytes::from(vec![1, 2, 3]),
+                logs_bloom: Bloom::default(),
+                timestamp: U256::from(12),
+                difficulty: U256::from(13),
+                mix_hash: Some(B256::with_last_byte(14)),
+                nonce: Some(B64::with_last_byte(15)),
+                base_fee_per_gas: Some(U256::from(20)),
+                blob_gas_used: None,
+                excess_blob_gas: None,
+                parent_beacon_block_root: None,
+            },
+            total_difficulty: Some(U256::from(100000)),
+            uncles: vec![],
+            transactions: BlockTransactions::Uncle,
+            size: Some(U256::from(19)),
+            withdrawals: None,
+            other: Default::default(),
+        };
+        let serialized = serde_json::to_string(&block).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":[],"size":"0x13"}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
         assert_eq!(block, deserialized);
