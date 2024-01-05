@@ -53,7 +53,8 @@ impl Signer for LedgerSigner {
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
         }
-        let mut sig = self.sign_tx(&tx.rlp_encode()).await.map_err(alloy_signer::Error::other)?;
+        let rlp = tx.rlp_encode();
+        let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
         if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
             sig = sig.with_chain_id(chain_id);
         }
@@ -180,7 +181,7 @@ impl LedgerSigner {
     /// Signs an Ethereum transaction's RLP bytes (requires confirmation on the ledger).
     ///
     /// Note that this does not apply EIP-155.
-    async fn sign_tx(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
+    pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(tx_rlp);
         self.sign_payload(INS::SIGN, &payload).await
