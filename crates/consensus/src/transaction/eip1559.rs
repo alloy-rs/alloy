@@ -2,7 +2,7 @@ use crate::{ReceiptWithBloom, TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
-use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
@@ -198,7 +198,7 @@ impl TxEip1559 {
     /// Outputs the signature hash of the transaction by first encoding without a signature, then
     /// hashing.
     pub(crate) fn signature_hash(&self) -> B256 {
-        let mut buf = BytesMut::with_capacity(self.payload_len_for_signature());
+        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
         self.encode_for_signing(&mut buf);
         keccak256(&buf)
     }

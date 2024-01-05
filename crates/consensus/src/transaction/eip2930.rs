@@ -2,7 +2,7 @@ use crate::{transaction::TxKind, ReceiptWithBloom, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
-use alloy_rlp::{length_of_length, BufMut, BytesMut, Decodable, Encodable, Header};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
@@ -159,7 +159,7 @@ impl TxEip2930 {
     /// Outputs the signature hash of the transaction by first encoding without a signature, then
     /// hashing.
     pub(crate) fn signature_hash(&self) -> B256 {
-        let mut buf = BytesMut::with_capacity(self.payload_len_for_signature());
+        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
         self.encode_for_signing(&mut buf);
         keccak256(&buf)
     }
@@ -279,7 +279,7 @@ mod tests {
     use crate::{transaction::TxKind, TxEnvelope};
     use alloy_network::{Signed, Transaction};
     use alloy_primitives::{Address, Bytes, Signature, U256};
-    use alloy_rlp::{BytesMut, Decodable, Encodable};
+    use alloy_rlp::{Decodable, Encodable};
 
     #[test]
     fn test_decode_create() {
@@ -298,7 +298,7 @@ mod tests {
 
         let tx = request.into_signed(signature);
 
-        let mut encoded = BytesMut::new();
+        let mut encoded = Vec::new();
         tx.encode(&mut encoded);
         assert_eq!(encoded.len(), tx.length());
 
@@ -325,7 +325,7 @@ mod tests {
 
         let envelope = TxEnvelope::Eip2930(tx);
 
-        let mut encoded = BytesMut::new();
+        let mut encoded = Vec::new();
         envelope.encode(&mut encoded);
         assert_eq!(encoded.len(), envelope.length());
 

@@ -39,7 +39,7 @@ pub trait Transaction: Send + Sync + 'static {
 
     /// Get `data`.
     fn input(&self) -> &[u8];
-    /// Mut getter for
+    /// Get `data`.
     fn input_mut(&mut self) -> &mut Bytes;
     /// Set `data`.
     fn set_input(&mut self, data: Bytes);
