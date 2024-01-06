@@ -8,7 +8,7 @@ pub struct FourByteFrame(pub BTreeMap<String, u64>);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace::geth::*;
+    use crate::geth::*;
 
     const DEFAULT: &str = r#"{
         "0x27dc297e-128": 1,

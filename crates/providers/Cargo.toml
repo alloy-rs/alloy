@@ -16,6 +16,7 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-client.workspace = true
 alloy-rpc-types.workspace = true
+alloy-rpc-trace-types.workspace = true
 alloy-transport-http.workspace = true
 alloy-transport.workspace = true
 async-trait.workspace = true

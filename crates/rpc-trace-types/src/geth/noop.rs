@@ -12,7 +12,7 @@ struct Null;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace::geth::*;
+    use crate::geth::*;
 
     const DEFAULT: &str = r"{}";
 
