@@ -7,23 +7,20 @@ use auto_impl::auto_impl;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// Trait for a signable transaction.
+/// A signable transaction.
+pub type SignableTx = dyn Transaction<Signature = Signature>;
+
+/// Extension trait for utilities for signable transactions.
 ///
-/// This trait allows us to generically sign transactions without knowing the
-/// receipt type, and is blanket implemented for transactions which our signer
-/// trait can produce signatures for.
-pub trait SignableTx: Send + Sync + 'static {
+/// This trait is implemented for all types that implement [`Transaction`] with [`Signature`] as the
+/// signature associated type.
+pub trait TransactionExt: Transaction<Signature = Signature> {
     /// Encode the transaction.
-    fn rlp_encode(&self) -> Vec<u8>;
-
-    /// Calculate the signing hash for the transaction.
-    fn signature_hash(&self) -> B256;
-
-    /// Returns the chain ID. Used for EIP-155 signing.
-    fn chain_id(&self) -> Option<ChainId>;
-
-    /// Sets the chain ID. Used for EIP-155 signing.
-    fn set_chain_id(&mut self, chain_id: ChainId);
+    fn rlp_encode(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        self.encode(&mut out);
+        out
+    }
 
     /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
     /// existing `chain_id` if it is already set.
@@ -45,25 +42,7 @@ pub trait SignableTx: Send + Sync + 'static {
     }
 }
 
-impl<T: Transaction<Signature = Signature>> SignableTx for T {
-    fn rlp_encode(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.encode(&mut out);
-        out
-    }
-
-    fn signature_hash(&self) -> B256 {
-        Transaction::signature_hash(self)
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        Transaction::chain_id(self)
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        Transaction::set_chain_id(self, chain_id)
-    }
-}
+impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
 
 /// Asynchronous Ethereum signer.
 ///
@@ -99,7 +78,7 @@ pub trait Signer: Send + Sync {
 
     /// Signs the transaction.
     #[inline]
-    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
         let chain_id = self.chain_id();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
@@ -182,7 +161,7 @@ pub trait SignerSync {
 
     /// Signs the transaction.
     #[inline]
-    fn sign_transaction_sync(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
+    fn sign_transaction_sync(&self, tx: &mut SignableTx) -> Result<Signature> {
         let chain_id = self.chain_id_sync();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;

@@ -1,6 +1,8 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_primitives::{hex, Address, ChainId, B256, U256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_consensus::TxEip1559;
+use alloy_network::{Transaction, TxKind};
+use alloy_primitives::{hex, Address, ChainId, Parity, B256, U256};
+use alloy_signer::{Result, SignableTx, Signature, Signer, TransactionExt};
 use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
@@ -35,6 +37,7 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
+    #[inline]
     async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
@@ -43,13 +46,23 @@ impl Signer for TrezorSigner {
 
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        self.sign_message_(message).await.map_err(alloy_signer::Error::other)
+        self.sign_message_inner(message).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
-    #[cfg(TODO)]
-    async fn sign_transaction(&self, tx: &mut dyn SignableTx) -> Result<Signature> {
-        self.sign_tx(tx).await
+    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
+        // TODO: the Trezor Ethereum sign transaction protobufs don't require a chain ID, but the
+        // trezor-client API does not reflect this.
+        // https://github.com/trezor/trezor-firmware/pull/3482
+        let chain_id = if let Some(chain_id) = self.chain_id {
+            tx.set_chain_id_checked(chain_id)?;
+            chain_id
+        } else {
+            tx.chain_id().ok_or(TrezorError::MissingChainId).map_err(alloy_signer::Error::other)?
+        };
+        let mut sig = self.sign_tx_inner(tx, chain_id).await.map_err(alloy_signer::Error::other)?;
+        sig = sig.with_chain_id(chain_id);
+        Ok(sig)
     }
 
     #[inline]
@@ -108,7 +121,7 @@ impl TrezorSigner {
         let mut client = trezor_client::unique(false)?;
         client.init_device(None)?;
 
-        let features = client.features().ok_or(TrezorError::FeaturesError)?;
+        let features = client.features().ok_or(TrezorError::Features)?;
         let version = semver::Version::new(
             features.major_version() as u64,
             features.minor_version() as u64,
@@ -143,59 +156,81 @@ impl TrezorSigner {
         Ok(address_str.parse()?)
     }
 
-    /// Signs an Ethereum transaction (requires confirmation on the Trezor)
-    #[cfg(TODO)]
-    async fn sign_tx(&self, tx: &mut dyn SignableTx) -> Result<Signature, TrezorError> {
+    /// Signs an Ethereum transaction (requires confirmation on the Trezor).
+    ///
+    /// Does not apply EIP-155.
+    async fn sign_tx_inner(
+        &self,
+        tx: &dyn Transaction<Signature = Signature>,
+        chain_id: ChainId,
+    ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
+        let path = Self::convert_path(&self.derivation);
 
-        let arr_path = Self::convert_path(&self.derivation);
+        let nonce = tx.nonce();
+        let nonce = u64_to_trezor(nonce);
 
-        let transaction = TrezorTransaction::load(tx)?;
+        let gas_price = U256::ZERO;
+        let gas_price = u256_to_trezor(gas_price);
 
-        let chain_id = tx.chain_id().unwrap_or(self.chain_id);
+        let gas_limit = tx.gas_limit();
+        let gas_limit = u64_to_trezor(gas_limit);
 
-        let signature = match tx {
-            TypedTransaction::Eip2930(_) | TypedTransaction::Legacy(_) => client.ethereum_sign_tx(
-                arr_path,
-                transaction.nonce,
-                transaction.gas_price,
-                transaction.gas,
-                transaction.to,
-                transaction.value,
-                transaction.data,
-                chain_id,
-            )?,
-            TypedTransaction::Eip1559(eip1559_tx) => client.ethereum_sign_eip1559_tx(
-                arr_path,
-                transaction.nonce,
-                transaction.gas,
-                transaction.to,
-                transaction.value,
-                transaction.data,
-                chain_id,
-                transaction.max_fee_per_gas,
-                transaction.max_priority_fee_per_gas,
-                transaction.access_list,
-            )?,
-            #[cfg(feature = "optimism")]
-            TypedTransaction::DepositTransaction(tx) => {
-                trezor_client::client::Signature { r: 0.into(), s: 0.into(), v: 0 }
-            }
+        let to = match tx.to() {
+            TxKind::Call(to) => address_to_trezor(&to),
+            TxKind::Create => String::new(),
         };
 
-        Ok(Signature { r: signature.r, s: signature.s, v: signature.v })
+        let value = tx.value();
+        let value = u256_to_trezor(value);
+
+        let data = tx.input().to_vec();
+
+        // TODO: Uncomment in 1.76
+        /*
+        let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
+        */
+        let signature = if let Some(tx) = tx.__downcast_ref::<TxEip1559>() {
+            let max_gas_fee = tx.max_fee_per_gas;
+            let max_gas_fee = u128_to_trezor(max_gas_fee);
+
+            let max_priority_fee = tx.max_priority_fee_per_gas;
+            let max_priority_fee = u128_to_trezor(max_priority_fee);
+
+            let access_list = tx
+                .access_list
+                .0
+                .iter()
+                .map(|item| trezor_client::client::AccessListItem {
+                    address: address_to_trezor(&item.address),
+                    storage_keys: item.storage_keys.iter().map(|key| key.to_vec()).collect(),
+                })
+                .collect();
+
+            client.ethereum_sign_eip1559_tx(
+                path,
+                nonce,
+                gas_limit,
+                to,
+                value,
+                data,
+                chain_id,
+                max_gas_fee,
+                max_priority_fee,
+                access_list,
+            )
+        } else {
+            client.ethereum_sign_tx(path, nonce, gas_price, gas_limit, to, value, data, chain_id)
+        }?;
+        signature_from_trezor(signature)
     }
 
     #[instrument(skip(message), fields(message=hex::encode(message)), ret)]
-    async fn sign_message_(&self, message: &[u8]) -> Result<Signature, TrezorError> {
+    async fn sign_message_inner(&self, message: &[u8]) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let apath = Self::convert_path(&self.derivation);
-
         let signature = client.ethereum_sign_message(message.into(), apath)?;
-
-        let r = U256::from_limbs(signature.r.0);
-        let s = U256::from_limbs(signature.s.0);
-        Signature::from_scalars_and_parity(r.into(), s.into(), signature.v).map_err(Into::into)
+        signature_from_trezor(signature)
     }
 
     // helper which converts a derivation path to [u32]
@@ -215,6 +250,31 @@ impl TrezorSigner {
 
         path
     }
+}
+
+fn u64_to_trezor(x: u64) -> Vec<u8> {
+    let bytes = x.to_be_bytes();
+    bytes[x.leading_zeros() as usize / 8..].to_vec()
+}
+
+fn u128_to_trezor(x: u128) -> Vec<u8> {
+    let bytes = x.to_be_bytes();
+    bytes[x.leading_zeros() as usize / 8..].to_vec()
+}
+
+fn u256_to_trezor(x: U256) -> Vec<u8> {
+    let bytes = x.to_be_bytes::<32>();
+    bytes[x.leading_zeros() / 8..].to_vec()
+}
+
+fn address_to_trezor(x: &Address) -> String {
+    format!("{x:?}")
+}
+
+fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signature, TrezorError> {
+    let s = U256::from_limbs(x.s.0);
+    let r = U256::from_limbs(x.r.0);
+    Signature::from_rs_and_parity(r, s, Parity::Eip155(x.v)).map_err(Into::into)
 }
 
 #[cfg(test)]

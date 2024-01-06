@@ -1,4 +1,4 @@
-use crate::{ReceiptWithBloom, TxKind, TxType};
+use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
@@ -231,7 +231,7 @@ impl Decodable for TxEip1559 {
 
 impl Transaction for TxEip1559 {
     type Signature = Signature;
-    type Receipt = ReceiptWithBloom;
+    // type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
@@ -274,6 +274,14 @@ impl Transaction for TxEip1559 {
         self.input = input;
     }
 
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn set_to(&mut self, to: TxKind) {
+        self.to = to;
+    }
+
     fn value(&self) -> U256 {
         self.value
     }
@@ -304,6 +312,14 @@ impl Transaction for TxEip1559 {
 
     fn set_gas_limit(&mut self, limit: u64) {
         self.gas_limit = limit;
+    }
+
+    fn gas_price(&self) -> Option<U256> {
+        None
+    }
+
+    fn set_gas_price(&mut self, price: U256) {
+        let _ = price;
     }
 }
 

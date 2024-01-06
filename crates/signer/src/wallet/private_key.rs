@@ -238,7 +238,7 @@ mod tests {
         }
 
         async fn sign_dyn_tx_test(
-            tx: &mut dyn SignableTx,
+            tx: &mut SignableTx,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
             let mut wallet: Wallet<SigningKey> =

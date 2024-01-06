@@ -1,4 +1,4 @@
-use crate::{transaction::TxKind, ReceiptWithBloom};
+use crate::TxKind;
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
@@ -208,7 +208,7 @@ impl Decodable for TxLegacy {
 
 impl Transaction for TxLegacy {
     type Signature = Signature;
-    type Receipt = ReceiptWithBloom;
+    // type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
@@ -250,6 +250,14 @@ impl Transaction for TxLegacy {
         self.input = data;
     }
 
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn set_to(&mut self, to: TxKind) {
+        self.to = to;
+    }
+
     fn value(&self) -> U256 {
         self.value
     }
@@ -281,6 +289,16 @@ impl Transaction for TxLegacy {
     fn set_gas_limit(&mut self, gas_limit: u64) {
         self.gas_limit = gas_limit;
     }
+
+    fn gas_price(&self) -> Option<U256> {
+        Some(U256::from(self.gas_price))
+    }
+
+    fn set_gas_price(&mut self, price: U256) {
+        if let Ok(price) = price.try_into() {
+            self.gas_price = price;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -288,7 +306,7 @@ mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn recover_signer_legacy() {
-        use crate::transaction::{TxKind, TxLegacy};
+        use crate::{TxKind, TxLegacy};
         use alloy_network::Transaction;
         use alloy_primitives::{b256, hex, Address, Signature, B256, U256};
 

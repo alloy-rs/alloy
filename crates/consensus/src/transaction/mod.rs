@@ -1,6 +1,3 @@
-mod common;
-pub use common::TxKind;
-
 mod eip1559;
 pub use eip1559::TxEip1559;
 
