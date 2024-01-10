@@ -34,8 +34,8 @@ alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
 
-alloy-primitives = { version = "0.5.1", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.5.1", default-features = false, features = ["std"] }
+alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
 alloy-rlp = "0.3"
 
 # crypto
@@ -85,8 +85,3 @@ proptest-derive = "0.4"
 serial_test = "2.0"
 similar-asserts = "1.5"
 tempfile = "3.8"
-
-[patch.crates-io]
-alloy-primitives = { git = "https://github.com/alloy-rs/core" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core" }
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core" }
