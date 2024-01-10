@@ -1,6 +1,5 @@
-use serde_json::value::RawValue;
-
 use crate::{ErrorPayload, RpcReturn};
+use serde_json::value::RawValue;
 
 /// An RPC error.
 #[derive(thiserror::Error, Debug)]

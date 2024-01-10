@@ -162,8 +162,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();
         let signer = SigningKey::from_bytes(&key.to_bytes())?;
         let address = secret_key_to_address(&signer);
-
-        Ok(Wallet::<SigningKey> { signer, address, chain_id: 1 })
+        Ok(Wallet::<SigningKey> { signer, address, chain_id: None })
     }
 }
 

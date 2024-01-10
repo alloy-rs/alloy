@@ -12,6 +12,8 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-consensus.workspace = true
+alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
@@ -22,7 +24,6 @@ protobuf = "=3.2.0"
 async-trait.workspace = true
 semver.workspace = true
 thiserror.workspace = true
-k256.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]

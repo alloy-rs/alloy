@@ -1,6 +1,5 @@
-use std::fmt::Display;
-
 use serde::{de::Visitor, Deserialize, Serialize};
+use std::fmt::Display;
 
 /// A JSON-RPC 2.0 ID object. This may be a number, a string, or null.
 ///

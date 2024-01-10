@@ -1,0 +1,29 @@
+[package]
+name = "alloy-consensus"
+description = "Ethereum consensus interface"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-network.workspace = true
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-rlp.workspace = true
+alloy-eips.workspace = true
+
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"], optional = true }
+
+[dev-dependencies]
+# arbitrary
+arbitrary = { workspace = true, features = ["derive"] }
+
+[features]
+k256 = ["alloy-primitives/k256", "alloy-network/k256"]
+arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]

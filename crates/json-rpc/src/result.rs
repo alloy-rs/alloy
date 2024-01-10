@@ -1,8 +1,6 @@
-use std::borrow::Borrow;
-
 use crate::{Response, ResponsePayload, RpcError, RpcReturn};
-
 use serde_json::value::RawValue;
+use std::borrow::Borrow;
 
 /// The result of a JSON-RPC request.
 ///

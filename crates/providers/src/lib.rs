@@ -16,7 +16,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_networks::{Network, Transaction};
+use alloy_network::{Network, Transaction};
 use alloy_primitives::Address;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::{BoxTransport, Transport, TransportResult};
@@ -109,14 +109,17 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     /// Send a transaction to the network.
     ///
     /// The transaction type is defined by the network.
-    async fn send_transaction(&self, tx: &N::TransactionRequest) -> TransportResult<N::Receipt> {
+    async fn send_transaction(
+        &self,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
         self.inner().send_transaction(tx).await
     }
 
     async fn populate_gas(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
         let gas = self.estimate_gas(&*tx).await;
 
-        gas.map(|gas| tx.set_gas(gas))
+        gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
     }
 }
 
@@ -149,7 +152,10 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
         .await
     }
 
-    async fn send_transaction(&self, tx: &N::TransactionRequest) -> TransportResult<N::Receipt> {
+    async fn send_transaction(
+        &self,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<N::ReceiptResponse> {
         self.prepare("eth_sendTransaction", Cow::Borrowed(tx)).await
     }
 }
@@ -157,7 +163,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
 #[cfg(test)]
 mod test {
     use crate::Provider;
-    use alloy_networks::Network;
+    use alloy_network::Network;
 
     // checks that `Provider<N>` is object-safe
     fn __compile_check<N: Network>() -> Box<dyn Provider<N>> {

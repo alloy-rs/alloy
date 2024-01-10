@@ -26,11 +26,11 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl TryFrom<Log> for alloy_primitives::Log {
+impl TryFrom<Log> for alloy_primitives::LogData {
     type Error = LogError;
 
     fn try_from(value: Log) -> Result<Self, Self::Error> {
-        alloy_primitives::Log::new(value.topics, value.data).ok_or(LogError::TooManyTopics)
+        alloy_primitives::LogData::new(value.topics, value.data).ok_or(LogError::TooManyTopics)
     }
 }
 

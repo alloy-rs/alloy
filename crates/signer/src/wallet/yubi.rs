@@ -59,7 +59,7 @@ impl From<YubiSigner<Secp256k1>> for Wallet<YubiSigner<Secp256k1>> {
         let bytes = pubkey.as_bytes();
         debug_assert_eq!(bytes[0], 0x04);
         let address = raw_public_key_to_address(&bytes[1..]);
-        Self::new_with_signer(signer, address, 1)
+        Self::new_with_signer(signer, address, None)
     }
 }
 

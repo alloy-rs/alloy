@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-networks.workspace = true
+alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-client.workspace = true
 alloy-rpc-types.workspace = true

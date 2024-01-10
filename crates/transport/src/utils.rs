@@ -1,3 +1,4 @@
+use crate::{TransportError, TransportResult};
 use serde::Serialize;
 use serde_json::{
     self,
@@ -5,8 +6,6 @@ use serde_json::{
 };
 use std::future::Future;
 use url::Url;
-
-use crate::{TransportError, TransportResult};
 
 /// Convert to a `Box<RawValue>` from a `Serialize` type, mapping the error
 /// to a `TransportError`.

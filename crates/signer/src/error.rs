@@ -13,7 +13,7 @@ pub enum Error {
     #[error("operation `{0}` is not supported by the signer")]
     UnsupportedOperation(UnsupportedSignerOperation),
     /// Mismatch between provided transaction chain ID and signer chain ID.
-    #[error("transaction chain ID ({tx}) does not match the signer's ({signer})")]
+    #[error("transaction-provided chain ID ({tx}) does not match the signer's ({signer})")]
     TransactionChainIdMismatch {
         /// The signer's chain ID.
         signer: u64,
@@ -26,6 +26,9 @@ pub enum Error {
     /// [`hex`](mod@hex) error.
     #[error(transparent)]
     HexError(#[from] hex::FromHexError),
+    /// Signature error.
+    #[error(transparent)]
+    SignatureError(#[from] alloy_primitives::SignatureError),
     /// Generic error.
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
