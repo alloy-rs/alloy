@@ -102,7 +102,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
 
     /// True if the envelope is the legacy variant.
     fn is_legacy(&self) -> bool {
-        self.type_flag().is_none()
+        matches!(self.type_flag(), None | Some(0))
     }
 
     /// The length of the 2718 encoded envelope. This is the length of the type

@@ -370,7 +370,7 @@ mod tests {
         dbg!(alloy_primitives::hex::encode(tx.signature_hash()));
 
         let signed_tx = tx.into_signed(sig);
-        assert_eq!(signed_tx.hash(), hash, "Expected same hash");
+        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
     }
 }

@@ -39,7 +39,6 @@ alloy-sol-types = { version = "0.5.1", default-features = false, features = ["st
 alloy-rlp = "0.3"
 
 # crypto
-c-kzg = "0.4.0" # for eip-4844
 elliptic-curve = { version = "0.13", default-features = false, features = ["std"] }
 generic-array = { version = "0.14", default-features = false, features = ["std"] }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }

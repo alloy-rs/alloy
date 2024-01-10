@@ -19,19 +19,19 @@ impl<T> std::ops::Deref for Signed<T> {
 }
 
 impl<T, Sig> Signed<T, Sig> {
-    /// Return a reference to the transactions
+    /// Returns a reference to the transaction.
     pub const fn tx(&self) -> &T {
         &self.tx
     }
 
-    /// Get a reference to the signature
+    /// Returns a reference to the signature.
     pub const fn signature(&self) -> &Sig {
         &self.signature
     }
 
-    /// Get the transaction hash.
-    pub const fn hash(&self) -> B256 {
-        self.hash
+    /// Returns a reference to the transaction hash.
+    pub const fn hash(&self) -> &B256 {
+        &self.hash
     }
 }
 
@@ -39,6 +39,11 @@ impl<T: Transaction> Signed<T> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub const fn new_unchecked(tx: T, signature: Signature, hash: B256) -> Self {
         Self { tx, signature, hash }
+    }
+
+    /// Calculate the signing hash for the transaction.
+    pub fn signature_hash(&self) -> B256 {
+        self.tx.signature_hash()
     }
 
     /// Output the signed RLP for the transaction.
