@@ -338,8 +338,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<TransactionReceipt>>
-where {
-        self.inner.prepare("eth_getBlockReceipts", block).await
+        where {
+        self.inner.prepare("eth_getBlockReceipts", (block, )).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
@@ -698,6 +698,15 @@ mod providers_test {
             .await
             .unwrap();
         assert_eq!(fee_history.oldest_block, U256::ZERO);
+    }
+
+    #[tokio::test]
+    #[ignore] // Anvil has yet to implement the `eth_getBlockReceipts` method.
+    async fn gets_block_receipts() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
+        assert_eq!(receipts.len(), 0);
     }
 
     #[tokio::test]
