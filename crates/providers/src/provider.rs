@@ -337,9 +337,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<TransactionReceipt>>
-where {
-        self.inner.prepare("eth_getBlockReceipts", block).await
+    ) -> TransportResult<Vec<TransactionReceipt>> {
+        self.inner.prepare("eth_getBlockReceipts", (block,)).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
@@ -375,7 +374,7 @@ where {
 
     /// Sends an already-signed transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash> {
-        self.inner.prepare("eth_sendRawTransaction", tx).await
+        self.inner.prepare("eth_sendRawTransaction", (tx,)).await
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -469,7 +468,7 @@ where {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.inner.prepare("trace_block", block).await
+        self.inner.prepare("trace_block", (block,)).await
     }
 
     /// Sends a raw request with the methods and params specified to the internal connection,
@@ -522,7 +521,7 @@ mod providers_test {
         provider::{Provider, TempProvider},
         utils,
     };
-    use alloy_primitives::{address, b256, U256, U64};
+    use alloy_primitives::{address, b256, bytes, U256, U64};
     use alloy_rpc_types::{Block, BlockNumberOrTag, Filter};
     use ethers_core::utils::Anvil;
 
@@ -698,5 +697,38 @@ mod providers_test {
             .await
             .unwrap();
         assert_eq!(fee_history.oldest_block, U256::ZERO);
+    }
+
+    #[tokio::test]
+    #[ignore] // Anvil has yet to implement the `eth_getBlockReceipts` method.
+    async fn gets_block_receipts() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
+        assert_eq!(receipts.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn gets_block_traces() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
+        assert_eq!(traces.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn sends_raw_transaction() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let tx_hash = provider
+            .send_raw_transaction(
+                // Transfer 1 ETH from default EOA address to the Genesis address.
+                bytes!("f865808477359400825208940000000000000000000000000000000000000000018082f4f5a00505e227c1c636c76fac55795db1a40a4d24840d81b40d2fe0cc85767f6bd202a01e91b437099a8a90234ac5af3cb7ca4fb1432e133f75f9a91678eaf5f487c74b")
+            )
+            .await.unwrap();
+        assert_eq!(
+            tx_hash.to_string(),
+            "0x9dae5cf33694a02e8a7d5de3fe31e9d05ca0ba6e9180efac4ab20a06c9e598a3"
+        );
     }
 }
