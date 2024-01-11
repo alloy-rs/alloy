@@ -469,7 +469,7 @@ where {
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.inner.prepare("trace_block", block).await
+        self.inner.prepare("trace_block", (block, )).await
     }
 
     /// Sends a raw request with the methods and params specified to the internal connection,
@@ -698,5 +698,13 @@ mod providers_test {
             .await
             .unwrap();
         assert_eq!(fee_history.oldest_block, U256::ZERO);
+    }
+
+    #[tokio::test]
+    async fn gets_block_traces() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
+        assert_eq!(traces.len(), 0);
     }
 }
