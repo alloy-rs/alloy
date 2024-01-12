@@ -124,7 +124,7 @@ pub trait TempProvider: Send + Sync {
     async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<TransactionReceipt>>;
+    ) -> TransportResult<Option<Vec<TransactionReceipt>>>;
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
     async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>>;
@@ -337,7 +337,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<TransactionReceipt>> {
+    ) -> TransportResult<Option<Vec<TransactionReceipt>>> {
         self.inner.prepare("eth_getBlockReceipts", (block,)).await
     }
 
@@ -705,7 +705,7 @@ mod providers_test {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
-        assert_eq!(receipts.len(), 0);
+        assert!(receipts.is_some());
     }
 
     #[tokio::test]
