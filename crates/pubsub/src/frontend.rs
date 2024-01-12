@@ -47,7 +47,7 @@ impl PubSubFrontend {
         &self,
         req: SerializedRequest,
     ) -> Pin<Box<dyn Future<Output = Result<Response, TransportError>> + Send>> {
-        let (in_flight, rx) = InFlight::new(req);
+        let (in_flight, rx) = InFlight::with_oneshot(req);
         let ix = PubSubInstruction::Request(in_flight);
         let tx = self.tx.clone();
 

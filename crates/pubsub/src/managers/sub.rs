@@ -60,11 +60,6 @@ impl SubscriptionManager {
         self.local_to_server.get_by_right(&server_id).copied()
     }
 
-    /// Drop all server_ids.
-    pub(crate) fn drop_server_ids(&mut self) {
-        self.local_to_server.clear();
-    }
-
     /// Change the server_id of a subscription.
     fn change_server_id(&mut self, local_id: B256, server_id: U256) {
         self.local_to_server.insert(local_id, server_id);
