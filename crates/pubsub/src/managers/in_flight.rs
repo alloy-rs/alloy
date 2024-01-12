@@ -27,7 +27,7 @@ impl fmt::Debug for InFlight {
 
 impl InFlight {
     /// Create a new in-flight request.
-    pub(crate) fn new(request: SerializedRequest) -> Self {
+    pub(crate) const fn new(request: SerializedRequest) -> Self {
         Self { request, tx: None }
     }
 
