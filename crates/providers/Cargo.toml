@@ -26,8 +26,8 @@ reqwest.workspace = true
 auto_impl = "1.1.0"
 
 [dev-dependencies]
+alloy-test-utils.workspace = true
 tokio = { version = "1.33.0", features = ["macros"] }
-ethers-core = "2.0.10"
 
 [features]
 anvil = []

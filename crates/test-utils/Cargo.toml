@@ -10,3 +10,11 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["k256"] }
+k256.workspace = true
+rand.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+tempfile.workspace = true

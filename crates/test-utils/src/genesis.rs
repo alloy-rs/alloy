@@ -1,17 +1,9 @@
-use std::{collections::HashMap, str::FromStr};
+//! Utilities for working with a `genesis.json` and other chain config structs.
 
-use crate::{
-    types::{
-        serde_helpers::{
-            deserialize_stringified_eth_u64, deserialize_stringified_eth_u64_opt,
-            deserialize_stringified_numeric, deserialize_stringified_numeric_opt,
-            deserialize_stringified_u64_opt, Numeric,
-        },
-        Address, Bytes, H256, U256, U64,
-    },
-    utils::from_unformatted_hex_map,
-};
+use crate::{from_bytes_to_h256, serde_helpers::deserialize_stringified_u64_opt};
+use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// This represents the chain configuration, specifying the genesis block, header fields, and hard
 /// fork switch blocks.
@@ -23,11 +15,11 @@ pub struct Genesis {
     pub config: ChainConfig,
 
     /// The genesis header nonce.
-    #[serde(default, deserialize_with = "deserialize_stringified_eth_u64")]
+    #[serde(default)]
     pub nonce: U64,
 
     /// The genesis header timestamp.
-    #[serde(default, deserialize_with = "deserialize_stringified_eth_u64")]
+    #[serde(default)]
     pub timestamp: U64,
 
     /// The genesis header extra data.
@@ -35,16 +27,15 @@ pub struct Genesis {
     pub extra_data: Bytes,
 
     /// The genesis header gas limit.
-    #[serde(default, deserialize_with = "deserialize_stringified_eth_u64")]
+    #[serde(default)]
     pub gas_limit: U64,
 
     /// The genesis header difficulty.
-    #[serde(deserialize_with = "deserialize_stringified_numeric")]
     pub difficulty: U256,
 
     /// The genesis header mix hash.
     #[serde(default)]
-    pub mix_hash: H256,
+    pub mix_hash: B256,
 
     /// The genesis header coinbase address.
     #[serde(default)]
@@ -56,31 +47,19 @@ pub struct Genesis {
     // The following fields are only included for tests, and should not be used in real genesis
     // blocks.
     /// The block number
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_stringified_eth_u64_opt",
-        default
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub number: Option<U64>,
 
     /// The block gas gasUsed
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_stringified_eth_u64_opt",
-        default
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub gas_used: Option<U64>,
 
     /// The block parent hash
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub parent_hash: Option<H256>,
+    pub parent_hash: Option<B256>,
 
     /// The base fee
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "deserialize_stringified_numeric_opt",
-        default
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub base_fee_per_gas: Option<U256>,
 }
 
@@ -127,13 +106,13 @@ impl Genesis {
         // There are 65 bytes of zeros after the signer address, which is usually populated with the
         // proposer signature. Because the genesis does not have a proposer signature, it will be
         // populated with zeros.
-        let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_bytes(), &[0u8; 65][..]].concat();
+        let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
         let extra_data = Bytes::from(extra_data_bytes);
 
         Genesis {
             config,
             alloc,
-            difficulty: U256::one(),
+            difficulty: U256::from(1),
             gas_limit: U64::from(5000000),
             extra_data,
             ..Default::default()
@@ -150,7 +129,6 @@ pub struct GenesisAccount {
         default
     )]
     pub nonce: Option<u64>,
-    #[serde(deserialize_with = "deserialize_stringified_numeric")]
     pub balance: U256,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub code: Option<Bytes>,
@@ -159,7 +137,7 @@ pub struct GenesisAccount {
         deserialize_with = "from_unformatted_hex_map",
         default
     )]
-    pub storage: Option<HashMap<H256, H256>>,
+    pub storage: Option<HashMap<B256, B256>>,
 }
 
 /// Represents a node's chain configuration.
@@ -200,7 +178,7 @@ pub struct ChainConfig {
 
     /// The EIP-150 hard fork hash.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip150_hash: Option<H256>,
+    pub eip150_hash: Option<B256>,
 
     /// The EIP-155 hard fork block.
     #[serde(
@@ -355,10 +333,7 @@ where
         None => Ok(None),
         Some(val) => {
             if let Some(num) = val.as_str() {
-                return Numeric::from_str(num)
-                    .map(U256::from)
-                    .map(Some)
-                    .map_err(serde::de::Error::custom)
+                return num.parse().map(Some).map_err(serde::de::Error::custom);
             }
 
             if let serde_json::Value::Number(num) = val {
@@ -381,13 +356,29 @@ where
     }
 }
 
+/// Deserializes the input into an Option<HashMap<H256, H256>>, using from_unformatted_hex to
+/// deserialize the keys and values.
+fn from_unformatted_hex_map<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<HashMap<B256, B256>>, D::Error> {
+    let map = Option::<HashMap<Bytes, Bytes>>::deserialize(deserializer)?;
+    match map {
+        Some(mut map) => {
+            let mut res_map = HashMap::new();
+            for (k, v) in map.drain() {
+                let k_deserialized = from_bytes_to_h256::<'de, D>(k)?;
+                let v_deserialized = from_bytes_to_h256::<'de, D>(v)?;
+                res_map.insert(k_deserialized, v_deserialized);
+            }
+            Ok(Some(res_map))
+        }
+        None => Ok(None),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ChainConfig, Genesis, GenesisAccount, H256};
-    use crate::{
-        types::{Address, Bytes, H160, U256},
-        utils::EthashConfig,
-    };
+    use super::*;
     use std::{collections::HashMap, str::FromStr};
 
     #[test]
@@ -475,11 +466,11 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(example_balance_json).unwrap();
 
         // check difficulty against hex ground truth
-        let expected_difficulty = U256::from_str("0x2123456").unwrap();
+        let expected_difficulty = U256::from(0x2123456);
         assert_eq!(expected_difficulty, genesis.difficulty);
 
         // check all alloc balances
-        let dec_balance = U256::from_dec_str("1000000000000000000000000000").unwrap();
+        let dec_balance = U256::from(1000000000000000000000000000_u128);
         for alloc in &genesis.alloc {
             assert_eq!(alloc.1.balance, dec_balance);
         }
@@ -735,10 +726,10 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
 
         // ensure the test fields are parsed correctly
-        assert_eq!(genesis.base_fee_per_gas, Some(1000000000.into()));
-        assert_eq!(genesis.number, Some(0.into()));
-        assert_eq!(genesis.gas_used, Some(0.into()));
-        assert_eq!(genesis.parent_hash, Some(H256::zero()));
+        assert_eq!(genesis.base_fee_per_gas, Some(U256::from(1000000000)));
+        assert_eq!(genesis.number, Some(U64::ZERO));
+        assert_eq!(genesis.gas_used, Some(U64::ZERO));
+        assert_eq!(genesis.parent_hash, Some(B256::ZERO));
     }
 
     #[test]
@@ -798,26 +789,26 @@ mod tests {
         let genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
         let alloc_entry = genesis
             .alloc
-            .get(&H160::from_str("0000000000000000000000000000000000000314").unwrap())
+            .get(&Address::from_str("0000000000000000000000000000000000000314").unwrap())
             .expect("missing account for parsed genesis");
         let storage = alloc_entry.storage.as_ref().expect("missing storage for parsed genesis");
         let expected_storage = HashMap::from_iter(vec![
             (
-                H256::from_str(
+                B256::from_str(
                     "0x0000000000000000000000000000000000000000000000000000000000000000",
                 )
                 .unwrap(),
-                H256::from_str(
+                B256::from_str(
                     "0x0000000000000000000000000000000000000000000000000000000000001234",
                 )
                 .unwrap(),
             ),
             (
-                H256::from_str(
+                B256::from_str(
                     "0x6661e9d6d8b923d5bbaab1b96e1dd51ff6ea2a93520fdc9eb75d059238b8c5e9",
                 )
                 .unwrap(),
-                H256::from_str(
+                B256::from_str(
                     "0x0000000000000000000000000000000000000000000000000000000000000001",
                 )
                 .unwrap(),
@@ -889,14 +880,14 @@ mod tests {
         "#;
 
         let expected_genesis = Genesis {
-            nonce: 0x0000000000000042.into(),
-            difficulty: 0x2123456.into(),
-            mix_hash: H256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234").unwrap(),
+            nonce: U64::from(0x0000000000000042),
+            difficulty: U256::from(0x2123456),
+            mix_hash: B256::from_str("0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234").unwrap(),
             coinbase: Address::from_str("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap(),
-            timestamp: 0x123456.into(),
-            parent_hash: Some(H256::from_str("0x0000000000000000000000000000000000000000000000000000000000000000").unwrap()),
+            timestamp: U64::from(0x123456),
+            parent_hash: Some(B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000000").unwrap()),
             extra_data: Bytes::from_str("0xfafbfcfd").unwrap(),
-            gas_limit: 0x2fefd8.into(),
+            gas_limit: U64::from(0x2fefd8),
             alloc: HashMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -924,8 +915,8 @@ mod tests {
                         code: None,
                         storage: Some(HashMap::from_iter(vec![
                             (
-                                H256::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(),
-                                H256::from_str("0x0000000000000000000000000000000000000000000000000000000000000022").unwrap(),
+                                B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap(),
+                                B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000022").unwrap(),
                             ),
                         ])),
                     },

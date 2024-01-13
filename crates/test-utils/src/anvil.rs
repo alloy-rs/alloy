@@ -1,8 +1,7 @@
-use crate::{
-    types::{Address, Chain},
-    utils::{secret_key_to_address, unused_port},
-};
-use generic_array::GenericArray;
+//! Utilities for launching an Anvil instance.
+
+use crate::unused_port;
+use alloy_primitives::{hex, Address};
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     io::{BufRead, BufReader},
@@ -43,7 +42,8 @@ impl AnvilInstance {
 
     /// Returns the chain of the anvil instance
     pub fn chain_id(&self) -> u64 {
-        self.chain_id.unwrap_or_else(|| Chain::AnvilHardhat.into())
+        const ANVIL_HARDHAT_CHAIN_ID: u64 = 31_337;
+        self.chain_id.unwrap_or(ANVIL_HARDHAT_CHAIN_ID)
     }
 
     /// Returns the HTTP endpoint of this instance
@@ -72,7 +72,7 @@ impl Drop for AnvilInstance {
 /// # Example
 ///
 /// ```no_run
-/// use ethers_core::utils::Anvil;
+/// use alloy_test_utils::Anvil;
 ///
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
@@ -105,7 +105,7 @@ impl Anvil {
     /// # Example
     ///
     /// ```
-    /// # use ethers_core::utils::Anvil;
+    /// # use alloy_test_utils::Anvil;
     /// fn a() {
     ///  let anvil = Anvil::default().spawn();
     ///
@@ -121,7 +121,7 @@ impl Anvil {
     /// # Example
     ///
     /// ```
-    /// # use ethers_core::utils::Anvil;
+    /// # use alloy_test_utils::Anvil;
     /// fn a() {
     ///  let anvil = Anvil::at("~/.foundry/bin/anvil").spawn();
     ///
@@ -256,8 +256,8 @@ impl Anvil {
         let mut is_private_key = false;
         let mut chain_id = None;
         loop {
-            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS)) <=
-                Instant::now()
+            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
+                <= Instant::now()
             {
                 panic!("Timed out waiting for anvil to start. Is anvil installed?")
             }
@@ -265,7 +265,7 @@ impl Anvil {
             let mut line = String::new();
             reader.read_line(&mut line).expect("Failed to read line from anvil process");
             if line.contains("Listening on") {
-                break
+                break;
             }
 
             if line.starts_with("Private Keys") {
@@ -279,9 +279,9 @@ impl Anvil {
                     .unwrap_or_else(|| panic!("could not parse private key: {}", line))
                     .trim();
                 let key_hex = hex::decode(key_str).expect("could not parse as hex");
-                let key = K256SecretKey::from_bytes(&GenericArray::clone_from_slice(&key_hex))
+                let key = K256SecretKey::from_bytes((&key_hex[..]).into())
                     .expect("did not get private key");
-                addresses.push(secret_key_to_address(&SigningKey::from(&key)));
+                addresses.push(Address::from_public_key(SigningKey::from(&key).verifying_key()));
                 private_keys.push(key);
             }
 

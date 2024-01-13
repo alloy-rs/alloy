@@ -1,8 +1,8 @@
 use alloy_primitives::U64;
 use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{ClientBuilder, RpcCall, RpcClient};
+use alloy_test_utils::{Geth, GethInstance};
 use alloy_transport_ipc::IpcConnect;
-use ethers_core::utils::{Geth, GethInstance};
 use std::borrow::Cow;
 use tempfile::NamedTempFile;
 

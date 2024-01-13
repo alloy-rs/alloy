@@ -1,8 +1,7 @@
-use super::{CliqueConfig, Genesis};
-use crate::{
-    types::{Bytes, H256},
-    utils::{secret_key_to_address, unused_port},
-};
+//! Utilities for launching a go-ethereum dev-mode instance.
+
+use crate::{unused_port, CliqueConfig, Genesis};
+use alloy_primitives::{hex, Address, Bytes, B256};
 use k256::ecdsa::SigningKey;
 use std::{
     borrow::Cow,
@@ -106,7 +105,7 @@ impl GethInstance {
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: H256) -> Result<(), GethInstanceError> {
+    pub fn wait_to_add_peer(&mut self, id: B256) -> Result<(), GethInstanceError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(GethInstanceError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
@@ -119,7 +118,7 @@ impl GethInstance {
             // geth ids are trunated
             let truncated_id = hex::encode(&id.0[..8]);
             if line.contains("Adding p2p peer") && line.contains(&truncated_id) {
-                return Ok(())
+                return Ok(());
             }
         }
         Err(GethInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
@@ -179,15 +178,12 @@ impl Default for PrivateNetOptions {
 /// # Example
 ///
 /// ```no_run
-/// use ethers_core::utils::Geth;
+/// use alloy_test_utils::Geth;
 ///
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
 ///
-/// let geth = Geth::new()
-///     .port(port)
-///     .block_time(5000u64)
-///     .spawn();
+/// let geth = Geth::new().port(port).block_time(5000u64).spawn();
 ///
 /// drop(geth); // this will kill the instance
 /// ```
@@ -219,20 +215,25 @@ impl Geth {
     /// # Example
     ///
     /// ```
-    /// use ethers_core::utils::Geth;
+    /// use alloy_test_utils::Geth;
     /// # fn a() {
-    ///  let geth = Geth::at("../go-ethereum/build/bin/geth").spawn();
+    /// let geth = Geth::at("../go-ethereum/build/bin/geth").spawn();
     ///
-    ///  println!("Geth running at `{}`", geth.endpoint());
+    /// println!("Geth running at `{}`", geth.endpoint());
     /// # }
     /// ```
     pub fn at(path: impl Into<PathBuf>) -> Self {
         Self::new().path(path)
     }
 
-    /// Returns whether the node is launched in Clique consensus mode
+    /// Returns whether the node is launched in Clique consensus mode.
     pub fn is_clique(&self) -> bool {
         self.clique_private_key.is_some()
+    }
+
+    /// Calculates the address of the Clique consensus address.
+    pub fn clique_address(&self) -> Option<Address> {
+        self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
     }
 
     /// Sets the `path` to the `geth` executable
@@ -395,14 +396,13 @@ impl Geth {
 
         // use geth init to initialize the datadir if the genesis exists
         if is_clique {
+            let clique_addr = self.clique_address();
             if let Some(genesis) = &mut self.genesis {
                 // set up a clique config with an instant sealing period and short (8 block) epoch
                 let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
                 genesis.config.clique = Some(clique_config);
 
-                let clique_addr = secret_key_to_address(
-                    self.clique_private_key.as_ref().expect("is_clique == true"),
-                );
+                let clique_addr = clique_addr.expect("is_clique == true");
 
                 // set the extraData field
                 let extra_data_bytes =
@@ -416,8 +416,7 @@ impl Geth {
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
-            let clique_addr =
-                secret_key_to_address(self.clique_private_key.as_ref().expect("is_clique == true"));
+            let clique_addr = self.clique_address().expect("is_clique == true");
 
             self.genesis = Some(Genesis::new(
                 self.chain_id.expect("chain id must be set in clique mode"),
@@ -545,8 +544,8 @@ impl Geth {
 
             // geth 1.9.23 uses "server started" while 1.9.18 uses "endpoint opened"
             // the unauthenticated api is used for regular non-engine API requests
-            if line.contains("HTTP endpoint opened") ||
-                (line.contains("HTTP server started") && !line.contains("auth=true"))
+            if line.contains("HTTP endpoint opened")
+                || (line.contains("HTTP server started") && !line.contains("auth=true"))
             {
                 // Extracts the address from the output
                 if let Some(addr) = extract_endpoint(&line) {
@@ -564,7 +563,7 @@ impl Geth {
             }
 
             if p2p_started && http_started {
-                break
+                break;
             }
         }
 
