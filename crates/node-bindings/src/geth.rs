@@ -178,7 +178,7 @@ impl Default for PrivateNetOptions {
 /// # Example
 ///
 /// ```no_run
-/// use alloy_test_utils::Geth;
+/// use alloy_node_bindings::Geth;
 ///
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
@@ -215,7 +215,7 @@ impl Geth {
     /// # Example
     ///
     /// ```
-    /// use alloy_test_utils::Geth;
+    /// use alloy_node_bindings::Geth;
     /// # fn a() {
     /// let geth = Geth::at("../go-ethereum/build/bin/geth").spawn();
     ///

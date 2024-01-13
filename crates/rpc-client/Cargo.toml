@@ -35,7 +35,7 @@ alloy-transport-ipc = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives.workspace = true
-alloy-test-utils.workspace = true
+alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
 alloy-transport-ws.workspace = true
 

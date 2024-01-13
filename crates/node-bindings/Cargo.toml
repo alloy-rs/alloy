@@ -1,6 +1,6 @@
 [package]
-name = "alloy-test-utils"
-description = "Common Ethereum testing utilities"
+name = "alloy-node-bindings"
+description = "Ethereum execution-layer client bindings"
 
 version.workspace = true
 edition.workspace = true

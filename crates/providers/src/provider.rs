@@ -521,9 +521,9 @@ mod tests {
         provider::{Provider, TempProvider},
         utils,
     };
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, U256, U64};
     use alloy_rpc_types::{Block, BlockNumberOrTag, Filter};
-    use alloy_test_utils::Anvil;
 
     #[tokio::test]
     async fn gets_block_number() {
