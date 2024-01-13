@@ -123,15 +123,19 @@ impl Genesis {
 /// An account in the state of the genesis block.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenesisAccount {
+    /// The nonce of the account.
     #[serde(
         skip_serializing_if = "Option::is_none",
         deserialize_with = "deserialize_stringified_u64_opt",
         default
     )]
     pub nonce: Option<u64>,
+    /// The balance of the account.
     pub balance: U256,
+    /// The code of the account, if any.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub code: Option<Bytes>,
+    /// The storage of the account, if any.
     #[serde(
         skip_serializing_if = "Option::is_none",
         deserialize_with = "from_unformatted_hex_map",
@@ -303,10 +307,12 @@ const fn one() -> u64 {
 
 /// Empty consensus configuration for proof-of-work networks.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[allow(missing_copy_implementations)]
 pub struct EthashConfig {}
 
 /// Consensus configuration for Clique.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[allow(missing_copy_implementations)]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(

@@ -31,7 +31,7 @@ where
 /// Helper type to deserialize sequence of numbers
 #[derive(Deserialize)]
 #[serde(untagged)]
-pub enum NumericSeq {
+enum NumericSeq {
     Seq([U256; 1]),
     U256(U256),
     Num(u64),

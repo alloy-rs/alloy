@@ -4,11 +4,10 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![warn(
-    // TODO
-    // missing_copy_implementations,
-    // missing_debug_implementations,
-    // missing_docs,
-    // unreachable_pub,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
+    unreachable_pub,
     clippy::missing_const_for_fn,
     rustdoc::all
 )]
@@ -19,10 +18,10 @@
 use alloy_primitives::{Bytes, B256, U256};
 use serde::Deserializer;
 
-mod anvil;
+pub mod anvil;
 pub use anvil::{Anvil, AnvilInstance};
 
-mod geth;
+pub mod geth;
 pub use geth::{Geth, GethInstance};
 
 mod genesis;
