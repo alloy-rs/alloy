@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["k256"] }
+alloy-primitives = { workspace = true, features = ["k256", "serde"] }
 k256.workspace = true
 serde_json.workspace = true
 serde.workspace = true

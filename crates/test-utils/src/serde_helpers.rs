@@ -58,11 +58,8 @@ pub fn deserialize_number_seq<'de, D>(deserializer: D) -> Result<U256, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let num = match NumericSeq::deserialize(deserializer)? {
-        NumericSeq::Seq(seq) => seq[0].into(),
-        NumericSeq::U256(n) => n,
+    Ok(match NumericSeq::deserialize(deserializer)? {
+        NumericSeq::Seq([n]) | NumericSeq::U256(n) => n,
         NumericSeq::Num(n) => U256::from(n),
-    };
-
-    Ok(num)
+    })
 }
