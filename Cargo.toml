@@ -21,10 +21,11 @@ alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
 alloy-eips = { version = "0.1.0", path = "crates/eips" }
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-network = { version = "0.1.0", path = "crates/network" }
+alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
-alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
+alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-signer = { version = "0.1.0", path = "crates/signer" }
 alloy-signer-aws = { version = "0.1.0", path = "crates/signer-aws" }
 alloy-signer-ledger = { version = "0.1.0", path = "crates/signer-ledger" }

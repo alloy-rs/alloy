@@ -516,14 +516,14 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 }
 
 #[cfg(test)]
-mod providers_test {
+mod tests {
     use crate::{
         provider::{Provider, TempProvider},
         utils,
     };
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, U256, U64};
     use alloy_rpc_types::{Block, BlockNumberOrTag, Filter};
-    use ethers_core::utils::Anvil;
 
     #[tokio::test]
     async fn gets_block_number() {
