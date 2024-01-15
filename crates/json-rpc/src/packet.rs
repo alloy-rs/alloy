@@ -227,7 +227,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
         }
     }
 
-    /// Returns `true` if the response payload is a success.
+    /// Returns `true` if the response payload is an error.
     ///
     /// For batch responses, this returns `true` there's at least one error response.
     pub fn is_error(&self) -> bool {
