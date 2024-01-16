@@ -1,5 +1,9 @@
 //! Alloy basic Transaction Request type.
-use crate::{eth::transaction::AccessList, other::OtherFields, kzg::{Blob, Bytes48}};
+use crate::{
+    eth::transaction::AccessList,
+    kzg::{Blob, Bytes48},
+    other::OtherFields,
+};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
