@@ -17,6 +17,7 @@ pub mod transaction;
 pub mod txpool;
 pub mod withdrawal;
 mod work;
+pub mod engine;
 
 pub use account::*;
 pub use block::*;
@@ -30,3 +31,4 @@ pub use syncing::*;
 pub use transaction::*;
 pub use withdrawal::Withdrawal;
 pub use work::Work;
+pub use engine::*;

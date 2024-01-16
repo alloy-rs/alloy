@@ -1,5 +1,5 @@
 //! Alloy basic Transaction Request type.
-use crate::{eth::transaction::AccessList, other::OtherFields};
+use crate::{eth::transaction::AccessList, other::OtherFields, kzg::{Blob, Bytes48}};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +36,8 @@ pub struct TransactionRequest {
     /// EIP-2718 type
     #[serde(rename = "type")]
     pub transaction_type: Option<U8>,
+    /// sidecar for EIP-4844 transactions
+    pub sidecar: Option<BlobTransactionSidecar>,
     /// Support for arbitrary additional fields.
     #[serde(flatten)]
     pub other: OtherFields,
@@ -62,6 +64,17 @@ impl From<OptimismTransactionFields> for OtherFields {
     }
 }
 
+/// This represents a set of blobs, and its corresponding commitments and proofs.
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[repr(C)]
+pub struct BlobTransactionSidecar {
+    /// The blob data.
+    pub blobs: Vec<Blob>,
+    /// The blob commitments.
+    pub commitments: Vec<Bytes48>,
+    /// The blob proofs.
+    pub proofs: Vec<Bytes48>,
+}
 // == impl TransactionRequest ==
 
 impl TransactionRequest {
