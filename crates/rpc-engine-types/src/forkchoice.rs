@@ -37,7 +37,7 @@ pub struct ForkchoiceState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ForkchoiceUpdateError {
     /// The forkchoice update has been processed, but the requested contained invalid
-    /// [PayloadAttributes](crate::engine::PayloadAttributes).
+    /// [PayloadAttributes](crate::PayloadAttributes).
     ///
     /// This is returned as an error because the payload attributes are invalid and the payload is not valid, See <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#engine_forkchoiceupdatedv1>
     #[error("invalid payload attributes")]
