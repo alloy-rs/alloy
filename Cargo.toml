@@ -24,6 +24,7 @@ alloy-network = { version = "0.1.0", path = "crates/network" }
 alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
+alloy-rpc-engine-types = { version = "0.1.0", path = "crates/rpc-engine-types" }
 alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-signer = { version = "0.1.0", path = "crates/signer" }
