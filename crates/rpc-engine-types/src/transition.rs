@@ -2,7 +2,7 @@ use alloy_primitives::{B256, U256, U64};
 use serde::{Deserialize, Serialize};
 
 /// This structure contains configurable settings of the transition process.
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransitionConfiguration {
     /// Maps on the TERMINAL_TOTAL_DIFFICULTY parameter of EIP-3675

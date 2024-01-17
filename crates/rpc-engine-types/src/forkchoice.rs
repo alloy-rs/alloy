@@ -89,36 +89,40 @@ pub struct ForkchoiceUpdated {
 }
 
 impl ForkchoiceUpdated {
-    pub fn new(payload_status: PayloadStatus) -> Self {
+    /// Creates a new [ForkchoiceUpdated] with the given [PayloadStatus].
+    pub const fn new(payload_status: PayloadStatus) -> Self {
         Self { payload_status, payload_id: None }
     }
 
-    pub fn from_status(status: PayloadStatusEnum) -> Self {
+    /// Creates a new [ForkchoiceUpdated] with the given [PayloadStatusEnum].
+    pub const fn from_status(status: PayloadStatusEnum) -> Self {
         Self { payload_status: PayloadStatus::from_status(status), payload_id: None }
     }
 
-    pub fn with_latest_valid_hash(mut self, hash: B256) -> Self {
+    /// Sets the latest valid hash of the payload status.
+    pub const fn with_latest_valid_hash(mut self, hash: B256) -> Self {
         self.payload_status.latest_valid_hash = Some(hash);
         self
     }
 
-    pub fn with_payload_id(mut self, id: PayloadId) -> Self {
+    /// Sets the payload id of the created payload job.
+    pub const fn with_payload_id(mut self, id: PayloadId) -> Self {
         self.payload_id = Some(id);
         self
     }
 
     /// Returns true if the payload status is syncing.
-    pub fn is_syncing(&self) -> bool {
+    pub const fn is_syncing(&self) -> bool {
         self.payload_status.is_syncing()
     }
 
     /// Returns true if the payload status is valid.
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.payload_status.is_valid()
     }
 
     /// Returns true if the payload status is invalid.
-    pub fn is_invalid(&self) -> bool {
+    pub const fn is_invalid(&self) -> bool {
         self.payload_status.is_invalid()
     }
 }

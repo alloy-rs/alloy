@@ -1,7 +1,10 @@
+//! Payload types.
+
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{
-    eth::{transaction::request::BlobTransactionSidecar, withdrawal::Withdrawal},
     kzg::{Blob, Bytes48},
+    transaction::request::BlobTransactionSidecar,
+    withdrawal::Withdrawal,
 };
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -121,6 +124,7 @@ pub struct ExecutionPayloadEnvelopeV3 {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
+#[allow(missing_docs)]
 pub struct ExecutionPayloadV1 {
     pub parent_hash: B256,
     pub fee_recipient: Address,
@@ -159,7 +163,7 @@ pub struct ExecutionPayloadV2 {
 
 impl ExecutionPayloadV2 {
     /// Returns the timestamp for the execution payload.
-    pub fn timestamp(&self) -> u64 {
+    pub const fn timestamp(&self) -> u64 {
         self.payload_inner.timestamp
     }
 }
@@ -277,12 +281,12 @@ pub struct ExecutionPayloadV3 {
 
 impl ExecutionPayloadV3 {
     /// Returns the withdrawals for the payload.
-    pub fn withdrawals(&self) -> &Vec<Withdrawal> {
+    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
         &self.payload_inner.withdrawals
     }
 
     /// Returns the timestamp for the payload.
-    pub fn timestamp(&self) -> u64 {
+    pub const fn timestamp(&self) -> u64 {
         self.payload_inner.payload_inner.timestamp
     }
 }
@@ -389,8 +393,11 @@ impl ssz::Encode for ExecutionPayloadV3 {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BlobsBundleV1 {
+    /// All commitments in the bundle.
     pub commitments: Vec<Bytes48>,
+    /// All proofs in the bundle.
     pub proofs: Vec<Bytes48>,
+    /// All blobs in the bundle.
     pub blobs: Vec<Blob>,
 }
 
@@ -456,7 +463,7 @@ pub enum ExecutionPayload {
 
 impl ExecutionPayload {
     /// Returns the withdrawals for the payload.
-    pub fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+    pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
         match self {
             ExecutionPayload::V1(_) => None,
             ExecutionPayload::V2(payload) => Some(&payload.withdrawals),
@@ -465,7 +472,7 @@ impl ExecutionPayload {
     }
 
     /// Returns the timestamp for the payload.
-    pub fn timestamp(&self) -> u64 {
+    pub const fn timestamp(&self) -> u64 {
         match self {
             ExecutionPayload::V1(payload) => payload.timestamp,
             ExecutionPayload::V2(payload) => payload.timestamp(),
@@ -474,7 +481,7 @@ impl ExecutionPayload {
     }
 
     /// Returns the parent hash for the payload.
-    pub fn parent_hash(&self) -> B256 {
+    pub const fn parent_hash(&self) -> B256 {
         match self {
             ExecutionPayload::V1(payload) => payload.parent_hash,
             ExecutionPayload::V2(payload) => payload.payload_inner.parent_hash,
@@ -483,7 +490,7 @@ impl ExecutionPayload {
     }
 
     /// Returns the block hash for the payload.
-    pub fn block_hash(&self) -> B256 {
+    pub const fn block_hash(&self) -> B256 {
         match self {
             ExecutionPayload::V1(payload) => payload.block_hash,
             ExecutionPayload::V2(payload) => payload.payload_inner.block_hash,
@@ -492,7 +499,7 @@ impl ExecutionPayload {
     }
 
     /// Returns the block number for this payload.
-    pub fn block_number(&self) -> u64 {
+    pub const fn block_number(&self) -> u64 {
         match self {
             ExecutionPayload::V1(payload) => payload.block_number,
             ExecutionPayload::V2(payload) => payload.payload_inner.block_number,
@@ -577,13 +584,13 @@ pub enum PayloadError {
 impl PayloadError {
     /// Returns `true` if the error is caused by a block hash mismatch.
     #[inline]
-    pub fn is_block_hash_mismatch(&self) -> bool {
+    pub const fn is_block_hash_mismatch(&self) -> bool {
         matches!(self, PayloadError::BlockHash { .. })
     }
 
     /// Returns `true` if the error is caused by invalid block hashes (Cancun).
     #[inline]
-    pub fn is_invalid_versioned_hashes(&self) -> bool {
+    pub const fn is_invalid_versioned_hashes(&self) -> bool {
         matches!(self, PayloadError::InvalidVersionedHashes)
     }
 }
@@ -628,6 +635,7 @@ pub struct PayloadAttributes {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PayloadStatus {
+    /// The status of the payload.
     #[serde(flatten)]
     pub status: PayloadStatusEnum,
     /// Hash of the most recent valid block in the branch defined by payload and its ancestors
@@ -635,36 +643,40 @@ pub struct PayloadStatus {
 }
 
 impl PayloadStatus {
-    pub fn new(status: PayloadStatusEnum, latest_valid_hash: Option<B256>) -> Self {
+    /// Initializes a new payload status.
+    pub const fn new(status: PayloadStatusEnum, latest_valid_hash: Option<B256>) -> Self {
         Self { status, latest_valid_hash }
     }
 
-    pub fn from_status(status: PayloadStatusEnum) -> Self {
+    /// Creates a new payload status from the given status.
+    pub const fn from_status(status: PayloadStatusEnum) -> Self {
         Self { status, latest_valid_hash: None }
     }
 
-    pub fn with_latest_valid_hash(mut self, latest_valid_hash: B256) -> Self {
+    /// Sets the latest valid hash.
+    pub const fn with_latest_valid_hash(mut self, latest_valid_hash: B256) -> Self {
         self.latest_valid_hash = Some(latest_valid_hash);
         self
     }
 
-    pub fn maybe_latest_valid_hash(mut self, latest_valid_hash: Option<B256>) -> Self {
+    /// Sets the latest valid hash if it's not None.
+    pub const fn maybe_latest_valid_hash(mut self, latest_valid_hash: Option<B256>) -> Self {
         self.latest_valid_hash = latest_valid_hash;
         self
     }
 
     /// Returns true if the payload status is syncing.
-    pub fn is_syncing(&self) -> bool {
+    pub const fn is_syncing(&self) -> bool {
         self.status.is_syncing()
     }
 
     /// Returns true if the payload status is valid.
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.status.is_valid()
     }
 
     /// Returns true if the payload status is invalid.
-    pub fn is_invalid(&self) -> bool {
+    pub const fn is_invalid(&self) -> bool {
         self.status.is_invalid()
     }
 }
@@ -698,6 +710,7 @@ impl From<PayloadError> for PayloadStatusEnum {
     }
 }
 
+/// Represents the status response of a payload.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PayloadStatusEnum {
@@ -710,6 +723,7 @@ pub enum PayloadStatusEnum {
     ///   - newPayload:       if the payload failed to execute on top of the local chain
     ///   - forkchoiceUpdate: if the new head is unknown, pre-merge, or reorg to it fails
     Invalid {
+        /// The error message for the invalid payload.
         #[serde(rename = "validationError")]
         validation_error: String,
     },
@@ -726,7 +740,7 @@ pub enum PayloadStatusEnum {
 
 impl PayloadStatusEnum {
     /// Returns the string representation of the payload status.
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             PayloadStatusEnum::Valid => "VALID",
             PayloadStatusEnum::Invalid { .. } => "INVALID",
@@ -744,17 +758,17 @@ impl PayloadStatusEnum {
     }
 
     /// Returns true if the payload status is syncing.
-    pub fn is_syncing(&self) -> bool {
+    pub const fn is_syncing(&self) -> bool {
         matches!(self, PayloadStatusEnum::Syncing)
     }
 
     /// Returns true if the payload status is valid.
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         matches!(self, PayloadStatusEnum::Valid)
     }
 
     /// Returns true if the payload status is invalid.
-    pub fn is_invalid(&self) -> bool {
+    pub const fn is_invalid(&self) -> bool {
         matches!(self, PayloadStatusEnum::Invalid { .. })
     }
 }
@@ -775,7 +789,7 @@ impl std::fmt::Display for PayloadStatusEnum {
 /// Various errors that can occur when validating a payload or forkchoice update.
 ///
 /// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum PayloadValidationError {
     /// Thrown when a forkchoice update's head links to a previously rejected payload.
     #[error("links to previously rejected block")]
