@@ -1,5 +1,8 @@
-use alloy_rpc_types::{eth::{withdrawal::Withdrawal, transaction::request::BlobTransactionSidecar}, kzg::{Blob, Bytes48}};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
+use alloy_rpc_types::{
+    eth::{transaction::request::BlobTransactionSidecar, withdrawal::Withdrawal},
+    kzg::{Blob, Bytes48},
+};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 /// The execution payload body response that allows for `null` values.
@@ -1084,5 +1087,4 @@ mod tests {
             serde_json::from_str(input);
         assert!(payload_res.is_err());
     }
-
 }
