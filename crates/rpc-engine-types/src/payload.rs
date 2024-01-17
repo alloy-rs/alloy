@@ -1,8 +1,4 @@
-pub use crate::Withdrawal;
-use crate::{
-    eth::transaction::request::BlobTransactionSidecar,
-    kzg::{Blob, Bytes48},
-};
+use alloy_rpc_types::{eth::{withdrawal::Withdrawal, transaction::request::BlobTransactionSidecar}, kzg::{Blob, Bytes48}};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -129,13 +125,13 @@ pub struct ExecutionPayloadV1 {
     pub receipts_root: B256,
     pub logs_bloom: Bloom,
     pub prev_randao: B256,
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub block_number: u64,
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub gas_limit: u64,
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub gas_used: u64,
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub timestamp: u64,
     pub extra_data: Bytes,
     pub base_fee_per_gas: U256,
@@ -268,11 +264,11 @@ pub struct ExecutionPayloadV3 {
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub excess_blob_gas: u64,
 }
 
@@ -608,7 +604,7 @@ pub struct ExecutionPayloadBodyV1 {
 #[serde(rename_all = "camelCase")]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
-    #[serde(with = "crate::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub timestamp: u64,
     /// Value for the `prevRandao` field of the new payload
     pub prev_randao: B256,
@@ -1089,20 +1085,4 @@ mod tests {
         assert!(payload_res.is_err());
     }
 
-    #[test]
-    fn beacon_api_payload_serde() {
-        #[derive(Serialize, Deserialize)]
-        #[serde(transparent)]
-        struct Event {
-            #[serde(with = "crate::beacon::payload::beacon_api_payload_attributes")]
-            payload: PayloadAttributes,
-        }
-
-        let s = r#"{"timestamp":"1697981664","prev_randao":"0x739947d9f0aed15e32ed05a978e53b55cdcfe3db4a26165890fa45a80a06c996","suggested_fee_recipient":"0x0000000000000000000000000000000000000001","withdrawals":[{"index":"2460700","validator_index":"852657","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5268915"},{"index":"2460701","validator_index":"852658","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5253066"},{"index":"2460702","validator_index":"852659","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5266666"},{"index":"2460703","validator_index":"852660","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5239026"},{"index":"2460704","validator_index":"852661","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5273516"},{"index":"2460705","validator_index":"852662","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5260842"},{"index":"2460706","validator_index":"852663","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5238925"},{"index":"2460707","validator_index":"852664","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5253956"},{"index":"2460708","validator_index":"852665","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5284374"},{"index":"2460709","validator_index":"852666","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5276798"},{"index":"2460710","validator_index":"852667","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5239682"},{"index":"2460711","validator_index":"852668","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5261544"},{"index":"2460712","validator_index":"852669","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5247034"},{"index":"2460713","validator_index":"852670","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5256750"},{"index":"2460714","validator_index":"852671","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5261929"},{"index":"2460715","validator_index":"852672","address":"0x778f5f13c4be78a3a4d7141bcb26999702f407cf","amount":"5243188"}]}"#;
-
-        let event: Event = serde_json::from_str(s).unwrap();
-        let input = serde_json::from_str::<serde_json::Value>(s).unwrap();
-        let json = serde_json::to_value(event).unwrap();
-        assert_eq!(input, json);
-    }
 }

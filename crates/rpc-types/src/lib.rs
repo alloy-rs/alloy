@@ -19,7 +19,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod eth;
+pub mod eth;
 pub mod serde_helpers;
 
 pub use eth::*;

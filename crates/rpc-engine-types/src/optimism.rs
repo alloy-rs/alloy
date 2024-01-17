@@ -1,4 +1,4 @@
-use crate::engine::PayloadAttributes;
+use crate::PayloadAttributes;
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 
@@ -19,14 +19,14 @@ pub struct OptimismPayloadAttributes {
     /// If set, this sets the exact gas limit the block produced with.
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "crate::serde_helpers::u64_hex_opt::deserialize"
+        deserialize_with = "alloy_rpc_types::serde_helpers::u64_hex_opt::deserialize"
     )]
     pub gas_limit: Option<u64>,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::engine::ExecutionPayloadInputV2;
+    use crate::ExecutionPayloadInputV2;
 
     // <https://github.com/paradigmxyz/reth/issues/6036>
     #[test]

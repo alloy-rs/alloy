@@ -3,7 +3,6 @@
 mod account;
 mod block;
 mod call;
-pub mod engine;
 pub mod error;
 mod fee;
 mod filter;
@@ -22,7 +21,6 @@ mod work;
 pub use account::*;
 pub use block::*;
 pub use call::{Bundle, CallInput, CallInputError, CallRequest, EthCallResponse, StateContext};
-pub use engine::*;
 pub use fee::{FeeHistory, TxGasAndReward};
 pub use filter::*;
 pub use index::Index;
