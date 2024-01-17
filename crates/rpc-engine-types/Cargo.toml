@@ -20,14 +20,10 @@ alloy-rpc-types.workspace = true
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 
-# arbitrary
-arbitrary = { version = "1.3", features = ["derive"], optional = true }
-
 # jsonrpsee
 jsonrpsee-types = { version = "0.20", optional = true }
 
 [features]
-arbitrary = ["dep:arbitrary", "alloy-primitives/arbitrary"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 
 [dev-dependencies]
