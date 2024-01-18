@@ -1,3 +1,3 @@
 # alloy-rpc-client
 
-RPC client.
+High-level Ethereum JSON-RPC client implementation.

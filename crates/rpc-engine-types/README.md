@@ -1,3 +1,3 @@
 # alloy-engine-rpc-types
 
-Engine related RPC types for Alloy.
+Ethereum execution-consensus layer (engine) API RPC types.

@@ -1,3 +1,3 @@
 # alloy-rpc-trace-types
 
-RPC trace types.
+Ethereum RPC trace types.

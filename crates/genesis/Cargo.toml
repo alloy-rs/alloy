@@ -1,6 +1,6 @@
 [package]
 name = "alloy-genesis"
-description = "Genesis types "
+description = "Ethereum genesis file definitions"
 
 version.workspace = true
 edition.workspace = true
@@ -20,4 +20,3 @@ serde.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
-
