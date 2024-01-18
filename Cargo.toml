@@ -45,11 +45,6 @@ elliptic-curve = { version = "0.13", default-features = false, features = ["std"
 k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }
 spki = { version = "0.7", default-features = false, features = ["std"] }
-secp256k1 = { version = "0.27.0", default-features = false, features = [
-    "global-context",
-    "rand-std",
-    "recovery",
-] }
 # async
 async-trait = "0.1.74"
 futures = "0.3.29"
