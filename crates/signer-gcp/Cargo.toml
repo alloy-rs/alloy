@@ -1,0 +1,29 @@
+[package]
+name = "alloy-signer-gcp"
+description = "Ethereum GCP KMS signer"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-signer.workspace = true
+
+async-trait.workspace = true
+gcloud-sdk = { version = "0.24", features = ["google-cloud-kms-v1"] }
+k256 = { workspace = true, features = ["pem"] }
+spki.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+eip712 = ["alloy-signer/eip712"]

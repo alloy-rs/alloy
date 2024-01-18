@@ -62,6 +62,7 @@ jobs:
           cargo hack check --workspace --target wasm32-unknown-unknown \
             --exclude alloy-signer \
             --exclude alloy-signer-aws \
+            --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-node-bindings \
