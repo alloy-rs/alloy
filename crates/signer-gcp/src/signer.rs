@@ -12,7 +12,7 @@ use gcloud_sdk::{
     tonic::{self, Request},
     GoogleApi, GoogleAuthMiddleware,
 };
-use k256::ecdsa::{self, RecoveryId, VerifyingKey};
+use k256::ecdsa::{self, VerifyingKey};
 use spki::DecodePublicKey;
 use std::{fmt, fmt::Debug};
 use thiserror::Error;
@@ -108,7 +108,7 @@ impl KeySpecifier {
 pub struct GcpSigner {
     client: Client,
     key_name: String,
-    chain_id: u64,
+    chain_id: Option<u64>,
     pubkey: VerifyingKey,
     address: Address,
 }
@@ -149,19 +149,8 @@ pub enum GcpSignerError {
 impl Signer for GcpSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
-    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
-        self.sign_digest_with_eip155(hash, self.chain_id).await.map_err(alloy_signer::Error::other)
-    }
-
-    #[cfg(TODO)] // TODO: TypedTransaction
-    #[instrument(err)]
-    async fn sign_transaction(&self, tx: &TypedTransaction) -> Result<Signature> {
-        let mut tx_with_chain = tx.clone();
-        let chain_id = tx_with_chain.chain_id().map(|id| id.as_u64()).unwrap_or(self.chain_id);
-        tx_with_chain.set_chain_id(chain_id);
-
-        let sighash = tx_with_chain.sighash();
-        self.sign_digest_with_eip155(sighash, chain_id).await
+    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
+        self.sign_digest_inner(&hash).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -170,12 +159,12 @@ impl Signer for GcpSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> u64 {
+    fn chain_id(&self) -> Option<u64> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: u64) {
+    fn set_chain_id(&mut self, chain_id: Option<u64>) {
         self.chain_id = chain_id;
     }
 }
@@ -188,7 +177,7 @@ impl GcpSigner {
     pub async fn new(
         client: Client,
         key_specifier: KeySpecifier,
-        chain_id: u64,
+        chain_id: Option<u64>,
     ) -> Result<GcpSigner, GcpSignerError> {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;
@@ -211,14 +200,12 @@ impl GcpSigner {
     /// Sign a digest with this signer's key and add the eip155 `v` value
     /// corresponding to the input chain_id
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_with_eip155(
-        &self,
-        digest: &B256,
-        chain_id: u64,
-    ) -> Result<Signature, GcpSignerError> {
+    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
         let sig = self.sign_digest(digest).await?;
         let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
-        sig.apply_eip155(chain_id);
+        if let Some(chain_id) = self.chain_id {
+            sig = sig.with_chain_id(chain_id);
+        }
         Ok(sig)
     }
 }
@@ -276,12 +263,12 @@ fn sig_from_digest_bytes_trial_recovery(
     hash: &B256,
     pubkey: &VerifyingKey,
 ) -> Signature {
-    let mut signature = Signature::new(sig, RecoveryId::from_byte(0).unwrap());
+    let signature = Signature::from_signature_and_parity(sig, false).unwrap();
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
 
-    signature.set_v(1);
+    let signature = signature.with_parity(true);
     if check_candidate(&signature, hash, pubkey) {
         return signature;
     }
@@ -291,7 +278,7 @@ fn sig_from_digest_bytes_trial_recovery(
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
 fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
-    signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
+    signature.recover_from_prehash(*hash).map(|key| key == *pubkey).unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -317,11 +304,10 @@ mod tests {
         )
         .await
         .expect("Failed to create GCP KMS Client");
-        let chain_id = 1;
         let key_version = 1;
 
         let specifier = KeySpecifier::new(keyring, &key_name, key_version);
-        let signer = GcpSigner::new(client, specifier, chain_id).await.expect("get key");
+        let signer = GcpSigner::new(client, specifier, None).await.expect("get key");
 
         let message = vec![0, 1, 2, 3];
         let sig = signer.sign_message(&message).await.unwrap();
