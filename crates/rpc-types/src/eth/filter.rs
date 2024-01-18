@@ -1401,9 +1401,9 @@ mod tests {
                 Default::default(),
             ],
         };
-        assert_eq!(true, filter.is_pending_block_filter());
+        assert!(filter.is_pending_block_filter());
         let filter_params = FilteredParams::new(Some(filter));
-        assert_eq!(true, filter_params.is_pending_block_filter());
+        assert!(filter_params.is_pending_block_filter());
 
         let filter = Filter {
             block_option: FilterBlockOption::Range {
@@ -1430,8 +1430,8 @@ mod tests {
                 Default::default(),
             ],
         };
-        assert_eq!(false, filter.is_pending_block_filter());
+        assert!(!filter.is_pending_block_filter());
         let filter_params = FilteredParams::new(Some(filter));
-        assert_eq!(false, filter_params.is_pending_block_filter());
+        assert!(!filter_params.is_pending_block_filter());
     }
 }
