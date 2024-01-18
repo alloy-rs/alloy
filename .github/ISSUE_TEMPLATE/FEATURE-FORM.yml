@@ -13,7 +13,7 @@ body:
       description: What component is the feature for?
       multiple: true
       options:
-        - consesus, eips, genesis
+        - consensus, eips, genesis
         - network, json-rpc
         - nodes
         - providers, pubsub

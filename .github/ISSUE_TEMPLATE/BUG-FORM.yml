@@ -15,7 +15,7 @@ body:
       description: What component is the bug in?
       multiple: true
       options:
-        - consesus, eips, genesis
+        - consensus, eips, genesis
         - network, json-rpc
         - nodes
         - providers, pubsub
