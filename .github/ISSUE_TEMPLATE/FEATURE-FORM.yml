@@ -13,12 +13,11 @@ body:
       description: What component is the feature for?
       multiple: true
       options:
-        - json-rpc
-        - networks
-        - providers
-        - pubsub
-        - rpc-client
-        - rpc-types
+        - consesus, eips, genesis
+        - network, json-rpc
+        - nodes
+        - providers, pubsub
+        - rpc
         - signers
         - transports
     validations:
@@ -26,7 +25,9 @@ body:
   - type: textarea
     attributes:
       label: Describe the feature you would like
-      description: Please also describe your goals for the feature. What problems it solves, how it would be used, etc.
+      description:
+        Please also describe your goals for the feature. What problems it solves, how it would be
+        used, etc.
     validations:
       required: true
   - type: textarea
