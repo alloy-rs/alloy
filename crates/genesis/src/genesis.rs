@@ -9,7 +9,7 @@ use alloy_signer::utils::{public_key_to_address, raw_public_key_to_address};
 use k256::ecdsa::VerifyingKey;
 use secp256k1::{
     rand::{thread_rng, RngCore},
-    All, KeyPair, PublicKey, Secp256k1, SecretKey,
+    KeyPair, Secp256k1,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
@@ -253,7 +253,7 @@ impl<'a> GenesisAllocator<'a> {
     pub fn new_funded_account(&mut self, balance: U256) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(secp, pair);
+        let address = self.to_verifying_key(pair);
 
         self.alloc.insert(address, GenesisAccount::default().with_balance(balance));
 
@@ -270,7 +270,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(secp, pair);
+        let address = self.to_verifying_key(pair);
         self.alloc
             .insert(address, GenesisAccount::default().with_balance(balance).with_code(Some(code)));
         (pair, address)
@@ -286,7 +286,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(secp, pair);
+        let address = self.to_verifying_key(pair);
         self.alloc.insert(
             address,
             GenesisAccount::default().with_balance(balance).with_storage(Some(storage)),
@@ -305,7 +305,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(secp, pair);
+        let address = self.to_verifying_key(pair);
 
         self.alloc.insert(
             address,
@@ -315,13 +315,12 @@ impl<'a> GenesisAllocator<'a> {
         (pair, address)
     }
 
-    pub fn to_verifying_key(&mut self, secp: Secp256k1<All>, pair: KeyPair) -> Address {
-        let secret_key =
-            SecretKey::from_slice(&pair.secret_bytes()).expect("Invalid secret key bytes");
-        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-        let serialized_pub_key = public_key.serialize();
-
-        let address = raw_public_key_to_address(&serialized_pub_key);
+    pub fn to_verifying_key(&mut self, pair: KeyPair) -> Address {
+        let public_key = pair.public_key();
+        let uncompressed_pub_key = public_key.serialize_uncompressed();
+        // Skip the first byte (0x04) and use the next 64 bytes
+        let raw_public_key = &uncompressed_pub_key[1..];
+        let address = raw_public_key_to_address(&raw_public_key);
         address
     }
 
