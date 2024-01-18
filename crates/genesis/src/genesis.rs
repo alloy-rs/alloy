@@ -5,11 +5,11 @@ use alloy_rpc_types::serde_helpers::{
     num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
 };
-use alloy_signer::utils::public_key_to_address;
+use alloy_signer::utils::{public_key_to_address, raw_public_key_to_address};
 use k256::ecdsa::VerifyingKey;
 use secp256k1::{
     rand::{thread_rng, RngCore},
-    KeyPair, Secp256k1
+    All, KeyPair, PublicKey, Secp256k1, SecretKey,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
@@ -198,8 +198,8 @@ impl<T> RngDebug for T where T: RngCore + std::fmt::Debug {}
 ///
 /// # Example
 /// ```
-/// # use alloy_genesis::genesis::GenesisAllocator;
 /// # use alloy_primitives::{Address, U256, hex, Bytes};
+/// use alloy_genesis::genesis::GenesisAllocator;
 /// # use std::str::FromStr;
 /// let mut allocator = GenesisAllocator::default();
 ///
@@ -253,8 +253,7 @@ impl<'a> GenesisAllocator<'a> {
     pub fn new_funded_account(&mut self, balance: U256) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let verifying_key = VerifyingKey::from_sec1_bytes(&pair.secret_bytes());
-        let address = public_key_to_address(&verifying_key.unwrap());
+        let address = self.to_verifying_key(secp, pair);
 
         self.alloc.insert(address, GenesisAccount::default().with_balance(balance));
 
@@ -271,13 +270,9 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let verifying_key = VerifyingKey::from_sec1_bytes(&pair.secret_bytes());
-
-        let address = public_key_to_address(&verifying_key.unwrap());
-
+        let address = self.to_verifying_key(secp, pair);
         self.alloc
             .insert(address, GenesisAccount::default().with_balance(balance).with_code(Some(code)));
-
         (pair, address)
     }
 
@@ -291,8 +286,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let verifying_key = VerifyingKey::from_sec1_bytes(&pair.secret_bytes());
-        let address = public_key_to_address(&verifying_key.unwrap());
+        let address = self.to_verifying_key(secp, pair);
         self.alloc.insert(
             address,
             GenesisAccount::default().with_balance(balance).with_storage(Some(storage)),
@@ -311,8 +305,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let verifying_key = VerifyingKey::from_sec1_bytes(&pair.secret_bytes());
-        let address = public_key_to_address(&verifying_key.unwrap());
+        let address = self.to_verifying_key(secp, pair);
 
         self.alloc.insert(
             address,
@@ -320,6 +313,16 @@ impl<'a> GenesisAllocator<'a> {
         );
 
         (pair, address)
+    }
+
+    pub fn to_verifying_key(&mut self, secp: Secp256k1<All>, pair: KeyPair) -> Address {
+        let secret_key =
+            SecretKey::from_slice(&pair.secret_bytes()).expect("Invalid secret key bytes");
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+        let serialized_pub_key = public_key.serialize();
+
+        let address = raw_public_key_to_address(&serialized_pub_key);
+        address
     }
 
     /// Adds an account with code to the genesis alloc.

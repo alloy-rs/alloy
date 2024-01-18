@@ -22,6 +22,7 @@ alloy-signer.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 k256.workspace = true
+elliptic-curve = "0.13.8"
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
