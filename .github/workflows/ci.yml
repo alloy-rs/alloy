@@ -64,7 +64,6 @@ jobs:
             --exclude alloy-signer-aws \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
-            --exclude alloy-genesis \
             --exclude alloy-node-bindings \
             --exclude alloy-transport-ipc
 

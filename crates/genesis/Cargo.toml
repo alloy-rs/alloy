@@ -14,12 +14,9 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
-secp256k1.workspace = true
-alloy-signer.workspace = true
 
 # serde
 serde.workspace = true
-k256.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
