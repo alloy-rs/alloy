@@ -3,6 +3,7 @@
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
+pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use receipt::{OptimismTransactionReceiptFields, TransactionReceipt};
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,8 @@ pub mod kzg;
 mod receipt;
 pub mod request;
 mod signature;
+
+mod blob;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
