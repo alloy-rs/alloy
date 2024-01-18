@@ -95,7 +95,7 @@ impl KeySpecifier {
 /// let key_name = "...";
 /// let key_version = 1;
 /// let key_specifier = KeySpecifier::new(keyring, key_name, key_version);
-/// let chain_id = 1;
+/// let chain_id = Some(1);
 /// let signer = GcpSigner::new(client, key_specifier, chain_id).await.unwrap();
 ///
 /// let message = vec![0, 1, 2, 3];
