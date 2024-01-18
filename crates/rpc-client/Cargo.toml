@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-client"
-description = "RPC client"
+description = "High-level Ethereum JSON-RPC client implementation"
 
 version.workspace = true
 edition.workspace = true

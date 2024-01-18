@@ -18,18 +18,55 @@ feature-parity in Alloy. No action is currently needed from devs.
 
 This repository contains the following crates:
 
-- [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients.
-- [`alloy-transport`] - Transport implementations for JSON-RPC 2.0 clients.
-- [`alloy-networks`] - Network abstraction for RPC types. Allows capturing
-  different RPC param and response types on a per-network basis.
-- [`alloy-providers`] - A client trait for interacting with Ethereum-like RPC
-  endpoints. Abstract over `alloy_networks::Network`, which allows capturing
-  different RPC types on a per-network basis.
+- [`alloy-consensus`] - Ethereum consensus interface
+- [`alloy-eips`] - Ethereum Improvement Proprosal (EIP) implementations
+- [`alloy-genesis`] - Ethereum genesis file definitions
+- [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
+- [`alloy-network`] - Network abstraction for RPC types
+- [`alloy-node-bindings`] - Ethereum execution-layer client bindings
+- [`alloy-providers`] - Client trait for interacting with Ethereum-like RPC endpoints
+- [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] provider
+- [`alloy-rpc-client`] - High-level Ethereum JSON-RPC client implementation
+- [`alloy-rpc-types`] - Ethereum JSON-RPC types
+  - [`alloy-rpc-engine-types`] - Ethereum execution-consensus layer (engine) API RPC types
+  - [`alloy-rpc-trace-types`] - Ethereum RPC trace types
+- [`alloy-signer`] - Ethereum signer abstraction
+  - [`alloy-signer-aws`] - [AWS KMS] signer implementation
+  - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
+  - [`alloy-signer-ledger`] - [Ledger] signer implementation
+  - [`alloy-signer-trezor`] - [Trezor] signer implementation
+- [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
+  - [`alloy-transport-http`] - HTTP transport implementation
+  - [`alloy-transport-ipc`] - IPC transport implementation
+  - [`alloy-transport-ws`] - WS transport implementation
 
-[`alloy-json-rpc`]: ./crates/json-rpc
-[`alloy-transport`]: ./crates/transport
-[`alloy-networks`]: ./crates/networks
-[`alloy-providers`]: ./crates/providers
+[`alloy-consensus`]: crates/consensus
+[`alloy-eips`]: crates/eips
+[`alloy-genesis`]: crates/genesis
+[`alloy-json-rpc`]: crates/json-rpc
+[`alloy-network`]: crates/network
+[`alloy-node-bindings`]: crates/node-bindings
+[`alloy-providers`]: crates/providers
+[`alloy-pubsub`]: crates/pubsub
+[`alloy-rpc-client`]: crates/rpc-client
+[`alloy-rpc-engine-types`]: crates/rpc-engine-types
+[`alloy-rpc-trace-types`]: crates/rpc-trace-types
+[`alloy-rpc-types`]: crates/rpc-types
+[`alloy-signer`]: crates/signer
+[`alloy-signer-aws`]: crates/signer-aws
+[`alloy-signer-gcp`]: crates/signer-gcp
+[`alloy-signer-ledger`]: crates/signer-ledger
+[`alloy-signer-trezor`]: crates/signer-trezor
+[`alloy-transport`]: crates/transport
+[`alloy-transport-http`]: crates/transport-http
+[`alloy-transport-ipc`]: crates/transport-ipc
+[`alloy-transport-ws`]: crates/transport-ws
+
+[publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
+[AWS KMS]: https://aws.amazon.com/kms
+[GCP KMS]: https://cloud.google.com/kms
+[Ledger]: https://www.ledger.com
+[Trezor]: https://trezor.io
 
 ## Supported Rust Versions
 

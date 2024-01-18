@@ -2,7 +2,7 @@
 
 <!-- TODO: links, docs, examples, etc -->
 
-Ethereum JSON-RPC providers.
+Client trait for interacting with Ethereum-like RPC endpoints.
 
 This crate contains the `Provider` trait, which exposes Ethereum JSON-RPC
 methods. Providers in alloy are similar to ethers.js Providers. They manage an

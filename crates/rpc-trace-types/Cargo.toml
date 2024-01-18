@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-trace-types"
-description = "RPC trace types"
+description = "Ethereum RPC trace types"
 
 version.workspace = true
 edition.workspace = true

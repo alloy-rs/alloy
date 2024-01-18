@@ -2,7 +2,7 @@
 
 <!-- TODO: More links and real doctests -->
 
-Transport implementations for Alloy providers.
+Low-level Ethereum JSON-RPC transport abstraction.
 
 This crate handles RPC connection and request management. It builds an
 `RpcClient` on top of the [tower `Service`] abstraction, and provides

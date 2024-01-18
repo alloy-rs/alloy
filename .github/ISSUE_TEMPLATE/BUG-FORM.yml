@@ -15,13 +15,11 @@ body:
       description: What component is the bug in?
       multiple: true
       options:
-        - consensus
-        - json-rpc
-        - networks
-        - providers
-        - pubsub
-        - rpc-client
-        - rpc-types
+        - consensus, eips, genesis
+        - network, json-rpc
+        - nodes
+        - providers, pubsub
+        - rpc
         - signers
         - transports
     validations:
