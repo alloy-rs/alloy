@@ -321,8 +321,7 @@ impl<'a> GenesisAllocator<'a> {
         let uncompressed_pub_key = public_key.serialize_uncompressed();
         // Skip the first byte (0x04) and use the next 64 bytes
         let raw_public_key = &uncompressed_pub_key[1..];
-        let address = raw_public_key_to_address(&raw_public_key);
-        address
+        raw_public_key_to_address(raw_public_key)
     }
 
     /// Adds an account with code to the genesis alloc.

@@ -12,25 +12,15 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["k256"] }
-alloy-rlp = { workspace = true, features = ["derive"] }
+alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
-thiserror.workspace = true
-secp256k1 = { workspace = true, features = ["global-context", "recovery"] }
+secp256k1.workspace = true
 alloy-signer.workspace = true
+
 # serde
 serde.workspace = true
 serde_json.workspace = true
 k256.workspace = true
-elliptic-curve = "0.13.8"
-# arbitrary
-arbitrary = { workspace = true, features = ["derive"], optional = true }
-proptest = { workspace = true, optional = true }
-proptest-derive = { workspace = true, optional = true }
 
-[dev-dependencies]
-arbitrary = { workspace = true, features = ["derive"] }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
-serde_json.workspace = true
+
 
