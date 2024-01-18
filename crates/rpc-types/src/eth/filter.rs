@@ -356,12 +356,11 @@ impl Filter {
         self
     }
 
-    /// Return `true` if filter configured to match pending block
+    /// Return `true` if filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
     pub fn is_pending_block_filter(&self) -> bool {
-        let is_pending_block_filter =
-            self.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
-                && self.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending);
-        is_pending_block_filter
+        self.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
+            && self.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
     }
 
     /// Pins the block hash for the filter
@@ -806,11 +805,11 @@ impl FilteredParams {
         true
     }
 
-    /// Return `true` if the filter configured to match pending block
+    /// Return `true` if the filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
+    /// It calls [`Filter::is_pending_block_filter`] undercover.
     pub fn is_pending_block_filter(&self) -> bool {
-        let is_pending_block_filter =
-            self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter());
-        is_pending_block_filter
+        self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter())
     }
 
     /// Returns `true` if the filter matches the given log.
