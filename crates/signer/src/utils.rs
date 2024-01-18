@@ -7,12 +7,6 @@ use k256::{
     AffinePoint,
 };
 
-/// Applies [EIP-155](https://eips.ethereum.org/EIPS/eip-155).
-#[inline]
-pub const fn to_eip155_v(v: u8, chain_id: u64) -> u64 {
-    (v as u64) + 35 + chain_id * 2
-}
-
 /// Converts an ECDSA private key to its corresponding Ethereum Address.
 #[inline]
 pub fn secret_key_to_address(secret_key: &SigningKey) -> Address {

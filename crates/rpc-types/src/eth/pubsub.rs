@@ -24,7 +24,7 @@ pub enum SubscriptionResult {
 }
 
 /// Response type for a SyncStatus subscription
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PubSubSyncStatus {
     /// If not currently syncing, this should always be `false`
@@ -34,7 +34,7 @@ pub enum PubSubSyncStatus {
 }
 
 /// Sync status infos
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(missing_docs)]
 pub struct SyncStatusMetadata {
@@ -61,7 +61,7 @@ impl Serialize for SubscriptionResult {
 }
 
 /// Subscription kind.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub enum SubscriptionKind {
@@ -110,13 +110,13 @@ pub enum Params {
 impl Params {
     /// Returns true if it's a bool parameter.
     #[inline]
-    pub fn is_bool(&self) -> bool {
+    pub const fn is_bool(&self) -> bool {
         matches!(self, Params::Bool(_))
     }
 
     /// Returns true if it's a log parameter.
     #[inline]
-    pub fn is_logs(&self) -> bool {
+    pub const fn is_logs(&self) -> bool {
         matches!(self, Params::Logs(_))
     }
 }

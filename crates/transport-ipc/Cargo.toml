@@ -1,5 +1,7 @@
 [package]
 name = "alloy-transport-ipc"
+description = "IPC transport implementation"
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,8 +10,6 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 alloy-json-rpc.workspace = true
@@ -20,7 +20,7 @@ futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-tokio-util = { workspace = true, features = ["io", "compat"]}
+tokio-util = { workspace = true, features = ["io", "compat"] }
 tracing.workspace = true
 
 bytes = "1.5.0"

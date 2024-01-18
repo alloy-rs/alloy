@@ -2,7 +2,7 @@ use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
 
 /// Internal struct to calculate reward percentiles
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxGasAndReward {
     /// Gas used by the transaction
     pub gas_used: u64,
@@ -36,8 +36,7 @@ pub struct FeeHistory {
     ///
     /// # Note
     ///
-    /// The `Option` is only for compatability with Erigon and Geth.
-    /// Empty list is skipped only for compatability with Erigon and Geth.
+    /// Empty list is skipped only for compatibility with Erigon and Geth.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub base_fee_per_gas: Vec<U256>,
     /// An array of block gas used ratios. These are calculated as the ratio

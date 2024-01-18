@@ -12,9 +12,8 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives.workspace = true
-# TODO
-# alloy-rpc-types.workspace = true
+alloy-network.workspace = true
+alloy-primitives = { workspace = true, features = ["k256"] }
 
 auto_impl.workspace = true
 elliptic-curve.workspace = true
@@ -37,6 +36,7 @@ coins-bip39 = { version = "0.8.7", default-features = false, optional = true }
 yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
 
 [dev-dependencies]
+alloy-consensus.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

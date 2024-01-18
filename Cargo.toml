@@ -17,10 +17,15 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
+alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
+alloy-eips = { version = "0.1.0", path = "crates/eips" }
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
-alloy-networks = { version = "0.1.0", path = "crates/networks" }
+alloy-network = { version = "0.1.0", path = "crates/network" }
+alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
+alloy-rpc-engine-types = { version = "0.1.0", path = "crates/rpc-engine-types" }
+alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-signer = { version = "0.1.0", path = "crates/signer" }
 alloy-signer-aws = { version = "0.1.0", path = "crates/signer-aws" }
@@ -31,18 +36,16 @@ alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
-
-alloy-primitives = { version = "0.5.1", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.5.1", default-features = false, features = ["std"] }
+alloy-genesis = {version = "0.1.0", path = "crates/genesis" }
+alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
 alloy-rlp = "0.3"
 
 # crypto
-elliptic-curve = { version = "0.13.5", default-features = false, features = ["std"] }
-generic-array = { version = "0.14.7", default-features = false, features = ["std"] }
-k256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "std"] }
-sha2 = { version = "0.10.8", default-features = false, features = ["std"] }
-spki = { version = "0.7.2", default-features = false, features = ["std"] }
-
+elliptic-curve = { version = "0.13", default-features = false, features = ["std"] }
+k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+spki = { version = "0.7", default-features = false, features = ["std"] }
 # async
 async-trait = "0.1.74"
 futures = "0.3.29"
@@ -57,21 +60,29 @@ tower = { version = "0.4.13", features = ["util"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
-tempfile = "3.8"
-
-assert_matches = "1.5"
+# misc
 auto_impl = "1.1"
 base64 = "0.21"
 bimap = "0.6"
 home = "0.5"
 itertools = "0.12"
+once_cell = "1.17"
 pin-project = "1.1"
 rand = "0.8.5"
 reqwest = { version = "0.11.18", default-features = false }
 semver = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_with = "3.4"
-serial_test = "2.0"
 thiserror = "1.0"
 url = "2.4"
+
+## serde
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+## misc-testing
+arbitrary = "1.3"
+assert_matches = "1.5"
+proptest = "1.4"
+proptest-derive = "0.4"
+serial_test = "3.0"
+similar-asserts = "1.5"
+tempfile = "3.8"

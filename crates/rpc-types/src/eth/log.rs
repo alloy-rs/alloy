@@ -2,7 +2,7 @@ use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Log {
     /// Address
@@ -26,16 +26,17 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl TryFrom<Log> for alloy_primitives::Log {
+impl TryFrom<Log> for alloy_primitives::LogData {
     type Error = LogError;
 
     fn try_from(value: Log) -> Result<Self, Self::Error> {
-        alloy_primitives::Log::new(value.topics, value.data).ok_or(LogError::TooManyTopics)
+        alloy_primitives::LogData::new(value.topics, value.data).ok_or(LogError::TooManyTopics)
     }
 }
 
 /// Error that can occur when converting other types to logs
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[allow(missing_copy_implementations)]
 pub enum LogError {
     /// There are too many topics
     #[error("too many topics")]
