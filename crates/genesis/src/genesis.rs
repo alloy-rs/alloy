@@ -253,7 +253,7 @@ impl<'a> GenesisAllocator<'a> {
     pub fn new_funded_account(&mut self, balance: U256) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(pair);
+        let address = self.keypair_to_address(pair);
 
         self.alloc.insert(address, GenesisAccount::default().with_balance(balance));
 
@@ -270,7 +270,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(pair);
+        let address = self.keypair_to_address(pair);
         self.alloc
             .insert(address, GenesisAccount::default().with_balance(balance).with_code(Some(code)));
         (pair, address)
@@ -286,7 +286,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(pair);
+        let address = self.keypair_to_address(pair);
         self.alloc.insert(
             address,
             GenesisAccount::default().with_balance(balance).with_storage(Some(storage)),
@@ -305,7 +305,7 @@ impl<'a> GenesisAllocator<'a> {
     ) -> (KeyPair, Address) {
         let secp = Secp256k1::new();
         let pair = KeyPair::new(&secp, &mut self.rng);
-        let address = self.to_verifying_key(pair);
+        let address = self.keypair_to_address(pair);
 
         self.alloc.insert(
             address,
@@ -315,7 +315,8 @@ impl<'a> GenesisAllocator<'a> {
         (pair, address)
     }
 
-    pub fn to_verifying_key(&mut self, pair: KeyPair) -> Address {
+    /// Returns the address from the keypair
+    pub fn keypair_to_address(&mut self, pair: KeyPair) -> Address {
         let public_key = pair.public_key();
         let uncompressed_pub_key = public_key.serialize_uncompressed();
         // Skip the first byte (0x04) and use the next 64 bytes
