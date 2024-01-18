@@ -78,13 +78,13 @@ pub struct Genesis {
 
 impl Genesis {
     /// Set the nonce.
-    pub fn with_nonce(mut self, nonce: u64) -> Self {
+    pub const fn with_nonce(mut self, nonce: u64) -> Self {
         self.nonce = nonce;
         self
     }
 
     /// Set the timestamp.
-    pub fn with_timestamp(mut self, timestamp: u64) -> Self {
+    pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
         self.timestamp = timestamp;
         self
     }
@@ -96,43 +96,43 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = gas_limit;
         self
     }
 
     /// Set the difficulty.
-    pub fn with_difficulty(mut self, difficulty: U256) -> Self {
+    pub const fn with_difficulty(mut self, difficulty: U256) -> Self {
         self.difficulty = difficulty;
         self
     }
 
     /// Set the mix hash of the header.
-    pub fn with_mix_hash(mut self, mix_hash: B256) -> Self {
+    pub const fn with_mix_hash(mut self, mix_hash: B256) -> Self {
         self.mix_hash = mix_hash;
         self
     }
 
     /// Set the coinbase address.
-    pub fn with_coinbase(mut self, address: Address) -> Self {
+    pub const fn with_coinbase(mut self, address: Address) -> Self {
         self.coinbase = address;
         self
     }
 
     /// Set the base fee.
-    pub fn with_base_fee(mut self, base_fee: Option<u64>) -> Self {
+    pub const fn with_base_fee(mut self, base_fee: Option<u64>) -> Self {
         self.base_fee_per_gas = base_fee;
         self
     }
 
     /// Set the excess blob gas.
-    pub fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
@@ -172,13 +172,13 @@ pub struct GenesisAccount {
 
 impl GenesisAccount {
     /// Set the nonce.
-    pub fn with_nonce(mut self, nonce: Option<u64>) -> Self {
+    pub const fn with_nonce(mut self, nonce: Option<u64>) -> Self {
         self.nonce = nonce;
         self
     }
 
     /// Set the balance.
-    pub fn with_balance(mut self, balance: U256) -> Self {
+    pub const fn with_balance(mut self, balance: U256) -> Self {
         self.balance = balance;
         self
     }
@@ -629,7 +629,7 @@ pub struct CliqueConfig {
 mod tests {
     use super::*;
     use alloy_primitives::{hex_literal::hex, Address, Bytes, U256};
-    use serde_json;
+
     use std::{collections::HashMap, str::FromStr};
     #[test]
     fn test_genesis() {
