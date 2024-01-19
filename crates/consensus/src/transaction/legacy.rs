@@ -232,10 +232,9 @@ impl Transaction for TxLegacy {
 
         let v = signature.v();
 
-        match v {
-            Parity::Eip155(_) => tx.chain_id = v.chain_id(),
-            _ => {}
-        };
+        if let Parity::Eip155(_) = v {
+            tx.chain_id = v.chain_id();
+        }
 
         Ok(tx.into_signed(signature))
     }
