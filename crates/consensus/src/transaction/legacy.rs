@@ -1,6 +1,6 @@
 use crate::TxKind;
 use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
 
@@ -228,16 +228,14 @@ impl Transaction for TxLegacy {
         }
         let mut tx = Self::decode_fields(buf)?;
 
-        if !buf.is_empty() {
-            let mut chain_buf = *buf;
-            let v = ChainId::decode(&mut chain_buf)?;
-            if v >= 35 {
-                // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
-                tx.chain_id = ((v - 35) >> 1).into();
-            }
-        }
-
         let signature = Signature::decode_rlp_vrs(buf)?;
+
+        let v = signature.v();
+
+        match v {
+            Parity::Eip155(_) => tx.chain_id = v.chain_id(),
+            _ => {}
+        };
 
         Ok(tx.into_signed(signature))
     }
