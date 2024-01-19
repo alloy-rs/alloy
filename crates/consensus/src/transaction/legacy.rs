@@ -344,6 +344,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "k256")]
+    // Test vector from https://github.com/alloy-rs/alloy/issues/125
     fn decode_legacy_and_recover_signer() {
         use crate::TxLegacy;
         use alloy_network::Signed;
