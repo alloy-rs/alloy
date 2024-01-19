@@ -12,13 +12,11 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
 alloy-rlp = { workspace = true, features = ["derive"] }
 
-thiserror.workspace = true
-
 # serde
-serde = { workspace = true, optional = true }
+serde = { workspace = true, default-features = false, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -31,5 +29,12 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 
 [features]
+default = ["std"]
+std = [
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+
+    "serde/std",
+]
 serde = ["dep:serde", "alloy-primitives/serde"]
 arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]

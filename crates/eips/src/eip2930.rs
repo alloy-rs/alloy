@@ -4,9 +4,10 @@
 
 #![allow(unknown_lints, non_local_definitions)]
 
+use alloc::vec::Vec;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
-use std::mem;
+use core::mem;
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.

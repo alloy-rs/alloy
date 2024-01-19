@@ -11,9 +11,12 @@
     clippy::missing_const_for_fn,
     rustdoc::all
 )]
-#![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(feature = "arbitrary", cfg(feature = "std"))]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 pub mod eip1559;
 pub use eip1559::calc_next_block_base_fee;
