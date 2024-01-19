@@ -228,12 +228,13 @@ impl Transaction for TxLegacy {
         }
         let mut tx = Self::decode_fields(buf)?;
 
-        // If the buffer is not empty, it should be an eip-155 encoded chain_id.
         if !buf.is_empty() {
             let mut chain_buf = *buf;
-            let chain_id = ChainId::decode(&mut chain_buf)?;
-            // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
-            tx.chain_id = ((chain_id - 35) >> 1).into();
+            let v = ChainId::decode(&mut chain_buf)?;
+            if v >= 35 {
+                // EIP-155: v = {0, 1} + CHAIN_ID * 2 + 35
+                tx.chain_id = ((v - 35) >> 1).into();
+            }
         }
 
         let signature = Signature::decode_rlp_vrs(buf)?;
