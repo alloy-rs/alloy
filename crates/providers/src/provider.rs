@@ -85,7 +85,7 @@ pub trait TempProvider: Send + Sync {
     async fn get_storage_at(
         &self,
         address: Address,
-        key: StorageKey,
+        key: U256,
         tag: Option<BlockId>,
     ) -> TransportResult<StorageValue>;
 
@@ -226,12 +226,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         address: Address,
         tag: Option<BlockId>,
     ) -> TransportResult<alloy_primitives::U256> {
-        self.inner
-            .prepare(
-                "eth_getTransactionCount",
-                (address, tag.unwrap_or(BlockNumberOrTag::Latest.into())),
-            )
-            .await
+        self.inner.prepare("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
     }
 
     /// Gets the last block number available.
@@ -277,15 +272,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     async fn get_storage_at(
         &self,
         address: Address,
-        key: StorageKey,
+        key: U256,
         tag: Option<BlockId>,
     ) -> TransportResult<StorageValue> {
-        self.inner
-            .prepare(
-                "eth_getStorageAt",
-                (address, key, tag.unwrap_or(BlockNumberOrTag::Latest.into())),
-            )
-            .await
+        self.inner.prepare("eth_getStorageAt", (address, key, tag.unwrap_or_default())).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].
@@ -300,7 +290,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
     async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>> {
-        self.inner.prepare("eth_getLogs", vec![filter]).await
+        self.inner.prepare("eth_getLogs", (filter,)).await
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
@@ -427,12 +417,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         keys: Vec<StorageKey>,
         block: Option<BlockId>,
     ) -> TransportResult<EIP1186AccountProofResponse> {
-        self.inner
-            .prepare(
-                "eth_getProof",
-                (address, keys, block.unwrap_or(BlockNumberOrTag::Latest.into())),
-            )
-            .await
+        self.inner.prepare("eth_getProof", (address, keys, block.unwrap_or_default())).await
     }
 
     async fn create_access_list(
@@ -440,12 +425,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         request: CallRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed> {
-        self.inner
-            .prepare(
-                "eth_createAccessList",
-                (request, block.unwrap_or(BlockNumberOrTag::Latest.into())),
-            )
-            .await
+        self.inner.prepare("eth_createAccessList", (request, block.unwrap_or_default())).await
     }
 
     /// Parity trace transaction.
@@ -453,7 +433,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         &self,
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.inner.prepare("trace_transaction", vec![hash]).await
+        self.inner.prepare("trace_transaction", (hash,)).await
     }
 
     async fn debug_trace_transaction(
@@ -607,10 +587,11 @@ mod tests {
 
     #[tokio::test]
     async fn gets_chain_id() {
-        let anvil = Anvil::new().args(vec!["--chain-id", "13371337"]).spawn();
+        let chain_id: u64 = 13371337;
+        let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let chain_id = provider.get_chain_id().await.unwrap();
-        assert_eq!(chain_id, U64::from(13371337));
+        assert_eq!(chain_id, U64::from(chain_id));
     }
 
     #[tokio::test]
@@ -628,6 +609,15 @@ mod tests {
             )
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn gets_storage_at() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let addr = alloy_primitives::Address::with_last_byte(16);
+        let storage = provider.get_storage_at(addr, U256::ZERO, None).await.unwrap();
+        assert_eq!(storage, U256::ZERO);
     }
 
     #[tokio::test]
