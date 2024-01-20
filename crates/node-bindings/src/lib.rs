@@ -14,19 +14,13 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{Bytes, B256, U256};
-use serde::Deserializer;
+use alloy_primitives::U256;
 
 pub mod anvil;
 pub use anvil::{Anvil, AnvilInstance};
 
 pub mod geth;
 pub use geth::{Geth, GethInstance};
-
-mod genesis;
-pub use genesis::{ChainConfig, CliqueConfig, EthashConfig, Genesis, GenesisAccount};
-
-pub mod serde_helpers;
 
 /// 1 Ether = 1e18 Wei == 0x0de0b6b3a7640000 Wei
 pub const WEI_IN_ETHER: U256 = U256::from_limbs([0x0de0b6b3a7640000, 0x0, 0x0, 0x0]);
@@ -43,24 +37,6 @@ pub const EIP1559_FEE_ESTIMATION_PRIORITY_FEE_TRIGGER: u64 = 100_000_000_000;
 /// The threshold max change/difference (in %) at which we will ignore the fee history values
 /// under it.
 pub const EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE: i64 = 200;
-
-/// Converts a Bytes value into a B256, accepting inputs that are less than 32 bytes long. These
-/// inputs will be left padded with zeros.
-pub fn from_bytes_to_h256<'de, D>(bytes: Bytes) -> Result<B256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    if bytes.0.len() > 32 {
-        return Err(serde::de::Error::custom("input too long to be a B256"));
-    }
-
-    // left pad with zeros to 32 bytes
-    let mut padded = [0u8; 32];
-    padded[32 - bytes.0.len()..].copy_from_slice(&bytes.0);
-
-    // then convert to B256 without a panic
-    Ok(B256::from_slice(&padded))
-}
 
 /// A bit of hack to find an unused TCP port.
 ///
