@@ -174,7 +174,7 @@ impl Encodable2718 for TxEnvelope {
                 tx.encode(out);
             }
             TxEnvelope::Eip1559(tx) => {
-                out.put_u8(TxType::Eip2930 as u8);
+                out.put_u8(TxType::Eip1559 as u8);
                 tx.encode(out);
             }
         }
