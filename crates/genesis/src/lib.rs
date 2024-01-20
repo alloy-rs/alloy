@@ -1251,4 +1251,31 @@ mod tests {
     {deserialized_genesis:#?} does not match expected {expected_genesis:#?}"
         );
     }
+
+    #[test]
+    fn parse_dump_genesis_mainnet() {
+        let mainnet = include_str!("../dumpgenesis/mainnet.json");
+        let gen = serde_json::from_str::<Genesis>(mainnet).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
+    }
+
+    #[test]
+    fn parse_dump_genesis_sepolia() {
+        let sepolia = include_str!("../dumpgenesis/sepolia.json");
+        let gen = serde_json::from_str::<Genesis>(sepolia).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
+    }
+
+    #[test]
+    fn parse_dump_genesis_holesky() {
+        let holesky = include_str!("../dumpgenesis/holesky.json");
+        let gen = serde_json::from_str::<Genesis>(holesky).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
+    }
 }
