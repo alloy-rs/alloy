@@ -1,7 +1,8 @@
 //! Utilities for launching a go-ethereum dev-mode instance.
 
-use crate::{unused_port, CliqueConfig, Genesis};
-use alloy_primitives::{hex, Address, Bytes, B256};
+use crate::unused_port;
+use alloy_genesis::{CliqueConfig, Genesis};
+use alloy_primitives::{hex, Address, B256};
 use k256::ecdsa::SigningKey;
 use std::{
     borrow::Cow,
@@ -407,8 +408,7 @@ impl Geth {
                 // set the extraData field
                 let extra_data_bytes =
                     [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
-                let extra_data = Bytes::from(extra_data_bytes);
-                genesis.extra_data = extra_data;
+                genesis.extra_data = extra_data_bytes.into();
 
                 // we must set the etherbase if using clique
                 // need to use format! / Debug here because the Address Display impl doesn't show
@@ -418,7 +418,7 @@ impl Geth {
 
             let clique_addr = self.clique_address().expect("is_clique == true");
 
-            self.genesis = Some(Genesis::new(
+            self.genesis = Some(Genesis::clique_genesis(
                 self.chain_id.expect("chain id must be set in clique mode"),
                 clique_addr,
             ));
