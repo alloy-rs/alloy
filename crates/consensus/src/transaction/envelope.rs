@@ -174,9 +174,64 @@ impl Encodable2718 for TxEnvelope {
                 tx.encode(out);
             }
             TxEnvelope::Eip1559(tx) => {
-                out.put_u8(TxType::Eip2930 as u8);
+                out.put_u8(TxType::Eip1559 as u8);
                 tx.encode(out);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_eips::eip2930::{AccessList, AccessListItem};
+    use alloy_network::{Transaction, TxKind};
+    use alloy_primitives::{Address, Bytes, Signature, B256, U256};
+
+    fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
+    where
+        Signed<T, T::Signature>: Into<TxEnvelope>,
+    {
+        let signature = Signature::test_signature();
+        let tx_signed = tx.into_signed(signature);
+        let tx_envelope: TxEnvelope = tx_signed.into();
+        let encoded = tx_envelope.encoded_2718();
+        let decoded = TxEnvelope::decode_2718(&mut encoded.as_ref()).unwrap();
+        assert_eq!(encoded.len(), tx_envelope.encode_2718_len());
+        assert_eq!(decoded, tx_envelope);
+    }
+
+    #[test]
+    fn test_encode_decode_eip1559() {
+        let tx = TxEip1559 {
+            chain_id: 1u64,
+            nonce: 2,
+            max_fee_per_gas: 3,
+            max_priority_fee_per_gas: 4,
+            gas_limit: 5,
+            to: TxKind::Call(Address::left_padding_from(&[6])),
+            value: U256::from(7_u64),
+            input: Bytes::from(vec![8]),
+            access_list: Default::default(),
+        };
+        test_encode_decode_roundtrip(tx);
+    }
+
+    #[test]
+    fn test_encode_decode_eip2930() {
+        let tx = TxEip2930 {
+            chain_id: 1u64,
+            nonce: 2,
+            gas_price: 3,
+            gas_limit: 4,
+            to: TxKind::Call(Address::left_padding_from(&[5])),
+            value: U256::from(6_u64),
+            input: Bytes::from(vec![7]),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::left_padding_from(&[8]),
+                storage_keys: vec![B256::left_padding_from(&[9])],
+            }]),
+        };
+        test_encode_decode_roundtrip(tx);
     }
 }
