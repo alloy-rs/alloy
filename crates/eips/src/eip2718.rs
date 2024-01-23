@@ -64,9 +64,11 @@ pub trait Decodable2718: Sized {
     /// RLP for all current Ethereum transaction types, but may not be in future
     /// versions of the protocol.
     fn network_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
-        let h_decode = &mut *buf;
-        let h = Header::decode(h_decode)?;
+        // Keep the original buffer around by copying it.
+        let mut h_decode = *buf;
+        let h = Header::decode(&mut h_decode)?;
 
+        // If it's a list, we need to fallback to the legacy decoding.
         if h.list {
             return Self::fallback_decode(buf);
         } else {
@@ -81,7 +83,7 @@ pub trait Decodable2718: Sized {
         let buf = &mut &buf[1..];
         let tx = Self::typed_decode(ty, buf)?;
 
-        if buf.len() != pre_len - h.payload_length {
+        if !buf.is_empty() {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
 
