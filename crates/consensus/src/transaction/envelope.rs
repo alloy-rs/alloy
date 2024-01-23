@@ -188,6 +188,47 @@ mod tests {
     use alloy_network::{Transaction, TxKind};
     use alloy_primitives::{Address, Bytes, Signature, B256, U256};
 
+    #[test]
+    #[cfg(feature = "k256")]
+    // Test vector from https://etherscan.io/tx/0xce4dc6d7a7549a98ee3b071b67e970879ff51b5b95d1c340bacd80fa1e1aab31
+    fn test_decode_live_1559_tx() {
+        use alloy_primitives::address;
+
+        let raw_tx = alloy_primitives::hex::decode("02f86f0102843b9aca0085029e7822d68298f094d9e1459a7a482635700cbc20bbaf52d495ab9c9680841b55ba3ac080a0c199674fcb29f353693dd779c017823b954b3c69dffa3cd6b2a6ff7888798039a028ca912de909e7e6cdef9cdcaf24c54dd8c1032946dfa1d85c206b32a9064fe8").unwrap();
+        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+
+        assert_eq!(res.tx_type(), TxType::Eip1559);
+
+        let tx = match res {
+            TxEnvelope::Eip1559(tx) => tx,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(tx.tx().to, TxKind::Call(address!("D9e1459A7A482635700cBc20BBAF52D495Ab9C96")));
+        let from = tx.recover_signer().unwrap();
+        assert_eq!(from, address!("001e2b7dE757bA469a57bF6b23d982458a07eFcE"));
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    // Test vector from https://etherscan.io/tx/0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4
+    fn test_decode_live_legacy_tx() {
+        use alloy_primitives::address;
+
+        let raw_tx = alloy_primitives::hex::decode("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8").unwrap();
+        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        assert_eq!(res.tx_type(), TxType::Legacy);
+
+        let tx = match res {
+            TxEnvelope::Legacy(tx) => tx,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
+        let from = tx.recover_signer().unwrap();
+        assert_eq!(from, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
+    }
+
     fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
     where
         Signed<T, T::Signature>: Into<TxEnvelope>,
