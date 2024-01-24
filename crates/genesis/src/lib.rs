@@ -34,22 +34,25 @@ pub struct Genesis {
     #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(default, with = "u64_hex_or_decimal")]
     pub nonce: u64,
     /// The genesis header timestamp.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(default, with = "u64_hex_or_decimal")]
     pub timestamp: u64,
     /// The genesis header extra data.
+    #[serde(default)]
     pub extra_data: Bytes,
     /// The genesis header gas limit.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(default, with = "u64_hex_or_decimal")]
     pub gas_limit: u64,
     /// The genesis header difficulty.
     #[serde(deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
     /// The genesis header mix hash.
+    #[serde(default)]
     pub mix_hash: B256,
     /// The genesis header coinbase address.
+    #[serde(default)]
     pub coinbase: Address,
     /// The initial state of accounts in the genesis block.
     pub alloc: HashMap<Address, GenesisAccount>,
@@ -60,13 +63,13 @@ pub struct Genesis {
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
     pub base_fee_per_gas: Option<u64>,
     /// The genesis header excess blob gas
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
     pub excess_blob_gas: Option<u64>,
     /// The genesis header blob gas used
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
     pub blob_gas_used: Option<u64>,
 }
 
@@ -257,7 +260,7 @@ impl GenesisAccount {
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
 #[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
     #[serde(default = "mainnet_id")]
