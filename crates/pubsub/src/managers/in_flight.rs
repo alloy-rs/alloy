@@ -13,31 +13,26 @@ pub(crate) struct InFlight {
     pub(crate) request: SerializedRequest,
 
     /// The channel to send the response on.
-    pub(crate) tx: Option<oneshot::Sender<Result<Response, TransportError>>>,
+    pub(crate) tx: oneshot::Sender<Result<Response, TransportError>>,
 }
 
 impl fmt::Debug for InFlight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InFlight")
             .field("request", &self.request)
-            .field("tx_is_closed", &self.tx.as_ref().map(|tx| tx.is_closed()).unwrap_or_default())
+            .field("tx_is_closed", &self.tx.is_closed())
             .finish()
     }
 }
 
 impl InFlight {
     /// Create a new in-flight request.
-    pub(crate) const fn new(request: SerializedRequest) -> Self {
-        Self { request, tx: None }
-    }
-
-    /// Create a new in-flight request, with an channel receive the response on.
-    pub(crate) fn with_oneshot(
+    pub(crate) fn new(
         request: SerializedRequest,
     ) -> (Self, oneshot::Receiver<Result<Response, TransportError>>) {
         let (tx, rx) = oneshot::channel();
 
-        (Self { request, tx: Some(tx) }, rx)
+        (Self { request, tx }, rx)
     }
 
     /// Get the method
@@ -62,9 +57,7 @@ impl InFlight {
                 match sub_id {
                     Ok(alias) => return Some((alias, self)),
                     Err(e) => {
-                        if let Some(tx) = self.tx {
-                            let _ = tx.send(Err(TransportError::deser_err(e, val.get())));
-                        }
+                        let _ = self.tx.send(Err(TransportError::deser_err(e, val.get())));
 
                         return None;
                     }
@@ -72,9 +65,7 @@ impl InFlight {
             }
         }
 
-        if let Some(tx) = self.tx {
-            let _ = tx.send(Ok(resp));
-        }
+        let _ = self.tx.send(Ok(resp));
 
         None
     }

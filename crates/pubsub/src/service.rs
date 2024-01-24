@@ -192,9 +192,8 @@ where
 
         // We send back a success response with the new subscription ID.
         // We don't care if the channel is dead.
-        if let Some(tx) = in_flight.tx {
-            let _ = tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
-        }
+        let _ =
+            in_flight.tx.send(Ok(Response { id, payload: ResponsePayload::Success(ser_alias) }));
 
         Ok(())
     }
