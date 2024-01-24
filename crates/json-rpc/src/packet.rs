@@ -1,4 +1,4 @@
-use crate::{Id, Response, SerializedRequest};
+use crate::{ErrorPayload, Id, Response, SerializedRequest};
 use serde::{
     de::{self, Deserializer, MapAccess, SeqAccess, Visitor},
     Deserialize, Serialize,
@@ -217,6 +217,41 @@ impl BorrowedResponsePacket<'_> {
 }
 
 impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
+    /// Returns `true` if the response payload is a success.
+    ///
+    /// For batch responses, this returns `true` if __all__ responses are successful.
+    pub fn is_success(&self) -> bool {
+        match self {
+            ResponsePacket::Single(single) => single.is_success(),
+            ResponsePacket::Batch(batch) => batch.iter().all(|res| res.is_success()),
+        }
+    }
+
+    /// Returns `true` if the response payload is an error.
+    ///
+    /// For batch responses, this returns `true` there's at least one error response.
+    pub fn is_error(&self) -> bool {
+        match self {
+            ResponsePacket::Single(single) => single.is_error(),
+            ResponsePacket::Batch(batch) => batch.iter().any(|res| res.is_error()),
+        }
+    }
+
+    /// Returns the [ErrorPayload] if the response is an error.
+    ///
+    /// For batch responses, this returns the first error response.
+    pub fn as_error(&self) -> Option<&ErrorPayload<ErrData>> {
+        self.iter_errors().next()
+    }
+
+    /// Returns an iterator over the [ErrorPayload]s in the response.
+    pub fn iter_errors(&self) -> impl Iterator<Item = &ErrorPayload<ErrData>> + '_ {
+        match self {
+            ResponsePacket::Single(single) => ResponsePacketErrorsIter::Single(Some(single)),
+            ResponsePacket::Batch(batch) => ResponsePacketErrorsIter::Batch(batch.iter()),
+        }
+    }
+
     /// Find responses by a list of IDs.
     ///
     /// This is intended to be used in conjunction with
@@ -238,6 +273,29 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
                 resps
             }
             Self::Batch(batch) => batch.iter().filter(|res| ids.contains(&res.id)).collect(),
+        }
+    }
+}
+
+/// An Iterator over the [ErrorPayload]s in a [ResponsePacket].
+#[derive(Debug, Clone)]
+enum ResponsePacketErrorsIter<'a, Payload, ErrData> {
+    Single(Option<&'a Response<Payload, ErrData>>),
+    Batch(std::slice::Iter<'a, Response<Payload, ErrData>>),
+}
+
+impl<'a, Payload, ErrData> Iterator for ResponsePacketErrorsIter<'a, Payload, ErrData> {
+    type Item = &'a ErrorPayload<ErrData>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            ResponsePacketErrorsIter::Single(single) => single.take()?.payload.as_error(),
+            ResponsePacketErrorsIter::Batch(batch) => loop {
+                let res = batch.next()?;
+                if let Some(err) = res.payload.as_error() {
+                    return Some(err);
+                }
+            },
         }
     }
 }

@@ -1,0 +1,22 @@
+[package]
+name = "alloy-node-bindings"
+description = "Ethereum execution-layer client bindings"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["k256", "serde"] }
+k256.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+rand.workspace = true

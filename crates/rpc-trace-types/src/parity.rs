@@ -180,7 +180,7 @@ impl Action {
 
     /// Returns true if this is a create action
     pub const fn is_create(&self) -> bool {
-        matches!(self, Action::Call(_))
+        matches!(self, Action::Create(_))
     }
 
     /// Returns true if this is a selfdestruct action

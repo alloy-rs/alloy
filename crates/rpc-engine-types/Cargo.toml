@@ -1,28 +1,35 @@
 [package]
-name = "alloy-rpc-trace-types"
-description = "RPC trace types"
+name = "alloy-rpc-engine-types"
+description = "Alloy RPC engine types"
 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-authors.workspace = true
 license.workspace = true
 homepage.workspace = true
+authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+# ethereum
+alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-rpc-types.workspace = true
 
-serde.workspace = true
-serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+
+# jsonrpsee
+jsonrpsee-types = { version = "0.20", optional = true }
+
+[features]
+jsonrpsee-types = ["dep:jsonrpsee-types"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 similar-asserts.workspace = true
