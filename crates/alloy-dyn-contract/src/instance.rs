@@ -17,22 +17,22 @@ pub struct ContractInstance<P> {
 
 impl<P> ContractInstance<P> {
     /// Creates a new contract from the provided address, provider, and interface.
-    pub fn new(address: Address, provider: P, interface: Interface) -> Self {
+    pub const fn new(address: Address, provider: P, interface: Interface) -> Self {
         Self { address, provider, interface }
     }
 
     /// Returns the contract's address.
-    pub fn address(&self) -> Address {
+    pub const fn address(&self) -> Address {
         self.address
     }
 
     /// Returns a reference to the contract's ABI.
-    pub fn abi(&self) -> &JsonAbi {
+    pub const fn abi(&self) -> &JsonAbi {
         self.interface.abi()
     }
 
     /// Returns a reference to the contract's provider.
-    pub fn provider_ref(&self) -> &P {
+    pub const fn provider_ref(&self) -> &P {
         &self.provider
     }
 }
@@ -86,7 +86,7 @@ where
 {
     fn clone(&self) -> Self {
         ContractInstance {
-            address: self.address.clone(),
+            address: self.address,
             provider: self.provider.clone(),
             interface: self.interface.clone(),
         }

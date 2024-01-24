@@ -30,14 +30,16 @@ pub struct CallBuilder<P> {
 
 impl<P> CallBuilder<P> {
     pub(crate) fn new(provider: P, function: Function, input: Bytes) -> Self {
-        let mut request = CallRequest::default();
-        request.input = CallInput { input: Some(input), ..Default::default() };
+        let request = CallRequest {
+            input: CallInput { input: Some(input), ..Default::default() },
+            ..Default::default()
+        };
 
         Self { request, function, provider, block: None, state: None }
     }
 
     /// Sets the `from` field in the transaction to the provided value
-    pub fn from(mut self, from: Address) -> Self {
+    pub const fn from(mut self, from: Address) -> Self {
         self.request.from = Some(from);
         self
     }
@@ -48,7 +50,7 @@ impl<P> CallBuilder<P> {
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub fn gas(mut self, gas: U256) -> Self {
+    pub const fn gas(mut self, gas: U256) -> Self {
         self.request.gas = Some(gas);
         self
     }
@@ -56,7 +58,7 @@ impl<P> CallBuilder<P> {
     /// Sets the `gas_price` field in the transaction to the provided value
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
-    pub fn gas_price(mut self, gas_price: U256) -> Self {
+    pub const fn gas_price(mut self, gas_price: U256) -> Self {
         // todo: differentiate between eip-1559 and legacy once we have typedtx
         self.request.gas_price = Some(gas_price);
         self.request.max_fee_per_gas = Some(gas_price);
@@ -65,19 +67,19 @@ impl<P> CallBuilder<P> {
     }
 
     /// Sets the `value` field in the transaction to the provided value
-    pub fn value(mut self, value: U256) -> Self {
+    pub const fn value(mut self, value: U256) -> Self {
         self.request.value = Some(value);
         self
     }
 
     /// Sets the `block` field for sending the tx to the chain
-    pub fn block(mut self, block: BlockId) -> Self {
+    pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
 
     /// Sets the `nonce` field in the transaction to the provided value
-    pub fn nonce(mut self, nonce: U64) -> Self {
+    pub const fn nonce(mut self, nonce: U64) -> Self {
         self.request.nonce = Some(nonce);
         self
     }
@@ -145,7 +147,7 @@ where
         CallBuilder {
             request: self.request.clone(),
             function: self.function.clone(),
-            block: self.block.clone(),
+            block: self.block,
             state: self.state.clone(),
             provider: self.provider.clone(),
         }

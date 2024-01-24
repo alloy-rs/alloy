@@ -98,7 +98,7 @@ impl Interface {
     }
 
     /// Returns a reference to the contract's ABI
-    pub fn abi(&self) -> &JsonAbi {
+    pub const fn abi(&self) -> &JsonAbi {
         &self.abi
     }
 
@@ -110,15 +110,14 @@ impl Interface {
     }
 
     pub(crate) fn get_from_selector(&self, selector: &Selector) -> Result<&Function> {
-        Ok(self
-            .functions
+        self.functions
             .get(selector)
             .map(|(name, index)| &self.abi.functions[name][*index])
-            .ok_or_else(|| Error::UnknownSelector(selector.clone()))?)
+            .ok_or_else(|| Error::UnknownSelector(*selector))
     }
 
     /// Create a [`ContractInstance`] from this ABI for a contract at the given address.
-    pub fn connect<P>(self, address: Address, provider: P) -> ContractInstance<P> {
+    pub const fn connect<P>(self, address: Address, provider: P) -> ContractInstance<P> {
         ContractInstance::new(address, provider, self)
     }
 }
