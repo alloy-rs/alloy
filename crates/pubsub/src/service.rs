@@ -5,9 +5,7 @@ use crate::{
     PubSubConnect, PubSubFrontend,
 };
 
-use alloy_json_rpc::{
-    Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload, SerializedRequest,
-};
+use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -92,12 +90,17 @@ where
         tracing::debug!(count = self.subs.len(), "Re-starting active subscriptions");
 
         // Dispatch all subscription requests
-        self.subs
-            .iter()
-            .map(|(_, sub)| sub.request().to_owned())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .try_for_each(|req| self.dispatch_subscription(req))?;
+        self.subs.iter().try_for_each(|(_, sub)| {
+            let req = sub.request().to_owned();
+            let (in_flight, _) = InFlight::new(req.clone());
+            self.in_flights.insert(in_flight);
+
+            self.handle
+                .to_socket
+                .send(req.serialized().to_owned())
+                .map(drop)
+                .map_err(|_| TransportErrorKind::backend_gone())
+        })?;
 
         Ok(())
     }
@@ -105,16 +108,6 @@ where
     /// Dispatch a request to the socket.
     fn dispatch_request(&mut self, brv: Box<RawValue>) -> TransportResult<()> {
         self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
-    }
-
-    fn dispatch_subscription(&mut self, req: SerializedRequest) -> TransportResult<()> {
-        self.in_flights.insert(InFlight::new(req.clone()));
-
-        self.handle
-            .to_socket
-            .send(req.serialized().to_owned())
-            .map(drop)
-            .map_err(|_| TransportErrorKind::backend_gone())
     }
 
     /// Service a request.
