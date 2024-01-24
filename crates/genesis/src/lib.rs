@@ -28,7 +28,7 @@ use std::collections::HashMap;
 
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", default)]
+#[serde(rename_all = "camelCase")]
 pub struct Genesis {
     /// The fork configuration for this network.
     #[serde(default)]
