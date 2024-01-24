@@ -231,7 +231,6 @@ impl Decodable for TxEip1559 {
 
 impl Transaction for TxEip1559 {
     type Signature = Signature;
-    // type Receipt = ReceiptWithBloom;
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         let mut buf = vec![];
@@ -239,7 +238,10 @@ impl Transaction for TxEip1559 {
         self.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
 
-        Signed::new_unchecked(self, signature, hash)
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-1559 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
     }
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
