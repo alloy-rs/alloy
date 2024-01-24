@@ -1,0 +1,18 @@
+[package]
+name = "alloy-dyn-contract"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+alloy-primitives.workspace = true
+alloy-providers.workspace = true
+alloy-rpc-types.workspace = true
+alloy-transport.workspace = true

@@ -8,7 +8,7 @@ use alloy_rpc_trace_types::{
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
+    state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
     EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
     TransactionReceipt,
 };
@@ -133,7 +133,16 @@ pub trait TempProvider: Send + Sync {
     async fn syncing(&self) -> TransportResult<SyncStatus>;
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call(
+        &self,
+        tx: CallRequest,
+        block: Option<BlockId>,
+        state: Option<StateOverride>,
+    ) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>;
@@ -359,8 +368,24 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
-        self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call(
+        &self,
+        tx: CallRequest,
+        block: Option<BlockId>,
+        state: Option<StateOverride>,
+    ) -> TransportResult<Bytes> {
+        // todo: if we just set `None` for the 3rd parameter, will this be ok for clients who do not
+        // expect a third parameter? if not, should we split this into `call` and
+        // `call_with_overrides`?
+        if let Some(state) = state {
+            self.inner.prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
+        } else {
+            self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
+        }
     }
 
     /// Estimate the gas needed for a transaction.

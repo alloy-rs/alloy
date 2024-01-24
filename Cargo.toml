@@ -18,11 +18,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
 alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
+alloy-dyn-abi = "0.6.0"
 alloy-eips = { version = "0.1.0", path = "crates/eips" }
+alloy-json-abi = "0.6.0"
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-network = { version = "0.1.0", path = "crates/network" }
 alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
 alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
+alloy-providers = { version = "0.1.0", path = "crates/providers" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 alloy-rpc-engine-types = { version = "0.1.0", path = "crates/rpc-engine-types" }
 alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
