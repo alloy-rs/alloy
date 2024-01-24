@@ -257,7 +257,7 @@ impl GenesisAccount {
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
 #[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
     #[serde(default = "mainnet_id")]
