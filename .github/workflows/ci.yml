@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ["stable", "beta", "nightly", "1.68"] # MSRV
+        rust: ["stable", "nightly", "1.68"] # MSRV
         flags: ["--no-default-features", "", "--all-features"]
         exclude:
           # Some features have higher MSRV.
@@ -38,12 +38,15 @@ jobs:
         with:
           cache-on-failure: true
       # Only run tests on latest stable and above
+      - name: Install cargo-nextest
+        if: ${{ matrix.rust != '1.68' }} # MSRV
+        uses: taiki-e/install-action@nextest
       - name: build
         if: ${{ matrix.rust == '1.68' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
         if: ${{ matrix.rust != '1.68' }} # MSRV
-        run: cargo test --workspace ${{ matrix.flags }}
+        run: cargo nextest run --workspace ${{ matrix.flags }}
 
   wasm:
     runs-on: ubuntu-latest
@@ -62,6 +65,7 @@ jobs:
           cargo hack check --workspace --target wasm32-unknown-unknown \
             --exclude alloy-signer \
             --exclude alloy-signer-aws \
+            --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-node-bindings \

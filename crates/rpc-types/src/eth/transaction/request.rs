@@ -1,10 +1,6 @@
 //! Alloy basic Transaction Request type.
-use crate::{
-    eth::transaction::AccessList,
-    kzg::{Blob, Bytes48},
-    other::OtherFields,
-};
-use alloy_primitives::{Address, Bytes, B256, U128, U256, U64, U8};
+use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
+use alloy_primitives::{Address, Bytes, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
 /// Represents _all_ transaction requests received from RPC
@@ -47,38 +43,6 @@ pub struct TransactionRequest {
     pub other: OtherFields,
 }
 
-/// Optimism specific transaction fields
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OptimismTransactionFields {
-    /// Hash that uniquely identifies the source of the deposit.
-    #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
-    pub source_hash: Option<B256>,
-    /// The ETH value to mint on L2
-    #[serde(rename = "mint", skip_serializing_if = "Option::is_none")]
-    pub mint: Option<U128>,
-    /// Field indicating whether the transaction is a system transaction, and therefore
-    /// exempt from the L2 gas limit.
-    #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
-    pub is_system_tx: Option<bool>,
-}
-
-impl From<OptimismTransactionFields> for OtherFields {
-    fn from(value: OptimismTransactionFields) -> Self {
-        serde_json::to_value(value).unwrap().try_into().unwrap()
-    }
-}
-
-/// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[repr(C)]
-pub struct BlobTransactionSidecar {
-    /// The blob data.
-    pub blobs: Vec<Blob>,
-    /// The blob commitments.
-    pub commitments: Vec<Bytes48>,
-    /// The blob proofs.
-    pub proofs: Vec<Bytes48>,
-}
 // == impl TransactionRequest ==
 
 impl TransactionRequest {

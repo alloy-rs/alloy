@@ -356,6 +356,13 @@ impl Filter {
         self
     }
 
+    /// Return `true` if filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
+    pub fn is_pending_block_filter(&self) -> bool {
+        self.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
+            && self.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
+    }
+
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
@@ -796,6 +803,13 @@ impl FilteredParams {
             }
         }
         true
+    }
+
+    /// Return `true` if the filter configured to match pending block.
+    /// This means that both from_block and to_block are set to the pending tag.
+    /// It calls [`Filter::is_pending_block_filter`] undercover.
+    pub fn is_pending_block_filter(&self) -> bool {
+        self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter())
     }
 
     /// Returns `true` if the filter matches the given log.
@@ -1358,5 +1372,66 @@ mod tests {
                 topics: Default::default(),
             }
         );
+    }
+
+    #[test]
+    fn test_is_pending_block_filter() {
+        let filter = Filter {
+            block_option: FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Pending),
+                to_block: Some(BlockNumberOrTag::Pending),
+            },
+            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
+                .parse::<Address>()
+                .unwrap()
+                .into(),
+            topics: [
+                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                Default::default(),
+            ],
+        };
+        assert!(filter.is_pending_block_filter());
+        let filter_params = FilteredParams::new(Some(filter));
+        assert!(filter_params.is_pending_block_filter());
+
+        let filter = Filter {
+            block_option: FilterBlockOption::Range {
+                from_block: Some(4365627u64.into()),
+                to_block: Some(4365627u64.into()),
+            },
+            address: "0xb59f67a8bff5d8cd03f6ac17265c550ed8f33907"
+                .parse::<Address>()
+                .unwrap()
+                .into(),
+            topics: [
+                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                "0x00000000000000000000000000b46c2526e227482e2ebb8f4c69e4674d262e75"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                "0x00000000000000000000000054a2d42a40f51259dedd1978f6c118a0f0eff078"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into(),
+                Default::default(),
+            ],
+        };
+        assert!(!filter.is_pending_block_filter());
+        let filter_params = FilteredParams::new(Some(filter));
+        assert!(!filter_params.is_pending_block_filter());
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "alloy-transport"
-description = "Transport implementations for Alloy providers"
+description = "Low-level Ethereum JSON-RPC transport abstraction"
 
 version.workspace = true
 edition.workspace = true

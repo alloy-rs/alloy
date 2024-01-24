@@ -16,6 +16,9 @@ exclude.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 
+ethereum_ssz_derive = { workspace = true, optional = true }
+ethereum_ssz = { workspace = true, optional = true }
+
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -32,6 +35,7 @@ jsonrpsee-types = { version = "0.20", optional = true }
 [features]
 arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
+ssz = ["dep:ethereum_ssz" ,"dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }

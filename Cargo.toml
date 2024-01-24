@@ -29,16 +29,21 @@ alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
 alloy-rpc-types = { version = "0.1.0", path = "crates/rpc-types" }
 alloy-signer = { version = "0.1.0", path = "crates/signer" }
 alloy-signer-aws = { version = "0.1.0", path = "crates/signer-aws" }
+alloy-signer-gcp = { version = "0.1.0", path = "crates/signer-gcp" }
 alloy-signer-ledger = { version = "0.1.0", path = "crates/signer-ledger" }
 alloy-signer-trezor = { version = "0.1.0", path = "crates/signer-trezor" }
 alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
-
+alloy-genesis = {version = "0.1.0", path = "crates/genesis" }
 alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
 alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
 alloy-rlp = "0.3"
+
+# ethereum
+ethereum_ssz_derive = "0.5"
+ethereum_ssz = "0.5"
 
 # crypto
 elliptic-curve = { version = "0.13", default-features = false, features = ["std"] }
