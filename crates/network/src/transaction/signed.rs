@@ -80,6 +80,6 @@ impl<T: Transaction> Signed<T, Signature> {
         &self,
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         let sighash = self.tx.signature_hash();
-        self.signature.recover_address_from_prehash(sighash)
+        self.signature.recover_address_from_prehash(&sighash)
     }
 }
