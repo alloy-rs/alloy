@@ -146,21 +146,29 @@ where
 }
 
 impl SerializedRequest {
-    /// Get the request metadata (ID and Method)
+    /// Returns the request metadata (ID and Method).
     pub const fn meta(&self) -> &RequestMeta {
         &self.meta
     }
-    /// Get the request ID.
+
+    /// Returns the request ID.
     pub const fn id(&self) -> &Id {
         &self.meta.id
     }
-    /// Get the request method.
+
+    /// Returns the request method.
     pub const fn method(&self) -> &'static str {
         self.meta.method
     }
-    /// Get the serialized request.
+
+    /// Returns the serialized request.
     pub const fn serialized(&self) -> &RawValue {
         &self.request
+    }
+
+    /// Consume the serialized request, returning the underlying [`RawValue`].
+    pub fn into_serialized(self) -> Box<RawValue> {
+        self.request
     }
 
     /// Consumes the serialized request, returning the underlying

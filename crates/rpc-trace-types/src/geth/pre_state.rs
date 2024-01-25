@@ -92,12 +92,9 @@ impl DiffMode {
 
     /// Removes all zero values from the storage of the [AccountState]s.
     pub fn remove_zero_storage_values(&mut self) {
-        self.pre.values_mut().for_each(|state| {
+        for state in self.pre.values_mut().chain(self.post.values_mut()) {
             state.storage.retain(|_, value| *value != B256::ZERO);
-        });
-        self.post.values_mut().for_each(|state| {
-            state.storage.retain(|_, value| *value != B256::ZERO);
-        });
+        }
     }
 }
 
