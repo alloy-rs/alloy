@@ -58,7 +58,6 @@ impl InFlight {
                     Ok(alias) => return Some((alias, self)),
                     Err(e) => {
                         let _ = self.tx.send(Err(TransportError::deser_err(e, val.get())));
-
                         return None;
                     }
                 }
@@ -66,7 +65,6 @@ impl InFlight {
         }
 
         let _ = self.tx.send(Ok(resp));
-
         None
     }
 }
