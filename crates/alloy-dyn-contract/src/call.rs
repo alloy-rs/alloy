@@ -39,8 +39,8 @@ impl<P> CallBuilder<P> {
     }
 
     /// Sets the `from` field in the transaction to the provided value
-    pub const fn from(mut self, from: Address) -> Self {
-        self.request.from = Some(from);
+    pub fn from(mut self, from: Address) -> Self {
+        self.request = self.request.from(from);
         self
     }
 
@@ -50,35 +50,34 @@ impl<P> CallBuilder<P> {
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub const fn gas(mut self, gas: U256) -> Self {
-        self.request.gas = Some(gas);
+    pub fn gas(mut self, gas: U256) -> Self {
+        self.request = self.request.gas(gas);
         self
     }
 
     /// Sets the `gas_price` field in the transaction to the provided value
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
-    pub const fn gas_price(mut self, gas_price: U256) -> Self {
-        // todo: Add EIP-1559 support
-        self.request.gas_price = Some(gas_price);
+    pub fn gas_price(mut self, gas_price: U256) -> Self {
+        self.request = self.request.gas_price(gas_price);
         self
     }
 
     /// Sets the `value` field in the transaction to the provided value
-    pub const fn value(mut self, value: U256) -> Self {
-        self.request.value = Some(value);
+    pub fn value(mut self, value: U256) -> Self {
+        self.request = self.request.value(value);
+        self
+    }
+
+    /// Sets the `nonce` field in the transaction to the provided value
+    pub fn nonce(mut self, nonce: U64) -> Self {
+        self.request = self.request.nonce(nonce);
         self
     }
 
     /// Sets the `block` field for sending the tx to the chain
     pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
-        self
-    }
-
-    /// Sets the `nonce` field in the transaction to the provided value
-    pub const fn nonce(mut self, nonce: U64) -> Self {
-        self.request.nonce = Some(nonce);
         self
     }
 

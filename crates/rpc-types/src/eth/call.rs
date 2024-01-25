@@ -149,6 +149,40 @@ impl CallRequest {
     pub fn has_empty_blob_hashes(&self) -> bool {
         self.blob_versioned_hashes.as_ref().map(|blobs| blobs.is_empty()).unwrap_or(false)
     }
+
+    /// Sets the `from` field in the call to the provided address
+    #[inline]
+    pub const fn from(mut self, from: Address) -> Self {
+        self.from = Some(from);
+        self
+    }
+
+    /// Sets the `gas` field in the transaction to the provided value
+    pub const fn gas(mut self, gas: U256) -> Self {
+        self.gas = Some(gas);
+        self
+    }
+
+    /// Sets the `gas_price` field in the transaction to the provided value
+    /// If the internal transaction is an EIP-1559 one, then it sets both
+    /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
+    pub const fn gas_price(mut self, gas_price: U256) -> Self {
+        // todo: Add EIP-1559 support
+        self.gas_price = Some(gas_price);
+        self
+    }
+
+    /// Sets the `value` field in the transaction to the provided value
+    pub const fn value(mut self, value: U256) -> Self {
+        self.value = Some(value);
+        self
+    }
+
+    /// Sets the `nonce` field in the transaction to the provided value
+    pub const fn nonce(mut self, nonce: U64) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
 }
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
