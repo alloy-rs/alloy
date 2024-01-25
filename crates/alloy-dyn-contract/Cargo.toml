@@ -1,5 +1,7 @@
 [package]
 name = "alloy-dyn-contract"
+description = "Helpers for interacting with contracts that do not have a known ABI at compile time."
+
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
