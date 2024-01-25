@@ -64,11 +64,11 @@ where
     /// Reconnect the backend, re-issue pending requests, and re-start active
     /// subscriptions.
     async fn reconnect(&mut self) -> TransportResult<()> {
-        tracing::info!("Reconnecting pubsub service backend.");
+        info!("Reconnecting pubsub service backend.");
 
         let mut old_handle = self.get_new_backend().await?;
 
-        tracing::debug!("Draining old backend to_handle");
+        debug!("Draining old backend to_handle");
 
         // Drain the old backend
         while let Ok(item) = old_handle.from_socket.try_recv() {
@@ -78,7 +78,7 @@ where
         old_handle.shutdown();
 
         // Re-issue pending requests.
-        tracing::debug!(count = self.in_flights.len(), "Reissuing pending requests");
+        debug!(count = self.in_flights.len(), "Reissuing pending requests");
         self.in_flights
             .iter()
             .map(|(_, in_flight)| in_flight.request().serialized().to_owned())
@@ -87,7 +87,7 @@ where
             .try_for_each(|brv| self.dispatch_request(brv))?;
 
         // Re-subscribe to all active subscriptions
-        tracing::debug!(count = self.subs.len(), "Re-starting active subscriptions");
+        debug!(count = self.subs.len(), "Re-starting active subscriptions");
 
         // Drop all server IDs. We'll re-insert them as we get responses.
         self.subs.drop_server_ids();
@@ -159,7 +159,7 @@ where
 
     /// Service an instruction
     fn service_ix(&mut self, ix: PubSubInstruction) -> TransportResult<()> {
-        tracing::trace!(?ix, "servicing instruction");
+        trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
             PubSubInstruction::GetSub(alias, tx) => self.service_get_sub(alias, tx),
@@ -222,7 +222,7 @@ where
                     }
 
                     _ = &mut self.handle.error => {
-                        tracing::error!("Pubsub service backend error.");
+                        error!("Pubsub service backend error.");
                         if let Err(e) = self.reconnect().await {
                             break Err(e)
                         }
@@ -234,7 +234,7 @@ where
                                 break Err(e)
                             }
                         } else {
-                            tracing::info!("Pubsub service request channel closed. Shutting down.");
+                            info!("Pubsub service request channel closed. Shutting down.");
                            break Ok(())
                         }
                     }
@@ -242,7 +242,7 @@ where
             };
 
             if let Err(err) = result {
-                tracing::error!(%err, "pubsub service reconnection error");
+                error!(%err, "pubsub service reconnection error");
             }
         };
         fut.spawn_task();

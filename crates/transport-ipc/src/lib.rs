@@ -15,6 +15,9 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[macro_use]
+extern crate tracing;
+
 use bytes::{Buf, BytesMut};
 use futures::{ready, AsyncRead, AsyncWriteExt, StreamExt};
 use interprocess::local_socket::{tokio::LocalSocketStream, ToLocalSocketName};
@@ -69,13 +72,13 @@ impl IpcBackend {
                             Some(msg) => {
                                 let bytes = msg.get();
                                 if let Err(e) = writer.write_all(bytes.as_bytes()).await {
-                                    tracing::error!(%e, "Failed to write to IPC socket");
+                                    error!(%e, "Failed to write to IPC socket");
                                     break true;
                                 }
                             },
                             // dispatcher has gone away, or shutdown was received
                             None => {
-                                tracing::debug!("Frontend has gone away");
+                                debug!("Frontend has gone away");
                                 break false;
                             },
                         }
@@ -85,12 +88,12 @@ impl IpcBackend {
                         match item {
                             Some(item) => {
                                 if self.interface.send_to_frontend(item).is_err() {
-                                    tracing::debug!("Frontend has gone away");
+                                    debug!("Frontend has gone away");
                                     break false;
                                 }
                             }
                             None => {
-                                tracing::error!("Read stream has failed.");
+                                error!("Read stream has failed.");
                                 break true;
                             }
                         }
@@ -154,7 +157,7 @@ where
         loop {
             // try decoding from the buffer, but only if we have new data
             if !*this.drained {
-                tracing::debug!(buf_len = this.buf.len(), "Deserializing buffered IPC data");
+                debug!(buf_len = this.buf.len(), "Deserializing buffered IPC data");
                 let mut de = serde_json::Deserializer::from_slice(this.buf.as_ref()).into_iter();
 
                 let item = de.next();
@@ -167,8 +170,8 @@ where
                         return Ready(Some(response));
                     }
                     Some(Err(e)) => {
-                        tracing::error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
-                        tracing::trace!(
+                        error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
+                        trace!(
                             buffer = %String::from_utf8_lossy(this.buf.as_ref()),
                             "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
                         );
@@ -185,13 +188,13 @@ where
             // read more data into the buffer
             match ready!(poll_read_buf(this.reader.as_mut(), cx, &mut this.buf)) {
                 Ok(data_len) => {
-                    tracing::debug!(%data_len, "Read data from IPC socket");
+                    debug!(%data_len, "Read data from IPC socket");
 
                     // can try decoding again
                     *this.drained = false;
                 }
                 Err(e) => {
-                    tracing::error!(%e, "Failed to read from IPC socket, shutting down");
+                    error!(%e, "Failed to read from IPC socket, shutting down");
                     return Ready(None);
                 }
             }

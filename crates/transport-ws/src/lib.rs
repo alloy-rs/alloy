@@ -47,7 +47,7 @@ pub struct WsBackend<T> {
 
 impl<T> WsBackend<T> {
     /// Handle inbound text from the websocket.
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     pub async fn handle_text(&mut self, t: String) -> Result<(), ()> {
         debug!(text = t, "Received message from websocket");
 
