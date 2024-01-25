@@ -47,7 +47,7 @@ impl SubscriptionManager {
 
         // If we already know a subscription with the exact params,
         // we can just update the server_id and get a new listener.
-        if self.local_to_server.contains_left(&local_id) {
+        if self.local_to_sub.contains_left(&local_id) {
             self.change_server_id(local_id, server_id);
             self.get_rx(local_id).expect("checked existence")
         } else {
@@ -58,6 +58,11 @@ impl SubscriptionManager {
     /// De-alias an alias, getting the original ID.
     pub(crate) fn local_id_for(&self, server_id: U256) -> Option<B256> {
         self.local_to_server.get_by_right(&server_id).copied()
+    }
+
+    /// Drop all server_ids.
+    pub(crate) fn drop_server_ids(&mut self) {
+        self.local_to_server.clear();
     }
 
     /// Change the server_id of a subscription.

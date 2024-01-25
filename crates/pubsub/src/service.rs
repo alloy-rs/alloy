@@ -89,6 +89,9 @@ where
         // Re-subscribe to all active subscriptions
         tracing::debug!(count = self.subs.len(), "Re-starting active subscriptions");
 
+        // Drop all server IDs. We'll re-insert them as we get responses.
+        self.subs.drop_server_ids();
+
         // Dispatch all subscription requests
         self.subs.iter().try_for_each(|(_, sub)| {
             let req = sub.request().to_owned();
