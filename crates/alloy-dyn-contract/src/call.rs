@@ -59,10 +59,8 @@ impl<P> CallBuilder<P> {
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
     pub const fn gas_price(mut self, gas_price: U256) -> Self {
-        // todo: differentiate between eip-1559 and legacy once we have typedtx
+        // todo: Add EIP-1559 support
         self.request.gas_price = Some(gas_price);
-        self.request.max_fee_per_gas = Some(gas_price);
-        self.request.max_priority_fee_per_gas = Some(gas_price);
         self
     }
 
