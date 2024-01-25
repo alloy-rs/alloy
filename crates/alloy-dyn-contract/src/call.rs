@@ -118,11 +118,14 @@ where
     ///
     /// This function _does not_ send a transaction from your account
     pub async fn call(&self) -> Result<Vec<DynSolValue>> {
-        let bytes = self
-            .provider
-            .call(self.request.clone(), self.block, self.state.clone())
-            .await
-            .map_err(Error::from)?;
+        let bytes = if let Some(state) = &self.state {
+            self.provider
+                .call_with_overrides(self.request.clone(), self.block, state.clone())
+                .await
+                .map_err(Error::from)?
+        } else {
+            self.provider.call(self.request.clone(), self.block).await.map_err(Error::from)?
+        };
 
         // decode output
         let data = self.function.abi_decode_output(bytes.as_ref(), true)?;

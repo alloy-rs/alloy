@@ -133,15 +133,18 @@ pub trait TempProvider: Send + Sync {
     async fn syncing(&self) -> TransportResult<SyncStatus>;
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
+    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a transaction.
     ///
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    async fn call(
+    async fn call_with_overrides(
         &self,
         tx: CallRequest,
         block: Option<BlockId>,
-        state: Option<StateOverride>,
+        state: StateOverride,
     ) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
@@ -368,24 +371,22 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
+    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
+    }
+
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a transaction.
     ///
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    async fn call(
+    async fn call_with_overrides(
         &self,
         tx: CallRequest,
         block: Option<BlockId>,
-        state: Option<StateOverride>,
+        state: StateOverride,
     ) -> TransportResult<Bytes> {
-        // todo: if we just set `None` for the 3rd parameter, will this be ok for clients who do not
-        // expect a third parameter? if not, should we split this into `call` and
-        // `call_with_overrides`?
-        if let Some(state) = state {
-            self.inner.prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
-        } else {
-            self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
-        }
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
     }
 
     /// Estimate the gas needed for a transaction.
