@@ -220,7 +220,7 @@ mod tests {
         assert_eq!(recovered, address);
 
         // if provided with a hash, it will skip hashing
-        let recovered2 = signature.recover_address_from_prehash(hash).unwrap();
+        let recovered2 = signature.recover_address_from_prehash(&hash).unwrap();
         assert_eq!(recovered2, address);
     }
 
@@ -247,7 +247,7 @@ mod tests {
 
             let sig = wallet.sign_transaction_sync(tx)?;
             let sighash = tx.signature_hash();
-            assert_eq!(sig.recover_address_from_prehash(sighash).unwrap(), wallet.address);
+            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
 
             let sig_async = wallet.sign_transaction(tx).await.unwrap();
             assert_eq!(sig_async, sig);
