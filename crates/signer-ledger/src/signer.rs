@@ -336,7 +336,7 @@ mod tests {
         let sighash = tx.signature_hash();
         let sig = ledger.sign_transaction(&mut tx).await.unwrap();
         assert_eq!(tx.chain_id, None);
-        assert_eq!(sig.recover_address_from_prehash(sighash).unwrap(), my_address());
+        assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), my_address());
     }
 
     #[tokio::test]
