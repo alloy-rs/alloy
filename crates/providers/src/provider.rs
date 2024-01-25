@@ -135,7 +135,8 @@ pub trait TempProvider: Send + Sync {
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
 
-    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a transaction.
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
+    /// transaction.
     ///
     /// # Note
     ///
@@ -375,7 +376,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
-    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a transaction.
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
+    /// transaction.
     ///
     /// # Note
     ///
