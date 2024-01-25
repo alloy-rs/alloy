@@ -91,13 +91,19 @@ where
 
         // Drop all server IDs. We'll re-insert them as we get responses.
         self.subs.drop_server_ids();
+
         // Dispatch all subscription requests
-        self.subs
-            .iter()
-            .map(|(_, sub)| sub.request().serialized().to_owned())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .try_for_each(|brv| self.dispatch_request(brv))?;
+        self.subs.iter().try_for_each(|(_, sub)| {
+            let req = sub.request().to_owned();
+            let (in_flight, _) = InFlight::new(req.clone());
+            self.in_flights.insert(in_flight);
+
+            self.handle
+                .to_socket
+                .send(req.serialized().to_owned())
+                .map(drop)
+                .map_err(|_| TransportErrorKind::backend_gone())
+        })?;
 
         Ok(())
     }
