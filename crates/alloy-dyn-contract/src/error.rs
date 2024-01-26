@@ -1,7 +1,7 @@
 use std::fmt;
 
 use alloy_dyn_abi::Error as AbiError;
-use alloy_primitives::{hex, Selector};
+use alloy_primitives::Selector;
 use alloy_transport::TransportError;
 
 /// Dynamic contract result type.
@@ -49,11 +49,7 @@ impl fmt::Display for Error {
                 write!(f, "unknown function: function {name} does not exist",)
             }
             Self::UnknownSelector(selector) => {
-                write!(
-                    f,
-                    "unknown function: function with selector {} does not exist",
-                    hex::encode(selector)
-                )
+                write!(f, "unknown function: function with selector {selector} does not exist")
             }
 
             Self::AbiError(e) => e.fmt(f),
