@@ -102,6 +102,11 @@ impl Interface {
         &self.abi
     }
 
+    /// Consumes the interface, returning the inner ABI
+    pub fn into_abi(self) -> JsonAbi {
+        self.abi
+    }
+
     pub(crate) fn get_from_name(&self, name: &str) -> Result<&Function> {
         self.abi
             .function(name)
