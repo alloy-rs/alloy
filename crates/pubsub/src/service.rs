@@ -79,12 +79,11 @@ where
 
         // Re-issue pending requests.
         debug!(count = self.in_flights.len(), "Reissuing pending requests");
-        self.in_flights
-            .iter()
-            .map(|(_, in_flight)| in_flight.request().serialized().to_owned())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .try_for_each(|brv| self.dispatch_request(brv))?;
+        for (_, in_flight) in self.in_flights.iter() {
+            let msg = in_flight.request.serialized().to_owned();
+            // Same as `dispatch_request`, but inlined to avoid double-borrowing `self`.
+            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+        }
 
         // Re-subscribe to all active subscriptions
         debug!(count = self.subs.len(), "Re-starting active subscriptions");
@@ -92,18 +91,15 @@ where
         // Drop all server IDs. We'll re-insert them as we get responses.
         self.subs.drop_server_ids();
 
-        // Dispatch all subscription requests
-        self.subs.iter().try_for_each(|(_, sub)| {
+        // Dispatch all subscription requests.
+        for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
             let (in_flight, _) = InFlight::new(req.clone());
             self.in_flights.insert(in_flight);
 
-            self.handle
-                .to_socket
-                .send(req.serialized().to_owned())
-                .map(drop)
-                .map_err(|_| TransportErrorKind::backend_gone())
-        })?;
+            let msg = req.into_serialized();
+            self.handle.to_socket.send(msg).map_err(|_| TransportErrorKind::backend_gone())?;
+        }
 
         Ok(())
     }

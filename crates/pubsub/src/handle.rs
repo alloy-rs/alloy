@@ -5,12 +5,12 @@ use tokio::sync::{
     oneshot::{self, error::TryRecvError},
 };
 
-#[derive(Debug)]
 /// A handle to a backend. Communicates to a `ConnectionInterface` on the
 /// backend.
 ///
 /// The backend SHOULD shut down when the handle is dropped (as indicated by
 /// the shutdown channel).
+#[derive(Debug)]
 pub struct ConnectionHandle {
     /// Outbound channel to server.
     pub(crate) to_socket: mpsc::UnboundedSender<Box<RawValue>>,
