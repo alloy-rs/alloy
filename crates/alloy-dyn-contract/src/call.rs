@@ -17,6 +17,7 @@ use std::{
 /// # Note
 ///
 /// Sets the [state overrides](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set) for `eth_call`, but this is not supported by all clients.
+#[derive(Clone)]
 pub struct CallBuilder<P> {
     // todo: this will not work with `send_transaction` and does not differentiate between EIP-1559
     // and legacy tx
@@ -136,21 +137,6 @@ where
     /// Signs and broadcasts the provided transaction
     pub async fn send(&self) -> Result<()> {
         todo!()
-    }
-}
-
-impl<P> Clone for CallBuilder<P>
-where
-    P: Clone,
-{
-    fn clone(&self) -> Self {
-        CallBuilder {
-            request: self.request.clone(),
-            function: self.function.clone(),
-            block: self.block,
-            state: self.state.clone(),
-            provider: self.provider.clone(),
-        }
     }
 }
 
