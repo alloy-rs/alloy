@@ -49,6 +49,11 @@ impl PreStateFrame {
     }
 }
 
+/// Includes all the account states necessary to execute a given transaction.
+///
+/// This corresponds to the default mode of the [PreStateConfig].
+///
+/// The [AccountState]'s storage will include all non-zero slots that are modified by a transaction.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreStateMode(pub BTreeMap<Address, AccountState>);
 
