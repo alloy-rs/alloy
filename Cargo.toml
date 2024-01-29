@@ -18,12 +18,14 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
 alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
+alloy-dyn-contract = { version = "0.1.0", path = "crates/dyn-contract" }
 alloy-eips = { version = "0.1.0", path = "crates/eips" }
+alloy-genesis = { version = "0.1.0", path = "crates/genesis" }
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-network = { version = "0.1.0", path = "crates/network" }
 alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
-alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-providers = { version = "0.1.0", path = "crates/providers" }
+alloy-pubsub = { version = "0.1.0", path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", path = "crates/rpc-client" }
 alloy-rpc-engine-types = { version = "0.1.0", path = "crates/rpc-engine-types" }
 alloy-rpc-trace-types = { version = "0.1.0", path = "crates/rpc-trace-types" }
@@ -37,7 +39,6 @@ alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
-alloy-genesis = { version = "0.1.0", path = "crates/genesis" }
 
 alloy-primitives = "0.6"
 alloy-sol-types = "0.6"
