@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::Result;
 use alloy_dyn_abi::{DynSolValue, FunctionExt};
 use alloy_json_abi::Function;
 use alloy_primitives::{Address, Bytes, U256, U64};
@@ -22,20 +22,16 @@ pub struct CallBuilder<P> {
     // todo: this will not work with `send_transaction` and does not differentiate between EIP-1559
     // and legacy tx
     request: CallRequest,
-    // todo: only used to decode - should it be some type D to dedupe with `sol!` contracts?
-    function: Function,
     block: Option<BlockId>,
     state: Option<StateOverride>,
     provider: P,
+    // todo: only used to decode - should it be some type D to dedupe with `sol!` contracts?
+    function: Function,
 }
 
 impl<P> CallBuilder<P> {
     pub(crate) fn new(provider: P, function: Function, input: Bytes) -> Self {
-        let request = CallRequest {
-            input: CallInput { input: Some(input), ..Default::default() },
-            ..Default::default()
-        };
-
+        let request = CallRequest { input: CallInput::new(input), ..Default::default() };
         Self { request, function, provider, block: None, state: None }
     }
 
@@ -93,8 +89,8 @@ impl<P> CallBuilder<P> {
     }
 
     /// Returns the underlying transaction's ABI encoded data
-    pub fn calldata(&self) -> Option<Bytes> {
-        self.request.input.data.clone()
+    pub fn calldata(&self) -> Option<&Bytes> {
+        self.request.input.data.as_ref()
     }
 }
 
@@ -113,25 +109,29 @@ where
     /// then it will return the raw data from the chain.
     ///
     /// If executed on a mutating smart contract function, it will do a "dry run" of the call
-    /// and return the return type of the transaction without mutating the state
+    /// and return the return type of the transaction without mutating the state.
     ///
     /// # Note
     ///
-    /// This function _does not_ send a transaction from your account
+    /// This function _does not_ send a transaction from your account.
     pub async fn call(&self) -> Result<Vec<DynSolValue>> {
-        let bytes = if let Some(state) = &self.state {
-            self.provider
-                .call_with_overrides(self.request.clone(), self.block, state.clone())
-                .await
-                .map_err(Error::from)?
-        } else {
-            self.provider.call(self.request.clone(), self.block).await.map_err(Error::from)?
-        };
+        let bytes = self.call_raw().await?;
 
         // decode output
-        let data = self.function.abi_decode_output(bytes.as_ref(), true)?;
+        let data = self.function.abi_decode_output(&bytes, true)?;
 
         Ok(data)
+    }
+
+    /// Queries the blockchain via an `eth_call` for the provided transaction without decoding
+    /// the output.
+    pub async fn call_raw(&self) -> Result<Bytes> {
+        if let Some(state) = &self.state {
+            self.provider.call_with_overrides(self.request.clone(), self.block, state.clone()).await
+        } else {
+            self.provider.call(self.request.clone(), self.block).await
+        }
+        .map_err(Into::into)
     }
 
     /// Signs and broadcasts the provided transaction
@@ -145,8 +145,7 @@ where
 /// Defaults to calling [`CallBuilder::call`].
 impl<P> IntoFuture for CallBuilder<P>
 where
-    Self: 'static,
-    P: TempProvider,
+    P: TempProvider + 'static,
 {
     type Output = Result<Vec<DynSolValue>>;
 
