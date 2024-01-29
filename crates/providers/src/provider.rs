@@ -8,7 +8,7 @@ use alloy_rpc_trace_types::{
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
+    state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
     EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
     TransactionReceipt,
 };
@@ -134,6 +134,19 @@ pub trait TempProvider: Send + Sync {
 
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
+    /// transaction.
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call_with_overrides(
+        &self,
+        tx: CallRequest,
+        block: Option<BlockId>,
+        state: StateOverride,
+    ) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>;
@@ -351,6 +364,21 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     /// Execute a smart contract call with [CallRequest] without publishing a transaction.
     async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
         self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
+    }
+
+    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
+    /// transaction.
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call_with_overrides(
+        &self,
+        tx: CallRequest,
+        block: Option<BlockId>,
+        state: StateOverride,
+    ) -> TransportResult<Bytes> {
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
     }
 
     /// Estimate the gas needed for a transaction.
