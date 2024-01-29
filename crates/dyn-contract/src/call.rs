@@ -90,7 +90,7 @@ impl<P> CallBuilder<P> {
 
     /// Returns the underlying transaction's ABI encoded data
     pub fn calldata(&self) -> Option<&Bytes> {
-        self.request.input.data.as_ref()
+        self.request.input.input()
     }
 }
 
