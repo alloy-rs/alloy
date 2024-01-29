@@ -1,7 +1,7 @@
 use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
@@ -141,28 +141,6 @@ impl TxEip2930 {
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip2930
     }
-
-    /// Encodes the legacy transaction in RLP for signing.
-    pub(crate) fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.tx_type() as u8);
-        Header { list: true, payload_length: self.fields_len() }.encode(out);
-        self.encode_fields(out);
-    }
-
-    /// Outputs the length of the signature RLP encoding for the transaction.
-    pub(crate) fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
-    }
-
-    /// Outputs the signature hash of the transaction by first encoding without a signature, then
-    /// hashing.
-    pub(crate) fn signature_hash(&self) -> B256 {
-        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
-        self.encode_for_signing(&mut buf);
-        keccak256(&buf)
-    }
 }
 
 impl Encodable for TxEip2930 {
@@ -194,8 +172,21 @@ impl Transaction for TxEip2930 {
     type Signature = Signature;
     // type Receipt = ReceiptWithBloom;
 
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        out.put_u8(self.tx_type() as u8);
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
+    }
+
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let mut buf = vec![];
+        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
         buf.put_u8(TxType::Eip2930 as u8);
         self.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
@@ -213,7 +204,6 @@ impl Transaction for TxEip2930 {
     fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
-            dbg!(alloy_primitives::hex::encode(&buf));
             return Err(alloy_rlp::Error::UnexpectedString);
         }
 
@@ -221,10 +211,6 @@ impl Transaction for TxEip2930 {
         let signature = Signature::decode_rlp_vrs(buf)?;
 
         Ok(tx.into_signed(signature))
-    }
-
-    fn signature_hash(&self) -> B256 {
-        TxEip2930::signature_hash(self)
     }
 
     fn input(&self) -> &[u8] {

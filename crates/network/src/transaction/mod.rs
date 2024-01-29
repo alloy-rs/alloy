@@ -1,5 +1,5 @@
-use alloy_primitives::{Bytes, ChainId, Signature, B256, U256};
-use alloy_rlp::{BufMut, Encodable};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_rlp::BufMut;
 
 mod common;
 pub use common::TxKind;
@@ -8,13 +8,33 @@ mod signed;
 pub use signed::Signed;
 
 /// Represents a minimal EVM transaction.
-pub trait Transaction: std::any::Any + Encodable + Send + Sync + 'static {
+pub trait Transaction: std::any::Any + Send + Sync + 'static {
     /// The signature type for this transaction.
     ///
     /// This is usually [`alloy_primitives::Signature`], however, it may be different for future
     /// EIP-2718 transaction types, or in other networks. For example, in Optimism, the deposit
     /// transaction signature is the unit type `()`.
     type Signature;
+
+    /// RLP-encodes the transaction for signing.
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
+
+    /// Outputs the length of the signature RLP encoding for the transaction.
+    fn payload_len_for_signature(&self) -> usize;
+
+    /// RLP-encodes the transaction for signing it. Used to calculate `signature_hash`.
+    ///
+    /// See [`Transaction::encode_for_signing`].
+    fn encoded_for_signing(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
+        self.encode_for_signing(&mut buf);
+        buf
+    }
+
+    /// Calculate the signing hash for the transaction.
+    fn signature_hash(&self) -> B256 {
+        keccak256(self.encoded_for_signing())
+    }
 
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.
@@ -33,9 +53,6 @@ pub trait Transaction: std::any::Any + Encodable + Send + Sync + 'static {
     fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>>
     where
         Self: Sized;
-
-    /// Calculate the signing hash for the transaction.
-    fn signature_hash(&self) -> B256;
 
     /// Get `data`.
     fn input(&self) -> &[u8];
@@ -75,7 +92,7 @@ pub trait Transaction: std::any::Any + Encodable + Send + Sync + 'static {
     fn set_gas_price(&mut self, price: U256);
 }
 
-// TODO: Remove in favor of dyn trait upcasting (1.76+)
+// TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
 #[doc(hidden)]
 impl<S: 'static> dyn Transaction<Signature = S> {
     pub fn __downcast_ref<T: std::any::Any>(&self) -> Option<&T> {

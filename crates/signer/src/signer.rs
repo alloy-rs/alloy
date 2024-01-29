@@ -1,11 +1,12 @@
 use crate::Result;
-use alloy_network::Transaction;
 use alloy_primitives::{eip191_hash_message, Address, ChainId, Signature, B256};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
+
+pub use alloy_network::Transaction;
 
 /// A signable transaction.
 pub type SignableTx = dyn Transaction<Signature = Signature>;
@@ -15,13 +16,6 @@ pub type SignableTx = dyn Transaction<Signature = Signature>;
 /// This trait is implemented for all types that implement [`Transaction`] with [`Signature`] as the
 /// signature associated type.
 pub trait TransactionExt: Transaction<Signature = Signature> {
-    /// Encode the transaction.
-    fn rlp_encode(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        self.encode(&mut out);
-        out
-    }
-
     /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
     /// existing `chain_id` if it is already set.
     fn set_chain_id_checked(&mut self, chain_id: ChainId) -> Result<()> {
