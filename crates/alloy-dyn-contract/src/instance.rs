@@ -1,9 +1,8 @@
+use crate::{error::Result, interface::Interface, CallBuilder};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::{Address, Selector};
 use alloy_providers::provider::TempProvider;
-
-use crate::{error::Result, interface::Interface, CallBuilder};
 
 /// A handle to an Ethereum contract at a specific address.
 ///

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     error::{Error, Result},
     instance::ContractInstance,
@@ -7,6 +5,7 @@ use crate::{
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector};
+use std::collections::HashMap;
 
 /// A smart contract interface.
 #[derive(Debug, Clone)]

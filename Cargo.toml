@@ -18,9 +18,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
 alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
-alloy-dyn-abi = "0.6.0"
 alloy-eips = { version = "0.1.0", path = "crates/eips" }
-alloy-json-abi = "0.6.0"
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
 alloy-network = { version = "0.1.0", path = "crates/network" }
 alloy-node-bindings = { version = "0.1.0", path = "crates/node-bindings" }
@@ -39,9 +37,13 @@ alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
-alloy-genesis = {version = "0.1.0", path = "crates/genesis" }
-alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
+alloy-genesis = { version = "0.1.0", path = "crates/genesis" }
+
+alloy-primitives = "0.6"
+alloy-sol-types = "0.6"
+alloy-dyn-abi = "0.6"
+alloy-json-abi = "0.6"
+
 alloy-rlp = "0.3"
 
 # ethereum

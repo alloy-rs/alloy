@@ -1,8 +1,7 @@
-use std::fmt;
-
 use alloy_dyn_abi::Error as AbiError;
 use alloy_primitives::Selector;
 use alloy_transport::TransportError;
+use std::fmt;
 
 /// Dynamic contract result type.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
