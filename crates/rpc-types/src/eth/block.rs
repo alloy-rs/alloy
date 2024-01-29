@@ -139,7 +139,17 @@ impl BlockTransactions {
         self
     }
 
-    /// Check if the enum variant is used for an uncle response.
+    /// Check if the enum variant is used for hashes.
+    pub const fn is_hashes(&self) -> bool {
+        matches!(self, Self::Hashes(_))
+    }
+
+    /// Returns true if the enum variant is used for full transactions.
+    pub const fn is_full(&self) -> bool {
+        matches!(self, Self::Full(_))
+    }
+
+    /// Returns true if the enum variant is used for an uncle response.
     pub const fn is_uncle(&self) -> bool {
         matches!(self, Self::Uncle)
     }
@@ -166,6 +176,24 @@ impl BlockTransactions {
     /// Returns an instance of BlockTransactions with the Uncle special case.
     pub const fn uncle() -> Self {
         Self::Uncle
+    }
+
+    /// Returns the number of transactions.
+    pub fn len(&self) -> usize {
+        match self {
+            BlockTransactions::Hashes(hashes) => hashes.len(),
+            BlockTransactions::Full(txs) => txs.len(),
+            BlockTransactions::Uncle => 0,
+        }
+    }
+
+    /// Whether the block has no transactions.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            BlockTransactions::Hashes(hashes) => hashes.is_empty(),
+            BlockTransactions::Full(txs) => txs.is_empty(),
+            BlockTransactions::Uncle => true,
+        }
     }
 }
 
