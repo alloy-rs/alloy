@@ -169,14 +169,20 @@ where
                     Some(Ok(response)) => {
                         return Ready(Some(response));
                     }
-                    Some(Err(e)) => {
-                        error!(%e, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
-                        trace!(
-                            buffer = %String::from_utf8_lossy(this.buf.as_ref()),
-                            "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
-                        );
+                    Some(Err(err)) => {
+                        if err.is_eof() {
+                            trace!("partial object in IPC buffer");
+                            // nothing decoded
+                            *this.drained = true;
+                        } else {
+                            error!(%err, "IPC response contained invalid JSON. Buffer contents will be logged at trace level");
+                            trace!(
+                                buffer = %String::from_utf8_lossy(this.buf.as_ref()),
+                                "IPC response contained invalid JSON. NOTE: Buffer contents do not include invalid utf8.",
+                            );
 
-                        return Ready(None);
+                            return Ready(None);
+                        }
                     }
                     None => {
                         // nothing decoded
