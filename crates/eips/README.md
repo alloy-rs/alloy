@@ -1,5 +1,7 @@
 # alloy-eips
 
+Ethereum Improvement Proprosal (EIP) implementations.
+
 Contains constants, helpers, and basic data structures for consensus EIPs.
 
 ## Current support

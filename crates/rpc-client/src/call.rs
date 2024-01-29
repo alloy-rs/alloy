@@ -213,7 +213,7 @@ where
     type Output = TransportResult<Resp>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        tracing::trace!(?self.state, "Polling RpcCall");
+        trace!(?self.state, "Polling RpcCall");
         let this = self.project();
 
         let result = task::ready!(this.state.poll(cx));

@@ -49,6 +49,11 @@ impl PreStateFrame {
     }
 }
 
+/// Includes all the account states necessary to execute a given transaction.
+///
+/// This corresponds to the default mode of the [PreStateConfig].
+///
+/// The [AccountState]'s storage will include all non-zero slots that are modified by a transaction.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreStateMode(pub BTreeMap<Address, AccountState>);
 
@@ -92,12 +97,9 @@ impl DiffMode {
 
     /// Removes all zero values from the storage of the [AccountState]s.
     pub fn remove_zero_storage_values(&mut self) {
-        self.pre.values_mut().for_each(|state| {
+        for state in self.pre.values_mut().chain(self.post.values_mut()) {
             state.storage.retain(|_, value| *value != B256::ZERO);
-        });
-        self.post.values_mut().for_each(|state| {
-            state.storage.retain(|_, value| *value != B256::ZERO);
-        });
+        }
     }
 }
 

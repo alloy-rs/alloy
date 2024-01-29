@@ -1,6 +1,6 @@
 # alloy-consensus
 
-Consensus types for the Ethereum blockchain.
+Ethereum consensus interface.
 
 This crate contains constants, types, and functions for implementing Ethereum
 EL consensus and communication. This includes headers, blocks, transactions,

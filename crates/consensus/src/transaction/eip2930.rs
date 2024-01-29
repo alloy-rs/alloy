@@ -200,7 +200,10 @@ impl Transaction for TxEip2930 {
         self.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
 
-        Signed::new_unchecked(self, signature, hash)
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
     }
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {

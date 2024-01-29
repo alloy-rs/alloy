@@ -3,7 +3,7 @@
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
 use alloy_primitives::{keccak256, Sealed, B256};
-use alloy_rlp::{BufMut, Header};
+use alloy_rlp::{BufMut, Header, EMPTY_STRING_CODE};
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;
@@ -60,28 +60,36 @@ pub trait Decodable2718: Sized {
     /// Decode an EIP-2718 transaction in the network format.
     ///
     /// The network format is the RLP encoded string consisting of the
-    /// type-flag prepneded to an opaque inner encoding. The inner encoding is
+    /// type-flag prepended to an opaque inner encoding. The inner encoding is
     /// RLP for all current Ethereum transaction types, but may not be in future
     /// versions of the protocol.
     fn network_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
-        let h_decode = &mut *buf;
-        let h = Header::decode(h_decode)?;
+        // Keep the original buffer around by copying it.
+        let mut h_decode = *buf;
+        let h = Header::decode(&mut h_decode)?;
 
+        // If it's a list, we need to fallback to the legacy decoding.
         if h.list {
             return Self::fallback_decode(buf);
         } else {
             *buf = h_decode;
         }
 
-        let pre_len = buf.len();
-        if pre_len == 0 || pre_len < h.payload_length {
+        let remaining_len = buf.len();
+
+        if remaining_len == 0 || remaining_len < h.payload_length {
             return Err(alloy_rlp::Error::InputTooShort.into());
         }
+
         let ty = buf[0];
         let buf = &mut &buf[1..];
         let tx = Self::typed_decode(ty, buf)?;
 
-        if buf.len() != pre_len - h.payload_length {
+        let bytes_consumed = remaining_len - buf.len();
+        // because Header::decode works for single bytes (including the tx type), returning a
+        // string Header with payload_length of 1, we need to make sure this check is only
+        // performed for transactions with a string header
+        if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
             return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
 

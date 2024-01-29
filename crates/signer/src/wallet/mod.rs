@@ -111,6 +111,11 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
     pub const fn signer(&self) -> &D {
         &self.signer
     }
+
+    /// Consumes this wallet and returns its signer.
+    pub fn into_signer(self) -> D {
+        self.signer
+    }
 }
 
 // do not log the signer

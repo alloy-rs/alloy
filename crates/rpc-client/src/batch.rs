@@ -216,11 +216,11 @@ where
             }
         }
 
-        // Any channels remaining in the map are missing responses. To avoid
-        // hanging futures, we send an error.
-        channels.drain().for_each(|(id, tx)| {
+        // Any channels remaining in the map are missing responses.
+        // To avoid hanging futures, we send an error.
+        for (id, tx) in channels.drain() {
             let _ = tx.send(Err(TransportErrorKind::missing_batch_response(id)));
-        });
+        }
 
         self.set(BatchFuture::Complete);
         Poll::Ready(Ok(()))

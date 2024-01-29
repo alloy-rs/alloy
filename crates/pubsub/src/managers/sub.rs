@@ -47,7 +47,7 @@ impl SubscriptionManager {
 
         // If we already know a subscription with the exact params,
         // we can just update the server_id and get a new listener.
-        if self.local_to_server.contains_left(&local_id) {
+        if self.local_to_sub.contains_left(&local_id) {
             self.change_server_id(local_id, server_id);
             self.get_rx(local_id).expect("checked existence")
         } else {

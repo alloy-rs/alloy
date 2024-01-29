@@ -5,13 +5,15 @@ pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
-pub use receipt::{OptimismTransactionReceiptFields, TransactionReceipt};
+pub use optimism::OptimismTransactionReceiptFields;
+pub use receipt::TransactionReceipt;
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 
 mod access_list;
 mod common;
 pub mod kzg;
+pub mod optimism;
 mod receipt;
 pub mod request;
 mod signature;
@@ -81,27 +83,6 @@ pub struct Transaction {
     /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
     #[serde(flatten)]
     pub other: OtherFields,
-}
-
-/// Optimism specific transaction fields
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OptimismTransactionFields {
-    /// Hash that uniquely identifies the source of the deposit.
-    #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
-    pub source_hash: Option<B256>,
-    /// The ETH value to mint on L2
-    #[serde(rename = "mint", skip_serializing_if = "Option::is_none")]
-    pub mint: Option<U128>,
-    /// Field indicating whether the transaction is a system transaction, and therefore
-    /// exempt from the L2 gas limit.
-    #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
-    pub is_system_tx: Option<bool>,
-}
-
-impl From<OptimismTransactionFields> for OtherFields {
-    fn from(value: OptimismTransactionFields) -> Self {
-        serde_json::to_value(value).unwrap().try_into().unwrap()
-    }
 }
 
 #[cfg(test)]

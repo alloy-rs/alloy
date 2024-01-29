@@ -1,12 +1,13 @@
 //! Utilities for launching an Anvil instance.
 
-use crate::unused_port;
 use alloy_primitives::{hex, Address};
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     io::{BufRead, BufReader},
+    net::SocketAddr,
     path::PathBuf,
     process::{Child, Command},
+    str::FromStr,
     time::{Duration, Instant},
 };
 
@@ -220,7 +221,12 @@ impl Anvil {
             Command::new("anvil")
         };
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
-        let port = if let Some(port) = self.port { port } else { unused_port() };
+        let mut port = if let Some(port) = self.port {
+            port
+        } else {
+            // let the OS choose a port for us
+            0
+        };
         cmd.arg("-p").arg(port.to_string());
 
         if let Some(mnemonic) = self.mnemonic {
@@ -265,7 +271,12 @@ impl Anvil {
 
             let mut line = String::new();
             reader.read_line(&mut line).expect("Failed to read line from anvil process");
-            if line.contains("Listening on") {
+            if let Some(addr) = line.strip_prefix("Listening on") {
+                // <Listening on 127.0.0.1:8545>
+                // parse the actual port
+                if let Ok(addr) = SocketAddr::from_str(addr.trim()) {
+                    port = addr.port();
+                }
                 break;
             }
 

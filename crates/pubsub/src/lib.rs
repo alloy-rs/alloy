@@ -15,6 +15,9 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[macro_use]
+extern crate tracing;
+
 mod connect;
 pub use connect::PubSubConnect;
 

@@ -71,6 +71,61 @@ pub struct Genesis {
 }
 
 impl Genesis {
+    /// Creates a chain config for Clique using the given chain id.
+    /// and funds the given address with max coins.
+    ///
+    /// Enables all hard forks up to London at genesis.
+    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Genesis {
+        // set up a clique config with an instant sealing period and short (8 block) epoch
+        let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
+
+        let config = ChainConfig {
+            chain_id,
+            eip155_block: Some(0),
+            eip150_block: Some(0),
+            eip158_block: Some(0),
+
+            homestead_block: Some(0),
+            byzantium_block: Some(0),
+            constantinople_block: Some(0),
+            petersburg_block: Some(0),
+            istanbul_block: Some(0),
+            muir_glacier_block: Some(0),
+            berlin_block: Some(0),
+            london_block: Some(0),
+            clique: Some(clique_config),
+            ..Default::default()
+        };
+
+        // fund account
+        let mut alloc = HashMap::new();
+        alloc.insert(
+            signer_addr,
+            GenesisAccount { balance: U256::MAX, nonce: None, code: None, storage: None },
+        );
+
+        // put signer address in the extra data, padded by the required amount of zeros
+        // Clique issue: https://github.com/ethereum/EIPs/issues/225
+        // Clique EIP: https://eips.ethereum.org/EIPS/eip-225
+        //
+        // The first 32 bytes are vanity data, so we will populate it with zeros
+        // This is followed by the signer address, which is 20 bytes
+        // There are 65 bytes of zeros after the signer address, which is usually populated with the
+        // proposer signature. Because the genesis does not have a proposer signature, it will be
+        // populated with zeros.
+        let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
+        let extra_data = Bytes::from(extra_data_bytes);
+
+        Genesis {
+            config,
+            alloc,
+            difficulty: U256::from(1),
+            gas_limit: 5_000_000,
+            extra_data,
+            ..Default::default()
+        }
+    }
+
     /// Set the nonce.
     pub const fn with_nonce(mut self, nonce: u64) -> Self {
         self.nonce = nonce;
@@ -209,18 +264,27 @@ pub struct ChainConfig {
     pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub homestead_block: Option<u64>,
 
     /// The DAO fork switch block (None = no fork).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub dao_fork_block: Option<u64>,
 
     /// Whether or not the node supports the DAO hard-fork.
     pub dao_fork_support: bool,
 
     /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork block (None = no fork).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub eip150_block: Option<u64>,
 
     /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork hash.
@@ -228,59 +292,101 @@ pub struct ChainConfig {
     pub eip150_hash: Option<B256>,
 
     /// The [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) hard fork block.
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub eip155_block: Option<u64>,
 
     /// The [EIP-158](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-158.md) hard fork block.
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub eip158_block: Option<u64>,
 
     /// The Byzantium hard fork block (None = no fork, 0 = already on byzantium).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub byzantium_block: Option<u64>,
 
     /// The Constantinople hard fork block (None = no fork, 0 = already on constantinople).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub constantinople_block: Option<u64>,
 
     /// The Petersburg hard fork block (None = no fork, 0 = already on petersburg).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub petersburg_block: Option<u64>,
 
     /// The Istanbul hard fork block (None = no fork, 0 = already on istanbul).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub istanbul_block: Option<u64>,
 
     /// The Muir Glacier hard fork block (None = no fork, 0 = already on muir glacier).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub muir_glacier_block: Option<u64>,
 
     /// The Berlin hard fork block (None = no fork, 0 = already on berlin).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub berlin_block: Option<u64>,
 
     /// The London hard fork block (None = no fork, 0 = already on london).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub london_block: Option<u64>,
 
     /// The Arrow Glacier hard fork block (None = no fork, 0 = already on arrow glacier).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub arrow_glacier_block: Option<u64>,
 
     /// The Gray Glacier hard fork block (None = no fork, 0 = already on gray glacier).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub gray_glacier_block: Option<u64>,
 
     /// Virtual fork after the merge to use as a network splitter.
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub merge_netsplit_block: Option<u64>,
 
     /// Shanghai switch time (None = no fork, 0 = already on shanghai).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub shanghai_time: Option<u64>,
 
     /// Cancun switch time (None = no fork, 0 = already on cancun).
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_hex_or_decimal_opt::deserialize"
+    )]
     pub cancun_time: Option<u64>,
 
     /// Total difficulty reached that triggers the merge consensus upgrade.
@@ -408,11 +514,11 @@ pub struct EthashConfig {}
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Copy)]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub period: Option<u64>,
 
     /// Epoch length to reset votes and checkpoints.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub epoch: Option<u64>,
 }
 
@@ -1144,5 +1250,32 @@ mod tests {
             "deserialized genesis
     {deserialized_genesis:#?} does not match expected {expected_genesis:#?}"
         );
+    }
+
+    #[test]
+    fn parse_dump_genesis_mainnet() {
+        let mainnet = include_str!("../dumpgenesis/mainnet.json");
+        let gen = serde_json::from_str::<Genesis>(mainnet).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
+    }
+
+    #[test]
+    fn parse_dump_genesis_sepolia() {
+        let sepolia = include_str!("../dumpgenesis/sepolia.json");
+        let gen = serde_json::from_str::<Genesis>(sepolia).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
+    }
+
+    #[test]
+    fn parse_dump_genesis_holesky() {
+        let holesky = include_str!("../dumpgenesis/holesky.json");
+        let gen = serde_json::from_str::<Genesis>(holesky).unwrap();
+        let s = serde_json::to_string_pretty(&gen).unwrap();
+        let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
+        assert_eq!(gen, gen2);
     }
 }
