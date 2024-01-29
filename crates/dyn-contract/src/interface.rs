@@ -1,7 +1,4 @@
-use crate::{
-    error::{Error, Result},
-    instance::ContractInstance,
-};
+use crate::{ContractInstance, Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector};
@@ -58,8 +55,7 @@ impl Interface {
         self.get_from_name(name)?.abi_decode_input(data, validate).map_err(Into::into)
     }
 
-    /// Decode the provided ABI encoded bytes as the input of the provided
-    /// function selector
+    /// Decode the provided ABI encoded bytes as the input of the provided function selector.
     pub fn decode_input_with_selector(
         &self,
         selector: &Selector,
@@ -70,7 +66,7 @@ impl Interface {
     }
 
     /// Decode the provided ABI encoded bytes as the output of the first function with the given
-    /// name
+    /// name.
     ///
     /// # Note
     ///
@@ -85,8 +81,7 @@ impl Interface {
         self.get_from_name(name)?.abi_decode_output(data, validate).map_err(Into::into)
     }
 
-    /// Decode the provided ABI encoded bytes as the output of the provided
-    /// function selector
+    /// Decode the provided ABI encoded bytes as the output of the provided function selector.
     pub fn decode_output_with_selector(
         &self,
         selector: &Selector,
@@ -96,12 +91,12 @@ impl Interface {
         self.get_from_selector(selector)?.abi_decode_output(data, validate).map_err(Into::into)
     }
 
-    /// Returns a reference to the contract's ABI
+    /// Returns a reference to the contract's ABI.
     pub const fn abi(&self) -> &JsonAbi {
         &self.abi
     }
 
-    /// Consumes the interface, returning the inner ABI
+    /// Consumes the interface, returning the inner ABI.
     pub fn into_abi(self) -> JsonAbi {
         self.abi
     }

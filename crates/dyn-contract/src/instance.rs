@@ -1,4 +1,4 @@
-use crate::{error::Result, interface::Interface, CallBuilder};
+use crate::{CallBuilder, Interface, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::{Address, Selector};
