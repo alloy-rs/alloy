@@ -506,6 +506,15 @@ impl ExecutionPayload {
             ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.block_number,
         }
     }
+
+    /// Returns the prev randao for this payload.
+    pub const fn prev_randao(&self) -> B256 {
+        match self {
+            ExecutionPayload::V1(payload) => payload.prev_randao,
+            ExecutionPayload::V2(payload) => payload.payload_inner.prev_randao,
+            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.prev_randao,
+        }
+    }
 }
 
 impl From<ExecutionPayloadV1> for ExecutionPayload {
