@@ -462,58 +462,98 @@ pub enum ExecutionPayload {
 }
 
 impl ExecutionPayload {
-    /// Returns the withdrawals for the payload.
-    pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+    /// Returns a reference to the V1 payload.
+    pub const fn as_v1(&self) -> &ExecutionPayloadV1 {
+        match self {
+            ExecutionPayload::V1(payload) => payload,
+            ExecutionPayload::V2(payload) => &payload.payload_inner,
+            ExecutionPayload::V3(payload) => &payload.payload_inner.payload_inner,
+        }
+    }
+
+    /// Returns a mutable reference to the V1 payload.
+    pub fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
+        match self {
+            ExecutionPayload::V1(payload) => payload,
+            ExecutionPayload::V2(payload) => &mut payload.payload_inner,
+            ExecutionPayload::V3(payload) => &mut payload.payload_inner.payload_inner,
+        }
+    }
+
+    /// Consumes the payload and returns the V1 payload.
+    pub fn into_v1(self) -> ExecutionPayloadV1 {
+        match self {
+            ExecutionPayload::V1(payload) => payload,
+            ExecutionPayload::V2(payload) => payload.payload_inner,
+            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner,
+        }
+    }
+
+    /// Returns a reference to the V2 payload, if any.
+    pub const fn as_v2(&self) -> Option<&ExecutionPayloadV2> {
         match self {
             ExecutionPayload::V1(_) => None,
-            ExecutionPayload::V2(payload) => Some(&payload.withdrawals),
-            ExecutionPayload::V3(payload) => Some(payload.withdrawals()),
+            ExecutionPayload::V2(payload) => Some(payload),
+            ExecutionPayload::V3(payload) => Some(&payload.payload_inner),
+        }
+    }
+
+    /// Returns a mutable reference to the V2 payload, if any.
+    pub fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
+        match self {
+            ExecutionPayload::V1(_) => None,
+            ExecutionPayload::V2(payload) => Some(payload),
+            ExecutionPayload::V3(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V2 payload, if any.
+    pub const fn as_v3(&self) -> Option<&ExecutionPayloadV3> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
+            ExecutionPayload::V3(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V2 payload, if any.
+    pub fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
+            ExecutionPayload::V3(payload) => Some(payload),
+        }
+    }
+
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> Option<&Vec<Withdrawal>> {
+        match self.as_v2() {
+            Some(payload) => Some(&payload.withdrawals),
+            None => None,
         }
     }
 
     /// Returns the timestamp for the payload.
     pub const fn timestamp(&self) -> u64 {
-        match self {
-            ExecutionPayload::V1(payload) => payload.timestamp,
-            ExecutionPayload::V2(payload) => payload.timestamp(),
-            ExecutionPayload::V3(payload) => payload.timestamp(),
-        }
+        self.as_v1().timestamp
     }
 
     /// Returns the parent hash for the payload.
     pub const fn parent_hash(&self) -> B256 {
-        match self {
-            ExecutionPayload::V1(payload) => payload.parent_hash,
-            ExecutionPayload::V2(payload) => payload.payload_inner.parent_hash,
-            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.parent_hash,
-        }
+        self.as_v1().parent_hash
     }
 
     /// Returns the block hash for the payload.
     pub const fn block_hash(&self) -> B256 {
-        match self {
-            ExecutionPayload::V1(payload) => payload.block_hash,
-            ExecutionPayload::V2(payload) => payload.payload_inner.block_hash,
-            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.block_hash,
-        }
+        self.as_v1().block_hash
     }
 
     /// Returns the block number for this payload.
     pub const fn block_number(&self) -> u64 {
-        match self {
-            ExecutionPayload::V1(payload) => payload.block_number,
-            ExecutionPayload::V2(payload) => payload.payload_inner.block_number,
-            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.block_number,
-        }
+        self.as_v1().block_number
     }
 
     /// Returns the prev randao for this payload.
     pub const fn prev_randao(&self) -> B256 {
-        match self {
-            ExecutionPayload::V1(payload) => payload.prev_randao,
-            ExecutionPayload::V2(payload) => payload.payload_inner.prev_randao,
-            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner.prev_randao,
-        }
+        self.as_v1().prev_randao
     }
 }
 
