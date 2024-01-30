@@ -53,7 +53,7 @@ impl Signer for LedgerSigner {
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
         }
-        let rlp = tx.rlp_encode();
+        let rlp = tx.encoded_for_signing();
         let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
         if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
             sig = sig.with_chain_id(chain_id);
@@ -106,6 +106,7 @@ impl LedgerSigner {
     ) -> Result<Self, LedgerError> {
         let transport = Ledger::init().await?;
         let address = Self::get_address_with_path_transport(&transport, &derivation).await?;
+        debug!(%address, "Connected to Ledger");
 
         Ok(Self { transport: Mutex::new(transport), derivation, chain_id, address })
     }
@@ -234,9 +235,10 @@ impl LedgerSigner {
         for chunk in payload.chunks(chunk_size) {
             command.data = APDUData::new(chunk);
 
-            debug!("Dispatching packet to device");
-
-            let ans = transport.exchange(&command).await?;
+            debug!(chunk = hex::encode(chunk), "Dispatching packet to device");
+            let res = transport.exchange(&command).await;
+            debug!(?res, "Received response from device");
+            let ans = res?;
             let data = ans.data().ok_or(LedgerError::UnexpectedNullResponse)?;
             debug!(response = hex::encode(data), "Received response from device");
             answer = Some(ans);
@@ -281,16 +283,24 @@ impl LedgerSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{address, U256};
+    use alloy_primitives::{address, bytes, U256};
+    use alloy_rlp::Decodable;
+    use alloy_signer::Transaction;
+    use std::sync::OnceLock;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
     fn my_address() -> Address {
-        std::env::var("LEDGER_ADDRESS").unwrap().parse().unwrap()
+        static ADDRESS: OnceLock<Address> = OnceLock::new();
+        *ADDRESS.get_or_init(|| {
+            let var = "LEDGER_ADDRESS";
+            std::env::var(var).expect(var).parse().expect(var)
+        })
     }
 
     async fn init_ledger() -> LedgerSigner {
-        match LedgerSigner::new(DTYPE, Some(1)).await {
+        let _ = tracing_subscriber::fmt::try_init();
+        match LedgerSigner::new(DTYPE, None).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
         }
@@ -302,7 +312,7 @@ mod tests {
     async fn test_get_address() {
         let ledger = init_ledger().await;
         assert_eq!(ledger.get_address().await.unwrap(), my_address());
-        assert_eq!(ledger.get_address_with_path(&DTYPE).await.unwrap(), my_address(),);
+        assert_eq!(ledger.get_address_with_path(&DTYPE).await.unwrap(), my_address());
     }
 
     #[tokio::test]
@@ -318,24 +328,61 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     #[ignore]
-    async fn test_sign_tx() {
-        let ledger = init_ledger().await;
-
-        // approve uni v2 router 0xff
-        let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
-
+    async fn test_sign_tx_legacy() {
+        // https://github.com/gakonst/ethers-rs/blob/90b87bd85be98caa8bb592b67f3f9acbc8a409cf/ethers-signers/src/ledger/app.rs#L321
         let mut tx = alloy_consensus::TxLegacy {
-            nonce: 0,
+            nonce: 5,
             gas_price: 400e9 as u128,
             gas_limit: 1000000,
             to: alloy_consensus::TxKind::Call(address!("2ed7afa17473e17ac59908f088b4371d28585476")),
-            input: data.into(),
+            // TODO: this fails for some reason with 6a80 APDU_CODE_BAD_KEY_HANDLE
+            // approve uni v2 router 0xff
+            // input: bytes!("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+            input: bytes!("01020304"),
             value: U256::from(100e18 as u128),
-            chain_id: None,
+            chain_id: Some(69420),
         };
+        /*
+        assert_eq!(tx.encoded_for_signing(), hex!("f87005855d21dba000830f4240942ed7afa17473e17ac59908f088b4371d2858547689056bc75e2d63100000b844095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+        */
+        test_sign_tx_generic(&mut tx).await;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    #[ignore]
+    async fn test_sign_tx_eip2930() {
+        // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L104-L106
+        /*
+        let tx_rlp = hex!("01f8e60380018402625a0094cccccccccccccccccccccccccccccccccccccccc830186a0a4693c61390000000000000000000000000000000000000000000000000000000000000002f85bf859940000000000000000000000000000000000000102f842a00000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000060a780a09b8adcd2a4abd34b42d56fcd90b949f74ca9696dfe2b427bc39aa280bbf1924ca029af4a471bb2953b4e7933ea95880648552a9345424a1ac760189655ceb1832a");
+        */
+        // Skip signature.
+        let tx_rlp = hex!("01f8a30380018402625a0094cccccccccccccccccccccccccccccccccccccccc830186a0a4693c61390000000000000000000000000000000000000000000000000000000000000002f85bf859940000000000000000000000000000000000000102f842a00000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000060a7");
+        let mut untyped_rlp = &tx_rlp[1..];
+        let mut tx = alloy_consensus::TxEip2930::decode(&mut untyped_rlp).unwrap();
+        assert_eq!(hex::encode(tx.encoded_for_signing()), hex::encode(tx_rlp));
+        test_sign_tx_generic(&mut tx).await;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    #[ignore]
+    async fn test_sign_tx_eip1559() {
+        // From the Ledger Ethereum app example: https://github.com/LedgerHQ/app-ethereum/blob/2264f677568cbc1e3177f9eccb3c14a229ab3255/examples/signTx.py#L100-L102
+        let tx_rlp = hex!("02ef0306843b9aca008504a817c80082520894b2bb2b958afa2e96dab3f3ce7162b87daea39017872386f26fc1000080c0");
+        let mut untyped_rlp = &tx_rlp[1..];
+        let mut tx = alloy_consensus::TxEip1559::decode(&mut untyped_rlp).unwrap();
+        assert_eq!(hex::encode(tx.encoded_for_signing()), hex::encode(tx_rlp));
+        test_sign_tx_generic(&mut tx).await;
+    }
+
+    async fn test_sign_tx_generic(tx: &mut SignableTx) {
         let sighash = tx.signature_hash();
-        let sig = ledger.sign_transaction(&mut tx).await.unwrap();
-        assert_eq!(tx.chain_id, None);
+        let ledger = init_ledger().await;
+        let sig = match ledger.sign_transaction(tx).await {
+            Ok(sig) => sig,
+            Err(e) => panic!("Failed signing transaction: {e}"),
+        };
         assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), my_address());
     }
 

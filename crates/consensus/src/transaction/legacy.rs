@@ -1,6 +1,6 @@
 use crate::TxKind;
 use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
 
@@ -125,31 +125,6 @@ impl TxLegacy {
         }
     }
 
-    /// Encodes the legacy transaction in RLP for signing, including the EIP-155 fields if possible.
-    pub(crate) fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
-            .encode(out);
-        self.encode_fields(out);
-        self.encode_eip155_signing_fields(out);
-    }
-
-    /// Outputs the length of the signature RLP encoding for the transaction, including the length
-    /// of the EIP-155 fields if possible.
-    pub(crate) fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len() + self.eip155_fields_len();
-        // 'header length' + 'payload length'
-        length_of_length(payload_length) + payload_length
-    }
-
-    /// Outputs the signature hash of the transaction by first encoding without a signature, then
-    /// hashing.
-    // See [`Self::encode_for_signing`] for more information on the encoding format.
-    pub fn signature_hash(&self) -> B256 {
-        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
-        self.encode_for_signing(&mut buf);
-        keccak256(&buf)
-    }
-
     /// Decode the RLP fields of the transaction, without decoding an RLP
     /// header.
     pub(crate) fn decode_fields(data: &mut &[u8]) -> Result<Self> {
@@ -210,8 +185,22 @@ impl Transaction for TxLegacy {
     type Signature = Signature;
     // type Receipt = ReceiptWithBloom;
 
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
+            .encode(out);
+        self.encode_fields(out);
+        self.encode_eip155_signing_fields(out);
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len() + self.eip155_fields_len();
+        // 'header length' + 'payload length'
+        length_of_length(payload_length) + payload_length
+    }
+
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let mut buf = vec![];
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
         self.encode_with_signature(&signature, &mut buf);
         let hash = keccak256(&buf);
         Signed::new_unchecked(self, signature, hash)
@@ -235,12 +224,6 @@ impl Transaction for TxLegacy {
         tx.chain_id = v.chain_id();
 
         Ok(tx.into_signed(signature))
-    }
-
-    fn signature_hash(&self) -> B256 {
-        let mut out: Vec<u8> = vec![];
-        self.encode_for_signing(&mut out);
-        keccak256(&out)
     }
 
     fn input(&self) -> &[u8] {
