@@ -41,9 +41,8 @@ pub use type_aliases::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod type_aliases {
-    use alloy_json_rpc::ResponsePacket;
-
     use crate::{TransportError, TransportResult};
+    use alloy_json_rpc::ResponsePacket;
 
     /// Pin-boxed future.
     pub type Pbf<'a, T, E> =
@@ -60,9 +59,8 @@ mod type_aliases {
 
 #[cfg(target_arch = "wasm32")]
 mod type_aliases {
-    use alloy_json_rpc::ResponsePacket;
-
     use crate::{TransportError, TransportResult};
+    use alloy_json_rpc::ResponsePacket;
 
     /// Pin-boxed future.
     pub type Pbf<'a, T, E> =
