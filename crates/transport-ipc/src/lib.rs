@@ -193,17 +193,15 @@ where
 
             // read more data into the buffer
             match ready!(poll_read_buf(this.reader.as_mut(), cx, &mut this.buf)) {
+                Ok(0) => {
+                    // stream is no longer readable and we're also unable to decode any more
+                    // data. This happens if the IPC socket is closed by the other end.
+                    // so we can return `None` here.
+                    debug!("IPC socket EOF, stream is closed");
+                    return Ready(None);
+                }
                 Ok(data_len) => {
                     debug!(%data_len, "Read data from IPC socket");
-
-                    if data_len == 0 {
-                        // stream is no longer readable and we're also unable to decode any more
-                        // data. This happens if the IPC socket is closed by the other end.
-                        // so we can return `None` here.
-                        debug!("IPC socket EOF, stream is closed");
-                        return Ready(None);
-                    }
-
                     // can try decoding again
                     *this.drained = false;
                 }
