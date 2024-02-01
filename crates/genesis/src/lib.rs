@@ -101,7 +101,13 @@ impl Genesis {
         let mut alloc = HashMap::new();
         alloc.insert(
             signer_addr,
-            GenesisAccount { balance: U256::MAX, nonce: None, code: None, storage: None },
+            GenesisAccount {
+                balance: U256::MAX,
+                nonce: None,
+                code: None,
+                storage: None,
+                private_key: None,
+            },
         );
 
         // put signer address in the extra data, padded by the required amount of zeros
@@ -198,7 +204,7 @@ impl Genesis {
 }
 
 /// An account in the state of the genesis block.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
@@ -217,6 +223,9 @@ pub struct GenesisAccount {
         deserialize_with = "deserialize_storage_map"
     )]
     pub storage: Option<HashMap<B256, B256>>,
+    /// The account's private key. Should only be used for testing.
+    #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
+    pub private_key: Option<B256>,
 }
 
 impl GenesisAccount {
@@ -575,6 +584,7 @@ mod tests {
             balance: U256::from(1),
             code: Some(Bytes::from(b"code")),
             storage: Some(HashMap::default()),
+            private_key: None,
         };
         let mut updated_account = HashMap::default();
         updated_account.insert(same_address, new_alloc_account);
@@ -1156,6 +1166,7 @@ mod tests {
     unwrap(),                     nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1165,6 +1176,7 @@ mod tests {
                         nonce: None,
                         code: Some(Bytes::from_str("0x12").unwrap()),
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1181,6 +1193,7 @@ mod tests {
     B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000022").
     unwrap(),                         ),
                         ])),
+                        private_key: None,
                     },
                 ),
                 (
@@ -1190,6 +1203,7 @@ mod tests {
                         nonce: Some(0x32u64),
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1199,6 +1213,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1208,6 +1223,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1217,6 +1233,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1226,6 +1243,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
             ]),
