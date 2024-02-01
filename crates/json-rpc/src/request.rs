@@ -10,6 +10,21 @@ pub struct RequestMeta {
     pub method: &'static str,
     /// The request ID.
     pub id: Id,
+    /// Whether the request is a subscription, other than `eth_subscribe`.
+    pub is_non_standard_sub: bool,
+}
+
+impl RequestMeta {
+    /// Returns `true` if the request is a subscription.
+    pub const fn is_subscription(&self) -> bool {
+        self.is_non_standard_sub || matches!(self.method.as_bytes(), b"eth_subscribe")
+    }
+
+    /// Indicates that the request is a non-standard subscription (i.e. not
+    /// "eth_subscribe").
+    pub fn set_non_standard_sub(&mut self) {
+        self.is_non_standard_sub = true;
+    }
 }
 
 /// A JSON-RPC 2.0 request object.
@@ -27,6 +42,19 @@ pub struct Request<Params> {
     pub meta: RequestMeta,
     /// The request parameters.
     pub params: Params,
+}
+
+impl<Params> Request<Params> {
+    /// Returns `true` if the request is a subscription.
+    pub fn is_subscription(&self) -> bool {
+        self.meta.is_subscription()
+    }
+
+    /// Indicates that the request is a non-standard subscription (i.e. not
+    /// "eth_subscribe").
+    pub fn set_non_standard_sub(&mut self) {
+        self.meta.set_non_standard_sub()
+    }
 }
 
 /// A [`Request`] that has been partially serialized. The request parameters
@@ -160,9 +188,16 @@ impl SerializedRequest {
     pub const fn method(&self) -> &'static str {
         self.meta.method
     }
+
+    /// Mark the request as a non-standard subscription (i.e. not
+    /// `eth_subscribe`)
+    pub fn set_non_standard_sub(&mut self) {
+        self.meta.is_non_standard_sub = true;
+    }
+
     /// Returns `true` if the request is a subscription.
     pub const fn is_subscription(&self) -> bool {
-        matches!(self.method().as_bytes(), b"eth_subscribe")
+        self.meta.is_non_standard_sub || matches!(self.method().as_bytes(), b"eth_subscribe")
     }
 
     /// Returns the serialized request.
