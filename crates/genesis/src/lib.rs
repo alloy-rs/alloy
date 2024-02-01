@@ -23,11 +23,12 @@ use alloy_rpc_types::serde_helpers::{
     num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
 };
+use alloy_signer::LocalWallet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The genesis block specification.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
@@ -101,7 +102,13 @@ impl Genesis {
         let mut alloc = HashMap::new();
         alloc.insert(
             signer_addr,
-            GenesisAccount { balance: U256::MAX, nonce: None, code: None, storage: None },
+            GenesisAccount {
+                balance: U256::MAX,
+                nonce: None,
+                code: None,
+                storage: None,
+                private_key: None,
+            },
         );
 
         // put signer address in the extra data, padded by the required amount of zeros
@@ -198,7 +205,7 @@ impl Genesis {
 }
 
 /// An account in the state of the genesis block.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
@@ -217,6 +224,55 @@ pub struct GenesisAccount {
         deserialize_with = "deserialize_storage_map"
     )]
     pub storage: Option<HashMap<B256, B256>>,
+    /// The account's private key.
+    #[serde(
+        rename = "secretKey",
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "secret_key"
+    )]
+    pub private_key: Option<LocalWallet>,
+}
+
+/// serde support for `secretKey` in genesis
+pub mod secret_key {
+    use alloy_primitives::Bytes;
+    use alloy_signer::LocalWallet;
+    use k256::{ecdsa::SigningKey, SecretKey};
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Serialize a secret key.
+    pub fn serialize<S>(value: &Option<LocalWallet>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if let Some(wallet) = value {
+            let signer: SigningKey = wallet.signer().clone();
+            let signer_bytes = signer.to_bytes();
+            let signer_bytes2: [u8; 32] = *signer_bytes.as_ref();
+            Bytes::from(signer_bytes2).serialize(serializer)
+        } else {
+            serializer.serialize_none()
+        }
+    }
+
+    /// Deserialize a secret key.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<LocalWallet>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if let Some(s) = Option::<Bytes>::deserialize(deserializer)? {
+            if s.is_empty() {
+                return Ok(None);
+            }
+            SecretKey::from_bytes(s.as_ref().into())
+                .map_err(de::Error::custom)
+                .map(Into::into)
+                .map(Some)
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl GenesisAccount {
@@ -575,6 +631,7 @@ mod tests {
             balance: U256::from(1),
             code: Some(Bytes::from(b"code")),
             storage: Some(HashMap::default()),
+            private_key: None,
         };
         let mut updated_account = HashMap::default();
         updated_account.insert(same_address, new_alloc_account);
@@ -1156,6 +1213,7 @@ mod tests {
     unwrap(),                     nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1165,6 +1223,7 @@ mod tests {
                         nonce: None,
                         code: Some(Bytes::from_str("0x12").unwrap()),
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1181,6 +1240,7 @@ mod tests {
     B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000022").
     unwrap(),                         ),
                         ])),
+                        private_key: None,
                     },
                 ),
                 (
@@ -1190,6 +1250,7 @@ mod tests {
                         nonce: Some(0x32u64),
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1199,6 +1260,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1208,6 +1270,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1217,6 +1280,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
                 (
@@ -1226,6 +1290,7 @@ mod tests {
                         nonce: None,
                         code: None,
                         storage: None,
+                        private_key: None,
                     },
                 ),
             ]),
