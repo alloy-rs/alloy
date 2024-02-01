@@ -114,12 +114,12 @@ impl<T> From<RawSubscription> for Subscription<T> {
 
 impl<T> Subscription<T> {
     /// Get the local ID of the subscription.
-    pub fn local_id(&self) -> B256 {
+    pub const fn local_id(&self) -> B256 {
         self.inner.local_id()
     }
 
     /// Get a reference to the inner subscription.
-    pub fn inner(&self) -> &RawSubscription {
+    pub const fn inner(&self) -> &RawSubscription {
         &self.inner
     }
 
