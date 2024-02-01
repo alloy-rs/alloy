@@ -28,7 +28,8 @@ alloy-transport-ws = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
-serde.workspace = true
+
+serde =  { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -47,6 +48,6 @@ tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
 default = ["reqwest"]
 reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
 hyper = ["dep:url", "dep:hyper", "alloy-transport-http/hyper"]
-pubsub = ["dep:alloy-pubsub", "dep:alloy-primitives"]
+pubsub = ["dep:alloy-pubsub", "dep:alloy-primitives", "dep:serde"]
 ws = ["pubsub", "dep:alloy-transport-ws"]
 ipc = ["pubsub", "dep:alloy-transport-ipc"]
