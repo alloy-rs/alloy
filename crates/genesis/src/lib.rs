@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The genesis block specification.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
@@ -204,7 +204,7 @@ impl Genesis {
 }
 
 /// An account in the state of the genesis block.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
