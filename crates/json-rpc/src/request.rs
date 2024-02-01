@@ -197,7 +197,7 @@ impl SerializedRequest {
 
     /// Returns `true` if the request is a subscription.
     pub const fn is_subscription(&self) -> bool {
-        self.meta.is_non_standard_sub || matches!(self.method().as_bytes(), b"eth_subscribe")
+        self.meta.is_subscription()
     }
 
     /// Returns the serialized request.
