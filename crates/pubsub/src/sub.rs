@@ -96,6 +96,10 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 
 /// A Subscription is a feed of notifications from the server of a specific
 /// type `T`, identified by a local ID.
+///
+/// The [`Subscription::recv`] method and its variants will discard any
+/// notifications of unexpected types, while [`Subscription::recv_any`] and its
+/// variants will return them as [`SubscriptionItem::Other`].
 #[derive(Debug)]
 pub struct Subscription<T> {
     pub(crate) inner: RawSubscription,
@@ -132,6 +136,9 @@ impl<T> Subscription<T> {
 
     /// Returns the number of messages in the broadcast channel that this
     /// receiver has yet to receive.
+    ///
+    /// NB: This count may include messages of unexpected types that will be
+    /// discarded upon receipt.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
@@ -162,18 +169,21 @@ impl<T> Subscription<T> {
 }
 
 impl<T: DeserializeOwned> Subscription<T> {
-    /// Wrapper for [`blocking_recv`]. Block the current thread until a message
-    /// is available.
+    /// Wrapper for [`blocking_recv`], may produce unexpected values. Block the
+    /// current thread until a message is available.
     ///
     /// [`blocking_recv`]: broadcast::Receiver::blocking_recv
-    pub fn blocking_recv(&mut self) -> Result<SubscriptionItem<T>, broadcast::error::RecvError> {
+    pub fn blocking_recv_any(
+        &mut self,
+    ) -> Result<SubscriptionItem<T>, broadcast::error::RecvError> {
         self.inner.blocking_recv().map(Into::into)
     }
 
-    /// Wrapper for [`recv`]. Await an item from the channel.
+    /// Wrapper for [`recv`], may produce unexpected values. Await an item from
+    /// the channel.
     ///
     /// [`recv`]: broadcast::Receiver::recv
-    pub async fn recv(&mut self) -> Result<Box<RawValue>, broadcast::error::RecvError> {
+    pub async fn recv_any(&mut self) -> Result<SubscriptionItem<T>, broadcast::error::RecvError> {
         self.inner.recv().await.map(Into::into)
     }
 
@@ -181,7 +191,40 @@ impl<T: DeserializeOwned> Subscription<T> {
     /// without awaiting.
     ///
     /// [`try_recv`]: broadcast::Receiver::try_recv
-    pub fn try_recv(&mut self) -> Result<SubscriptionItem<T>, broadcast::error::TryRecvError> {
+    pub fn try_recv_any(&mut self) -> Result<SubscriptionItem<T>, broadcast::error::TryRecvError> {
         self.inner.try_recv().map(Into::into)
+    }
+
+    /// Wrapper for [`blocking_recv`]. Block the current thread until a message
+    /// of the expected type is available.
+    pub fn blocking_recv(&mut self) -> Result<T, broadcast::error::RecvError> {
+        loop {
+            match self.blocking_recv_any()? {
+                SubscriptionItem::Item(item) => return Ok(item),
+                SubscriptionItem::Other(_) => continue,
+            }
+        }
+    }
+
+    /// Wrapper for [`recv`]. Await an item of the expected type from the
+    /// channel.
+    pub async fn recv(&mut self) -> Result<T, broadcast::error::RecvError> {
+        loop {
+            match self.recv_any().await? {
+                SubscriptionItem::Item(item) => return Ok(item),
+                SubscriptionItem::Other(_) => continue,
+            }
+        }
+    }
+
+    /// Wrapper for [`try_recv`]. Attempt to receive a message of the expected
+    /// type from the channel without awaiting.
+    pub fn try_recv(&mut self) -> Result<T, broadcast::error::TryRecvError> {
+        loop {
+            match self.try_recv_any()? {
+                SubscriptionItem::Item(item) => return Ok(item),
+                SubscriptionItem::Other(_) => continue,
+            }
+        }
     }
 }
