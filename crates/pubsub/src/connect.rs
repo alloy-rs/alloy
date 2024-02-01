@@ -9,8 +9,8 @@ pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// Returns `true` if the transport connects to a local resource.
     fn is_local(&self) -> bool;
 
-    /// Returns the buffer size for subscription channels. This value will
-    /// be used to determine the size of the broadcast channels used to send
+    /// Select the buffer size for subscription channels. This value will
+    /// be used to determine the capacity of the broadcast channels used to send
     /// notifications to subscribers. See [`broadcast::channel`] for more
     /// information about channel behavior.
     ///
