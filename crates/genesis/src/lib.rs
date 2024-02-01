@@ -57,6 +57,7 @@ pub struct Genesis {
     // * base_fee_per_gas
     // * excess_blob_gas
     // * blob_gas_used
+    // * number
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
@@ -68,6 +69,9 @@ pub struct Genesis {
     /// The genesis header blob gas used
     #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
     pub blob_gas_used: Option<u64>,
+    /// The genesis block number
+    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    pub number: Option<u64>,
 }
 
 impl Genesis {
@@ -1157,6 +1161,7 @@ mod tests {
                 base_fee_per_gas: None,
                 excess_blob_gas: None,
                 blob_gas_used: None,
+                number: None,
                 alloc: HashMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
