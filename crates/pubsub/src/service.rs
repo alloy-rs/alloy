@@ -40,7 +40,6 @@ where
 {
     /// Create a new service from a connector.
     pub(crate) async fn connect(connector: T) -> Result<PubSubFrontend, TransportError> {
-        let buffer_size = connector.subscription_buffer_size();
         let handle = connector.connect().await?;
 
         let (tx, reqs) = mpsc::unbounded_channel();
@@ -48,7 +47,7 @@ where
             handle,
             connector,
             reqs,
-            subs: SubscriptionManager::new(buffer_size),
+            subs: SubscriptionManager::default(),
             in_flights: Default::default(),
         };
         this.spawn();
@@ -183,7 +182,7 @@ where
         let request = in_flight.request;
         let id = request.id().clone();
 
-        self.subs.upsert(request, server_id);
+        self.subs.upsert(request, server_id, self.connector.subscription_buffer_size());
 
         // lie to the client about the sub id.
         let local_id = self.subs.local_id_for(server_id).unwrap();

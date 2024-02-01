@@ -3,22 +3,15 @@ use alloy_json_rpc::{EthNotification, SerializedRequest};
 use alloy_primitives::{B256, U256};
 use bimap::BiBTreeMap;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub(crate) struct SubscriptionManager {
     /// The subscriptions.
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
     local_to_server: BiBTreeMap<B256, U256>,
-
-    /// The buffer size for subscription channels.
-    buffer_size: usize,
 }
 
 impl SubscriptionManager {
-    pub(crate) fn new(buffer_size: usize) -> Self {
-        Self { local_to_sub: Default::default(), local_to_server: Default::default(), buffer_size }
-    }
-
     /// Get an iterator over the subscriptions.
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&B256, &ActiveSubscription)> {
         self.local_to_sub.iter()
@@ -30,8 +23,13 @@ impl SubscriptionManager {
     }
 
     /// Insert a subscription.
-    fn insert(&mut self, request: SerializedRequest, server_id: U256) -> RawSubscription {
-        let active = ActiveSubscription::new(request, self.buffer_size);
+    fn insert(
+        &mut self,
+        request: SerializedRequest,
+        server_id: U256,
+        buffer_size: usize,
+    ) -> RawSubscription {
+        let active = ActiveSubscription::new(request, buffer_size);
         let sub = active.subscribe();
 
         let local_id = active.local_id;
@@ -46,6 +44,7 @@ impl SubscriptionManager {
         &mut self,
         request: SerializedRequest,
         server_id: U256,
+        buffer_size: usize,
     ) -> RawSubscription {
         let local_id = request.params_hash();
 
@@ -55,7 +54,7 @@ impl SubscriptionManager {
             self.change_server_id(local_id, server_id);
             self.get_subscription(local_id).expect("checked existence")
         } else {
-            self.insert(request, server_id)
+            self.insert(request, server_id, buffer_size)
         }
     }
 
