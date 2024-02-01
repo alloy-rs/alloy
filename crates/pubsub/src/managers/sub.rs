@@ -1,9 +1,7 @@
-use crate::managers::ActiveSubscription;
+use crate::{managers::ActiveSubscription, RawSubscription};
 use alloy_json_rpc::{EthNotification, SerializedRequest};
 use alloy_primitives::{B256, U256};
 use bimap::BiBTreeMap;
-use serde_json::value::RawValue;
-use tokio::sync::broadcast;
 
 #[derive(Default, Debug)]
 pub(crate) struct SubscriptionManager {
@@ -25,16 +23,15 @@ impl SubscriptionManager {
     }
 
     /// Insert a subscription.
-    fn insert(
-        &mut self,
-        request: SerializedRequest,
-        server_id: U256,
-    ) -> broadcast::Receiver<Box<RawValue>> {
-        let (sub, rx) = ActiveSubscription::new(request);
-        self.local_to_server.insert(sub.local_id, server_id);
-        self.local_to_sub.insert(sub.local_id, sub);
+    fn insert(&mut self, request: SerializedRequest, server_id: U256) -> RawSubscription {
+        let active = ActiveSubscription::new(request);
+        let sub = active.subscribe();
 
-        rx
+        let local_id = active.local_id;
+        self.local_to_server.insert(local_id, server_id);
+        self.local_to_sub.insert(local_id, active);
+
+        sub
     }
 
     /// Insert or update the server_id for a subscription.
@@ -42,14 +39,14 @@ impl SubscriptionManager {
         &mut self,
         request: SerializedRequest,
         server_id: U256,
-    ) -> broadcast::Receiver<Box<RawValue>> {
+    ) -> RawSubscription {
         let local_id = request.params_hash();
 
         // If we already know a subscription with the exact params,
         // we can just update the server_id and get a new listener.
         if self.local_to_sub.contains_left(&local_id) {
             self.change_server_id(local_id, server_id);
-            self.get_rx(local_id).expect("checked existence")
+            self.get_subscription(local_id).expect("checked existence")
         } else {
             self.insert(request, server_id)
         }
@@ -89,8 +86,7 @@ impl SubscriptionManager {
     }
 
     /// Get a receiver for a subscription.
-    pub(crate) fn get_rx(&self, local_id: B256) -> Option<broadcast::Receiver<Box<RawValue>>> {
-        let sub = self.local_to_sub.get_by_left(&local_id)?;
-        Some(sub.tx.subscribe())
+    pub(crate) fn get_subscription(&self, local_id: B256) -> Option<RawSubscription> {
+        self.local_to_sub.get_by_left(&local_id).map(ActiveSubscription::subscribe)
     }
 }

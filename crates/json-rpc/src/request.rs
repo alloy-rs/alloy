@@ -167,6 +167,7 @@ impl SerializedRequest {
     }
 
     /// Consume the serialized request, returning the underlying [`RawValue`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn into_serialized(self) -> Box<RawValue> {
         self.request
     }

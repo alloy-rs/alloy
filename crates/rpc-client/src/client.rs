@@ -131,15 +131,11 @@ where
 #[cfg(feature = "pubsub")]
 mod pubsub_impl {
     use super::*;
-    use alloy_pubsub::{PubSubConnect, PubSubFrontend};
-    use tokio::sync::broadcast;
+    use alloy_pubsub::{PubSubConnect, PubSubFrontend, Subscription};
 
     impl RpcClient<PubSubFrontend> {
         /// Get a [`broadcast::Receiver`] for the given subscription ID.
-        pub async fn get_watcher(
-            &self,
-            id: alloy_primitives::U256,
-        ) -> broadcast::Receiver<Box<serde_json::value::RawValue>> {
+        pub async fn get_watcher(&self, id: alloy_primitives::U256) -> Subscription {
             self.transport.get_subscription(id).await.unwrap()
         }
 

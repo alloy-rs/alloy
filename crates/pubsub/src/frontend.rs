@@ -1,14 +1,13 @@
-use crate::{ix::PubSubInstruction, managers::InFlight};
+use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::U256;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
-use serde_json::value::RawValue;
 use std::{
     future::Future,
     task::{Context, Poll},
 };
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 
 /// A `PubSubFrontend` is [`Transport`] composed of a channel to a running
 /// PubSub service.
@@ -29,8 +28,7 @@ impl PubSubFrontend {
     pub fn get_subscription(
         &self,
         id: U256,
-    ) -> impl Future<Output = Result<broadcast::Receiver<Box<RawValue>>, TransportError>> + Send + 'static
-    {
+    ) -> impl Future<Output = Result<RawSubscription, TransportError>> + Send + 'static {
         let backend_tx = self.tx.clone();
         async move {
             let (tx, rx) = oneshot::channel();

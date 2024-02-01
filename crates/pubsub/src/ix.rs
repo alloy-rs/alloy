@@ -1,15 +1,15 @@
-use crate::managers::InFlight;
+use crate::{managers::InFlight, RawSubscription};
+
 use alloy_primitives::U256;
-use serde_json::value::RawValue;
 use std::fmt;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::oneshot;
 
 /// Instructions for the pubsub service.
 pub(crate) enum PubSubInstruction {
     /// Send a request.
     Request(InFlight),
     /// Get the subscription ID for a local ID.
-    GetSub(U256, oneshot::Sender<broadcast::Receiver<Box<RawValue>>>),
+    GetSub(U256, oneshot::Sender<RawSubscription>),
     /// Unsubscribe from a subscription.
     Unsubscribe(U256),
 }

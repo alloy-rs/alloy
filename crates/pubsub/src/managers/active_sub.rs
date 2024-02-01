@@ -4,6 +4,8 @@ use serde_json::value::RawValue;
 use std::{fmt, hash::Hash};
 use tokio::sync::broadcast;
 
+use crate::RawSubscription;
+
 #[derive(Clone)]
 /// An active subscription.
 pub(crate) struct ActiveSubscription {
@@ -55,10 +57,10 @@ impl fmt::Debug for ActiveSubscription {
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub(crate) fn new(request: SerializedRequest) -> (Self, broadcast::Receiver<Box<RawValue>>) {
+    pub(crate) fn new(request: SerializedRequest) -> Self {
         let local_id = request.params_hash();
-        let (tx, rx) = broadcast::channel(16);
-        (Self { request, local_id, tx }, rx)
+        let (tx, _rx) = broadcast::channel(16);
+        Self { request, local_id, tx }
     }
 
     /// Serialize the request as a boxed [`RawValue`].
@@ -66,6 +68,11 @@ impl ActiveSubscription {
     /// This is used to (re-)send the request over the transport.
     pub(crate) const fn request(&self) -> &SerializedRequest {
         &self.request
+    }
+
+    /// Get a subscription.
+    pub(crate) fn subscribe(&self) -> RawSubscription {
+        RawSubscription { rx: self.tx.subscribe(), local_id: self.local_id }
     }
 
     /// Notify the subscription channel of a new value, if any receiver exists.
