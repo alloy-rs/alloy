@@ -27,9 +27,9 @@ impl SubscriptionManager {
         &mut self,
         request: SerializedRequest,
         server_id: U256,
-        buffer_size: usize,
+        channel_size: usize,
     ) -> RawSubscription {
-        let active = ActiveSubscription::new(request, buffer_size);
+        let active = ActiveSubscription::new(request, channel_size);
         let sub = active.subscribe();
 
         let local_id = active.local_id;
@@ -44,7 +44,7 @@ impl SubscriptionManager {
         &mut self,
         request: SerializedRequest,
         server_id: U256,
-        buffer_size: usize,
+        channel_size: usize,
     ) -> RawSubscription {
         let local_id = request.params_hash();
 
@@ -54,7 +54,7 @@ impl SubscriptionManager {
             self.change_server_id(local_id, server_id);
             self.get_subscription(local_id).expect("checked existence")
         } else {
-            self.insert(request, server_id, buffer_size)
+            self.insert(request, server_id, channel_size)
         }
     }
 

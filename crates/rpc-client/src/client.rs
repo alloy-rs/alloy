@@ -59,7 +59,10 @@ impl<T> RpcClient<T> {
         method: &'static str,
         params: Params,
     ) -> Request<Params> {
-        Request { meta: RequestMeta { method, id: self.next_id() }, params }
+        Request {
+            meta: RequestMeta { method, id: self.next_id(), is_non_standard_sub: false },
+            params,
+        }
     }
 
     /// `true` if the client believes the transport is local.

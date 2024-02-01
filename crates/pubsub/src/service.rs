@@ -94,7 +94,9 @@ where
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            let (in_flight, _) = InFlight::new(req.clone());
+            // 0 is a dummy value, we don't care about the channel size here,
+            // as none of these will result in channel creation.
+            let (in_flight, _) = InFlight::new(req.clone(), 0);
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -143,7 +145,11 @@ where
     fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
         let local_id = local_id.into();
         let req = Request {
-            meta: RequestMeta { id: Id::None, method: "eth_unsubscribe" },
+            meta: RequestMeta {
+                id: Id::None,
+                method: "eth_unsubscribe",
+                is_non_standard_sub: false,
+            },
             params: [local_id],
         };
         let brv = req.serialize().expect("no ser error").take_request();
@@ -182,7 +188,7 @@ where
         let request = in_flight.request;
         let id = request.id().clone();
 
-        self.subs.upsert(request, server_id, self.connector.subscription_buffer_size());
+        self.subs.upsert(request, server_id, in_flight.channel_size);
 
         // lie to the client about the sub id.
         let local_id = self.subs.local_id_for(server_id).unwrap();

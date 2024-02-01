@@ -12,6 +12,9 @@ pub(crate) struct InFlight {
     /// The request
     pub(crate) request: SerializedRequest,
 
+    /// The number of items to buffer in the subscription channel.
+    pub(crate) channel_size: usize,
+
     /// The channel to send the response on.
     pub(crate) tx: oneshot::Sender<Result<Response, TransportError>>,
 }
@@ -20,6 +23,7 @@ impl fmt::Debug for InFlight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InFlight")
             .field("request", &self.request)
+            .field("channel_size", &self.channel_size)
             .field("tx_is_closed", &self.tx.is_closed())
             .finish()
     }
@@ -29,10 +33,11 @@ impl InFlight {
     /// Create a new in-flight request.
     pub(crate) fn new(
         request: SerializedRequest,
+        channel_size: usize,
     ) -> (Self, oneshot::Receiver<Result<Response, TransportError>>) {
         let (tx, rx) = oneshot::channel();
 
-        (Self { request, tx }, rx)
+        (Self { request, channel_size, tx }, rx)
     }
 
     /// Check if the request is a subscription.

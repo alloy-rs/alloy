@@ -57,9 +57,9 @@ impl fmt::Debug for ActiveSubscription {
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub(crate) fn new(request: SerializedRequest, buffer_size: usize) -> Self {
+    pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
         let local_id = request.params_hash();
-        let (tx, _rx) = broadcast::channel(buffer_size);
+        let (tx, _rx) = broadcast::channel(channel_size);
         Self { request, local_id, tx }
     }
 

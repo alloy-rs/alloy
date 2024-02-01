@@ -162,10 +162,45 @@ where
         Self { state: CallState::Prepared { request: Some(req), connection }, _pd: PhantomData }
     }
 
+    /// Set the request to be a non-standard subscription (i.e. not
+    /// "eth_subscribe").
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn set_non_standard_sub(&mut self) {
+        if let CallState::Prepared { request, .. } = &mut self.state {
+            request
+                .as_mut()
+                .expect("No request in prepared. This is a bug")
+                .meta
+                .set_non_standard_sub();
+        } else {
+            panic!("Cannot set non-standard sub after request has been sent");
+        }
+    }
+
+    /// Returns `true` if the request is a subscription.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn is_subscription(&self) -> bool {
+        if let CallState::Prepared { request, .. } = &self.state {
+            request.as_ref().expect("No request in prepared. This is a bug").meta.is_subscription()
+        } else {
+            panic!("Cannot get is_subscription after request has been sent");
+        }
+    }
+
     /// Get a mutable reference to the params of the request.
     ///
     /// This is useful for modifying the params after the request has been
     /// prepared.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
     pub fn params(&mut self) -> &mut Params {
         if let CallState::Prepared { request, .. } = &mut self.state {
             &mut request.as_mut().expect("No params in prepared. This is a bug").params
