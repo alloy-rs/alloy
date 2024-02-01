@@ -23,7 +23,6 @@ use alloy_rpc_types::serde_helpers::{
     num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
 };
-use alloy_signer::LocalWallet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -224,55 +223,9 @@ pub struct GenesisAccount {
         deserialize_with = "deserialize_storage_map"
     )]
     pub storage: Option<HashMap<B256, B256>>,
-    /// The account's private key.
-    #[serde(
-        rename = "secretKey",
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "secret_key"
-    )]
-    pub private_key: Option<LocalWallet>,
-}
-
-/// serde support for `secretKey` in genesis
-pub mod secret_key {
-    use alloy_primitives::Bytes;
-    use alloy_signer::LocalWallet;
-    use k256::{ecdsa::SigningKey, SecretKey};
-    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-
-    /// Serialize a secret key.
-    pub fn serialize<S>(value: &Option<LocalWallet>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if let Some(wallet) = value {
-            let signer: SigningKey = wallet.signer().clone();
-            let signer_bytes = signer.to_bytes();
-            let signer_bytes2: [u8; 32] = *signer_bytes.as_ref();
-            Bytes::from(signer_bytes2).serialize(serializer)
-        } else {
-            serializer.serialize_none()
-        }
-    }
-
-    /// Deserialize a secret key.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<LocalWallet>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if let Some(s) = Option::<Bytes>::deserialize(deserializer)? {
-            if s.is_empty() {
-                return Ok(None);
-            }
-            SecretKey::from_bytes(s.as_ref().into())
-                .map_err(de::Error::custom)
-                .map(Into::into)
-                .map(Some)
-        } else {
-            Ok(None)
-        }
-    }
+    /// The account's private key. Should only be used for testing.
+    #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
+    pub private_key: Option<B256>,
 }
 
 impl GenesisAccount {
