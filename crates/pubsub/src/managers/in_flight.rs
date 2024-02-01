@@ -35,9 +35,9 @@ impl InFlight {
         (Self { request, tx }, rx)
     }
 
-    /// Get the method
-    pub(crate) const fn method(&self) -> &'static str {
-        self.request.method()
+    /// Check if the request is a subscription.
+    pub(crate) const fn is_subscription(&self) -> bool {
+        self.request.is_subscription()
     }
 
     /// Get a reference to the serialized request.
@@ -51,7 +51,7 @@ impl InFlight {
     /// request. If the request is a subscription and the response is not an
     /// error, the subscription ID and the in-flight request are returned.
     pub(crate) fn fulfill(self, resp: Response) -> Option<(U256, Self)> {
-        if self.method() == "eth_subscribe" {
+        if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
                 let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
                 match sub_id {

@@ -160,6 +160,13 @@ impl SerializedRequest {
     pub const fn method(&self) -> &'static str {
         self.meta.method
     }
+    /// Returns `true` if the request is a subscription.
+    pub const fn is_subscription(&self) -> bool {
+        match self.method().as_bytes() {
+            b"eth_subscribe" => true,
+            _ => false,
+        }
+    }
 
     /// Returns the serialized request.
     pub const fn serialized(&self) -> &RawValue {
