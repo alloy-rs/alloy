@@ -40,6 +40,7 @@ where
 {
     /// Create a new service from a connector.
     pub(crate) async fn connect(connector: T) -> Result<PubSubFrontend, TransportError> {
+        let buffer_size = connector.subscription_buffer_size();
         let handle = connector.connect().await?;
 
         let (tx, reqs) = mpsc::unbounded_channel();
@@ -47,7 +48,7 @@ where
             handle,
             connector,
             reqs,
-            subs: Default::default(),
+            subs: SubscriptionManager::new(buffer_size),
             in_flights: Default::default(),
         };
         this.spawn();
