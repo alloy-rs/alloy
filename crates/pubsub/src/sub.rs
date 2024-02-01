@@ -89,6 +89,7 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
         if let Ok(item) = serde_json::from_str(value.get()) {
             SubscriptionItem::Item(item)
         } else {
+            trace!(value = value.get(), "Received unexpected value in subscription.");
             SubscriptionItem::Other(value)
         }
     }
@@ -97,9 +98,13 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 /// A Subscription is a feed of notifications from the server of a specific
 /// type `T`, identified by a local ID.
 ///
-/// The [`Subscription::recv`] method and its variants will discard any
-/// notifications of unexpected types, while [`Subscription::recv_any`] and its
-/// variants will return them as [`SubscriptionItem::Other`].
+/// For flexibility, we expose three similar APIs:
+/// - The [`Subscription::recv`] method and its variants will discard any notifications of
+///   unexpected types.
+/// - The [`Subscription::recv_any`] and its variants will yield unexpected types as
+///   [`SubscriptionItem::Other`].
+/// - The [`Subscription::recv_result`] and its variants will attempt to deserialize the
+///  notifications and yield the `serde_json::Result` of the deserialization.
 #[derive(Debug)]
 pub struct Subscription<T> {
     pub(crate) inner: RawSubscription,
@@ -238,5 +243,35 @@ impl<T: DeserializeOwned> Subscription<T> {
                 SubscriptionItem::Other(_) => continue,
             }
         }
+    }
+
+    /// Wrapper for [`blocking_recv`]. Block the current thread until a message
+    /// is available, deserializing the message and returning the result.
+    ///
+    /// [`blocking_recv`]: broadcast::Receiver::blocking_recv
+    pub fn blocking_recv_result(
+        &mut self,
+    ) -> Result<Result<T, serde_json::Error>, broadcast::error::RecvError> {
+        self.inner.blocking_recv().map(|value| serde_json::from_str(value.get()))
+    }
+
+    /// Wrapper for [`recv`]. Await an item from the channel, deserializing the
+    /// message and returning the result.
+    ///
+    /// [`recv`]: broadcast::Receiver::recv
+    pub async fn recv_result(
+        &mut self,
+    ) -> Result<Result<T, serde_json::Error>, broadcast::error::RecvError> {
+        self.inner.recv().await.map(|value| serde_json::from_str(value.get()))
+    }
+
+    /// Wrapper for [`try_recv`]. Attempt to receive a message from the channel
+    /// without awaiting, deserializing the message and returning the result.
+    ///
+    /// [`try_recv`]: broadcast::Receiver::try_recv
+    pub fn try_recv_result(
+        &mut self,
+    ) -> Result<Result<T, serde_json::Error>, broadcast::error::TryRecvError> {
+        self.inner.try_recv().map(|value| serde_json::from_str(value.get()))
     }
 }
