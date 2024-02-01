@@ -40,6 +40,8 @@ alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
 alloy-transport-ws.workspace = true
 
+tokio.workspace = true
+
 tempfile = "3"
 test-log = { version = "0.2.13", default-features = false, features = ["trace"] }
 tracing-subscriber = { version = "0.3.17", features = ["std", "env-filter"] }
