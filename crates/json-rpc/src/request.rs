@@ -46,7 +46,7 @@ pub struct Request<Params> {
 
 impl<Params> Request<Params> {
     /// Returns `true` if the request is a subscription.
-    pub fn is_subscription(&self) -> bool {
+    pub const fn is_subscription(&self) -> bool {
         self.meta.is_subscription()
     }
 

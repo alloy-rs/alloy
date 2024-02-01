@@ -81,7 +81,7 @@ impl PubSubFrontend {
     /// to buffer in new subscription channels. Defaults to 16. See
     /// [`tokio::sync::broadcast::channel`] for a description of relevant
     /// behavior.
-    pub fn channel_size(&self) -> usize {
+    pub const fn channel_size(&self) -> usize {
         self.channel_size
     }
 
