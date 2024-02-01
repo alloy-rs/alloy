@@ -18,7 +18,7 @@ pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
     /// The number of items to buffer in new subscription channels. Defaults to
     /// 16. See [`tokio::sync::broadcast::channel`] for a description.
-    pub channel_size: usize,
+    channel_size: usize,
 }
 
 impl PubSubFrontend {
@@ -75,6 +75,23 @@ impl PubSubFrontend {
                 .map_ok(ResponsePacket::Batch)
                 .boxed(),
         }
+    }
+
+    /// Get the currently configured channel size. This is the number of items
+    /// to buffer in new subscription channels. Defaults to 16. See
+    /// [`tokio::sync::broadcast::channel`] for a description of relevant
+    /// behavior.
+    pub fn channel_size(&self) -> usize {
+        self.channel_size
+    }
+
+    /// Set the channel size. This is the number of items to buffer in new
+    /// subscription channels. Defaults to 16. See
+    /// [`tokio::sync::broadcast::channel`] for a description of relevant
+    /// behavior.
+    pub fn set_channel_size(&mut self, channel_size: usize) {
+        debug_assert_ne!(channel_size, 0, "channel size must be non-zero");
+        self.channel_size = channel_size;
     }
 }
 
