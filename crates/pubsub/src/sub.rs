@@ -118,6 +118,12 @@ impl<T> Subscription<T> {
         self.inner.local_id()
     }
 
+    /// Convert the subscription into its inner [`RawSubscription`].
+    #[allow(clippy::missing_const_for_fn)] // erroneous lint
+    pub fn into_raw(self) -> RawSubscription {
+        self.inner
+    }
+
     /// Get a reference to the inner subscription.
     pub const fn inner(&self) -> &RawSubscription {
         &self.inner
