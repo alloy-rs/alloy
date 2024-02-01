@@ -32,3 +32,6 @@ pub use handle::{ConnectionHandle, ConnectionInterface};
 mod managers;
 
 mod service;
+
+mod sub;
+pub use sub::{RawSubscription, Subscription, SubscriptionItem};

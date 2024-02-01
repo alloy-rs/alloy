@@ -2,7 +2,7 @@ use crate::{
     handle::ConnectionHandle,
     ix::PubSubInstruction,
     managers::{InFlight, RequestManager, SubscriptionManager},
-    PubSubConnect, PubSubFrontend,
+    PubSubConnect, PubSubFrontend, RawSubscription,
 };
 
 use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
@@ -12,7 +12,7 @@ use alloy_transport::{
     TransportError, TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug)]
 /// The service contains the backend handle, a subscription manager, and the
@@ -128,11 +128,11 @@ where
     fn service_get_sub(
         &mut self,
         local_id: U256,
-        tx: oneshot::Sender<broadcast::Receiver<Box<RawValue>>>,
+        tx: oneshot::Sender<RawSubscription>,
     ) -> TransportResult<()> {
         let local_id = local_id.into();
 
-        if let Some(rx) = self.subs.get_rx(local_id) {
+        if let Some(rx) = self.subs.get_subscription(local_id) {
             let _ = tx.send(rx);
         }
 
