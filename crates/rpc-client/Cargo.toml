@@ -27,7 +27,6 @@ alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
 serde.workspace = true
 

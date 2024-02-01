@@ -143,8 +143,8 @@ impl<T> Subscription<T> {
         self.inner.len()
     }
 
-    /// Wrapper for [`resubscribe`]. Create a new [`SubInner`], starting from
-    /// the current tail element.
+    /// Wrapper for [`resubscribe`]. Create a new [`RawSubscription`], starting
+    /// from the current tail element.
     ///
     /// [`resubscribe`]: broadcast::Receiver::resubscribe
     pub fn resubscribe_inner(&self) -> RawSubscription {
@@ -197,6 +197,8 @@ impl<T: DeserializeOwned> Subscription<T> {
 
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
     /// of the expected type is available.
+    ///
+    /// [`blocking_recv`]: broadcast::Receiver::blocking_recv
     pub fn blocking_recv(&mut self) -> Result<T, broadcast::error::RecvError> {
         loop {
             match self.blocking_recv_any()? {
@@ -208,6 +210,8 @@ impl<T: DeserializeOwned> Subscription<T> {
 
     /// Wrapper for [`recv`]. Await an item of the expected type from the
     /// channel.
+    ///
+    /// [`recv`]: broadcast::Receiver::recv
     pub async fn recv(&mut self) -> Result<T, broadcast::error::RecvError> {
         loop {
             match self.recv_any().await? {
@@ -219,6 +223,8 @@ impl<T: DeserializeOwned> Subscription<T> {
 
     /// Wrapper for [`try_recv`]. Attempt to receive a message of the expected
     /// type from the channel without awaiting.
+    ///
+    /// [`try_recv`]: broadcast::Receiver::try_recv
     pub fn try_recv(&mut self) -> Result<T, broadcast::error::TryRecvError> {
         loop {
             match self.try_recv_any()? {
