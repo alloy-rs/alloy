@@ -2,10 +2,10 @@
 
 use super::{Wallet, WalletError};
 use crate::utils::secret_key_to_address;
-use alloy_primitives::hex;
+use alloy_primitives::{hex, B256};
 use k256::{
     ecdsa::{self, SigningKey},
-    FieldBytes, SecretKey as K256SecretKey,
+    FieldBytes, NonZeroScalar, SecretKey as K256SecretKey,
 };
 use rand::{CryptoRng, Rng};
 use std::str::FromStr;
@@ -14,13 +14,23 @@ use std::str::FromStr;
 use {elliptic_curve::rand_core, std::path::Path};
 
 impl Wallet<SigningKey> {
-    /// Creates a new Wallet instance from a raw scalar serialized as a byte array.
+    /// Creates a new Wallet instance from a raw scalar serialized as a [`B256`] byte array.
+    ///
+    /// This is identical to [`from_field_bytes`](Self::from_field_bytes).
     #[inline]
-    pub fn from_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
+    pub fn from_bytes(bytes: &B256) -> Result<Self, ecdsa::Error> {
+        Self::from_field_bytes((&bytes.0).into())
+    }
+
+    /// Creates a new Wallet instance from a raw scalar serialized as a [`FieldBytes`] byte array.
+    #[inline]
+    pub fn from_field_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
         SigningKey::from_bytes(bytes).map(Self::new_pk)
     }
 
     /// Creates a new Wallet instance from a raw scalar serialized as a byte slice.
+    ///
+    /// Byte slices shorter than the field size (32 bytes) are handled by zero padding the input.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
         SigningKey::from_slice(bytes).map(Self::new_pk)
@@ -42,6 +52,30 @@ impl Wallet<SigningKey> {
     fn new_pk(signer: SigningKey) -> Self {
         let address = secret_key_to_address(&signer);
         Self::new_with_signer(signer, address, None)
+    }
+
+    /// Borrow the secret [`NonZeroScalar`] value for this key.
+    ///
+    /// # ⚠️ Warning
+    ///
+    /// This value is key material.
+    ///
+    /// Please treat it with the care it deserves!
+    #[inline]
+    pub fn as_nonzero_scalar(&self) -> &NonZeroScalar {
+        self.signer.as_nonzero_scalar()
+    }
+
+    /// Serialize this [`Wallet`]'s [`SigningKey`] as a [`B256`] byte array.
+    #[inline]
+    pub fn to_bytes(&self) -> B256 {
+        B256::new(<[u8; 32]>::from(self.to_field_bytes()))
+    }
+
+    /// Serialize this [`Wallet`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
+    #[inline]
+    pub fn to_field_bytes(&self) -> FieldBytes {
+        self.signer.to_bytes()
     }
 }
 
@@ -136,7 +170,7 @@ mod tests {
     use super::*;
     use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
     use alloy_consensus::TxLegacy;
-    use alloy_primitives::{address, ChainId, Signature, U256};
+    use alloy_primitives::{address, b256, ChainId, Signature, U256};
 
     #[cfg(feature = "keystore")]
     use {std::path::Path, tempfile::tempdir};
@@ -356,16 +390,36 @@ mod tests {
     }
 
     #[test]
-    fn key_from_bytes() {
-        let wallet: Wallet<SigningKey> =
-            "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
+    fn conversions() {
+        let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
 
-        let key_as_bytes = wallet.signer.to_bytes();
-        let wallet_from_bytes = Wallet::from_bytes(&key_as_bytes).unwrap();
+        let wallet_b256: Wallet<SigningKey> = LocalWallet::from_bytes(&key).unwrap();
+        assert_eq!(wallet_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+        assert_eq!(wallet_b256.chain_id, None);
+        assert_eq!(wallet_b256.signer, SigningKey::from_bytes((&key.0).into()).unwrap());
 
-        assert_eq!(wallet.address, wallet_from_bytes.address);
-        assert_eq!(wallet.chain_id, wallet_from_bytes.chain_id);
-        assert_eq!(wallet.signer, wallet_from_bytes.signer);
+        let wallet_str =
+            Wallet::from_str("0000000000000000000000000000000000000000000000000000000000000001")
+                .unwrap();
+        assert_eq!(wallet_str.address, wallet_b256.address);
+        assert_eq!(wallet_str.chain_id, wallet_b256.chain_id);
+        assert_eq!(wallet_str.signer, wallet_b256.signer);
+        assert_eq!(wallet_str.to_bytes(), key);
+        assert_eq!(wallet_str.to_field_bytes(), key.0.into());
+
+        let wallet_slice = Wallet::from_slice(&key[..]).unwrap();
+        assert_eq!(wallet_slice.address, wallet_b256.address);
+        assert_eq!(wallet_slice.chain_id, wallet_b256.chain_id);
+        assert_eq!(wallet_slice.signer, wallet_b256.signer);
+        assert_eq!(wallet_slice.to_bytes(), key);
+        assert_eq!(wallet_slice.to_field_bytes(), key.0.into());
+
+        let wallet_field_bytes = Wallet::from_field_bytes((&key.0).into()).unwrap();
+        assert_eq!(wallet_field_bytes.address, wallet_b256.address);
+        assert_eq!(wallet_field_bytes.chain_id, wallet_b256.chain_id);
+        assert_eq!(wallet_field_bytes.signer, wallet_b256.signer);
+        assert_eq!(wallet_field_bytes.to_bytes(), key);
+        assert_eq!(wallet_field_bytes.to_field_bytes(), key.0.into());
     }
 
     #[test]

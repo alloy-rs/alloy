@@ -29,6 +29,7 @@ pub use wallet::{Wallet, WalletError};
 pub mod utils;
 
 pub use alloy_primitives::Signature;
+pub use k256;
 
 #[cfg(feature = "yubihsm")]
 pub use yubihsm;
