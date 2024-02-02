@@ -1,7 +1,7 @@
 //! Builder style functions for `trace_call`
 
 use crate::parity::TraceType;
-use alloy_rpc_types::{state::StateOverride, BlockId, BlockOverrides, CallRequest};
+use alloy_rpc_types::{request::TransactionRequest, state::StateOverride, BlockId, BlockOverrides};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -9,7 +9,7 @@ use std::collections::HashSet;
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TraceCallRequest {
     /// call request object
-    pub call: CallRequest,
+    pub call: TransactionRequest,
     /// trace types
     pub trace_types: HashSet<TraceType>,
     /// Optional: blockId
@@ -21,8 +21,8 @@ pub struct TraceCallRequest {
 }
 
 impl TraceCallRequest {
-    /// Returns a new [`TraceCallRequest`] given a [`CallRequest`] and [`HashSet<TraceType>`]
-    pub fn new(call: CallRequest) -> Self {
+    /// Returns a new [`TraceCallRequest`] given a [`TransactionRequest`] and [`HashSet<TraceType>`]
+    pub fn new(call: TransactionRequest) -> Self {
         Self {
             call,
             trace_types: HashSet::new(),
