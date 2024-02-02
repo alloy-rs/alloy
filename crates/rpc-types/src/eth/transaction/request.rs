@@ -3,48 +3,48 @@ use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSid
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
-/// Represents _all_ transaction requests to/from RPC
+/// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionRequest {
-    /// from address
+    /// The address of the transaction author.
     pub from: Option<Address>,
-    /// to address
+    /// The destination address of the transaction.
     pub to: Option<Address>,
-    /// legacy, gas Price
+    /// The legacy gas price.
     #[serde(default)]
     pub gas_price: Option<U128>,
-    /// max base fee per gas sender is willing to pay
+    /// The max base fee per gas the sender is willing to pay.
     #[serde(default)]
     pub max_fee_per_gas: Option<U128>,
-    /// miner tip
+    /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
     #[serde(default)]
     pub max_priority_fee_per_gas: Option<U128>,
-    /// Max Fee per Blob gas for EIP-4844 transactions
+    /// The max fee per blob gas for EIP-4844 blob transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_per_blob_gas: Option<U256>,
-    /// gas
+    /// The gas limit for the transaction.
     pub gas: Option<U256>,
-    /// value of th tx in wei
+    /// The value transferred in the transaction, in wei.
     pub value: Option<U256>,
-    /// Any additional data sent
+    /// Transaction data.
     #[serde(default, flatten)]
     pub input: TransactionInput,
-    /// Transaction nonce
+    /// The nonce of the transaction.
     pub nonce: Option<U64>,
-    /// chain id
+    /// The chain ID for the transaction.
     pub chain_id: Option<U64>,
-    /// warm storage access pre-payment
+    /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default)]
     pub access_list: Option<AccessList>,
-    /// EIP-2718 type
+    /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
     #[serde(rename = "type")]
     pub transaction_type: Option<U8>,
-    /// Blob Versioned Hashes for EIP-4844 transactions
+    /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
-    /// sidecar for EIP-4844 transactions
+    /// Blob sidecar for EIP-4844 transactions.
     pub sidecar: Option<BlobTransactionSidecar>,
     /// Support for arbitrary additional fields.
     #[serde(flatten)]
