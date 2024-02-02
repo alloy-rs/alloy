@@ -79,7 +79,7 @@ impl PubSubFrontend {
 
     /// Get the currently configured channel size. This is the number of items
     /// to buffer in new subscription channels. Defaults to 16. See
-    /// [`tokio::sync::broadcast::channel`] for a description of relevant
+    /// [`tokio::sync::broadcast`] for a description of relevant
     /// behavior.
     pub const fn channel_size(&self) -> usize {
         self.channel_size
@@ -87,7 +87,7 @@ impl PubSubFrontend {
 
     /// Set the channel size. This is the number of items to buffer in new
     /// subscription channels. Defaults to 16. See
-    /// [`tokio::sync::broadcast::channel`] for a description of relevant
+    /// [`tokio::sync::broadcast`] for a description of relevant
     /// behavior.
     pub fn set_channel_size(&mut self, channel_size: usize) {
         debug_assert_ne!(channel_size, 0, "channel size must be non-zero");

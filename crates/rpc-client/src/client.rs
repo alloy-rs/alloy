@@ -156,6 +156,26 @@ mod pubsub_impl {
         {
             ClientBuilder::default().pubsub(connect).await
         }
+
+        /// Get the currently configured channel size. This is the number of items
+        /// to buffer in new subscription channels. Defaults to 16. See
+        /// [`tokio::sync::broadcast`] for a description of relevant
+        /// behavior.
+        ///
+        /// [`tokio::sync::broadcast`]: https://docs.rs/tokio/latest/tokio/sync/broadcast/index.html
+        pub const fn channel_size(&self) -> usize {
+            self.transport.channel_size()
+        }
+
+        /// Set the channel size. This is the number of items to buffer in new
+        /// subscription channels. Defaults to 16. See
+        /// [`tokio::sync::broadcast`] for a description of relevant
+        /// behavior.
+        ///
+        /// [`tokio::sync::broadcast`]: https://docs.rs/tokio/latest/tokio/sync/broadcast/index.html
+        pub fn set_channel_size(&mut self, size: usize) {
+            self.transport.set_channel_size(size);
+        }
     }
 }
 
