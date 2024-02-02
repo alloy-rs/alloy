@@ -1,3 +1,5 @@
+//! In-memory (local) private key signer.
+
 use crate::{Result, Signer, SignerSync};
 use alloy_primitives::{Address, ChainId, Signature, B256};
 use async_trait::async_trait;

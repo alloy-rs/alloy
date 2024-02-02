@@ -2,7 +2,7 @@ use alloy_primitives::hex;
 use k256::ecdsa;
 use thiserror::Error;
 
-/// Error thrown by the Wallet module.
+/// Error thrown by [`Wallet`](crate::Wallet).
 #[derive(Debug, Error)]
 pub enum WalletError {
     /// [`ecdsa`] error.

@@ -1,4 +1,4 @@
-//! Helpers for creating wallets for YubiHSM2.
+//! [YubiHSM2](yubihsm) wallet implementation.
 
 use super::Wallet;
 use crate::utils::raw_public_key_to_address;
