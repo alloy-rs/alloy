@@ -11,19 +11,24 @@ pub struct RequestMeta {
     /// The request ID.
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
-    pub is_non_standard_sub: bool,
+    is_subscription: bool,
 }
 
 impl RequestMeta {
+    /// Create a new `RequestMeta`.
+    pub const fn new(method: &'static str, id: Id) -> Self {
+        Self { method, id, is_subscription: false }
+    }
+
     /// Returns `true` if the request is a subscription.
     pub const fn is_subscription(&self) -> bool {
-        self.is_non_standard_sub || matches!(self.method.as_bytes(), b"eth_subscribe")
+        self.is_subscription || matches!(self.method.as_bytes(), b"eth_subscribe")
     }
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_non_standard_sub(&mut self) {
-        self.is_non_standard_sub = true;
+    pub fn set_is_subscription(&mut self) {
+        self.is_subscription = true;
     }
 }
 
@@ -45,6 +50,11 @@ pub struct Request<Params> {
 }
 
 impl<Params> Request<Params> {
+    /// Create a new `Request`.
+    pub const fn new(method: &'static str, id: Id, params: Params) -> Self {
+        Self { meta: RequestMeta::new(method, id), params }
+    }
+
     /// Returns `true` if the request is a subscription.
     pub const fn is_subscription(&self) -> bool {
         self.meta.is_subscription()
@@ -53,7 +63,7 @@ impl<Params> Request<Params> {
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
     pub fn set_non_standard_sub(&mut self) {
-        self.meta.set_non_standard_sub()
+        self.meta.set_is_subscription()
     }
 }
 
@@ -192,7 +202,7 @@ impl SerializedRequest {
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
     pub fn set_non_standard_sub(&mut self) {
-        self.meta.is_non_standard_sub = true;
+        self.meta.is_subscription = true;
     }
 
     /// Returns `true` if the request is a subscription.

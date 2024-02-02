@@ -168,13 +168,13 @@ where
     /// # Panics
     ///
     /// Panics if called after the request has been sent.
-    pub fn set_non_standard_sub(&mut self) {
+    pub fn set_is_subscription(&mut self) {
         if let CallState::Prepared { request, .. } = &mut self.state {
             request
                 .as_mut()
                 .expect("No request in prepared. This is a bug")
                 .meta
-                .set_non_standard_sub();
+                .set_is_subscription();
         } else {
             panic!("Cannot set non-standard sub after request has been sent");
         }

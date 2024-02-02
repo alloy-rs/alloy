@@ -5,7 +5,7 @@ use crate::{
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
 
-use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -144,14 +144,7 @@ where
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
         let local_id = local_id.into();
-        let req = Request {
-            meta: RequestMeta {
-                id: Id::None,
-                method: "eth_unsubscribe",
-                is_non_standard_sub: false,
-            },
-            params: [local_id],
-        };
+        let req = Request::new("eth_unsubscribe", Id::None, [local_id]);
         let brv = req.serialize().expect("no ser error").take_request();
 
         self.dispatch_request(brv)?;

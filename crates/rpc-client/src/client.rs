@@ -1,5 +1,5 @@
 use crate::{BatchRequest, ClientBuilder, RpcCall};
-use alloy_json_rpc::{Id, Request, RequestMeta, RpcParam, RpcReturn};
+use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -59,10 +59,7 @@ impl<T> RpcClient<T> {
         method: &'static str,
         params: Params,
     ) -> Request<Params> {
-        Request {
-            meta: RequestMeta { method, id: self.next_id(), is_non_standard_sub: false },
-            params,
-        }
+        Request::new(method, self.next_id(), params)
     }
 
     /// `true` if the client believes the transport is local.
