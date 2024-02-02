@@ -1,5 +1,5 @@
 //! Alloy basic Transaction Request type.
-use crate::{eth::transaction::AccessList, other::OtherFields};
+use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +33,8 @@ pub struct TransactionRequest {
     pub input: TransactionInput,
     /// Transaction nonce
     pub nonce: Option<U64>,
+    /// chain id
+    pub chain_id: Option<U64>,
     /// warm storage access pre-payment
     #[serde(default)]
     pub access_list: Option<AccessList>,
@@ -42,8 +44,8 @@ pub struct TransactionRequest {
     /// Blob Versioned Hashes for EIP-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
-    /// chain id
-    pub chain_id: Option<U64>,
+    /// sidecar for EIP-4844 transactions
+    pub sidecar: Option<BlobTransactionSidecar>,
     /// Support for arbitrary additional fields.
     #[serde(flatten)]
     pub other: OtherFields,
