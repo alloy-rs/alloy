@@ -1,4 +1,4 @@
-//! Specific helper functions for loading an offline K256 Private Key stored on disk
+//! [`k256`] wallet implementation.
 
 use super::{Wallet, WalletError};
 use crate::utils::secret_key_to_address;

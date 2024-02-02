@@ -12,6 +12,25 @@ pub enum TxKind {
     Call(Address),
 }
 
+impl From<Option<Address>> for TxKind {
+    /// Creates a `TxKind::Call` with the `Some` address, `None` otherwise.
+    #[inline]
+    fn from(value: Option<Address>) -> Self {
+        match value {
+            None => TxKind::Create,
+            Some(addr) => TxKind::Call(addr),
+        }
+    }
+}
+
+impl From<Address> for TxKind {
+    /// Creates a `TxKind::Call` with the given address.
+    #[inline]
+    fn from(value: Address) -> Self {
+        TxKind::Call(value)
+    }
+}
+
 impl TxKind {
     /// Returns the address of the contract that will be called or will receive the transfer.
     pub const fn to(self) -> Option<Address> {

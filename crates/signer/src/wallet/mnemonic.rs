@@ -1,5 +1,7 @@
-//! Specific helper functions for creating/loading a mnemonic private key following BIP-39
+//! Specific helper functions for creating/loading a mnemonic private key following [BIP-39]
 //! specifications.
+//!
+//! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
 use crate::{utils::secret_key_to_address, Wallet, WalletError};
 use coins_bip32::path::DerivationPath;
