@@ -1,4 +1,5 @@
-use crate::{NetworkRpcClient, Provider};
+use crate::parameterized::{NetworkRpcClient, Provider};
+
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;

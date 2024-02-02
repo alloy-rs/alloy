@@ -28,7 +28,10 @@ mod call;
 pub use call::RpcCall;
 
 mod client;
-pub use client::RpcClient;
+pub use client::{ClientRef, RpcClient, WeakClient};
+
+mod poller;
+pub use poller::PollStream;
 
 #[cfg(feature = "ws")]
 pub use alloy_transport_ws::WsConnect;

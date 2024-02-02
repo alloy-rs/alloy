@@ -2,8 +2,66 @@ use crate::{BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    ops::Deref,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
+    },
+};
 use tower::{layer::util::Identity, ServiceBuilder};
+
+/// An [`RpcClient`] in a [`Weak`] reference.
+pub type WeakClient<T> = Weak<RpcClientInner<T>>;
+
+/// A borrowed [`RpcClient`].
+pub type ClientRef<'a, T> = &'a RpcClientInner<T>;
+
+/// A JSON-RPC client.
+#[derive(Debug, Clone)]
+pub struct RpcClient<T>(Arc<RpcClientInner<T>>);
+
+impl<T> RpcClient<T> {
+    /// Create a new [`RpcClient`] with the given transport.
+    pub fn new(t: T, is_local: bool) -> Self {
+        Self(Arc::new(RpcClientInner::new(t, is_local)))
+    }
+
+    /// Connect to a transport via a [`TransportConnect`] implementor.
+    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
+    where
+        T: Transport,
+        C: TransportConnect<Transport = T>,
+    {
+        ClientBuilder::default().connect(connect).await
+    }
+
+    /// Get a [`Weak`] reference to the client.
+    pub fn get_weak(&self) -> WeakClient<T> {
+        Arc::downgrade(&self.0)
+    }
+
+    /// Borrow the client.
+    pub fn get_ref(&self) -> ClientRef<'_, T> {
+        &self.0
+    }
+}
+
+impl<T> RpcClient<Http<T>> {
+    /// Create a new [`BatchRequest`] builder.
+    #[inline]
+    pub fn new_batch(&self) -> BatchRequest<'_, Http<T>> {
+        BatchRequest::new(&self.0)
+    }
+}
+
+impl<T> Deref for RpcClient<T> {
+    type Target = RpcClientInner<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// A JSON-RPC client.
 ///
@@ -18,7 +76,7 @@ use tower::{layer::util::Identity, ServiceBuilder};
 /// no guarantee that a prepared [`RpcCall`] will be sent, or that a sent call
 /// will receive a response.
 #[derive(Debug)]
-pub struct RpcClient<T> {
+pub struct RpcClientInner<T> {
     /// The underlying transport.
     pub(crate) transport: T,
     /// `true` if the transport is local.
@@ -27,26 +85,17 @@ pub struct RpcClient<T> {
     pub(crate) id: AtomicU64,
 }
 
-impl RpcClient<Identity> {
+impl RpcClientInner<Identity> {
     /// Create a new [`ClientBuilder`].
     pub fn builder() -> ClientBuilder<Identity> {
         ClientBuilder { builder: ServiceBuilder::new() }
     }
 }
 
-impl<T> RpcClient<T> {
+impl<T> RpcClientInner<T> {
     /// Create a new [`RpcClient`] with the given transport.
     pub const fn new(t: T, is_local: bool) -> Self {
         Self { transport: t, is_local, id: AtomicU64::new(0) }
-    }
-
-    /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
-    where
-        T: Transport,
-        C: TransportConnect<Transport = T>,
-    {
-        ClientBuilder::default().connect(connect).await
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -91,7 +140,7 @@ impl<T> RpcClient<T> {
     }
 }
 
-impl<T> RpcClient<T>
+impl<T> RpcClientInner<T>
 where
     T: Transport + Clone,
 {
@@ -123,8 +172,8 @@ where
     /// erasing each type. E.g. if you have `RpcClient<Http>` and
     /// `RpcClient<Ws>` you can put both into a `Vec<RpcClient<BoxTransport>>`.
     #[inline]
-    pub fn boxed(self) -> RpcClient<BoxTransport> {
-        RpcClient { transport: self.transport.boxed(), is_local: self.is_local, id: self.id }
+    pub fn boxed(self) -> RpcClientInner<BoxTransport> {
+        RpcClientInner { transport: self.transport.boxed(), is_local: self.is_local, id: self.id }
     }
 }
 
@@ -133,7 +182,7 @@ mod pubsub_impl {
     use super::*;
     use alloy_pubsub::{PubSubConnect, PubSubFrontend, RawSubscription, Subscription};
 
-    impl RpcClient<PubSubFrontend> {
+    impl RpcClientInner<PubSubFrontend> {
         /// Get a [`RawSubscription`] for the given subscription ID.
         pub async fn get_raw_subscription(&self, id: alloy_primitives::U256) -> RawSubscription {
             self.transport.get_subscription(id).await.unwrap()
@@ -150,7 +199,7 @@ mod pubsub_impl {
         /// Connect to a transport via a [`PubSubConnect`] implementor.
         pub async fn connect_pubsub<C>(
             connect: C,
-        ) -> Result<RpcClient<PubSubFrontend>, TransportError>
+        ) -> Result<RpcClientInner<PubSubFrontend>, TransportError>
         where
             C: PubSubConnect,
         {
@@ -176,13 +225,5 @@ mod pubsub_impl {
         pub fn set_channel_size(&mut self, size: usize) {
             self.transport.set_channel_size(size);
         }
-    }
-}
-
-impl<T> RpcClient<Http<T>> {
-    /// Create a new [`BatchRequest`] builder.
-    #[inline]
-    pub fn new_batch(&self) -> BatchRequest<'_, Http<T>> {
-        BatchRequest::new(self)
     }
 }

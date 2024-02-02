@@ -33,7 +33,7 @@ pub type HttpProvider = Provider<Http<Client>>;
 /// An abstract provider for interacting with the [Ethereum JSON RPC
 /// API](https://github.com/ethereum/wiki/wiki/JSON-RPC). Must be instantiated
 /// with a transport which implements the [Transport] trait.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Provider<T: Transport = BoxTransport> {
     inner: RpcClient<T>,
     from: Option<Address>,
@@ -552,7 +552,7 @@ impl<'a> TryFrom<&'a String> for Provider<Http<Client>> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        provider::{Provider, TempProvider},
+        tmp::{Provider, TempProvider},
         utils,
     };
     use alloy_node_bindings::Anvil;
@@ -676,7 +676,7 @@ mod tests {
         let _code = provider
             .get_code_at(
                 addr,
-                crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
+                crate::tmp::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
             )
             .await
             .unwrap();
