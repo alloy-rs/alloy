@@ -93,9 +93,9 @@ impl<T> Deref for RpcClient<T> {
 /// ### Note
 ///
 /// IDs are allocated sequentially, starting at 0. IDs are reserved via
-/// [`RpcClient::next_id`]. Note that allocated IDs may not be used. There is
-/// no guarantee that a prepared [`RpcCall`] will be sent, or that a sent call
-/// will receive a response.
+/// [`RpcClientInner::next_id`]. Note that allocated IDs may not be used. There
+/// is no guarantee that a prepared [`RpcCall`] will be sent, or that a sent
+/// call will receive a response.
 #[derive(Debug)]
 pub struct RpcClientInner<T> {
     /// The underlying transport.
@@ -122,8 +122,8 @@ impl<T> RpcClientInner<T> {
     /// Build a `JsonRpcRequest` with the given method and params.
     ///
     /// This function reserves an ID for the request, however the request
-    /// is not sent. To send a request, use [`RpcClient::prepare`] and await
-    /// the returned [`RpcCall`].
+    /// is not sent. To send a request, use [`RpcClientInner::prepare`] and
+    /// await the returned [`RpcCall`].
     pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
