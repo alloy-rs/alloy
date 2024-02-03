@@ -62,7 +62,7 @@ impl<Params> Request<Params> {
 
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
-    pub fn set_non_standard_sub(&mut self) {
+    pub fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
     }
 }
@@ -201,8 +201,8 @@ impl SerializedRequest {
 
     /// Mark the request as a non-standard subscription (i.e. not
     /// `eth_subscribe`)
-    pub fn set_non_standard_sub(&mut self) {
-        self.meta.is_subscription = true;
+    pub fn set_is_subscription(&mut self) {
+        self.meta.set_is_subscription();
     }
 
     /// Returns `true` if the request is a subscription.
