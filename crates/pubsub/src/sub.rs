@@ -324,7 +324,7 @@ pub struct SubAnyStream<T> {
 
 impl<T> SubAnyStream<T> {
     /// Get the local ID of the subscription.
-    pub fn id(&self) -> B256 {
+    pub const fn id(&self) -> B256 {
         self.id
     }
 }
@@ -355,7 +355,7 @@ pub struct SubscriptionStream<T> {
 
 impl<T> SubscriptionStream<T> {
     /// Get the local ID of the subscription.
-    pub fn id(&self) -> B256 {
+    pub const fn id(&self) -> B256 {
         self.id
     }
 }
@@ -395,7 +395,7 @@ pub struct SubResultStream<T> {
 
 impl<T> SubResultStream<T> {
     /// Get the local ID of the subscription.
-    pub fn id(&self) -> B256 {
+    pub const fn id(&self) -> B256 {
         self.id
     }
 }
@@ -407,14 +407,10 @@ impl<T: DeserializeOwned> Stream for SubResultStream<T> {
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.inner.poll_next_unpin(cx)) {
-                Some(Ok(value)) => {
-                    return task::Poll::Ready(Some(Ok(serde_json::from_str(value.get()))))
-                }
-                Some(Err(e)) => return task::Poll::Ready(Some(Err(e))),
-                None => return task::Poll::Ready(None),
-            }
+        match ready!(self.inner.poll_next_unpin(cx)) {
+            Some(Ok(value)) => task::Poll::Ready(Some(Ok(serde_json::from_str(value.get())))),
+            Some(Err(e)) => task::Poll::Ready(Some(Err(e))),
+            None => task::Poll::Ready(None),
         }
     }
 }
