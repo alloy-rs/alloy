@@ -53,7 +53,7 @@ where
     /// Poll a method with the given parameters.
     ///
     /// A [`PollTask`]
-    pub fn prepare_poller<Params, Resp>(
+    pub fn prepare_static_poller<Params, Resp>(
         &self,
         method: &'static str,
         params: Params,
@@ -63,7 +63,7 @@ where
         Params: RpcParam + 'static,
         Resp: RpcReturn + Clone,
     {
-        let request = self.make_request(method, params);
+        let request: Request<Params> = self.make_request(method, params);
         PollTask::new(self.get_weak(), method, request.params)
     }
 }

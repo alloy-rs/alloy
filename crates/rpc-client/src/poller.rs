@@ -24,12 +24,12 @@ where
 
     /// Request Method
     method: &'static str,
-    /// Request Params
     params: Params,
 
     // config options
     channel_size: usize,
     poll_interval: Duration,
+    limit: Option<usize>,
 
     _pd: PhantomData<fn() -> Resp>,
 }
@@ -40,16 +40,22 @@ where
     Params: RpcParam + 'static,
     Resp: RpcReturn + Clone,
 {
-    /// Create a new poller task.
-    pub(crate) fn new(client: WeakClient<Conn>, method: &'static str, params: Params) -> Self {
+    /// Create a new poller task with cloneable params.
+    pub fn new(client: WeakClient<Conn>, method: &'static str, params: Params) -> Self {
         Self {
             client,
-            params,
             method,
+            params,
             channel_size: 16,
             poll_interval: Duration::from_secs(10),
+            limit: None,
             _pd: PhantomData,
         }
+    }
+
+    /// Set a limit on the number of succesful polls.
+    pub fn set_limit(&mut self, limit: Option<usize>) {
+        self.limit = limit;
     }
 
     /// Set the duration between polls.
@@ -68,7 +74,8 @@ where
         let (tx, rx) = broadcast::channel(self.channel_size);
 
         let fut = async move {
-            loop {
+            let limit = self.limit.unwrap_or(usize::MAX);
+            for _ in 0..limit {
                 let client = match self.client.upgrade() {
                     Some(client) => client,
                     None => break,
