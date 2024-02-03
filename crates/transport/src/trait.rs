@@ -51,6 +51,14 @@ pub trait Transport:
     {
         BoxTransport::new(self)
     }
+
+    /// Make a boxed trait object by cloning this transport.
+    fn as_boxed(&self) -> BoxTransport
+    where
+        Self: Sized + Clone + Send + Sync + 'static,
+    {
+        BoxTransport::new(self.clone())
+    }
 }
 
 impl<T> Transport for T where

@@ -1,4 +1,4 @@
-use crate::{BatchRequest, ClientBuilder, RpcCall};
+use crate::{poller::PollTask, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
@@ -27,15 +27,6 @@ impl<T> RpcClient<T> {
         Self(Arc::new(RpcClientInner::new(t, is_local)))
     }
 
-    /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
-    where
-        T: Transport,
-        C: TransportConnect<Transport = T>,
-    {
-        ClientBuilder::default().connect(connect).await
-    }
-
     /// Get a [`Weak`] reference to the client.
     pub fn get_weak(&self) -> WeakClient<T> {
         Arc::downgrade(&self.0)
@@ -44,6 +35,36 @@ impl<T> RpcClient<T> {
     /// Borrow the client.
     pub fn get_ref(&self) -> ClientRef<'_, T> {
         &self.0
+    }
+}
+
+impl<T> RpcClient<T>
+where
+    T: Transport,
+{
+    /// Connect to a transport via a [`TransportConnect`] implementor.
+    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
+    where
+        C: TransportConnect<Transport = T>,
+    {
+        ClientBuilder::default().connect(connect).await
+    }
+
+    /// Poll a method with the given parameters.
+    ///
+    /// A [`PollTask`]
+    pub fn prepare_poller<Params, Resp>(
+        &self,
+        method: &'static str,
+        params: Params,
+    ) -> PollTask<T, Params, Resp>
+    where
+        T: Clone,
+        Params: RpcParam + 'static,
+        Resp: RpcReturn + Clone,
+    {
+        let request = self.make_request(method, params);
+        PollTask::new(self.get_weak(), method, request.params)
     }
 }
 
@@ -171,7 +192,6 @@ where
     /// This is for abstracting over `RpcClient<T>` for multiple `T` by
     /// erasing each type. E.g. if you have `RpcClient<Http>` and
     /// `RpcClient<Ws>` you can put both into a `Vec<RpcClient<BoxTransport>>`.
-    #[inline]
     pub fn boxed(self) -> RpcClientInner<BoxTransport> {
         RpcClientInner { transport: self.transport.boxed(), is_local: self.is_local, id: self.id }
     }
@@ -195,11 +215,13 @@ mod pubsub_impl {
         ) -> Subscription<T> {
             Subscription::from(self.get_raw_subscription(id).await)
         }
+    }
 
+    impl RpcClient<PubSubFrontend> {
         /// Connect to a transport via a [`PubSubConnect`] implementor.
         pub async fn connect_pubsub<C>(
             connect: C,
-        ) -> Result<RpcClientInner<PubSubFrontend>, TransportError>
+        ) -> Result<RpcClient<PubSubFrontend>, TransportError>
         where
             C: PubSubConnect,
         {
