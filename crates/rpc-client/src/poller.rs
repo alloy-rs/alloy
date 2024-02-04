@@ -64,7 +64,7 @@ where
     }
 
     /// Set the duration between polls.
-    pub fn withpoll_interval(mut self, poll_interval: Duration) -> Self {
+    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
         self.set_poll_interval(poll_interval);
         self
     }
