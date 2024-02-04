@@ -24,6 +24,8 @@ mod receipt;
 pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 mod transaction;
-pub use transaction::{TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType};
+pub use transaction::{
+    TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType, TypedTransactionRequest,
+};
 
 pub use alloy_network::TxKind;

@@ -169,7 +169,8 @@ impl FromStr for Wallet<SigningKey> {
 mod tests {
     use super::*;
     use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
-    use alloy_consensus::TxLegacy;
+    use alloy_consensus::{TxEip2930, TxLegacy, TypedTransactionRequest};
+    use alloy_network::Transaction;
     use alloy_primitives::{address, b256, ChainId, Signature, U256};
 
     #[cfg(feature = "keystore")]
@@ -331,6 +332,79 @@ mod tests {
         let error = sign_tx_test(&mut tx, Some(1)).await.unwrap_err();
         let expected_error = crate::Error::TransactionChainIdMismatch { signer: 1, tx: 2 };
         assert_eq!(error.to_string(), expected_error.to_string());
+    }
+
+    #[tokio::test]
+    async fn signs_typed_tx_test() {
+        async fn sign_dyn_tx_test(
+            tx: &mut SignableTx,
+            chain_id: Option<ChainId>,
+        ) -> Result<Signature> {
+            let mut wallet: Wallet<SigningKey> =
+                "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
+            wallet.set_chain_id(chain_id);
+
+            let sig = wallet.sign_transaction_sync(tx)?;
+            let sighash = tx.signature_hash();
+            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
+
+            let sig_async = wallet.sign_transaction(tx).await.unwrap();
+            assert_eq!(sig_async, sig);
+
+            Ok(sig)
+        }
+
+        async fn sign_typed_tx_test(
+            tx: &mut TypedTransactionRequest,
+            chain_id: Option<ChainId>,
+        ) -> Result<Signature> {
+            let mut before = tx.clone();
+            let sig = sign_dyn_tx_test(tx, chain_id).await?;
+            if let Some(chain_id) = chain_id {
+                assert_eq!(tx.chain_id(), Some(chain_id), "chain ID was not set");
+                before.set_chain_id(chain_id);
+            }
+            assert_eq!(*tx, before);
+            Ok(sig)
+        }
+
+        // retrieved test vector from:
+        // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
+        let mut tx = TxLegacy {
+            to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
+            value: U256::from(1_000_000_000),
+            gas_limit: 2_000_000,
+            nonce: 0,
+            gas_price: 21_000_000_000,
+            input: Default::default(),
+            chain_id: None,
+        };
+
+        let sig_none = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+
+        tx.chain_id = Some(1);
+        let sig_1 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        let expected = "c9cf86333bcb065d140032ecaab5d9281bde80f21b9687b3e94161de42d51895727a108a0b8d101465414033c3f705a9c7b826e596766046ee1183dbc8aeaa6825".parse().unwrap();
+
+        assert_eq!(sig_1, expected);
+        assert_ne!(sig_1, sig_none);
+
+        let tx = TxEip2930 {
+            to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
+            value: U256::from(1_000_000_000),
+            gas_limit: 2_000_000,
+            nonce: 0,
+            gas_price: 21_000_000_000,
+            input: Default::default(),
+            chain_id: 1,
+            access_list: Default::default(),
+        };
+
+        let sig_1 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        let expected = "3aa3cb10b34f3e807123aeb77fc7d5da718f487367d0906d8a80151482c78c8d1342e405601925b88e33b0fc2b930ac64779255a440ee1b4a181711c97cbfd6f25".parse().unwrap();
+
+        assert_eq!(sig_1, expected);
+        assert_ne!(sig_1, sig_none);
     }
 
     #[test]

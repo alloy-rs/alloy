@@ -9,3 +9,6 @@ pub use legacy::TxLegacy;
 
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};
+
+mod request;
+pub use request::TypedTransactionRequest;
