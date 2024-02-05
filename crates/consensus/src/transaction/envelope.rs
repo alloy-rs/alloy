@@ -1,4 +1,4 @@
-use crate::{TxEip1559, TxEip2930, TxLegacy};
+use crate::{TxEip1559, TxEip2930, TxEip4844, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
@@ -18,6 +18,8 @@ pub enum TxType {
     Eip2930 = 1,
     /// EIP-1559 transaction type.
     Eip1559 = 2,
+    /// EIP-4844 transaction type.
+    Eip4844 = 3,
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
@@ -65,6 +67,8 @@ pub enum TxEnvelope {
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`].
     Eip1559(Signed<TxEip1559>),
+    /// A [`TxEip4844`].
+    Eip4844(Signed<TxEip4844>),
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
@@ -86,6 +90,7 @@ impl TxEnvelope {
             Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
+            Self::Eip4844(_) => TxType::Eip4844,
         }
     }
 
@@ -95,6 +100,7 @@ impl TxEnvelope {
             Self::Legacy(t) | Self::TaggedLegacy(t) => t.length(),
             Self::Eip2930(t) => t.length(),
             Self::Eip1559(t) => t.length(),
+            Self::Eip4844(t) => t.length(),
         }
     }
 
@@ -140,6 +146,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Legacy => Ok(Self::TaggedLegacy(Decodable::decode(buf)?)),
             TxType::Eip2930 => Ok(Self::Eip2930(Decodable::decode(buf)?)),
             TxType::Eip1559 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
+            TxType::Eip4844 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
         }
     }
 
@@ -155,6 +162,7 @@ impl Encodable2718 for TxEnvelope {
             Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
+            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
         }
     }
 
@@ -175,6 +183,10 @@ impl Encodable2718 for TxEnvelope {
             }
             TxEnvelope::Eip1559(tx) => {
                 out.put_u8(TxType::Eip1559 as u8);
+                tx.encode(out);
+            }
+            TxEnvelope::Eip4844(tx) => {
+                out.put_u8(TxType::Eip4844 as u8);
                 tx.encode(out);
             }
         }
