@@ -4,14 +4,14 @@ use alloy_rlp::Encodable;
 
 use crate::{TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType};
 
-/// The TypedTransactionRequest enum represents all Ethereum transaction request types.
+/// The TypedTransaction enum represents all Ethereum transaction request types.
 ///
 /// Its variants correspond to specific allowed transactions:
 /// 1. Legacy (pre-EIP2718) [`TxLegacy`]
 /// 2. EIP2930 (state access lists) [`TxEip2930`]
 /// 3. EIP1559 [`TxEip1559`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TypedTransactionRequest {
+pub enum TypedTransaction {
     /// Legacy transaction
     Legacy(TxLegacy),
     /// EIP-2930 transaction
@@ -20,25 +20,25 @@ pub enum TypedTransactionRequest {
     Eip1559(TxEip1559),
 }
 
-impl From<TxLegacy> for TypedTransactionRequest {
+impl From<TxLegacy> for TypedTransaction {
     fn from(tx: TxLegacy) -> Self {
         Self::Legacy(tx)
     }
 }
 
-impl From<TxEip2930> for TypedTransactionRequest {
+impl From<TxEip2930> for TypedTransaction {
     fn from(tx: TxEip2930) -> Self {
         Self::Eip2930(tx)
     }
 }
 
-impl From<TxEip1559> for TypedTransactionRequest {
+impl From<TxEip1559> for TypedTransaction {
     fn from(tx: TxEip1559) -> Self {
         Self::Eip1559(tx)
     }
 }
 
-impl TypedTransactionRequest {
+impl TypedTransaction {
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
         match self {
@@ -67,7 +67,7 @@ impl TypedTransactionRequest {
     }
 }
 
-impl Encodable for TypedTransactionRequest {
+impl Encodable for TypedTransaction {
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
             Self::Legacy(tx) => tx.encode(out),
@@ -77,7 +77,7 @@ impl Encodable for TypedTransactionRequest {
     }
 }
 
-impl Transaction for TypedTransactionRequest {
+impl Transaction for TypedTransaction {
     type Signature = Signature;
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {

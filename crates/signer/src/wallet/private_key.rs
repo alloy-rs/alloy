@@ -169,7 +169,7 @@ impl FromStr for Wallet<SigningKey> {
 mod tests {
     use super::*;
     use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
-    use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy, TypedTransactionRequest};
+    use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy, TypedTransaction};
     use alloy_network::Transaction;
     use alloy_primitives::{address, b256, ChainId, Signature, U256};
 
@@ -334,7 +334,7 @@ mod tests {
     #[tokio::test]
     async fn signs_typed_tx_test() {
         async fn sign_typed_tx_test(
-            tx: &mut TypedTransactionRequest,
+            tx: &mut TypedTransaction,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
             let mut before = tx.clone();
