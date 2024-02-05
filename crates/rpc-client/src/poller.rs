@@ -100,11 +100,11 @@ where
     }
 }
 
-/// A stream of responses from a poller task.
+/// A channel yeildiing responses from a poller task.
 ///
 /// This stream is backed by a coroutine, and will continue to produce responses
 /// until the poller task is dropped. The poller task is dropped when all
-/// [`RpcClient`] instances are dropped, or when all listening PollStream are
+/// [`RpcClient`] instances are dropped, or when all listening `PollChannel` are
 /// dropped.
 ///
 /// The poller task also ignores errors from the server and deserialization
@@ -148,4 +148,9 @@ where
     pub fn into_stream(self) -> BroadcastStream<Resp> {
         BroadcastStream::from(self.rx)
     }
+}
+
+fn __assert_unpin() {
+    fn _assert<T: Unpin>() {}
+    _assert::<PollChannel<()>>();
 }

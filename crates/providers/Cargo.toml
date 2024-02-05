@@ -24,6 +24,8 @@ serde.workspace = true
 thiserror.workspace = true
 reqwest.workspace = true
 auto_impl = "1.1.0"
+tokio = { version = "1.33.0", features = ["sync"] }
+futures.workspace = true
 
 [dev-dependencies]
 alloy-node-bindings.workspace = true
