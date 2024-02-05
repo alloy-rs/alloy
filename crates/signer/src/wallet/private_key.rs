@@ -169,7 +169,7 @@ impl FromStr for Wallet<SigningKey> {
 mod tests {
     use super::*;
     use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
-    use alloy_consensus::{TxEip2930, TxLegacy, TypedTransactionRequest};
+    use alloy_consensus::{TxEip1559, TxEip2930, TxLegacy, TypedTransactionRequest};
     use alloy_network::Transaction;
     use alloy_primitives::{address, b256, ChainId, Signature, U256};
 
@@ -259,6 +259,21 @@ mod tests {
         assert_eq!(recovered2, address);
     }
 
+    async fn sign_dyn_tx_test(tx: &mut SignableTx, chain_id: Option<ChainId>) -> Result<Signature> {
+        let mut wallet: Wallet<SigningKey> =
+            "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
+        wallet.set_chain_id(chain_id);
+
+        let sig = wallet.sign_transaction_sync(tx)?;
+        let sighash = tx.signature_hash();
+        assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
+
+        let sig_async = wallet.sign_transaction(tx).await.unwrap();
+        assert_eq!(sig_async, sig);
+
+        Ok(sig)
+    }
+
     #[tokio::test]
     async fn signs_tx() {
         async fn sign_tx_test(tx: &mut TxLegacy, chain_id: Option<ChainId>) -> Result<Signature> {
@@ -269,24 +284,6 @@ mod tests {
                 before.chain_id = Some(chain_id);
             }
             assert_eq!(*tx, before);
-            Ok(sig)
-        }
-
-        async fn sign_dyn_tx_test(
-            tx: &mut SignableTx,
-            chain_id: Option<ChainId>,
-        ) -> Result<Signature> {
-            let mut wallet: Wallet<SigningKey> =
-                "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-            wallet.set_chain_id(chain_id);
-
-            let sig = wallet.sign_transaction_sync(tx)?;
-            let sighash = tx.signature_hash();
-            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
-
-            let sig_async = wallet.sign_transaction(tx).await.unwrap();
-            assert_eq!(sig_async, sig);
-
             Ok(sig)
         }
 
@@ -336,24 +333,6 @@ mod tests {
 
     #[tokio::test]
     async fn signs_typed_tx_test() {
-        async fn sign_dyn_tx_test(
-            tx: &mut SignableTx,
-            chain_id: Option<ChainId>,
-        ) -> Result<Signature> {
-            let mut wallet: Wallet<SigningKey> =
-                "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-            wallet.set_chain_id(chain_id);
-
-            let sig = wallet.sign_transaction_sync(tx)?;
-            let sighash = tx.signature_hash();
-            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
-
-            let sig_async = wallet.sign_transaction(tx).await.unwrap();
-            assert_eq!(sig_async, sig);
-
-            Ok(sig)
-        }
-
         async fn sign_typed_tx_test(
             tx: &mut TypedTransactionRequest,
             chain_id: Option<ChainId>,
@@ -389,7 +368,16 @@ mod tests {
         assert_eq!(sig_1, expected);
         assert_ne!(sig_1, sig_none);
 
-        let tx = TxEip2930 {
+        tx.chain_id = Some(2);
+        let sig_2 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        assert_ne!(sig_2, sig_1);
+        assert_ne!(sig_2, sig_none);
+
+        tx.chain_id = None;
+        let sig_none_none = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        assert_eq!(sig_none_none, sig_none);
+
+        let mut tx = TxEip2930 {
             to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
             value: U256::from(1_000_000_000),
             gas_limit: 2_000_000,
@@ -402,9 +390,34 @@ mod tests {
 
         let sig_1 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
         let expected = "3aa3cb10b34f3e807123aeb77fc7d5da718f487367d0906d8a80151482c78c8d1342e405601925b88e33b0fc2b930ac64779255a440ee1b4a181711c97cbfd6f25".parse().unwrap();
+        assert_eq!(sig_1, expected);
+
+        tx.set_chain_id(2);
+        let sig_2 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        assert_ne!(sig_2, sig_1);
+
+        let mut tx = TxEip1559 {
+            to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
+            value: U256::from(1_000_000_000),
+            gas_limit: 2_000_000,
+            nonce: 0,
+            max_fee_per_gas: 15_000_000_000,
+            max_priority_fee_per_gas: 1_000_000,
+            input: Default::default(),
+            chain_id: 1,
+            access_list: Default::default(),
+        };
+
+        let sig_1 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+        let expected = "82582dc3c843708e696643fcbc731e4cf574d666bf9bd4cbd397c54f399fcc860114400c11d66913083c0d36f4e506bcc8b164535aff5f8f822232c8ddc62e0625".parse().unwrap();
 
         assert_eq!(sig_1, expected);
         assert_ne!(sig_1, sig_none);
+
+        tx.set_chain_id(2);
+        let sig_2 = sign_typed_tx_test(&mut tx.clone().into(), None).await.unwrap();
+
+        assert_ne!(sig_2, sig_1);
     }
 
     #[test]
