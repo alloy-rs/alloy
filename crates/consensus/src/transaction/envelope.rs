@@ -9,6 +9,7 @@ use alloy_rlp::{length_of_length, Decodable, Encodable};
 /// [2718]: https://eips.ethereum.org/EIPS/eip-2718
 /// [1559]: https://eips.ethereum.org/EIPS/eip-1559
 /// [2930]: https://eips.ethereum.org/EIPS/eip-2930
+/// [4844]: https://eips.ethereum.org/EIPS/eip-4844
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum TxType {
@@ -29,6 +30,7 @@ impl<'a> arbitrary::Arbitrary<'a> for TxType {
             0 => TxType::Legacy,
             1 => TxType::Eip2930,
             2 => TxType::Eip1559,
+            3 => TxType::Eip4844,
             _ => unreachable!(),
         })
     }
@@ -40,7 +42,7 @@ impl TryFrom<u8> for TxType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: repr(u8) with explicit discriminant
-            ..=2 => Ok(unsafe { std::mem::transmute(value) }),
+            ..=3 => Ok(unsafe { std::mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }
@@ -146,7 +148,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Legacy => Ok(Self::TaggedLegacy(Decodable::decode(buf)?)),
             TxType::Eip2930 => Ok(Self::Eip2930(Decodable::decode(buf)?)),
             TxType::Eip1559 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
-            TxType::Eip4844 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
+            TxType::Eip4844 => Ok(Self::Eip4844(Decodable::decode(buf)?)),
         }
     }
 
@@ -239,6 +241,40 @@ mod tests {
         assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
         let from = tx.recover_signer().unwrap();
         assert_eq!(from, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
+    }
+
+    #[test]
+    #[cfg(feature = "k256")]
+    // Test vector from https://sepolia.etherscan.io/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
+    // Blobscan: https://sepolia.blobscan.com/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
+    fn test_decode_live_4844_tx() {
+        use alloy_primitives::{address, b256};
+
+        // https://sepolia.etherscan.io/getRawTx?tx=0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
+        let raw_tx = alloy_primitives::hex::decode("0x03f9011d83aa36a7820fa28477359400852e90edd0008252089411e9ca82a3a762b4b5bd264d4173a242e7a770648080c08504a817c800f8a5a0012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921aa00152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4a0013b98c6c83e066d5b14af2b85199e3d4fc7d1e778dd53130d180f5077e2d1c7a001148b495d6e859114e670ca54fb6e2657f0cbae5b08063605093a4b3dc9f8f1a0011ac212f13c5dff2b2c6b600a79635103d6f580a4221079951181b25c7e654901a0c8de4cced43169f9aa3d36506363b2d2c44f6c49fc1fd91ea114c86f3757077ea01e11fdd0d1934eda0492606ee0bb80a7bf8f35cc5f86ec60fe5031ba48bfd544").unwrap();
+        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        assert_eq!(res.tx_type(), TxType::Eip4844);
+
+        let tx = match res {
+            TxEnvelope::Eip4844(tx) => tx,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(tx.tx().to, TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064")));
+
+        assert_eq!(
+            tx.tx().blob_versioned_hashes,
+            vec![
+                b256!("012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921a"),
+                b256!("0152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4"),
+                b256!("013b98c6c83e066d5b14af2b85199e3d4fc7d1e778dd53130d180f5077e2d1c7"),
+                b256!("01148b495d6e859114e670ca54fb6e2657f0cbae5b08063605093a4b3dc9f8f1"),
+                b256!("011ac212f13c5dff2b2c6b600a79635103d6f580a4221079951181b25c7e6549")
+            ]
+        );
+
+        let from = tx.recover_signer().unwrap();
+        assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
     fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
