@@ -1,7 +1,7 @@
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
 use serde_json::value::RawValue;
-use std::{fmt, hash::Hash};
+use std::{fmt, hash::Hash, usize};
 use tokio::sync::broadcast;
 
 use crate::RawSubscription;
@@ -57,9 +57,9 @@ impl fmt::Debug for ActiveSubscription {
 
 impl ActiveSubscription {
     /// Create a new active subscription.
-    pub(crate) fn new(request: SerializedRequest) -> Self {
+    pub(crate) fn new(request: SerializedRequest, channel_size: usize) -> Self {
         let local_id = request.params_hash();
-        let (tx, _rx) = broadcast::channel(16);
+        let (tx, _rx) = broadcast::channel(channel_size);
         Self { request, local_id, tx }
     }
 

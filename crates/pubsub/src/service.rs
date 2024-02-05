@@ -5,7 +5,7 @@ use crate::{
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
 
-use alloy_json_rpc::{Id, PubSubItem, Request, RequestMeta, Response, ResponsePayload};
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -47,7 +47,7 @@ where
             handle,
             connector,
             reqs,
-            subs: Default::default(),
+            subs: SubscriptionManager::default(),
             in_flights: Default::default(),
         };
         this.spawn();
@@ -94,7 +94,9 @@ where
         // Dispatch all subscription requests.
         for (_, sub) in self.subs.iter() {
             let req = sub.request().to_owned();
-            let (in_flight, _) = InFlight::new(req.clone());
+            // 0 is a dummy value, we don't care about the channel size here,
+            // as none of these will result in channel creation.
+            let (in_flight, _) = InFlight::new(req.clone(), 0);
             self.in_flights.insert(in_flight);
 
             let msg = req.into_serialized();
@@ -142,10 +144,7 @@ where
     /// Service an unsubscribe instruction.
     fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
         let local_id = local_id.into();
-        let req = Request {
-            meta: RequestMeta { id: Id::None, method: "eth_unsubscribe" },
-            params: [local_id],
-        };
+        let req = Request::new("eth_unsubscribe", Id::None, [local_id]);
         let brv = req.serialize().expect("no ser error").take_request();
 
         self.dispatch_request(brv)?;
@@ -182,7 +181,7 @@ where
         let request = in_flight.request;
         let id = request.id().clone();
 
-        self.subs.upsert(request, server_id);
+        self.subs.upsert(request, server_id, in_flight.channel_size);
 
         // lie to the client about the sub id.
         let local_id = self.subs.local_id_for(server_id).unwrap();

@@ -10,6 +10,26 @@ pub struct RequestMeta {
     pub method: &'static str,
     /// The request ID.
     pub id: Id,
+    /// Whether the request is a subscription, other than `eth_subscribe`.
+    is_subscription: bool,
+}
+
+impl RequestMeta {
+    /// Create a new `RequestMeta`.
+    pub const fn new(method: &'static str, id: Id) -> Self {
+        Self { method, id, is_subscription: false }
+    }
+
+    /// Returns `true` if the request is a subscription.
+    pub const fn is_subscription(&self) -> bool {
+        self.is_subscription || matches!(self.method.as_bytes(), b"eth_subscribe")
+    }
+
+    /// Indicates that the request is a non-standard subscription (i.e. not
+    /// "eth_subscribe").
+    pub fn set_is_subscription(&mut self) {
+        self.is_subscription = true;
+    }
 }
 
 /// A JSON-RPC 2.0 request object.
@@ -27,6 +47,24 @@ pub struct Request<Params> {
     pub meta: RequestMeta,
     /// The request parameters.
     pub params: Params,
+}
+
+impl<Params> Request<Params> {
+    /// Create a new `Request`.
+    pub const fn new(method: &'static str, id: Id, params: Params) -> Self {
+        Self { meta: RequestMeta::new(method, id), params }
+    }
+
+    /// Returns `true` if the request is a subscription.
+    pub const fn is_subscription(&self) -> bool {
+        self.meta.is_subscription()
+    }
+
+    /// Indicates that the request is a non-standard subscription (i.e. not
+    /// "eth_subscribe").
+    pub fn set_is_subscription(&mut self) {
+        self.meta.set_is_subscription()
+    }
 }
 
 /// A [`Request`] that has been partially serialized. The request parameters
@@ -159,6 +197,17 @@ impl SerializedRequest {
     /// Returns the request method.
     pub const fn method(&self) -> &'static str {
         self.meta.method
+    }
+
+    /// Mark the request as a non-standard subscription (i.e. not
+    /// `eth_subscribe`)
+    pub fn set_is_subscription(&mut self) {
+        self.meta.set_is_subscription();
+    }
+
+    /// Returns `true` if the request is a subscription.
+    pub const fn is_subscription(&self) -> bool {
+        self.meta.is_subscription()
     }
 
     /// Returns the serialized request.

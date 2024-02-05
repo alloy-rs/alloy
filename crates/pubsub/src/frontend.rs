@@ -16,12 +16,15 @@ use tokio::sync::{mpsc, oneshot};
 #[derive(Debug, Clone)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
+    /// The number of items to buffer in new subscription channels. Defaults to
+    /// 16. See [`tokio::sync::broadcast::channel`] for a description.
+    channel_size: usize,
 }
 
 impl PubSubFrontend {
     /// Create a new frontend.
     pub(crate) const fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
-        Self { tx }
+        Self { tx, channel_size: 16 }
     }
 
     /// Get the subscription ID for a local ID.
@@ -52,8 +55,10 @@ impl PubSubFrontend {
         req: SerializedRequest,
     ) -> impl Future<Output = Result<Response, TransportError>> + Send + 'static {
         let tx = self.tx.clone();
+        let channel_size = self.channel_size;
+
         async move {
-            let (in_flight, rx) = InFlight::new(req);
+            let (in_flight, rx) = InFlight::new(req, channel_size);
             tx.send(PubSubInstruction::Request(in_flight))
                 .map_err(|_| TransportErrorKind::backend_gone())?;
             rx.await.map_err(|_| TransportErrorKind::backend_gone())?
@@ -70,6 +75,23 @@ impl PubSubFrontend {
                 .map_ok(ResponsePacket::Batch)
                 .boxed(),
         }
+    }
+
+    /// Get the currently configured channel size. This is the number of items
+    /// to buffer in new subscription channels. Defaults to 16. See
+    /// [`tokio::sync::broadcast`] for a description of relevant
+    /// behavior.
+    pub const fn channel_size(&self) -> usize {
+        self.channel_size
+    }
+
+    /// Set the channel size. This is the number of items to buffer in new
+    /// subscription channels. Defaults to 16. See
+    /// [`tokio::sync::broadcast`] for a description of relevant
+    /// behavior.
+    pub fn set_channel_size(&mut self, channel_size: usize) {
+        debug_assert_ne!(channel_size, 0, "channel size must be non-zero");
+        self.channel_size = channel_size;
     }
 }
 
