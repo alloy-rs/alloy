@@ -148,7 +148,7 @@ impl CallDecoder for () {
 /// # }
 /// ```
 ///
-/// Using [`ContractInstance`]:
+/// Using [`ContractInstance`](crate::ContractInstance):
 ///
 /// ```no_run
 /// # async fn test<P: alloy_contract::private::Provider>(provider: P, dynamic_abi: alloy_json_abi::JsonAbi) -> Result<(), Box<dyn std::error::Error>> {
