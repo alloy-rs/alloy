@@ -157,6 +157,13 @@ impl CallRequest {
         self
     }
 
+    /// Sets the `to` field in the call to the provided address
+    #[inline]
+    pub const fn to(mut self, to: Option<Address>) -> Self {
+        self.to = to;
+        self
+    }
+
     /// Sets the `gas` field in the transaction to the provided value
     pub const fn gas(mut self, gas: U256) -> Self {
         self.gas = Some(gas);

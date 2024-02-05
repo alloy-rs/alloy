@@ -219,7 +219,7 @@ impl<P: TempProvider, C: SolCall> SolCallBuilder<P, C> {
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     #[doc(hidden)]
     pub fn new_sol(provider: P, address: &Address, call: &C) -> Self {
-        Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).from(*address)
+        Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(Some(*address))
     }
 
     /// Clears the decoder, returning a raw call builder.
@@ -252,9 +252,15 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
         Self { request, decoder, provider, block: None, state: None }
     }
 
-    /// Sets the `from` field in the transaction to the provided value
+    /// Sets the `from` field in the transaction to the provided value. Defaults to [Address::ZERO].
     pub fn from(mut self, from: Address) -> Self {
         self.request = self.request.from(from);
+        self
+    }
+
+    /// Sets the `to` field in the transaction to the provided address.
+    pub fn to(mut self, to: Option<Address>) -> Self {
+        self.request = self.request.to(to);
         self
     }
 
