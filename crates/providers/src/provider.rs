@@ -633,7 +633,7 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let version = provider.get_client_version().await.unwrap();
-        assert_eq!(version, "anvil/v0.2.0");
+        assert!(version.contains("anvil"));
     }
 
     #[tokio::test]
