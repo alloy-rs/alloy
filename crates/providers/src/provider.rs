@@ -78,8 +78,14 @@ pub trait TempProvider: Send + Sync {
         full: bool,
     ) -> TransportResult<Option<Block>>;
 
+    /// Gets the client version of the chain client.
+    async fn get_client_version(&self) -> TransportResult<String>;
+
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<U64>;
+
+    /// Gets the network ID. Same as `eth_chainId`.
+    async fn get_net_version(&self) -> TransportResult<U64>;
 
     /// Gets the specified storage value from [Address].
     async fn get_storage_at(
@@ -276,9 +282,18 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_getBlockByNumber", (number, full)).await
     }
 
+    /// Gets the client version of the chain client.
+    async fn get_client_version(&self) -> TransportResult<String> {
+        self.inner.prepare("web3_clientVersion", ()).await
+    }
+
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<U64> {
         self.inner.prepare("eth_chainId", ()).await
+    }
+
+    async fn get_net_version(&self) -> TransportResult<U64> {
+        self.inner.prepare("net_version", ()).await
     }
 
     /// Gets the specified storage value from [Address].
@@ -614,11 +629,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gets_client_version() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let version = provider.get_client_version().await.unwrap();
+        assert!(version.contains("anvil"));
+    }
+
+    #[tokio::test]
     async fn gets_chain_id() {
         let chain_id: u64 = 13371337;
         let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let chain_id = provider.get_chain_id().await.unwrap();
+        assert_eq!(chain_id, U64::from(chain_id));
+    }
+
+    #[tokio::test]
+    async fn gets_network_id() {
+        let chain_id: u64 = 13371337;
+        let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let chain_id = provider.get_net_version().await.unwrap();
         assert_eq!(chain_id, U64::from(chain_id));
     }
 
