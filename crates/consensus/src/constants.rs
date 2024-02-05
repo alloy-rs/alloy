@@ -1,6 +1,4 @@
 //! Ethereum protocol-related constants
-pub mod eip4844;
-
 use alloy_primitives::{address, b256, Address, B256};
 
 /// The first four bytes of the call data for a function call specifies the function to be called.

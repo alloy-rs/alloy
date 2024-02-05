@@ -1,5 +1,5 @@
-use crate::{constants::eip4844::DATA_GAS_PER_BLOB, TxKind, TxType};
-use alloy_eips::eip2930::AccessList;
+use crate::{TxKind, TxType};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
