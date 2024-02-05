@@ -7,6 +7,9 @@ pub use eip2930::TxEip2930;
 mod legacy;
 pub use legacy::TxLegacy;
 
+mod eip4844;
+pub use eip4844::TxEip4844;
+
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};
 
