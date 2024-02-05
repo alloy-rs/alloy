@@ -239,6 +239,18 @@ impl TxEip4844 {
     }
 }
 
+impl Encodable for TxEip4844 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
+    }
+
+    fn length(&self) -> usize {
+        let payload_length = self.fields_len();
+        length_of_length(payload_length) + payload_length
+    }
+}
+
 impl Transaction for TxEip4844 {
     type Signature = Signature;
 
