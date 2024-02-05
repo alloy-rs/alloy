@@ -105,12 +105,12 @@ impl CallDecoder for () {
 ///
 /// [`call`]: CallBuilder::call
 ///
-/// ## Note
+/// # Note
 ///
-/// Sets the [state overrides](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set)
+/// This will set [state overrides](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set)
 /// for `eth_call`, but this is not supported by all clients.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// Using [`sol!`][sol]:
 ///
