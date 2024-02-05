@@ -20,12 +20,14 @@ pub enum Error {
 }
 
 impl From<AbiError> for Error {
+    #[inline]
     fn from(error: AbiError) -> Self {
         Self::AbiError(error)
     }
 }
 
 impl From<TransportError> for Error {
+    #[inline]
     fn from(error: TransportError) -> Self {
         Self::TransportError(error)
     }
@@ -36,12 +38,14 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::AbiError(e) => Some(e),
+            Self::TransportError(e) => Some(e),
             _ => None,
         }
     }
 }
 
 impl fmt::Display for Error {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownFunction(name) => {

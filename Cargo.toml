@@ -97,3 +97,10 @@ proptest-derive = "0.4"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.8"
+
+# TODO: remove
+[patch.crates-io]
+alloy-primitives = { git = "https://github.com/alloy-rs/core", branch = "dani/sol-rpc" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", branch = "dani/sol-rpc" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", branch = "dani/sol-rpc" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", branch = "dani/sol-rpc" }

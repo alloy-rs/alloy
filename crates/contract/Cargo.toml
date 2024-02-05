@@ -1,6 +1,6 @@
 [package]
-name = "alloy-dyn-contract"
-description = "Helpers for interacting with contracts that do not have a known ABI at compile time"
+name = "alloy-contract"
+description = "Helpers for interacting with on-chain contracts"
 
 version.workspace = true
 edition.workspace = true
@@ -19,3 +19,4 @@ alloy-transport.workspace = true
 alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true
 alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
