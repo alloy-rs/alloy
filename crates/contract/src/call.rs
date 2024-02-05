@@ -21,6 +21,9 @@ pub type DynCallBuilder<P> = CallBuilder<P, Function>;
 /// [`CallBuilder`] that does not have a call decoder.
 pub type RawCallBuilder<P> = CallBuilder<P, ()>;
 
+/// Contract deployment [`CallBuilder`]. TODO
+pub type DeploymentCallBuilder<P> = CallBuilder<P, ()>;
+
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Function {}
@@ -85,6 +88,23 @@ impl CallDecoder for () {
     #[inline]
     fn as_debug_field(&self) -> impl std::fmt::Debug {
         format_args!("()")
+    }
+}
+
+/// Marker type for contract deployment.
+pub struct DeploymentMarker(());
+
+impl CallDecoder for DeploymentMarker {
+    type Output = Bytes;
+
+    #[inline]
+    fn abi_decode_output(&self, data: Bytes, _validate: bool) -> Result<Self::Output> {
+        Ok(data)
+    }
+
+    #[inline]
+    fn as_debug_field(&self) -> impl std::fmt::Debug {
+        format_args!("DeploymentMarker")
     }
 }
 
