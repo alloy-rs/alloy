@@ -53,7 +53,7 @@ impl PreStateFrame {
 ///
 /// This corresponds to the default mode of the [PreStateConfig].
 ///
-/// The [AccountState]'s storage will include all non-zero slots that are modified by a transaction.
+/// The [AccountState]'s storage will include all touched slots of an account.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreStateMode(pub BTreeMap<Address, AccountState>);
 
