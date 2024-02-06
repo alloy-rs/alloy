@@ -19,9 +19,14 @@
 mod builder;
 pub use builder::{ProviderBuilder, ProviderLayer, Stack};
 
-pub mod tmp;
-pub mod utils;
-
-pub mod parameterized;
+mod chain;
 
 mod heart;
+
+pub mod new;
+pub use new::{ProviderRef, RootProvider, WeakProvider, Provider};
+
+pub mod utils;
+
+// TODO: remove
+pub mod tmp;

@@ -82,6 +82,7 @@ impl Future for PendingTransaction {
 }
 
 /// A handle to the heartbeat task.
+#[derive(Debug, Clone)]
 pub struct HeartbeatHandle {
     tx: mpsc::Sender<WatchConfig>,
     latest: watch::Receiver<Block>,

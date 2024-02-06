@@ -18,8 +18,14 @@ pub type WeakClient<T> = Weak<RpcClientInner<T>>;
 pub type ClientRef<'a, T> = &'a RpcClientInner<T>;
 
 /// A JSON-RPC client.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RpcClient<T>(Arc<RpcClientInner<T>>);
+
+impl<T> Clone for RpcClient<T> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
 
 impl<T> RpcClient<T> {
     /// Create a new [`RpcClient`] with the given transport.
