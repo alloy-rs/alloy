@@ -16,7 +16,10 @@ alloy-eips = { workspace = true, features = ["serde"] }
 alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rlp.workspace = true
+alloy-signer.workspace = true
+async-trait.workspace = true
 serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256"]

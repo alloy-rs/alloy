@@ -1,5 +1,11 @@
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_signer::LocalWallet;
+use async_trait::async_trait;
+
+use alloy_primitives::{keccak256, ChainId, Signature, B256, U256};
 use alloy_rlp::BufMut;
+
+mod builder;
+pub use builder::{Builder, BuilderError, CanBuild};
 
 mod common;
 pub use common::TxKind;
@@ -48,44 +54,62 @@ pub trait Signable<Sig = Signature>: Transaction {
         Self: Sized;
 }
 
+/// A transaction signer.
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+pub trait TxSigner<Sig: 'static>: alloy_signer::Signer<Sig> {
+    /// Signs the transaction.
+    async fn sign_transaction(&self, tx: &mut dyn Signable<Sig>) -> alloy_signer::Result<Sig> {
+        match (self.chain_id(), tx.chain_id()) {
+            (Some(signer), Some(tx)) if signer != tx => {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
+            }
+            _ => {}
+        }
+        self.sign_hash(tx.signature_hash()).await
+    }
+}
+
+impl TxSigner<Signature> for LocalWallet {}
+impl TxSignerSync<Signature> for LocalWallet {}
+
+/// A synchronous transaction signer.
+pub trait TxSignerSync<Sig: 'static>: alloy_signer::SignerSync<Sig> {
+    /// Signs the transaction.
+    #[inline]
+    fn sign_transaction_sync(&self, tx: &mut dyn Signable<Sig>) -> alloy_signer::Result<Sig> {
+        match (self.chain_id_sync(), tx.chain_id()) {
+            (Some(signer), Some(tx)) if signer != tx => {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
+            }
+            _ => {}
+        }
+        self.sign_hash_sync(tx.signature_hash())
+    }
+}
+
 /// Represents a minimal EVM transaction.
 pub trait Transaction: std::any::Any + Send + Sync + 'static {
     /// Get `data`.
     fn input(&self) -> &[u8];
-    /// Get `data`.
-    fn input_mut(&mut self) -> &mut Bytes;
-    /// Set `data`.
-    fn set_input(&mut self, data: Bytes);
 
     /// Get `to`.
     fn to(&self) -> TxKind;
-    /// Set `to`.
-    fn set_to(&mut self, to: TxKind);
 
     /// Get `value`.
     fn value(&self) -> U256;
-    /// Set `value`.
-    fn set_value(&mut self, value: U256);
 
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
-    /// Set `chain_id`.
-    fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Get `nonce`.
     fn nonce(&self) -> u64;
-    /// Set `nonce`.
-    fn set_nonce(&mut self, nonce: u64);
 
     /// Get `gas_limit`.
     fn gas_limit(&self) -> u64;
-    /// Set `gas_limit`.
-    fn set_gas_limit(&mut self, limit: u64);
 
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<U256>;
-    /// Set `gas_price`.
-    fn set_gas_price(&mut self, price: U256);
 }
 
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
@@ -98,19 +122,4 @@ impl<S: 'static> dyn Signable<S> {
             None
         }
     }
-}
-
-/// Captures getters and setters common across EIP-1559 transactions across all networks
-pub trait Eip1559Transaction: Transaction {
-    /// Get `max_priority_fee_per_gas`.
-    #[doc(alias = "max_tip")]
-    fn max_priority_fee_per_gas(&self) -> U256;
-    /// Set `max_priority_fee_per_gas`.
-    #[doc(alias = "set_max_tip")]
-    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256);
-
-    /// Get `max_fee_per_gas`.
-    fn max_fee_per_gas(&self) -> U256;
-    /// Set `max_fee_per_gas`.
-    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256);
 }

@@ -212,60 +212,28 @@ impl Transaction for TxEip1559 {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Bytes {
-        &mut self.input
-    }
-
-    fn set_input(&mut self, input: Bytes) {
-        self.input = input;
-    }
-
     fn to(&self) -> TxKind {
         self.to
-    }
-
-    fn set_to(&mut self, to: TxKind) {
-        self.to = to;
     }
 
     fn value(&self) -> U256 {
         self.value
     }
 
-    fn set_value(&mut self, value: U256) {
-        self.value = value;
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.chain_id = chain_id;
     }
 
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
-    fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
-
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
-    fn set_gas_limit(&mut self, limit: u64) {
-        self.gas_limit = limit;
-    }
-
     fn gas_price(&self) -> Option<U256> {
         None
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        let _ = price;
     }
 }
 

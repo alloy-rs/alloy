@@ -24,6 +24,7 @@ tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
+alloy-network.workspace = true
 
 [dev-dependencies]
 alloy-consensus.workspace = true

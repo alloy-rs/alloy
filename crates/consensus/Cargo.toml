@@ -19,10 +19,14 @@ alloy-eips.workspace = true
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+alloy-rpc-types.workspace = true
 
 [dev-dependencies]
+alloy-signer.workspace = true
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"] }
+k256.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 
 [features]
 k256 = ["alloy-primitives/k256", "alloy-network/k256"]

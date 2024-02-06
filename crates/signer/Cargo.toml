@@ -12,7 +12,6 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["k256"] }
 
 auto_impl.workspace = true

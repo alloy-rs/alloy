@@ -23,7 +23,9 @@ mod sealed;
 pub use sealed::{Sealable, Sealed};
 
 mod transaction;
-pub use transaction::{Eip1559Transaction, Signable, Signed, Transaction, TxKind};
+pub use transaction::{
+    Builder, BuilderError, CanBuild, Signable, Signed, Transaction, TxKind, TxSigner, TxSignerSync,
+};
 
 mod receipt;
 pub use receipt::Receipt;
@@ -69,8 +71,11 @@ pub trait Network: Sized + Send + Sync + 'static {
 
     // -- JSON RPC types --
 
+    /// The transaction builder type
+    type TransactionBuilder: Builder<Self>;
+
     /// The JSON body of a transaction request.
-    type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
+    type TransactionRequest: RpcObject;
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.

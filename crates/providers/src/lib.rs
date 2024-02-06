@@ -16,7 +16,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_network::{Network, Transaction};
+use alloy_network::{Builder, Network};
 use alloy_primitives::Address;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::{BoxTransport, Transport, TransportResult};
@@ -90,7 +90,7 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
 
     async fn estimate_gas(
         &self,
-        tx: &N::TransactionRequest,
+        tx: &N::TransactionBuilder,
     ) -> TransportResult<alloy_primitives::U256> {
         self.inner().estimate_gas(tx).await
     }
@@ -116,7 +116,7 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
         self.inner().send_transaction(tx).await
     }
 
-    async fn populate_gas(&self, tx: &mut N::TransactionRequest) -> TransportResult<()> {
+    async fn populate_gas(&self, tx: &mut N::TransactionBuilder) -> TransportResult<()> {
         let gas = self.estimate_gas(&*tx).await;
 
         gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
@@ -136,9 +136,10 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
 
     async fn estimate_gas(
         &self,
-        tx: &<N as Network>::TransactionRequest,
+        _tx: &<N as Network>::TransactionBuilder,
     ) -> TransportResult<alloy_primitives::U256> {
-        self.prepare("eth_estimateGas", Cow::Borrowed(tx)).await
+        todo!()
+        // self.prepare("eth_estimateGas", Cow::Borrowed(tx)).await
     }
 
     async fn get_transaction_count(

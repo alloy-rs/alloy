@@ -188,62 +188,28 @@ impl Transaction for TxLegacy {
         &self.input
     }
 
-    fn input_mut(&mut self) -> &mut Bytes {
-        &mut self.input
-    }
-
-    fn set_input(&mut self, data: Bytes) {
-        self.input = data;
-    }
-
     fn to(&self) -> TxKind {
         self.to
-    }
-
-    fn set_to(&mut self, to: TxKind) {
-        self.to = to;
     }
 
     fn value(&self) -> U256 {
         self.value
     }
 
-    fn set_value(&mut self, value: U256) {
-        self.value = value;
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.chain_id = Some(chain_id);
     }
 
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
-    fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
-
     fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u64) {
-        self.gas_limit = gas_limit;
-    }
-
     fn gas_price(&self) -> Option<U256> {
         Some(U256::from(self.gas_price))
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        if let Ok(price) = price.try_into() {
-            self.gas_price = price;
-        }
     }
 }
 

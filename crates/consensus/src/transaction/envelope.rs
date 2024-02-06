@@ -73,6 +73,12 @@ pub enum TxEnvelope {
     Eip4844(Signed<TxEip4844>),
 }
 
+impl From<Signed<TxLegacy>> for TxEnvelope {
+    fn from(v: Signed<TxLegacy>) -> Self {
+        Self::Legacy(v)
+    }
+}
+
 impl From<Signed<TxEip2930>> for TxEnvelope {
     fn from(v: Signed<TxEip2930>) -> Self {
         Self::Eip2930(v)
@@ -82,6 +88,12 @@ impl From<Signed<TxEip2930>> for TxEnvelope {
 impl From<Signed<TxEip1559>> for TxEnvelope {
     fn from(v: Signed<TxEip1559>) -> Self {
         Self::Eip1559(v)
+    }
+}
+
+impl From<Signed<TxEip4844>> for TxEnvelope {
+    fn from(v: Signed<TxEip4844>) -> Self {
+        Self::Eip4844(v)
     }
 }
 
