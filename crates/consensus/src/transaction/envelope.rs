@@ -199,7 +199,7 @@ impl Encodable2718 for TxEnvelope {
 mod tests {
     use super::*;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_network::{Transaction, TxKind};
+    use alloy_network::{Signable, TxKind};
     use alloy_primitives::{Address, Bytes, Signature, B256, U256};
 
     #[test]
@@ -277,9 +277,9 @@ mod tests {
         assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
-    fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
+    fn test_encode_decode_roundtrip<T: Signable<Signature>>(tx: T)
     where
-        Signed<T, T::Signature>: Into<TxEnvelope>,
+        Signed<T>: Into<TxEnvelope>,
     {
         let signature = Signature::test_signature();
         let tx_signed = tx.into_signed(signature);

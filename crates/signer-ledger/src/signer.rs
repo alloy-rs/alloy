@@ -285,7 +285,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, bytes, U256};
     use alloy_rlp::Decodable;
-    use alloy_signer::Transaction;
+    use alloy_signer::{Signable, SignableTx};
     use std::sync::OnceLock;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);

@@ -6,16 +6,16 @@ use auto_impl::auto_impl;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-pub use alloy_network::Transaction;
+pub use alloy_network::{Signable, Transaction};
 
 /// A signable transaction.
-pub type SignableTx = dyn Transaction<Signature = Signature>;
+pub type SignableTx<Sig = Signature> = dyn Signable<Sig>;
 
 /// Extension trait for utilities for signable transactions.
 ///
 /// This trait is implemented for all types that implement [`Transaction`] with [`Signature`] as the
 /// signature associated type.
-pub trait TransactionExt: Transaction<Signature = Signature> {
+pub trait TransactionExt: Transaction {
     /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
     /// existing `chain_id` if it is already set.
     fn set_chain_id_checked(&mut self, chain_id: ChainId) -> Result<()> {
@@ -36,7 +36,7 @@ pub trait TransactionExt: Transaction<Signature = Signature> {
     }
 }
 
-impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
+impl<T: ?Sized + Transaction> TransactionExt for T {}
 
 /// Asynchronous Ethereum signer.
 ///
@@ -58,30 +58,26 @@ impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&mut, Box)]
-pub trait Signer: Send + Sync {
+pub trait Signer<Sig: 'static = Signature>: Send + Sync {
     /// Signs the given hash.
-    async fn sign_hash(&self, hash: B256) -> Result<Signature>;
+    async fn sign_hash(&self, hash: B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
+    async fn sign_message(&self, message: &[u8]) -> Result<Sig> {
         self.sign_hash(eip191_hash_message(message)).await
     }
 
     /// Signs the transaction.
     #[inline]
-    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
+    async fn sign_transaction(&self, tx: &mut SignableTx<Sig>) -> Result<Sig> {
         let chain_id = self.chain_id();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
         }
-        let mut sig = self.sign_hash(tx.signature_hash()).await?;
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        self.sign_hash(tx.signature_hash()).await
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -141,30 +137,26 @@ pub trait Signer: Send + Sync {
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 #[auto_impl(&, &mut, Box, Rc, Arc)]
-pub trait SignerSync {
+pub trait SignerSync<Sig: 'static = Signature> {
     /// Signs the given hash.
-    fn sign_hash_sync(&self, hash: B256) -> Result<Signature>;
+    fn sign_hash_sync(&self, hash: B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    fn sign_message_sync(&self, message: &[u8]) -> Result<Signature> {
+    fn sign_message_sync(&self, message: &[u8]) -> Result<Sig> {
         self.sign_hash_sync(eip191_hash_message(message))
     }
 
     /// Signs the transaction.
     #[inline]
-    fn sign_transaction_sync(&self, tx: &mut SignableTx) -> Result<Signature> {
+    fn sign_transaction_sync(&self, tx: &mut SignableTx<Sig>) -> Result<Sig> {
         let chain_id = self.chain_id_sync();
         if let Some(chain_id) = chain_id {
             tx.set_chain_id_checked(chain_id)?;
         }
-        let mut sig = self.sign_hash_sync(tx.signature_hash())?;
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        self.sign_hash_sync(tx.signature_hash())
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -172,11 +164,7 @@ pub trait SignerSync {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
-    fn sign_typed_data_sync<T: SolStruct>(
-        &self,
-        payload: &T,
-        domain: &Eip712Domain,
-    ) -> Result<Signature>
+    fn sign_typed_data_sync<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Sig>
     where
         Self: Sized,
     {

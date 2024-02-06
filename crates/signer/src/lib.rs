@@ -19,7 +19,7 @@ mod error;
 pub use error::{Error, Result, UnsupportedSignerOperation};
 
 mod signer;
-pub use signer::{SignableTx, Signer, SignerSync, Transaction, TransactionExt};
+pub use signer::{Signable, SignableTx, Signer, SignerSync, Transaction, TransactionExt};
 
 mod wallet;
 #[cfg(feature = "mnemonic")]

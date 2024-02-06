@@ -7,15 +7,8 @@ pub use common::TxKind;
 mod signed;
 pub use signed::Signed;
 
-/// Represents a minimal EVM transaction.
-pub trait Transaction: std::any::Any + Send + Sync + 'static {
-    /// The signature type for this transaction.
-    ///
-    /// This is usually [`alloy_primitives::Signature`], however, it may be different for future
-    /// EIP-2718 transaction types, or in other networks. For example, in Optimism, the deposit
-    /// transaction signature is the unit type `()`.
-    type Signature;
-
+/// Transaction-like objects signable with a specific signature type.
+pub trait Signable<Sig = Signature>: Transaction {
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
 
@@ -38,22 +31,25 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
 
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.
-    fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature>
+    fn into_signed(self, signature: Sig) -> Signed<Self, Sig>
     where
         Self: Sized;
 
     /// Encode with a signature. This encoding is usually RLP, but may be
     /// different for future EIP-2718 transaction types.
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut);
+    fn encode_signed(&self, signature: &Sig, out: &mut dyn BufMut);
 
     /// Decode a signed transaction. This decoding is usually RLP, but may be
     /// different for future EIP-2718 transaction types.
     ///
     /// This MUST be the inverse of [`Transaction::encode_signed`].
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>>
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self, Sig>>
     where
         Self: Sized;
+}
 
+/// Represents a minimal EVM transaction.
+pub trait Transaction: std::any::Any + Send + Sync + 'static {
     /// Get `data`.
     fn input(&self) -> &[u8];
     /// Get `data`.
@@ -94,7 +90,7 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
 
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
 #[doc(hidden)]
-impl<S: 'static> dyn Transaction<Signature = S> {
+impl<S: 'static> dyn Signable<S> {
     pub fn __downcast_ref<T: std::any::Any>(&self) -> Option<&T> {
         if std::any::Any::type_id(self) == std::any::TypeId::of::<T>() {
             unsafe { Some(&*(self as *const _ as *const T)) }

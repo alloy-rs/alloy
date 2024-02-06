@@ -1,5 +1,5 @@
 use crate::TxKind;
-use alloy_network::{Signed, Transaction};
+use alloy_network::{Signable, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
@@ -182,49 +182,7 @@ impl Decodable for TxLegacy {
 }
 
 impl Transaction for TxLegacy {
-    type Signature = Signature;
     // type Receipt = ReceiptWithBloom;
-
-    fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
-            .encode(out);
-        self.encode_fields(out);
-        self.encode_eip155_signing_fields(out);
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len() + self.eip155_fields_len();
-        // 'header length' + 'payload length'
-        length_of_length(payload_length) + payload_length
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        self.encode_with_signature(&signature, &mut buf);
-        let hash = keccak256(&buf);
-        Signed::new_unchecked(self, signature, hash)
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.encode_with_signature(signature, out);
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let mut tx = Self::decode_fields(buf)?;
-
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        let v = signature.v();
-
-        tx.chain_id = v.chain_id();
-
-        Ok(tx.into_signed(signature))
-    }
 
     fn input(&self) -> &[u8] {
         &self.input
@@ -286,6 +244,49 @@ impl Transaction for TxLegacy {
         if let Ok(price) = price.try_into() {
             self.gas_price = price;
         }
+    }
+}
+
+impl Signable<Signature> for TxLegacy {
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
+            .encode(out);
+        self.encode_fields(out);
+        self.encode_eip155_signing_fields(out);
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len() + self.eip155_fields_len();
+        // 'header length' + 'payload length'
+        length_of_length(payload_length) + payload_length
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
+        self.encode_with_signature(&signature, &mut buf);
+        let hash = keccak256(&buf);
+        Signed::new_unchecked(self, signature, hash)
+    }
+
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        self.encode_with_signature(signature, out);
+    }
+
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        let mut tx = Self::decode_fields(buf)?;
+
+        let signature = Signature::decode_rlp_vrs(buf)?;
+
+        let v = signature.v();
+
+        tx.chain_id = v.chain_id();
+
+        Ok(tx.into_signed(signature))
     }
 }
 

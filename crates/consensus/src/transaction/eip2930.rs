@@ -1,6 +1,6 @@
 use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Signed, Transaction};
+use alloy_network::{Signable, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
@@ -169,50 +169,6 @@ impl Decodable for TxEip2930 {
 }
 
 impl Transaction for TxEip2930 {
-    type Signature = Signature;
-    // type Receipt = ReceiptWithBloom;
-
-    fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.tx_type() as u8);
-        Header { list: true, payload_length: self.fields_len() }.encode(out);
-        self.encode_fields(out);
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        buf.put_u8(TxType::Eip2930 as u8);
-        self.encode_signed(&signature, &mut buf);
-        let hash = keccak256(&buf);
-
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.encode_with_signature(signature, out)
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let tx = Self::decode_inner(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        Ok(tx.into_signed(signature))
-    }
-
     fn input(&self) -> &[u8] {
         &self.input
     }
@@ -276,11 +232,56 @@ impl Transaction for TxEip2930 {
     }
 }
 
+impl Signable<Signature> for TxEip2930 {
+    // type Receipt = ReceiptWithBloom;z
+
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        out.put_u8(self.tx_type() as u8);
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
+        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
+        buf.put_u8(TxType::Eip2930 as u8);
+        self.encode_signed(&signature, &mut buf);
+        let hash = keccak256(&buf);
+
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+    }
+
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        self.encode_with_signature(signature, out)
+    }
+
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let tx = Self::decode_inner(buf)?;
+        let signature = Signature::decode_rlp_vrs(buf)?;
+
+        Ok(tx.into_signed(signature))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::TxEip2930;
     use crate::{TxEnvelope, TxKind};
-    use alloy_network::{Signed, Transaction};
+    use alloy_network::{Signable, Signed};
     use alloy_primitives::{Address, Bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 

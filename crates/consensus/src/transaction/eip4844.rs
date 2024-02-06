@@ -1,6 +1,6 @@
 use crate::{TxKind, TxType};
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
-use alloy_network::{Signed, Transaction};
+use alloy_network::{Signable, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
@@ -240,49 +240,8 @@ impl TxEip4844 {
 }
 
 impl Transaction for TxEip4844 {
-    type Signature = Signature;
-
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        buf.put_u8(TxType::Eip1559 as u8);
-        self.encode_signed(&signature, &mut buf);
-        let hash = keccak256(&buf);
-
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let tx = Self::decode_inner(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        Ok(tx.into_signed(signature))
-    }
-
-    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.encode_for_signing(out);
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        TxEip4844::encode_with_signature(self, signature, out, true);
     }
 
     fn input(&self) -> &[u8] {
@@ -339,5 +298,46 @@ impl Transaction for TxEip4844 {
 
     fn set_gas_price(&mut self, price: U256) {
         let _ = price;
+    }
+}
+
+impl Signable<Signature> for TxEip4844 {
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
+        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
+        buf.put_u8(TxType::Eip1559 as u8);
+        self.encode_signed(&signature, &mut buf);
+        let hash = keccak256(&buf);
+
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+    }
+
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let tx = Self::decode_inner(buf)?;
+        let signature = Signature::decode_rlp_vrs(buf)?;
+
+        Ok(tx.into_signed(signature))
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.encode_for_signing(out);
+    }
+
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        TxEip4844::encode_with_signature(self, signature, out, true);
     }
 }
