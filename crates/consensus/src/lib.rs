@@ -27,6 +27,7 @@ pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 mod transaction;
 pub use transaction::{
     EthereumTxBuilder, TxEip1559, TxEip2930, TxEip4844, TxEnvelope, TxLegacy, TxType,
+    TypedTransaction,
 };
 
 pub use alloy_network::TxKind;
@@ -39,6 +40,8 @@ impl Network for Ethereum {
     type ReceiptEnvelope = ReceiptEnvelope;
 
     type Header = Header;
+
+    type UnsignedTx = TypedTransaction;
 
     type TransactionBuilder = EthereumTxBuilder;
 

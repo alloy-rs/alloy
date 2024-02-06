@@ -1,6 +1,8 @@
-use alloy_primitives::{Bytes, ChainId, Signature, U256};
+use alloy_primitives::{Bytes, ChainId, U256};
 
-use crate::{Network, Signable, Signed, TxKind};
+use crate::{Network, TxKind};
+
+use super::signer::NetworkSigner;
 
 #[derive(Debug, thiserror::Error)]
 /// Error type for transaction builders.
@@ -112,22 +114,9 @@ pub trait Builder<N: Network>: Sized + Send + Sync + 'static {
         self
     }
 
-    /// Build a transaction request.
-    fn build_request(self) -> Result<N::TransactionRequest>;
+    /// Build an unsigned, but typed, transaction.
+    fn build_unsigned(self) -> Result<N::UnsignedTx>;
 
-    /// Build a transaction.
-    fn build_tx<T, Sig>(self) -> Result<T>
-    where
-        T: Signable<Sig>,
-        Signed<T, Sig>: Into<N::TxEnvelope>,
-        Self: CanBuild<T, Sig>,
-    {
-        CanBuild::build(self)
-    }
-}
-
-/// Trait for indicating a builder can build a specific transaction.
-pub trait CanBuild<T: Signable<Sig>, Sig = Signature> {
-    /// Build the transaction.
-    fn build(self) -> Result<T>;
+    /// Build a signed transaction.
+    fn build<S: NetworkSigner<N>>(self, signer: &S) -> Result<N::TxEnvelope>;
 }

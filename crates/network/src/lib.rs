@@ -24,7 +24,8 @@ pub use sealed::{Sealable, Sealed};
 
 mod transaction;
 pub use transaction::{
-    Builder, BuilderError, CanBuild, Signable, Signed, Transaction, TxKind, TxSigner, TxSignerSync,
+    Builder, BuilderError, NetworkSigner, Signable, Signed, Transaction, TxKind, TxSigner,
+    TxSignerSync,
 };
 
 mod receipt;
@@ -64,6 +65,10 @@ pub trait Network: Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     type TxEnvelope: Eip2718Envelope;
+
+    /// An enum over the various transaction types.
+    type UnsignedTx;
+
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
     /// The network header type.

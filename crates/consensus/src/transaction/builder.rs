@@ -1,8 +1,8 @@
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Builder, BuilderError, CanBuild, TxKind};
+use alloy_network::{Builder, BuilderError, TxKind};
 use alloy_primitives::{Bytes, ChainId, B256, U256};
 
-use crate::{Ethereum, TxEip1559, TxEip2930, TxEip4844, TxLegacy};
+use crate::{Ethereum, TxEip1559, TxEip2930, TxEip4844, TxEnvelope, TxLegacy, TypedTransaction};
 
 /// A builder for Ethereum transactions.
 #[derive(Default, Debug, Clone)]
@@ -86,9 +86,14 @@ impl Builder<Ethereum> for EthereumTxBuilder {
         self.gas_limit = Some(gas_limit);
     }
 
-    fn build_request(
+    fn build_unsigned(self) -> Result<TypedTransaction, BuilderError> {
+        todo!()
+    }
+
+    fn build<S: alloy_network::NetworkSigner<Ethereum>>(
         self,
-    ) -> Result<<Ethereum as alloy_network::Network>::TransactionRequest, BuilderError> {
+        _signer: &S,
+    ) -> Result<TxEnvelope, BuilderError> {
         todo!()
     }
 }
@@ -155,8 +160,9 @@ impl EthereumTxBuilder {
     }
 }
 
-impl CanBuild<TxLegacy> for EthereumTxBuilder {
-    fn build(self) -> Result<TxLegacy, BuilderError> {
+impl EthereumTxBuilder {
+    /// Build a legacy transaction.
+    pub fn build_legacy(self) -> Result<TxLegacy, BuilderError> {
         Ok(TxLegacy {
             chain_id: self.chain_id,
             nonce: self.nonce.ok_or_else(|| BuilderError::MissingKey("nonce"))?,
@@ -167,10 +173,9 @@ impl CanBuild<TxLegacy> for EthereumTxBuilder {
             input: self.input.unwrap_or_default(),
         })
     }
-}
 
-impl CanBuild<TxEip1559> for EthereumTxBuilder {
-    fn build(self) -> Result<TxEip1559, BuilderError> {
+    /// Build an EIP-1559 transaction.
+    pub fn build_1559(self) -> Result<TxEip1559, BuilderError> {
         Ok(TxEip1559 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.ok_or_else(|| BuilderError::MissingKey("nonce"))?,
@@ -187,10 +192,9 @@ impl CanBuild<TxEip1559> for EthereumTxBuilder {
             access_list: self.access_list.unwrap_or_default(),
         })
     }
-}
 
-impl CanBuild<TxEip2930> for EthereumTxBuilder {
-    fn build(self) -> Result<TxEip2930, BuilderError> {
+    /// Build an EIP-2930 transaction.
+    pub fn build_2930(self) -> Result<TxEip2930, BuilderError> {
         Ok(TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.ok_or_else(|| BuilderError::MissingKey("nonce"))?,
@@ -202,10 +206,9 @@ impl CanBuild<TxEip2930> for EthereumTxBuilder {
             access_list: self.access_list.unwrap_or_default(),
         })
     }
-}
 
-impl CanBuild<TxEip4844> for EthereumTxBuilder {
-    fn build(self) -> Result<TxEip4844, BuilderError> {
+    /// Build an EIP-4844 transaction.
+    pub fn build_4844(self) -> Result<TxEip4844, BuilderError> {
         Ok(TxEip4844 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.ok_or_else(|| BuilderError::MissingKey("nonce"))?,
