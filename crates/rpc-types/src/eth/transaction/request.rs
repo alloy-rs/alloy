@@ -14,13 +14,13 @@ pub struct TransactionRequest {
     pub to: Option<Address>,
     /// The legacy gas price.
     #[serde(default)]
-    pub gas_price: Option<U128>,
+    pub gas_price: Option<U256>,
     /// The max base fee per gas the sender is willing to pay.
     #[serde(default)]
-    pub max_fee_per_gas: Option<U128>,
+    pub max_fee_per_gas: Option<U256>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
     #[serde(default)]
-    pub max_priority_fee_per_gas: Option<U128>,
+    pub max_priority_fee_per_gas: Option<U256>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_fee_per_blob_gas: Option<U256>,
@@ -58,7 +58,7 @@ impl TransactionRequest {
     ///
     /// The returns `gas_price` (legacy) if set or `max_fee_per_gas` (EIP1559)
     #[inline]
-    pub fn fee_cap(&self) -> Option<U128> {
+    pub fn fee_cap(&self) -> Option<U256> {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
@@ -88,14 +88,14 @@ impl TransactionRequest {
     }
 
     /// Sets the maximum fee per gas for the transaction.
-    pub fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
-        self.max_fee_per_gas = Some(U128::from(max_fee_per_gas));
+    pub fn max_fee_per_gas(mut self, max_fee_per_gas: U256) -> Self {
+        self.max_fee_per_gas = Some(max_fee_per_gas);
         self
     }
 
     /// Sets the maximum priority fee per gas for the transaction.
-    pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
-        self.max_priority_fee_per_gas = Some(U128::from(max_priority_fee_per_gas));
+    pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: U256) -> Self {
+        self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
         self
     }
 
@@ -107,8 +107,8 @@ impl TransactionRequest {
     }
 
     /// Sets the value (amount) for the transaction.
-    pub fn value(mut self, value: u128) -> Self {
-        self.value = Some(U256::from(value));
+    pub fn value(mut self, value: U256) -> Self {
+        self.value = Some(value);
         self
     }
 
