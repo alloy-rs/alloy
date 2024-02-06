@@ -46,6 +46,13 @@ pub struct FeeHistory {
     ///
     /// The `Option` is only for compatability with Erigon and Geth.
     pub gas_used_ratio: Vec<f64>,
+    /// An array of block base fees per blob gas. This includes the next block after the newest
+    /// of  the returned range, because this value can be derived from the newest block. Zeroes
+    /// are returned for pre-EIP-4844 blocks.
+    pub base_fee_per_blob_gas: Vec<U256>,
+    /// An array of block blob gas used ratios. These are calculated as the ratio of gasUsed and
+    /// gasLimit.
+    pub blob_gas_used_ratio: Vec<f64>,
     /// Lowest number block of the returned range.
     pub oldest_block: U256,
     /// An (optional) array of effective priority fee per gas data points from a single
