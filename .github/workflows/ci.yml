@@ -16,11 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: ["stable", "nightly", "1.68"] # MSRV
+        rust: ["stable", "nightly", "1.75"] # MSRV
         flags: ["--no-default-features", "", "--all-features"]
         exclude:
           # Some features have higher MSRV.
-          - rust: "1.68" # MSRV
+          - rust: "1.75" # MSRV
             flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
@@ -39,13 +39,13 @@ jobs:
           cache-on-failure: true
       # Only run tests on latest stable and above
       - name: Install cargo-nextest
-        if: ${{ matrix.rust != '1.68' }} # MSRV
+        if: ${{ matrix.rust != '1.75' }} # MSRV
         uses: taiki-e/install-action@nextest
       - name: build
-        if: ${{ matrix.rust == '1.68' }} # MSRV
+        if: ${{ matrix.rust == '1.75' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
-        if: ${{ matrix.rust != '1.68' }} # MSRV
+        if: ${{ matrix.rust != '1.75' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
   wasm:

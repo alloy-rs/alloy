@@ -25,7 +25,7 @@ allow = [
     "Unlicense",
     "MPL-2.0",
     # https://github.com/briansmith/ring/issues/902
-    "LicenseRef-ring"
+    "LicenseRef-ring",
 ]
 
 exceptions = [
@@ -52,3 +52,5 @@ license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# TODO: Remove once alloy-contract is stable. This is only used in tests for `sol!`.
+allow-git = ["https://github.com/alloy-rs/core"]

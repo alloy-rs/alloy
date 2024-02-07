@@ -157,6 +157,13 @@ impl CallRequest {
         self
     }
 
+    /// Sets the `to` field in the call to the provided address
+    #[inline]
+    pub const fn to(mut self, to: Option<Address>) -> Self {
+        self.to = to;
+        self
+    }
+
     /// Sets the `gas` field in the transaction to the provided value
     pub const fn gas(mut self, gas: U256) -> Self {
         self.gas = Some(gas);
@@ -183,6 +190,19 @@ impl CallRequest {
     pub const fn nonce(mut self, nonce: U64) -> Self {
         self.nonce = Some(nonce);
         self
+    }
+
+    /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
+    /// the `from` or `nonce` fields are not set.
+    pub fn calculate_create_address(&self) -> Option<Address> {
+        if self.to.is_some() {
+            return None;
+        }
+        let from = self.from.as_ref()?;
+        let nonce = self.nonce?;
+        Some(from.create(nonce.to()))
     }
 }
 

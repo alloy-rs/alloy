@@ -27,6 +27,9 @@ pub enum ClientError {
     UnsupportedBlockIdError,
 }
 
+/// Type alias for a [`Provider`] using the [`Http`] transport.
+pub type HttpProvider = Provider<Http<Client>>;
+
 /// An abstract provider for interacting with the [Ethereum JSON RPC
 /// API](https://github.com/ethereum/wiki/wiki/JSON-RPC). Must be instantiated
 /// with a transport which implements the [Transport] trait.

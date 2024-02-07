@@ -15,6 +15,9 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(test)]
+extern crate self as alloy_contract;
+
 mod error;
 pub use error::*;
 
@@ -26,3 +29,10 @@ pub use instance::*;
 
 mod call;
 pub use call::*;
+
+// Not public API.
+// NOTE: please avoid changing the API of this module due to its use in the `sol!` macro.
+#[doc(hidden)]
+pub mod private {
+    pub use alloy_providers::provider::TempProvider as Provider;
+}
