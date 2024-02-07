@@ -449,7 +449,7 @@ impl<P, D: CallDecoder> std::fmt::Debug for CallBuilder<P, D> {
 mod tests {
     use super::*;
     use alloy_node_bindings::{Anvil, AnvilInstance};
-    use alloy_primitives::{address, b256, hex};
+    use alloy_primitives::{address, b256, bytes, hex};
     use alloy_providers::provider::{HttpProvider, Provider};
     use alloy_sol_types::sol;
 
@@ -476,8 +476,8 @@ mod tests {
         let contract = MyContract::new(Address::ZERO, &&provider).with_cloned_provider();
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         assert_eq!(
-            call_builder.calldata()[..],
-            hex!(
+            *call_builder.calldata(),
+            bytes!(
                 "b09a2616"
                 "0000000000000000000000000000000000000000000000000000000000000000"
                 "0000000000000000000000000000000000000000000000000000000000000001"
@@ -491,15 +491,24 @@ mod tests {
     #[test]
     fn deploy_encoding() {
         let provider = Provider::try_from("http://localhost:8545").unwrap();
+        let bytecode = &MyContract::BYTECODE[..];
         let call_builder = MyContract::deploy_builder(&provider, false);
         assert_eq!(
             call_builder.calldata()[..],
-            hex!("6942 0000000000000000000000000000000000000000000000000000000000000000")
+            [
+                bytecode,
+                &hex!("0000000000000000000000000000000000000000000000000000000000000000")[..]
+            ]
+            .concat(),
         );
         let call_builder = MyContract::deploy_builder(&provider, true);
         assert_eq!(
             call_builder.calldata()[..],
-            hex!("6942 0000000000000000000000000000000000000000000000000000000000000001")
+            [
+                bytecode,
+                &hex!("0000000000000000000000000000000000000000000000000000000000000001")[..]
+            ]
+            .concat(),
         );
     }
 
