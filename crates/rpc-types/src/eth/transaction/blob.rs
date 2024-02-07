@@ -4,7 +4,7 @@ use crate::kzg::{Blob, Bytes48};
 use serde::{Deserialize, Serialize};
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[repr(C)]
 pub struct BlobTransactionSidecar {
     /// The blob data.

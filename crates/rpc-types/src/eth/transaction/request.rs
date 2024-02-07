@@ -1,4 +1,6 @@
 //! Alloy basic Transaction Request type.
+use std::hash::Hash;
+
 use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
 use alloy_primitives::{Address, Bytes, B256, U256, U64, U8};
 use serde::{Deserialize, Serialize};
@@ -49,6 +51,30 @@ pub struct TransactionRequest {
     /// Support for arbitrary additional fields.
     #[serde(flatten)]
     pub other: OtherFields,
+}
+
+impl Hash for TransactionRequest {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.from.hash(state);
+        self.to.hash(state);
+        self.gas_price.hash(state);
+        self.max_fee_per_gas.hash(state);
+        self.max_priority_fee_per_gas.hash(state);
+        self.max_fee_per_blob_gas.hash(state);
+        self.gas.hash(state);
+        self.value.hash(state);
+        self.input.hash(state);
+        self.nonce.hash(state);
+        self.chain_id.hash(state);
+        self.access_list.hash(state);
+        self.transaction_type.hash(state);
+        self.blob_versioned_hashes.hash(state);
+        self.sidecar.hash(state);
+        for (k, v) in self.other.iter() {
+            k.hash(state);
+            v.to_string().hash(state);
+        }
+    }
 }
 
 // == impl TransactionRequest ==
