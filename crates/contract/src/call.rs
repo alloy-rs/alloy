@@ -453,6 +453,20 @@ mod tests {
     use alloy_providers::provider::{HttpProvider, Provider};
     use alloy_sol_types::sol;
 
+    #[test]
+    fn empty_constructor() {
+        sol! {
+            #[sol(rpc, bytecode = "6942")]
+            contract EmptyConstructor {
+                constructor();
+            }
+        }
+
+        let provider = Provider::try_from("http://localhost:8545").unwrap();
+        let call_builder = EmptyConstructor::deploy_builder(&provider);
+        assert_eq!(*call_builder.calldata(), bytes!("6942"));
+    }
+
     sol! {
         // Solc: 0.8.24+commit.e11b9ed9.Linux.g++
         // Command: solc a.sol --bin --via-ir --optimize --optimize-runs 1
