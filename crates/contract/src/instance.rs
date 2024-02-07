@@ -57,8 +57,12 @@ impl<P> ContractInstance<P> {
 impl<P: Clone> ContractInstance<&P> {
     /// Clones the provider and returns a new contract instance with the cloned provider.
     #[inline]
-    pub fn with_cloned_provider(self, provider: P) -> ContractInstance<P> {
-        ContractInstance { address: self.address, provider, interface: self.interface }
+    pub fn with_cloned_provider(self) -> ContractInstance<P> {
+        ContractInstance {
+            address: self.address,
+            provider: self.provider.clone(),
+            interface: self.interface,
+        }
     }
 }
 

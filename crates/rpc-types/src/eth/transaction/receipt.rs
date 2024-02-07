@@ -32,7 +32,7 @@ pub struct TransactionReceipt {
     pub blob_gas_price: Option<U128>,
     /// Address of the sender
     pub from: Address,
-    /// Address of the receiver. null when its a contract creation transaction.
+    /// Address of the receiver. None when its a contract creation transaction.
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
@@ -54,4 +54,17 @@ pub struct TransactionReceipt {
     /// Arbitrary extra fields.
     #[serde(flatten)]
     pub other: OtherFields,
+}
+
+impl TransactionReceipt {
+    /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
+    /// the `from` field is not set.
+    pub fn calculate_create_address(&self, nonce: u64) -> Option<Address> {
+        if self.to.is_some() {
+            return None;
+        }
+        Some(self.from.create(nonce))
+    }
 }

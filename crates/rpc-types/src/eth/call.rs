@@ -191,6 +191,19 @@ impl CallRequest {
         self.nonce = Some(nonce);
         self
     }
+
+    /// Calculates the address that will be created by the transaction, if any.
+    ///
+    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
+    /// the `from` or `nonce` fields are not set.
+    pub fn calculate_create_address(&self) -> Option<Address> {
+        if self.to.is_some() {
+            return None;
+        }
+        let from = self.from.as_ref()?;
+        let nonce = self.nonce?;
+        Some(from.create(nonce.to()))
+    }
 }
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.

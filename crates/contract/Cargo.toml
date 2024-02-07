@@ -20,3 +20,9 @@ alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
+
+thiserror.workspace = true
+
+[dev-dependencies]
+alloy-node-bindings.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
