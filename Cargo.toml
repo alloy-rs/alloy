@@ -98,9 +98,6 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.8"
 
-# TODO: remove
+# TODO: Remove once alloy-contract is stable. This is only used in tests for `sol!`.
 [patch.crates-io]
-alloy-primitives = { git = "https://github.com/alloy-rs/core" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core" }
