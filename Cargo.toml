@@ -100,4 +100,4 @@ tempfile = "3.8"
 
 # TODO: Remove once alloy-contract is stable. This is only used in tests for `sol!`.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "18b0509950c90d9ec38f25913b692ae4cdd6f227" }
