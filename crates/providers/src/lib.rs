@@ -19,6 +19,7 @@
 use alloy_network::{Network, Transaction};
 use alloy_primitives::Address;
 use alloy_rpc_client::RpcClient;
+use alloy_rpc_types::BlockId;
 use alloy_transport::{BoxTransport, Transport, TransportResult};
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -97,13 +98,12 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
 
     /// Get the transaction count for an address. Used for finding the
     /// appropriate nonce.
-    ///
-    /// TODO: block number/hash/tag
     async fn get_transaction_count(
         &self,
         address: Address,
+        tag: Option<BlockId>,
     ) -> TransportResult<alloy_primitives::U256> {
-        self.inner().get_transaction_count(address).await
+        self.inner().get_transaction_count(address, tag).await
     }
 
     /// Send a transaction to the network.
@@ -144,10 +144,11 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for NetworkRpcClient<N, T>
     async fn get_transaction_count(
         &self,
         address: Address,
+        tag: Option<BlockId>,
     ) -> TransportResult<alloy_primitives::U256> {
         self.prepare(
             "eth_getTransactionCount",
-            Cow::<(Address, String)>::Owned((address, "latest".to_string())),
+            Cow::<(Address, BlockId)>::Owned((address, tag.unwrap_or_default())),
         )
         .await
     }
