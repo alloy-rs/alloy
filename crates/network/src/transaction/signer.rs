@@ -43,7 +43,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// different for future EIP-2718 transaction types.
     ///
     /// This MUST be the inverse of [`Transaction::encode_signed`].
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>>
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self, Signature>>
     where
         Self: Sized;
 }
