@@ -26,12 +26,26 @@ thiserror.workspace = true
 # jsonrpsee
 jsonrpsee-types = { version = "0.20", optional = true }
 
+#serde_helper
+alloy-serde.workspace = true
+
+
 [features]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = ["dep:ethereum_ssz" ,"dep:ethereum_ssz_derive", "alloy-primitives/ssz", "alloy-rpc-types/ssz"]
+ssz = [
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+    "alloy-rpc-types/ssz",
+]
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "rlp",
+    "serde",
+    "arbitrary",
+] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
