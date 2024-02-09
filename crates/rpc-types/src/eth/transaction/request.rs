@@ -109,8 +109,8 @@ impl TransactionRequest {
     }
 
     /// Sets the nonce for the transaction.
-    pub fn nonce(mut self, nonce: u64) -> Self {
-        self.nonce = Some(U64::from(nonce));
+    pub fn nonce(mut self, nonce: U64) -> Self {
+        self.nonce = Some(nonce);
         self
     }
 
