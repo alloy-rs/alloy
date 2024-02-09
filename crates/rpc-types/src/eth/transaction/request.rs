@@ -103,8 +103,8 @@ impl TransactionRequest {
     }
 
     /// Sets the gas limit for the transaction.
-    pub fn gas_limit(mut self, gas_limit: u64) -> Self {
-        self.gas = Some(U256::from(gas_limit));
+    pub fn gas_limit(mut self, gas_limit: U256) -> Self {
+        self.gas = Some(gas_limit);
         self
     }
 
