@@ -74,9 +74,9 @@ impl RawSubscription {
     }
 }
 
-#[derive(Debug)]
 /// An item in a typed [`Subscription`]. This is either the expected type, or
 /// some serialized value of another type.
+#[derive(Debug)]
 pub enum SubscriptionItem<T> {
     /// The expected item.
     Item(T),

@@ -1,6 +1,6 @@
 # alloy-pubsub
 
-Ethereum JSON-RPC [publish-subscribe] provider.
+Ethereum JSON-RPC [publish-subscribe] tower service and type definitions.
 
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 

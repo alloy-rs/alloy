@@ -18,15 +18,17 @@ feature-parity in Alloy. No action is currently needed from devs.
 
 This repository contains the following crates:
 
+- [`alloy`]: Meta-crate for the entire project, including [`alloy-core`]
 - [`alloy-consensus`] - Ethereum consensus interface
+- [`alloy-contract`] - Interact with on-chain contracts
 - [`alloy-eips`] - Ethereum Improvement Proprosal (EIP) implementations
 - [`alloy-genesis`] - Ethereum genesis file definitions
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
 - [`alloy-network`] - Network abstraction for RPC types
 - [`alloy-node-bindings`] - Ethereum execution-layer client bindings
-- [`alloy-providers`] - Client trait for interacting with Ethereum-like RPC endpoints
-- [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] provider
-- [`alloy-rpc-client`] - High-level Ethereum JSON-RPC client implementation
+- [`alloy-providers`] - Interface with an Ethereum blockchain
+- [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
+- [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Ethereum JSON-RPC types
   - [`alloy-rpc-engine-types`] - Ethereum execution-consensus layer (engine) API RPC types
   - [`alloy-rpc-trace-types`] - Ethereum RPC trace types
@@ -40,7 +42,9 @@ This repository contains the following crates:
   - [`alloy-transport-ipc`] - IPC transport implementation
   - [`alloy-transport-ws`] - WS transport implementation
 
+[`alloy`]: crates/alloy
 [`alloy-consensus`]: crates/consensus
+[`alloy-contract`]: crates/contract
 [`alloy-eips`]: crates/eips
 [`alloy-genesis`]: crates/genesis
 [`alloy-json-rpc`]: crates/json-rpc
@@ -62,6 +66,7 @@ This repository contains the following crates:
 [`alloy-transport-ipc`]: crates/transport-ipc
 [`alloy-transport-ws`]: crates/transport-ws
 
+[`alloy-core`]: https://docs.rs/alloy-core
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms
