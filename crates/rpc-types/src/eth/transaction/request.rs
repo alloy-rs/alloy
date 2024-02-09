@@ -47,6 +47,7 @@ pub struct TransactionRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// Blob sidecar for EIP-4844 transactions.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
     /// Support for arbitrary additional fields.
     #[serde(flatten)]
