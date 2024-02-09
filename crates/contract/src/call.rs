@@ -285,7 +285,8 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
     pub fn gas_price(mut self, gas_price: U256) -> Self {
-        self.request = self.request.gas_price(gas_price);
+        self.request = self.request.max_fee_per_gas(gas_price);
+        self.request = self.request.max_priority_fee_per_gas(gas_price);
         self
     }
 
