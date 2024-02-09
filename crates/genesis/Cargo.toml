@@ -13,10 +13,14 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives.workspace = true
-alloy-rpc-types.workspace = true
+
 
 # serde
 serde.workspace = true
+
+#serde_helper
+alloy-serde.workspace = true
+
 
 [dev-dependencies]
 serde_json.workspace = true
