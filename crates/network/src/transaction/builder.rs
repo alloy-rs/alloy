@@ -4,8 +4,8 @@ use crate::{Network, TxKind};
 
 use super::signer::NetworkSigner;
 
-#[derive(Debug, thiserror::Error)]
 /// Error type for transaction builders.
+#[derive(Debug, thiserror::Error)]
 pub enum BuilderError {
     /// A required key is missing.
     #[error("A required key is missing: {0}")]
@@ -15,7 +15,7 @@ pub enum BuilderError {
     #[error("Signer cannot produce signature type required for transaction")]
     UnsupportedSignatureType,
 
-    /// Signer Error
+    /// Signer error.
     #[error(transparent)]
     Signer(#[from] alloy_signer::Error),
 
@@ -36,7 +36,13 @@ impl BuilderError {
 
 type Result<T, E = BuilderError> = std::result::Result<T, E>;
 
-/// Transaction Builder for a network
+/// A Transaction builder for a network.
+///
+/// Transaction builders are primarily used to construct typed transactions that can be signed with
+/// [`Builder::build`], or unsigned typed transactions with [`Builder::build_unsigned`].
+///
+/// Transaction builders should be able to construct all available transaction types on a given
+/// network.
 pub trait Builder<N: Network>: Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;

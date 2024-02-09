@@ -7,26 +7,50 @@ use crate::{Ethereum, TxEip1559, TxEip2930, TxEip4844, TxEnvelope, TxLegacy, Typ
 /// A builder for Ethereum transactions.
 #[derive(Default, Debug, Clone)]
 pub struct EthereumTxBuilder {
+    /// The nonce of the transaction.
     nonce: Option<u64>,
+    /// The gas limit of the transaction.
     gas_limit: Option<u64>,
+    /// The destination address of the transaction, or if the transaction is a contract creation.
     to: Option<TxKind>,
+    /// The value transferred in the transaction.
     value: Option<U256>,
-    input: Option<Bytes>,
+    /// The input data of the transaction.
+    input: Option<Bytes>, // todo: this should be typed like `TransactionInput`
+    /// The chain ID of the transaction.
     chain_id: Option<ChainId>,
 
-    // Legacy or 2930 Only
+    /// The gas price of the transaction.
+    ///
+    /// # Note
+    ///
+    /// Only applies to legacy or EIP-2930 transactions.
     gas_price: Option<u128>,
 
-    // 1559 or 4844 Only
+    /// The max priority fee per gas.
+    ///
+    /// # Note
+    ///
+    /// Only applies to EIP-1559 or EIP-4844 transactions.
     max_priority_fee_per_gas: Option<u128>,
+    /// The max fee per gas.
+    ///
+    /// # Note
+    ///
+    /// Only applies to EIP-1559 or EIP-4844 transactions.
     max_fee_per_gas: Option<u128>,
 
-    // 2930 or 4844 Only
+    /// The access list for the transaction.
+    ///
+    /// # Note
+    ///
+    /// Only applies to EIP-1559, EIP-2930 or EIP-4844 transactions.
     access_list: Option<AccessList>,
 
     // 4844 Only
     blob_versioned_hashes: Option<Vec<B256>>,
     max_fee_per_blob_gas: Option<u128>,
+    // todo: blob sidecar
 }
 
 impl Builder<Ethereum> for EthereumTxBuilder {
