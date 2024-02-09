@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
@@ -259,6 +258,8 @@ pub struct TransactionInputError;
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::b256;
+
     use super::*;
 
     #[test]
@@ -284,5 +285,15 @@ mod tests {
         let s = r#"{"accessList":[],"data":"0x0902f1ac", "input":"0x0902f1","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
         let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
         assert!(req.input.try_into_unique_input().is_err());
+    }
+
+    #[test]
+    fn serde_tx_request_additional_fields() {
+        let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02","sourceHash":"0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a"}"#;
+        let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
+        assert_eq!(
+            req.other.get_deserialized::<B256>("sourceHash").unwrap().unwrap(),
+            b256!("bf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+        );
     }
 }
