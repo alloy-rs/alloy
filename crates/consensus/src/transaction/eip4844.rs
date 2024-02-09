@@ -1,6 +1,6 @@
 use crate::{TxKind, TxType};
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
-use alloy_network::{Signable, Signed, Transaction};
+use alloy_network::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
@@ -269,7 +269,7 @@ impl Transaction for TxEip4844 {
     }
 }
 
-impl Signable<Signature> for TxEip4844 {
+impl SignableTransaction<Signature> for TxEip4844 {
     fn payload_len_for_signature(&self) -> usize {
         let payload_length = self.fields_len();
         // 'transaction type byte length' + 'header length' + 'payload length'

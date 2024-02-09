@@ -24,8 +24,8 @@ pub use sealed::{Sealable, Sealed};
 
 mod transaction;
 pub use transaction::{
-    Builder, BuilderError, NetworkSigner, Signable, Signed, Transaction, TxKind, TxSigner,
-    TxSignerSync,
+    Builder, BuilderError, NetworkSigner, SignableTransaction, Signed, Transaction, TxKind,
+    TxSigner, TxSignerSync,
 };
 
 mod receipt;

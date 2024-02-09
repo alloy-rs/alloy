@@ -37,11 +37,11 @@ struct Ethereum;
 impl Network for Ethereum {
     type TxEnvelope = TxEnvelope;
 
+    type UnsignedTx = TypedTransaction;
+
     type ReceiptEnvelope = ReceiptEnvelope;
 
     type Header = Header;
-
-    type UnsignedTx = TypedTransaction;
 
     type TransactionBuilder = EthereumTxBuilder;
 

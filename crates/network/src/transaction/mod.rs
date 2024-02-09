@@ -9,7 +9,7 @@ mod signed;
 pub use signed::Signed;
 
 mod signer;
-pub use signer::{NetworkSigner, Signable, TxSigner, TxSignerSync};
+pub use signer::{NetworkSigner, SignableTransaction, TxSigner, TxSignerSync};
 
 /// Represents a minimal EVM transaction.
 pub trait Transaction: std::any::Any + Send + Sync + 'static {

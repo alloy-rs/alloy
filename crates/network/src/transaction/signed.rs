@@ -1,4 +1,4 @@
-use crate::Signable;
+use crate::SignableTransaction;
 use alloy_primitives::{Signature, B256};
 use alloy_rlp::BufMut;
 
@@ -35,7 +35,7 @@ impl<T, Sig> Signed<T, Sig> {
     }
 }
 
-impl<T: Signable<Sig>, Sig> Signed<T, Sig> {
+impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
         Self { tx, signature, hash }
@@ -59,7 +59,7 @@ impl<T: Signable<Sig>, Sig> Signed<T, Sig> {
     }
 }
 
-impl<T: Signable<Sig>, Sig> alloy_rlp::Encodable for Signed<T, Sig> {
+impl<T: SignableTransaction<Sig>, Sig> alloy_rlp::Encodable for Signed<T, Sig> {
     fn encode(&self, out: &mut dyn BufMut) {
         self.tx.encode_signed(&self.signature, out)
     }
@@ -67,14 +67,14 @@ impl<T: Signable<Sig>, Sig> alloy_rlp::Encodable for Signed<T, Sig> {
     // TODO: impl length
 }
 
-impl<T: Signable<Sig>, Sig> alloy_rlp::Decodable for Signed<T, Sig> {
+impl<T: SignableTransaction<Sig>, Sig> alloy_rlp::Decodable for Signed<T, Sig> {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        <T as Signable<Sig>>::decode_signed(buf)
+        <T as SignableTransaction<Sig>>::decode_signed(buf)
     }
 }
 
 #[cfg(feature = "k256")]
-impl<T: Signable<Sig>, Sig> Signed<T, Signature, Sig> {
+impl<T: SignableTransaction<Sig>, Sig> Signed<T, Signature, Sig> {
     /// Recover the signer of the transaction
     pub fn recover_signer(
         &self,

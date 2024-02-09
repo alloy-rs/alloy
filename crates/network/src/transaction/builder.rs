@@ -11,6 +11,14 @@ pub enum BuilderError {
     #[error("A required key is missing: {0}")]
     MissingKey(&'static str),
 
+    /// Signer cannot produce signature type required for transaction.
+    #[error("Signer cannot produce signature type required for transaction")]
+    UnsupportedSignatureType,
+
+    /// Signer Error
+    #[error(transparent)]
+    Signer(#[from] alloy_signer::Error),
+
     /// A custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),

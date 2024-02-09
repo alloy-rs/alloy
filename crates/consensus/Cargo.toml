@@ -20,6 +20,8 @@ alloy-eips.workspace = true
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 alloy-rpc-types.workspace = true
+async-trait.workspace = true
+alloy-signer.workspace = true
 
 [dev-dependencies]
 alloy-signer.workspace = true

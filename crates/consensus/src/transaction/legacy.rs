@@ -1,5 +1,5 @@
 use crate::TxKind;
-use alloy_network::{Signable, Signed, Transaction};
+use alloy_network::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
@@ -213,7 +213,7 @@ impl Transaction for TxLegacy {
     }
 }
 
-impl Signable<Signature> for TxLegacy {
+impl SignableTransaction<Signature> for TxLegacy {
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
         Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
             .encode(out);

@@ -1,6 +1,6 @@
 use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Signable, Signed, Transaction};
+use alloy_network::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
@@ -237,7 +237,7 @@ impl Transaction for TxEip1559 {
     }
 }
 
-impl Signable<Signature> for TxEip1559 {
+impl SignableTransaction<Signature> for TxEip1559 {
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
         out.put_u8(self.tx_type() as u8);
         Header { list: true, payload_length: self.fields_len() }.encode(out);

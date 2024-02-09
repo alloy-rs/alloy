@@ -1,6 +1,6 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_consensus::TxEip1559;
-use alloy_network::{Signable, TxKind};
+use alloy_network::{SignableTransaction, TxKind};
 use alloy_primitives::{hex, Address, ChainId, Parity, B256, U256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
@@ -69,7 +69,10 @@ impl Signer for TrezorSigner {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl alloy_network::TxSigner<Signature> for TrezorSigner {
     #[inline]
-    async fn sign_transaction(&self, tx: &mut dyn Signable<Signature>) -> Result<Signature> {
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
         let chain_id = match (self.chain_id(), tx.chain_id()) {
             (Some(id), None) | (None, Some(id)) => id,
             (Some(signer), Some(tx)) if signer != tx => {
@@ -164,7 +167,10 @@ impl TrezorSigner {
     /// Signs an Ethereum transaction (requires confirmation on the Trezor).
     ///
     /// Does not apply EIP-155.
-    async fn sign_tx_inner(&self, tx: &dyn Signable<Signature>) -> Result<Signature, TrezorError> {
+    async fn sign_tx_inner(
+        &self,
+        tx: &dyn SignableTransaction<Signature>,
+    ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let path = Self::convert_path(&self.derivation);
 

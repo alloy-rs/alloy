@@ -1,3 +1,9 @@
+use alloy_network::{BuilderError, NetworkSigner, SignableTransaction, TxSigner};
+use alloy_primitives::Signature;
+use alloy_signer::Signer;
+
+use async_trait::async_trait;
+
 mod builder;
 pub use builder::EthereumTxBuilder;
 
@@ -18,6 +24,36 @@ pub use legacy::TxLegacy;
 
 mod typed;
 pub use typed::TypedTransaction;
+
+use crate::Ethereum;
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl<S> NetworkSigner<Ethereum> for S
+where
+    S: TxSigner<Signature>,
+{
+    async fn sign(&self, tx: TypedTransaction) -> Result<TxEnvelope, BuilderError> {
+        match tx {
+            TypedTransaction::Legacy(t) => {
+                let sig = self.signer.sign_transaction(&t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+            TypedTransaction::Eip2930(t) => {
+                let sig = self.signer.sign_transaction(&t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+            TypedTransaction::Eip1559(t) => {
+                let sig = self.signer.sign_transaction(&t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+            TypedTransaction::Eip4844(t) => {
+                let sig = self.signer.sign_transaction(&t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -41,7 +77,7 @@ mod test {
         }
 
         async fn sign_dyn_tx_test(
-            tx: &mut dyn alloy_network::Signable,
+            tx: &mut dyn alloy_network::SignableTransaction,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
             let mut wallet: alloy_signer::Wallet<k256::ecdsa::SigningKey> =

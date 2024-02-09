@@ -1,6 +1,6 @@
 use crate::{TxKind, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Signable, Signed, Transaction};
+use alloy_network::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
@@ -198,7 +198,7 @@ impl Transaction for TxEip2930 {
     }
 }
 
-impl Signable<Signature> for TxEip2930 {
+impl SignableTransaction<Signature> for TxEip2930 {
     // type Receipt = ReceiptWithBloom;z
 
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
@@ -247,7 +247,7 @@ impl Signable<Signature> for TxEip2930 {
 mod tests {
     use super::TxEip2930;
     use crate::{TxEnvelope, TxKind};
-    use alloy_network::{Signable, Signed};
+    use alloy_network::{SignableTransaction, Signed};
     use alloy_primitives::{Address, Bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
