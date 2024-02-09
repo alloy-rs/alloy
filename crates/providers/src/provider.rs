@@ -8,9 +8,9 @@ use alloy_rpc_trace_types::{
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
-    state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
-    EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
-    TransactionReceipt,
+    request::TransactionRequest, state::StateOverride, AccessListWithGasUsed, Block, BlockId,
+    BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus,
+    Transaction, TransactionReceipt,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
@@ -141,24 +141,28 @@ pub trait TempProvider: Send + Sync {
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus>;
 
-    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
 
-    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
-    /// transaction.
+    /// Execute a smart contract call with [TransactionRequest] and state overrides, without
+    /// publishing a transaction.
     ///
     /// # Note
     ///
     /// Not all client implementations support state overrides.
     async fn call_with_overrides(
         &self,
-        tx: CallRequest,
+        tx: TransactionRequest,
         block: Option<BlockId>,
         state: StateOverride,
     ) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>;
+    async fn estimate_gas(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<U256>;
 
     /// Sends an already-signed transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>;
@@ -183,7 +187,7 @@ pub trait TempProvider: Send + Sync {
 
     async fn create_access_list(
         &self,
-        request: CallRequest,
+        request: TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed>;
 
@@ -379,20 +383,20 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_syncing", ()).await
     }
 
-    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
         self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
-    /// Execute a smart contract call with [CallRequest] and state overrides, without publishing a
-    /// transaction.
+    /// Execute a smart contract call with [TransactionRequest] and state overrides, without
+    /// publishing a transaction.
     ///
     /// # Note
     ///
     /// Not all client implementations support state overrides.
     async fn call_with_overrides(
         &self,
-        tx: CallRequest,
+        tx: TransactionRequest,
         block: Option<BlockId>,
         state: StateOverride,
     ) -> TransportResult<Bytes> {
@@ -400,7 +404,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256> {
+    async fn estimate_gas(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<U256> {
         if let Some(block_id) = block {
             self.inner.prepare("eth_estimateGas", (tx, block_id)).await
         } else {
@@ -468,7 +476,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     async fn create_access_list(
         &self,
-        request: CallRequest,
+        request: TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed> {
         self.inner.prepare("eth_createAccessList", (request, block.unwrap_or_default())).await

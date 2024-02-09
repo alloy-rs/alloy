@@ -20,7 +20,7 @@ mod work;
 
 pub use account::*;
 pub use block::*;
-pub use call::{Bundle, CallInput, CallInputError, CallRequest, EthCallResponse, StateContext};
+pub use call::{Bundle, EthCallResponse, StateContext};
 pub use fee::{FeeHistory, TxGasAndReward};
 pub use filter::*;
 pub use index::Index;

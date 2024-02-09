@@ -3,7 +3,11 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_primitives::{Address, Bytes, U256, U64};
 use alloy_providers::provider::TempProvider;
-use alloy_rpc_types::{state::StateOverride, BlockId, CallInput, CallRequest, TransactionReceipt};
+use alloy_rpc_types::{
+    request::{TransactionInput, TransactionRequest},
+    state::StateOverride,
+    BlockId, TransactionReceipt,
+};
 use alloy_sol_types::SolCall;
 use std::{
     future::{Future, IntoFuture},
@@ -189,7 +193,7 @@ impl CallDecoder for () {
 pub struct CallBuilder<P, D> {
     // TODO: this will not work with `send_transaction` and does not differentiate between EIP-1559
     // and legacy tx
-    request: CallRequest,
+    request: TransactionRequest,
     block: Option<BlockId>,
     state: Option<StateOverride>,
     provider: P,
@@ -249,7 +253,8 @@ impl<P: TempProvider> RawCallBuilder<P> {
 
 impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     fn new_inner(provider: P, input: Bytes, decoder: D) -> Self {
-        let request = CallRequest { input: CallInput::new(input), ..Default::default() };
+        let request =
+            TransactionRequest { input: TransactionInput::new(input), ..Default::default() };
         Self { request, decoder, provider, block: None, state: None }
     }
 
@@ -272,7 +277,7 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
 
     /// Sets the `gas` field in the transaction to the provided value
     pub fn gas(mut self, gas: U256) -> Self {
-        self.request = self.request.gas(gas);
+        self.request = self.request.gas_limit(gas);
         self
     }
 
@@ -280,7 +285,8 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
     pub fn gas_price(mut self, gas_price: U256) -> Self {
-        self.request = self.request.gas_price(gas_price);
+        self.request = self.request.max_fee_per_gas(gas_price);
+        self.request = self.request.max_priority_fee_per_gas(gas_price);
         self
     }
 
