@@ -17,6 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
+alloy-serde = { version = "0.1.0", path = "crates/serde" }
 alloy-consensus = { version = "0.1.0", path = "crates/consensus" }
 alloy-eips = { version = "0.1.0", path = "crates/eips" }
 alloy-json-rpc = { version = "0.1.0", path = "crates/json-rpc" }
@@ -36,9 +37,13 @@ alloy-transport = { version = "0.1.0", path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", path = "crates/transport-ws" }
-alloy-genesis = {version = "0.1.0", path = "crates/genesis" }
-alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
+alloy-genesis = { version = "0.1.0", path = "crates/genesis" }
+alloy-primitives = { version = "0.6", default-features = false, features = [
+    "std",
+] }
+alloy-sol-types = { version = "0.6", default-features = false, features = [
+    "std",
+] }
 alloy-rlp = "0.3"
 
 # ethereum
@@ -46,8 +51,13 @@ ethereum_ssz_derive = "0.5"
 ethereum_ssz = "0.5"
 
 # crypto
-elliptic-curve = { version = "0.13", default-features = false, features = ["std"] }
-k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+elliptic-curve = { version = "0.13", default-features = false, features = [
+    "std",
+] }
+k256 = { version = "0.13", default-features = false, features = [
+    "ecdsa",
+    "std",
+] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }
 spki = { version = "0.7", default-features = false, features = ["std"] }
 
