@@ -1,6 +1,7 @@
 use crate::{BuilderError, Network, Signed, Transaction};
 use alloy_primitives::{keccak256, B256};
 use alloy_rlp::BufMut;
+use async_trait::async_trait;
 
 /// A signable transaction.
 ///
@@ -49,11 +50,15 @@ pub trait SignableTransaction<Signature>: Transaction {
 }
 
 // todo: move
+/// A signer capable of signing any transaction for the given network.
+#[async_trait]
 pub trait NetworkSigner<N: Network> {
-    async fn sign(&self, tx: N::TransactionBuilder) -> Result<N::TxEnvelope, BuilderError>;
+    async fn sign(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
 }
 
 // todo: move
+/// An async signer capable of signing any [SignableTransaction] for the given [Signature] type.
+#[async_trait]
 pub trait TxSigner<Signature> {
     async fn sign_transaction(
         &self,
@@ -62,6 +67,7 @@ pub trait TxSigner<Signature> {
 }
 
 // todo: move
+/// A sync signer capable of signing any [SignableTransaction] for the given [Signature] type.
 pub trait TxSignerSync<Signature> {
     fn sign_transaction_sync(
         &self,

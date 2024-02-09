@@ -33,7 +33,7 @@ impl<S> NetworkSigner<Ethereum> for S
 where
     S: TxSigner<Signature>,
 {
-    async fn sign(&self, tx: TypedTransaction) -> Result<TxEnvelope, BuilderError> {
+    async fn sign(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
         match tx {
             TypedTransaction::Legacy(t) => {
                 let sig = self.signer.sign_transaction(&t).await?;
