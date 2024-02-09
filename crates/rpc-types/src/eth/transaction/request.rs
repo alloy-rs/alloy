@@ -127,8 +127,8 @@ impl TransactionRequest {
 
     /// Sets the recipient address for the transaction.
     #[inline]
-    pub const fn to(mut self, to: Address) -> Self {
-        self.to = Some(to);
+    pub const fn to(mut self, to: Option<Address>) -> Self {
+        self.to = to;
         self
     }
 
