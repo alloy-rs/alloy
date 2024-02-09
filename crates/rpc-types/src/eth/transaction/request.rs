@@ -103,25 +103,25 @@ impl TransactionRequest {
     }
 
     /// Sets the gas limit for the transaction.
-    pub fn gas_limit(mut self, gas_limit: U256) -> Self {
+    pub const fn gas_limit(mut self, gas_limit: U256) -> Self {
         self.gas = Some(gas_limit);
         self
     }
 
     /// Sets the nonce for the transaction.
-    pub fn nonce(mut self, nonce: U64) -> Self {
+    pub const fn nonce(mut self, nonce: U64) -> Self {
         self.nonce = Some(nonce);
         self
     }
 
     /// Sets the maximum fee per gas for the transaction.
-    pub fn max_fee_per_gas(mut self, max_fee_per_gas: U256) -> Self {
+    pub const fn max_fee_per_gas(mut self, max_fee_per_gas: U256) -> Self {
         self.max_fee_per_gas = Some(max_fee_per_gas);
         self
     }
 
     /// Sets the maximum priority fee per gas for the transaction.
-    pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: U256) -> Self {
+    pub const fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: U256) -> Self {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
         self
     }
@@ -134,7 +134,7 @@ impl TransactionRequest {
     }
 
     /// Sets the value (amount) for the transaction.
-    pub fn value(mut self, value: U256) -> Self {
+    pub const fn value(mut self, value: U256) -> Self {
         self.value = Some(value);
         self
     }
