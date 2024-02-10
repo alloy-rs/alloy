@@ -116,14 +116,14 @@ pub mod signers {
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.
 ///
 /// You will likely not need to use this module;
-/// see the [`provider`] module for high-level usage of transports.
+/// see the [`providers`] module for high-level usage of transports.
 ///
 /// See [`alloy_transport`] for more details.
 #[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
-#[cfg_attr(feature = "provider", doc = "[`provider`]: crate::provider")]
+#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
 #[cfg_attr(
     not(feature = "providers"),
-    doc = "[`provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/providers"
 )]
 #[cfg(feature = "transports")]
 pub mod transports {
@@ -144,14 +144,14 @@ pub mod transports {
 /// Ethereum JSON-RPC publish-subscribe tower service and type definitions.
 ///
 /// You will likely not need to use this module;
-/// see the [`provider`] module for high-level usage of pubsub.
+/// see the [`providers`] module for high-level usage of pubsub.
 ///
 /// See [`alloy_pubsub`] for more details.
 #[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
-#[cfg_attr(feature = "provider", doc = "[`provider`]: crate::provider")]
+#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
 #[cfg_attr(
     not(feature = "providers"),
-    doc = "[`provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/providers"
 )]
 #[cfg(feature = "pubsub")]
 pub mod pubsub {
