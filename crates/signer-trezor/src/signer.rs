@@ -51,17 +51,13 @@ impl Signer for TrezorSigner {
 
     #[inline]
     async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
-        // TODO: the Trezor Ethereum sign transaction protobufs don't require a chain ID, but the
-        // trezor-client API does not reflect this.
-        // https://github.com/trezor/trezor-firmware/pull/3482
-        let chain_id = if let Some(chain_id) = self.chain_id {
+        if let Some(chain_id) = self.chain_id {
             tx.set_chain_id_checked(chain_id)?;
-            chain_id
-        } else {
-            tx.chain_id().ok_or(TrezorError::MissingChainId).map_err(alloy_signer::Error::other)?
-        };
-        let mut sig = self.sign_tx_inner(tx, chain_id).await.map_err(alloy_signer::Error::other)?;
-        sig = sig.with_chain_id(chain_id);
+        }
+        let mut sig = self.sign_tx_inner(tx).await.map_err(alloy_signer::Error::other)?;
+        if let Some(chain_id) = self.chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
         Ok(sig)
     }
 
@@ -162,7 +158,6 @@ impl TrezorSigner {
     async fn sign_tx_inner(
         &self,
         tx: &dyn Transaction<Signature = Signature>,
-        chain_id: ChainId,
     ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let path = Self::convert_path(&self.derivation);
@@ -185,6 +180,7 @@ impl TrezorSigner {
         let value = u256_to_trezor(value);
 
         let data = tx.input().to_vec();
+        let chain_id = tx.chain_id();
 
         // TODO: Uncomment in 1.76
         /*
@@ -272,9 +268,10 @@ fn address_to_trezor(x: &Address) -> String {
 }
 
 fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signature, TrezorError> {
-    let s = U256::from_limbs(x.s.0);
-    let r = U256::from_limbs(x.r.0);
-    Signature::from_rs_and_parity(r, s, Parity::Eip155(x.v)).map_err(Into::into)
+    let r = U256::from_be_bytes(x.r);
+    let s = U256::from_be_bytes(x.s);
+    let v = Parity::Eip155(x.v);
+    Signature::from_rs_and_parity(r, s, v).map_err(Into::into)
 }
 
 #[cfg(test)]

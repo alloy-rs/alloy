@@ -17,9 +17,7 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-# TODO: bump this and remove protobuf pin
-trezor-client = { version = "=0.1.0", default-features = false, features = ["ethereum"] }
-protobuf = "=3.2.0"
+trezor-client = { version = "=0.1.3", default-features = false, features = ["ethereum"] }
 
 async-trait.workspace = true
 semver.workspace = true
