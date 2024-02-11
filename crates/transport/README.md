@@ -9,7 +9,7 @@ This crate handles RPC connection and request management. It builds an
 futures for simple and batch RPC requests as well as a unified `TransportError`
 type.
 
-[alloy-providers]: ../providers/
+[alloy-provider]: ../provider/
 [tower `Service`]: https://docs.rs/tower/latest/tower/trait.Service.html
 
 ## Usage

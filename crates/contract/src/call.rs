@@ -2,7 +2,7 @@ use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_primitives::{Address, Bytes, U256, U64};
-use alloy_providers::tmp::TempProvider;
+use alloy_provider::tmp::TempProvider;
 use alloy_rpc_types::{
     request::{TransactionInput, TransactionRequest},
     state::StateOverride,
@@ -456,7 +456,7 @@ mod tests {
     use super::*;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex};
-    use alloy_providers::tmp::{HttpProvider, Provider};
+    use alloy_provider::tmp::{HttpProvider, Provider};
     use alloy_sol_types::sol;
 
     #[test]

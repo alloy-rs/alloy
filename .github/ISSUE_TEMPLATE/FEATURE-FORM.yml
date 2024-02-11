@@ -1,7 +1,7 @@
 name: Feature request
 description: Suggest a feature
-labels: ["enhancement"]
-title: "[Feature] "
+labels: ['enhancement']
+title: '[Feature] '
 body:
   - type: markdown
     attributes:
@@ -16,7 +16,7 @@ body:
         - consensus, eips, genesis
         - network, json-rpc
         - nodes
-        - providers, pubsub
+        - provider, pubsub
         - rpc
         - signers
         - transports

@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-providers.workspace = true
+alloy-provider.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport.workspace = true
 
