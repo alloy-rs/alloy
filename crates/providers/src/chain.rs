@@ -49,9 +49,11 @@ where
                 continue;
             }
 
+            // then get the tip/
             let block_number = match poll_stream.next().await {
                 Some(Ok(block_number)) => block_number,
                 Some(Err(err)) => {
+                    // this is fine.
                     tracing::error!(%err, "polling stream lagged");
                     continue;
                 },
@@ -61,6 +63,7 @@ where
                 },
             };
 
+            // then upgrade the provider
             let provider = match provider.upgrade() {
                 Some(provider) => provider,
                 None => {
