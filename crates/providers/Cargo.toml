@@ -26,6 +26,9 @@ reqwest.workspace = true
 auto_impl = "1.1.0"
 tokio = { version = "1.33.0", features = ["sync"] }
 futures.workspace = true
+async-stream = "0.3.5"
+lru = "0.12.2"
+tracing.workspace = true
 
 [dev-dependencies]
 alloy-node-bindings.workspace = true

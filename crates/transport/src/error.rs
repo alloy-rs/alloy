@@ -32,6 +32,15 @@ pub enum TransportErrorKind {
 }
 
 impl TransportErrorKind {
+    /// Whether the error is potentially recoverable. This is a naive heuristic
+    /// and should be used with caution.
+    pub fn recoverable(&self) -> bool {
+        match self {
+            Self::MissingBatchResponse(_) => true,
+            _ => false,
+        }
+    }
+
     /// Instantiate a new `TransportError` from a custom error.
     pub fn custom_str(err: &str) -> TransportError {
         RpcError::Transport(Self::Custom(err.into()))

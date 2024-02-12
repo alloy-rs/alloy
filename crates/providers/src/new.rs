@@ -1,9 +1,8 @@
 use alloy_network::{Network, Transaction};
 use alloy_primitives::{Address, BlockNumber, U64};
-use alloy_rpc_client::RpcClient;
+use alloy_rpc_client::{ClientRef, RpcClient, WeakClient};
 use alloy_rpc_types::Block;
 use alloy_transport::{BoxTransport, Transport, TransportResult};
-use auto_impl::auto_impl;
 use std::{
     borrow::Cow,
     marker::PhantomData,
@@ -35,9 +34,14 @@ impl<N, T> RootProviderInner<N, T> {
         this
     }
 
+    /// Get a weak reference to the RPC client.
+    pub fn weak_client(&self) -> WeakClient<T> {
+        self.client.get_weak()
+    }
+
     /// Get a reference to the RPC client.
-    pub fn client_ref(&self) -> &RpcClient<T> {
-        &self.client
+    pub fn client_ref(&self) -> ClientRef<'_, T> {
+        self.client.get_ref()
     }
 
     /// Get a clone of the RPC client.
@@ -54,6 +58,8 @@ impl<N, T> RootProviderInner<N, T> {
     }
 }
 
+/// The root provider manages the RPC client and the heartbeat. It is at the
+/// base of every provider stack.
 pub struct RootProvider<N, T> {
     pub inner: Arc<RootProviderInner<N, T>>,
 }
@@ -84,7 +90,10 @@ impl<N, T> Deref for RootProvider<N, T> {
 /// transport is type-erased, but you can do `Provider<N, Http>`.
 pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
     /// Get a reference to the RPC client.
-    fn client(&self) -> &RpcClient<T>;
+    fn client_ref(&self) -> ClientRef<'_, T>;
+
+    /// Get a weak reference to the RPC client.
+    fn weak_client(&self) -> WeakClient<T>;
 
     async fn estimate_gas(
         &self,
@@ -123,8 +132,12 @@ pub trait Provider<N: Network, T: Transport = BoxTransport>: Send + Sync {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
-    fn client(&self) -> &RpcClient<T> {
-        &self.client_ref()
+    fn client_ref(&self) -> ClientRef<'_, T> {
+        self.inner.client_ref()
+    }
+
+    fn weak_client(&self) -> WeakClient<T> {
+        self.inner.weak_client()
     }
 
     async fn estimate_gas(

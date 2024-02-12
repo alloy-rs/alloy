@@ -24,7 +24,7 @@ mod chain;
 mod heart;
 
 pub mod new;
-pub use new::{ProviderRef, RootProvider, WeakProvider, Provider};
+pub use new::{Provider, ProviderRef, RootProvider, WeakProvider};
 
 pub mod utils;
 

@@ -32,7 +32,7 @@ pub use error::{TransportError, TransportResult};
 mod r#trait;
 pub use r#trait::Transport;
 
-pub use alloy_json_rpc::RpcResult;
+pub use alloy_json_rpc::{RpcError, RpcResult};
 
 /// Misc. utilities for building transports.
 pub mod utils;
