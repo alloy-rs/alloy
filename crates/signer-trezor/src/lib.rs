@@ -18,9 +18,6 @@
 #[macro_use]
 extern crate tracing;
 
-// TODO: Needed to pin version.
-use protobuf as _;
-
 mod signer;
 pub use signer::TrezorSigner;
 
