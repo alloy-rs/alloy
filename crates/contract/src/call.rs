@@ -534,8 +534,8 @@ mod tests {
 
     // TODO: send_transaction, PendingTransaction
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "TODO"]
     async fn deploy_and_call() {
-        /*
         let (provider, anvil) = spawn_anvil();
 
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -558,7 +558,6 @@ mod tests {
             result.d,
             b256!("0000000000000000000000000000000000000000000000000000000000000001"),
         );
-        */
     }
 
     #[allow(dead_code)]
