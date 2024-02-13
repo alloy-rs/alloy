@@ -86,6 +86,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn serialize_empty_optimism_transaction_receipt_fields_struct() {
+        let op_fields = OptimismTransactionReceiptFields::default();
+
+        let json = serde_json::to_value(op_fields).unwrap();
+        assert_eq!(json, json!({}));
+    }
+
+    #[test]
     fn serialize_l1_fee_scalar() {
         let op_fields = OptimismTransactionReceiptFields {
             l1_fee_scalar: Some(0.678),
