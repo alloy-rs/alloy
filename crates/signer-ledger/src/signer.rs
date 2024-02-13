@@ -58,7 +58,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
-    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
@@ -391,7 +391,7 @@ mod tests {
         test_sign_tx_generic(&mut tx).await;
     }
 
-    async fn test_sign_tx_generic(tx: &mut dyn SignableTransaction) {
+    async fn test_sign_tx_generic(tx: &mut dyn SignableTransaction<Signature>) {
         let sighash = tx.signature_hash();
         let ledger = init_ledger().await;
         let sig = match ledger.sign_transaction(tx).await {

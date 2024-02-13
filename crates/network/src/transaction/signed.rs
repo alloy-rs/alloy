@@ -74,7 +74,7 @@ impl<T: SignableTransaction<Sig>, Sig> alloy_rlp::Decodable for Signed<T, Sig> {
 }
 
 #[cfg(feature = "k256")]
-impl<T: SignableTransaction<Sig>, Sig> Signed<T, Signature, Sig> {
+impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     /// Recover the signer of the transaction
     pub fn recover_signer(
         &self,

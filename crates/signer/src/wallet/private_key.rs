@@ -295,7 +295,7 @@ mod tests {
         let hash = foo_bar.eip712_signing_hash(&domain);
         let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
-        assert_eq!(wallet.sign_hash_sync(hash).unwrap(), sig);
+        assert_eq!(wallet.sign_hash_sync(&hash).unwrap(), sig);
     }
 
     #[test]

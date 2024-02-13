@@ -38,7 +38,7 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
     #[inline]
-    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))

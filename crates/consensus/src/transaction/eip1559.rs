@@ -285,7 +285,7 @@ mod tests {
     use super::TxEip1559;
     use crate::TxKind;
     use alloy_eips::eip2930::AccessList;
-    use alloy_network::Transaction;
+    use alloy_network::SignableTransaction;
     use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
     use alloy_rlp::Encodable;
 

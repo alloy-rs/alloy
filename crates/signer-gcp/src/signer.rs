@@ -149,8 +149,8 @@ pub enum GcpSignerError {
 impl Signer for GcpSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
-    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
-        self.sign_digest_inner(&hash).await.map_err(alloy_signer::Error::other)
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+        self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -278,7 +278,7 @@ fn sig_from_digest_bytes_trial_recovery(
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
 fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
-    signature.recover_from_prehash(*hash).map(|key| key == *pubkey).unwrap_or(false)
+    signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
 }
 
 #[cfg(test)]

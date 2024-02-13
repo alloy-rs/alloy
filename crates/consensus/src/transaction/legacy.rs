@@ -262,12 +262,11 @@ mod tests {
     #[cfg(feature = "k256")]
     fn recover_signer_legacy() {
         use crate::{TxKind, TxLegacy};
-        use alloy_network::Transaction;
-        use alloy_primitives::{b256, hex, Address, Signature, B256, U256};
+        use alloy_network::SignableTransaction;
+        use alloy_primitives::{address, b256, hex, Signature, U256};
 
-        let signer: Address = hex!("398137383b3d25c92898c656696e41950e47316b").into();
-        let hash: B256 =
-            hex!("bb3a336e3f823ec18197f1e13ee875700f08f03e2cab75f0d0b118dabb44cba0").into();
+        let signer = address!("398137383b3d25c92898c656696e41950e47316b");
+        let hash = b256!("bb3a336e3f823ec18197f1e13ee875700f08f03e2cab75f0d0b118dabb44cba0");
 
         let tx = TxLegacy {
             chain_id: Some(1),
