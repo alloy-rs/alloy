@@ -20,6 +20,7 @@ alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
+alloy-network.workspace = true
 
 thiserror.workspace = true
 

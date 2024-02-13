@@ -16,12 +16,13 @@ alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-eips.workspace = true
+alloy-rpc-types.workspace = true
+alloy-signer.workspace = true
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-alloy-rpc-types.workspace = true
 async-trait.workspace = true
-alloy-signer.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 alloy-signer.workspace = true

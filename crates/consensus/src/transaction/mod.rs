@@ -1,9 +1,3 @@
-use alloy_network::{BuilderError, NetworkSigner, SignableTransaction, TxSigner};
-use alloy_primitives::Signature;
-use alloy_signer::Signer;
-
-use async_trait::async_trait;
-
 mod builder;
 pub use builder::EthereumTxBuilder;
 
@@ -25,7 +19,29 @@ pub use legacy::TxLegacy;
 mod typed;
 pub use typed::TypedTransaction;
 
+/*
+use alloy_network::{NetworkSigner, SignableTransaction, TxSigner};
+use alloy_primitives::Signature;
+
+use async_trait::async_trait;
+
 use crate::Ethereum;
+
+
+todo: this doesn't work
+
+error[E0210]: type parameter `S` must be covered by another type when it appears before the first local type (`Ethereum`)
+  --> crates/consensus/src/transaction/mod.rs:32:6
+   |
+32 | impl<S> NetworkSigner<Ethereum> for S
+   |      ^ type parameter `S` must be covered by another type when it appears before the first local type (`Ethereum`)
+   |
+   = note: implementing a foreign trait is only possible if at least one of the types for which it is implemented is local, and no uncovered type parameters appear before that first local type
+   = note: in this case, 'before' refers to the following order: `impl<..> ForeignTrait<T1, ..., Tn> for T0`, where `T0` is the first and `Tn` is the last
+
+a solution would be to move this to alloy-network, but then we'd have a circular dep, since alloy-consensus depends on alloy-network for the tx builder traits.
+if we move e.g. `Ethereum` to alloy-network, we'd still have a circular dep. the only way to not have a circular dep is to move more
+stuff from alloy-network into alloy-consensus or vice versa
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -138,3 +154,4 @@ mod test {
         assert_eq!(error.to_string(), expected_error.to_string());
     }
 }
+*/

@@ -1,4 +1,4 @@
-use crate::{BuilderError, Network, Signed, Transaction};
+use crate::{Network, Signed, Transaction};
 use alloy_primitives::{keccak256, B256};
 use alloy_rlp::BufMut;
 use async_trait::async_trait;
@@ -49,10 +49,23 @@ pub trait SignableTransaction<Signature>: Transaction {
         Self: Sized;
 }
 
+// TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
+#[doc(hidden)]
+impl<S: 'static> dyn SignableTransaction<S> {
+    pub fn __downcast_ref<T: std::any::Any>(&self) -> Option<&T> {
+        if std::any::Any::type_id(self) == std::any::TypeId::of::<T>() {
+            unsafe { Some(&*(self as *const _ as *const T)) }
+        } else {
+            None
+        }
+    }
+}
+
 // todo: move
 /// A signer capable of signing any transaction for the given network.
 #[async_trait]
 pub trait NetworkSigner<N: Network> {
+    /// Asynchronously sign an unsigned transaction.
     async fn sign(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
 }
 
@@ -60,6 +73,7 @@ pub trait NetworkSigner<N: Network> {
 /// An async signer capable of signing any [SignableTransaction] for the given [Signature] type.
 #[async_trait]
 pub trait TxSigner<Signature> {
+    /// Asynchronously sign an unsigned transaction.
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -69,6 +83,7 @@ pub trait TxSigner<Signature> {
 // todo: move
 /// A sync signer capable of signing any [SignableTransaction] for the given [Signature] type.
 pub trait TxSignerSync<Signature> {
+    /// Synchronously sign an unsigned transaction.
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
