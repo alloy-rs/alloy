@@ -560,7 +560,6 @@ mod tests {
         );
     }
 
-    #[allow(dead_code)]
     fn spawn_anvil() -> (HttpProvider, AnvilInstance) {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(anvil.endpoint()).unwrap();
