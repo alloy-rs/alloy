@@ -23,7 +23,7 @@ use alloy_transport::{BoxTransport, Transport, TransportResult};
 use std::{borrow::Cow, marker::PhantomData};
 
 mod builder;
-pub use builder::{ProviderBuilder, ProviderLayer, Stack};
+pub use builder::{DebugTraceCallBuilder, ProviderBuilder, ProviderLayer, Stack};
 
 pub mod provider;
 pub mod utils;
