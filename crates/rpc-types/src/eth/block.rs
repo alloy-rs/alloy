@@ -750,13 +750,20 @@ pub struct ParseBlockIdError {
 impl FromStr for BlockId {
     type Err = ParseBlockIdError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match u64::from_str(s) {
-            Ok(val) => Ok(BlockId::Number(BlockNumberOrTag::Number(val))),
-            Err(parse_int_error) => match B256::from_str(s) {
-                Ok(val) => Ok(BlockId::Hash(val.into())),
-                Err(hex_error) => {
-                    Err(ParseBlockIdError { input: s.to_string(), parse_int_error, hex_error })
-                }
+        match s {
+            "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
+            "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
+            "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
+            "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
+            "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
+            _ => match u64::from_str(s) {
+                Ok(val) => Ok(BlockId::Number(BlockNumberOrTag::Number(val))),
+                Err(parse_int_error) => match B256::from_str(s) {
+                    Ok(val) => Ok(BlockId::Hash(val.into())),
+                    Err(hex_error) => {
+                        Err(ParseBlockIdError { input: s.to_string(), parse_int_error, hex_error })
+                    }
+                },
             },
         }
     }
