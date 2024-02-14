@@ -9,8 +9,8 @@ use alloy_rpc_trace_types::{
 };
 use alloy_rpc_types::{
     request::TransactionRequest, state::StateOverride, AccessListWithGasUsed, Block, BlockId,
-    BlockNumberOrTag, CallRequest, EIP1186AccountProofResponse, FeeHistory, Filter, Log,
-    SyncStatus, Transaction, TransactionReceipt,
+    BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus,
+    Transaction, TransactionReceipt,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
@@ -184,10 +184,10 @@ pub trait TempProvider: Send + Sync {
         keys: Vec<StorageKey>,
         block: Option<BlockId>,
     ) -> TransportResult<EIP1186AccountProofResponse>;
-
+    /// Inspect and debug transaction
     async fn debug_trace_call(
         &self,
-        req: CallRequest,
+        req: TransactionRequest,
         block: Option<BlockId>,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
@@ -263,7 +263,6 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the last block number available.
-    /// Gets the last block number available.
     async fn get_block_number(&self) -> TransportResult<u64> {
         self.inner.prepare("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
@@ -277,10 +276,10 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
             )
             .await
     }
-
+    /// Inspect and debug transaction
     async fn debug_trace_call(
         &self,
-        req: CallRequest,
+        req: TransactionRequest,
         block: Option<BlockId>,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
