@@ -740,31 +740,32 @@ impl<'de> Deserialize<'de> for BlockId {
 
 /// Error thrown when parsing a [BlockId] from a string.
 #[derive(Debug, thiserror::Error)]
-#[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]
-pub struct ParseBlockIdError {
-    input: String,
-    parse_int_error: ParseIntError,
-    hex_error: alloy_primitives::hex::FromHexError,
+pub enum ParseBlockIdError {
+    /// Failed to parse a block id from a number.
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
+    /// Failed to parse a block id as a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] alloy_primitives::hex::FromHexError),
 }
 
 impl FromStr for BlockId {
     type Err = ParseBlockIdError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("0x") {
+            return B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError);
+        }
+
         match s {
             "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
             "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
             "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
             "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
             "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
-            _ => match u64::from_str(s) {
-                Ok(val) => Ok(BlockId::Number(BlockNumberOrTag::Number(val))),
-                Err(parse_int_error) => match B256::from_str(s) {
-                    Ok(val) => Ok(BlockId::Hash(val.into())),
-                    Err(hex_error) => {
-                        Err(ParseBlockIdError { input: s.to_string(), parse_int_error, hex_error })
-                    }
-                },
-            },
+            _ => s
+                .parse::<u64>()
+                .map_err(ParseBlockIdError::ParseIntError)
+                .map(|n| BlockId::Number(n.into())),
         }
     }
 }
