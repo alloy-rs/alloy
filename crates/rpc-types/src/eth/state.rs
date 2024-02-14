@@ -37,6 +37,44 @@ mod tests {
     use alloy_primitives::address;
 
     #[test]
+    #[should_panic(expected = "invalid type")]
+    fn test_invalid_json_structure() {
+        let invalid_json = r#"{
+            "0x1234567890123456789012345678901234567890": {
+                "balance": true
+            }
+        }"#;
+
+        let _: StateOverride = serde_json::from_str(invalid_json).unwrap();
+    }
+
+    #[test]
+    fn test_large_values_in_override() {
+        let large_values_json = r#"{
+            "0x1234567890123456789012345678901234567890": {
+                "balance": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "nonce": "0xffffffffffffffff"
+            }
+        }"#;
+
+        let state_override: StateOverride = serde_json::from_str(large_values_json).unwrap();
+        let acc =
+            state_override.get(&address!("1234567890123456789012345678901234567890")).unwrap();
+        assert_eq!(acc.balance, Some(U256::MAX));
+        assert_eq!(acc.nonce, Some(U64::MAX));
+    }
+
+    #[test]
+    fn test_default_account_override() {
+        let acc_override = AccountOverride::default();
+        assert!(acc_override.balance.is_none());
+        assert!(acc_override.nonce.is_none());
+        assert!(acc_override.code.is_none());
+        assert!(acc_override.state.is_none());
+        assert!(acc_override.state_diff.is_none());
+    }
+
+    #[test]
     fn test_state_override() {
         let s = r#"{
             "0x0000000000000000000000000000000000000124": {
