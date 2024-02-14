@@ -1,7 +1,9 @@
-use crate::{NetworkRpcClient, Provider};
+use crate::{provider::TempProvider, NetworkRpcClient, Provider};
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
-use alloy_transport::Transport;
+use alloy_rpc_trace_types::geth::{GethDebugTracingCallOptions, GethTrace};
+use alloy_rpc_types::{request::TransactionRequest, BlockId};
+use alloy_transport::{Transport, TransportResult};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -115,6 +117,45 @@ impl<L, N, T> ProviderBuilder<L, N, T> {
         N: Network,
     {
         self.layer.layer(provider)
+    }
+}
+
+/// Builder for constructing a debug trace call request.
+#[derive(Clone)]
+pub struct DebugTraceCallBuilder {
+    pub req: Option<TransactionRequest>,
+    pub block: Option<BlockId>,
+    pub trace_options: Option<GethDebugTracingCallOptions>,
+}
+
+impl DebugTraceCallBuilder {
+    /// Creates a new `DebugTraceCallBuilder`.
+    pub fn new() -> Self {
+        DebugTraceCallBuilder { req: None, block: None, trace_options: None }
+    }
+
+    /// Sets the transaction request for the builder.
+    pub fn request(mut self, req: TransactionRequest) -> Self {
+        self.req = Some(req);
+        self
+    }
+
+    /// Sets the block ID for the builder.
+    pub fn block(mut self, block: BlockId) -> Self {
+        self.block = Some(block);
+        self
+    }
+
+    /// Sets the tracing options for the builder.
+    pub fn trace_options(mut self, options: GethDebugTracingCallOptions) -> Self {
+        self.trace_options = Some(options);
+        self
+    }
+
+    /// Executes the debug trace call using the provided provider.
+    /// Panics if required fields (req and trace_options) are not set.
+    pub async fn execute<T: TempProvider>(&self, provider: &T) -> TransportResult<GethTrace> {
+        provider.debug_trace_call(self.clone()).await
     }
 }
 
