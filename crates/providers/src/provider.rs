@@ -673,7 +673,8 @@ mod tests {
         // Set the code
         let addr = alloy_primitives::Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider.get_code_at(addr, None).await.unwrap();
+        let code = provider.get_code_at(addr, None).await.unwrap();
+        assert_eq!(code, bytes!("beef"));
     }
 
     #[tokio::test]
