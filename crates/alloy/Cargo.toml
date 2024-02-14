@@ -1,6 +1,6 @@
 [package]
 name = "alloy"
-description = "TODO"
+description = "Connect applications to blockchains"
 
 version.workspace = true
 edition.workspace = true

@@ -158,3 +158,21 @@ pub mod pubsub {
     #[doc(inline)]
     pub use alloy_pubsub::*;
 }
+
+// TODO: Enable on next alloy-core release.
+/*
+/// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
+///
+/// See [`sol!`](sol_types::sol!) for the actual macro documentation.
+#[cfg(all(not(doc), feature = "sol-types"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! sol {
+    ($($t:tt)*) => {
+        $crate::sol_types::sol! {
+            #![sol(alloy_sol_types = $crate::sol_types, alloy_contract = $crate::contract)]
+            $($t)*
+        }
+    };
+}
+*/
