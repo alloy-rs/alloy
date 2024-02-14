@@ -4,13 +4,13 @@ use crate::utils::{self, EstimatorFunction};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_trace_types::{
-    geth::{GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace},
+    geth::{GethDebugTracingOptions, GethTrace},
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, CallRequest,
-    EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus, Transaction,
-    TransactionReceipt,
+    request::TransactionRequest, state::StateOverride, AccessListWithGasUsed, Block, BlockId,
+    BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus,
+    Transaction, TransactionReceipt,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
@@ -26,6 +26,9 @@ pub enum ClientError {
     #[error("Unsupported Tag")]
     UnsupportedBlockIdError,
 }
+
+/// Type alias for a [`Provider`] using the [`Http`] transport.
+pub type HttpProvider = Provider<Http<Client>>;
 
 /// An abstract provider for interacting with the [Ethereum JSON RPC
 /// API](https://github.com/ethereum/wiki/wiki/JSON-RPC). Must be instantiated
@@ -78,8 +81,14 @@ pub trait TempProvider: Send + Sync {
         full: bool,
     ) -> TransportResult<Option<Block>>;
 
+    /// Gets the client version of the chain client.
+    async fn get_client_version(&self) -> TransportResult<String>;
+
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<U64>;
+
+    /// Gets the network ID. Same as `eth_chainId`.
+    async fn get_net_version(&self) -> TransportResult<U64>;
 
     /// Gets the specified storage value from [Address].
     async fn get_storage_at(
@@ -132,11 +141,28 @@ pub trait TempProvider: Send + Sync {
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus>;
 
-    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes>;
+
+    /// Execute a smart contract call with [TransactionRequest] and state overrides, without
+    /// publishing a transaction.
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call_with_overrides(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+        state: StateOverride,
+    ) -> TransportResult<Bytes>;
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256>;
+    async fn estimate_gas(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<U256>;
 
     /// Sends an already-signed transaction.
     async fn send_raw_transaction(&self, tx: Bytes) -> TransportResult<TxHash>;
@@ -159,9 +185,16 @@ pub trait TempProvider: Send + Sync {
         block: Option<BlockId>,
     ) -> TransportResult<EIP1186AccountProofResponse>;
 
+    async fn debug_trace_call(
+        &self,
+        req: CallRequest,
+        block: Option<BlockId>,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<GethTrace>;
+
     async fn create_access_list(
         &self,
-        request: CallRequest,
+        request: TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed>;
 
@@ -187,13 +220,6 @@ pub trait TempProvider: Send + Sync {
         P: Serialize + Send + Sync + Clone,
         R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
         Self: Sync;
-
-    async fn debug_trace_call(
-        &self,
-        req: CallRequest,
-        block: Option<BlockId>,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<GethTrace>;
 }
 
 impl<T: Transport + Clone + Send + Sync> Provider<T> {
@@ -252,6 +278,18 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
             .await
     }
 
+    async fn debug_trace_call(
+        &self,
+        req: CallRequest,
+        block: Option<BlockId>,
+        trace_options: GethDebugTracingCallOptions,
+    ) -> TransportResult<GethTrace> {
+        let method = "debug_traceCall";
+        let params = (req, block, trace_options);
+
+        self.inner.prepare(method, params).await
+    }
+
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
     async fn get_block_by_hash(
         &self,
@@ -270,9 +308,18 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_getBlockByNumber", (number, full)).await
     }
 
+    /// Gets the client version of the chain client.
+    async fn get_client_version(&self) -> TransportResult<String> {
+        self.inner.prepare("web3_clientVersion", ()).await
+    }
+
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<U64> {
         self.inner.prepare("eth_chainId", ()).await
+    }
+
+    async fn get_net_version(&self) -> TransportResult<U64> {
+        self.inner.prepare("net_version", ()).await
     }
 
     /// Gets the specified storage value from [Address].
@@ -355,13 +402,32 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         self.inner.prepare("eth_syncing", ()).await
     }
 
-    /// Execute a smart contract call with [CallRequest] without publishing a transaction.
-    async fn call(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
+    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    async fn call(&self, tx: TransactionRequest, block: Option<BlockId>) -> TransportResult<Bytes> {
         self.inner.prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
+    /// Execute a smart contract call with [TransactionRequest] and state overrides, without
+    /// publishing a transaction.
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
+    async fn call_with_overrides(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+        state: StateOverride,
+    ) -> TransportResult<Bytes> {
+        self.inner.prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
+    }
+
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(&self, tx: CallRequest, block: Option<BlockId>) -> TransportResult<U256> {
+    async fn estimate_gas(
+        &self,
+        tx: TransactionRequest,
+        block: Option<BlockId>,
+    ) -> TransportResult<U256> {
         if let Some(block_id) = block {
             self.inner.prepare("eth_estimateGas", (tx, block_id)).await
         } else {
@@ -429,7 +495,7 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
 
     async fn create_access_list(
         &self,
-        request: CallRequest,
+        request: TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed> {
         self.inner.prepare("eth_createAccessList", (request, block.unwrap_or_default())).await
@@ -449,18 +515,6 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<GethTrace> {
         self.inner.prepare("debug_traceTransaction", (hash, trace_options)).await
-    }
-
-    async fn debug_trace_call(
-        &self,
-        req: CallRequest,
-        block: Option<BlockId>,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<GethTrace> {
-        let method = "debug_traceCall";
-        let params = (req, block, trace_options);
-
-        self.inner.prepare(method, params).await
     }
 
     async fn trace_block(
@@ -605,11 +659,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gets_client_version() {
+        let anvil = Anvil::new().spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let version = provider.get_client_version().await.unwrap();
+        assert!(version.contains("anvil"));
+    }
+
+    #[tokio::test]
     async fn gets_chain_id() {
         let chain_id: u64 = 13371337;
         let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
         let provider = Provider::try_from(&anvil.endpoint()).unwrap();
         let chain_id = provider.get_chain_id().await.unwrap();
+        assert_eq!(chain_id, U64::from(chain_id));
+    }
+
+    #[tokio::test]
+    async fn gets_network_id() {
+        let chain_id: u64 = 13371337;
+        let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
+        let provider = Provider::try_from(&anvil.endpoint()).unwrap();
+        let chain_id = provider.get_net_version().await.unwrap();
         assert_eq!(chain_id, U64::from(chain_id));
     }
 
