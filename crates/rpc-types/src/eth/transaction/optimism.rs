@@ -26,6 +26,9 @@ pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deposit_nonce: Option<U64>,
+    /// Deposit receipt version for deposit transactions post-canyon
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deposit_receipt_version: Option<U64>,
     /// L1 fee for the transaction
     #[serde(skip_serializing_if = "Option::is_none")]
     pub l1_fee: Option<U256>,
