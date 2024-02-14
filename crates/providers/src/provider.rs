@@ -99,7 +99,7 @@ pub trait TempProvider: Send + Sync {
     ) -> TransportResult<StorageValue>;
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes>;
+    async fn get_code_at(&self, address: Address, tag: Option<BlockId>) -> TransportResult<Bytes>;
 
     /// Gets a [Transaction] by its [TxHash].
     async fn get_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Transaction>;
@@ -314,8 +314,8 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
-        self.inner.prepare("eth_getCode", (address, tag)).await
+    async fn get_code_at(&self, address: Address, tag: Option<BlockId>) -> TransportResult<Bytes> {
+        self.inner.prepare("eth_getCode", (address, tag.unwrap_or_default())).await
     }
 
     /// Gets a [Transaction] by its [TxHash].
@@ -673,13 +673,8 @@ mod tests {
         // Set the code
         let addr = alloy_primitives::Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider
-            .get_code_at(
-                addr,
-                crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
-            )
-            .await
-            .unwrap();
+        let code = provider.get_code_at(addr, None).await.unwrap();
+        assert_eq!(code, bytes!("beef"));
     }
 
     #[tokio::test]
