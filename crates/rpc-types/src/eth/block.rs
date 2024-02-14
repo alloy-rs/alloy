@@ -1218,7 +1218,7 @@ mod tests {
             { "blockNumber": "0x0" }
         );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64.into())));
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
 
         let num = serde_json::json!(
             { "blockNumber": "pending" }
@@ -1252,7 +1252,7 @@ mod tests {
 
         let num = serde_json::json!("0x0");
         let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64.into())));
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
 
         let num = serde_json::json!("pending");
         let id = serde_json::from_value::<BlockId>(num).unwrap();
@@ -1283,7 +1283,8 @@ mod tests {
             BlockId::Hash(
                 "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
                     .parse::<B256>()
-                    .unwrap().into()
+                    .unwrap()
+                    .into()
             )
         );
     }
