@@ -89,3 +89,71 @@ impl Decodable for TxKind {
         }
     }
 }
+#[cfg(test)]
+mod tx_kind_tests {
+    use super::*;
+    use alloy_primitives::Address;
+    use alloy_rlp::{Decodable, Encodable, EMPTY_STRING_CODE};
+
+    #[test]
+    fn test_from_option_address() {
+        let addr = Some(Address::ZERO);
+        let tx_kind = TxKind::from(addr);
+        assert_eq!(tx_kind, TxKind::Call(Address::ZERO));
+
+        let none_addr: Option<Address> = None;
+        let tx_kind_none = TxKind::from(none_addr);
+        assert_eq!(tx_kind_none, TxKind::Create);
+    }
+
+    #[test]
+    fn test_from_address() {
+        let addr = Address::ZERO;
+        let tx_kind = TxKind::from(addr);
+        assert_eq!(tx_kind, TxKind::Call(addr));
+    }
+
+    #[test]
+    fn test_to_method() {
+        assert_eq!(TxKind::Create.to(), None);
+        let addr = Address::ZERO;
+        assert_eq!(TxKind::Call(addr).to(), Some(addr));
+    }
+
+    #[test]
+    fn test_is_create_and_is_call() {
+        assert!(TxKind::Create.is_create());
+        assert!(!TxKind::Create.is_call());
+
+        let addr = Address::ZERO;
+        assert!(!TxKind::Call(addr).is_create());
+        assert!(TxKind::Call(addr).is_call());
+    }
+
+    #[test]
+    fn test_size_method() {
+        assert_eq!(TxKind::Create.size(), std::mem::size_of::<TxKind>());
+        let addr = Address::ZERO;
+        assert_eq!(TxKind::Call(addr).size(), std::mem::size_of::<TxKind>());
+    }
+
+    #[test]
+    fn test_encode_decode() {
+        let mut buf = Vec::new();
+        let tx_kind_create = TxKind::Create;
+        tx_kind_create.encode(&mut buf);
+        assert_eq!(buf, vec![EMPTY_STRING_CODE]);
+        let mut buf_slice = buf.as_slice();
+        let decoded = TxKind::decode(&mut buf_slice).unwrap();
+        assert_eq!(decoded, TxKind::Create);
+
+        buf.clear();
+        let addr = Address::ZERO;
+        let tx_kind_call = TxKind::Call(addr);
+        tx_kind_call.encode(&mut buf);
+        assert_ne!(buf, vec![EMPTY_STRING_CODE]);
+        buf_slice = buf.as_slice();
+        let decoded = TxKind::decode(&mut buf_slice).unwrap();
+        assert_eq!(decoded, TxKind::Call(addr));
+    }
+}
