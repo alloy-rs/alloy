@@ -6,7 +6,6 @@ use std::{
 #[derive(Debug, Clone)]
 /// An IPC Connection object.
 pub struct IpcConnect<T> {
-    ///
     inner: T,
 }
 

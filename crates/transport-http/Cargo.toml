@@ -12,12 +12,12 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-json-rpc.workspace = true
+alloy-json-rpc = { workspace = true, optional = true }
 alloy-transport.workspace = true
 
 url.workspace = true
-serde_json.workspace = true
-tower.workspace = true
+serde_json = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
 
 reqwest = { workspace = true, features = ["serde_json", "json"], optional = true }
 
@@ -26,5 +26,5 @@ hyper = { workspace = true, features = ["full"], optional = true }
 
 [features]
 default = ["reqwest"]
-reqwest = ["dep:reqwest"]
-hyper = ["dep:hyper"]
+reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
+hyper = ["dep:hyper", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]

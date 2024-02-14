@@ -1,6 +1,6 @@
 [package]
 name = "alloy-contract"
-description = "Helpers for interacting with on-chain contracts"
+description = "Interact with on-chain contracts"
 
 version.workspace = true
 edition.workspace = true

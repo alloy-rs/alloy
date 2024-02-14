@@ -2,13 +2,13 @@
 
 <!-- TODO: links, docs, examples, etc -->
 
-Client trait for interacting with Ethereum-like RPC endpoints.
+Interface with an Ethereum blockchain.
 
 This crate contains the `Provider` trait, which exposes Ethereum JSON-RPC
-methods. Providers in alloy are similar to ethers.js Providers. They manage an
-`RpcClient` and allow other parts of the program to easily make RPC calls.
+methods. Providers in alloy are similar to [`ethers.js`] providers. They manage
+an `RpcClient` and allow other parts of the program to easily make RPC calls.
 
-Unlike an ethers.js Provider, an alloy Provider is network-aware. It is
+Unlike an [`ethers.js`] Provider, an alloy Provider is network-aware. It is
 parameterized with a `Network` from [`alloy-networks`]. This allows the Provider
 to expose a consistent interface to the rest of the program, while adjusting
 request and response types to match the underlying blockchain.
@@ -23,6 +23,7 @@ The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 
 [alloy-networks]: ../networks/
 [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
+[`ethers.js`]: https://docs.ethers.org/v6/
 
 ## Usage
 
