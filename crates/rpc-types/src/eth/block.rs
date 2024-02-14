@@ -738,6 +738,38 @@ impl<'de> Deserialize<'de> for BlockId {
     }
 }
 
+/// Error thrown when parsing a [BlockId] from a string.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseBlockIdError {
+    /// Failed to parse a block id from a number.
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
+    /// Failed to parse a block id as a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] alloy_primitives::hex::FromHexError),
+}
+
+impl FromStr for BlockId {
+    type Err = ParseBlockIdError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("0x") {
+            return B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError);
+        }
+
+        match s {
+            "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
+            "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
+            "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
+            "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
+            "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
+            _ => s
+                .parse::<u64>()
+                .map_err(ParseBlockIdError::ParseIntError)
+                .map(|n| BlockId::Number(n.into())),
+        }
+    }
+}
+
 /// Block number and hash.
 #[derive(Clone, Copy, Hash, Default, PartialEq, Eq)]
 pub struct BlockNumHash {
@@ -1186,5 +1218,82 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    fn can_parse_eip1898_block_ids() {
+        let num = serde_json::json!(
+            { "blockNumber": "0x0" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
+
+        let num = serde_json::json!(
+            { "blockNumber": "pending" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
+
+        let num = serde_json::json!(
+            { "blockNumber": "latest" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
+
+        let num = serde_json::json!(
+            { "blockNumber": "finalized" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
+
+        let num = serde_json::json!(
+            { "blockNumber": "safe" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
+
+        let num = serde_json::json!(
+            { "blockNumber": "earliest" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
+
+        let num = serde_json::json!("0x0");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
+
+        let num = serde_json::json!("pending");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
+
+        let num = serde_json::json!("latest");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
+
+        let num = serde_json::json!("finalized");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
+
+        let num = serde_json::json!("safe");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
+
+        let num = serde_json::json!("earliest");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
+
+        let num = serde_json::json!(
+            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(
+            id,
+            BlockId::Hash(
+                "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into()
+            )
+        );
     }
 }
