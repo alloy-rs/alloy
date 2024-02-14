@@ -1,10 +1,13 @@
 //! Alloy main Provider abstraction.
 
-use crate::utils::{self, EstimatorFunction};
+use crate::{
+    builder::DebugTraceCallBuilder,
+    utils::{self, EstimatorFunction},
+};
 use alloy_primitives::{Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, U256, U64};
 use alloy_rpc_client::{ClientBuilder, RpcClient};
 use alloy_rpc_trace_types::{
-    geth::{GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace},
+    geth::{GethDebugTracingOptions, GethTrace},
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
@@ -185,12 +188,7 @@ pub trait TempProvider: Send + Sync {
         block: Option<BlockId>,
     ) -> TransportResult<EIP1186AccountProofResponse>;
     /// Inspect and debug transaction
-    async fn debug_trace_call(
-        &self,
-        req: TransactionRequest,
-        block: Option<BlockId>,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<GethTrace>;
+    async fn debug_trace_call(&self, request: DebugTraceCallBuilder) -> TransportResult<GethTrace>;
 
     async fn create_access_list(
         &self,
@@ -277,12 +275,11 @@ impl<T: Transport + Clone + Send + Sync> TempProvider for Provider<T> {
             .await
     }
     /// Inspect and debug transaction
-    async fn debug_trace_call(
-        &self,
-        req: TransactionRequest,
-        block: Option<BlockId>,
-        trace_options: GethDebugTracingCallOptions,
-    ) -> TransportResult<GethTrace> {
+    async fn debug_trace_call(&self, builder: DebugTraceCallBuilder) -> TransportResult<GethTrace> {
+        let req = builder.req.expect("Transaction request is required");
+        let block = builder.block;
+        let trace_options = builder.trace_options.expect("Trace options are required");
+
         let method = "debug_traceCall";
         let params = (req, block, trace_options);
 
