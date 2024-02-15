@@ -8,7 +8,7 @@ use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
-    TransportError, TransportErrorKind, TransportResult,
+    TransportErrorKind, TransportResult,
 };
 use serde_json::value::RawValue;
 use tokio::sync::{mpsc, oneshot};
@@ -35,7 +35,7 @@ pub(crate) struct PubSubService<T> {
 
 impl<T: PubSubConnect> PubSubService<T> {
     /// Create a new service from a connector.
-    pub(crate) async fn connect(connector: T) -> Result<PubSubFrontend, TransportError> {
+    pub(crate) async fn connect(connector: T) -> TransportResult<PubSubFrontend> {
         let handle = connector.connect().await?;
 
         let (tx, reqs) = mpsc::unbounded_channel();
@@ -51,7 +51,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Reconnect by dropping the backend and creating a new one.
-    async fn get_new_backend(&mut self) -> Result<ConnectionHandle, TransportError> {
+    async fn get_new_backend(&mut self) -> TransportResult<ConnectionHandle> {
         let mut handle = self.connector.try_reconnect().await?;
         std::mem::swap(&mut self.handle, &mut handle);
         Ok(handle)

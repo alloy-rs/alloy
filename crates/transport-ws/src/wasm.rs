@@ -20,21 +20,16 @@ impl PubSubConnect for WsConnect {
         alloy_transport::utils::guess_local_url(&self.url)
     }
 
-    fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
-        Box::pin(async move {
-            let socket = WsMeta::connect(&self.url, None)
-                .await
-                .map_err(TransportErrorKind::custom)?
-                .1
-                .fuse();
+    async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
+        let socket =
+            WsMeta::connect(&self.url, None).await.map_err(TransportErrorKind::custom)?.1.fuse();
 
-            let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-            let backend = WsBackend { socket, interface };
+        let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
+        let backend = WsBackend { socket, interface };
 
-            backend.spawn();
+        backend.spawn();
 
-            Ok(handle)
-        })
+        Ok(handle)
     }
 }
 

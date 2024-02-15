@@ -1,4 +1,5 @@
 use crate::{BoxTransport, Pbf, Transport, TransportError};
+use futures_util::{FutureExt, TryFutureExt};
 
 /// Connection details for a transport.
 ///
@@ -41,23 +42,15 @@ pub trait BoxTransportConnect {
     fn get_boxed_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, BoxTransport, TransportError>;
 }
 
-impl<T> BoxTransportConnect for T
-where
-    T: TransportConnect,
-{
+impl<T: TransportConnect> BoxTransportConnect for T {
     fn is_local(&self) -> bool {
         TransportConnect::is_local(self)
     }
 
     fn get_boxed_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, BoxTransport, TransportError> {
-        Box::pin(async move { self.get_transport().await.map(Transport::boxed) })
+        self.get_transport().map_ok(Transport::boxed).boxed()
     }
 }
 
 #[cfg(test)]
-mod test {
-    use super::*;
-    fn __compile_check(_: Box<dyn BoxTransportConnect>) {
-        todo!()
-    }
-}
+fn _object_safe(_: Box<dyn BoxTransportConnect>) {}

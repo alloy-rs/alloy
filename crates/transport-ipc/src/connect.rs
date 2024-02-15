@@ -3,8 +3,8 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug, Clone)]
 /// An IPC Connection object.
+#[derive(Debug, Clone)]
 pub struct IpcConnect<T> {
     inner: T,
 }
@@ -28,18 +28,12 @@ macro_rules! impl_connect {
                 true
             }
 
-            fn connect<'a: 'b, 'b>(
-                &'a self,
-            ) -> alloy_transport::Pbf<
-                'b,
-                alloy_pubsub::ConnectionHandle,
-                alloy_transport::TransportError,
-            > {
-                Box::pin(async move {
-                    crate::IpcBackend::connect(&self.inner)
-                        .await
-                        .map_err(alloy_transport::TransportErrorKind::custom)
-                })
+            async fn connect(
+                &self,
+            ) -> Result<alloy_pubsub::ConnectionHandle, alloy_transport::TransportError> {
+                crate::IpcBackend::connect(&self.inner)
+                    .await
+                    .map_err(alloy_transport::TransportErrorKind::custom)
             }
         }
     };

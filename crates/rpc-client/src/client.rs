@@ -1,6 +1,6 @@
 use crate::{BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
+use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportResult};
 use alloy_transport_http::Http;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tower::{layer::util::Identity, ServiceBuilder};
@@ -41,7 +41,7 @@ impl<T> RpcClient<T> {
     }
 
     /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
+    pub async fn connect<C>(connect: C) -> TransportResult<Self>
     where
         T: Transport,
         C: TransportConnect<Transport = T>,
@@ -148,9 +148,7 @@ mod pubsub_impl {
         }
 
         /// Connect to a transport via a [`PubSubConnect`] implementor.
-        pub async fn connect_pubsub<C>(
-            connect: C,
-        ) -> Result<RpcClient<PubSubFrontend>, TransportError>
+        pub async fn connect_pubsub<C>(connect: C) -> TransportResult<RpcClient<PubSubFrontend>>
         where
             C: PubSubConnect,
         {
