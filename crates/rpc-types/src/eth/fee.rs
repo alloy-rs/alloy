@@ -114,4 +114,54 @@ mod tests {
 
         assert_eq!(fee_history, deserialized);
     }
+
+    #[test]
+    fn tx_gas_and_reward_sorting() {
+        let mut txs = vec![
+            TxGasAndReward { gas_used: 10000, reward: 100 },
+            TxGasAndReward { gas_used: 50000, reward: 300 },
+            TxGasAndReward { gas_used: 30000, reward: 200 },
+        ];
+
+        txs.sort();
+        assert_eq!(txs[0].reward, 100);
+        assert_eq!(txs[1].reward, 200);
+        assert_eq!(txs[2].reward, 300);
+    }
+
+    #[test]
+    fn fee_history_edge_case_serialization() {
+        let fee_history = FeeHistory {
+            base_fee_per_gas: vec![U256::MAX, U256::from(0)],
+            gas_used_ratio: vec![1.0, 0.0],
+            base_fee_per_blob_gas: vec![U256::MAX, U256::from(0)],
+            blob_gas_used_ratio: vec![1.0, 0.0],
+            oldest_block: U256::MAX,
+            reward: None,
+        };
+
+        let serialized = serde_json::to_string(&fee_history).unwrap();
+        let deserialized: FeeHistory = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(fee_history, deserialized);
+    }
+
+    #[test]
+    fn fee_history_with_values() {
+        let fee_history = FeeHistory {
+            base_fee_per_gas: vec![U256::from(100), U256::from(200)],
+            gas_used_ratio: vec![0.5, 0.75],
+            base_fee_per_blob_gas: vec![U256::from(150), U256::from(250)],
+            blob_gas_used_ratio: vec![0.6, 0.8],
+            oldest_block: U256::from(12345),
+            reward: Some(vec![vec![U256::from(100)], vec![U256::from(200)]]),
+        };
+
+        assert!(!fee_history.base_fee_per_gas.is_empty());
+        assert!(!fee_history.gas_used_ratio.is_empty());
+        assert!(!fee_history.base_fee_per_blob_gas.is_empty());
+        assert!(!fee_history.blob_gas_used_ratio.is_empty());
+        assert_eq!(fee_history.oldest_block, U256::from(12345));
+        assert!(fee_history.reward.is_some());
+    }
 }
