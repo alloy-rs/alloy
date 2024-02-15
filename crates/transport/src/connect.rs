@@ -1,5 +1,5 @@
 use crate::{BoxTransport, Pbf, Transport, TransportError};
-use futures_util::{FutureExt, TryFutureExt};
+use futures_util::TryFutureExt;
 
 /// Connection details for a transport.
 ///
@@ -48,7 +48,7 @@ impl<T: TransportConnect> BoxTransportConnect for T {
     }
 
     fn get_boxed_transport<'a: 'b, 'b>(&'a self) -> Pbf<'b, BoxTransport, TransportError> {
-        self.get_transport().map_ok(Transport::boxed).boxed()
+        Box::pin(self.get_transport().map_ok(Transport::boxed))
     }
 }
 
