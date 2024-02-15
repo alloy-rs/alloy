@@ -1,6 +1,5 @@
 use crate::{handle::ConnectionHandle, service::PubSubService, PubSubFrontend};
-use alloy_transport::TransportResult;
-use std::future::Future;
+use alloy_transport::{impl_future, TransportResult};
 
 /// Configuration objects that contain connection details for a backend.
 ///
@@ -16,19 +15,19 @@ pub trait PubSubConnect: Sized + Send + Sync + 'static {
     /// [`ConnectionInterface`], and return the corresponding handle.
     ///
     /// [`ConnectionInterface`]: crate::ConnectionInterface
-    fn connect(&self) -> impl Future<Output = TransportResult<ConnectionHandle>> + Send;
+    fn connect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>);
 
     /// Attempt to reconnect the transport.
     ///
     /// Override this to add custom reconnection logic to your connector. This
     /// will be used by the internal pubsub connection managers in the event the
     /// connection fails.
-    fn try_reconnect(&self) -> impl Future<Output = TransportResult<ConnectionHandle>> + Send {
+    fn try_reconnect(&self) -> impl_future!(<Output = TransportResult<ConnectionHandle>>) {
         self.connect()
     }
 
     /// Convert the configuration object into a service with a running backend.
-    fn into_service(self) -> impl Future<Output = TransportResult<PubSubFrontend>> + Send {
+    fn into_service(self) -> impl_future!(<Output = TransportResult<PubSubFrontend>>) {
         PubSubService::connect(self)
     }
 }

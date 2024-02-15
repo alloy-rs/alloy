@@ -1,6 +1,6 @@
 use super::WsBackend;
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Pbf, TransportError, TransportErrorKind};
+use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use futures::{
     sink::SinkExt,
     stream::{Fuse, StreamExt},
