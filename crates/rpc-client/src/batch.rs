@@ -107,7 +107,7 @@ impl<'a, T> BatchRequest<'a, T> {
     fn push<Params: RpcParam, Resp: RpcReturn>(
         &mut self,
         request: Request<Params>,
-    ) -> Result<Waiter<Resp>, TransportError> {
+    ) -> TransportResult<Waiter<Resp>> {
         let ser = request.serialize().map_err(TransportError::ser_err)?;
         Ok(self.push_raw(ser).into())
     }
@@ -127,7 +127,7 @@ where
         &mut self,
         method: &'static str,
         params: &Params,
-    ) -> Result<Waiter<Resp>, TransportError> {
+    ) -> TransportResult<Waiter<Resp>> {
         let request = self.transport.make_request(method, Cow::Borrowed(params));
         self.push(request)
     }
@@ -245,7 +245,7 @@ impl<T> Future for BatchFuture<T>
 where
     T: Transport + Clone,
 {
-    type Output = Result<(), TransportError>;
+    type Output = TransportResult<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
         if matches!(*self.as_mut(), BatchFuture::Prepared { .. }) {

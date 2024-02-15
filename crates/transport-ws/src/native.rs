@@ -1,6 +1,6 @@
 use crate::WsBackend;
 use alloy_pubsub::PubSubConnect;
-use alloy_transport::{utils::Spawnable, Authorization, Pbf, TransportError, TransportErrorKind};
+use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, TransportResult};
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
@@ -42,21 +42,18 @@ impl PubSubConnect for WsConnect {
         alloy_transport::utils::guess_local_url(&self.url)
     }
 
-    fn connect<'a: 'b, 'b>(&'a self) -> Pbf<'b, alloy_pubsub::ConnectionHandle, TransportError> {
+    async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
         let request = self.clone().into_client_request();
+        let req = request.map_err(TransportErrorKind::custom)?;
+        let (socket, _) =
+            tokio_tungstenite::connect_async(req).await.map_err(TransportErrorKind::custom)?;
 
-        Box::pin(async move {
-            let req = request.map_err(TransportErrorKind::custom)?;
-            let (socket, _) =
-                tokio_tungstenite::connect_async(req).await.map_err(TransportErrorKind::custom)?;
+        let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
+        let backend = WsBackend { socket, interface };
 
-            let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-            let backend = WsBackend { socket, interface };
+        backend.spawn();
 
-            backend.spawn();
-
-            Ok(handle)
-        })
+        Ok(handle)
     }
 }
 
