@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn tx_gas_and_reward_sorting() {
-        let mut txs = vec![
+        let mut txs = [
             TxGasAndReward { gas_used: 10000, reward: 100 },
             TxGasAndReward { gas_used: 50000, reward: 300 },
             TxGasAndReward { gas_used: 30000, reward: 200 },
