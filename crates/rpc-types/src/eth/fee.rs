@@ -62,3 +62,56 @@ pub struct FeeHistory {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reward: Option<Vec<Vec<U256>>>,
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_tx_gas_and_reward() {
+        let tx = TxGasAndReward { gas_used: 50000, reward: 200 };
+        assert_eq!(tx.gas_used, 50000);
+        assert_eq!(tx.reward, 200);
+    }
+
+    #[test]
+    fn compare_tx_gas_and_reward() {
+        let tx1 = TxGasAndReward { gas_used: 50000, reward: 300 };
+        let tx2 = TxGasAndReward { gas_used: 60000, reward: 200 };
+        assert!(tx1 > tx2);
+    }
+
+    #[test]
+    fn equality_tx_gas_and_reward() {
+        let tx1 = TxGasAndReward { gas_used: 50000, reward: 200 };
+        let tx2 = tx1.clone();
+        assert_eq!(tx1, tx2);
+    }
+
+    #[test]
+    fn create_default_fee_history() {
+        let fee_history = FeeHistory::default();
+        assert_eq!(fee_history.base_fee_per_gas.len(), 0);
+        assert_eq!(fee_history.gas_used_ratio.len(), 0);
+        assert_eq!(fee_history.base_fee_per_blob_gas.len(), 0);
+        assert_eq!(fee_history.blob_gas_used_ratio.len(), 0);
+        assert_eq!(fee_history.oldest_block, U256::ZERO);
+        assert!(fee_history.reward.is_none());
+    }
+
+    #[test]
+    fn serialize_deserialize_fee_history() {
+        let fee_history = FeeHistory {
+            base_fee_per_gas: vec![U256::from(100), U256::from(200)],
+            gas_used_ratio: vec![0.5, 0.75],
+            base_fee_per_blob_gas: vec![U256::from(150), U256::from(250)],
+            blob_gas_used_ratio: vec![0.6, 0.8],
+            oldest_block: U256::from(12345),
+            reward: Some(vec![vec![U256::from(100)], vec![U256::from(200)]]),
+        };
+
+        let serialized = serde_json::to_string(&fee_history).unwrap();
+        let deserialized: FeeHistory = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(fee_history, deserialized);
+    }
+}
