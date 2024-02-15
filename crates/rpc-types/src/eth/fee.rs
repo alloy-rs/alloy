@@ -64,6 +64,8 @@ pub struct FeeHistory {
 }
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -163,5 +165,59 @@ mod tests {
         assert!(!fee_history.blob_gas_used_ratio.is_empty());
         assert_eq!(fee_history.oldest_block, U256::from(12345));
         assert!(fee_history.reward.is_some());
+    }
+
+    #[test]
+    fn deserialize_and_validate_fee_history() {
+        let json_response = r#"
+        {
+            "id": "1",
+            "jsonrpc": "2.0",
+            "result": {
+                "oldestBlock": 10762137,
+                "reward": [
+                    ["0x4a817c7ee", "0x4a817c7ee"],
+                    ["0x773593f0", "0x773593f5"],
+                    ["0x0", "0x0"],
+                    ["0x773593f5", "0x773bae75"]
+                ],
+                "baseFeePerGas": ["0x12", "0x10", "0x10", "0xe", "0xd"],
+                "gasUsedRatio": [0.026089875, 0.406803, 0, 0.0866665]
+            }
+        }"#;
+
+        let parsed: serde_json::Value = serde_json::from_str(json_response).unwrap();
+        let fee_history: FeeHistory = serde_json::from_value(parsed["result"].clone()).unwrap();
+
+        assert_eq!(fee_history.oldest_block, U256::from_str("10762137").unwrap());
+
+        let expected_rewards = vec![
+            vec![
+                U256::from_str_radix("4a817c7ee", 16).unwrap(),
+                U256::from_str_radix("4a817c7ee", 16).unwrap(),
+            ],
+            vec![
+                U256::from_str_radix("773593f0", 16).unwrap(),
+                U256::from_str_radix("773593f5", 16).unwrap(),
+            ],
+            vec![U256::from(0), U256::from(0)],
+            vec![
+                U256::from_str_radix("773593f5", 16).unwrap(),
+                U256::from_str_radix("773bae75", 16).unwrap(),
+            ],
+        ];
+        assert_eq!(fee_history.reward.unwrap(), expected_rewards);
+
+        let expected_base_fees = vec![
+            U256::from_str_radix("12", 16).unwrap(),
+            U256::from_str_radix("10", 16).unwrap(),
+            U256::from_str_radix("10", 16).unwrap(),
+            U256::from_str_radix("e", 16).unwrap(),
+            U256::from_str_radix("d", 16).unwrap(),
+        ];
+        assert_eq!(fee_history.base_fee_per_gas, expected_base_fees);
+
+        let expected_ratios = vec![0.026089875, 0.406803, 0.0, 0.0866665];
+        assert_eq!(fee_history.gas_used_ratio, expected_ratios);
     }
 }
