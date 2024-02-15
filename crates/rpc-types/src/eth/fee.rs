@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn equality_tx_gas_and_reward() {
         let tx1 = TxGasAndReward { gas_used: 50000, reward: 200 };
-        let tx2 = tx1.clone();
+        let tx2 = tx1;
         assert_eq!(tx1, tx2);
     }
 
