@@ -96,11 +96,11 @@ pub use alloy_node_bindings as node_bindings;
 
 /// Interface with an Ethereum blockchain.
 ///
-/// See [`alloy_providers`] for more details.
+/// See [`alloy_provider`] for more details.
 #[cfg(feature = "providers")]
 pub mod providers {
     #[doc(inline)]
-    pub use alloy_providers::*;
+    pub use alloy_provider::*;
 
     // TODO: provider type aliases
     // #[cfg(feature = "provider-http")]
