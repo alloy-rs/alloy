@@ -19,10 +19,6 @@ pub struct Block {
     /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
-    /// Total difficulty, this field is None only if representing
-    /// an Uncle block.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_difficulty: Option<U256>,
     /// Uncles' hashes.
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
@@ -72,6 +68,8 @@ pub struct Header {
     pub logs_bloom: Bloom,
     /// Difficulty
     pub difficulty: U256,
+    /// Total difficulty
+    pub total_difficulty: Option<U256>,
     /// Block number
     pub number: Option<U256>,
     /// Gas Limit
