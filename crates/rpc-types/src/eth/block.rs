@@ -534,7 +534,7 @@ impl FromStr for BlockNumberOrTag {
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlockNumberOrTag::Number(ref x) => format!("0x{x:x}").fmt(f),
+            BlockNumberOrTag::Number(x) => write!(f, "0x{x:x}"),
             BlockNumberOrTag::Latest => f.write_str("latest"),
             BlockNumberOrTag::Finalized => f.write_str("finalized"),
             BlockNumberOrTag::Safe => f.write_str("safe"),

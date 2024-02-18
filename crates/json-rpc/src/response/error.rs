@@ -20,15 +20,9 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
     pub data: Option<ErrData>,
 }
 
-impl<ErrData> std::fmt::Display for ErrorPayload<ErrData> {
+impl<ErrData> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "ErrorPayload code {}, message: \"{}\", contains payload: {}",
-            self.code,
-            self.message,
-            self.data.is_some()
-        )
+        write!(f, "error code {}: {}", self.code, self.message)
     }
 }
 
