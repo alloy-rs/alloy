@@ -7,6 +7,7 @@ use alloy_rpc_types::{
     withdrawal::Withdrawal,
 };
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -24,8 +25,8 @@ impl PayloadId {
     }
 }
 
-impl std::fmt::Display for PayloadId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for PayloadId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -730,11 +731,11 @@ impl PayloadStatus {
     }
 }
 
-impl std::fmt::Display for PayloadStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for PayloadStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "PayloadStatus {{status: {}, latestValidHash: {:?} }}",
+            "PayloadStatus {{ status: {}, latestValidHash: {:?} }}",
             self.status, self.latest_valid_hash
         )
     }
@@ -822,8 +823,8 @@ impl PayloadStatusEnum {
     }
 }
 
-impl std::fmt::Display for PayloadStatusEnum {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for PayloadStatusEnum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PayloadStatusEnum::Invalid { validation_error } => {
                 f.write_str(self.as_str())?;
