@@ -272,10 +272,11 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
 
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
     pub fn legacy(mut self) -> Self {
-        
         self.request.max_fee_per_blob_gas = None;
         self.request.max_fee_per_gas = None;
         self.request.max_priority_fee_per_gas = None;
+        self.request.blob_versioned_hashes = None;
+        self.request.sidecar = None;
         self
     }
 
