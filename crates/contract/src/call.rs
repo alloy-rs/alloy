@@ -271,8 +271,9 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     }
 
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
-    pub fn to(mut self, to: Option<Address>) -> Self {
-        self.request = self.request.to(to);
+    pub fn legacy(mut self) -> Self {
+        self.request = self.request.max_fee_per_gas(U256::ZERO);
+        self.request = self.request.max_priority_fee_per_gas(U256::ZERO);
         self
     }
 
