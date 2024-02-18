@@ -271,8 +271,9 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     }
 
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
-    pub fn legacy(self) -> Self {
-        todo!()
+    pub fn to(mut self, to: Option<Address>) -> Self {
+        self.request = self.request.to(to);
+        self
     }
 
     /// Sets the `gas` field in the transaction to the provided value
