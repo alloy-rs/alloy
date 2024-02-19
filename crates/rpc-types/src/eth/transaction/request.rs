@@ -258,9 +258,16 @@ pub struct TransactionInputError;
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use alloy_primitives::b256;
 
-    use super::*;
+    // <https://github.com/paradigmxyz/reth/issues/6670>
+    #[test]
+    fn serde_from_to() {
+        let s = r#"{"from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "to":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8" }"#;
+        let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
+        assert!(req.input.check_unique_input().is_ok())
+    }
 
     #[test]
     fn serde_tx_request() {
