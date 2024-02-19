@@ -270,6 +270,12 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
         self
     }
 
+    /// Sets the `gas` field in the transaction to the provided value
+    pub fn gas(mut self, gas: U256) -> Self {
+        self.request = self.request.gas_limit(gas);
+        self
+    }
+
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
     pub fn legacy(mut self) -> Self {
         self.request.access_list = None;
