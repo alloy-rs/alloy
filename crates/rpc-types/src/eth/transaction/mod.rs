@@ -88,7 +88,6 @@ pub struct Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::eth::transaction::signature::Parity;
 
     #[test]
     fn serde_transaction() {
