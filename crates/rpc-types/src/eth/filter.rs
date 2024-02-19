@@ -985,7 +985,6 @@ impl<'a> Deserialize<'a> for PendingTransactionFilterKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::U256;
     use serde_json::json;
 
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {

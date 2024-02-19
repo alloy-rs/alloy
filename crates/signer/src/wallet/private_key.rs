@@ -173,7 +173,7 @@ mod tests {
     use alloy_primitives::{address, b256, ChainId, Signature, U256};
 
     #[cfg(feature = "keystore")]
-    use {std::path::Path, tempfile::tempdir};
+    use tempfile::tempdir;
 
     #[test]
     fn parse_pk() {

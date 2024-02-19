@@ -1,9 +1,6 @@
 use crate::{TransportError, TransportResult};
 use serde::Serialize;
-use serde_json::{
-    self,
-    value::{to_raw_value, RawValue},
-};
+use serde_json::value::{to_raw_value, RawValue};
 use std::future::Future;
 use url::Url;
 
