@@ -1,3 +1,4 @@
+use crate::heart::HeartbeatHandle;
 use alloy_network::{Network, Transaction};
 use alloy_primitives::{Address, BlockNumber, U64};
 use alloy_rpc_client::{ClientRef, RpcClient, WeakClient};
@@ -9,8 +10,6 @@ use std::{
     ops::Deref,
     sync::{Arc, Weak},
 };
-
-use crate::heart::HeartbeatHandle;
 
 /// A [`Provider`] in a [`Weak`] reference.
 pub type WeakProvider<P> = Weak<P>;

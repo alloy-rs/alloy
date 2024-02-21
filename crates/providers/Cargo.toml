@@ -1,6 +1,6 @@
 [package]
 name = "alloy-providers"
-description = "Ethereum JSON-RPC providers"
+description = "Interface with an Ethereum blockchain"
 
 version.workspace = true
 edition.workspace = true
@@ -14,10 +14,10 @@ exclude.workspace = true
 [dependencies]
 alloy-network.workspace = true
 alloy-primitives.workspace = true
-alloy-rpc-client.workspace = true
+alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rpc-types.workspace = true
 alloy-rpc-trace-types.workspace = true
-alloy-transport-http.workspace = true
+alloy-transport-http = { workspace = true, features = ["reqwest"] }
 alloy-transport.workspace = true
 async-trait.workspace = true
 serde.workspace = true

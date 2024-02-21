@@ -73,7 +73,7 @@ pub(crate) enum INS {
     SIGN_ETH_EIP_712 = 0x0C,
 }
 
-impl std::fmt::Display for INS {
+impl fmt::Display for INS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             INS::GET_PUBLIC_KEY => write!(f, "GET_PUBLIC_KEY"),

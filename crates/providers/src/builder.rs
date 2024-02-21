@@ -1,5 +1,4 @@
 use crate::new::{Provider, RootProvider, RootProviderInner};
-
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;

@@ -456,7 +456,7 @@ mod tests {
     use super::*;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex};
-    use alloy_providers::provider::{HttpProvider, Provider};
+    use alloy_providers::tmp::{HttpProvider, Provider};
     use alloy_sol_types::sol;
 
     #[test]
@@ -534,8 +534,8 @@ mod tests {
 
     // TODO: send_transaction, PendingTransaction
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "TODO"]
     async fn deploy_and_call() {
-        /*
         let (provider, anvil) = spawn_anvil();
 
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -545,7 +545,7 @@ mod tests {
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
         let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert_eq!(result._0, true);
+        assert!(result._0);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(
@@ -558,10 +558,8 @@ mod tests {
             result.d,
             b256!("0000000000000000000000000000000000000000000000000000000000000001"),
         );
-        */
     }
 
-    #[allow(dead_code)]
     fn spawn_anvil() -> (HttpProvider, AnvilInstance) {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(anvil.endpoint()).unwrap();

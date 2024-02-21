@@ -1,6 +1,6 @@
 use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest};
 use alloy_primitives::U256;
-use alloy_transport::TransportError;
+use alloy_transport::{TransportError, TransportResult};
 use std::fmt;
 use tokio::sync::oneshot;
 
@@ -16,7 +16,7 @@ pub(crate) struct InFlight {
     pub(crate) channel_size: usize,
 
     /// The channel to send the response on.
-    pub(crate) tx: oneshot::Sender<Result<Response, TransportError>>,
+    pub(crate) tx: oneshot::Sender<TransportResult<Response>>,
 }
 
 impl fmt::Debug for InFlight {
@@ -34,7 +34,7 @@ impl InFlight {
     pub(crate) fn new(
         request: SerializedRequest,
         channel_size: usize,
-    ) -> (Self, oneshot::Receiver<Result<Response, TransportError>>) {
+    ) -> (Self, oneshot::Receiver<TransportResult<Response>>) {
         let (tx, rx) = oneshot::channel();
 
         (Self { request, channel_size, tx }, rx)

@@ -1,6 +1,6 @@
 use crate::{poller::PollTask, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
+use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError, TransportResult};
 use alloy_transport_http::Http;
 use std::{
     ops::Deref,
@@ -44,10 +44,7 @@ impl<T> RpcClient<T> {
     }
 }
 
-impl<T> RpcClient<T>
-where
-    T: Transport,
-{
+impl<T: Transport> RpcClient<T> {
     /// Connect to a transport via a [`TransportConnect`] implementor.
     pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
     where
@@ -225,9 +222,7 @@ mod pubsub_impl {
 
     impl RpcClient<PubSubFrontend> {
         /// Connect to a transport via a [`PubSubConnect`] implementor.
-        pub async fn connect_pubsub<C>(
-            connect: C,
-        ) -> Result<RpcClient<PubSubFrontend>, TransportError>
+        pub async fn connect_pubsub<C>(connect: C) -> TransportResult<RpcClient<PubSubFrontend>>
         where
             C: PubSubConnect,
         {

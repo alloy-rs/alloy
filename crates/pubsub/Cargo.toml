@@ -1,6 +1,6 @@
 [package]
 name = "alloy-pubsub"
-description = "Publish-subscribe Alloy provider"
+description = "Ethereum JSON-RPC publish-subscribe tower service and type definitions"
 
 version.workspace = true
 edition.workspace = true

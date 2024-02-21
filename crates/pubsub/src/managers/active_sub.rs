@@ -1,13 +1,12 @@
+use crate::RawSubscription;
 use alloy_json_rpc::SerializedRequest;
 use alloy_primitives::B256;
 use serde_json::value::RawValue;
 use std::{fmt, hash::Hash, usize};
 use tokio::sync::broadcast;
 
-use crate::RawSubscription;
-
-#[derive(Clone)]
 /// An active subscription.
+#[derive(Clone)]
 pub(crate) struct ActiveSubscription {
     /// Cached hash of the request, used for sorting and equality.
     pub(crate) local_id: B256,

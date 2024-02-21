@@ -1,5 +1,4 @@
-use std::{num::NonZeroUsize, time::Duration};
-
+use crate::{Provider, WeakProvider};
 use alloy_network::Network;
 use alloy_primitives::BlockNumber;
 use alloy_rpc_client::PollTask;
@@ -8,8 +7,7 @@ use alloy_transport::{RpcError, Transport};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-
-use crate::{Provider, WeakProvider};
+use std::{num::NonZeroUsize, time::Duration};
 
 /// The size of the block cache.
 pub const BLOCK_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(10) {

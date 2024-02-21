@@ -1,16 +1,15 @@
 #![allow(dead_code, unreachable_pub)] // TODO: remove
 //! Block Hearbeat and Transaction Watcher
 
+use alloy_primitives::{B256, U256};
+use alloy_rpc_types::Block;
+use alloy_transport::utils::Spawnable;
+use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, HashMap},
     future::Future,
     time::Duration,
 };
-
-use alloy_primitives::{B256, U256};
-use alloy_rpc_types::Block;
-use alloy_transport::utils::Spawnable;
-use futures::{stream::StreamExt, FutureExt, Stream};
 use tokio::{
     select,
     sync::{mpsc, oneshot, watch},

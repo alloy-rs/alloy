@@ -538,9 +538,9 @@ pub struct CliqueConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{hex_literal::hex, Address, Bytes, U256};
+    use alloy_primitives::hex;
+    use std::str::FromStr;
 
-    use std::{collections::HashMap, str::FromStr};
     #[test]
     fn test_genesis() {
         let default_genesis = Genesis::default();

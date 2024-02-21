@@ -35,9 +35,9 @@ pub enum Id {
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Id::Number(n) => write!(f, "{}", n),
-            Id::String(s) => write!(f, "{}", s),
-            Id::None => write!(f, "null"),
+            Id::Number(n) => write!(f, "{n}"),
+            Id::String(s) => f.write_str(s),
+            Id::None => f.write_str("null"),
         }
     }
 }

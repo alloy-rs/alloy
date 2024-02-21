@@ -1,7 +1,7 @@
 use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
 use alloy_primitives::U256;
-use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
+use alloy_transport::{TransportError, TransportErrorKind, TransportFut, TransportResult};
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
@@ -31,7 +31,7 @@ impl PubSubFrontend {
     pub fn get_subscription(
         &self,
         id: U256,
-    ) -> impl Future<Output = Result<RawSubscription, TransportError>> + Send + 'static {
+    ) -> impl Future<Output = TransportResult<RawSubscription>> + Send + 'static {
         let backend_tx = self.tx.clone();
         async move {
             let (tx, rx) = oneshot::channel();
@@ -43,7 +43,7 @@ impl PubSubFrontend {
     }
 
     /// Unsubscribe from a subscription.
-    pub fn unsubscribe(&self, id: U256) -> Result<(), TransportError> {
+    pub fn unsubscribe(&self, id: U256) -> TransportResult<()> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))
             .map_err(|_| TransportErrorKind::backend_gone())
@@ -53,7 +53,7 @@ impl PubSubFrontend {
     pub fn send(
         &self,
         req: SerializedRequest,
-    ) -> impl Future<Output = Result<Response, TransportError>> + Send + 'static {
+    ) -> impl Future<Output = TransportResult<Response>> + Send + 'static {
         let tx = self.tx.clone();
         let channel_size = self.channel_size;
 

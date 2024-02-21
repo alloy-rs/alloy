@@ -19,10 +19,6 @@ pub struct Block {
     /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
-    /// Total difficulty, this field is None only if representing
-    /// an Uncle block.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_difficulty: Option<U256>,
     /// Uncles' hashes.
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
@@ -80,6 +76,9 @@ pub struct Header {
     pub gas_used: U256,
     /// Timestamp
     pub timestamp: U256,
+    /// Total difficulty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_difficulty: Option<U256>,
     /// Extra data
     pub extra_data: Bytes,
     /// Mix Hash
@@ -534,7 +533,7 @@ impl FromStr for BlockNumberOrTag {
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlockNumberOrTag::Number(ref x) => format!("0x{x:x}").fmt(f),
+            BlockNumberOrTag::Number(x) => write!(f, "0x{x:x}"),
             BlockNumberOrTag::Latest => f.write_str("latest"),
             BlockNumberOrTag::Finalized => f.write_str("finalized"),
             BlockNumberOrTag::Safe => f.write_str("safe"),
@@ -735,6 +734,38 @@ impl<'de> Deserialize<'de> for BlockId {
         }
 
         deserializer.deserialize_any(BlockIdVisitor)
+    }
+}
+
+/// Error thrown when parsing a [BlockId] from a string.
+#[derive(Debug, thiserror::Error)]
+pub enum ParseBlockIdError {
+    /// Failed to parse a block id from a number.
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
+    /// Failed to parse a block id as a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] alloy_primitives::hex::FromHexError),
+}
+
+impl FromStr for BlockId {
+    type Err = ParseBlockIdError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("0x") {
+            return B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError);
+        }
+
+        match s {
+            "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
+            "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
+            "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
+            "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
+            "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
+            _ => s
+                .parse::<u64>()
+                .map_err(ParseBlockIdError::ParseIntError)
+                .map(|n| BlockId::Number(n.into())),
+        }
     }
 }
 
@@ -1035,6 +1066,7 @@ mod tests {
                 logs_bloom: Bloom::default(),
                 timestamp: U256::from(12),
                 difficulty: U256::from(13),
+                total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
                 base_fee_per_gas: Some(U256::from(20)),
@@ -1042,7 +1074,6 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
             },
-            total_difficulty: Some(U256::from(100000)),
             uncles: vec![B256::with_last_byte(17)],
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
@@ -1052,7 +1083,7 @@ mod tests {
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13","withdrawals":[]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","totalDifficulty":"0x186a0","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13","withdrawals":[]}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
         assert_eq!(block, deserialized);
@@ -1077,6 +1108,7 @@ mod tests {
                 logs_bloom: Bloom::default(),
                 timestamp: U256::from(12),
                 difficulty: U256::from(13),
+                total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
                 base_fee_per_gas: Some(U256::from(20)),
@@ -1084,7 +1116,6 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
             },
-            total_difficulty: Some(U256::from(100000)),
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
             size: Some(U256::from(19)),
@@ -1094,7 +1125,7 @@ mod tests {
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","totalDifficulty":"0x186a0","uncles":[],"size":"0x13"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","totalDifficulty":"0x186a0","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","withdrawalsRoot":"0x0000000000000000000000000000000000000000000000000000000000000008","uncles":[],"size":"0x13"}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
         assert_eq!(block, deserialized);
@@ -1119,6 +1150,7 @@ mod tests {
                 logs_bloom: Bloom::default(),
                 timestamp: U256::from(12),
                 difficulty: U256::from(13),
+                total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
                 base_fee_per_gas: Some(U256::from(20)),
@@ -1126,7 +1158,6 @@ mod tests {
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
             },
-            total_difficulty: Some(U256::from(100000)),
             uncles: vec![B256::with_last_byte(17)],
             transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
             size: Some(U256::from(19)),
@@ -1136,7 +1167,7 @@ mod tests {
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","totalDifficulty":"0x186a0","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000002","sha3Uncles":"0x0000000000000000000000000000000000000000000000000000000000000003","miner":"0x0000000000000000000000000000000000000004","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000005","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000006","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000007","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0xd","number":"0x9","gasLimit":"0xb","gasUsed":"0xa","timestamp":"0xc","totalDifficulty":"0x186a0","extraData":"0x010203","mixHash":"0x000000000000000000000000000000000000000000000000000000000000000e","nonce":"0x000000000000000f","baseFeePerGas":"0x14","uncles":["0x0000000000000000000000000000000000000000000000000000000000000011"],"transactions":["0x0000000000000000000000000000000000000000000000000000000000000012"],"size":"0x13"}"#
         );
         let deserialized: Block = serde_json::from_str(&serialized).unwrap();
         assert_eq!(block, deserialized);
@@ -1164,10 +1195,10 @@ mod tests {
     "gasLimit": "0xbe5a66",
     "gasUsed": "0xbe0fcc",
     "timestamp": "0x5f93b749",
+    "totalDifficulty": "0x3dc957fd8167fb2684a",
     "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
     "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
     "nonce": "0x4722f2acd35abe0f",
-    "totalDifficulty": "0x3dc957fd8167fb2684a",
     "uncles": [],
     "transactions": [
         "0xf435a26acc2a9ef73ac0b73632e32e29bd0e28d5c4f46a7e18ed545c93315916"
@@ -1186,5 +1217,82 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    fn can_parse_eip1898_block_ids() {
+        let num = serde_json::json!(
+            { "blockNumber": "0x0" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
+
+        let num = serde_json::json!(
+            { "blockNumber": "pending" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
+
+        let num = serde_json::json!(
+            { "blockNumber": "latest" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
+
+        let num = serde_json::json!(
+            { "blockNumber": "finalized" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
+
+        let num = serde_json::json!(
+            { "blockNumber": "safe" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
+
+        let num = serde_json::json!(
+            { "blockNumber": "earliest" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
+
+        let num = serde_json::json!("0x0");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
+
+        let num = serde_json::json!("pending");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
+
+        let num = serde_json::json!("latest");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
+
+        let num = serde_json::json!("finalized");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
+
+        let num = serde_json::json!("safe");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
+
+        let num = serde_json::json!("earliest");
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
+
+        let num = serde_json::json!(
+            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3" }
+        );
+        let id = serde_json::from_value::<BlockId>(num).unwrap();
+        assert_eq!(
+            id,
+            BlockId::Hash(
+                "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
+                    .parse::<B256>()
+                    .unwrap()
+                    .into()
+            )
+        );
     }
 }
