@@ -118,7 +118,7 @@ pub struct ExecutionPayloadEnvelopeV3 {
     /// should be used instead of an externally provided one.
     pub should_override_builder: bool,
     /// Optimism-specific - Ecotone parent beacon block root
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
 }
 
