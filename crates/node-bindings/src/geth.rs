@@ -14,6 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tempfile::tempdir;
+use thiserror::Error;
 
 /// How long we will wait for geth to indicate that it is ready.
 const GETH_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -168,6 +169,41 @@ impl Default for PrivateNetOptions {
     fn default() -> Self {
         Self { p2p_port: None, discovery: true }
     }
+}
+
+/// Errors that can occur when working with the [`Geth`].
+#[derive(Debug, Error)]
+pub enum GethError {
+    /// Clique private key error
+    #[error("Clique address error: {0}")]
+    CliqueAddress(String),
+    /// The chain id was not set.
+    #[error("The chain id was not set")]
+    ChainIdNotSet,
+    /// Could not create the data directory.
+    #[error("Could not create the data directory")]
+    CreateDataDir,
+    /// No stderr was captured from the child process.
+    #[error("No stderr was captured from the process")]
+    NoStderr,
+    /// Timed out waiting for geth to start.
+    #[error("Timeout error: {0}")]
+    Timeout(String),
+    /// Encountered a fatal error.
+    #[error("Fatal error: {0}")]
+    Fatal(String),
+    /// A line could not be read from the geth stderr.
+    #[error("Read line error: {0}")]
+    ReadLineError(std::io::Error),
+    /// Genesis error
+    #[error("Genesis error: {0}")]
+    Genesis(String),
+    /// Geth init error
+    #[error("Geth init error: {0}")]
+    GethInit(String),
+    /// Spawn geth error
+    #[error("Spawn geth error")]
+    SpawnGeth,
 }
 
 /// Builder for launching `geth`.
@@ -578,6 +614,241 @@ impl Geth {
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
         }
+    }
+
+    /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
+    pub fn try_spawn(mut self) -> Result<GethInstance, GethError> {
+        let bin_path = match self.program.as_ref() {
+            Some(bin) => bin.as_os_str(),
+            None => GETH.as_ref(),
+        }
+        .to_os_string();
+        let mut cmd = Command::new(&bin_path);
+        // geth uses stderr for its logs
+        cmd.stderr(Stdio::piped());
+
+        // If no port provided, let the os chose it for us
+        let mut port = self.port.unwrap_or(0);
+        let port_s = port.to_string();
+
+        // Open the HTTP API
+        cmd.arg("--http");
+        cmd.arg("--http.port").arg(&port_s);
+        cmd.arg("--http.api").arg(API);
+
+        // Open the WS API
+        cmd.arg("--ws");
+        cmd.arg("--ws.port").arg(port_s);
+        cmd.arg("--ws.api").arg(API);
+
+        // pass insecure unlock flag if set
+        let is_clique = self.is_clique();
+        if self.insecure_unlock || is_clique {
+            cmd.arg("--allow-insecure-unlock");
+        }
+
+        if is_clique {
+            self.inner_disable_discovery();
+        }
+
+        // Set the port for authenticated APIs
+        let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
+        cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
+
+        // use geth init to initialize the datadir if the genesis exists
+        if is_clique {
+            let clique_addr = self.clique_address();
+            if let Some(genesis) = &mut self.genesis {
+                // set up a clique config with an instant sealing period and short (8 block) epoch
+                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
+                genesis.config.clique = Some(clique_config);
+
+                let clique_addr = clique_addr.ok_or(GethError::CliqueAddress(
+                    "could not calculates the address of the Clique consensus address.".to_string(),
+                ))?;
+
+                // set the extraData field
+                let extra_data_bytes =
+                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
+                genesis.extra_data = extra_data_bytes.into();
+
+                // we must set the etherbase if using clique
+                // need to use format! / Debug here because the Address Display impl doesn't show
+                // the entire address
+                cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
+            }
+
+            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddress(
+                "could not calculates the address of the Clique consensus address.".to_string(),
+            ))?;
+
+            self.genesis = Some(Genesis::clique_genesis(
+                self.chain_id.ok_or(GethError::ChainIdNotSet)?,
+                clique_addr,
+            ));
+
+            // we must set the etherbase if using clique
+            // need to use format! / Debug here because the Address Display impl doesn't show the
+            // entire address
+            cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
+        }
+
+        if let Some(ref genesis) = self.genesis {
+            // create a temp dir to store the genesis file
+            let temp_genesis_dir_path =
+                tempdir().expect("should be able to create temp dir for genesis init").into_path();
+
+            // create a temp dir to store the genesis file
+            let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
+
+            // create the genesis file
+            let mut file = File::create(&temp_genesis_path)
+                .map_err(|_| GethError::Genesis("could not create genesis file".to_string()))?;
+
+            // serialize genesis and write to file
+            serde_json::to_writer_pretty(&mut file, &genesis)
+                .map_err(|_| GethError::Genesis("could not write genesis to file".to_string()))?;
+
+            let mut init_cmd = Command::new(bin_path);
+            if let Some(ref data_dir) = self.data_dir {
+                init_cmd.arg("--datadir").arg(data_dir);
+            }
+
+            // set the stderr to null so we don't pollute the test output
+            init_cmd.stderr(Stdio::null());
+
+            init_cmd.arg("init").arg(temp_genesis_path);
+            let res = init_cmd
+                .spawn()
+                .map_err(|_| GethError::GethInit("failed to spawn geth init".to_string()))?
+                .wait()
+                .map_err(|_| {
+                    GethError::GethInit("failed to wait for geth init to exit".to_string())
+                })?;
+            // .expect("failed to wait for geth init to exit");
+            if !res.success() {
+                return Err(GethError::GethInit("geth init failed".to_string()));
+            }
+
+            // clean up the temp dir which is now persisted
+            std::fs::remove_dir_all(temp_genesis_dir_path)
+                .map_err(|_| GethError::Genesis("could not remove genesis temp dir".to_string()))?;
+        }
+
+        if let Some(ref data_dir) = self.data_dir {
+            cmd.arg("--datadir").arg(data_dir);
+
+            // create the directory if it doesn't exist
+            if !data_dir.exists() {
+                create_dir(data_dir).map_err(|_| GethError::CreateDataDir)?;
+            }
+        }
+
+        // Dev mode with custom block time
+        let mut p2p_port = match self.mode {
+            GethMode::Dev(DevOptions { block_time }) => {
+                cmd.arg("--dev");
+                if let Some(block_time) = block_time {
+                    cmd.arg("--dev.period").arg(block_time.to_string());
+                }
+                None
+            }
+            GethMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
+                // if no port provided, let the os chose it for us
+                let port = p2p_port.unwrap_or(0);
+                cmd.arg("--port").arg(port.to_string());
+
+                // disable discovery if the flag is set
+                if !discovery {
+                    cmd.arg("--nodiscover");
+                }
+                Some(port)
+            }
+        };
+
+        if let Some(chain_id) = self.chain_id {
+            cmd.arg("--networkid").arg(chain_id.to_string());
+        }
+
+        // debug verbosity is needed to check when peers are added
+        cmd.arg("--verbosity").arg("4");
+
+        if let Some(ref ipc) = self.ipc_path {
+            cmd.arg("--ipcpath").arg(ipc);
+        }
+
+        let mut child = cmd.spawn().map_err(|_| GethError::SpawnGeth)?;
+
+        let stderr = child.stderr.ok_or(GethError::NoStderr)?;
+
+        let start = Instant::now();
+        let mut reader = BufReader::new(stderr);
+
+        // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
+        // dev mode
+        let mut p2p_started = matches!(self.mode, GethMode::Dev(_));
+        let mut http_started = false;
+
+        loop {
+            if start + GETH_STARTUP_TIMEOUT <= Instant::now() {
+                // panic!("Timed out waiting for geth to start. Is geth installed?")
+                return Err(GethError::Timeout(
+                    "Timed out waiting for geth to start. Is geth installed?".to_string(),
+                ));
+            }
+
+            let mut line = String::with_capacity(120);
+            reader.read_line(&mut line).map_err(GethError::ReadLineError)?;
+
+            if matches!(self.mode, GethMode::NonDev(_)) && line.contains("Started P2P networking") {
+                p2p_started = true;
+            }
+
+            if !matches!(self.mode, GethMode::Dev(_)) {
+                // try to find the p2p port, if not in dev mode
+                if line.contains("New local node record") {
+                    if let Some(port) = extract_value("tcp=", &line) {
+                        p2p_port = port.parse::<u16>().ok();
+                    }
+                }
+            }
+
+            // geth 1.9.23 uses "server started" while 1.9.18 uses "endpoint opened"
+            // the unauthenticated api is used for regular non-engine API requests
+            if line.contains("HTTP endpoint opened")
+                || (line.contains("HTTP server started") && !line.contains("auth=true"))
+            {
+                // Extracts the address from the output
+                if let Some(addr) = extract_endpoint(&line) {
+                    // use the actual http port
+                    port = addr.port();
+                }
+
+                http_started = true;
+            }
+
+            // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
+            // 127.0.0.1:8545: bind: address already in use
+            if line.contains("Fatal:") {
+                return Err(GethError::Fatal(line));
+            }
+
+            if p2p_started && http_started {
+                break;
+            }
+        }
+
+        child.stderr = Some(reader.into_inner());
+
+        Ok(GethInstance {
+            pid: child,
+            port,
+            ipc: self.ipc_path,
+            data_dir: self.data_dir,
+            p2p_port,
+            genesis: self.genesis,
+            clique_private_key: self.clique_private_key,
+        })
     }
 }
 

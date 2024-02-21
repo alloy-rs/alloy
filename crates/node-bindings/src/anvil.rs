@@ -10,6 +10,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+use thiserror::Error;
 
 /// How long we will wait for anvil to indicate that it is ready.
 const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
@@ -63,6 +64,38 @@ impl Drop for AnvilInstance {
     fn drop(&mut self) {
         self.pid.kill().expect("could not kill anvil");
     }
+}
+
+/// Errors that can occur when working with the [`Anvil`].
+#[derive(Debug, Error)]
+pub enum AnvilError {
+    /// Spawning the anvil process failed.
+    #[error("couldnt start anvil")]
+    Spawn,
+
+    /// Timed out waiting for a message from anvil's stderr.
+    #[error("timedout occurred: {0}")]
+    Timeout(String),
+
+    /// A line could not be read from the geth stderr.
+    #[error("could not read line from anvil stderr: {0}")]
+    ReadLineError(std::io::Error),
+
+    /// The child anvil process's stderr was not captured.
+    #[error("could not get stderr for anvil child process")]
+    NoStderr,
+
+    /// The private key could not be parsed.
+    #[error("could not parse private key")]
+    ParsePrivateKeyError,
+
+    /// An error occurred while deserializing a private key.
+    #[error("could not deserialize private key from bytes")]
+    DeserializePrivateKeyError,
+
+    /// An error occurred while parsing a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
 }
 
 /// Builder for launching `anvil`.
@@ -312,6 +345,107 @@ impl Anvil {
             port,
             chain_id: self.chain_id.or(chain_id),
         }
+    }
+
+    /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
+    #[track_caller]
+    pub fn try_spawn(self) -> Result<AnvilInstance, AnvilError> {
+        let mut cmd = if let Some(ref prg) = self.program {
+            Command::new(prg)
+        } else {
+            Command::new("anvil")
+        };
+        cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
+        let mut port = if let Some(port) = self.port {
+            port
+        } else {
+            // let the OS choose a port for us
+            0
+        };
+        cmd.arg("-p").arg(port.to_string());
+
+        if let Some(mnemonic) = self.mnemonic {
+            cmd.arg("-m").arg(mnemonic);
+        }
+
+        if let Some(chain_id) = self.chain_id {
+            cmd.arg("--chain-id").arg(chain_id.to_string());
+        }
+
+        if let Some(block_time) = self.block_time {
+            cmd.arg("-b").arg(block_time.to_string());
+        }
+
+        if let Some(fork) = self.fork {
+            cmd.arg("-f").arg(fork);
+        }
+
+        if let Some(fork_block_number) = self.fork_block_number {
+            cmd.arg("--fork-block-number").arg(fork_block_number.to_string());
+        }
+
+        cmd.args(self.args);
+
+        let mut child = cmd.spawn().map_err(|_| AnvilError::Spawn)?;
+
+        let stdout = child.stdout.take().ok_or(AnvilError::NoStderr)?;
+
+        let start = Instant::now();
+        let mut reader = BufReader::new(stdout);
+
+        let mut private_keys = Vec::new();
+        let mut addresses = Vec::new();
+        let mut is_private_key = false;
+        let mut chain_id = None;
+        loop {
+            if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
+                <= Instant::now()
+            {
+                return Err(AnvilError::Timeout(
+                    "Timed out waiting for anvil to start. Is anvil installed?".to_string(),
+                ));
+            }
+
+            let mut line = String::new();
+            reader.read_line(&mut line).map_err(AnvilError::ReadLineError)?;
+            if let Some(addr) = line.strip_prefix("Listening on") {
+                // <Listening on 127.0.0.1:8545>
+                // parse the actual port
+                if let Ok(addr) = SocketAddr::from_str(addr.trim()) {
+                    port = addr.port();
+                }
+                break;
+            }
+
+            if line.starts_with("Private Keys") {
+                is_private_key = true;
+            }
+
+            if is_private_key && line.starts_with('(') {
+                let key_str =
+                    line.split("0x").last().ok_or(AnvilError::ParsePrivateKeyError)?.trim();
+                let key_hex = hex::decode(key_str).map_err(AnvilError::FromHexError)?;
+                let key = K256SecretKey::from_bytes((&key_hex[..]).into())
+                    .map_err(|_| AnvilError::DeserializePrivateKeyError)?;
+                addresses.push(Address::from_public_key(SigningKey::from(&key).verifying_key()));
+                private_keys.push(key);
+            }
+
+            if let Some(start_chain_id) = line.find("Chain ID:") {
+                let rest = &line[start_chain_id + "Chain ID:".len()..];
+                if let Ok(chain) = rest.split_whitespace().next().unwrap_or("").parse::<u64>() {
+                    chain_id = Some(chain);
+                };
+            }
+        }
+
+        Ok(AnvilInstance {
+            pid: child,
+            private_keys,
+            addresses,
+            port,
+            chain_id: self.chain_id.or(chain_id),
+        })
     }
 }
 
