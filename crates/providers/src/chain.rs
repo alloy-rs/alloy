@@ -10,10 +10,7 @@ use lru::LruCache;
 use std::{num::NonZeroUsize, time::Duration};
 
 /// The size of the block cache.
-pub const BLOCK_CACHE_SIZE: NonZeroUsize = match NonZeroUsize::new(10) {
-    Some(size) => size,
-    None => panic!("BLOCK_CACHE_SIZE must be non-zero"),
-};
+const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
 
 fn chain_stream_poller<P, N, T>(
     provider: WeakProvider<P>,
@@ -25,52 +22,47 @@ where
     N: Network,
     T: Transport + Clone,
 {
-    let mut poll_stream = provider
-        .upgrade()
-        .map(|provider| {
-            PollTask::new((&*provider).weak_client(), "eth_blockNumber", ())
-                .with_poll_interval(poll_interval)
-                .spawn()
-                .into_stream()
-        })
-        .expect("provider dropped before poller started");
+    let mut poll_stream = {
+        let upgraded_provider = provider.upgrade().expect("provider dropped before poller started");
+        PollTask::new(upgraded_provider.weak_client(), "eth_blockNumber", ())
+            .with_poll_interval(poll_interval)
+            .spawn()
+            .into_stream()
+    };
 
     let mut next_yield = from_height;
-    let mut known_blocks: LruCache<BlockNumber, Block> = LruCache::new(BLOCK_CACHE_SIZE);
+    let mut known_blocks = LruCache::<BlockNumber, Block>::new(BLOCK_CACHE_SIZE);
 
     stream! {
         'task: loop {
-            // first clear any buffered blocks
-            if known_blocks.contains(&next_yield) {
+            // Clear any buffered blocks.
+            while let Some(known_block) = known_blocks.pop(&next_yield) {
                 next_yield += 1;
-                yield known_blocks.get(&next_yield).unwrap().clone();
-                continue;
+                yield known_block;
             }
 
-            // then get the tip/
+            // Get the tip.
             let block_number = match poll_stream.next().await {
                 Some(Ok(block_number)) => block_number,
                 Some(Err(err)) => {
-                    // this is fine.
-                    tracing::error!(%err, "polling stream lagged");
-                    continue;
-                },
+                    // This is fine.
+                    debug!(%err, "polling stream lagged");
+                    continue 'task;
+                }
                 None => {
-                    tracing::debug!("polling stream ended");
-                    break;
-                },
-            };
-
-            // then upgrade the provider
-            let provider = match provider.upgrade() {
-                Some(provider) => provider,
-                None => {
-                    tracing::debug!("provider dropped");
+                    debug!("polling stream ended");
                     break 'task;
-                },
+                }
             };
 
-            // Then try to fill as many blocks as possible
+            // Upgrade the provider.
+            let Some(provider) = provider.upgrade() else {
+                debug!("provider dropped");
+                break 'task;
+            };
+
+            // Then try to fill as many blocks as possible.
+            // TODO: Maybe use `join_all`
             while !known_blocks.contains(&block_number) {
                 let block = provider.get_block_by_number(block_number, false).await;
                 match block {
@@ -81,12 +73,11 @@ where
                         continue 'task;
                     },
                     Err(err) => {
-                        tracing::error!(block_number, %err, "failed to fetch block");
+                        error!(block_number, %err, "failed to fetch block");
                         break 'task;
                     },
                 }
             }
-
         }
     }
 }

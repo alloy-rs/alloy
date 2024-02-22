@@ -1,9 +1,8 @@
-use std::{pin::Pin, task};
-
 use alloy_primitives::B256;
 use futures::{ready, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
+use std::{pin::Pin, task};
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 
@@ -22,8 +21,8 @@ pub struct RawSubscription {
 
 impl RawSubscription {
     /// Get the local ID of the subscription.
-    pub const fn local_id(&self) -> B256 {
-        self.local_id
+    pub const fn local_id(&self) -> &B256 {
+        &self.local_id
     }
 
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
@@ -128,7 +127,7 @@ impl<T> From<RawSubscription> for Subscription<T> {
 
 impl<T> Subscription<T> {
     /// Get the local ID of the subscription.
-    pub const fn local_id(&self) -> B256 {
+    pub const fn local_id(&self) -> &B256 {
         self.inner.local_id()
     }
 
@@ -218,7 +217,7 @@ impl<T: DeserializeOwned> Subscription<T> {
     /// Convert the subscription into a stream that may yield unexpected types.
     pub fn into_any_stream(self) -> SubAnyStream<T> {
         SubAnyStream {
-            id: self.local_id(),
+            id: self.inner.local_id,
             inner: self.inner.into_stream(),
             _pd: std::marker::PhantomData,
         }
@@ -266,7 +265,7 @@ impl<T: DeserializeOwned> Subscription<T> {
     /// Convert the subscription into a stream.
     pub fn into_stream(self) -> SubscriptionStream<T> {
         SubscriptionStream {
-            id: self.local_id(),
+            id: self.inner.local_id,
             inner: self.inner.into_stream(),
             _pd: std::marker::PhantomData,
         }
@@ -306,7 +305,7 @@ impl<T: DeserializeOwned> Subscription<T> {
     /// results.
     pub fn into_result_stream(self) -> SubResultStream<T> {
         SubResultStream {
-            id: self.local_id(),
+            id: self.inner.local_id,
             inner: self.inner.into_stream(),
             _pd: std::marker::PhantomData,
         }
@@ -324,8 +323,8 @@ pub struct SubAnyStream<T> {
 
 impl<T> SubAnyStream<T> {
     /// Get the local ID of the subscription.
-    pub const fn id(&self) -> B256 {
-        self.id
+    pub const fn id(&self) -> &B256 {
+        &self.id
     }
 }
 
@@ -355,8 +354,8 @@ pub struct SubscriptionStream<T> {
 
 impl<T> SubscriptionStream<T> {
     /// Get the local ID of the subscription.
-    pub const fn id(&self) -> B256 {
-        self.id
+    pub const fn id(&self) -> &B256 {
+        &self.id
     }
 }
 
@@ -383,9 +382,10 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
     }
 }
 
-/// A stream of notifications from the server, identified by a local ID. This
-/// stream will attempt to deserialize the notifications and yield the
-/// `serde_json::Result` of the deserialization.
+/// A stream of notifications from the server, identified by a local ID.
+///
+/// This stream will attempt to deserialize the notifications and yield the [`serde_json::Result`]
+/// of the deserialization.
 #[derive(Debug)]
 pub struct SubResultStream<T> {
     id: B256,
@@ -395,8 +395,8 @@ pub struct SubResultStream<T> {
 
 impl<T> SubResultStream<T> {
     /// Get the local ID of the subscription.
-    pub const fn id(&self) -> B256 {
-        self.id
+    pub const fn id(&self) -> &B256 {
+        &self.id
     }
 }
 

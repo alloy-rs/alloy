@@ -19,6 +19,8 @@ alloy-transport.workspace = true
 futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+tokio-stream = { version = "0.1.14", features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
 
@@ -30,9 +32,6 @@ reqwest = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
 
 serde = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["sync"] }
-tokio-stream = { version = "0.1.14", features = ["sync"] }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 alloy-transport-ipc = { workspace = true, optional = true }
 

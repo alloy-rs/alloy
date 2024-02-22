@@ -8,7 +8,7 @@ use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, HashMap},
     future::Future,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     select,
@@ -33,13 +33,23 @@ pub struct WatchConfig {
 impl WatchConfig {
     /// Create a new watch for a transaction.
     pub fn new(tx_hash: B256, tx: oneshot::Sender<()>) -> Self {
-        Self { tx_hash, confirmations: 0, timeout: Default::default(), tx }
+        Self { tx_hash, confirmations: 0, timeout: None, tx }
+    }
+
+    /// Set the number of confirmations to wait for.
+    pub fn set_confirmations(&mut self, confirmations: u64) {
+        self.confirmations = confirmations;
     }
 
     /// Set the number of confirmations to wait for.
     pub fn with_confirmations(mut self, confirmations: u64) -> Self {
         self.confirmations = confirmations;
         self
+    }
+
+    /// Set the timeout for the transaction.
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = Some(timeout);
     }
 
     /// Set the timeout for the transaction.
@@ -64,8 +74,9 @@ pub struct PendingTransaction {
 }
 
 impl PendingTransaction {
-    pub fn tx_hash(&self) -> B256 {
-        self.tx_hash
+    /// Returns this transaction's hash.
+    pub const fn tx_hash(&self) -> &B256 {
+        &self.tx_hash
     }
 }
 
@@ -76,7 +87,7 @@ impl Future for PendingTransaction {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.rx.poll_unpin(cx).map(|res| res.unwrap())
+        self.rx.poll_unpin(cx).map(Result::unwrap)
     }
 }
 
@@ -107,7 +118,7 @@ pub(crate) struct Heartbeat<St> {
     waiting_confs: BTreeMap<U256, WatchConfig>,
 
     /// Ordered map of transactions to reap at a certain time.
-    reap_at: BTreeMap<std::time::Instant, B256>,
+    reap_at: BTreeMap<Instant, B256>,
 }
 
 impl<St> Heartbeat<St>
@@ -140,17 +151,16 @@ impl<St> Heartbeat<St> {
 
     /// Get the next time to reap a transaction. If no reaps, this is a very
     /// long time from now (i.e. will not be woken).
-    fn next_reap(&self) -> std::time::Instant {
+    fn next_reap(&self) -> Instant {
         self.reap_at
-            .keys()
-            .next()
-            .copied()
-            .unwrap_or_else(|| std::time::Instant::now() + Duration::from_secs(60_000))
+            .first_key_value()
+            .map(|(k, _)| *k)
+            .unwrap_or_else(|| Instant::now() + Duration::from_secs(60_000))
     }
 
     /// Reap any timeout
     fn reap_timeouts(&mut self) {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let to_keep = self.reap_at.split_off(&now);
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
@@ -164,7 +174,7 @@ impl<St> Heartbeat<St> {
     fn handle_watch_ix(&mut self, to_watch: WatchConfig) {
         // start watching for the tx
         if let Some(timeout) = to_watch.timeout {
-            self.reap_at.insert(std::time::Instant::now() + timeout, to_watch.tx_hash);
+            self.reap_at.insert(Instant::now() + timeout, to_watch.tx_hash);
         }
         self.unconfirmed.insert(to_watch.tx_hash, to_watch);
     }
@@ -180,11 +190,8 @@ impl<St> Heartbeat<St> {
         };
 
         // check if we are watching for any of the txns in this block
-        let to_check = block
-            .transactions
-            .hashes()
-            .copied()
-            .filter_map(|tx_hash| self.unconfirmed.remove(&tx_hash));
+        let to_check =
+            block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
 
         // If confirmations is 1 or less, notify the watcher
         for watcher in to_check {

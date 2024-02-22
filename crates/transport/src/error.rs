@@ -32,13 +32,10 @@ pub enum TransportErrorKind {
 }
 
 impl TransportErrorKind {
-    /// Whether the error is potentially recoverable. This is a naive heuristic
-    /// and should be used with caution.
-    pub fn recoverable(&self) -> bool {
-        match self {
-            Self::MissingBatchResponse(_) => true,
-            _ => false,
-        }
+    /// Returns `true` if the error is potentially recoverable.
+    /// This is a naive heuristic and should be used with caution.
+    pub const fn recoverable(&self) -> bool {
+        matches!(self, Self::MissingBatchResponse(_))
     }
 
     /// Instantiate a new `TransportError` from a custom error.

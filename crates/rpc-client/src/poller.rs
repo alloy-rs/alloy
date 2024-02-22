@@ -1,15 +1,13 @@
+use crate::WeakClient;
+use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_transport::{utils::Spawnable, Transport};
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
     time::Duration,
 };
-
-use alloy_json_rpc::{RpcParam, RpcReturn};
-use alloy_transport::{utils::Spawnable, Transport};
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
-
-use crate::WeakClient;
 
 /// A Poller task.
 #[derive(Debug)]
@@ -29,7 +27,7 @@ where
     // config options
     channel_size: usize,
     poll_interval: Duration,
-    limit: Option<usize>,
+    limit: usize,
 
     _pd: PhantomData<fn() -> Resp>,
 }
@@ -48,22 +46,54 @@ where
             params,
             channel_size: 16,
             poll_interval: Duration::from_secs(10),
-            limit: None,
+            limit: usize::MAX,
             _pd: PhantomData,
         }
     }
 
-    /// Set a limit on the number of succesful polls.
-    pub fn set_limit(&mut self, limit: Option<usize>) {
-        self.limit = limit;
+    /// Returns the channel size for the poller task.
+    pub fn channel_size(&self) -> usize {
+        self.channel_size
     }
 
-    /// Set the duration between polls.
+    /// Sets the channel size for the poller task.
+    pub fn set_channel_size(&mut self, channel_size: usize) {
+        self.channel_size = channel_size;
+    }
+
+    /// Sets the channel size for the poller task.
+    pub fn with_channel_size(mut self, channel_size: usize) -> Self {
+        self.set_channel_size(channel_size);
+        self
+    }
+
+    /// Retuns the limit on the number of succesful polls.
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
+
+    /// Sets a limit on the number of succesful polls.
+    pub fn set_limit(&mut self, limit: Option<usize>) {
+        self.limit = limit.unwrap_or(usize::MAX);
+    }
+
+    /// Sets a limit on the number of succesful polls.
+    pub fn with_limit(mut self, limit: Option<usize>) -> Self {
+        self.set_limit(limit);
+        self
+    }
+
+    /// Returns the duration between polls.
+    pub fn poll_interval(&self) -> Duration {
+        self.poll_interval
+    }
+
+    /// Sets the duration between polls.
     pub fn set_poll_interval(&mut self, poll_interval: Duration) {
         self.poll_interval = poll_interval;
     }
 
-    /// Set the duration between polls.
+    /// Sets the duration between polls.
     pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
         self.set_poll_interval(poll_interval);
         self
@@ -72,15 +102,11 @@ where
     /// Spawn the poller task, producing a stream of responses.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
-
         let fut = async move {
-            let limit = self.limit.unwrap_or(usize::MAX);
-            for _ in 0..limit {
-                let client = match self.client.upgrade() {
-                    Some(client) => client,
-                    None => break,
+            for _ in 0..self.limit {
+                let Some(client) = self.client.upgrade() else {
+                    break;
                 };
-
                 match client.prepare(self.method, &self.params).await {
                     Ok(resp) => {
                         if tx.send(resp).is_err() {
@@ -88,10 +114,9 @@ where
                         }
                     }
                     Err(e) => {
-                        debug!(%e, "Error response in polling request.");
+                        debug!(%e, "error response in polling request");
                     }
                 }
-
                 tokio::time::sleep(self.poll_interval).await;
             }
         };
@@ -129,6 +154,7 @@ impl<Resp> Deref for PollChannel<Resp> {
         &self.rx
     }
 }
+
 impl<Resp> DerefMut for PollChannel<Resp> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.rx
@@ -144,13 +170,15 @@ where
         Self { rx: self.rx.resubscribe() }
     }
 
-    /// Convert the poll_channel into a stream.
+    /// Convert the poll channel into a stream.
     pub fn into_stream(self) -> BroadcastStream<Resp> {
-        BroadcastStream::from(self.rx)
+        self.rx.into()
     }
 }
 
-fn __assert_unpin() {
+#[cfg(test)]
+#[allow(clippy::missing_const_for_fn)]
+fn _assert_unpin() {
     fn _assert<T: Unpin>() {}
     _assert::<PollChannel<()>>();
 }

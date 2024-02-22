@@ -29,8 +29,7 @@ pub struct RootProviderInner<N, T> {
 
 impl<N, T> RootProviderInner<N, T> {
     pub(crate) fn new(client: RpcClient<T>) -> Self {
-        let this = Self { client, heart: None, _network: PhantomData };
-        this
+        Self { client, heart: None, _network: PhantomData }
     }
 
     /// Get a weak reference to the RPC client.

@@ -47,7 +47,7 @@ pub trait Transport:
     /// Convert this transport into a boxed trait object.
     fn boxed(self) -> BoxTransport
     where
-        Self: Sized + Clone + Send + Sync + 'static,
+        Self: Sized + Clone,
     {
         BoxTransport::new(self)
     }
@@ -55,9 +55,9 @@ pub trait Transport:
     /// Make a boxed trait object by cloning this transport.
     fn as_boxed(&self) -> BoxTransport
     where
-        Self: Sized + Clone + Send + Sync + 'static,
+        Self: Sized + Clone,
     {
-        BoxTransport::new(self.clone())
+        self.clone().boxed()
     }
 }
 
