@@ -16,6 +16,9 @@ alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-eips.workspace = true
+thiserror.workspace = true
+c-kzg = { version = "0.4.2", features = ["serde"] }
+sha2 = "0.10.7"
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
