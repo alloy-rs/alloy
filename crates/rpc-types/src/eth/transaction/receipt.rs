@@ -27,9 +27,9 @@ pub struct TransactionReceipt {
     /// This is None for non eip-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_gas_used: Option<U128>,
-    /// The price paid by the eip-4844 transaction per blob gas.
+    /// The base fee used by the eip-4844 transaction per blob gas.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub blob_gas_price: Option<U128>,
+    pub blob_base_fee: Option<U128>,
     /// Address of the sender
     pub from: Address,
     /// Address of the receiver. None when its a contract creation transaction.
