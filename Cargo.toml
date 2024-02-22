@@ -40,11 +40,11 @@ alloy-transport-http = { version = "0.1.0", default-features = false, path = "cr
 alloy-transport-ipc = { version = "0.1.0", default-features = false, path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crates/transport-ws" }
 
-alloy-core = { version = "0.6", default-features = false, features = ["std"] }
-alloy-dyn-abi = { version = "0.6", default-features = false, features = ["std"] }
-alloy-json-abi = { version = "0.6", default-features = false, features = ["std"] }
-alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
+alloy-core = { version = "0.6.3", default-features = false, features = ["std"] }
+alloy-dyn-abi = { version = "0.6.3", default-features = false, features = ["std"] }
+alloy-json-abi = { version = "0.6.3", default-features = false, features = ["std"] }
+alloy-primitives = { version = "0.6.3", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "0.6.3", default-features = false, features = ["std"] }
 
 alloy-rlp = "0.3"
 
@@ -99,6 +99,7 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.8"
 
-# TODO: Remove once alloy-contract is stable. This is only used in tests for `sol!`.
-[patch.crates-io]
+# TODO: Keep around until alloy-contract is stable.
+# This should only be used in `alloy-contract` tests.
+# [patch.crates-io]
 # alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "18b0509950c90d9ec38f25913b692ae4cdd6f227" }
