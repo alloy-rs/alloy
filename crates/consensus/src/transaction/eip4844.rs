@@ -7,7 +7,7 @@ use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
 use sha2::Digest;
 use std::{mem, ops::Deref};
 
-/// An error that can occur when validating a [BlobTransaction].
+/// An error that can occur when validating a [TxEip4844].
 #[derive(Debug, thiserror::Error)]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
@@ -58,7 +58,7 @@ impl From<(BlobTx, BlobTransactionSidecar)> for TxEip4844 {
 impl TxEip4844 {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
-    /// See also [TxEip4844::validate_blob]
+    /// See also [BlobTx::validate_blob]
     pub fn validate(
         &self,
         proof_settings: &KzgSettings,
