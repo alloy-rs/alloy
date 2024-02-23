@@ -93,8 +93,12 @@ impl TxEip4844 {
         }
     }
 
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require rlp header
+    /// Encodes the [TxEip4844] fields as RLP, with a tx type. If `with_header` is `false`,
+    /// the following will be encoded:
+    /// `tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs])`
+    ///
+    /// If `with_header` is `true`, the following will be encoded:
+    /// `rlp(tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs]))`
     pub(crate) fn encode_with_signature(
         &self,
         signature: &Signature,
@@ -113,8 +117,8 @@ impl TxEip4844 {
             }
             .encode(out);
         }
-
         out.put_u8(self.tx_type() as u8);
+
         let header = Header { list: true, payload_length };
         header.encode(out);
 
@@ -163,6 +167,12 @@ impl Transaction for TxEip4844 {
         let tx = BlobTx::decode_inner(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
+        // There are two possibilities when decoding a signed EIP-4844 transaction:
+        // If it's a historical transaction, it will only have the transaction fields, and no
+        // sidecar. If it's a transaction received during the gossip stage or sent through
+        // eth_sendRawTransaction, it will have the transaction fields and a sidecar.
+        // To disambiguate, we try to decode the sidecar in all instances, and if it fails, we
+        // assume it's a historical transaction.
         let sidecar = BlobTransactionSidecar::decode_inner(buf);
 
         if let Ok(sidecar) = sidecar {
@@ -173,11 +183,16 @@ impl Transaction for TxEip4844 {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        // A signature for a [BlobTransaction] is a signature over the [TxEip4844] EIP-2718 payload
+        // fields:
+        // (BLOB_TX_TYPE ||
+        //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
+        //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
         self.tx().encode_for_signing(out);
     }
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        TxEip4844::encode_with_signature(self, signature, out, true);
+        Self::encode_with_signature(self, signature, out, true);
     }
 
     fn chain_id(&self) -> Option<ChainId> {
