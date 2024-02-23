@@ -301,7 +301,7 @@ impl TxEip4844 {
         TxType::Eip4844
     }
 
-    /// Encodes the legacy transaction in RLP for signing.
+    /// Encodes the 4844 transaction in RLP for signing.
     ///
     /// This encodes the transaction as:
     /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
@@ -463,33 +463,71 @@ impl BlobTransaction {
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
     }
+
+    pub(crate) fn encode_with_signature(
+        &self,
+        signature: &Signature,
+        out: &mut dyn BufMut,
+        with_header: bool,
+    ) {
+        let payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
+        if with_header {
+            Header {
+                list: false,
+                payload_length: 1 + length_of_length(payload_length) + payload_length,
+            }
+            .encode(out);
+        }
+        out.put_u8(self.tx.tx_type() as u8);
+        let header = Header { list: true, payload_length };
+        header.encode(out);
+        self.tx.encode_fields(out);
+        signature.encode(out);
+        self.sidecar.encode_inner(out);
+    }
 }
 
 impl Transaction for BlobTransaction {
     type Signature = Signature;
 
     fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        todo!()
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        let tx = TxEip4844::decode_inner(buf)?;
+        let signature = Signature::decode_rlp_vrs(buf)?;
+        let sidecar = BlobTransactionSidecar::decode_inner(buf)?;
+
+        Ok(BlobTransaction::from_tx_and_sidecar(tx, sidecar).into_signed(signature))
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        todo!()
+        self.tx.encode_for_signing(out);
     }
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        todo!()
-    }
-
-    fn encoded_for_signing(&self) -> Vec<u8> {
-        todo!()
+        self.encode_with_signature(signature, out, true)
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature> {
-        todo!()
+        let payload_length = 1 + self.tx.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
+        buf.put_u8(TxType::Eip4844 as u8);
+        self.tx.encode_signed(&signature, &mut buf);
+        let hash = keccak256(&buf);
+
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
     }
 
+    /// The payload length is the length of the `tranascation_payload_body` list, plus the
+    /// length of the blobs, commitments, and proofs.
     fn payload_len_for_signature(&self) -> usize {
-        todo!()
+        self.tx.payload_len_for_signature() + self.sidecar.fields_len()
     }
 
     fn chain_id(&self) -> Option<ChainId> {
@@ -640,7 +678,7 @@ const _: [(); std::mem::size_of::<BlobTransactionSidecar>()] =
     [(); std::mem::size_of::<BlobTransactionSidecarRlp>()];
 
 impl BlobTransactionSidecarRlp {
-    fn wrap_ref(other: &BlobTransactionSidecar) -> &Self {
+    const fn wrap_ref(other: &BlobTransactionSidecar) -> &Self {
         // SAFETY: Same repr and size
         unsafe { &*(other as *const BlobTransactionSidecar).cast::<Self>() }
     }
