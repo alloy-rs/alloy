@@ -741,7 +741,6 @@ impl BlobTransactionSidecarRlp {
 /// Calculates the versioned hash for a KzgCommitment
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
-// #[cfg(feature = "c-kzg")]
 pub(crate) fn kzg_to_versioned_hash(commitment: c_kzg::KzgCommitment) -> B256 {
     let mut res = sha2::Sha256::digest(commitment.as_slice());
     res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
