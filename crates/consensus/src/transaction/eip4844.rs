@@ -13,7 +13,7 @@ pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     #[error("invalid KZG proof")]
     InvalidProof,
-    /// An error returned by [`kzg`].
+    /// An error returned by [`c_kzg`].
     #[error("KZG error: {0:?}")]
     KZGError(#[from] c_kzg::Error),
     /// The inner transaction is not a blob transaction.
