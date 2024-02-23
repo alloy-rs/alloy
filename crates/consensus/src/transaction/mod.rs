@@ -11,7 +11,8 @@ pub use legacy::TxLegacy;
 mod eip4844;
 #[cfg(feature = "kzg")]
 pub use eip4844::{
-    BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844, TxEip4844Wrapper,
+    BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844, TxEip4844WithSidecar,
+    TxEip4844Wrapper,
 };
 
 mod envelope;
