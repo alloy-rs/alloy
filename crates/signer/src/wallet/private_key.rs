@@ -394,13 +394,13 @@ mod tests {
             out: Address::ZERO,
         };
         
-        let foo_bar_dynamic = TypedData::from_struct(&foo_bar_no_fizz, Some(domain.clone()));
-        let no_fizz_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
+        let foo_bar_dynamic = TypedData::from_struct(&foo_bar_no_fizz, Some(domain));
+        let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
 
         let sig_dynamic = wallet.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
         
-        assert_eq!(sig_dynamic.recover_address_from_prehash(&no_fizz_hash).unwrap(), wallet.address());
-        assert_eq!(wallet.sign_hash_sync(no_fizz_hash).unwrap(), sig_dynamic);
+        assert_eq!(sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(), wallet.address());
+        assert_eq!(wallet.sign_hash_sync(dynamic_hash).unwrap(), sig_dynamic);
     }
 
     #[test]
