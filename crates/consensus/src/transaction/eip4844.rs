@@ -1,3 +1,4 @@
+#![cfg(feature = "kzg")]
 use crate::{TxKind, TxType};
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
 use alloy_network::{Signed, Transaction};
