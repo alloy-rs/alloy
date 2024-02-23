@@ -4,7 +4,7 @@ use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 #[cfg(feature = "c-kzg")]
-use crate::TxEip4844;
+use crate::TxEip4844Wrapper;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -76,7 +76,7 @@ pub enum TxEnvelope {
     Eip1559(Signed<TxEip1559>),
     /// A [`TxEip4844`] tagged with type 3.
     #[cfg(feature = "c-kzg")]
-    Eip4844(Signed<TxEip4844>),
+    Eip4844(Signed<TxEip4844Wrapper>),
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
@@ -278,7 +278,7 @@ mod tests {
         );
 
         // Assert this is the correct variant of the EIP-4844 enum, which only contains the tx.
-        assert!(matches!(tx.tx(), TxEip4844::TxEip4844(_)));
+        assert!(matches!(tx.tx(), TxEip4844Wrapper::TxEip4844(_)));
 
         assert_eq!(
             tx.tx().tx().blob_versioned_hashes,

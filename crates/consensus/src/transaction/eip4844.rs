@@ -8,7 +8,7 @@ use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
 use sha2::Digest;
 use std::{mem, ops::Deref};
 
-/// An error that can occur when validating a [TxEip4844].
+/// An error that can occur when validating a [TxEip4844Wrapper].
 #[derive(Debug, thiserror::Error)]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
@@ -37,38 +37,38 @@ pub enum BlobTransactionValidationError {
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TxEip4844 {
+pub enum TxEip4844Wrapper {
     /// A standalone transaction with blob hashes and max blob fee.
-    TxEip4844(BlobTx),
+    TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
-    TxEip4844WithSidecar((BlobTx, BlobTransactionSidecar)),
+    TxEip4844WithSidecar((TxEip4844, BlobTransactionSidecar)),
 }
 
-impl From<BlobTx> for TxEip4844 {
-    fn from(tx: BlobTx) -> Self {
-        TxEip4844::TxEip4844(tx)
+impl From<TxEip4844> for TxEip4844Wrapper {
+    fn from(tx: TxEip4844) -> Self {
+        TxEip4844Wrapper::TxEip4844(tx)
     }
 }
 
-impl From<(BlobTx, BlobTransactionSidecar)> for TxEip4844 {
-    fn from((tx, sidecar): (BlobTx, BlobTransactionSidecar)) -> Self {
-        TxEip4844::TxEip4844WithSidecar((tx, sidecar))
+impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Wrapper {
+    fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
+        TxEip4844Wrapper::TxEip4844WithSidecar((tx, sidecar))
     }
 }
 
-impl TxEip4844 {
+impl TxEip4844Wrapper {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
-    /// See also [BlobTx::validate_blob]
+    /// See also [TxEip4844::validate_blob]
     pub fn validate(
         &self,
         proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
-            TxEip4844::TxEip4844(tx) => {
+            TxEip4844Wrapper::TxEip4844(tx) => {
                 tx.validate_blob(&BlobTransactionSidecar::default(), proof_settings)
             }
-            TxEip4844::TxEip4844WithSidecar((tx, sidecar)) => {
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, sidecar)) => {
                 tx.validate_blob(sidecar, proof_settings)
             }
         }
@@ -79,22 +79,22 @@ impl TxEip4844 {
         TxType::Eip4844
     }
 
-    /// Get access to the inner tx [BlobTx].
-    pub const fn tx(&self) -> &BlobTx {
+    /// Get access to the inner tx [TxEip4844].
+    pub const fn tx(&self) -> &TxEip4844 {
         match self {
-            TxEip4844::TxEip4844(tx) => tx,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx,
+            TxEip4844Wrapper::TxEip4844(tx) => tx,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx,
         }
     }
 
     pub(crate) fn fields_len(&self) -> usize {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.fields_len(),
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.fields_len(),
+            TxEip4844Wrapper::TxEip4844(tx) => tx.fields_len(),
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.fields_len(),
         }
     }
 
-    /// Encodes the [TxEip4844] fields as RLP, with a tx type. If `with_header` is `false`,
+    /// Encodes the [TxEip4844Wrapper] fields as RLP, with a tx type. If `with_header` is `false`,
     /// the following will be encoded:
     /// `tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs])`
     ///
@@ -107,8 +107,10 @@ impl TxEip4844 {
         with_header: bool,
     ) {
         let payload_length = match self {
-            TxEip4844::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.fields_len() + signature.rlp_vrs_len(),
+            TxEip4844Wrapper::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => {
+                tx.fields_len() + signature.rlp_vrs_len()
+            }
         };
 
         if with_header {
@@ -124,11 +126,11 @@ impl TxEip4844 {
         header.encode(out);
 
         match self {
-            TxEip4844::TxEip4844(tx) => {
+            TxEip4844Wrapper::TxEip4844(tx) => {
                 tx.encode_fields(out);
                 signature.encode(out);
             }
-            TxEip4844::TxEip4844WithSidecar((tx, sidecar)) => {
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, sidecar)) => {
                 tx.encode_fields(out);
                 signature.encode(out);
                 sidecar.encode_inner(out);
@@ -137,7 +139,7 @@ impl TxEip4844 {
     }
 }
 
-impl Transaction for TxEip4844 {
+impl Transaction for TxEip4844Wrapper {
     type Signature = Signature;
 
     fn payload_len_for_signature(&self) -> usize {
@@ -165,7 +167,7 @@ impl Transaction for TxEip4844 {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
 
-        let tx = BlobTx::decode_inner(buf)?;
+        let tx = TxEip4844::decode_inner(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
         // There are two possibilities when decoding a signed EIP-4844 transaction:
@@ -177,15 +179,15 @@ impl Transaction for TxEip4844 {
         let sidecar = BlobTransactionSidecar::decode_inner(buf);
 
         if let Ok(sidecar) = sidecar {
-            Ok(TxEip4844::TxEip4844WithSidecar((tx, sidecar)).into_signed(signature))
+            Ok(TxEip4844Wrapper::TxEip4844WithSidecar((tx, sidecar)).into_signed(signature))
         } else {
-            Ok(TxEip4844::TxEip4844(tx).into_signed(signature))
+            Ok(TxEip4844Wrapper::TxEip4844(tx).into_signed(signature))
         }
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [BlobTransaction] is a signature over the [TxEip4844] EIP-2718 payload
-        // fields:
+        // A signature for a [BlobTransaction] is a signature over the [TxEip4844Wrapper] EIP-2718
+        // payload fields:
         // (BLOB_TX_TYPE ||
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
         //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
@@ -198,15 +200,15 @@ impl Transaction for TxEip4844 {
 
     fn chain_id(&self) -> Option<ChainId> {
         match self {
-            TxEip4844::TxEip4844(tx) => Some(tx.chain_id),
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => Some(tx.chain_id),
+            TxEip4844Wrapper::TxEip4844(tx) => Some(tx.chain_id),
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => Some(tx.chain_id),
         }
     }
 
     fn gas_limit(&self) -> u64 {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.gas_limit,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.gas_limit,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.gas_limit,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.gas_limit,
         }
     }
 
@@ -216,36 +218,36 @@ impl Transaction for TxEip4844 {
 
     fn set_chain_id(&mut self, chain_id: ChainId) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.chain_id = chain_id,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.chain_id = chain_id,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.chain_id = chain_id,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.chain_id = chain_id,
         }
     }
 
     fn input(&self) -> &[u8] {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.input.as_ref(),
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.input.as_ref(),
+            TxEip4844Wrapper::TxEip4844(tx) => tx.input.as_ref(),
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.input.as_ref(),
         }
     }
 
     fn input_mut(&mut self) -> &mut Bytes {
         match self {
-            TxEip4844::TxEip4844(tx) => &mut tx.input,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => &mut tx.input,
+            TxEip4844Wrapper::TxEip4844(tx) => &mut tx.input,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => &mut tx.input,
         }
     }
 
     fn nonce(&self) -> u64 {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.nonce,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.nonce,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.nonce,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.nonce,
         }
     }
 
     fn set_gas_limit(&mut self, limit: u64) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.gas_limit = limit,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.gas_limit = limit,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.gas_limit = limit,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.gas_limit = limit,
         }
     }
 
@@ -255,43 +257,43 @@ impl Transaction for TxEip4844 {
 
     fn set_input(&mut self, data: Bytes) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.input = data,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.input = data,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.input = data,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.input = data,
         }
     }
 
     fn set_nonce(&mut self, nonce: u64) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.nonce = nonce,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.nonce = nonce,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.nonce = nonce,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.nonce = nonce,
         }
     }
 
     fn set_to(&mut self, to: TxKind) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.to = to,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.to = to,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.to = to,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.to = to,
         }
     }
 
     fn set_value(&mut self, value: U256) {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.value = value,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.value = value,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.value = value,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.value = value,
         }
     }
 
     fn to(&self) -> TxKind {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.to,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.to,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.to,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.to,
         }
     }
 
     fn value(&self) -> U256 {
         match self {
-            TxEip4844::TxEip4844(tx) => tx.value,
-            TxEip4844::TxEip4844WithSidecar((tx, _)) => tx.value,
+            TxEip4844Wrapper::TxEip4844(tx) => tx.value,
+            TxEip4844Wrapper::TxEip4844WithSidecar((tx, _)) => tx.value,
         }
     }
 }
@@ -300,7 +302,7 @@ impl Transaction for TxEip4844 {
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct BlobTx {
+pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
@@ -362,7 +364,7 @@ pub struct BlobTx {
     pub input: Bytes,
 }
 
-impl BlobTx {
+impl TxEip4844 {
     /// Returns the effective gas price for the given `base_fee`.
     pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match base_fee {
@@ -447,7 +449,7 @@ impl BlobTx {
         }
     }
 
-    /// Decodes the inner [TxEip4844] fields from RLP bytes.
+    /// Decodes the inner [TxEip4844Wrapper] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -511,7 +513,7 @@ impl BlobTx {
         self.blob_versioned_hashes.encode(out);
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip4844] transaction.
+    /// Calculates a heuristic for the in-memory size of the [TxEip4844Wrapper] transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
@@ -589,7 +591,7 @@ impl BlobTx {
     }
 }
 
-impl Transaction for BlobTx {
+impl Transaction for TxEip4844 {
     type Signature = Signature;
 
     fn chain_id(&self) -> Option<ChainId> {
@@ -632,7 +634,7 @@ impl Transaction for BlobTx {
     }
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        BlobTx::encode_with_signature(self, signature, out, true);
+        TxEip4844::encode_with_signature(self, signature, out, true);
     }
 
     fn input(&self) -> &[u8] {

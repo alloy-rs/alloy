@@ -27,6 +27,8 @@ mod transaction;
 pub use transaction::{TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType};
 
 #[cfg(feature = "kzg")]
-pub use transaction::{BlobTransactionSidecar, BlobTransactionValidationError, BlobTx, TxEip4844};
+pub use transaction::{
+    BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844, TxEip4844Wrapper,
+};
 
 pub use alloy_network::TxKind;
