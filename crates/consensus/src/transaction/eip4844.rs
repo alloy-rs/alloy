@@ -189,7 +189,7 @@ impl Transaction for TxEip4844Wrapper {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [BlobTransaction] is a signature over the [TxEip4844Wrapper] EIP-2718
+        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844Wrapper] EIP-2718
         // payload fields:
         // (BLOB_TX_TYPE ||
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
@@ -715,7 +715,7 @@ pub struct TxEip4844WithSidecar {
 }
 
 impl TxEip4844WithSidecar {
-    /// Constructs a new [BlobTransaction] from a [TxEip4844] and a [BlobTransactionSidecar].
+    /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a [BlobTransactionSidecar].
     pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: BlobTransactionSidecar) -> Self {
         Self { tx, sidecar }
     }
@@ -745,17 +745,17 @@ impl TxEip4844WithSidecar {
         &self.sidecar
     }
 
-    /// Consumes the [BlobTransaction] and returns the inner [TxEip4844].
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
     pub fn into_tx(self) -> TxEip4844 {
         self.tx
     }
 
-    /// Consumes the [BlobTransaction] and returns the inner sidecar [BlobTransactionSidecar].
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
     pub fn into_sidecar(self) -> BlobTransactionSidecar {
         self.sidecar
     }
 
-    /// Consumes the [BlobTransaction] and returns the inner [TxEip4844] and
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844] and
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
@@ -803,7 +803,7 @@ impl Transaction for TxEip4844WithSidecar {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [BlobTransaction] is a signature over the [TxEip4844] EIP-2718 payload
+        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844] EIP-2718 payload
         // fields:
         // (BLOB_TX_TYPE ||
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
