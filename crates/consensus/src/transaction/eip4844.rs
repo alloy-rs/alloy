@@ -520,7 +520,7 @@ impl Transaction for BlobTransaction {
 
         let tx = TxEip4844::decode_inner(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
-        let sidecar = BlobTransactionSidecar::decode_inner(buf).unwrap_or_default();
+        let sidecar = BlobTransactionSidecar::decode_inner(buf)?;
 
         Ok(BlobTransaction::from_tx_and_sidecar(tx, sidecar).into_signed(signature))
     }
