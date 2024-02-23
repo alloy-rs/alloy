@@ -8,9 +8,7 @@ mod legacy;
 pub use legacy::TxLegacy;
 
 mod eip4844;
-pub use eip4844::{
-    BlobTransaction, BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844,
-};
+pub use eip4844::{BlobTransactionSidecar, BlobTransactionValidationError, BlobTx, TxEip4844};
 
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};

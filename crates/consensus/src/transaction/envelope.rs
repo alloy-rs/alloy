@@ -1,6 +1,6 @@
-use crate::{BlobTransaction, TxEip1559, TxEip2930, TxEip4844, TxLegacy};
+use crate::{TxEip1559, TxEip2930, TxEip4844, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_network::{Signed, Transaction};
+use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -71,9 +71,6 @@ pub enum TxEnvelope {
     Eip1559(Signed<TxEip1559>),
     /// A [`TxEip4844`] tagged with type 3.
     Eip4844(Signed<TxEip4844>),
-    /// A [`BlobTransaction`], which is a [`crate::TxEip4844`] with a
-    /// [`crate::BlobTransactionSidecar`].
-    Eip4844WithSidecar(Signed<BlobTransaction>),
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
@@ -96,7 +93,6 @@ impl TxEnvelope {
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
-            Self::Eip4844WithSidecar(_) => TxType::Eip4844,
         }
     }
 
@@ -107,7 +103,6 @@ impl TxEnvelope {
             Self::Eip2930(t) => t.length(),
             Self::Eip1559(t) => t.length(),
             Self::Eip4844(t) => t.length(),
-            Self::Eip4844WithSidecar(t) => t.length(),
         }
     }
 
@@ -153,21 +148,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Legacy => Ok(Self::TaggedLegacy(Decodable::decode(buf)?)),
             TxType::Eip2930 => Ok(Self::Eip2930(Decodable::decode(buf)?)),
             TxType::Eip1559 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
-            TxType::Eip4844 => {
-                // For Eip4844 txs, we have two possible representations:
-                // 1. A `BlobTransaction`, which is a [TxEip4844] along with a
-                //    [BlobTransactionSidecar].
-                // 2. A regular `TxEip4844`.
-                // We first try to decode as a `BlobTransaction` with a sidecar, and produce the
-                // appropiate envelope variant if successful.
-                let mut original_buf = *buf;
-                if let Ok(tx) = BlobTransaction::decode_signed(buf) {
-                    Ok(TxEnvelope::Eip4844WithSidecar(tx))
-                } else {
-                    // If that fails, fall back to decoding as a regular `TxEip4844`
-                    Ok(Self::Eip4844(Decodable::decode(&mut original_buf)?))
-                }
-            }
+            TxType::Eip4844 => Ok(Self::Eip4844(Decodable::decode(buf)?)),
         }
     }
 
@@ -184,7 +165,6 @@ impl Encodable2718 for TxEnvelope {
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
             Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
-            Self::Eip4844WithSidecar(_) => Some(TxType::Eip4844 as u8),
         }
     }
 
@@ -211,10 +191,6 @@ impl Encodable2718 for TxEnvelope {
                 out.put_u8(TxType::Eip4844 as u8);
                 tx.encode(out);
             }
-            TxEnvelope::Eip4844WithSidecar(tx) => {
-                out.put_u8(TxType::Eip4844 as u8);
-                tx.encode(out);
-            }
         }
     }
 }
@@ -223,7 +199,7 @@ impl Encodable2718 for TxEnvelope {
 mod tests {
     use super::*;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_network::TxKind;
+    use alloy_network::{Transaction, TxKind};
     use alloy_primitives::{Address, Bytes, Signature, B256, U256};
 
     #[test]
@@ -284,10 +260,16 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(tx.tx().to, TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064")));
+        assert_eq!(
+            tx.tx().to(),
+            TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064"))
+        );
+
+        // Assert this is the correct variant of the EIP-4844 enum, which only contains the tx.
+        assert!(matches!(tx.tx(), TxEip4844::TxEip4844(_)));
 
         assert_eq!(
-            tx.tx().blob_versioned_hashes,
+            tx.tx().tx().blob_versioned_hashes,
             vec![
                 b256!("012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921a"),
                 b256!("0152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4"),

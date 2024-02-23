@@ -25,7 +25,7 @@ pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 mod transaction;
 pub use transaction::{
-    BlobTransaction, BlobTransactionSidecar, BlobTransactionValidationError, TxEip1559, TxEip2930,
+    BlobTransactionSidecar, BlobTransactionValidationError, BlobTx, TxEip1559, TxEip2930,
     TxEip4844, TxEnvelope, TxLegacy, TxType,
 };
 
