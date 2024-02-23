@@ -75,10 +75,11 @@ pub enum TxEnvelope {
     /// A [`TxEip1559`] tagged with type 2.
     Eip1559(Signed<TxEip1559>),
     #[cfg(feature = "c-kzg")]
-    /// A [`TxEip4844`] tagged with type 3.
+    /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
-    /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve historical transactions..
-    /// 2 - The transaction with a sidecar, which is the form used to send transactions to the network.
+    /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve
+    /// historical transactions.. 2 - The transaction with a sidecar, which is the form used to
+    /// send transactions to the network.
     Eip4844(Signed<TxEip4844Wrapper>),
 }
 
