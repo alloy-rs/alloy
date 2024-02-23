@@ -339,6 +339,8 @@ mod tests {
         use crate::Signer;
         use alloy_primitives::{keccak256, Address, I256, U256};
         use alloy_sol_types::{eip712_domain, sol, SolStruct};
+        use alloy_dyn_abi::eip712::TypedData;
+        use serde::Serialize;
 
         sol! {
             #[derive(Debug)]
@@ -346,6 +348,17 @@ mod tests {
                 int256 foo;
                 uint256 bar;
                 bytes fizz;
+                bytes32 buzz;
+                string far;
+                address out;
+            }
+        }
+
+        sol! {
+            #[derive(Debug, Serialize)]
+            struct FooBarNoFizz {
+                int256 foo;
+                uint256 bar;
                 bytes32 buzz;
                 string far;
                 address out;
@@ -372,6 +385,22 @@ mod tests {
         let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
         assert_eq!(wallet.sign_hash_sync(hash).unwrap(), sig);
+
+        let foo_bar_no_fizz = FooBarNoFizz {
+            foo: I256::try_from(10u64).unwrap(),
+            bar: U256::from(20u64),
+            buzz: keccak256("buzz"),
+            far: String::from("space"),
+            out: Address::ZERO,
+        };
+        
+        let foo_bar_dynamic = TypedData::from_struct(&foo_bar_no_fizz, Some(domain.clone()));
+        let no_fizz_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
+
+        let sig_dynamic = wallet.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
+        
+        assert_eq!(sig_dynamic.recover_address_from_prehash(&no_fizz_hash).unwrap(), wallet.address());
+        assert_eq!(wallet.sign_hash_sync(no_fizz_hash).unwrap(), sig_dynamic);
     }
 
     #[test]
