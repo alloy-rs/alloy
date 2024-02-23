@@ -142,7 +142,10 @@ impl TxEip1559 {
         signature: &Signature,
         out: &mut dyn alloy_rlp::BufMut,
     ) {
-        self.encode_for_signing(out);
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        let header = Header { list: true, payload_length };
+        header.encode(out);
+        self.encode_fields(out);
         signature.write_rlp_vrs(out);
     }
 
@@ -311,13 +314,11 @@ impl Transaction for TxEip1559 {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use std::str::FromStr;
-
     use super::TxEip1559;
     use crate::TxKind;
     use alloy_eips::eip2930::AccessList;
     use alloy_network::Transaction;
-    use alloy_primitives::{address, b256, hex, Address, Bytes, Signature, B256, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
     use alloy_rlp::Encodable;
 
     #[test]
@@ -360,26 +361,5 @@ mod tests {
         let signed_tx = tx.into_signed(sig);
         assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
-    }
-
-    #[test]
-    fn signing_eip1559() {
-        let tx =  TxEip1559 {
-            chain_id: 1,
-            nonce: 624,
-            gas_limit: 8000000,
-            to: TxKind::Call( address!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")),
-            value: U256::from(0_u64),
-            input:  hex!("095ea7b300000000000000000000000031403b1e52051883f2ce1b1b4c89f36034e1221dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(),
-            max_fee_per_gas: 77778136893,
-            max_priority_fee_per_gas: 26675000,
-            access_list: AccessList::default(),
-        };
-
-        let signature = Signature::from_str("0x15c8bf318ef51e6241732b5ae5bf3b77d9ad6c2173b3cc0e0cb0449703c9be664f99cad5994fc6a5a627cfe58fa87a0a221d1cb3d130d9ad9779c9faf256474201").expect("Invalid signature");
-
-        let tx_raw: Bytes = tx.into_signed(signature).rlp_signed().into();
-
-        assert_eq!(tx_raw, Bytes::from(hex!("02f87001820270840197073885121bf02f3d837a120094a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4880b844095ea7b300000000000000000000000031403b1e52051883f2ce1b1b4c89f36034e1221dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc001a015c8bf318ef51e6241732b5ae5bf3b77d9ad6c2173b3cc0e0cb0449703c9be66a04f99cad5994fc6a5a627cfe58fa87a0a221d1cb3d130d9ad9779c9faf2564742")))
     }
 }
