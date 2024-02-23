@@ -189,8 +189,8 @@ impl Transaction for TxEip4844Wrapper {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844Wrapper] EIP-2718
-        // payload fields:
+        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844Wrapper]
+        // EIP-2718 payload fields:
         // (BLOB_TX_TYPE ||
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
         //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
@@ -803,8 +803,8 @@ impl Transaction for TxEip4844WithSidecar {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844] EIP-2718 payload
-        // fields:
+        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844] EIP-2718
+        // payload fields:
         // (BLOB_TX_TYPE ||
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
         //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
