@@ -41,7 +41,7 @@ alloy-transport-ipc = { version = "0.1.0", default-features = false, path = "cra
 alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crates/transport-ws" }
 
 alloy-core = { version = "0.6", default-features = false, features = ["std"] }
-alloy-dyn-abi = { version = "0.6", default-features = false, features = ["std"] }
+alloy-dyn-abi = { version = "0.6", default-features = false, features = ["std", "eip712"] }
 alloy-json-abi = { version = "0.6", default-features = false, features = ["std"] }
 alloy-primitives = { version = "0.6", default-features = false, features = ["std"] }
 alloy-sol-types = { version = "0.6", default-features = false, features = ["std"] }
