@@ -433,7 +433,7 @@ impl Transaction for TxEip4844 {
 ///
 /// This is defined in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#networking) as an element
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
-/// through the network.
+/// through the network (eth_sendRawTransaction/eth_sendTransaction).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlobTransaction {
     /// The transaction payload.
@@ -458,12 +458,34 @@ impl BlobTransaction {
         self.tx.validate_blob(&self.sidecar, proof_settings)
     }
 
+    /// Get the transaction type.
+    pub const fn tx_type(&self) -> TxType {
+        self.tx.tx_type()
+    }
+
+    /// Get access to the inner tx [TxEip4844].
+    pub const fn tx(&self) -> &TxEip4844 {
+        &self.tx
+    }
+
+    /// Consumes the [BlobTransaction] and returns the inner [TxEip4844].
+    pub fn into_tx(self) -> TxEip4844 {
+        self.tx
+    }
+
+    /// Consumes the [BlobTransaction] and returns the inner sidecar [BlobTransactionSidecar].
+    pub fn into_sidecar(self) -> BlobTransactionSidecar {
+        self.sidecar
+    }
+
     /// Consumes the [BlobTransaction] and returns the inner [TxEip4844] and
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
     }
 
+    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
+    /// hash that for eip2718 does not require rlp header
     pub(crate) fn encode_with_signature(
         &self,
         signature: &Signature,
@@ -498,12 +520,17 @@ impl Transaction for BlobTransaction {
 
         let tx = TxEip4844::decode_inner(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
-        let sidecar = BlobTransactionSidecar::decode_inner(buf)?;
+        let sidecar = BlobTransactionSidecar::decode_inner(buf).unwrap_or_default();
 
         Ok(BlobTransaction::from_tx_and_sidecar(tx, sidecar).into_signed(signature))
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        // A signature for a [BlobTransaction] is a signature over the [TxEip4844] EIP-2718 payload
+        // fields:
+        // (BLOB_TX_TYPE ||
+        //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
+        //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
         self.tx.encode_for_signing(out);
     }
 
@@ -514,7 +541,10 @@ impl Transaction for BlobTransaction {
     fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature> {
         let payload_length = 1 + self.tx.fields_len() + signature.rlp_vrs_len();
         let mut buf = Vec::with_capacity(payload_length);
+        // The sidecar is NOT included in the signed payload, only the transaction fields and the
+        // type byte. Include the type byte.
         buf.put_u8(TxType::Eip4844 as u8);
+        // Include the transaction fields.
         self.tx.encode_signed(&signature, &mut buf);
         let hash = keccak256(&buf);
 
@@ -524,10 +554,10 @@ impl Transaction for BlobTransaction {
         Signed::new_unchecked(self, signature.with_parity_bool(), hash)
     }
 
-    /// The payload length is the length of the `tranascation_payload_body` list, plus the
-    /// length of the blobs, commitments, and proofs.
     fn payload_len_for_signature(&self) -> usize {
-        self.tx.payload_len_for_signature() + self.sidecar.fields_len()
+        // The payload length is the length of the `transaction_payload_body` list.
+        // The sidecar is NOT included.
+        self.tx.payload_len_for_signature()
     }
 
     fn chain_id(&self) -> Option<ChainId> {
@@ -596,7 +626,7 @@ impl Transaction for BlobTransaction {
 }
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[repr(C)]
 pub struct BlobTransactionSidecar {
     /// The blob data.

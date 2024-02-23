@@ -1,4 +1,4 @@
-use crate::{TxEip1559, TxEip2930, TxEip4844, TxLegacy};
+use crate::{BlobTransaction, TxEip1559, TxEip2930, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
@@ -69,8 +69,8 @@ pub enum TxEnvelope {
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`].
     Eip1559(Signed<TxEip1559>),
-    /// A [`TxEip4844`].
-    Eip4844(Signed<TxEip4844>),
+    /// A [`BlobTransaction`], which is a [`crate::TxEip4844`] with a [`crate::BlobTransactionSidecar`].
+    Eip4844(Signed<BlobTransaction>),
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
@@ -260,10 +260,13 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(tx.tx().to, TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064")));
+        assert_eq!(
+            tx.tx().tx().to,
+            TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064"))
+        );
 
         assert_eq!(
-            tx.tx().blob_versioned_hashes,
+            tx.tx().tx.blob_versioned_hashes,
             vec![
                 b256!("012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921a"),
                 b256!("0152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4"),
