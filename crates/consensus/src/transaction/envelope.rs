@@ -69,7 +69,8 @@ pub enum TxEnvelope {
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`].
     Eip1559(Signed<TxEip1559>),
-    /// A [`BlobTransaction`], which is a [`crate::TxEip4844`] with a [`crate::BlobTransactionSidecar`].
+    /// A [`BlobTransaction`], which is a [`crate::TxEip4844`] with a
+    /// [`crate::BlobTransactionSidecar`].
     Eip4844(Signed<BlobTransaction>),
 }
 
