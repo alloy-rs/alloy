@@ -30,6 +30,10 @@ pub enum BlobTransactionValidationError {
     /// The inner transaction is not a blob transaction.
     #[error("unable to verify proof for non blob transaction: {0}")]
     NotBlobTransaction(u8),
+    /// Using a standalone [TxEip4844] instead of the [TxEip4844WithSidecar] variant, which
+    /// includes the sidecar for validation.
+    #[error("eip4844 tx variant without sidecar being used for verification. Please use the TxEip4844WithSidecar variant, which includes the sidecar")]
+    NoSidecarIncluded,
     /// The versioned hash is incorrect.
     #[error("wrong versioned hash: have {have}, expected {expected}")]
     WrongVersionedHash {
@@ -78,8 +82,8 @@ impl TxEip4844Wrapper {
         proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
-            TxEip4844Wrapper::TxEip4844(tx) => {
-                tx.validate_blob(&BlobTransactionSidecar::default(), proof_settings)
+            TxEip4844Wrapper::TxEip4844(_) => {
+                Err(BlobTransactionValidationError::NoSidecarIncluded)
             }
             TxEip4844Wrapper::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
         }
@@ -404,7 +408,6 @@ impl TxEip4844 {
         self.blob_versioned_hashes.len() as u64 * DATA_GAS_PER_BLOB
     }
 
-    #[cfg(feature = "kzg")]
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
@@ -418,6 +421,7 @@ impl TxEip4844 {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
+    #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
         sidecar: &BlobTransactionSidecar,

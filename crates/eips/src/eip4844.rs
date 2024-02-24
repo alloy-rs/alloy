@@ -13,6 +13,10 @@ pub const FIELD_ELEMENTS_PER_BLOB: u64 = 4096;
 /// Gas consumption of a single data blob.
 pub const DATA_GAS_PER_BLOB: u64 = 131_072u64; // 32*4096 = 131072 == 2^17 == 0x20000
 
+/// How many bytes are in a blob
+/// Same as [DATA_GAS_PER_BLOB], but as an usize
+pub const BYTES_PER_BLOB: usize = 131_072;
+
 /// Maximum data gas for data blobs in a single block.
 pub const MAX_DATA_GAS_PER_BLOCK: u64 = 786_432u64; // 0xC0000 = 6 * 0x20000
 
@@ -33,9 +37,6 @@ pub const BLOB_TX_MIN_BLOB_GASPRICE: u128 = 1u128;
 
 /// Commitment version of a KZG commitment
 pub const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
-
-/// How many bytes are in a blob
-pub const BYTES_PER_BLOB: usize = 131072;
 
 /// How many bytes are in a commitment
 pub const BYTES_PER_COMMITMENT: usize = 48;
