@@ -7,13 +7,10 @@ pub use eip2930::TxEip2930;
 mod legacy;
 pub use legacy::TxLegacy;
 
-#[cfg(feature = "kzg")]
 mod eip4844;
 #[cfg(feature = "kzg")]
-pub use eip4844::{
-    BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844, TxEip4844WithSidecar,
-    TxEip4844Wrapper,
-};
+pub use eip4844::BlobTransactionValidationError;
+pub use eip4844::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar, TxEip4844Wrapper};
 
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};

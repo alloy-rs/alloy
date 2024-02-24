@@ -1,13 +1,23 @@
-#![cfg(feature = "kzg")]
 use crate::{TxKind, TxType};
-use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
+use alloy_eips::{
+    eip2930::AccessList,
+    eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
+};
 use alloy_network::{Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
-use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
-use sha2::Digest;
-use std::{mem, ops::Deref};
+use std::mem;
 
+#[cfg(not(feature = "kzg"))]
+use alloy_eips::eip4844::{Blob, Bytes48};
+#[cfg(feature = "kzg")]
+use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
+#[cfg(feature = "kzg")]
+use sha2::Digest;
+#[cfg(feature = "kzg")]
+use std::ops::Deref;
+
+#[cfg(feature = "kzg")]
 /// An error that can occur when validating a [TxEip4844Wrapper].
 #[derive(Debug, thiserror::Error)]
 pub enum BlobTransactionValidationError {
@@ -59,6 +69,7 @@ impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Wrapper {
 }
 
 impl TxEip4844Wrapper {
+    #[cfg(feature = "kzg")]
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
@@ -393,6 +404,7 @@ impl TxEip4844 {
         self.blob_versioned_hashes.len() as u64 * DATA_GAS_PER_BLOB
     }
 
+    #[cfg(feature = "kzg")]
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
@@ -720,6 +732,7 @@ impl TxEip4844WithSidecar {
         Self { tx, sidecar }
     }
 
+    #[cfg(feature = "kzg")]
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
@@ -949,9 +962,9 @@ impl BlobTransactionSidecar {
     /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
     #[inline]
     pub fn size(&self) -> usize {
-        self.blobs.len() * c_kzg::BYTES_PER_BLOB + // blobs
-        self.commitments.len() * c_kzg::BYTES_PER_COMMITMENT + // commitments
-        self.proofs.len() * c_kzg::BYTES_PER_PROOF // proofs
+        self.blobs.len() * BYTES_PER_BLOB + // blobs
+        self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
+        self.proofs.len() * BYTES_PER_PROOF // proofs
     }
 }
 
@@ -976,9 +989,9 @@ impl Decodable for BlobTransactionSidecar {
 // Wrapper for c-kzg rlp
 #[repr(C)]
 struct BlobTransactionSidecarRlp {
-    blobs: Vec<[u8; c_kzg::BYTES_PER_BLOB]>,
-    commitments: Vec<[u8; c_kzg::BYTES_PER_COMMITMENT]>,
-    proofs: Vec<[u8; c_kzg::BYTES_PER_PROOF]>,
+    blobs: Vec<[u8; BYTES_PER_BLOB]>,
+    commitments: Vec<[u8; BYTES_PER_COMMITMENT]>,
+    proofs: Vec<[u8; BYTES_PER_PROOF]>,
 }
 
 const _: [(); std::mem::size_of::<BlobTransactionSidecar>()] =
@@ -1015,10 +1028,11 @@ impl BlobTransactionSidecarRlp {
     }
 }
 
+#[cfg(feature = "kzg")]
 /// Calculates the versioned hash for a KzgCommitment
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
-pub(crate) fn kzg_to_versioned_hash(commitment: c_kzg::KzgCommitment) -> B256 {
+pub(crate) fn kzg_to_versioned_hash(commitment: KzgCommitment) -> B256 {
     let mut res = sha2::Sha256::digest(commitment.as_slice());
     res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
     B256::new(res.into())

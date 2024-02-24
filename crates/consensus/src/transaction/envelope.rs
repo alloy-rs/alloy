@@ -1,10 +1,7 @@
-use crate::{TxEip1559, TxEip2930, TxLegacy};
+use crate::{TxEip1559, TxEip2930, TxEip4844Wrapper, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
-
-#[cfg(feature = "c-kzg")]
-use crate::TxEip4844Wrapper;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -22,7 +19,6 @@ pub enum TxType {
     Eip2930 = 1,
     /// EIP-1559 transaction type.
     Eip1559 = 2,
-    #[cfg(feature = "kzg")]
     /// EIP-4844 transaction type.
     Eip4844 = 3,
 }
@@ -34,7 +30,6 @@ impl<'a> arbitrary::Arbitrary<'a> for TxType {
             0 => TxType::Legacy,
             1 => TxType::Eip2930,
             2 => TxType::Eip1559,
-            #[cfg(feature = "kzg")]
             3 => TxType::Eip4844,
             _ => unreachable!(),
         })
@@ -74,7 +69,6 @@ pub enum TxEnvelope {
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
     Eip1559(Signed<TxEip1559>),
-    #[cfg(feature = "c-kzg")]
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
     /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve
@@ -102,7 +96,6 @@ impl TxEnvelope {
             Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
-            #[cfg(feature = "c-kzg")]
             Self::Eip4844(_) => TxType::Eip4844,
         }
     }
@@ -113,7 +106,6 @@ impl TxEnvelope {
             Self::Legacy(t) | Self::TaggedLegacy(t) => t.length(),
             Self::Eip2930(t) => t.length(),
             Self::Eip1559(t) => t.length(),
-            #[cfg(feature = "c-kzg")]
             Self::Eip4844(t) => t.length(),
         }
     }
@@ -160,7 +152,6 @@ impl Decodable2718 for TxEnvelope {
             TxType::Legacy => Ok(Self::TaggedLegacy(Decodable::decode(buf)?)),
             TxType::Eip2930 => Ok(Self::Eip2930(Decodable::decode(buf)?)),
             TxType::Eip1559 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
-            #[cfg(feature = "c-kzg")]
             TxType::Eip4844 => Ok(Self::Eip4844(Decodable::decode(buf)?)),
         }
     }
@@ -177,7 +168,6 @@ impl Encodable2718 for TxEnvelope {
             Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            #[cfg(feature = "c-kzg")]
             Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
         }
     }
@@ -201,7 +191,6 @@ impl Encodable2718 for TxEnvelope {
                 out.put_u8(TxType::Eip1559 as u8);
                 tx.encode(out);
             }
-            #[cfg(feature = "c-kzg")]
             TxEnvelope::Eip4844(tx) => {
                 out.put_u8(TxType::Eip4844 as u8);
                 tx.encode(out);
@@ -260,7 +249,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "k256")]
-    #[cfg(feature = "kzg")]
     // Test vector from https://sepolia.etherscan.io/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
     // Blobscan: https://sepolia.blobscan.com/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
     fn test_decode_live_4844_tx() {

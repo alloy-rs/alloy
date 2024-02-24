@@ -24,12 +24,12 @@ mod receipt;
 pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 mod transaction;
-pub use transaction::{TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType};
+pub use transaction::{
+    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844WithSidecar,
+    TxEip4844Wrapper, TxEnvelope, TxLegacy, TxType,
+};
 
 #[cfg(feature = "kzg")]
-pub use transaction::{
-    BlobTransactionSidecar, BlobTransactionValidationError, TxEip4844, TxEip4844WithSidecar,
-    TxEip4844Wrapper,
-};
+pub use transaction::BlobTransactionValidationError;
 
 pub use alloy_network::TxKind;

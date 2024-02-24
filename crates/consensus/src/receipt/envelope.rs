@@ -26,7 +26,6 @@ pub enum ReceiptEnvelope {
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     Eip1559(ReceiptWithBloom),
-    #[cfg(feature = "kzg")]
     /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
@@ -40,7 +39,6 @@ impl ReceiptEnvelope {
             Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
-            #[cfg(feature = "kzg")]
             Self::Eip4844(_) => TxType::Eip4844,
         }
     }
@@ -49,11 +47,11 @@ impl ReceiptEnvelope {
     /// however, future receipt types may be added.
     pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom> {
         match self {
-            Self::Legacy(t) | Self::TaggedLegacy(t) | Self::Eip2930(t) | Self::Eip1559(t) => {
-                Some(t)
-            }
-            #[cfg(feature = "kzg")]
-            Self::Eip4844(t) => Some(t),
+            Self::Legacy(t)
+            | Self::TaggedLegacy(t)
+            | Self::Eip2930(t)
+            | Self::Eip1559(t)
+            | Self::Eip4844(t) => Some(t),
         }
     }
 
@@ -61,11 +59,11 @@ impl ReceiptEnvelope {
     /// receipt types may be added.
     pub const fn as_receipt(&self) -> Option<&Receipt> {
         match self {
-            Self::Legacy(t) | Self::TaggedLegacy(t) | Self::Eip2930(t) | Self::Eip1559(t) => {
-                Some(&t.receipt)
-            }
-            #[cfg(feature = "kzg")]
-            Self::Eip4844(t) => Some(&t.receipt),
+            Self::Legacy(t)
+            | Self::TaggedLegacy(t)
+            | Self::Eip2930(t)
+            | Self::Eip1559(t)
+            | Self::Eip4844(t) => Some(&t.receipt),
         }
     }
 
@@ -115,7 +113,6 @@ impl Encodable2718 for ReceiptEnvelope {
             Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            #[cfg(feature = "kzg")]
             Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
         }
     }
@@ -140,7 +137,6 @@ impl Decodable2718 for ReceiptEnvelope {
             TxType::Legacy => Ok(Self::TaggedLegacy(receipt)),
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
-            #[cfg(feature = "kzg")]
             TxType::Eip4844 => Ok(Self::Eip4844(receipt)),
         }
     }
