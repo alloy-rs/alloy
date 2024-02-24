@@ -33,7 +33,7 @@ pub enum BlobTransactionValidationError {
     /// Using a standalone [TxEip4844] instead of the [TxEip4844WithSidecar] variant, which
     /// includes the sidecar for validation.
     #[error("eip4844 tx variant without sidecar being used for verification. Please use the TxEip4844WithSidecar variant, which includes the sidecar")]
-    NoSidecarIncluded,
+    MissingSidecar,
     /// The versioned hash is incorrect.
     #[error("wrong versioned hash: have {have}, expected {expected}")]
     WrongVersionedHash {
@@ -82,9 +82,7 @@ impl TxEip4844Wrapper {
         proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
-            TxEip4844Wrapper::TxEip4844(_) => {
-                Err(BlobTransactionValidationError::NoSidecarIncluded)
-            }
+            TxEip4844Wrapper::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
             TxEip4844Wrapper::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
         }
     }
