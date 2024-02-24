@@ -16,9 +16,10 @@ impl Http<reqwest::Client> {
                 .send()
                 .await
                 .map_err(TransportErrorKind::custom)?;
-            let json = resp.text().await.map_err(TransportErrorKind::custom)?;
+            let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
 
-            serde_json::from_str(&json).map_err(|err| TransportError::deser_err(err, &json))
+            serde_json::from_slice(&body)
+                .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
         })
     }
 }
