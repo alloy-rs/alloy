@@ -28,6 +28,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 arbitrary = { workspace = true, features = ["derive"] }
 
 [features]
+default = ["kzg"]
 k256 = ["alloy-primitives/k256", "alloy-network/k256"]
-kzg = ["c-kzg", "sha2", "thiserror"]
+kzg = ["dep:c-kzg", "dep:sha2", "dep:thiserror"]
 arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]
