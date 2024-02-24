@@ -2,6 +2,8 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+use alloy_primitives::FixedBytes;
+
 /// Size a single field element in bytes.
 pub const FIELD_ELEMENT_BYTES: u64 = 32;
 
@@ -31,6 +33,21 @@ pub const BLOB_TX_MIN_BLOB_GASPRICE: u128 = 1u128;
 
 /// Commitment version of a KZG commitment
 pub const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
+
+/// How many bytes are in a blob
+pub const BYTES_PER_BLOB: usize = 131072;
+
+/// How many bytes are in a commitment
+pub const BYTES_PER_COMMITMENT: usize = 48;
+
+/// How many bytes are in a proof
+pub const BYTES_PER_PROOF: usize = 48;
+
+/// A Blob serialized as 0x-prefixed hex string
+pub type Blob = FixedBytes<BYTES_PER_BLOB>;
+
+/// A commitment/proof serialized as 0x-prefixed hex string
+pub type Bytes48 = FixedBytes<48>;
 
 /// Calculates the `excess_blob_gas` from the parent header's `blob_gas_used` and `excess_blob_gas`.
 ///
