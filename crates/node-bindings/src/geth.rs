@@ -181,29 +181,32 @@ pub enum GethError {
     #[error("the chain id was not set")]
     ChainIdNotSet,
     /// Could not create the data directory.
-    #[error("could not create the data directory")]
-    CreateDataDirError,
+    #[error("could not create directory: {0}")]
+    CreateDirError(std::io::Error),
     /// No stderr was captured from the child process.
     #[error("no stderr was captured from the process")]
     NoStderr,
     /// Timed out waiting for geth to start.
-    #[error("timeout error: {0}")]
+    #[error("timedout occurred: {0}")]
     Timeout(String),
     /// Encountered a fatal error.
     #[error("fatal error: {0}")]
     Fatal(String),
     /// A line could not be read from the geth stderr.
-    #[error("read line error: {0}")]
+    #[error("could not read line from geth stderr: {0}")]
     ReadLineError(std::io::Error),
     /// Genesis error
-    #[error("genesis error: {0}")]
+    #[error("genesis error occurred: {0}")]
     GenesisError(String),
     /// Geth init error
-    #[error("geth init error: {0}")]
-    InitError(String),
+    #[error("geth init error occurred")]
+    InitError,
     /// Spawn geth error
     #[error("could not spawn geth: {0}")]
     SpawnError(std::io::Error),
+    /// Wait error
+    #[error("could not wait for geth to exit: {0}")]
+    WaitError(std::io::Error),
 }
 
 /// Builder for launching `geth`.
@@ -695,8 +698,7 @@ impl Geth {
 
         if let Some(ref genesis) = self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path =
-                tempdir().expect("should be able to create temp dir for genesis init").into_path();
+            let temp_genesis_dir_path = tempdir().map_err(GethError::CreateDirError)?.into_path();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
@@ -722,14 +724,12 @@ impl Geth {
             init_cmd.arg("init").arg(temp_genesis_path);
             let res = init_cmd
                 .spawn()
-                .map_err(|_| GethError::InitError("failed to spawn geth init".to_string()))?
+                .map_err(GethError::SpawnError)?
                 .wait()
-                .map_err(|_| {
-                    GethError::InitError("failed to wait for geth init to exit".to_string())
-                })?;
+                .map_err(GethError::WaitError)?;
             // .expect("failed to wait for geth init to exit");
             if !res.success() {
-                return Err(GethError::InitError("geth init failed".to_string()));
+                return Err(GethError::InitError);
             }
 
             // clean up the temp dir which is now persisted
@@ -743,7 +743,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(|_| GethError::CreateDataDirError)?;
+                create_dir(data_dir).map_err(GethError::CreateDirError)?;
             }
         }
 
