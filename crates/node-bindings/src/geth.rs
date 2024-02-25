@@ -175,35 +175,35 @@ impl Default for PrivateNetOptions {
 #[derive(Debug, Error)]
 pub enum GethError {
     /// Clique private key error
-    #[error("Clique address error: {0}")]
-    CliqueAddress(String),
+    #[error("clique address error: {0}")]
+    CliqueAddressError(String),
     /// The chain id was not set.
-    #[error("The chain id was not set")]
+    #[error("the chain id was not set")]
     ChainIdNotSet,
     /// Could not create the data directory.
-    #[error("Could not create the data directory")]
-    CreateDataDir,
+    #[error("could not create the data directory")]
+    CreateDataDirError,
     /// No stderr was captured from the child process.
-    #[error("No stderr was captured from the process")]
+    #[error("no stderr was captured from the process")]
     NoStderr,
     /// Timed out waiting for geth to start.
-    #[error("Timeout error: {0}")]
+    #[error("timeout error: {0}")]
     Timeout(String),
     /// Encountered a fatal error.
-    #[error("Fatal error: {0}")]
+    #[error("fatal error: {0}")]
     Fatal(String),
     /// A line could not be read from the geth stderr.
-    #[error("Read line error: {0}")]
+    #[error("read line error: {0}")]
     ReadLineError(std::io::Error),
     /// Genesis error
-    #[error("Genesis error: {0}")]
-    Genesis(String),
+    #[error("genesis error: {0}")]
+    GenesisError(String),
     /// Geth init error
-    #[error("Geth init error: {0}")]
-    GethInit(String),
+    #[error("geth init error: {0}")]
+    InitError(String),
     /// Spawn geth error
-    #[error("Spawn geth error")]
-    SpawnGeth,
+    #[error("could not spawn geth: {0}")]
+    SpawnError(std::io::Error),
 }
 
 /// Builder for launching `geth`.
@@ -663,7 +663,7 @@ impl Geth {
                 let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
                 genesis.config.clique = Some(clique_config);
 
-                let clique_addr = clique_addr.ok_or(GethError::CliqueAddress(
+                let clique_addr = clique_addr.ok_or(GethError::CliqueAddressError(
                     "could not calculates the address of the Clique consensus address.".to_string(),
                 ))?;
 
@@ -678,7 +678,7 @@ impl Geth {
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
-            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddress(
+            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddressError(
                 "could not calculates the address of the Clique consensus address.".to_string(),
             ))?;
 
@@ -702,12 +702,14 @@ impl Geth {
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
 
             // create the genesis file
-            let mut file = File::create(&temp_genesis_path)
-                .map_err(|_| GethError::Genesis("could not create genesis file".to_string()))?;
+            let mut file = File::create(&temp_genesis_path).map_err(|_| {
+                GethError::GenesisError("could not create genesis file".to_string())
+            })?;
 
             // serialize genesis and write to file
-            serde_json::to_writer_pretty(&mut file, &genesis)
-                .map_err(|_| GethError::Genesis("could not write genesis to file".to_string()))?;
+            serde_json::to_writer_pretty(&mut file, &genesis).map_err(|_| {
+                GethError::GenesisError("could not write genesis to file".to_string())
+            })?;
 
             let mut init_cmd = Command::new(bin_path);
             if let Some(ref data_dir) = self.data_dir {
@@ -720,19 +722,20 @@ impl Geth {
             init_cmd.arg("init").arg(temp_genesis_path);
             let res = init_cmd
                 .spawn()
-                .map_err(|_| GethError::GethInit("failed to spawn geth init".to_string()))?
+                .map_err(|_| GethError::InitError("failed to spawn geth init".to_string()))?
                 .wait()
                 .map_err(|_| {
-                    GethError::GethInit("failed to wait for geth init to exit".to_string())
+                    GethError::InitError("failed to wait for geth init to exit".to_string())
                 })?;
             // .expect("failed to wait for geth init to exit");
             if !res.success() {
-                return Err(GethError::GethInit("geth init failed".to_string()));
+                return Err(GethError::InitError("geth init failed".to_string()));
             }
 
             // clean up the temp dir which is now persisted
-            std::fs::remove_dir_all(temp_genesis_dir_path)
-                .map_err(|_| GethError::Genesis("could not remove genesis temp dir".to_string()))?;
+            std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
+                GethError::GenesisError("could not remove genesis temp dir".to_string())
+            })?;
         }
 
         if let Some(ref data_dir) = self.data_dir {
@@ -740,7 +743,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(|_| GethError::CreateDataDir)?;
+                create_dir(data_dir).map_err(|_| GethError::CreateDataDirError)?;
             }
         }
 
@@ -777,7 +780,7 @@ impl Geth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        let mut child = cmd.spawn().map_err(|_| GethError::SpawnGeth)?;
+        let mut child = cmd.spawn().map_err(GethError::SpawnError)?;
 
         let stderr = child.stderr.ok_or(GethError::NoStderr)?;
 
