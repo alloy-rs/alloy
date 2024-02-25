@@ -70,8 +70,8 @@ impl Drop for AnvilInstance {
 #[derive(Debug, Error)]
 pub enum AnvilError {
     /// Spawning the anvil process failed.
-    #[error("couldnt start anvil")]
-    Spawn,
+    #[error("couldnt start anvil: {0}")]
+    Spawn(std::io::Error),
 
     /// Timed out waiting for a message from anvil's stderr.
     #[error("timedout occurred: {0}")]
@@ -386,7 +386,7 @@ impl Anvil {
 
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().map_err(|_| AnvilError::Spawn)?;
+        let mut child = cmd.spawn().map_err(AnvilError::Spawn)?;
 
         let stdout = child.stdout.take().ok_or(AnvilError::NoStderr)?;
 
