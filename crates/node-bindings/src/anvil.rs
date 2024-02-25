@@ -348,7 +348,6 @@ impl Anvil {
     }
 
     /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
-    #[track_caller]
     pub fn try_spawn(self) -> Result<AnvilInstance, AnvilError> {
         let mut cmd = if let Some(ref prg) = self.program {
             Command::new(prg)
