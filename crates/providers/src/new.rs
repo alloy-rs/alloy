@@ -33,19 +33,17 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 
 impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
     async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction> {
-        self.get_heart()
-            .watch_tx(WatchConfig::new(tx_hash))
-            .await
-            .map_err(|_| TransportErrorKind::backend_gone())
+        // TODO: Make this configurable.
+        let cfg = WatchConfig::new(tx_hash);
+        self.get_heart().watch_tx(cfg).await.map_err(|_| TransportErrorKind::backend_gone())
     }
 
     #[inline]
     fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
-            let weak = Arc::downgrade(&self.inner);
-            let stream = ChainStreamPoller::new(weak, self.inner.weak_client());
-            // TODO: Can we avoid `Pin<Box<_>>` here?
-            Heartbeat::new(Box::pin(stream.into_stream())).spawn()
+            let poller = ChainStreamPoller::from_root(self);
+            // TODO: Can we avoid `Box::pin` here?
+            Heartbeat::new(Box::pin(poller.into_stream())).spawn()
         })
     }
 }
@@ -347,9 +345,8 @@ mod tests {
 
         let anvil = alloy_node_bindings::Anvil::new().block_time(1u64).spawn();
         let url = anvil.endpoint().parse().unwrap();
-        // let url = "http://127.0.0.1:8545".parse().unwrap();
         let http = Http::<Client>::new(url);
-        let provider: RootProvider<TmpNetwork, _> = RootProvider::new(RpcClient::new(http, true));
+        let provider = RootProvider::<TmpNetwork, _>::new(RpcClient::new(http, true));
 
         let tx = alloy_consensus::TxLegacy {
             value: U256::from(100),
