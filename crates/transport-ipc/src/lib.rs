@@ -71,8 +71,8 @@ impl IpcBackend {
                         match item {
                             Some(msg) => {
                                 let bytes = msg.get();
-                                if let Err(e) = writer.write_all(bytes.as_bytes()).await {
-                                    error!(%e, "Failed to write to IPC socket");
+                                if let Err(err) = writer.write_all(bytes.as_bytes()).await {
+                                    error!(%err, "Failed to write to IPC socket");
                                     break true;
                                 }
                             },
@@ -205,8 +205,8 @@ where
                     // can try decoding again
                     *this.drained = false;
                 }
-                Err(e) => {
-                    error!(%e, "Failed to read from IPC socket, shutting down");
+                Err(err) => {
+                    error!(%err, "Failed to read from IPC socket, shutting down");
                     return Ready(None);
                 }
             }
