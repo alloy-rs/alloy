@@ -3,10 +3,11 @@
 
 use alloy_primitives::{B256, U256};
 use alloy_rpc_types::Block;
-use alloy_transport::utils::Spawnable;
+use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt,
     future::Future,
     time::{Duration, Instant},
 };
@@ -77,6 +78,12 @@ pub struct PendingTransaction {
     pub(crate) rx: oneshot::Receiver<()>,
 }
 
+impl fmt::Debug for PendingTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PendingTransaction").field("tx_hash", &self.tx_hash).finish()
+    }
+}
+
 impl PendingTransaction {
     /// Returns this transaction's hash.
     pub const fn tx_hash(&self) -> &B256 {
@@ -85,13 +92,13 @@ impl PendingTransaction {
 }
 
 impl Future for PendingTransaction {
-    type Output = ();
+    type Output = TransportResult<()>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.rx.poll_unpin(cx).map(Result::unwrap)
+        self.rx.poll_unpin(cx).map(|res| res.map_err(|_| TransportErrorKind::backend_gone()))
     }
 }
 
@@ -99,7 +106,7 @@ impl Future for PendingTransaction {
 #[derive(Debug, Clone)]
 pub struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
-    latest: watch::Receiver<Block>,
+    latest: watch::Receiver<Option<Block>>,
 }
 
 impl HeartbeatHandle {
@@ -114,7 +121,7 @@ impl HeartbeatHandle {
     }
 
     /// Returns a watcher that always sees the latest block.
-    pub fn latest(&self) -> &watch::Receiver<Block> {
+    pub fn latest(&self) -> &watch::Receiver<Option<Block>> {
         &self.latest
     }
 }
@@ -149,8 +156,8 @@ impl<S: Stream<Item = Block>> Heartbeat<S> {
 
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
-    fn check_confirmations(&mut self, latest: &watch::Sender<Block>) {
-        if let Some(current_height) = { latest.borrow().header.number } {
+    fn check_confirmations(&mut self, latest: &watch::Sender<Option<Block>>) {
+        if let Some(current_height) = latest.borrow().as_ref().unwrap().header.number {
             let to_keep = self.waiting_confs.split_off(&current_height);
             let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
 
@@ -193,7 +200,7 @@ impl<S> Heartbeat<S> {
     /// Handle a new block by checking if any of the transactions we're
     /// watching are in it, and if so, notifying the watcher. Also updates
     /// the latest block.
-    fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Block>) {
+    fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Option<Block>>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
         let Some(block_height) = block.header.number else {
             return;
@@ -217,7 +224,7 @@ impl<S> Heartbeat<S> {
         // latest block is always up to date, even if no receivers exist.
         // C.f.
         // https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
-        let _ = latest.send_replace(block);
+        let _ = latest.send_replace(Some(block));
 
         self.check_confirmations(latest);
     }
@@ -226,8 +233,7 @@ impl<S> Heartbeat<S> {
 impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`]
     pub(crate) fn spawn(mut self) -> HeartbeatHandle {
-        let from = None.unwrap();
-        let (latest, latest_rx) = watch::channel(from);
+        let (latest, latest_rx) = watch::channel(None::<Block>);
         let (ix_tx, mut ixns) = mpsc::channel(16);
 
         let fut = async move {

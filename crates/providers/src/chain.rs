@@ -1,6 +1,6 @@
 use crate::{Provider, WeakProvider};
 use alloy_network::Network;
-use alloy_primitives::BlockNumber;
+use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{PollTask, WeakClient};
 use alloy_rpc_types::Block;
 use alloy_transport::{RpcError, Transport};
@@ -18,7 +18,7 @@ const MAX_RETRIES: usize = 3;
 
 pub(crate) struct ChainStreamPoller<P> {
     provider: WeakProvider<P>,
-    poll_stream: BroadcastStream<BlockNumber>,
+    poll_stream: BroadcastStream<U64>,
     next_yield: BlockNumber,
     known_blocks: LruCache<BlockNumber, Block>,
 }
@@ -46,6 +46,7 @@ impl<P> ChainStreamPoller<P> {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
+                debug!("yielding block number {}", self.next_yield);
                 self.next_yield += 1;
                 yield known_block;
             }
@@ -63,6 +64,7 @@ impl<P> ChainStreamPoller<P> {
                     break 'task;
                 }
             };
+            let block_number = block_number.to::<u64>();
             if block_number == self.next_yield {
                 continue 'task;
             }

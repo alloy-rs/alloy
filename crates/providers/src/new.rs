@@ -87,7 +87,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction>;
 
     async fn estimate_gas(&self, tx: &N::TransactionRequest) -> TransportResult<U256> {
-        self.client().prepare("eth_estimateGas", tx).await
+        self.client().prepare("eth_estimateGas", (tx,)).await
     }
 
     /// Get the last block number available.
@@ -129,7 +129,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         tx: &N::TransactionRequest,
     ) -> TransportResult<PendingTransaction> {
-        let tx_hash = self.client().prepare("eth_sendTransaction", tx).await?;
+        let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
         self.new_pending_transaction(tx_hash).await
     }
 
@@ -137,7 +137,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// once the transaction has been confirmed.
     async fn send_raw_transaction(&self, rlp_bytes: &[u8]) -> TransportResult<PendingTransaction> {
         let rlp_hex = hex::encode(rlp_bytes);
-        let tx_hash = self.client().prepare("eth_sendRawTransaction", rlp_hex).await?;
+        let tx_hash = self.client().prepare("eth_sendRawTransaction", (rlp_hex,)).await?;
         self.new_pending_transaction(tx_hash).await
     }
 }

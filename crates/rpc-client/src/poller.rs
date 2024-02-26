@@ -52,7 +52,7 @@ where
     }
 
     /// Returns the channel size for the poller task.
-    pub fn channel_size(&self) -> usize {
+    pub const fn channel_size(&self) -> usize {
         self.channel_size
     }
 
@@ -68,7 +68,7 @@ where
     }
 
     /// Retuns the limit on the number of succesful polls.
-    pub fn limit(&self) -> usize {
+    pub const fn limit(&self) -> usize {
         self.limit
     }
 
@@ -84,7 +84,7 @@ where
     }
 
     /// Returns the duration between polls.
-    pub fn poll_interval(&self) -> Duration {
+    pub const fn poll_interval(&self) -> Duration {
         self.poll_interval
     }
 
@@ -105,18 +105,25 @@ where
         let fut = async move {
             for _ in 0..self.limit {
                 let Some(client) = self.client.upgrade() else {
+                    debug!("client dropped");
                     break;
                 };
+
+                trace!("polling");
                 match client.prepare(self.method, &self.params).await {
                     Ok(resp) => {
                         if tx.send(resp).is_err() {
+                            debug!("channel closed");
                             break;
                         }
                     }
-                    Err(e) => {
-                        debug!(%e, "error response in polling request");
+                    Err(err) => {
+                        error!(%err, "error in polling request");
+                        break;
                     }
                 }
+
+                trace!(duration=?self.poll_interval, "sleeping");
                 tokio::time::sleep(self.poll_interval).await;
             }
         };
