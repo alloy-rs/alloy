@@ -25,15 +25,12 @@ pub struct WatchConfig {
 
     /// Optional timeout for the transaction.
     timeout: Option<Duration>,
-
-    /// Notify the waiter.
-    tx: oneshot::Sender<()>,
 }
 
 impl WatchConfig {
     /// Create a new watch for a transaction.
-    pub fn new(tx_hash: B256, tx: oneshot::Sender<()>) -> Self {
-        Self { tx_hash, confirmations: 0, timeout: None, tx }
+    pub fn new(tx_hash: B256) -> Self {
+        Self { tx_hash, confirmations: 0, timeout: None }
     }
 
     /// Set the number of confirmations to wait for.
@@ -57,7 +54,14 @@ impl WatchConfig {
         self.timeout = Some(timeout);
         self
     }
+}
 
+struct TxWatcher {
+    config: WatchConfig,
+    tx: oneshot::Sender<()>,
+}
+
+impl TxWatcher {
     /// Notify the waiter.
     fn notify(self) {
         let _ = self.tx.send(());
@@ -67,10 +71,10 @@ impl WatchConfig {
 /// A pending transaction that can be awaited.
 pub struct PendingTransaction {
     /// The transaction hash.
-    tx_hash: B256,
+    pub(crate) tx_hash: B256,
     /// The receiver for the notification.
     // TODO: send a receipt?
-    rx: oneshot::Receiver<()>,
+    pub(crate) rx: oneshot::Receiver<()>,
 }
 
 impl PendingTransaction {
@@ -94,39 +98,46 @@ impl Future for PendingTransaction {
 /// A handle to the heartbeat task.
 #[derive(Debug, Clone)]
 pub struct HeartbeatHandle {
-    tx: mpsc::Sender<WatchConfig>,
+    tx: mpsc::Sender<TxWatcher>,
     latest: watch::Receiver<Block>,
 }
 
 impl HeartbeatHandle {
-    /// Get a new watcher that always sees the latest block.
-    pub fn latest(&self) -> watch::Receiver<Block> {
-        self.latest.clone()
+    /// Watch for a transaction to be confirmed with the given config.
+    pub async fn watch_tx(&self, config: WatchConfig) -> Result<PendingTransaction, WatchConfig> {
+        let (tx, rx) = oneshot::channel();
+        let tx_hash = config.tx_hash;
+        match self.tx.send(TxWatcher { config, tx }).await {
+            Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
+            Err(e) => Err(e.0.config),
+        }
+    }
+
+    /// Returns a watcher that always sees the latest block.
+    pub fn latest(&self) -> &watch::Receiver<Block> {
+        &self.latest
     }
 }
 
 // TODO: Parameterize with `Network`
 /// A heartbeat task that receives blocks and watches for transactions.
-pub(crate) struct Heartbeat<St> {
+pub(crate) struct Heartbeat<S> {
     /// The stream of incoming blocks to watch.
-    stream: futures::stream::Fuse<St>,
+    stream: futures::stream::Fuse<S>,
 
     /// Transactions to watch for.
-    unconfirmed: HashMap<B256, WatchConfig>,
+    unconfirmed: HashMap<B256, TxWatcher>,
 
     /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<U256, WatchConfig>,
+    waiting_confs: BTreeMap<U256, TxWatcher>,
 
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
 }
 
-impl<St> Heartbeat<St>
-where
-    St: Stream<Item = Block> + Unpin + Send + 'static,
-{
+impl<S: Stream<Item = Block>> Heartbeat<S> {
     /// Create a new heartbeat task.
-    pub fn new(stream: St) -> Self {
+    pub(crate) fn new(stream: S) -> Self {
         Self {
             stream: stream.fuse(),
             unconfirmed: Default::default(),
@@ -136,7 +147,7 @@ where
     }
 }
 
-impl<St> Heartbeat<St> {
+impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
     fn check_confirmations(&mut self, latest: &watch::Sender<Block>) {
         if let Some(current_height) = { latest.borrow().header.number } {
@@ -171,12 +182,12 @@ impl<St> Heartbeat<St> {
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
-    fn handle_watch_ix(&mut self, to_watch: WatchConfig) {
+    fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
         // start watching for the tx
-        if let Some(timeout) = to_watch.timeout {
-            self.reap_at.insert(Instant::now() + timeout, to_watch.tx_hash);
+        if let Some(timeout) = to_watch.config.timeout {
+            self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
         }
-        self.unconfirmed.insert(to_watch.tx_hash, to_watch);
+        self.unconfirmed.insert(to_watch.config.tx_hash, to_watch);
     }
 
     /// Handle a new block by checking if any of the transactions we're
@@ -184,27 +195,26 @@ impl<St> Heartbeat<St> {
     /// the latest block.
     fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Block>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
-        let block_height = match block.header.number {
-            Some(height) => height,
-            None => return,
+        let Some(block_height) = block.header.number else {
+            return;
         };
 
         // check if we are watching for any of the txns in this block
         let to_check =
             block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
-
-        // If confirmations is 1 or less, notify the watcher
         for watcher in to_check {
-            if watcher.confirmations <= 1 {
+            // If `confirmations` is 1 or less, notify the watcher.
+            let confs = watcher.config.confirmations;
+            if confs <= 1 {
                 watcher.notify();
                 continue;
             }
-            // Otherwise add it to the waiting list
-            self.waiting_confs.insert(block_height + U256::from(watcher.confirmations), watcher);
+            // Otherwise add it to the waiting list.
+            self.waiting_confs.insert(block_height + U256::from(confs), watcher);
         }
 
-        // update the latest block. We use `send_replace` here to ensure the
-        // latest block is always up to date, even if no receivers exist
+        // Update the latest block. We use `send_replace` here to ensure the
+        // latest block is always up to date, even if no receivers exist.
         // C.f.
         // https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
         let _ = latest.send_replace(block);
@@ -213,12 +223,10 @@ impl<St> Heartbeat<St> {
     }
 }
 
-impl<St> Heartbeat<St>
-where
-    St: Stream<Item = Block> + Unpin + Send + 'static,
-{
+impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`]
-    pub(crate) fn spawn(mut self, from: Block) -> HeartbeatHandle {
+    pub(crate) fn spawn(mut self) -> HeartbeatHandle {
+        let from = None.unwrap();
         let (latest, latest_rx) = watch::channel(from);
         let (ix_tx, mut ixns) = mpsc::channel(16);
 
@@ -232,11 +240,9 @@ where
                         biased;
 
                         // Watch for new transactions.
-                        ix_opt = ixns.recv() => {
-                            match ix_opt {
-                                Some(to_watch) => self.handle_watch_ix(to_watch),
-                                None => break 'shutdown, // ix channel is closed
-                            }
+                        ix_opt = ixns.recv() => match ix_opt {
+                            Some(to_watch) => self.handle_watch_ix(to_watch),
+                            None => break 'shutdown, // ix channel is closed
                         },
 
                         // Wake up to handle new blocks
@@ -254,8 +260,8 @@ where
                 self.reap_timeouts();
             }
         };
-
         fut.spawn_task();
+
         HeartbeatHandle { tx: ix_tx, latest: latest_rx }
     }
 }

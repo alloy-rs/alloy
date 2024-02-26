@@ -66,10 +66,7 @@ where
 
 #[pin_project::pin_project(project = CallStateProj)]
 #[derive(Debug)]
-pub enum BatchFuture<Conn>
-where
-    Conn: Transport,
-{
+pub enum BatchFuture<Conn: Transport> {
     Prepared {
         transport: Conn,
         requests: RequestPacket,

@@ -20,7 +20,7 @@ futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["sync"] }
-tokio-stream = { version = "0.1.14", features = ["sync"] }
+tokio-stream = { workspace = true, features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
 

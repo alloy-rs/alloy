@@ -1,48 +1,57 @@
 use crate::{Provider, WeakProvider};
 use alloy_network::Network;
 use alloy_primitives::BlockNumber;
-use alloy_rpc_client::PollTask;
+use alloy_rpc_client::{PollTask, WeakClient};
 use alloy_rpc_types::Block;
 use alloy_transport::{RpcError, Transport};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use std::{num::NonZeroUsize, time::Duration};
+use std::num::NonZeroUsize;
+use tokio_stream::wrappers::BroadcastStream;
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
 
-fn chain_stream_poller<P, N, T>(
+/// Maximum number of retries for fetching a block.
+const MAX_RETRIES: usize = 3;
+
+pub(crate) struct ChainStreamPoller<P> {
     provider: WeakProvider<P>,
-    from_height: BlockNumber,
-    poll_interval: Duration,
-) -> impl Stream<Item = Block>
-where
-    P: Provider<N, T>,
-    N: Network,
-    T: Transport + Clone,
-{
-    let mut poll_stream = {
-        let upgraded_provider = provider.upgrade().expect("provider dropped before poller started");
-        PollTask::new(upgraded_provider.weak_client(), "eth_blockNumber", ())
-            .with_poll_interval(poll_interval)
-            .spawn()
-            .into_stream()
-    };
+    poll_stream: BroadcastStream<BlockNumber>,
+    next_yield: BlockNumber,
+    known_blocks: LruCache<BlockNumber, Block>,
+}
 
-    let mut next_yield = from_height;
-    let mut known_blocks = LruCache::<BlockNumber, Block>::new(BLOCK_CACHE_SIZE);
+impl<P> ChainStreamPoller<P> {
+    pub(crate) fn new<T>(provider: WeakProvider<P>, client: WeakClient<T>) -> Self
+    where
+        T: Transport + Clone,
+    {
+        Self {
+            provider,
+            poll_stream: PollTask::new(client, "eth_blockNumber", ()).spawn().into_stream(),
+            next_yield: BlockNumber::MAX,
+            known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
+        }
+    }
 
-    stream! {
+    pub(crate) fn into_stream<N, T>(mut self) -> impl Stream<Item = Block>
+    where
+        P: Provider<N, T>,
+        N: Network,
+        T: Transport + Clone,
+    {
+        stream! {
         'task: loop {
             // Clear any buffered blocks.
-            while let Some(known_block) = known_blocks.pop(&next_yield) {
-                next_yield += 1;
+            while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
+                self.next_yield += 1;
                 yield known_block;
             }
 
             // Get the tip.
-            let block_number = match poll_stream.next().await {
+            let block_number = match self.poll_stream.next().await {
                 Some(Ok(block_number)) => block_number,
                 Some(Err(err)) => {
                     // This is fine.
@@ -54,30 +63,38 @@ where
                     break 'task;
                 }
             };
+            if block_number == self.next_yield {
+                continue 'task;
+            }
+            if self.next_yield > block_number {
+                self.next_yield = block_number;
+            }
 
             // Upgrade the provider.
-            let Some(provider) = provider.upgrade() else {
+            let Some(provider) = self.provider.upgrade() else {
                 debug!("provider dropped");
                 break 'task;
             };
 
             // Then try to fill as many blocks as possible.
             // TODO: Maybe use `join_all`
-            while !known_blocks.contains(&block_number) {
-                let block = provider.get_block_by_number(block_number, false).await;
-                match block {
-                    Ok(block) => {
-                        known_blocks.put(block_number, block);
-                    },
-                    Err(RpcError::Transport(err)) if err.recoverable() => {
-                        continue 'task;
-                    },
+            let mut retries = MAX_RETRIES;
+            for block_number in self.next_yield..=block_number {
+                let block = match provider.get_block_by_number(block_number, false).await {
+                    Ok(block) => block,
+                    Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
+                        debug!(block_number, %err, "failed to fetch block, retrying");
+                        retries -= 1;
+                        continue;
+                    }
                     Err(err) => {
                         error!(block_number, %err, "failed to fetch block");
                         break 'task;
-                    },
-                }
+                    }
+                };
+                self.known_blocks.put(block_number, block);
             }
+        }
         }
     }
 }

@@ -27,6 +27,13 @@ impl<T> Clone for RpcClient<T> {
     }
 }
 
+impl RpcClient<Identity> {
+    /// Create a new [`ClientBuilder`].
+    pub fn builder() -> ClientBuilder<Identity> {
+        ClientBuilder { builder: ServiceBuilder::new() }
+    }
+}
+
 impl<T> RpcClient<T> {
     /// Create a new [`RpcClient`] with the given transport.
     pub fn new(t: T, is_local: bool) -> Self {
@@ -109,13 +116,6 @@ pub struct RpcClientInner<T> {
     pub(crate) id: AtomicU64,
 }
 
-impl RpcClientInner<Identity> {
-    /// Create a new [`ClientBuilder`].
-    pub fn builder() -> ClientBuilder<Identity> {
-        ClientBuilder { builder: ServiceBuilder::new() }
-    }
-}
-
 impl<T> RpcClientInner<T> {
     /// Create a new [`RpcClient`] with the given transport.
     pub const fn new(t: T, is_local: bool) -> Self {
@@ -164,10 +164,7 @@ impl<T> RpcClientInner<T> {
     }
 }
 
-impl<T> RpcClientInner<T>
-where
-    T: Transport + Clone,
-{
+impl<T: Transport + Clone> RpcClientInner<T> {
     /// Prepare an [`RpcCall`].
     ///
     /// This function reserves an ID for the request, however the request

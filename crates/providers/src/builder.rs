@@ -1,4 +1,4 @@
-use crate::new::{Provider, RootProvider, RootProviderInner};
+use crate::new::{Provider, RootProvider};
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport> {
+pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
     type Provider: Provider<N, T>;
 
     fn layer(&self, inner: P) -> Self::Provider;
@@ -27,7 +27,7 @@ impl<Inner, Outer> Stack<Inner, Outer> {
 
 impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<Inner, Outer>
 where
-    T: Transport,
+    T: Transport + Clone,
     N: Network,
     P: Provider<N, T>,
     Inner: ProviderLayer<P, N, T>,
@@ -91,7 +91,7 @@ impl<L, N> ProviderBuilder<L, N> {
     where
         L: ProviderLayer<P, N, T>,
         P: Provider<N, T>,
-        T: Transport,
+        T: Transport + Clone,
         N: Network,
     {
         self.layer.layer(provider)
@@ -108,8 +108,7 @@ impl<L, N> ProviderBuilder<L, N> {
         T: Transport + Clone,
         N: Network,
     {
-        let root = RootProviderInner::new(client);
-        self.provider(root.into())
+        self.provider(RootProvider::new(client))
     }
 }
 
