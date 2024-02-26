@@ -1,6 +1,8 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_transport::{utils::Spawnable, Transport};
+use serde::Serialize;
+use serde_json::value::RawValue;
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -8,6 +10,10 @@ use std::{
 };
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
+use tracing::Instrument;
+
+/// The number of retries for polling a request.
+const MAX_RETRIES: usize = 3;
 
 /// A Poller task.
 #[derive(Debug)]
@@ -102,37 +108,57 @@ where
     /// Spawn the poller task, producing a stream of responses.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
+        let span = debug_span!("poller", method = self.method);
         let fut = async move {
-            for _ in 0..self.limit {
+            let mut params = ParamsOnce::Typed(self.params);
+            let mut retries = MAX_RETRIES;
+            'outer: for _ in 0..self.limit {
                 let Some(client) = self.client.upgrade() else {
                     debug!("client dropped");
                     break;
                 };
 
-                trace!("polling");
-                match client.prepare(self.method, &self.params).await {
-                    Ok(resp) => {
-                        if tx.send(resp).is_err() {
-                            debug!("channel closed");
-                            break;
+                // Avoid serializing the params more than once.
+                let params = match params.get() {
+                    Ok(p) => p,
+                    Err(err) => {
+                        error!(%err, "failed to serialize params");
+                        break 'outer;
+                    }
+                };
+
+                loop {
+                    trace!("polling");
+                    match client.prepare(self.method, params).await {
+                        Ok(resp) => {
+                            if tx.send(resp).is_err() {
+                                debug!("channel closed");
+                                break 'outer;
+                            }
+                        }
+                        Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
+                            debug!(%err, "failed to poll, retrying");
+                            retries -= 1;
+                            continue;
+                        }
+                        Err(err) => {
+                            error!(%err, "failed to poll");
+                            break 'outer;
                         }
                     }
-                    Err(err) => {
-                        error!(%err, "error in polling request");
-                        break;
-                    }
+                    break;
                 }
 
                 trace!(duration=?self.poll_interval, "sleeping");
                 tokio::time::sleep(self.poll_interval).await;
             }
         };
-        fut.spawn_task();
+        fut.instrument(span).spawn_task();
         rx.into()
     }
 }
 
-/// A channel yeildiing responses from a poller task.
+/// A channel yielding responses from a poller task.
 ///
 /// This stream is backed by a coroutine, and will continue to produce responses
 /// until the poller task is dropped. The poller task is dropped when all
@@ -180,6 +206,31 @@ where
     /// Convert the poll channel into a stream.
     pub fn into_stream(self) -> BroadcastStream<Resp> {
         self.rx.into()
+    }
+}
+
+// Serializes the parameters only once.
+enum ParamsOnce<P> {
+    Typed(P),
+    Serialized(Box<RawValue>),
+}
+
+impl<P: Serialize> ParamsOnce<P> {
+    #[inline]
+    fn get(&mut self) -> serde_json::Result<&RawValue> {
+        match self {
+            ParamsOnce::Typed(_) => self.init(),
+            ParamsOnce::Serialized(p) => Ok(p),
+        }
+    }
+
+    #[cold]
+    fn init(&mut self) -> serde_json::Result<&RawValue> {
+        let Self::Typed(p) = self else { unreachable!() };
+        let v = serde_json::value::to_raw_value(p)?;
+        *self = ParamsOnce::Serialized(v);
+        let Self::Serialized(v) = self else { unreachable!() };
+        Ok(v)
     }
 }
 
