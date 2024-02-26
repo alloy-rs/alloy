@@ -104,14 +104,17 @@ impl Future for PendingTransaction {
 
 /// A handle to the heartbeat task.
 #[derive(Debug, Clone)]
-pub struct HeartbeatHandle {
+pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
     latest: watch::Receiver<Option<Block>>,
 }
 
 impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
-    pub async fn watch_tx(&self, config: WatchConfig) -> Result<PendingTransaction, WatchConfig> {
+    pub(crate) async fn watch_tx(
+        &self,
+        config: WatchConfig,
+    ) -> Result<PendingTransaction, WatchConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
         match self.tx.send(TxWatcher { config, tx }).await {
@@ -121,7 +124,7 @@ impl HeartbeatHandle {
     }
 
     /// Returns a watcher that always sees the latest block.
-    pub fn latest(&self) -> &watch::Receiver<Option<Block>> {
+    pub(crate) fn latest(&self) -> &watch::Receiver<Option<Block>> {
         &self.latest
     }
 }
