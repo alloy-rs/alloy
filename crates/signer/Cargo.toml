@@ -24,7 +24,7 @@ async-trait.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
-alloy-dyn-abi.workspace = true
+alloy-dyn-abi = { workspace = true, features = ["eip712"] }
 
 # keystore
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
