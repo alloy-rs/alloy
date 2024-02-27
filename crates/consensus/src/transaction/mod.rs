@@ -10,7 +10,7 @@ pub use legacy::TxLegacy;
 mod eip4844;
 #[cfg(feature = "kzg")]
 pub use eip4844::BlobTransactionValidationError;
-pub use eip4844::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar, TxEip4844Wrapper};
+pub use eip4844::{BlobTransactionSidecar, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
 mod envelope;
 pub use envelope::{TxEnvelope, TxType};
