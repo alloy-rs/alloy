@@ -19,8 +19,56 @@
 #[cfg(feature = "transport-http-reqwest")]
 use reqwest as _;
 
+/* --------------------------------------- Core re-exports -------------------------------------- */
+
+// Re-export the core crate.
+// This should generally not be used by downstream crates as we re-export everything else
+// individually.
+// It is acceptable to use this if an item has been added to `alloy-core` and it has not been added
+// to the re-exports below.
+#[doc(hidden)]
+pub use alloy_core as core;
+
 #[doc(inline)]
-pub use alloy_core::*;
+pub use self::core::primitives;
+#[doc(no_inline)]
+pub use primitives::{hex, uint};
+
+#[cfg(feature = "dyn-abi")]
+#[doc(inline)]
+pub use self::core::dyn_abi;
+
+#[cfg(feature = "json-abi")]
+#[doc(inline)]
+pub use self::core::json_abi;
+
+#[cfg(feature = "sol-types")]
+#[doc(inline)]
+pub use self::core::sol_types;
+#[cfg(all(doc, feature = "sol-types"))] // Show this re-export in docs instead of the wrapper below.
+#[doc(no_inline)]
+pub use sol_types::sol;
+
+#[cfg(feature = "rlp")]
+#[doc(inline)]
+pub use self::core::rlp;
+
+/// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
+///
+/// See [`sol!`](sol_types::sol!) for the actual macro documentation.
+#[cfg(all(not(doc), feature = "sol-types"))] // Show the actual macro in docs.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! sol {
+    ($($t:tt)*) => {
+        $crate::sol_types::sol! {
+            #![sol(alloy_sol_types = $crate::sol_types, alloy_contract = $crate::contract)]
+            $($t)*
+        }
+    };
+}
+
+/* --------------------------------------- Main re-exports -------------------------------------- */
 
 #[cfg(feature = "contract")]
 #[doc(inline)]
@@ -158,21 +206,3 @@ pub mod pubsub {
     #[doc(inline)]
     pub use alloy_pubsub::*;
 }
-
-// TODO: Enable on next alloy-core release.
-/*
-/// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
-///
-/// See [`sol!`](sol_types::sol!) for the actual macro documentation.
-#[cfg(all(not(doc), feature = "sol-types"))]
-#[doc(hidden)]
-#[macro_export]
-macro_rules! sol {
-    ($($t:tt)*) => {
-        $crate::sol_types::sol! {
-            #![sol(alloy_sol_types = $crate::sol_types, alloy_contract = $crate::contract)]
-            $($t)*
-        }
-    };
-}
-*/
