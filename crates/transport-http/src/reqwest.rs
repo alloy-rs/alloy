@@ -1,5 +1,5 @@
 use crate::Http;
-use alloy_json_rpc::{RequestPacket, ResponsePacket};
+use alloy_json_rpc::{ErrorPayload, RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
 use std::task;
 use tower::Service;
@@ -18,8 +18,14 @@ impl Http<reqwest::Client> {
                 .map_err(TransportErrorKind::custom)?;
             let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
 
-            serde_json::from_slice(&body)
-                .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
+            serde_json::from_slice(&body).map_err(|err| {
+                // check if the response is an error payload
+                if let Ok(err) = serde_json::from_slice::<ErrorPayload>(&body) {
+                    return TransportError::err_resp(err);
+                }
+
+                TransportError::deser_err(err, String::from_utf8_lossy(&body))
+            })
         })
     }
 }
