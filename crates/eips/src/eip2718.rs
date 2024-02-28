@@ -43,15 +43,15 @@ pub trait Decodable2718: Sized {
     /// ## Note
     ///
     /// This should be a simple match block that invokes an inner type's RLP decoder.
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode the default variant.
     ///
     /// This function is invoked by [`Self::decode_2718`] when no type byte can be extracted.
-    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
+    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode an EIP-2718 transaction into a concrete instance
-    fn decode_2718(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn decode_2718(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::extract_type_byte(buf)
             .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
             .unwrap_or_else(|| Self::fallback_decode(buf))
@@ -63,7 +63,7 @@ pub trait Decodable2718: Sized {
     /// type-flag prepended to an opaque inner encoding. The inner encoding is
     /// RLP for all current Ethereum transaction types, but may not be in future
     /// versions of the protocol.
-    fn network_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn network_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         // Keep the original buffer around by copying it.
         let mut h_decode = *buf;
         let h = Header::decode(&mut h_decode)?;
@@ -78,7 +78,7 @@ pub trait Decodable2718: Sized {
         let remaining_len = buf.len();
 
         if remaining_len == 0 || remaining_len < h.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort.into());
+            return Err(alloy_rlp::Error::InputTooShort);
         }
 
         let ty = buf[0];
@@ -90,7 +90,7 @@ pub trait Decodable2718: Sized {
         // string Header with payload_length of 1, we need to make sure this check is only
         // performed for transactions with a string header
         if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
-            return Err(alloy_rlp::Error::UnexpectedLength.into());
+            return Err(alloy_rlp::Error::UnexpectedLength);
         }
 
         Ok(tx)

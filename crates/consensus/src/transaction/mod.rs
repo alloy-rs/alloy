@@ -100,18 +100,6 @@ pub trait SignableTransaction<Signature>: Transaction {
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
     where
         Self: Sized;
-
-    /// Encode with a signature. This encoding is usually RLP, but may be
-    /// different for future EIP-2718 transaction types.
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut);
-
-    /// Decode a signed transaction. This decoding is usually RLP, but may be
-    /// different for future EIP-2718 transaction types.
-    ///
-    /// This MUST be the inverse of [`SignableTransaction::encode_signed`].
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self, Signature>>
-    where
-        Self: Sized;
 }
 
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
