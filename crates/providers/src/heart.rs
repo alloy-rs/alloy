@@ -17,6 +17,7 @@ use tokio::{
 };
 
 /// A configuration object for watching for transaction confirmation.
+#[derive(Debug)]
 pub struct WatchConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
@@ -65,6 +66,7 @@ struct TxWatcher {
 impl TxWatcher {
     /// Notify the waiter.
     fn notify(self) {
+        debug!(tx=%self.config.tx_hash, "notifying");
         let _ = self.tx.send(());
     }
 }
@@ -92,13 +94,15 @@ impl PendingTransaction {
 }
 
 impl Future for PendingTransaction {
-    type Output = TransportResult<()>;
+    type Output = TransportResult<B256>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.rx.poll_unpin(cx).map(|res| res.map_err(|_| TransportErrorKind::backend_gone()))
+        self.rx
+            .poll_unpin(cx)
+            .map(|res| res.map(|()| self.tx_hash).map_err(|_| TransportErrorKind::backend_gone()))
     }
 }
 
@@ -139,7 +143,7 @@ pub(crate) struct Heartbeat<S> {
     unconfirmed: HashMap<B256, TxWatcher>,
 
     /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<U256, TxWatcher>,
+    waiting_confs: BTreeMap<U256, Vec<TxWatcher>>,
 
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
@@ -159,14 +163,11 @@ impl<S: Stream<Item = Block>> Heartbeat<S> {
 
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
-    fn check_confirmations(&mut self, latest: &watch::Sender<Option<Block>>) {
-        if let Some(current_height) = latest.borrow().as_ref().unwrap().header.number {
-            let to_keep = self.waiting_confs.split_off(&current_height);
-            let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
-
-            for (_, watcher) in to_notify.into_iter() {
-                watcher.notify();
-            }
+    fn check_confirmations(&mut self, current_height: &U256) {
+        let to_keep = self.waiting_confs.split_off(current_height);
+        let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
+        for watcher in to_notify.into_values().flatten() {
+            watcher.notify();
         }
     }
 
@@ -186,14 +187,18 @@ impl<S> Heartbeat<S> {
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
         for tx_hash in to_reap.values() {
-            self.unconfirmed.remove(tx_hash);
+            if self.unconfirmed.remove(tx_hash).is_some() {
+                debug!(tx=%tx_hash, "reaped");
+            }
         }
     }
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
     fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
-        // start watching for the tx
+        // Start watching for the transaction.
+        debug!(tx=%to_watch.config.tx_hash, "watching");
+        trace!(?to_watch.config);
         if let Some(timeout) = to_watch.config.timeout {
             self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
         }
@@ -205,31 +210,33 @@ impl<S> Heartbeat<S> {
     /// the latest block.
     fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Option<Block>>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
-        let Some(block_height) = block.header.number else {
-            return;
-        };
+        let Some(block_height) = &block.header.number else { return };
 
-        // check if we are watching for any of the txns in this block
+        // Check if we are watching for any of the transactions in this block.
         let to_check =
             block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
         for watcher in to_check {
-            // If `confirmations` is 1 or less, notify the watcher.
-            let confs = watcher.config.confirmations;
-            if confs <= 1 {
+            // If `confirmations` is 0 we can notify the watcher immediately.
+            let confirmations = watcher.config.confirmations;
+            if confirmations == 0 {
                 watcher.notify();
                 continue;
             }
             // Otherwise add it to the waiting list.
-            self.waiting_confs.insert(block_height + U256::from(confs), watcher);
+            debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+            self.waiting_confs
+                .entry(*block_height + U256::from(confirmations))
+                .or_default()
+                .push(watcher);
         }
+
+        self.check_confirmations(block_height);
 
         // Update the latest block. We use `send_replace` here to ensure the
         // latest block is always up to date, even if no receivers exist.
-        // C.f.
-        // https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
+        // C.f. https://docs.rs/tokio/latest/tokio/sync/watch/struct.Sender.html#method.send
+        debug!(%block_height, "updating latest block");
         let _ = latest.send_replace(Some(block));
-
-        self.check_confirmations(latest);
     }
 }
 
@@ -254,7 +261,7 @@ impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
                             None => break 'shutdown, // ix channel is closed
                         },
 
-                        // Wake up to handle new blocks
+                        // Wake up to handle new blocks.
                         block = self.stream.select_next_some() => {
                             self.handle_new_block(block, &latest);
                         },

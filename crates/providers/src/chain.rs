@@ -15,6 +15,9 @@ const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) 
 /// Maximum number of retries for fetching a block.
 const MAX_RETRIES: usize = 3;
 
+/// Default block number for when we don't have a block yet.
+const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
+
 pub(crate) struct ChainStreamPoller<P, T: Transport + Clone> {
     provider: WeakProvider<P>,
     poll_task: PollTask<T, (), U64>,
@@ -37,7 +40,7 @@ impl<P, T: Transport + Clone> ChainStreamPoller<P, T> {
         Self {
             provider,
             poll_task: PollTask::new(client, "eth_blockNumber", ()),
-            next_yield: BlockNumber::MAX,
+            next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
         }
     }
@@ -51,7 +54,7 @@ impl<P, T: Transport + Clone> ChainStreamPoller<P, T> {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
-                debug!("yielding block number {}", self.next_yield);
+                debug!(number=self.next_yield, "yielding block");
                 self.next_yield += 1;
                 yield known_block;
             }
@@ -70,11 +73,12 @@ impl<P, T: Transport + Clone> ChainStreamPoller<P, T> {
                 }
             };
             let block_number = block_number.to::<u64>();
-            if block_number == self.next_yield {
-                continue 'task;
-            }
-            if self.next_yield > block_number {
+            if self.next_yield == NO_BLOCK_NUMBER {
+                assert!(block_number < NO_BLOCK_NUMBER, "too many blocks");
                 self.next_yield = block_number;
+            } else if block_number < self.next_yield {
+                debug!(block_number, self.next_yield, "not advanced yet");
+                continue 'task;
             }
 
             // Upgrade the provider.
@@ -86,20 +90,21 @@ impl<P, T: Transport + Clone> ChainStreamPoller<P, T> {
             // Then try to fill as many blocks as possible.
             // TODO: Maybe use `join_all`
             let mut retries = MAX_RETRIES;
-            for block_number in self.next_yield..=block_number {
-                let block = match provider.get_block_by_number(block_number, false).await {
+            for number in self.next_yield..=block_number {
+                debug!(number, "fetching block");
+                let block = match provider.get_block_by_number(number, false).await {
                     Ok(block) => block,
                     Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                        debug!(block_number, %err, "failed to fetch block, retrying");
+                        debug!(number, %err, "failed to fetch block, retrying");
                         retries -= 1;
                         continue;
                     }
                     Err(err) => {
-                        error!(block_number, %err, "failed to fetch block");
+                        error!(number, %err, "failed to fetch block");
                         break 'task;
                     }
                 };
-                self.known_blocks.put(block_number, block);
+                self.known_blocks.put(number, block);
             }
         }
         }

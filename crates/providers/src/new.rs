@@ -159,7 +159,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
     }
 }
 
-// Internal implementation for [`chain_stream_poller`].
+// Internal implementation for [`ChainStreamPoller`].
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T> {
@@ -343,7 +343,7 @@ mod tests {
     async fn test_send_tx() {
         init_tracing();
 
-        let anvil = alloy_node_bindings::Anvil::new().block_time(1u64).spawn();
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
         let provider = RootProvider::<TmpNetwork, _>::new(RpcClient::new(http, true));
@@ -356,7 +356,8 @@ mod tests {
             ..Default::default()
         };
         let pending_tx = provider.send_transaction(&TxLegacy(tx)).await.expect("failed to send tx");
-        eprintln!("{pending_tx:?}");
-        let () = pending_tx.await.expect("failed to await pending tx");
+        let hash1 = pending_tx.tx_hash;
+        let hash2 = pending_tx.await.expect("failed to await pending tx");
+        assert_eq!(hash1, hash2);
     }
 }
