@@ -182,6 +182,7 @@ where
 #[cfg(test)]
 mod test {
     use super::BorrowedErrorPayload;
+    use crate::ErrorPayload;
 
     #[test]
     fn smooth_borrowing() {
@@ -206,5 +207,15 @@ mod test {
         let payload: BorrowedErrorPayload<'_> = serde_json::from_str(json).unwrap();
         let data: TestData = payload.try_data_as().unwrap().unwrap();
         assert_eq!(data, TestData { a: 5, b: None });
+    }
+
+    #[test]
+    fn missing_data() {
+        let json = r#"{"code":-32007,"message":"20/second request limit reached - reduce calls per second or upgrade your account at quicknode.com"}"#;
+        let payload: ErrorPayload = serde_json::from_str(json).unwrap();
+
+        assert_eq!(payload.code, -32007);
+        assert_eq!(payload.message, "20/second request limit reached - reduce calls per second or upgrade your account at quicknode.com");
+        assert!(payload.data.is_none());
     }
 }
