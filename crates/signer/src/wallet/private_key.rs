@@ -337,9 +337,9 @@ mod tests {
     #[cfg(feature = "eip712")]
     fn typed_data() {
         use crate::Signer;
+        use alloy_dyn_abi::eip712::TypedData;
         use alloy_primitives::{keccak256, Address, I256, U256};
         use alloy_sol_types::{eip712_domain, sol, SolStruct};
-        use alloy_dyn_abi::eip712::TypedData;
         use serde::Serialize;
 
         sol! {
@@ -374,13 +374,13 @@ mod tests {
         let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
         assert_eq!(wallet.sign_hash_sync(hash).unwrap(), sig);
-        
         let foo_bar_dynamic = TypedData::from_struct(&foo_bar, Some(domain));
         let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
-
         let sig_dynamic = wallet.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
-        
-        assert_eq!(sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(), wallet.address());
+        assert_eq!(
++            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
++            wallet.address()
++       );
         assert_eq!(wallet.sign_hash_sync(dynamic_hash).unwrap(), sig_dynamic);
     }
 

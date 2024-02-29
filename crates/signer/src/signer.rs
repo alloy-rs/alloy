@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
-use alloy_sol_types::{Eip712Domain, SolStruct};
 use alloy_dyn_abi::eip712::TypedData;
+use alloy_sol_types::{Eip712Domain, SolStruct};
 
 pub use alloy_network::Transaction;
 
@@ -104,10 +104,7 @@ pub trait Signer: Send + Sync {
     /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically sized.
     #[cfg(feature = "eip712")]
     #[inline]
-    async fn sign_dynamic_typed_data(
-        &self,
-        payload: &TypedData
-    ) -> Result<Signature> {
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Signature> {
         let hash = payload.eip712_signing_hash()?;
         self.sign_hash(hash).await
     }
@@ -200,10 +197,7 @@ pub trait SignerSync {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
-    fn sign_dynamic_typed_data_sync(
-        &self,
-        payload: &TypedData
-    ) -> Result<Signature> {
+    fn sign_dynamic_typed_data_sync(&self, payload: &TypedData) -> Result<Signature> {
         let hash = payload.eip712_signing_hash()?;
         self.sign_hash_sync(hash)
     }
