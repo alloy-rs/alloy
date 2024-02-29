@@ -108,7 +108,7 @@ pub trait Signer: Send + Sync {
         &self,
         payload: &TypedData
     ) -> Result<Signature> {
-        let hash = payload.eip712_signing_hash().unwrap();
+        let hash = payload.eip712_signing_hash()?;
         self.sign_hash(hash).await
     }
 
@@ -204,7 +204,7 @@ pub trait SignerSync {
         &self,
         payload: &TypedData
     ) -> Result<Signature> {
-        let hash = payload.eip712_signing_hash().unwrap();
+        let hash = payload.eip712_signing_hash()?;
         self.sign_hash_sync(hash)
     }
 
