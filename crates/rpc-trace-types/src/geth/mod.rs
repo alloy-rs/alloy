@@ -572,8 +572,20 @@ mod tests {
                 "input": "0xa9059cbb000000000000000000000000e3f85a274c1edbea2f2498cf5978f41961cf8b5b0000000000000000000000000000000000000000000000000000000068c8f380",
                 "value": "0x0",
                 "type": "CALL"
-            }
+            },
+            "txHash": "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"
         }"#;
-        let _result: TraceResult = serde_json::from_str(s).unwrap();
+        let result: TraceResult = serde_json::from_str(s).unwrap();
+        let hash = result.tx_hash().unwrap();
+        assert_eq!(
+            hash,
+            "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"
+                .parse::<B256>()
+                .unwrap()
+        );
+
+        let de = serde_json::to_value(&result).unwrap();
+        let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
+        similar_asserts::assert_eq!(val, de);
     }
 }
