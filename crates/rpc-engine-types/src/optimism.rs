@@ -1,5 +1,5 @@
-use crate::PayloadAttributes;
-use alloy_primitives::Bytes;
+use crate::{ExecutionPayloadV2, PayloadAttributes};
+use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 
 /// Optimism Payload Attributes
@@ -22,6 +22,29 @@ pub struct OptimismPayloadAttributes {
         deserialize_with = "alloy_rpc_types::serde_helpers::u64_hex_opt::deserialize"
     )]
     pub gas_limit: Option<u64>,
+}
+
+/// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
+///
+/// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptimismExecutionPayloadV3 {
+    /// Inner V2 payload
+    #[serde(flatten)]
+    pub payload_inner: ExecutionPayloadV2,
+
+    /// Array of hex [`u64`] representing blob gas used, enabled with V3
+    /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    pub blob_gas_used: u64,
+    /// Array of hex[`u64`] representing excess blob gas, enabled with V3
+    /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
+    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    pub excess_blob_gas: u64,
+
+    /// Ecotone parent beacon block root
+    pub parent_beacon_block_root: B256,
 }
 
 #[cfg(test)]
