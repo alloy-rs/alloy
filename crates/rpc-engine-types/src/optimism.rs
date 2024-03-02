@@ -24,9 +24,10 @@ pub struct OptimismPayloadAttributes {
     pub gas_limit: Option<u64>,
 }
 
-/// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
+/// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec to be used on
+/// Optimism.
 ///
-/// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
+/// See also: [Ethereum exeuction payload v2](https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2), [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3), [Optimism exeuction payload v3](https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv3)
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimismExecutionPayloadV3 {
@@ -35,15 +36,16 @@ pub struct OptimismExecutionPayloadV3 {
     pub payload_inner: ExecutionPayloadV2,
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
-    /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
+    /// See [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3)
     #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
-    /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
+    /// See [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3)
     #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
     pub excess_blob_gas: u64,
 
     /// Ecotone parent beacon block root
+    /// See [Optimism exeuction payload v3](https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv3)
     pub parent_beacon_block_root: B256,
 }
 
