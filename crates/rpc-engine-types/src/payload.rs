@@ -13,7 +13,7 @@ use std::fmt;
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash, Default)]
 pub struct PayloadId(B64);
 
 // === impl PayloadId ===
@@ -117,9 +117,6 @@ pub struct ExecutionPayloadEnvelopeV3 {
     /// Introduced in V3, this represents a suggestion from the execution layer if the payload
     /// should be used instead of an externally provided one.
     pub should_override_builder: bool,
-    /// Optimism-specific - Ecotone parent beacon block root
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_beacon_block_root: Option<B256>,
 }
 
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.

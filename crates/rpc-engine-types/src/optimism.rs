@@ -1,5 +1,5 @@
-use crate::{ExecutionPayloadV2, PayloadAttributes};
-use alloy_primitives::{Bytes, B256};
+use crate::{BlobsBundleV1, ExecutionPayloadV3, PayloadAttributes};
+use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Optimism Payload Attributes
@@ -24,28 +24,24 @@ pub struct OptimismPayloadAttributes {
     pub gas_limit: Option<u64>,
 }
 
-/// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec to be used on
-/// Optimism.
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V3.
 ///
-/// See also: [Ethereum exeuction payload v2](https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2), [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3), [Optimism exeuction payload v3](https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv3)
+/// See also:
+/// [Optimism execution payload envelope v3] <https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv3>
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OptimismExecutionPayloadV3 {
-    /// Inner V2 payload
-    #[serde(flatten)]
-    pub payload_inner: ExecutionPayloadV2,
-
-    /// Array of hex [`u64`] representing blob gas used, enabled with V3
-    /// See [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3)
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
-    pub blob_gas_used: u64,
-    /// Array of hex[`u64`] representing excess blob gas, enabled with V3
-    /// See [Ethereum exeuction payload v3](https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3)
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
-    pub excess_blob_gas: u64,
-
+pub struct OptimismExecutionPayloadEnvelopeV3 {
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV1,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
     /// Ecotone parent beacon block root
-    /// See [Optimism exeuction payload v3](https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv3)
     pub parent_beacon_block_root: B256,
 }
 
