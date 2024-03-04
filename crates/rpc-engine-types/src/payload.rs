@@ -13,7 +13,7 @@ use std::fmt;
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct PayloadId(B64);
 
 // === impl PayloadId ===
