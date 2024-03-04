@@ -249,9 +249,11 @@ impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
         let fut = async move {
             'shutdown: loop {
                 {
+                    let next_reap = self.next_reap();
+                    let sleep = std::pin::pin!(tokio::time::sleep_until(next_reap.into()));
+
                     // We bias the select so that we always handle new messages
                     // before checking blocks, and reap timeouts are last.
-                    let next_reap = self.next_reap();
                     select! {
                         biased;
 
@@ -268,7 +270,7 @@ impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
 
                         // This arm ensures we always wake up to reap timeouts,
                         // even if there are no other events.
-                        _ = tokio::time::sleep_until(next_reap.into()) => {},
+                        _ = sleep => {},
                     }
                 }
 
