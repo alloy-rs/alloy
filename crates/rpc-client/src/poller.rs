@@ -123,7 +123,7 @@ where
                     Ok(p) => p,
                     Err(err) => {
                         error!(%err, "failed to serialize params");
-                        break 'outer;
+                        break;
                     }
                 };
 
