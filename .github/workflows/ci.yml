@@ -67,12 +67,14 @@ jobs:
       - name: cargo hack
         run: |
           cargo hack check --workspace --target wasm32-unknown-unknown \
+            --exclude alloy-contract \
+            --exclude alloy-node-bindings \
+            --exclude alloy-providers \
             --exclude alloy-signer \
             --exclude alloy-signer-aws \
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
-            --exclude alloy-node-bindings \
             --exclude alloy-transport-ipc
 
   feature-checks:

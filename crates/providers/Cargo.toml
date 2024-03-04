@@ -13,21 +13,31 @@ exclude.workspace = true
 
 [dependencies]
 alloy-network.workspace = true
-alloy-primitives.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
-alloy-rpc-types.workspace = true
 alloy-rpc-trace-types.workspace = true
+alloy-rpc-types.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
 alloy-transport.workspace = true
+
+alloy-primitives.workspace = true
+
+async-stream = "0.3.5"
 async-trait.workspace = true
+auto_impl = "1.1.0"
+futures.workspace = true
+lru = "0.12.2"
+reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-reqwest.workspace = true
-auto_impl = "1.1.0"
+tokio = { workspace = true, features = ["sync", "macros"] }
+tracing.workspace = true
 
 [dev-dependencies]
+alloy-consensus.workspace = true
 alloy-node-bindings.workspace = true
-tokio = { version = "1.33.0", features = ["macros"] }
+alloy-rlp.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+tracing-subscriber = { workspace = true, features = ["fmt"] }
 
 [features]
 anvil = []

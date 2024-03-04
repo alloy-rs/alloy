@@ -33,6 +33,21 @@ where
     Complete,
 }
 
+impl<Params, Conn> Clone for CallState<Params, Conn>
+where
+    Params: RpcParam,
+    Conn: Transport + Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Prepared { request, connection } => {
+                Self::Prepared { request: request.clone(), connection: connection.clone() }
+            }
+            _ => panic!("cloned after dispatch"),
+        }
+    }
+}
+
 impl<Params, Conn> fmt::Debug for CallState<Params, Conn>
 where
     Params: RpcParam,
@@ -150,6 +165,17 @@ where
     #[pin]
     state: CallState<Params, Conn>,
     _pd: PhantomData<fn() -> Resp>,
+}
+
+impl<Conn, Params, Resp> Clone for RpcCall<Conn, Params, Resp>
+where
+    Conn: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+{
+    fn clone(&self) -> Self {
+        Self { state: self.state.clone(), _pd: PhantomData }
+    }
 }
 
 impl<Conn, Params, Resp> RpcCall<Conn, Params, Resp>

@@ -1,4 +1,4 @@
-use crate::RpcClient;
+use crate::{client::RpcClientInner, ClientRef};
 use alloy_json_rpc::{
     transform_response, try_deserialize_ok, Id, Request, RequestPacket, ResponsePacket, RpcParam,
     RpcReturn, SerializedRequest,
@@ -24,7 +24,7 @@ pub(crate) type ChannelMap = HashMap<Id, Channel>;
 #[must_use = "A BatchRequest does nothing unless sent via `send_batch` and `.await`"]
 pub struct BatchRequest<'a, T> {
     /// The transport via which the batch will be sent.
-    transport: &'a RpcClient<T>,
+    transport: ClientRef<'a, T>,
 
     /// The requests to be sent.
     requests: RequestPacket,
@@ -66,10 +66,7 @@ where
 
 #[pin_project::pin_project(project = CallStateProj)]
 #[derive(Debug)]
-pub enum BatchFuture<Conn>
-where
-    Conn: Transport,
-{
+pub enum BatchFuture<Conn: Transport> {
     Prepared {
         transport: Conn,
         requests: RequestPacket,
@@ -86,7 +83,7 @@ where
 
 impl<'a, T> BatchRequest<'a, T> {
     /// Create a new batch request.
-    pub fn new(transport: &'a RpcClient<T>) -> Self {
+    pub fn new(transport: &'a RpcClientInner<T>) -> Self {
         Self {
             transport,
             requests: RequestPacket::Batch(Vec::with_capacity(10)),

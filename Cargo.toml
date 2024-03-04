@@ -67,6 +67,7 @@ futures-executor = "0.3.29"
 hyper = "0.14.27"
 tokio = "1.33"
 tokio-util = "0.7"
+tokio-stream = "0.1.14"
 tower = { version = "0.4.13", features = ["util"] }
 
 tracing = "0.1.40"

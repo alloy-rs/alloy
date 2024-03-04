@@ -1,7 +1,10 @@
 use alloy_primitives::B256;
+use futures::{ready, Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
+use std::{pin::Pin, task};
 use tokio::sync::broadcast;
+use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream};
 
 /// A Subscription is a feed of notifications from the server, identified by a
 /// local ID.
@@ -18,8 +21,8 @@ pub struct RawSubscription {
 
 impl RawSubscription {
     /// Get the local ID of the subscription.
-    pub const fn local_id(&self) -> B256 {
-        self.local_id
+    pub const fn local_id(&self) -> &B256 {
+        &self.local_id
     }
 
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
@@ -72,6 +75,11 @@ impl RawSubscription {
     pub fn try_recv(&mut self) -> Result<Box<RawValue>, broadcast::error::TryRecvError> {
         self.rx.try_recv()
     }
+
+    /// Convert the subscription into a stream.
+    pub fn into_stream(self) -> BroadcastStream<Box<RawValue>> {
+        self.rx.into()
+    }
 }
 
 /// An item in a typed [`Subscription`]. This is either the expected type, or
@@ -119,7 +127,7 @@ impl<T> From<RawSubscription> for Subscription<T> {
 
 impl<T> Subscription<T> {
     /// Get the local ID of the subscription.
-    pub const fn local_id(&self) -> B256 {
+    pub const fn local_id(&self) -> &B256 {
         self.inner.local_id()
     }
 
@@ -206,6 +214,15 @@ impl<T: DeserializeOwned> Subscription<T> {
         self.inner.try_recv().map(Into::into)
     }
 
+    /// Convert the subscription into a stream that may yield unexpected types.
+    pub fn into_any_stream(self) -> SubAnyStream<T> {
+        SubAnyStream {
+            id: self.inner.local_id,
+            inner: self.inner.into_stream(),
+            _pd: std::marker::PhantomData,
+        }
+    }
+
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
     /// of the expected type is available.
     ///
@@ -245,6 +262,15 @@ impl<T: DeserializeOwned> Subscription<T> {
         }
     }
 
+    /// Convert the subscription into a stream.
+    pub fn into_stream(self) -> SubscriptionStream<T> {
+        SubscriptionStream {
+            id: self.inner.local_id,
+            inner: self.inner.into_stream(),
+            _pd: std::marker::PhantomData,
+        }
+    }
+
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
     /// is available, deserializing the message and returning the result.
     ///
@@ -273,5 +299,118 @@ impl<T: DeserializeOwned> Subscription<T> {
         &mut self,
     ) -> Result<Result<T, serde_json::Error>, broadcast::error::TryRecvError> {
         self.inner.try_recv().map(|value| serde_json::from_str(value.get()))
+    }
+
+    /// Convert the subscription into a stream that returns deserialization
+    /// results.
+    pub fn into_result_stream(self) -> SubResultStream<T> {
+        SubResultStream {
+            id: self.inner.local_id,
+            inner: self.inner.into_stream(),
+            _pd: std::marker::PhantomData,
+        }
+    }
+}
+
+/// A stream of notifications from the server, identified by a local ID. This
+/// stream may yield unexpected types.
+#[derive(Debug)]
+pub struct SubAnyStream<T> {
+    id: B256,
+    inner: BroadcastStream<Box<RawValue>>,
+    _pd: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T> SubAnyStream<T> {
+    /// Get the local ID of the subscription.
+    pub const fn id(&self) -> &B256 {
+        &self.id
+    }
+}
+
+impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
+    type Item = Result<SubscriptionItem<T>, BroadcastStreamRecvError>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> task::Poll<Option<Self::Item>> {
+        match ready!(self.inner.poll_next_unpin(cx)) {
+            Some(value) => task::Poll::Ready(Some(value.map(Into::into))),
+            None => task::Poll::Ready(None),
+        }
+    }
+}
+
+/// A stream of notifications from the server, identified by a local ID. This/
+/// stream will yield only the expected type, discarding any notifications of
+/// unexpected types.
+#[derive(Debug)]
+pub struct SubscriptionStream<T> {
+    id: B256,
+    inner: BroadcastStream<Box<RawValue>>,
+    _pd: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T> SubscriptionStream<T> {
+    /// Get the local ID of the subscription.
+    pub const fn id(&self) -> &B256 {
+        &self.id
+    }
+}
+
+impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
+    type Item = Result<T, BroadcastStreamRecvError>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> task::Poll<Option<Self::Item>> {
+        loop {
+            match ready!(self.inner.poll_next_unpin(cx)) {
+                Some(Ok(value)) => match serde_json::from_str(value.get()) {
+                    Ok(item) => return task::Poll::Ready(Some(Ok(item))),
+                    Err(e) => {
+                        trace!(value = value.get(), error = ?e, "Received unexpected value in subscription.");
+                        continue;
+                    }
+                },
+                Some(Err(e)) => return task::Poll::Ready(Some(Err(e))),
+                None => return task::Poll::Ready(None),
+            }
+        }
+    }
+}
+
+/// A stream of notifications from the server, identified by a local ID.
+///
+/// This stream will attempt to deserialize the notifications and yield the [`serde_json::Result`]
+/// of the deserialization.
+#[derive(Debug)]
+pub struct SubResultStream<T> {
+    id: B256,
+    inner: BroadcastStream<Box<RawValue>>,
+    _pd: std::marker::PhantomData<fn() -> T>,
+}
+
+impl<T> SubResultStream<T> {
+    /// Get the local ID of the subscription.
+    pub const fn id(&self) -> &B256 {
+        &self.id
+    }
+}
+
+impl<T: DeserializeOwned> Stream for SubResultStream<T> {
+    type Item = Result<serde_json::Result<T>, BroadcastStreamRecvError>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> task::Poll<Option<Self::Item>> {
+        match ready!(self.inner.poll_next_unpin(cx)) {
+            Some(Ok(value)) => task::Poll::Ready(Some(Ok(serde_json::from_str(value.get())))),
+            Some(Err(e)) => task::Poll::Ready(Some(Err(e))),
+            None => task::Poll::Ready(None),
+        }
     }
 }

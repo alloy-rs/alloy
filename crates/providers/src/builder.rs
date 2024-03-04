@@ -1,4 +1,4 @@
-use crate::{NetworkRpcClient, Provider};
+use crate::new::{Provider, RootProvider};
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
@@ -7,28 +7,27 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport> {
+pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
     type Provider: Provider<N, T>;
 
     fn layer(&self, inner: P) -> Self::Provider;
 }
 
-pub struct Stack<T, Inner, Outer> {
+pub struct Stack<Inner, Outer> {
     inner: Inner,
     outer: Outer,
-    _pd: std::marker::PhantomData<fn() -> T>,
 }
 
-impl<T, Inner, Outer> Stack<T, Inner, Outer> {
+impl<Inner, Outer> Stack<Inner, Outer> {
     /// Create a new `Stack`.
     pub fn new(inner: Inner, outer: Outer) -> Self {
-        Stack { inner, outer, _pd: std::marker::PhantomData }
+        Stack { inner, outer }
     }
 }
 
-impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<T, Inner, Outer>
+impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<Inner, Outer>
 where
-    T: Transport,
+    T: Transport + Clone,
     N: Network,
     P: Provider<N, T>,
     Inner: ProviderLayer<P, N, T>,
@@ -49,14 +48,13 @@ where
 /// around maintaining the network and transport types.
 ///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
-pub struct ProviderBuilder<L, N = (), T = ()> {
+pub struct ProviderBuilder<L, N = ()> {
     layer: L,
 
-    transport: PhantomData<T>,
     network: PhantomData<N>,
 }
 
-impl<L, N, T> ProviderBuilder<L, N, T> {
+impl<L, N> ProviderBuilder<L, N> {
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
     ///
@@ -70,12 +68,8 @@ impl<L, N, T> ProviderBuilder<L, N, T> {
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 
-    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<T, Inner, L>> {
-        ProviderBuilder {
-            layer: Stack::new(layer, self.layer),
-            transport: PhantomData,
-            network: PhantomData,
-        }
+    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>> {
+        ProviderBuilder { layer: Stack::new(layer, self.layer), network: PhantomData }
     }
 
     /// Change the network.
@@ -87,34 +81,34 @@ impl<L, N, T> ProviderBuilder<L, N, T> {
     /// ```rust,ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net, T> {
-        ProviderBuilder { layer: self.layer, transport: self.transport, network: PhantomData }
+    pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net> {
+        ProviderBuilder { layer: self.layer, network: PhantomData }
+    }
+
+    /// Finish the layer stack by providing a root [`Provider`], outputting
+    /// the final [`Provider`] type with all stack components.
+    pub fn provider<P, T>(self, provider: P) -> L::Provider
+    where
+        L: ProviderLayer<P, N, T>,
+        P: Provider<N, T>,
+        T: Transport + Clone,
+        N: Network,
+    {
+        self.layer.layer(provider)
     }
 
     /// Finish the layer stack by providing a root [`RpcClient`], outputting
     /// the final [`Provider`] type with all stack components.
     ///
     /// This is a convenience function for
-    /// `ProviderBuilder::provider<NetworkRpcClient>`.
-    pub fn client(self, client: RpcClient<T>) -> L::Provider
+    /// `ProviderBuilder::provider<RpcClient>`.
+    pub fn on_client<T>(self, client: RpcClient<T>) -> L::Provider
     where
-        L: ProviderLayer<NetworkRpcClient<N, T>, N, T>,
+        L: ProviderLayer<RootProvider<N, T>, N, T>,
         T: Transport + Clone,
         N: Network,
     {
-        self.provider(NetworkRpcClient::from(client))
-    }
-
-    /// Finish the layer stack by providing a root [`Provider`], outputting
-    /// the final [`Provider`] type with all stack components.
-    pub fn provider<P>(self, provider: P) -> L::Provider
-    where
-        L: ProviderLayer<P, N, T>,
-        P: Provider<N, T>,
-        T: Transport,
-        N: Network,
-    {
-        self.layer.layer(provider)
+        self.provider(RootProvider::new(client))
     }
 }
 

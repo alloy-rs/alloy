@@ -123,18 +123,10 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// the subscription does not exist, the waiter is sent nothing, and the
     /// `tx` is dropped. This notifies the waiter that the subscription does
     /// not exist.
-    fn service_get_sub(
-        &mut self,
-        local_id: U256,
-        tx: oneshot::Sender<RawSubscription>,
-    ) -> TransportResult<()> {
-        let local_id = local_id.into();
-
-        if let Some(rx) = self.subs.get_subscription(local_id) {
+    fn service_get_sub(&mut self, local_id: U256, tx: oneshot::Sender<RawSubscription>) {
+        if let Some(rx) = self.subs.get_subscription(local_id.into()) {
             let _ = tx.send(rx);
         }
-
-        Ok(())
     }
 
     /// Service an unsubscribe instruction.
@@ -153,7 +145,10 @@ impl<T: PubSubConnect> PubSubService<T> {
         trace!(?ix, "servicing instruction");
         match ix {
             PubSubInstruction::Request(in_flight) => self.service_request(in_flight),
-            PubSubInstruction::GetSub(alias, tx) => self.service_get_sub(alias, tx),
+            PubSubInstruction::GetSub(alias, tx) => {
+                self.service_get_sub(alias, tx);
+                Ok(())
+            }
             PubSubInstruction::Unsubscribe(alias) => self.service_unsubscribe(alias),
         }
     }

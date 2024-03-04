@@ -2,7 +2,7 @@ use crate::{ErrorPayload, RpcReturn};
 use serde_json::value::RawValue;
 
 /// An RPC error.
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum RpcError<E, ErrResp = Box<RawValue>> {
     /// Server returned an error response.
     #[error("Server returned an error response: {0}")]
