@@ -25,7 +25,7 @@ pub use builder::{ProviderBuilder, ProviderLayer, Stack};
 mod chain;
 
 mod heart;
-pub use heart::PendingTransaction;
+pub use heart::{PendingTransaction, WatchConfig};
 
 pub mod new;
 pub use new::{Provider, ProviderRef, RootProvider, WeakProvider};

@@ -1,4 +1,3 @@
-#![allow(dead_code, unreachable_pub)] // TODO: remove
 //! Block Hearbeat and Transaction Watcher
 
 use alloy_primitives::{B256, U256};
@@ -110,6 +109,7 @@ impl Future for PendingTransaction {
 #[derive(Debug, Clone)]
 pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
+    #[allow(dead_code)]
     latest: watch::Receiver<Option<Block>>,
 }
 
@@ -128,6 +128,7 @@ impl HeartbeatHandle {
     }
 
     /// Returns a watcher that always sees the latest block.
+    #[allow(dead_code)]
     pub(crate) fn latest(&self) -> &watch::Receiver<Option<Block>> {
         &self.latest
     }
