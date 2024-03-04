@@ -29,7 +29,7 @@ lru = "0.12.2"
 reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["sync"] }
+tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 
 [dev-dependencies]
