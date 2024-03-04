@@ -48,6 +48,23 @@ where
     pub const fn err_resp(err: ErrorPayload<ErrResp>) -> Self {
         Self::ErrorResp(err)
     }
+
+    /// Instantiate a new `TransportError` from a [`serde_json::Error`] and the
+    /// text. This should be called when the error occurs during
+    /// deserialization.
+    ///
+    /// Note: This will check if the response is actually an [ErrorPayload], if so it will return a
+    /// [RpcError::ErrorResp].
+    pub fn deser_err(err: serde_json::Error, text: impl AsRef<str>) -> Self {
+        let text = text.as_ref();
+
+        // check if the response is actually an `ErrorPayload`
+        if let Ok(err) = serde_json::from_str::<ErrorPayload<ErrResp>>(text) {
+            return Self::ErrorResp(err);
+        }
+
+        Self::DeserError { err, text: text.to_owned() }
+    }
 }
 
 impl<E, ErrResp> RpcError<E, ErrResp> {
@@ -55,13 +72,6 @@ impl<E, ErrResp> RpcError<E, ErrResp> {
     /// should be called when the error occurs during serialization.
     pub const fn ser_err(err: serde_json::Error) -> Self {
         Self::SerError(err)
-    }
-
-    /// Instantiate a new `TransportError` from a [`serde_json::Error`] and the
-    /// text. This should be called when the error occurs during
-    /// deserialization.
-    pub fn deser_err(err: serde_json::Error, text: impl AsRef<str>) -> Self {
-        Self::DeserError { err, text: text.as_ref().to_owned() }
     }
 
     /// Check if the error is a serialization error.
