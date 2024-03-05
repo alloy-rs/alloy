@@ -378,9 +378,9 @@ mod tests {
         let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
         let sig_dynamic = wallet.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
         assert_eq!(
-+            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
-+            wallet.address()
-+       );
+            sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
+            wallet.address()
+        );
         assert_eq!(wallet.sign_hash_sync(dynamic_hash).unwrap(), sig_dynamic);
     }
 
