@@ -18,5 +18,6 @@
 pub mod common;
 pub mod filter;
 pub mod geth;
+pub mod opcode;
 pub mod parity;
 pub mod tracerequest;
