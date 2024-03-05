@@ -11,7 +11,8 @@ pub struct BlockOpcodeGas {
     pub block_hash: B256,
     /// The block number
     pub block_number: u64,
-    /// The gas used by each opcode in the transaction
+    /// All executed transactions in the block in the order they were executed, with their opcode
+    /// gas usage.
     pub transactions: Vec<TransactionOpcodeGas>,
 }
 
