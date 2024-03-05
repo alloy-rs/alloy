@@ -26,5 +26,5 @@ hyper = { workspace = true, features = ["full"], optional = true }
 
 [features]
 default = ["reqwest"]
-reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
+reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower", "reqwest/default-tls"]
 hyper = ["dep:hyper", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
