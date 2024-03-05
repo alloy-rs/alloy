@@ -36,7 +36,6 @@ pub struct OpcodeGas {
     pub count: u64,
     /// Combined gas used by all instances of the opcode
     ///
-    /// For dynamic gas costs, this is the sum of all gas used by the opcode.
-    /// For constant gas costs, this is the gas cost times the count.
+    /// For opcodes with constant gas costs, this is the constant opcode gas cost times the count.
     pub gas_used: u64,
 }
