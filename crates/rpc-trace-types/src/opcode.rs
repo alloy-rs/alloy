@@ -19,12 +19,13 @@ pub struct BlockOpcodeGas {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionOpcodeGas {
+    /// The transaction hash
+    pub transaction_hash: B256,
     /// The gas used by each opcode in the transaction
     pub opcode_gas: Vec<OpcodeGas>,
-    /// The transaction hash
-    pub transaction_hash: Vec<OpcodeGas>,
 }
 
+/// Gas information for a single opcode.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpcodeGas {
