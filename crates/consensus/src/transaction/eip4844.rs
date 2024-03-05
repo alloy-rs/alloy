@@ -1,4 +1,10 @@
+mod builder;
+pub use builder::{SidecarBuilder, SidecarCoder, SimpleCoder};
+
+pub mod utils;
+
 use crate::{SignableTransaction, Signed, Transaction, TxType};
+
 use alloy_eips::{
     eip2930::AccessList,
     eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
