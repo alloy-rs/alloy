@@ -5,10 +5,7 @@ use std::collections::HashMap;
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MuxConfig {
-    #[serde(flatten)]
-    pub tracers: HashMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>,
-}
+pub struct MuxConfig(pub HashMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>);
 
 /// A `muxTracer` frame response that contains the results of multiple tracers
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,19 +59,17 @@ mod tests {
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
         let prestate_config = PreStateConfig { diff_mode: Some(true) };
 
-        opts.tracing_options.tracer_config = serde_json::to_value(MuxConfig {
-            tracers: HashMap::from([
-                (GethDebugBuiltInTracerType::FourByteTracer, None),
-                (
-                    GethDebugBuiltInTracerType::CallTracer,
-                    Some(GethDebugTracerConfig(serde_json::to_value(call_config).unwrap())),
-                ),
-                (
-                    GethDebugBuiltInTracerType::PreStateTracer,
-                    Some(GethDebugTracerConfig(serde_json::to_value(prestate_config).unwrap())),
-                ),
-            ]),
-        })
+        opts.tracing_options.tracer_config = serde_json::to_value(MuxConfig(HashMap::from([
+            (GethDebugBuiltInTracerType::FourByteTracer, None),
+            (
+                GethDebugBuiltInTracerType::CallTracer,
+                Some(GethDebugTracerConfig(serde_json::to_value(call_config).unwrap())),
+            ),
+            (
+                GethDebugBuiltInTracerType::PreStateTracer,
+                Some(GethDebugTracerConfig(serde_json::to_value(prestate_config).unwrap())),
+            ),
+        ])))
         .unwrap()
         .into();
 

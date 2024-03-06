@@ -246,7 +246,7 @@ impl GethDebugTracerConfig {
         self.0
     }
 
-    /// Returns the [PreStateConfig] if it is a call config.
+    /// Returns the [PreStateConfig] if it is a prestate config.
     pub fn into_pre_state_config(self) -> Result<PreStateConfig, serde_json::Error> {
         if self.0.is_null() {
             return Ok(Default::default());
@@ -254,6 +254,7 @@ impl GethDebugTracerConfig {
         self.from_value()
     }
 
+    /// Returns the [MuxConfig] if it is a mux config.
     pub fn into_mux_config(self) -> Result<MuxConfig, serde_json::Error> {
         if self.0.is_null() {
             return Ok(Default::default());
