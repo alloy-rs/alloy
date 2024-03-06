@@ -5,6 +5,7 @@ use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
 use alloy_dyn_abi::eip712::TypedData;
+#[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
 pub use alloy_network::Transaction;
