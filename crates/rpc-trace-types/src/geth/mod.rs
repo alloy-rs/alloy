@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 //! Geth tracing types
 
+use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
@@ -19,6 +20,7 @@ pub use self::{
 
 pub mod call;
 pub mod four_byte;
+pub mod mux;
 pub mod noop;
 pub mod pre_state;
 
@@ -116,6 +118,8 @@ pub enum GethTrace {
     PreStateTracer(PreStateFrame),
     /// An empty json response
     NoopTracer(NoopFrame),
+    /// The response for mux tracer
+    MuxTracer(MuxFrame),
     /// Any other trace response, such as custom javascript response objects
     JS(serde_json::Value),
 }
@@ -150,10 +154,16 @@ impl From<NoopFrame> for GethTrace {
     }
 }
 
+impl From<MuxFrame> for GethTrace {
+    fn from(value: MuxFrame) -> Self {
+        GethTrace::MuxTracer(value)
+    }
+}
+
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
-#[derive(Debug, Copy, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Hash, Deserialize, Serialize)]
 pub enum GethDebugBuiltInTracerType {
     /// The 4byteTracer collects the function selectors of every function executed in the lifetime
     /// of a transaction, along with the size of the supplied call data. The result is a
@@ -179,6 +189,9 @@ pub enum GethDebugBuiltInTracerType {
     /// This tracer is noop. It returns an empty object and is only meant for testing the setup.
     #[serde(rename = "noopTracer")]
     NoopTracer,
+    /// The mux tracer is a tracer that can run multiple tracers at once.
+    #[serde(rename = "muxTracer")]
+    MuxTracer,
 }
 
 /// Available tracers
@@ -235,6 +248,13 @@ impl GethDebugTracerConfig {
 
     /// Returns the [PreStateConfig] if it is a call config.
     pub fn into_pre_state_config(self) -> Result<PreStateConfig, serde_json::Error> {
+        if self.0.is_null() {
+            return Ok(Default::default());
+        }
+        self.from_value()
+    }
+
+    pub fn into_mux_config(self) -> Result<MuxConfig, serde_json::Error> {
         if self.0.is_null() {
             return Ok(Default::default());
         }
