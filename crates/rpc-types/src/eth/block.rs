@@ -1,5 +1,7 @@
 //! Block RPC types.
 
+#![allow(unknown_lints, non_local_definitions)]
+
 use crate::{other::OtherFields, Transaction, Withdrawal};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
