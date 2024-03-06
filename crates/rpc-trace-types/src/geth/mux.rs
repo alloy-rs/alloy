@@ -60,8 +60,8 @@ mod tests {
             Some(GethDebugTracerType::BuiltInTracer(GethDebugBuiltInTracerType::MuxTracer));
 
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
-
         let prestate_config = PreStateConfig { diff_mode: Some(true) };
+
         opts.tracing_options.tracer_config = serde_json::to_value(MuxConfig {
             tracers: HashMap::from([
                 (GethDebugBuiltInTracerType::FourByteTracer, None),
