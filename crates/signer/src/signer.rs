@@ -102,7 +102,8 @@ pub trait Signer: Send + Sync {
         self.sign_hash(payload.eip712_signing_hash(domain)).await
     }
 
-    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically sized.
+    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
+    /// sized.
     #[cfg(feature = "eip712")]
     #[inline]
     async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Signature> {
@@ -193,7 +194,8 @@ pub trait SignerSync {
         self.sign_hash_sync(payload.eip712_signing_hash(domain))
     }
 
-    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically sized.
+    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
+    /// sized.
     ///
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
