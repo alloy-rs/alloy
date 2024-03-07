@@ -132,7 +132,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         use alloy_network::TransactionBuilder;
         let gas = self.estimate_gas(&*tx, block).await;
 
-        gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
+        gas.map(|gas| tx.set_gas_limit(gas))
     }
 
     /// Populates the EIP-1559 gas price fields of the given transaction request.
@@ -145,8 +145,8 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         let gas = self.estimate_eip1559_fees(estimator).await;
 
         gas.map(|(max_fee_per_gas, max_priority_fee_per_gas)| {
-            tx.set_max_fee_per_gas(max_fee_per_gas.try_into().unwrap());
-            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas.try_into().unwrap());
+            tx.set_max_fee_per_gas(max_fee_per_gas);
+            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
         })
     }
 
