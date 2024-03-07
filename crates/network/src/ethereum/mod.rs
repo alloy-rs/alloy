@@ -30,7 +30,8 @@ impl Network for Ethereum {
     type HeaderResponse = alloy_rpc_types::Header;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
         self.chain_id

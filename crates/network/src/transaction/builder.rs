@@ -43,7 +43,8 @@ pub type BuilderResult<T, E = TransactionBuilderError> = std::result::Result<T, 
 ///
 /// Transaction builders should be able to construct all available transaction types on a given
 /// network.
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
