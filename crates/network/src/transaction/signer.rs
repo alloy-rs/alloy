@@ -5,7 +5,7 @@ use async_trait::async_trait;
 // todo: move
 /// A signer capable of signing any transaction for the given network.
 #[async_trait]
-pub trait NetworkSigner<N: Network> {
+pub trait NetworkSigner<N: Network>: Sync {
     /// Asynchronously sign an unsigned transaction.
     async fn sign(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
 }
