@@ -17,6 +17,7 @@ alloy-genesis.workspace = true
 k256.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
