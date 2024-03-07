@@ -117,3 +117,5 @@ tempfile = "3.10"
 # This should only be used in `alloy-contract` tests.
 # [patch.crates-io]
 # alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "18b0509950c90d9ec38f25913b692ae4cdd6f227" }
+[patch.crates-io]
+alloy-sol-macro = { path = "../core/crates/sol-macro" }

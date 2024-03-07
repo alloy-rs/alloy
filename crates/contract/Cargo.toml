@@ -25,5 +25,8 @@ alloy-sol-types.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+alloy-rpc-client.workspace = true
+alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true
+reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

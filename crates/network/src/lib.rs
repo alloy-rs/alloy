@@ -56,7 +56,7 @@ pub struct BlockResponse<N: Network> {
 /// Captures type info for network-specific RPC requests/responses.
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
-pub trait Network: Sized + Send + Sync + 'static {
+pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     #[doc(hidden)]
     /// Asserts that this trait can only be implemented on a ZST.
     const __ASSERT_ZST: () = {

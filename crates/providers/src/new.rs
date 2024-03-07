@@ -38,7 +38,7 @@ pub struct RootProvider<N, T> {
 }
 
 impl<N: Network, T: Transport> RootProvider<N, T> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
+    pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
 }
@@ -483,7 +483,7 @@ mod tests {
         let _ = tracing_subscriber::fmt::try_init();
     }
 
-    fn anvil_provider() -> (HttpProvider<Ethereum>, AnvilInstance) {
+    fn spawn_anvil() -> (HttpProvider<Ethereum>, AnvilInstance) {
         let anvil = Anvil::new().spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
@@ -493,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_tx() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -511,7 +511,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_number() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num)
@@ -522,7 +522,7 @@ mod tests {
         use super::RawProvider;
 
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num: U64 = provider.raw_request("eth_blockNumber", ()).await.unwrap();
         assert_eq!(0, num.to::<u64>())
@@ -531,7 +531,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let count = provider
             .get_transaction_count(
@@ -546,7 +546,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_hash() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
@@ -561,7 +561,7 @@ mod tests {
         use super::RawProvider;
 
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
@@ -580,7 +580,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_number_full() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
@@ -591,7 +591,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_number() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
@@ -602,7 +602,7 @@ mod tests {
     #[tokio::test]
     async fn gets_client_version() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let version = provider.get_client_version().await.unwrap();
         assert!(version.contains("anvil"));
@@ -636,7 +636,7 @@ mod tests {
     #[cfg(feature = "anvil")]
     async fn gets_code_at() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         // Set the code
         let addr = alloy_primitives::Address::with_last_byte(16);
@@ -650,7 +650,7 @@ mod tests {
     #[tokio::test]
     async fn gets_storage_at() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let addr = alloy_primitives::Address::with_last_byte(16);
         let storage = provider.get_storage_at(addr, U256::ZERO, None).await.unwrap();
@@ -661,7 +661,7 @@ mod tests {
     #[ignore]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let tx = provider
             .get_transaction_by_hash(b256!(
@@ -680,7 +680,7 @@ mod tests {
     #[ignore]
     async fn gets_logs() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let filter = Filter::new()
             .at_block_hash(b256!(
@@ -697,7 +697,7 @@ mod tests {
     #[ignore]
     async fn gets_tx_receipt() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let receipt = provider
             .get_transaction_receipt(b256!(
@@ -716,7 +716,7 @@ mod tests {
     #[tokio::test]
     async fn gets_fee_history() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let block_number = provider.get_block_number().await.unwrap();
         let fee_history = provider
@@ -734,7 +734,7 @@ mod tests {
     #[ignore] // Anvil has yet to implement the `eth_getBlockReceipts` method.
     async fn gets_block_receipts() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
         assert!(receipts.is_some());
@@ -743,7 +743,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_traces() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
         assert_eq!(traces.len(), 0);
@@ -752,7 +752,7 @@ mod tests {
     #[tokio::test]
     async fn sends_raw_transaction() {
         init_tracing();
-        let (provider, _anvil) = anvil_provider();
+        let (provider, _anvil) = spawn_anvil();
 
         let pending = provider
             .send_raw_transaction(

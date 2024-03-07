@@ -15,9 +15,8 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-// todo: re-enable when alloy-sol-macro is adjusted
-//#[cfg(test)]
-//extern crate self as alloy_contract;
+#[cfg(test)]
+extern crate self as alloy_contract;
 
 mod error;
 pub use error::*;
@@ -35,5 +34,7 @@ pub use call::*;
 // NOTE: please avoid changing the API of this module due to its use in the `sol!` macro.
 #[doc(hidden)]
 pub mod private {
+    pub use alloy_network::Network;
     pub use alloy_providers::Provider;
+    pub use alloy_transport::Transport;
 }
