@@ -8,7 +8,7 @@ use alloy_primitives::TxKind;
 /// 2. EIP2930 (state access lists) [`TxEip2930`]
 /// 3. EIP1559 [`TxEip1559`]
 /// 4. EIP4844 [`TxEip4844`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypedTransaction {
     /// Legacy transaction
     Legacy(TxLegacy),
