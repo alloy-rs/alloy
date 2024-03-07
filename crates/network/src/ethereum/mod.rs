@@ -80,11 +80,27 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
     }
 
     fn gas_price(&self) -> Option<U256> {
-        todo!()
+        self.gas_price
     }
 
     fn set_gas_price(&mut self, gas_price: U256) {
-        todo!()
+        self.gas_price = Some(gas_price);
+    }
+
+    fn max_fee_per_gas(&self) -> Option<U256> {
+        self.max_fee_per_gas
+    }
+
+    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256) {
+        self.max_fee_per_gas = Some(max_fee_per_gas);
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<U256> {
+        self.max_priority_fee_per_gas
+    }
+
+    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256) {
+        self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
     fn gas_limit(&self) -> Option<U256> {

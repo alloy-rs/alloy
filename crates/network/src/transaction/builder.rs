@@ -128,15 +128,39 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
-    /// Get the gas price for the transaction.
+    /// Get the legacy gas price for the transaction.
     fn gas_price(&self) -> Option<U256>;
 
-    /// Set the gas price for the transaction.
+    /// Set the legacy gas price for the transaction.
     fn set_gas_price(&mut self, gas_price: U256);
 
-    /// Builder-pattern method for setting the gas price.
+    /// Builder-pattern method for setting the legacy gas price.
     fn with_gas_price(mut self, gas_price: U256) -> Self {
         self.set_gas_price(gas_price);
+        self
+    }
+
+    /// Get the max fee per gas for the transaction.
+    fn max_fee_per_gas(&self) -> Option<U256>;
+
+    /// Set the max fee per gas  for the transaction.
+    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256);
+
+    /// Builder-pattern method for setting max fee per gas .
+    fn with_max_fee_per_gas(mut self, max_fee_per_gas: U256) -> Self {
+        self.set_max_fee_per_gas(max_fee_per_gas);
+        self
+    }
+
+    /// Get the max priority fee per gas for the transaction.
+    fn max_priority_fee_per_gas(&self) -> Option<U256>;
+
+    /// Set the max priority fee per gas for the transaction.
+    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256);
+
+    /// Builder-pattern method for setting max priority fee per gas.
+    fn with_max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: U256) -> Self {
+        self.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
         self
     }
 
