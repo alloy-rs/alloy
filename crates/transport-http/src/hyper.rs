@@ -30,6 +30,8 @@ where
 
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
 
+            let status = resp.status();
+
             // unpack data from the response body. We do this regardless of
             // the status code, as we want to return the error in the body if
             // there is one.
@@ -37,11 +39,10 @@ where
                 .await
                 .map_err(TransportErrorKind::custom)?;
 
-            if resp.status() != hyper::StatusCode::OK {
+            if status != hyper::StatusCode::OK {
                 return Err(TransportErrorKind::custom_str(&format!(
                     "HTTP error: {} with body: {:?}",
-                    resp.status(),
-                    body
+                    status, body
                 )));
             }
 
