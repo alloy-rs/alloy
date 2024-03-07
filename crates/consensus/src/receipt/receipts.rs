@@ -33,7 +33,7 @@ impl Receipt {
 /// This convenience type allows us to lazily calculate the bloom filter for a
 /// receipt, similar to [`Sealed`].
 ///
-/// [`Sealed`]: ::alloy_network::Sealed
+/// [`Sealed`]: crate::sealed::Sealed
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct ReceiptWithBloom {
     /// The receipt.

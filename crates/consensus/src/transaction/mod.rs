@@ -64,7 +64,7 @@ pub trait SignableTransaction<Signature>: Transaction {
 
     /// RLP-encodes the transaction for signing it. Used to calculate `signature_hash`.
     ///
-    /// See [`Transaction::encode_for_signing`].
+    /// See [`SignableTransaction::encode_for_signing`].
     fn encoded_for_signing(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(self.payload_len_for_signature());
         self.encode_for_signing(&mut buf);
@@ -89,7 +89,7 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// Decode a signed transaction. This decoding is usually RLP, but may be
     /// different for future EIP-2718 transaction types.
     ///
-    /// This MUST be the inverse of [`Transaction::encode_signed`].
+    /// This MUST be the inverse of [`SignableTransaction::encode_signed`].
     fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self, Signature>>
     where
         Self: Sized;

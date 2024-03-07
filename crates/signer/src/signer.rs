@@ -14,13 +14,6 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 /// [`UnsupportedOperation`](crate::Error::UnsupportedOperation), and implement all the signing
 /// methods directly.
 ///
-/// A signer should hold an optional [`ChainId`] value, which is used for [EIP-155] replay
-/// protection.
-///
-/// If `chain_id` is Some, [EIP-155] should be applied to the input transaction in
-/// [`sign_transaction`](Self::sign_transaction), and to the resulting signature in all the methods.
-/// If `chain_id` is None, [EIP-155] should not be applied.
-///
 /// Synchronous signers should implement both this trait and [`SignerSync`].
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
@@ -83,13 +76,6 @@ pub trait Signer<Sig: 'static = Signature>: Send + Sync {
 /// may not always be able to implement this method, in which case it should return
 /// [`UnsupportedOperation`](crate::Error::UnsupportedOperation), and implement all the signing
 /// methods directly.
-///
-/// A signer should hold an optional [`ChainId`] value, which is used for [EIP-155] replay
-/// protection.
-///
-/// If `chain_id` is Some, [EIP-155] should be applied to the input transaction in
-/// [`sign_transaction_sync`](Self::sign_transaction_sync), and to the resulting signature in all
-/// the methods. If `chain_id` is None, [EIP-155] should not be applied.
 ///
 /// Synchronous signers should also implement [`Signer`], as they are always able to by delegating
 /// the asynchronous methods to the synchronous ones.
