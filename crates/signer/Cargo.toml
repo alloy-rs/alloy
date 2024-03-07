@@ -39,8 +39,6 @@ yubihsm = { version = "0.42", features = [
 ], optional = true }
 
 [dev-dependencies]
-# todo: circular dep v_v
-# alloy-consensus needs alloy-signer for the SignableTransaction trait
 alloy-consensus.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true

@@ -20,7 +20,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&mut, Box)]
-pub trait Signer<Sig: 'static = Signature>: Send + Sync {
+pub trait Signer<Sig = Signature>: Send + Sync {
     /// Signs the given hash.
     async fn sign_hash(&self, hash: &B256) -> Result<Sig>;
 
