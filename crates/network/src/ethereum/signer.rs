@@ -58,9 +58,10 @@ impl NetworkSigner<Ethereum> for EthereumSigner {
 
 #[cfg(test)]
 mod test {
+    use crate::{TxSigner, TxSignerSync};
     use alloy_consensus::{SignableTransaction, TxLegacy};
     use alloy_primitives::{address, ChainId, Signature, U256};
-    use alloy_signer::{k256, Result, Signer, TxSigner, TxSignerSync};
+    use alloy_signer::{k256, Result, Signer};
 
     #[tokio::test]
     async fn signs_tx() {
