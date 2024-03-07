@@ -173,6 +173,10 @@ impl Transaction for TxEip2930 {
 }
 
 impl SignableTransaction<Signature> for TxEip2930 {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
+
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
         out.put_u8(self.tx_type() as u8);
         Header { list: true, payload_length: self.fields_len() }.encode(out);

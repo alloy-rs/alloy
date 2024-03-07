@@ -137,20 +137,6 @@ impl TxLegacy {
             chain_id: None,
         })
     }
-
-    /// Encodes the legacy transaction in RLP for signing.
-    ///
-    /// This encodes the transaction as:
-    /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
-    /// value, input, access_list, max_fee_per_blob_gas, blob_versioned_hashes)`
-    ///
-    /// Note that there is no rlp header before the transaction type byte.
-    pub fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
-            .encode(out);
-        self.encode_fields(out);
-        self.encode_eip155_signing_fields(out);
-    }
 }
 
 impl Transaction for TxLegacy {
@@ -184,8 +170,15 @@ impl Transaction for TxLegacy {
 }
 
 impl SignableTransaction<Signature> for TxLegacy {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = Some(chain_id);
+    }
+
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        self.encode_for_signing(out)
+        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
+            .encode(out);
+        self.encode_fields(out);
+        self.encode_eip155_signing_fields(out);
     }
 
     fn payload_len_for_signature(&self) -> usize {

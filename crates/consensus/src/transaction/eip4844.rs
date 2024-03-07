@@ -200,6 +200,17 @@ impl Transaction for TxEip4844Variant {
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            TxEip4844Variant::TxEip4844(ref mut inner) => {
+                inner.chain_id = chain_id;
+            }
+            TxEip4844Variant::TxEip4844WithSidecar(ref mut inner) => {
+                inner.tx.chain_id = chain_id;
+            }
+        }
+    }
+
     fn payload_len_for_signature(&self) -> usize {
         let payload_length = self.fields_len();
         // 'transaction type byte length' + 'header length' + 'payload length'

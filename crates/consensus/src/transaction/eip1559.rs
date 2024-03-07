@@ -212,6 +212,10 @@ impl Transaction for TxEip1559 {
 }
 
 impl SignableTransaction<Signature> for TxEip1559 {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
+
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
         out.put_u8(self.tx_type() as u8);
         Header { list: true, payload_length: self.fields_len() }.encode(out);

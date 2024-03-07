@@ -49,7 +49,28 @@ where
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        self.sign_hash(&tx.signature_hash()).await
+        let chain_id = self.chain_id_sync();
+        if let Some(chain_id) = chain_id {
+            match tx.chain_id() {
+                Some(tx_chain_id) => {
+                    if tx_chain_id != chain_id {
+                        return Err(alloy_signer::Error::TransactionChainIdMismatch {
+                            signer: chain_id,
+                            tx: tx_chain_id,
+                        });
+                    }
+                }
+                None => {
+                    tx.set_chain_id(chain_id);
+                }
+            }
+        }
+
+        let mut sig = self.sign_hash(&tx.signature_hash()).await?;
+        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
     }
 }
 
@@ -61,6 +82,27 @@ where
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        self.sign_hash_sync(&tx.signature_hash())
+        let chain_id = self.chain_id_sync();
+        if let Some(chain_id) = chain_id {
+            match tx.chain_id() {
+                Some(tx_chain_id) => {
+                    if tx_chain_id != chain_id {
+                        return Err(alloy_signer::Error::TransactionChainIdMismatch {
+                            signer: chain_id,
+                            tx: tx_chain_id,
+                        });
+                    }
+                }
+                None => {
+                    tx.set_chain_id(chain_id);
+                }
+            }
+        }
+
+        let mut sig = self.sign_hash_sync(&tx.signature_hash())?;
+        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
     }
 }
