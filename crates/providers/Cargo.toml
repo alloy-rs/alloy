@@ -32,6 +32,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 
+
 [dev-dependencies]
 alloy-consensus.workspace = true
 alloy-node-bindings.workspace = true

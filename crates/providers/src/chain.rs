@@ -92,15 +92,24 @@ impl<P, T: Transport + Clone> ChainStreamPoller<P, T> {
             let mut retries = MAX_RETRIES;
             for number in self.next_yield..=block_number {
                 debug!(number, "fetching block");
-                let block = match provider.get_block_by_number(number, false).await {
-                    Ok(block) => block,
+                let block = match provider.get_block_by_number(number.into(), false).await {
+                    Ok(Some(block)) => block,
                     Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
                         debug!(number, %err, "failed to fetch block, retrying");
                         retries -= 1;
                         continue;
                     }
+                    Ok(None) if retries > 0 => {
+                        debug!(number, "failed to fetch block (doesn't exist), retrying");
+                        retries -= 1;
+                        continue;
+                    }
                     Err(err) => {
                         error!(number, %err, "failed to fetch block");
+                        break 'task;
+                    }
+                    Ok(None) => {
+                        error!(number, "failed to fetch block (doesn't exist)");
                         break 'task;
                     }
                 };
