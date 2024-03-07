@@ -420,9 +420,10 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
 }
 
 /// Extension trait for Anvil specific JSON-RPC methods.
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait AnvilProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
     /// Set the bytecode of a given account.
-    #[cfg(feature = "anvil")]
     async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
         self.client().prepare("anvil_setCode", (address, code)).await
     }

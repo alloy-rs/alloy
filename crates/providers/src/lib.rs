@@ -35,6 +35,8 @@ mod heart;
 pub use heart::{PendingTransaction, WatchConfig};
 
 pub mod new;
-pub use new::{Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
+
+#[doc(inline)]
+pub use new::{AnvilProvider, Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
 
 pub mod utils;
