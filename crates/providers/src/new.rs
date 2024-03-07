@@ -123,12 +123,13 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_getBlockByNumber", (number, hydrate)).await
     }
 
+    // todo eip-1559 and blobs as well
     async fn populate_gas(
         &self,
         tx: &mut N::TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<()> {
-        let gas = self.estimate_gas(&*tx, block).await;
+        let _ = self.estimate_gas(&*tx, block).await;
 
         todo!()
         // gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
@@ -467,9 +468,8 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
 
 #[cfg(test)]
 mod tests {
-    use crate::HttpProvider;
-
     use super::*;
+    use crate::HttpProvider;
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes};
@@ -642,10 +642,7 @@ mod tests {
         let addr = alloy_primitives::Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
         let _code = provider
-            .get_code_at(
-                addr,
-                crate::provider::BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest),
-            )
+            .get_code_at(addr, BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest))
             .await
             .unwrap();
     }

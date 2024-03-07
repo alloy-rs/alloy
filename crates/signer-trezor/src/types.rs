@@ -54,8 +54,8 @@ pub enum TrezorError {
     Features,
 }
 
-impl Into<alloy_signer::Error> for TrezorError {
-    fn into(self) -> alloy_signer::Error {
-        alloy_signer::Error::other(self)
+impl From<TrezorError> for alloy_signer::Error {
+    fn from(error: TrezorError) -> Self {
+        alloy_signer::Error::other(error)
     }
 }
