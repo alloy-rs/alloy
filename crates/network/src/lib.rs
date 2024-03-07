@@ -19,9 +19,6 @@ use alloy_eips::eip2718::Eip2718Envelope;
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::B256;
 
-mod sealed;
-pub use sealed::{Sealable, Sealed};
-
 mod transaction;
 pub use transaction::{
     BuilderResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
@@ -32,6 +29,9 @@ mod receipt;
 pub use receipt::Receipt;
 
 pub use alloy_eips::eip2718;
+
+mod ethereum;
+pub use ethereum::{Ethereum, EthereumSigner};
 
 /// A list of transactions, either hydrated or hashes.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -54,6 +54,8 @@ pub struct BlockResponse<N: Network> {
 }
 
 /// Captures type info for network-specific RPC requests/responses.
+// todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
+// generic over tx/header type
 pub trait Network: Sized + Send + Sync + 'static {
     #[doc(hidden)]
     /// Asserts that this trait can only be implemented on a ZST.
@@ -65,6 +67,10 @@ pub trait Network: Sized + Send + Sync + 'static {
 
     /// The network transaction envelope type.
     type TxEnvelope: Eip2718Envelope;
+
+    /// An enum over the various transaction types.
+    type UnsignedTx;
+
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
     /// The network header type.
@@ -73,7 +79,7 @@ pub trait Network: Sized + Send + Sync + 'static {
     // -- JSON RPC types --
 
     /// The JSON body of a transaction request.
-    type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
+    type TransactionRequest: RpcObject + TransactionBuilder<Self> + std::fmt::Debug;
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.
