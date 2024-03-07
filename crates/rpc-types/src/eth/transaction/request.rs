@@ -2,7 +2,7 @@
 use std::hash::Hash;
 
 use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
-use alloy_primitives::{Address, Bytes, B256, U256, U64, U8};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
 /// Represents _all_ transaction requests to/from RPC.
@@ -35,7 +35,7 @@ pub struct TransactionRequest {
     /// The nonce of the transaction.
     pub nonce: Option<U64>,
     /// The chain ID for the transaction.
-    pub chain_id: Option<U64>,
+    pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default)]
     pub access_list: Option<AccessList>,
@@ -154,19 +154,6 @@ impl TransactionRequest {
     pub fn transaction_type(mut self, transaction_type: u8) -> Self {
         self.transaction_type = Some(U8::from(transaction_type));
         self
-    }
-
-    /// Calculates the address that will be created by the transaction, if any.
-    ///
-    /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
-    /// the `from` or `nonce` fields are not set.
-    pub fn calculate_create_address(&self) -> Option<Address> {
-        if self.to.is_some() {
-            return None;
-        }
-        let from = self.from.as_ref()?;
-        let nonce = self.nonce?;
-        Some(from.create(nonce.to()))
     }
 }
 

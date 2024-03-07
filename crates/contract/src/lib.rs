@@ -29,10 +29,3 @@ pub use instance::*;
 
 mod call;
 pub use call::*;
-
-// Not public API.
-// NOTE: please avoid changing the API of this module due to its use in the `sol!` macro.
-#[doc(hidden)]
-pub mod private {
-    pub use alloy_providers::tmp::TempProvider as Provider;
-}

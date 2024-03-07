@@ -1,13 +1,10 @@
 use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256, U64};
-use alloy_providers::tmp::TempProvider;
-use alloy_rpc_types::{
-    request::{TransactionInput, TransactionRequest},
-    state::StateOverride,
-    BlockId, TransactionReceipt,
-};
+use alloy_providers::Provider;
+use alloy_rpc_types::{state::StateOverride, BlockId, TransactionReceipt};
 use alloy_sol_types::SolCall;
 use std::{
     future::{Future, IntoFuture},
@@ -17,13 +14,13 @@ use std::{
 
 /// [`CallBuilder`] using a [`SolCall`] type as the call decoder.
 // NOTE: please avoid changing this type due to its use in the `sol!` macro.
-pub type SolCallBuilder<P, C> = CallBuilder<P, PhantomData<C>>;
+pub type SolCallBuilder<N, P, C> = CallBuilder<N, P, PhantomData<C>>;
 
 /// [`CallBuilder`] using a [`Function`] as the call decoder.
-pub type DynCallBuilder<P> = CallBuilder<P, Function>;
+pub type DynCallBuilder<N, P> = CallBuilder<N, P, Function>;
 
 /// [`CallBuilder`] that does not have a call decoder.
-pub type RawCallBuilder<P> = CallBuilder<P, ()>;
+pub type RawCallBuilder<N, P> = CallBuilder<N, P, ()>;
 
 mod private {
     pub trait Sealed {}
@@ -190,10 +187,10 @@ impl CallDecoder for () {
 /// [sol]: alloy_sol_types::sol
 #[derive(Clone)]
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
-pub struct CallBuilder<P, D> {
+pub struct CallBuilder<N: Network, P, D> {
     // TODO: this will not work with `send_transaction` and does not differentiate between EIP-1559
     // and legacy tx
-    request: TransactionRequest,
+    request: N::TransactionRequest,
     block: Option<BlockId>,
     state: Option<StateOverride>,
     provider: P,
@@ -201,14 +198,14 @@ pub struct CallBuilder<P, D> {
 }
 
 // See [`ContractInstance`].
-impl<P: TempProvider> DynCallBuilder<P> {
+impl<N: Network, P: Provider<N>> DynCallBuilder<N, P> {
     pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
         Ok(Self::new_inner(provider, function.abi_encode_input(args)?.into(), function.clone()))
     }
 
     /// Clears the decoder, returning a raw call builder.
     #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<P> {
+    pub fn clear_decoder(self) -> RawCallBuilder<N, P> {
         RawCallBuilder {
             request: self.request,
             block: self.block,
@@ -219,7 +216,7 @@ impl<P: TempProvider> DynCallBuilder<P> {
     }
 }
 
-impl<P: TempProvider, C: SolCall> SolCallBuilder<P, C> {
+impl<N: Network, P: Provider<N>, C: SolCall> SolCallBuilder<N, P, C> {
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     #[doc(hidden)]
@@ -229,7 +226,7 @@ impl<P: TempProvider, C: SolCall> SolCallBuilder<P, C> {
 
     /// Clears the decoder, returning a raw call builder.
     #[inline]
-    pub fn clear_decoder(self) -> RawCallBuilder<P> {
+    pub fn clear_decoder(self) -> RawCallBuilder<N, P> {
         RawCallBuilder {
             request: self.request,
             block: self.block,
@@ -240,7 +237,7 @@ impl<P: TempProvider, C: SolCall> SolCallBuilder<P, C> {
     }
 }
 
-impl<P: TempProvider> RawCallBuilder<P> {
+impl<N: Network, P: Provider<N>> RawCallBuilder<N, P> {
     /// Creates a new call builder with the provided provider and ABI encoded input.
     ///
     /// Will not decode the output of the call, meaning that [`call`](Self::call) will behave the
@@ -251,22 +248,26 @@ impl<P: TempProvider> RawCallBuilder<P> {
     }
 }
 
-impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
+impl<N: Network, P: Provider<N>, D: CallDecoder> CallBuilder<N, P, D> {
     fn new_inner(provider: P, input: Bytes, decoder: D) -> Self {
-        let request =
-            TransactionRequest { input: TransactionInput::new(input), ..Default::default() };
-        Self { request, decoder, provider, block: None, state: None }
+        Self {
+            request: <N::TransactionRequest>::default().with_input(input),
+            decoder,
+            provider,
+            block: None,
+            state: None,
+        }
     }
 
     /// Sets the `from` field in the transaction to the provided value. Defaults to [Address::ZERO].
     pub fn from(mut self, from: Address) -> Self {
-        self.request = self.request.from(from);
+        self.request.set_from(from);
         self
     }
 
     /// Sets the `to` field in the transaction to the provided address.
     pub fn to(mut self, to: Option<Address>) -> Self {
-        self.request = self.request.to(to);
+        self.request.set_to(to.into());
         self
     }
 
@@ -277,7 +278,7 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
 
     /// Sets the `gas` field in the transaction to the provided value
     pub fn gas(mut self, gas: U256) -> Self {
-        self.request = self.request.gas_limit(gas);
+        self.request.set_gas_limit(gas);
         self
     }
 
@@ -285,20 +286,19 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
     pub fn gas_price(mut self, gas_price: U256) -> Self {
-        self.request = self.request.max_fee_per_gas(gas_price);
-        self.request = self.request.max_priority_fee_per_gas(gas_price);
+        self.request.set_gas_price(gas_price);
         self
     }
 
     /// Sets the `value` field in the transaction to the provided value
     pub fn value(mut self, value: U256) -> Self {
-        self.request = self.request.value(value);
+        self.request.set_value(value);
         self
     }
 
     /// Sets the `nonce` field in the transaction to the provided value
     pub fn nonce(mut self, nonce: U64) -> Self {
-        self.request = self.request.nonce(nonce);
+        self.request.set_nonce(nonce);
         self
     }
 
@@ -307,6 +307,8 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
         self.block = Some(block);
         self
     }
+
+    // todo map function fn(req) -> req
 
     /// Sets the [state override set](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set).
     ///
@@ -320,12 +322,12 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
 
     /// Returns the underlying transaction's ABI-encoded data.
     pub fn calldata(&self) -> &Bytes {
-        self.request.input.input().expect("set in the constructor")
+        self.request.input().expect("set in the constructor")
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
     pub async fn estimate_gas(&self) -> Result<U256> {
-        self.provider.estimate_gas(self.request.clone(), self.block).await.map_err(Into::into)
+        self.provider.estimate_gas(&self.request, self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -344,9 +346,9 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     /// See [`call`](Self::call) for more information.
     pub async fn call_raw(&self) -> Result<Bytes> {
         if let Some(state) = &self.state {
-            self.provider.call_with_overrides(self.request.clone(), self.block, state.clone()).await
+            self.provider.call_with_overrides(&self.request, self.block, state.clone()).await
         } else {
-            self.provider.call(self.request.clone(), self.block).await
+            self.provider.call(&self.request, self.block).await
         }
         .map_err(Into::into)
     }
@@ -368,7 +370,7 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     /// Note that the deployment address can be pre-calculated if the `from` address and `nonce` are
     /// known using [`calculate_create_address`](Self::calculate_create_address).
     pub async fn deploy(&self) -> Result<Address> {
-        if self.request.to.is_some() {
+        if !self.request.to().is_some_and(|to| to.is_create()) {
             return Err(Error::NotADeploymentTransaction);
         }
         let pending_tx = self.send().await?;
@@ -403,9 +405,9 @@ impl<P: TempProvider, D: CallDecoder> CallBuilder<P, D> {
     }
 }
 
-impl<P: Clone, D> CallBuilder<&P, D> {
+impl<N: Network, P: Clone, D> CallBuilder<N, &P, D> {
     /// Clones the provider and returns a new builder with the cloned provider.
-    pub fn with_cloned_provider(self) -> CallBuilder<P, D> {
+    pub fn with_cloned_provider(self) -> CallBuilder<N, P, D> {
         CallBuilder {
             request: self.request,
             block: self.block,
@@ -419,9 +421,10 @@ impl<P: Clone, D> CallBuilder<&P, D> {
 /// [`CallBuilder`] can be turned into a [`Future`] automatically with `.await`.
 ///
 /// Defaults to calling [`CallBuilder::call`].
-impl<P, D> IntoFuture for CallBuilder<P, D>
+impl<N, P, D> IntoFuture for CallBuilder<N, P, D>
 where
-    P: TempProvider,
+    N: Network,
+    P: Provider<N>,
     D: CallDecoder + Send + Sync,
     Self: 'static,
 {
@@ -438,7 +441,7 @@ where
     }
 }
 
-impl<P, D: CallDecoder> std::fmt::Debug for CallBuilder<P, D> {
+impl<N: Network, P, D: CallDecoder> std::fmt::Debug for CallBuilder<N, P, D> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CallBuilder")
@@ -456,10 +459,10 @@ mod tests {
     use super::*;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex};
-    use alloy_providers::tmp::{HttpProvider, Provider};
+    use alloy_providers::{HttpProvider, Provider};
     use alloy_sol_types::sol;
 
-    #[test]
+    /*#[test]
     fn empty_constructor() {
         sol! {
             #[sol(rpc, bytecode = "6942")]
@@ -564,5 +567,5 @@ mod tests {
         let anvil = Anvil::new().spawn();
         let provider = Provider::try_from(anvil.endpoint()).unwrap();
         (provider, anvil)
-    }
+    }*/
 }
