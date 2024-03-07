@@ -209,7 +209,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_getCode", (address, tag)).await
     }
 
-    /// Gets a [Transaction] by its [TxHash].
+    /// Gets a transaction by its [TxHash].
     async fn get_transaction_by_hash(
         &self,
         hash: TxHash,
@@ -233,7 +233,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_gasPrice", ()).await
     }
 
-    /// Gets a [TransactionReceipt] if it exists, by its [TxHash].
+    /// Gets a transaction receipt if it exists, by its [TxHash].
     async fn get_transaction_receipt(
         &self,
         hash: TxHash,
@@ -277,7 +277,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_syncing", ()).await
     }
 
-    /// Execute a smart contract call with [TransactionRequest] without publishing a transaction.
+    /// Execute a smart contract call with a transaction request, without publishing a transaction.
     async fn call(
         &self,
         tx: &N::TransactionRequest,
@@ -286,7 +286,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_call", (tx, block.unwrap_or_default())).await
     }
 
-    /// Execute a smart contract call with [TransactionRequest] and state overrides, without
+    /// Execute a smart contract call with a transaction request and state overrides, without
     /// publishing a transaction.
     ///
     /// # Note
