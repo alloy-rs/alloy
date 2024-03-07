@@ -30,10 +30,20 @@ where
 
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
 
-            // unpack json from the response body
+            // unpack json from the response body. We do this regardless of
+            // the status code, as we want to return the error in the body if
+            // there is one.
             let body = hyper::body::to_bytes(resp.into_body())
                 .await
                 .map_err(TransportErrorKind::custom)?;
+
+            if resp.status() != hyper::StatusCode::OK {
+                return Err(TransportErrorKind::custom_str(&format!(
+                    "HTTP error: {} with body: {:?}",
+                    resp.status(),
+                    body
+                )));
+            }
 
             // Deser a Box<RawValue> from the body. If deser fails, return the
             // body as a string in the error. If the body is not UTF8, this will
