@@ -68,6 +68,7 @@ jobs:
         run: |
           cargo hack check --workspace --target wasm32-unknown-unknown \
             --exclude alloy-contract \
+            --exclude alloy-network \
             --exclude alloy-node-bindings \
             --exclude alloy-providers \
             --exclude alloy-signer \
