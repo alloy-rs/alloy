@@ -1,6 +1,4 @@
-use crate::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
-};
+use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
