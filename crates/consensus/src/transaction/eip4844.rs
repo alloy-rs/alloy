@@ -492,29 +492,6 @@ impl TxEip4844 {
         mem::size_of::<u128>() // max_fee_per_data_gas
     }
 
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require rlp header
-    pub(crate) fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1 + length_of_length(payload_length) + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx_type() as u8);
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-        self.encode_fields(out);
-        signature.encode(out);
-    }
-
     /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
     pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
         let len = self.payload_len_with_signature_without_header(signature);
@@ -672,30 +649,6 @@ impl TxEip4844WithSidecar {
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
-    }
-
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require rlp header
-    pub(crate) fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
-        let payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1 + length_of_length(payload_length) + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx.tx_type() as u8);
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-        self.tx.encode_fields(out);
-        signature.encode(out);
-        self.sidecar.encode_inner(out);
     }
 }
 
