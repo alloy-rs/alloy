@@ -359,12 +359,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         Ok((max_fee_per_gas, max_priority_fee_per_gas))
     }
 
-    // todo: move to extension trait
-    #[cfg(feature = "anvil")]
-    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
-        self.client().prepare("anvil_setCode", (address, code)).await
-    }
-
     async fn get_proof(
         &self,
         address: Address,
@@ -408,6 +402,17 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("trace_block", (block,)).await
     }
 }
+
+/// Extension trait for Anvil specific JSON-RPC methods.
+pub trait AnvilProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
+    /// Set the bytecode of a given account.
+    #[cfg(feature = "anvil")]
+    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
+        self.client().prepare("anvil_setCode", (address, code)).await
+    }
+}
+
+impl<P, N: Network, T: Transport + Clone> AnvilProvider<N, T> for P where P: Provider<N, T> {}
 
 /// Extension trait for raw RPC requests.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]

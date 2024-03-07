@@ -37,6 +37,3 @@ alloy-node-bindings.workspace = true
 alloy-rlp.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
-
-[features]
-anvil = []
