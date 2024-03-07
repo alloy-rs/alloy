@@ -25,11 +25,15 @@ pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 mod transaction;
 pub use transaction::{
-    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType,
+    BlobTransactionSidecar, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 
-pub use alloy_network::TxKind;
+mod sealed;
+pub use sealed::{Sealable, Sealed};
+
+mod signed;
+pub use signed::Signed;

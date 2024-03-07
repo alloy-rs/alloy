@@ -1,6 +1,5 @@
-use crate::TxKind;
-use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
+use crate::{SignableTransaction, Signed, Transaction};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
 
@@ -138,6 +137,90 @@ impl TxLegacy {
             chain_id: None,
         })
     }
+
+    /// Encodes the legacy transaction in RLP for signing.
+    ///
+    /// This encodes the transaction as:
+    /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
+    /// value, input, access_list, max_fee_per_blob_gas, blob_versioned_hashes)`
+    ///
+    /// Note that there is no rlp header before the transaction type byte.
+    pub fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
+            .encode(out);
+        self.encode_fields(out);
+        self.encode_eip155_signing_fields(out);
+    }
+}
+
+impl Transaction for TxLegacy {
+    fn input(&self) -> &[u8] {
+        &self.input
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    fn gas_price(&self) -> Option<U256> {
+        Some(U256::from(self.gas_price))
+    }
+}
+
+impl SignableTransaction<Signature> for TxLegacy {
+    fn encode_for_signing(&self, out: &mut dyn BufMut) {
+        self.encode_for_signing(out)
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        let payload_length = self.fields_len() + self.eip155_fields_len();
+        // 'header length' + 'payload length'
+        length_of_length(payload_length) + payload_length
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        let mut buf = Vec::with_capacity(payload_length);
+        self.encode_with_signature(&signature, &mut buf);
+        let hash = keccak256(&buf);
+        Signed::new_unchecked(self, signature, hash)
+    }
+
+    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
+        self.encode_with_signature(signature, out);
+    }
+
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        let mut tx = Self::decode_fields(buf)?;
+
+        let signature = Signature::decode_rlp_vrs(buf)?;
+
+        let v = signature.v();
+
+        tx.chain_id = v.chain_id();
+
+        Ok(tx.into_signed(signature))
+    }
 }
 
 impl Encodable for TxLegacy {
@@ -181,126 +264,17 @@ impl Decodable for TxLegacy {
     }
 }
 
-impl Transaction for TxLegacy {
-    type Signature = Signature;
-    // type Receipt = ReceiptWithBloom;
-
-    fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() + self.eip155_fields_len() }
-            .encode(out);
-        self.encode_fields(out);
-        self.encode_eip155_signing_fields(out);
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len() + self.eip155_fields_len();
-        // 'header length' + 'payload length'
-        length_of_length(payload_length) + payload_length
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        self.encode_with_signature(&signature, &mut buf);
-        let hash = keccak256(&buf);
-        Signed::new_unchecked(self, signature, hash)
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.encode_with_signature(signature, out);
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let mut tx = Self::decode_fields(buf)?;
-
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        let v = signature.v();
-
-        tx.chain_id = v.chain_id();
-
-        Ok(tx.into_signed(signature))
-    }
-
-    fn input(&self) -> &[u8] {
-        &self.input
-    }
-
-    fn input_mut(&mut self) -> &mut Bytes {
-        &mut self.input
-    }
-
-    fn set_input(&mut self, data: Bytes) {
-        self.input = data;
-    }
-
-    fn to(&self) -> TxKind {
-        self.to
-    }
-
-    fn set_to(&mut self, to: TxKind) {
-        self.to = to;
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
-    fn set_value(&mut self, value: U256) {
-        self.value = value;
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        self.chain_id
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.chain_id = Some(chain_id);
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
-
-    fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.gas_limit
-    }
-
-    fn set_gas_limit(&mut self, gas_limit: u64) {
-        self.gas_limit = gas_limit;
-    }
-
-    fn gas_price(&self) -> Option<U256> {
-        Some(U256::from(self.gas_price))
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        if let Ok(price) = price.try_into() {
-            self.gas_price = price;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn recover_signer_legacy() {
         use crate::{TxKind, TxLegacy};
-        use alloy_network::Transaction;
-        use alloy_primitives::{b256, hex, Address, Signature, B256, U256};
+        use alloy_network::SignableTransaction;
+        use alloy_primitives::{address, b256, hex, Signature, U256};
 
-        let signer: Address = hex!("398137383b3d25c92898c656696e41950e47316b").into();
-        let hash: B256 =
-            hex!("bb3a336e3f823ec18197f1e13ee875700f08f03e2cab75f0d0b118dabb44cba0").into();
+        let signer = address!("398137383b3d25c92898c656696e41950e47316b");
+        let hash = b256!("bb3a336e3f823ec18197f1e13ee875700f08f03e2cab75f0d0b118dabb44cba0");
 
         let tx = TxLegacy {
             chain_id: Some(1),

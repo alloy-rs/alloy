@@ -1,6 +1,7 @@
-use crate::{TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy};
+use crate::{
+    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
+};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -77,6 +78,12 @@ pub enum TxEnvelope {
     Eip4844(Signed<TxEip4844Variant>),
 }
 
+impl From<Signed<TxLegacy>> for TxEnvelope {
+    fn from(v: Signed<TxLegacy>) -> Self {
+        Self::Legacy(v)
+    }
+}
+
 impl From<Signed<TxEip2930>> for TxEnvelope {
     fn from(v: Signed<TxEip2930>) -> Self {
         Self::Eip2930(v)
@@ -86,6 +93,12 @@ impl From<Signed<TxEip2930>> for TxEnvelope {
 impl From<Signed<TxEip1559>> for TxEnvelope {
     fn from(v: Signed<TxEip1559>) -> Self {
         Self::Eip1559(v)
+    }
+}
+
+impl From<Signed<TxEip4844Variant>> for TxEnvelope {
+    fn from(v: Signed<TxEip4844Variant>) -> Self {
+        Self::Eip4844(v)
     }
 }
 
@@ -201,10 +214,11 @@ impl Encodable2718 for TxEnvelope {
 
 #[cfg(test)]
 mod tests {
+    use crate::transaction::SignableTransaction;
+
     use super::*;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_network::{Transaction, TxKind};
-    use alloy_primitives::{Address, Bytes, Signature, B256, U256};
+    use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
 
     #[test]
     #[cfg(feature = "k256")]
@@ -287,9 +301,9 @@ mod tests {
         assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
-    fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
+    fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(tx: T)
     where
-        Signed<T, T::Signature>: Into<TxEnvelope>,
+        Signed<T>: Into<TxEnvelope>,
     {
         let signature = Signature::test_signature();
         let tx_signed = tx.into_signed(signature);
