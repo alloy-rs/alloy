@@ -1,8 +1,7 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_consensus::TxEip1559;
-use alloy_network::{Transaction, TxKind};
-use alloy_primitives::{hex, Address, ChainId, Parity, B256, U256};
-use alloy_signer::{Result, SignableTx, Signature, Signer, TransactionExt};
+use alloy_consensus::{SignableTransaction, TxEip1559};
+use alloy_primitives::{hex, Address, ChainId, Parity, TxKind, B256, U256};
+use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
@@ -38,7 +37,7 @@ impl fmt::Debug for TrezorSigner {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for TrezorSigner {
     #[inline]
-    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
@@ -47,18 +46,6 @@ impl Signer for TrezorSigner {
     #[inline]
     async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
         self.sign_message_inner(message).await.map_err(alloy_signer::Error::other)
-    }
-
-    #[inline]
-    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
-        if let Some(chain_id) = self.chain_id {
-            tx.set_chain_id_checked(chain_id)?;
-        }
-        let mut sig = self.sign_tx_inner(tx).await.map_err(alloy_signer::Error::other)?;
-        if let Some(chain_id) = self.chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
     }
 
     #[inline]
@@ -74,6 +61,30 @@ impl Signer for TrezorSigner {
     #[inline]
     fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl alloy_network::TxSigner<Signature> for TrezorSigner {
+    #[inline]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
+        let chain_id = match (self.chain_id(), tx.chain_id()) {
+            (Some(id), None) | (None, Some(id)) => id,
+            (Some(signer), Some(tx)) if signer != tx => {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx });
+            }
+            _ => {
+                return Err(TrezorError::MissingChainId.into());
+            }
+        };
+
+        let mut sig = self.sign_tx_inner(tx).await.map_err(alloy_signer::Error::other)?;
+        sig = sig.with_chain_id(chain_id);
+        Ok(sig)
     }
 }
 
@@ -157,7 +168,7 @@ impl TrezorSigner {
     /// Does not apply EIP-155.
     async fn sign_tx_inner(
         &self,
-        tx: &dyn Transaction<Signature = Signature>,
+        tx: &dyn SignableTransaction<Signature>,
     ) -> Result<Signature, TrezorError> {
         let mut client = self.get_client()?;
         let path = Self::convert_path(&self.derivation);

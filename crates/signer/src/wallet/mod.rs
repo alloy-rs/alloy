@@ -64,7 +64,7 @@ pub struct Wallet<D> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
     #[inline]
-    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_hash_sync(hash)
     }
 
@@ -86,7 +86,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> {
     #[inline]
-    fn sign_hash_sync(&self, hash: B256) -> Result<Signature> {
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
         let mut sig = Signature::from_signature_and_parity(recoverable_sig, recovery_id)?;
         if let Some(chain_id) = self.chain_id {

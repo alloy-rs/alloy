@@ -1,42 +1,11 @@
 use crate::Result;
+
 use alloy_primitives::{eip191_hash_message, Address, ChainId, Signature, B256};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
-
-pub use alloy_network::Transaction;
-
-/// A signable transaction.
-pub type SignableTx = dyn Transaction<Signature = Signature>;
-
-/// Extension trait for utilities for signable transactions.
-///
-/// This trait is implemented for all types that implement [`Transaction`] with [`Signature`] as the
-/// signature associated type.
-pub trait TransactionExt: Transaction<Signature = Signature> {
-    /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
-    /// existing `chain_id` if it is already set.
-    fn set_chain_id_checked(&mut self, chain_id: ChainId) -> Result<()> {
-        match self.chain_id() {
-            Some(tx_chain_id) => {
-                if tx_chain_id != chain_id {
-                    return Err(crate::Error::TransactionChainIdMismatch {
-                        signer: chain_id,
-                        tx: tx_chain_id,
-                    });
-                }
-            }
-            None => {
-                self.set_chain_id(chain_id);
-            }
-        }
-        Ok(())
-    }
-}
-
-impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
 
 /// Asynchronous Ethereum signer.
 ///
@@ -58,30 +27,16 @@ impl<T: ?Sized + Transaction<Signature = Signature>> TransactionExt for T {}
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&mut, Box)]
-pub trait Signer: Send + Sync {
+pub trait Signer<Sig: 'static = Signature>: Send + Sync {
     /// Signs the given hash.
-    async fn sign_hash(&self, hash: B256) -> Result<Signature>;
+    async fn sign_hash(&self, hash: &B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    async fn sign_message(&self, message: &[u8]) -> Result<Signature> {
-        self.sign_hash(eip191_hash_message(message)).await
-    }
-
-    /// Signs the transaction.
-    #[inline]
-    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
-        let chain_id = self.chain_id();
-        if let Some(chain_id) = chain_id {
-            tx.set_chain_id_checked(chain_id)?;
-        }
-        let mut sig = self.sign_hash(tx.signature_hash()).await?;
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+    async fn sign_message(&self, message: &[u8]) -> Result<Sig> {
+        self.sign_hash(&eip191_hash_message(message)).await
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -93,11 +48,11 @@ pub trait Signer: Send + Sync {
         &self,
         payload: &T,
         domain: &Eip712Domain,
-    ) -> Result<Signature>
+    ) -> Result<Sig>
     where
         Self: Sized,
     {
-        self.sign_hash(payload.eip712_signing_hash(domain)).await
+        self.sign_hash(&payload.eip712_signing_hash(domain)).await
     }
 
     /// Returns the signer's Ethereum Address.
@@ -141,30 +96,16 @@ pub trait Signer: Send + Sync {
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 #[auto_impl(&, &mut, Box, Rc, Arc)]
-pub trait SignerSync {
+pub trait SignerSync<Sig: 'static = Signature> {
     /// Signs the given hash.
-    fn sign_hash_sync(&self, hash: B256) -> Result<Signature>;
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Sig>;
 
     /// Signs the hash of the provided message after prefixing it, as specified in [EIP-191].
     ///
     /// [EIP-191]: https://eips.ethereum.org/EIPS/eip-191
     #[inline]
-    fn sign_message_sync(&self, message: &[u8]) -> Result<Signature> {
-        self.sign_hash_sync(eip191_hash_message(message))
-    }
-
-    /// Signs the transaction.
-    #[inline]
-    fn sign_transaction_sync(&self, tx: &mut SignableTx) -> Result<Signature> {
-        let chain_id = self.chain_id_sync();
-        if let Some(chain_id) = chain_id {
-            tx.set_chain_id_checked(chain_id)?;
-        }
-        let mut sig = self.sign_hash_sync(tx.signature_hash())?;
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+    fn sign_message_sync(&self, message: &[u8]) -> Result<Sig> {
+        self.sign_hash_sync(&eip191_hash_message(message))
     }
 
     /// Encodes and signs the typed data according to [EIP-712].
@@ -172,15 +113,11 @@ pub trait SignerSync {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
-    fn sign_typed_data_sync<T: SolStruct>(
-        &self,
-        payload: &T,
-        domain: &Eip712Domain,
-    ) -> Result<Signature>
+    fn sign_typed_data_sync<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Sig>
     where
         Self: Sized,
     {
-        self.sign_hash_sync(payload.eip712_signing_hash(domain))
+        self.sign_hash_sync(&payload.eip712_signing_hash(domain))
     }
 
     /// Returns the signer's chain ID.
@@ -222,7 +159,7 @@ mod tests {
 
         async fn test_unsized_unimplemented_signer<S: Signer + ?Sized>(s: &S) {
             assert_matches!(
-                s.sign_hash(B256::ZERO).await,
+                s.sign_hash(&B256::ZERO).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
@@ -230,13 +167,11 @@ mod tests {
                 s.sign_message(&[]).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
-
-            assert!(s.sign_transaction(&mut alloy_consensus::TxLegacy::default()).await.is_err());
         }
 
         fn test_unsized_unimplemented_signer_sync<S: SignerSync + ?Sized>(s: &S) {
             assert_matches!(
-                s.sign_hash_sync(B256::ZERO),
+                s.sign_hash_sync(&B256::ZERO),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
 
@@ -244,8 +179,6 @@ mod tests {
                 s.sign_message_sync(&[]),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
-
-            assert!(s.sign_transaction_sync(&mut alloy_consensus::TxLegacy::default()).is_err());
         }
 
         struct UnimplementedSigner;
@@ -253,7 +186,7 @@ mod tests {
         #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
         #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
         impl Signer for UnimplementedSigner {
-            async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
+            async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             }
 
@@ -269,7 +202,7 @@ mod tests {
         }
 
         impl SignerSync for UnimplementedSigner {
-            fn sign_hash_sync(&self, _hash: B256) -> Result<Signature> {
+            fn sign_hash_sync(&self, _hash: &B256) -> Result<Signature> {
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             }
 

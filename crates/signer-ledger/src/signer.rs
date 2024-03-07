@@ -1,8 +1,9 @@
 //! Ledger Ethereum app wrapper.
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
+use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{Result, SignableTx, Signature, Signer, TransactionExt};
+use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -29,8 +30,35 @@ pub struct LedgerSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl alloy_network::TxSigner<Signature> for LedgerSigner {
+    #[inline]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
+        let chain_id = match (self.chain_id(), tx.chain_id()) {
+            (Some(signer), Some(tx)) if signer != tx => {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
+            }
+            (Some(signer), _) => Some(signer),
+            (None, Some(tx)) => Some(tx),
+            _ => None,
+        };
+
+        let rlp = tx.encoded_for_signing();
+        let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
+
+        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for LedgerSigner {
-    async fn sign_hash(&self, _hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
         ))
@@ -45,20 +73,6 @@ impl Signer for LedgerSigner {
         self.sign_payload(INS::SIGN_PERSONAL_MESSAGE, &payload)
             .await
             .map_err(alloy_signer::Error::other)
-    }
-
-    #[inline]
-    async fn sign_transaction(&self, tx: &mut SignableTx) -> Result<Signature> {
-        let chain_id = self.chain_id();
-        if let Some(chain_id) = chain_id {
-            tx.set_chain_id_checked(chain_id)?;
-        }
-        let rlp = tx.encoded_for_signing();
-        let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
     }
 
     #[cfg(feature = "eip712")]
@@ -285,8 +299,9 @@ mod tests {
     use super::*;
     use alloy_primitives::{address, bytes, U256};
     use alloy_rlp::Decodable;
-    use alloy_signer::Transaction;
     use std::sync::OnceLock;
+
+    use alloy_network::TxSigner;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
@@ -334,7 +349,9 @@ mod tests {
             nonce: 5,
             gas_price: 400e9 as u128,
             gas_limit: 1000000,
-            to: alloy_consensus::TxKind::Call(address!("2ed7afa17473e17ac59908f088b4371d28585476")),
+            to: alloy_primitives::TxKind::Call(address!(
+                "2ed7afa17473e17ac59908f088b4371d28585476"
+            )),
             // TODO: this fails for some reason with 6a80 APDU_CODE_BAD_KEY_HANDLE
             // approve uni v2 router 0xff
             // input: bytes!("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
@@ -376,7 +393,7 @@ mod tests {
         test_sign_tx_generic(&mut tx).await;
     }
 
-    async fn test_sign_tx_generic(tx: &mut SignableTx) {
+    async fn test_sign_tx_generic(tx: &mut dyn SignableTransaction<Signature>) {
         let sighash = tx.signature_hash();
         let ledger = init_ledger().await;
         let sig = match ledger.sign_transaction(tx).await {
