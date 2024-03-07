@@ -28,7 +28,6 @@ futures.workspace = true
 lru = "0.12"
 reqwest.workspace = true
 serde.workspace = true
-thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 
