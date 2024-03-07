@@ -116,4 +116,4 @@ tempfile = "3.10"
 # TODO: Keep around until alloy-contract is stable.
 # This should only be used in `alloy-contract` tests.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "1882c819a2d26ad04d4720d3751c9833d3bbc54a" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ab0cab1047a088be6cffa4e7a2fcde7cf77aa460" }
