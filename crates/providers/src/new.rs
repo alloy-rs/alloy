@@ -467,158 +467,13 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_network::Ethereum;
     use alloy_primitives::address;
-    use alloy_rpc_types::request::{TransactionInput, TransactionRequest};
+    use alloy_rpc_types::request::TransactionRequest;
     use alloy_transport_http::Http;
     use reqwest::Client;
 
     struct _ObjectSafe<N: Network>(dyn Provider<N>);
-
-    #[derive(Clone)]
-    struct TxLegacy(alloy_consensus::TxLegacy);
-    impl serde::Serialize for TxLegacy {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let tx = &self.0;
-            TransactionRequest {
-                from: None,
-                to: tx.to().to(),
-                gas_price: tx.gas_price(),
-                max_fee_per_gas: None,
-                max_priority_fee_per_gas: None,
-                max_fee_per_blob_gas: None,
-                gas: Some(U256::from(tx.gas_limit())),
-                value: Some(tx.value()),
-                input: TransactionInput::new(tx.input().to_vec().into()),
-                nonce: Some(U64::from(tx.nonce())),
-                chain_id: tx.chain_id().map(U64::from),
-                access_list: None,
-                transaction_type: None,
-                blob_versioned_hashes: None,
-                sidecar: None,
-                other: Default::default(),
-            }
-            .serialize(serializer)
-        }
-    }
-    impl<'de> serde::Deserialize<'de> for TxLegacy {
-        fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            unimplemented!()
-        }
-    }
-    #[allow(unused)]
-    impl alloy_network::Transaction for TxLegacy {
-        type Signature = ();
-
-        fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-            todo!()
-        }
-
-        fn payload_len_for_signature(&self) -> usize {
-            todo!()
-        }
-
-        fn into_signed(
-            self,
-            signature: alloy_primitives::Signature,
-        ) -> alloy_network::Signed<Self, Self::Signature>
-        where
-            Self: Sized,
-        {
-            todo!()
-        }
-
-        fn encode_signed(
-            &self,
-            signature: &alloy_primitives::Signature,
-            out: &mut dyn alloy_primitives::bytes::BufMut,
-        ) {
-            todo!()
-        }
-
-        fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>>
-        where
-            Self: Sized,
-        {
-            todo!()
-        }
-
-        fn input(&self) -> &[u8] {
-            todo!()
-        }
-
-        fn input_mut(&mut self) -> &mut alloy_primitives::Bytes {
-            todo!()
-        }
-
-        fn set_input(&mut self, data: alloy_primitives::Bytes) {
-            todo!()
-        }
-
-        fn to(&self) -> alloy_network::TxKind {
-            todo!()
-        }
-
-        fn set_to(&mut self, to: alloy_network::TxKind) {
-            todo!()
-        }
-
-        fn value(&self) -> U256 {
-            todo!()
-        }
-
-        fn set_value(&mut self, value: U256) {
-            todo!()
-        }
-
-        fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
-            todo!()
-        }
-
-        fn set_chain_id(&mut self, chain_id: alloy_primitives::ChainId) {
-            todo!()
-        }
-
-        fn nonce(&self) -> u64 {
-            todo!()
-        }
-
-        fn set_nonce(&mut self, nonce: u64) {
-            todo!()
-        }
-
-        fn gas_limit(&self) -> u64 {
-            todo!()
-        }
-
-        fn set_gas_limit(&mut self, limit: u64) {
-            todo!()
-        }
-
-        fn gas_price(&self) -> Option<U256> {
-            todo!()
-        }
-
-        fn set_gas_price(&mut self, price: U256) {
-            todo!()
-        }
-    }
-
-    struct TmpNetwork;
-    impl Network for TmpNetwork {
-        type TxEnvelope = alloy_consensus::TxEnvelope;
-        type ReceiptEnvelope = alloy_consensus::ReceiptEnvelope;
-        type Header = ();
-        type TransactionRequest = TxLegacy;
-        type TransactionResponse = ();
-        type ReceiptResponse = ();
-        type HeaderResponse = ();
-    }
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -631,16 +486,16 @@ mod tests {
         let anvil = alloy_node_bindings::Anvil::new().spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
-        let provider = RootProvider::<TmpNetwork, _>::new(RpcClient::new(http, true));
+        let provider = RootProvider::<Ethereum, _>::new(RpcClient::new(http, true));
 
-        let tx = alloy_consensus::TxLegacy {
-            value: U256::from(100),
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
-            gas_price: 20e9 as u128,
-            gas_limit: 21000,
+            gas_price: Some(U256::from(20e9)),
+            gas: Some(U256::from(21000)),
             ..Default::default()
         };
-        let pending_tx = provider.send_transaction(&TxLegacy(tx)).await.expect("failed to send tx");
+        let pending_tx = provider.send_transaction(&tx).await.expect("failed to send tx");
         let hash1 = pending_tx.tx_hash;
         let hash2 = pending_tx.await.expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
