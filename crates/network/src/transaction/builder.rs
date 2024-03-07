@@ -39,7 +39,8 @@ pub type BuilderResult<T, E = TransactionBuilderError> = std::result::Result<T, 
 /// A Transaction builder for a network.
 ///
 /// Transaction builders are primarily used to construct typed transactions that can be signed with
-/// [`Builder::build`], or unsigned typed transactions with [`Builder::build_unsigned`].
+/// [`TransactionBuilder::build`], or unsigned typed transactions with
+/// [`TransactionBuilder::build_unsigned`].
 ///
 /// Transaction builders should be able to construct all available transaction types on a given
 /// network.
