@@ -123,16 +123,31 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_getBlockByNumber", (number, hydrate)).await
     }
 
-    // todo eip-1559 and blobs as well
+    /// Populates the legacy gas price field of the given transaction request.
     async fn populate_gas(
         &self,
         tx: &mut N::TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<()> {
-        let _ = self.estimate_gas(&*tx, block).await;
+        use alloy_network::TransactionBuilder;
+        let gas = self.estimate_gas(&*tx, block).await;
 
-        todo!()
-        // gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
+        gas.map(|gas| tx.set_gas_limit(gas.try_into().unwrap()))
+    }
+
+    /// Populates the EIP-1559 gas price fields of the given transaction request.
+    async fn populate_gas_eip1559(
+        &self,
+        tx: &mut N::TransactionRequest,
+        estimator: Option<EstimatorFunction>,
+    ) -> TransportResult<()> {
+        use alloy_network::TransactionBuilder;
+        let gas = self.estimate_eip1559_fees(estimator).await;
+
+        gas.map(|(max_fee_per_gas, max_priority_fee_per_gas)| {
+            tx.set_max_fee_per_gas(max_fee_per_gas.try_into().unwrap());
+            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas.try_into().unwrap());
+        })
     }
 
     /// Broadcasts a transaction, returning a [`PendingTransaction`] that resolves once the
@@ -316,6 +331,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
+    ///
     /// Receives an optional [EstimatorFunction] that can be used to modify
     /// how to estimate these fees.
     async fn estimate_eip1559_fees(
