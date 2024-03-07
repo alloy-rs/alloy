@@ -262,9 +262,9 @@ mod tests {
     #[test]
     #[cfg(feature = "k256")]
     fn recover_signer_legacy() {
-        use crate::{TxKind, TxLegacy};
-        use alloy_network::SignableTransaction;
-        use alloy_primitives::{address, b256, hex, Signature, U256};
+        use crate::SignableTransaction;
+        use crate::TxLegacy;
+        use alloy_primitives::{address, b256, hex, Signature, TxKind, U256};
 
         let signer = address!("398137383b3d25c92898c656696e41950e47316b");
         let hash = b256!("bb3a336e3f823ec18197f1e13ee875700f08f03e2cab75f0d0b118dabb44cba0");
@@ -296,8 +296,8 @@ mod tests {
     #[cfg(feature = "k256")]
     // Test vector from https://github.com/alloy-rs/alloy/issues/125
     fn decode_legacy_and_recover_signer() {
+        use crate::Signed;
         use crate::TxLegacy;
-        use alloy_network::Signed;
         use alloy_primitives::address;
         use alloy_rlp::Decodable;
 
