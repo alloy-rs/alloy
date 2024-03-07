@@ -30,7 +30,7 @@ where
 
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
 
-            // unpack json from the response body. We do this regardless of
+            // unpack data from the response body. We do this regardless of
             // the status code, as we want to return the error in the body if
             // there is one.
             let body = hyper::body::to_bytes(resp.into_body())
