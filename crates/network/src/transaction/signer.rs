@@ -2,7 +2,7 @@ use crate::Network;
 use alloy_consensus::SignableTransaction;
 use alloy_signer::{
     k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId},
-    Signature, Wallet,
+    Signature, Signer, SignerSync, Wallet,
 };
 use async_trait::async_trait;
 
@@ -49,7 +49,7 @@ where
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        todo!()
+        self.sign_hash(&tx.signature_hash()).await
     }
 }
 
@@ -61,6 +61,6 @@ where
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        todo!()
+        self.sign_hash_sync(&tx.signature_hash())
     }
 }
