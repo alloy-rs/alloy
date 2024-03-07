@@ -103,6 +103,14 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<U256> {
+        self.max_fee_per_blob_gas
+    }
+
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: U256) {
+        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
+    }
+
     fn gas_limit(&self) -> Option<U256> {
         self.gas
     }

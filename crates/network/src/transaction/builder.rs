@@ -164,6 +164,18 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Get the max fee per blob gas for the transaction.
+    fn max_fee_per_blob_gas(&self) -> Option<U256>;
+
+    /// Set the max fee per blob gas  for the transaction.
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: U256);
+
+    /// Builder-pattern method for setting max fee per blob gas .
+    fn with_max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: U256) -> Self {
+        self.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
+        self
+    }
+
     /// Get the gas limit for the transaction.
     fn gas_limit(&self) -> Option<U256>;
 
