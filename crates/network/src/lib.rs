@@ -17,7 +17,7 @@
 
 use alloy_eips::eip2718::Eip2718Envelope;
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::B256;
+use alloy_primitives::{Address, B256};
 
 mod transaction;
 pub use transaction::{
@@ -50,6 +50,16 @@ pub struct BlockResponse<N: Network> {
     transactions: TransactionList<N::TransactionResponse>,
 }
 
+/// A receipt response.
+///
+/// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
+///
+/// [`TxReceipt`]: alloy_consensus::TxReceipt
+pub trait ReceiptResponse {
+    /// Address of the created contract, or `None` if the transaction was not a deployment.
+    fn contract_address(&self) -> Option<Address>;
+}
+
 /// Captures type info for network-specific RPC requests/responses.
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
@@ -80,7 +90,7 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.
-    type ReceiptResponse: RpcObject;
+    type ReceiptResponse: RpcObject + ReceiptResponse;
     /// The JSON body of a header response, as flattened into
     /// [`BlockResponse`].
     type HeaderResponse: RpcObject;

@@ -1,12 +1,13 @@
 use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256, U64};
 use alloy_providers::Provider;
-use alloy_rpc_types::{state::StateOverride, BlockId, TransactionReceipt};
+use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
+use futures_util::TryFutureExt;
 use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
@@ -387,25 +388,20 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
         }
         let pending_tx = self.send().await?;
         let receipt = pending_tx.await?;
-        receipt.contract_address.ok_or(Error::ContractNotDeployed)
+        receipt
+            .ok_or(Error::ContractNotDeployed)?
+            .contract_address()
+            .ok_or(Error::ContractNotDeployed)
     }
 
     /// Broadcasts the underlying transaction to the network.
     // TODO: more docs referring to customizing PendingTransaction
-    pub async fn send(&self) -> Result<impl IntoFuture<Output = Result<TransactionReceipt>>> {
-        // TODO: send_transaction, PendingTransaction
-        // NOTE: This struct is needed to have a concrete type for the `Future` trait.
-        struct Tmp<T>(PhantomData<T>);
-        impl<T> Future for Tmp<T> {
-            type Output = T;
-            fn poll(
-                self: Pin<&mut Self>,
-                _cx: &mut std::task::Context<'_>,
-            ) -> std::task::Poll<Self::Output> {
-                todo!()
-            }
-        }
-        Ok(Tmp(PhantomData))
+    pub async fn send(
+        &self,
+    ) -> Result<impl IntoFuture<Output = Result<Option<N::ReceiptResponse>>> + '_> {
+        let pending = self.provider.send_transaction(self.request.clone()).await?;
+
+        Ok(pending.and_then(|hash| self.provider.get_transaction_receipt(hash)).map_err(Into::into))
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -479,6 +475,13 @@ mod tests {
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
+
+    fn spawn_anvil() -> (HttpProvider<Ethereum>, AnvilInstance) {
+        let anvil = Anvil::new().spawn();
+        let url = anvil.endpoint().parse().unwrap();
+        let http = Http::<Client>::new(url);
+        (RootProvider::<Ethereum, _>::new(RpcClient::new(http, true)), anvil)
+    }
 
     #[test]
     fn empty_constructor() {
@@ -555,7 +558,6 @@ mod tests {
 
     // TODO: send_transaction, PendingTransaction
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "TODO"]
     async fn deploy_and_call() {
         let (provider, anvil) = spawn_anvil();
 
@@ -579,12 +581,5 @@ mod tests {
             result.d,
             b256!("0000000000000000000000000000000000000000000000000000000000000001"),
         );
-    }
-
-    fn spawn_anvil() -> (HttpProvider<Ethereum>, AnvilInstance) {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-        (RootProvider::<Ethereum, _>::new(RpcClient::new(http, true)), anvil)
     }
 }

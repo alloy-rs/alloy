@@ -22,6 +22,8 @@ alloy-json-abi.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
+futures-util.workspace = true
+
 thiserror.workspace = true
 
 [dev-dependencies]
