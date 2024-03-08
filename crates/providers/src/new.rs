@@ -154,7 +154,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// transaction has been confirmed.
     async fn send_transaction(
         &self,
-        tx: &N::TransactionRequest,
+        tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransaction> {
         let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
         self.new_pending_transaction(tx_hash).await
@@ -524,7 +524,7 @@ mod tests {
             gas: Some(U256::from(21000)),
             ..Default::default()
         };
-        let pending_tx = provider.send_transaction(&tx).await.expect("failed to send tx");
+        let pending_tx = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = pending_tx.tx_hash;
         let hash2 = pending_tx.await.expect("failed to await pending tx");
         assert_eq!(hash1, hash2);

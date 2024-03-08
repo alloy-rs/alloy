@@ -9,7 +9,7 @@ use async_trait::async_trait;
 /// A signer capable of signing any transaction for the given network.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait NetworkSigner<N: Network>: Sync {
+pub trait NetworkSigner<N: Network>: Send + Sync {
     /// Asynchronously sign an unsigned transaction.
     async fn sign(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
 }

@@ -13,6 +13,22 @@ pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
     fn layer(&self, inner: P) -> Self::Provider;
 }
 
+/// An identity layer that does nothing.
+pub struct Identity;
+
+impl<P, N, T> ProviderLayer<P, N, T> for Identity
+where
+    T: Transport + Clone,
+    N: Network,
+    P: Provider<N, T>,
+{
+    type Provider = P;
+
+    fn layer(&self, inner: P) -> Self::Provider {
+        inner
+    }
+}
+
 pub struct Stack<Inner, Outer> {
     inner: Inner,
     outer: Outer,
@@ -54,6 +70,18 @@ pub struct ProviderBuilder<L, N = ()> {
     network: PhantomData<N>,
 }
 
+impl<N> ProviderBuilder<Identity, N> {
+    pub fn new() -> Self {
+        ProviderBuilder { layer: Identity, network: PhantomData }
+    }
+}
+
+impl<N> Default for ProviderBuilder<Identity, N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<L, N> ProviderBuilder<L, N> {
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
@@ -67,7 +95,6 @@ impl<L, N> ProviderBuilder<L, N> {
     ///
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
-
     pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>> {
         ProviderBuilder { layer: Stack::new(layer, self.layer), network: PhantomData }
     }

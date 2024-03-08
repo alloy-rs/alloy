@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::Ethereum;
 use crate::{NetworkSigner, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
@@ -5,7 +7,8 @@ use alloy_signer::Signature;
 use async_trait::async_trait;
 
 /// A signer capable of signing any transaction for the Ethereum network.
-pub struct EthereumSigner(Box<dyn TxSigner<Signature> + Sync>);
+#[derive(Clone)]
+pub struct EthereumSigner(Arc<dyn TxSigner<Signature> + Send + Sync>);
 
 impl std::fmt::Debug for EthereumSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -15,10 +18,10 @@ impl std::fmt::Debug for EthereumSigner {
 
 impl<S> From<S> for EthereumSigner
 where
-    S: TxSigner<Signature> + Sync + 'static,
+    S: TxSigner<Signature> + Send + Sync + 'static,
 {
     fn from(signer: S) -> Self {
-        Self(Box::new(signer))
+        Self(Arc::new(signer))
     }
 }
 
