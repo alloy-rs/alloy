@@ -44,7 +44,7 @@ impl EthereumSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl NetworkSigner<Ethereum> for EthereumSigner {
-    async fn sign(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
+    async fn sign_transaction(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
         match tx {
             TypedTransaction::Legacy(mut t) => {
                 let sig = self.sign_transaction(&mut t).await?;

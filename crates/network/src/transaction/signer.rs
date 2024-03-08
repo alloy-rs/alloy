@@ -11,7 +11,7 @@ use async_trait::async_trait;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait NetworkSigner<N: Network>: Send + Sync {
     /// Asynchronously sign an unsigned transaction.
-    async fn sign(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
+    async fn sign_transaction(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
 }
 
 /// Asynchronous transaction signer, capable of signing any [`SignableTransaction`] for the given
