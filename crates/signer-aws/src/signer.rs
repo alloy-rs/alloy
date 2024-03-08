@@ -101,14 +101,7 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let chain_id = match (self.chain_id(), tx.chain_id()) {
-            (Some(signer), Some(tx)) if signer != tx => {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
-            }
-            (Some(signer), _) => Some(signer),
-            (None, Some(tx)) => Some(tx),
-            _ => None,
-        };
+        let chain_id = self.chain_id().or(tx.chain_id());
 
         let mut sig =
             self.sign_hash(&tx.signature_hash()).await.map_err(alloy_signer::Error::other)?;
