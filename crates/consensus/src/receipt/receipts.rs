@@ -1,6 +1,8 @@
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
+use super::TxReceipt;
+
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Receipt {
@@ -28,6 +30,24 @@ impl Receipt {
     }
 }
 
+impl TxReceipt for Receipt {
+    fn success(&self) -> bool {
+        self.success
+    }
+
+    fn bloom(&self) -> Bloom {
+        self.bloom_slow()
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.cumulative_gas_used
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.logs
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -40,6 +60,28 @@ pub struct ReceiptWithBloom {
     pub receipt: Receipt,
     /// The bloom filter.
     pub bloom: Bloom,
+}
+
+impl TxReceipt for ReceiptWithBloom {
+    fn success(&self) -> bool {
+        self.receipt.success
+    }
+
+    fn bloom(&self) -> Bloom {
+        self.bloom
+    }
+
+    fn bloom_cheap(&self) -> Option<Bloom> {
+        Some(self.bloom)
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.receipt.cumulative_gas_used
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.receipt.logs
+    }
 }
 
 impl From<Receipt> for ReceiptWithBloom {

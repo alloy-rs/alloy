@@ -4,7 +4,6 @@ use alloy_primitives::{Address, TxKind, U256, U64};
 use alloy_rpc_types::request::TransactionRequest;
 use async_trait::async_trait;
 
-mod receipt;
 mod signer;
 pub use signer::EthereumSigner;
 

@@ -25,9 +25,6 @@ pub use transaction::{
     TxSignerSync,
 };
 
-mod receipt;
-pub use receipt::Receipt;
-
 pub use alloy_eips::eip2718;
 
 mod ethereum;
