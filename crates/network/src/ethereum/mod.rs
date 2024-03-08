@@ -7,7 +7,9 @@ pub use signer::EthereumSigner;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Debug, Clone, Copy)]
-pub struct Ethereum;
+pub struct Ethereum {
+    _private: (),
+}
 
 impl Network for Ethereum {
     type TxEnvelope = alloy_consensus::TxEnvelope;

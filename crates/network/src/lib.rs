@@ -64,12 +64,6 @@ pub trait ReceiptResponse {
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
 pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
-    #[doc(hidden)]
-    /// Asserts that this trait can only be implemented on a ZST.
-    const __ASSERT_ZST: () = {
-        assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
-    };
-
     // -- Consensus types --
 
     /// The network transaction envelope type.
