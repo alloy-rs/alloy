@@ -106,7 +106,7 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
         let mut sig =
             self.sign_hash(&tx.signature_hash()).await.map_err(alloy_signer::Error::other)?;
 
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+        if let Some(chain_id) = chain_id {
             sig = sig.with_chain_id(chain_id);
         }
         Ok(sig)
