@@ -1,6 +1,7 @@
 use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
+use reqwest::Response;
 use std::task;
 use tower::Service;
 
@@ -15,7 +16,9 @@ impl Http<reqwest::Client> {
                 .json(&req)
                 .send()
                 .await
+                .and_then(Response::error_for_status)
                 .map_err(TransportErrorKind::custom)?;
+
             let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
 
             serde_json::from_slice(&body)
