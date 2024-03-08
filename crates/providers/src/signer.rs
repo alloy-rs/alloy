@@ -112,7 +112,6 @@ mod tests {
     use alloy_primitives::{address, U256, U64};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
-    use alloy_signer::k256;
     use alloy_transport_http::Http;
     use reqwest::Client;
 
@@ -122,9 +121,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        // todo: is there a more ergo way?
-        let wallet: alloy_signer::Wallet<k256::ecdsa::SigningKey> =
-            alloy_signer::Wallet::from_slice(&anvil.keys().first().unwrap().to_bytes()).unwrap();
+        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
 
         // can we somehow remove the need for <_, Ethereum>? we NEED to call .network<Ethereum>
         // note: we need to 1) add <_, Ethereum> 2) layer things, and then 3) call .network before

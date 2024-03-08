@@ -14,6 +14,19 @@ use std::str::FromStr;
 use {elliptic_curve::rand_core, std::path::Path};
 
 impl Wallet<SigningKey> {
+    /// Creates a new Wallet instance from a [`SigningKey`].
+    ///
+    /// This can also be used to create a Wallet from a [`SecretKey`](K256SecretKey).
+    /// See also the `From` implementations.
+    #[doc(alias = "from_private_key")]
+    #[doc(alias = "new_private_key")]
+    #[doc(alias = "new_pk")]
+    #[inline]
+    pub fn from_signing_key(signer: SigningKey) -> Self {
+        let address = secret_key_to_address(&signer);
+        Self::new_with_signer(signer, address, None)
+    }
+
     /// Creates a new Wallet instance from a raw scalar serialized as a [`B256`] byte array.
     ///
     /// This is identical to [`from_field_bytes`](Self::from_field_bytes).
@@ -25,7 +38,7 @@ impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a raw scalar serialized as a [`FieldBytes`] byte array.
     #[inline]
     pub fn from_field_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_bytes(bytes).map(Self::new_pk)
+        SigningKey::from_bytes(bytes).map(Self::from_signing_key)
     }
 
     /// Creates a new Wallet instance from a raw scalar serialized as a byte slice.
@@ -33,7 +46,7 @@ impl Wallet<SigningKey> {
     /// Byte slices shorter than the field size (32 bytes) are handled by zero padding the input.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_slice(bytes).map(Self::new_pk)
+        SigningKey::from_slice(bytes).map(Self::from_signing_key)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -45,13 +58,7 @@ impl Wallet<SigningKey> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        Self::new_pk(SigningKey::random(rng))
-    }
-
-    #[inline]
-    fn new_pk(signer: SigningKey) -> Self {
-        let address = secret_key_to_address(&signer);
-        Self::new_with_signer(signer, address, None)
+        Self::from_signing_key(SigningKey::random(rng))
     }
 
     /// Borrow the secret [`NonZeroScalar`] value for this key.
@@ -146,13 +153,13 @@ impl PartialEq for Wallet<SigningKey> {
 
 impl From<SigningKey> for Wallet<SigningKey> {
     fn from(value: SigningKey) -> Self {
-        Self::new_pk(value)
+        Self::from_signing_key(value)
     }
 }
 
 impl From<K256SecretKey> for Wallet<SigningKey> {
     fn from(value: K256SecretKey) -> Self {
-        Self::new_pk(value.into())
+        Self::from_signing_key(value.into())
     }
 }
 
