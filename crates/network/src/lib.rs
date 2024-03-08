@@ -61,6 +61,8 @@ pub trait ReceiptResponse {
 }
 
 /// Captures type info for network-specific RPC requests/responses.
+///
+/// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
 pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
