@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use super::Ethereum;
 use crate::{NetworkSigner, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_signer::Signature;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 /// A signer capable of signing any transaction for the Ethereum network.
 #[derive(Clone)]

@@ -212,9 +212,8 @@ impl Encodable2718 for TxEnvelope {
 
 #[cfg(test)]
 mod tests {
-    use crate::transaction::SignableTransaction;
-
     use super::*;
+    use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
     use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
 

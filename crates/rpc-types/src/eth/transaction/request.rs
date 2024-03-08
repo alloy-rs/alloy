@@ -1,9 +1,9 @@
 //! Alloy basic Transaction Request type.
-use std::hash::Hash;
 
 use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U64, U8};
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
