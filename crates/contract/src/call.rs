@@ -307,13 +307,20 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
         self
     }
 
+    /// Applies a function to the internal transaction request.
+    pub fn map<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(N::TransactionRequest) -> N::TransactionRequest,
+    {
+        self.request = f(self.request);
+        self
+    }
+
     /// Sets the `block` field for sending the tx to the chain
     pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
-
-    // todo map function fn(req) -> req
 
     /// Sets the [state override set](https://geth.ethereum.org/docs/rpc/ns-eth#3-object---state-override-set).
     ///
