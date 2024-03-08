@@ -20,11 +20,19 @@ where
     S: TxSigner<Signature> + Send + Sync + 'static,
 {
     fn from(signer: S) -> Self {
-        Self(Arc::new(signer))
+        Self::new(signer)
     }
 }
 
 impl EthereumSigner {
+    /// Create a new Ethereum signer.
+    pub fn new<S>(signer: S) -> Self
+    where
+        S: TxSigner<Signature> + Send + Sync + 'static,
+    {
+        Self(Arc::new(signer))
+    }
+
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
