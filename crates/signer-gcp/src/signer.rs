@@ -1,3 +1,4 @@
+use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, B256};
 use alloy_signer::{Result, Signature, Signer};
 use async_trait::async_trait;
@@ -142,6 +143,33 @@ pub enum GcpSignerError {
     /// [`ecdsa`] error.
     #[error(transparent)]
     K256(#[from] ecdsa::Error),
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl alloy_network::TxSigner<Signature> for GcpSigner {
+    #[inline]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
+        let chain_id = match (self.chain_id(), tx.chain_id()) {
+            (Some(signer), Some(tx)) if signer != tx => {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
+            }
+            (Some(signer), _) => Some(signer),
+            (None, Some(tx)) => Some(tx),
+            _ => None,
+        };
+
+        let mut sig =
+            self.sign_hash(&tx.signature_hash()).await.map_err(alloy_signer::Error::other)?;
+
+        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+            sig = sig.with_chain_id(chain_id);
+        }
+        Ok(sig)
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

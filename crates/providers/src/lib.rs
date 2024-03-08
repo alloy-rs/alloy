@@ -26,7 +26,6 @@ pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
 extern crate tracing;
 
 mod builder;
-
 pub use builder::{ProviderBuilder, ProviderLayer, Stack};
 
 mod chain;

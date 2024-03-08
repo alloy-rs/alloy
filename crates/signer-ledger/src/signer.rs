@@ -297,11 +297,10 @@ impl LedgerSigner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_network::TxSigner;
     use alloy_primitives::{address, bytes, U256};
     use alloy_rlp::Decodable;
     use std::sync::OnceLock;
-
-    use alloy_network::TxSigner;
 
     const DTYPE: DerivationType = DerivationType::LedgerLive(0);
 
