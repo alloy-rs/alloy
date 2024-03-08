@@ -1,4 +1,7 @@
-use crate::new::{Provider, RootProvider};
+use crate::{
+    new::{Provider, RootProvider},
+    SignerLayer,
+};
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
@@ -97,6 +100,16 @@ impl<L, N> ProviderBuilder<L, N> {
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
     pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>> {
         ProviderBuilder { layer: Stack::new(layer, self.layer), network: PhantomData }
+    }
+
+    /// Add a signer layer to the stack being built.
+    ///
+    /// See [`SignerLayer`].
+    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>> {
+        ProviderBuilder {
+            layer: Stack::new(SignerLayer::new(signer), self.layer),
+            network: PhantomData,
+        }
     }
 
     /// Change the network.

@@ -105,7 +105,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::SignerLayer;
     use crate::{Provider, ProviderBuilder, RootProvider};
     use alloy_network::{Ethereum, EthereumSigner};
     use alloy_node_bindings::Anvil;
@@ -127,7 +126,7 @@ mod tests {
         // note: we need to 1) add <_, Ethereum> 2) layer things, and then 3) call .network before
         // we can call provider
         let provider = ProviderBuilder::<_, Ethereum>::new()
-            .layer(SignerLayer::new(EthereumSigner::from(wallet)))
+            .signer(EthereumSigner::from(wallet))
             .network::<Ethereum>()
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
