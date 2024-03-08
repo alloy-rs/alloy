@@ -41,8 +41,9 @@ where
 
             if status != hyper::StatusCode::OK {
                 return Err(TransportErrorKind::custom_str(&format!(
-                    "HTTP error: {} with body: {:?}",
-                    status, body
+                    r#"HTTP error: {} with body: "{}""#,
+                    status,
+                    String::from_utf8_lossy(body.as_ref())
                 )));
             }
 
