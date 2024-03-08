@@ -190,8 +190,6 @@ impl CallDecoder for () {
 #[derive(Clone)]
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
 pub struct CallBuilder<N: Network, T, P, D> {
-    // TODO: this will not work with `send_transaction` and does not differentiate between EIP-1559
-    // and legacy tx
     request: N::TransactionRequest,
     block: Option<BlockId>,
     state: Option<StateOverride>,
