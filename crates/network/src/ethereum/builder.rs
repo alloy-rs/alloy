@@ -130,8 +130,7 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self,
         signer: &S,
     ) -> BuilderResult<<Ethereum as Network>::TxEnvelope> {
-        // todo: BuilderResult + SignerResult
-        Ok(signer.sign(self.build_unsigned()?).await.unwrap())
+        Ok(signer.sign(self.build_unsigned()?).await?)
     }
 }
 
