@@ -32,7 +32,7 @@ pub trait TxReceipt {
 mod tests {
     use super::*;
     use alloy_eips::eip2718::Encodable2718;
-    use alloy_primitives::{address, b256, bytes, hex, Bytes, Log, LogData};
+    use alloy_primitives::{address, b256, bytes, hex, Bytes, LogData};
     use alloy_rlp::{Decodable, Encodable};
 
     // Test vector from: https://eips.ethereum.org/EIPS/eip-2481
