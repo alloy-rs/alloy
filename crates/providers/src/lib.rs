@@ -42,3 +42,6 @@ pub mod new;
 pub use new::{AnvilProvider, Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
 
 pub mod utils;
+
+#[doc(no_inline)]
+pub use alloy_network::{self as network, Network};

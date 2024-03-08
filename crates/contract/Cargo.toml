@@ -23,7 +23,7 @@ alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
 futures-util.workspace = true
-
+futures.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

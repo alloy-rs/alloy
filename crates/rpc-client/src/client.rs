@@ -1,4 +1,4 @@
-use crate::{poller::PollTask, BatchRequest, ClientBuilder, RpcCall};
+use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
@@ -60,21 +60,18 @@ impl<T: Transport> RpcClient<T> {
         ClientBuilder::default().connect(connect).await
     }
 
-    /// Poll a method with the given parameters.
-    ///
-    /// A [`PollTask`]
+    /// Build a poller that polls a method with the given parameters.
     pub fn prepare_static_poller<Params, Resp>(
         &self,
         method: &'static str,
         params: Params,
-    ) -> PollTask<T, Params, Resp>
+    ) -> PollerBuilder<T, Params, Resp>
     where
         T: Clone,
         Params: RpcParam + 'static,
         Resp: RpcReturn + Clone,
     {
-        let request: Request<Params> = self.make_request(method, params);
-        PollTask::new(self.get_weak(), method, request.params)
+        PollerBuilder::new(self.get_weak(), method, params)
     }
 }
 
@@ -175,6 +172,7 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     /// Serialization is done lazily. It will not be performed until the call
     /// is awaited. This means that if a serializer error occurs, it will not
     /// be caught until the call is awaited.
+    #[doc(alias = "request")]
     pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,

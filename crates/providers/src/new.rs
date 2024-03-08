@@ -4,18 +4,19 @@ use crate::{
     utils,
     utils::EstimatorFunction,
 };
+use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_client::{ClientRef, RpcClient, WeakClient};
+use alloy_rpc_client::{ClientRef, PollerBuilder, RpcClient, WeakClient};
 use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::LocalizedTransactionTrace,
 };
 use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
-    EIP1186AccountProofResponse, FeeHistory, Filter, Log, SyncStatus,
+    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde::{de::DeserializeOwned, Serialize};
@@ -29,6 +30,11 @@ pub type WeakProvider<P> = Weak<P>;
 
 /// A borrowed [`Provider`].
 pub type ProviderRef<'a, P> = &'a P;
+
+/// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
+///
+/// See [`PollerBuilder`] for more details.
+pub type FilterPoller<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
@@ -96,7 +102,84 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Returns a [`Weak`] RPC client used to send requests.
     fn weak_client(&self) -> WeakClient<T>;
 
+    /// Creates a new pending transaction from a transaction hash.
     async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction>;
+
+    /// Notify the provider that we are interested in new blocks.
+    ///
+    /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// See also [`watch_blocks`](Self::watch_blocks) to configure a poller.
+    async fn new_block_filter(&self) -> TransportResult<U256> {
+        self.client().prepare("eth_newBlockFilter", ()).await
+    }
+
+    /// Notify the provider that we are interested in new blocks.
+    ///
+    /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// See also [`watch_blocks`](Self::watch_blocks) to configure a poller.
+    async fn new_pending_transactions_filter(&self) -> TransportResult<U256> {
+        self.client().prepare("eth_newPendingTransactionFilter", ()).await
+    }
+
+    /// Notify the provider that we are interested in new logs using the given filter.
+    ///
+    /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// See also [`watch_logs`](Self::watch_logs) to configure a poller.
+    async fn new_filter(&self, filter: &Filter) -> TransportResult<U256> {
+        self.client().prepare("eth_newFilter", (filter,)).await
+    }
+
+    /// Get a list of values that have been added since the last poll.
+    async fn get_filter_changes<R: RpcReturn>(&self, id: U256) -> TransportResult<Vec<R>>
+    where
+        Self: Sized,
+    {
+        self.client().prepare("eth_getFilterChanges", (id,)).await
+    }
+
+    /// Get a list of values that have been added since the last poll.
+    async fn dyn_get_filter_changes<R: RpcReturn>(
+        &self,
+        id: U256,
+    ) -> TransportResult<Vec<FilterChanges>>
+    where
+        Self: Sized,
+    {
+        self.client().prepare("eth_getFilterChanges", (id,)).await
+    }
+
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    async fn watch_blocks(&self) -> TransportResult<FilterPoller<T, B256>> {
+        let id = self.new_block_filter().await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new pending transaction by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPoller<T, B256>> {
+        let id = self.new_pending_transactions_filter().await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new logs using the given filter by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPoller<T, Log>> {
+        let id = self.new_filter(filter).await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
 
     /// Get the last block number available.
     async fn get_block_number(&self) -> TransportResult<BlockNumber> {
@@ -234,7 +317,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
-    async fn get_logs(&self, filter: Filter) -> TransportResult<Vec<Log>> {
+    async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.client().prepare("eth_getLogs", (filter,)).await
     }
 
@@ -711,7 +794,7 @@ mod tests {
             .event_signature(b256!(
                 "e1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
             ));
-        let logs = provider.get_logs(filter).await.unwrap();
+        let logs = provider.get_logs(&filter).await.unwrap();
         assert_eq!(logs.len(), 1);
     }
 

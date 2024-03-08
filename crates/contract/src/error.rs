@@ -28,3 +28,10 @@ pub enum Error {
     #[error(transparent)]
     TransportError(#[from] TransportError),
 }
+
+impl From<alloy_sol_types::Error> for Error {
+    #[inline]
+    fn from(e: alloy_sol_types::Error) -> Self {
+        Self::AbiError(e.into())
+    }
+}

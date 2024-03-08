@@ -255,13 +255,12 @@ impl FilterBlockOption {
 /// Filter for logs.
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Filter {
-    /// Filter block options, specifying on which blocks the filter should
-    /// match.
+    /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
     /// Address
     pub address: FilterSet<Address>,
-    /// Topics (maxmimum of 4)
+    /// Topics (maximum of 4)
     pub topics: [Topic; 4],
 }
 
@@ -846,6 +845,7 @@ impl FilteredParams {
         true
     }
 }
+
 /// Response of the `eth_getFilterChanges` RPC.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FilterChanges {
