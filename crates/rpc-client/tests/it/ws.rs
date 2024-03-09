@@ -1,21 +1,16 @@
+use alloy_node_bindings::Anvil;
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
 use alloy_transport_ws::WsConnect;
-use std::borrow::Cow;
 
-// #[test_log::test(tokio::test)]
+#[tokio::test]
 async fn it_makes_a_request() {
-    let infura = std::env::var("WS_PROVIDER_URL").unwrap();
-
-    let connector = WsConnect { url: infura.parse().unwrap(), auth: None };
-
+    let anvil = Anvil::new().spawn();
+    let url = anvil.ws_endpoint();
+    let connector = WsConnect { url: url.parse().unwrap(), auth: None };
     let client = ClientBuilder::default().pubsub(connector).await.unwrap();
-
-    let params: Cow<'static, _> = Cow::Owned(());
-
-    let req: RpcCall<_, Cow<'static, ()>, U64> = client.prepare("eth_blockNumber", params);
-
+    let req: RpcCall<_, (), U64> = client.prepare("eth_blockNumber", ());
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
-
-    timeout.await.unwrap().unwrap();
+    let res = timeout.await.unwrap().unwrap();
+    assert_eq!(res.to::<u64>(), 0);
 }
