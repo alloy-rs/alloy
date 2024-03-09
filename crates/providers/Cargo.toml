@@ -21,11 +21,11 @@ alloy-transport.workspace = true
 
 alloy-primitives.workspace = true
 
-async-stream = "0.3.5"
+async-stream = "0.3"
 async-trait.workspace = true
-auto_impl = "1.1.0"
+auto_impl.workspace = true
 futures.workspace = true
-lru = "0.12.2"
+lru = "0.12"
 reqwest.workspace = true
 serde.workspace = true
 thiserror.workspace = true
