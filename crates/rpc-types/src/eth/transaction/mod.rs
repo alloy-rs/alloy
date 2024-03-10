@@ -2,13 +2,12 @@
 
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
-use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
+use alloy_primitives::{Address, Bytes, Signature, B256, U128, U256, U64};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use optimism::OptimismTransactionReceiptFields;
 pub use receipt::TransactionReceipt;
 use serde::{Deserialize, Serialize};
-pub use signature::{Parity, Signature};
 
 mod access_list;
 mod common;
@@ -16,7 +15,6 @@ pub mod kzg;
 pub mod optimism;
 mod receipt;
 pub mod request;
-mod signature;
 
 mod blob;
 
@@ -91,6 +89,8 @@ mod tests {
 
     #[test]
     fn serde_transaction() {
+        let signature =
+            Signature::from_rs_and_parity(U256::from(14), U256::from(14), false).unwrap();
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
             nonce: U64::from(2),
@@ -103,12 +103,7 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: None,
-            }),
+            signature: Some(signature),
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
@@ -121,7 +116,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","yParity":"0x0","chainId":"0x11","type":"0x14"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
@@ -129,6 +124,8 @@ mod tests {
 
     #[test]
     fn serde_transaction_with_parity_bit() {
+        let signature =
+            Signature::from_rs_and_parity(U256::from(14), U256::from(14), true).unwrap();
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
             nonce: U64::from(2),
@@ -141,12 +138,7 @@ mod tests {
             gas_price: Some(U128::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: Some(Parity(true)),
-            }),
+            signature: Some(signature),
             chain_id: Some(U64::from(17)),
             blob_versioned_hashes: vec![],
             access_list: None,
@@ -159,7 +151,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
