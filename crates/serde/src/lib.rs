@@ -1,4 +1,4 @@
-//! Serde helpers for primitive types.
+//! Alloy serde helpers for primitive types.
 
 use alloy_primitives::B256;
 use serde::Serializer;

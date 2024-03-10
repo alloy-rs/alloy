@@ -1,22 +1,21 @@
 [package]
-name = "alloy-rpc-trace-types"
-description = "Ethereum RPC trace types"
+name = "alloy-serde"
+description = "Alloy serde helpers"
 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-authors.workspace = true
 license.workspace = true
 homepage.workspace = true
+authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+# ethereum
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-rpc-types.workspace = true
-alloy-serde.workspace = true
 
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 
 [dev-dependencies]
@@ -26,9 +25,3 @@ alloy-primitives = { workspace = true, features = [
   "serde",
   "arbitrary",
 ] }
-
-arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
-rand.workspace = true
-similar-asserts.workspace = true

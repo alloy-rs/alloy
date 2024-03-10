@@ -1,8 +1,8 @@
 //! Withdrawal type and serde helpers.
 
-use crate::serde_helpers::u64_hex;
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
+use alloy_serde::u64_hex;
 use serde::{Deserialize, Serialize};
 
 /// Multiplier for converting gwei to wei.

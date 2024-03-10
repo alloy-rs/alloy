@@ -30,6 +30,7 @@ alloy-rpc-client = { version = "0.1.0", default-features = false, path = "crates
 alloy-rpc-engine-types = { version = "0.1.0", default-features = false, path = "crates/rpc-engine-types" }
 alloy-rpc-trace-types = { version = "0.1.0", default-features = false, path = "crates/rpc-trace-types" }
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }
+alloy-serde = { version = "0.1.0", default-features = false, path = "crates/serde" }
 alloy-signer = { version = "0.1.0", default-features = false, path = "crates/signer" }
 alloy-signer-aws = { version = "0.1.0", default-features = false, path = "crates/signer-aws" }
 alloy-signer-gcp = { version = "0.1.0", default-features = false, path = "crates/signer-gcp" }
