@@ -55,7 +55,7 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
 pub trait SignableTransaction<Signature>: Transaction {
     /// Sets `chain_id`.
     ///
-    /// Prefer [`set_chain_id_checked`].
+    /// Prefer [`set_chain_id_checked`](Self::set_chain_id_checked).
     fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
