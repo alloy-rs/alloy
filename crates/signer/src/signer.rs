@@ -81,7 +81,7 @@ pub trait Signer<Sig = Signature>: Send + Sync {
 ///
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 #[auto_impl(&, &mut, Box, Rc, Arc)]
-pub trait SignerSync<Sig: 'static = Signature> {
+pub trait SignerSync<Sig = Signature> {
     /// Signs the given hash.
     fn sign_hash_sync(&self, hash: &B256) -> Result<Sig>;
 
