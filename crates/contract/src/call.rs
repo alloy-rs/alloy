@@ -219,14 +219,18 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> DynCallBuilder<N, T, P
     }
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall> SolCallBuilder<N, T, P, C> {
+#[doc(hidden)]
+impl<'a, N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall>
+    SolCallBuilder<N, T, &'a P, C>
+{
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
-    #[doc(hidden)]
-    pub fn new_sol(provider: P, address: &Address, call: &C) -> Self {
+    pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
         Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(Some(*address))
     }
+}
 
+impl<N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall> SolCallBuilder<N, T, P, C> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
     pub fn clear_decoder(self) -> RawCallBuilder<N, T, P> {

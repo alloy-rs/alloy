@@ -1,4 +1,5 @@
 use crate::Error;
+use alloy_primitives::Address;
 use alloy_providers::{new::FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types::{Filter, Log};
 use alloy_sol_types::SolEvent;
@@ -24,6 +25,15 @@ impl<N, T, P: fmt::Debug, E> fmt::Debug for Event<N, T, P, E> {
             .field("filter", &self.filter)
             .field("event_type", &format_args!("{}", std::any::type_name::<E>()))
             .finish()
+    }
+}
+
+#[doc(hidden)]
+impl<'a, N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, T, &'a P, E> {
+    // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
+    // NOTE: please avoid changing this function due to its use in the `sol!` macro.
+    pub fn new_sol(provider: &'a P, address: &Address) -> Self {
+        Self::new(provider, Filter::new().address(*address))
     }
 }
 
@@ -142,14 +152,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn manual_event() {
+    async fn event_filters() {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 
         let contract = MyContract::deploy(&provider).await.unwrap();
+
         let event: Event<_, _, _, MyContract::MyEvent> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
+
+        let event = contract.MyContractInstance_filter();
 
         let poller = event.watch().await.unwrap();
 
