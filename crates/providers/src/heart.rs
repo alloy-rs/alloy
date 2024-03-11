@@ -19,7 +19,7 @@ use tokio::{
 };
 
 /// A configuration object for watching for transaction confirmation.
-#[must_use = "this type does nothing unless you call `watch_on` or `subscribe_on`"]
+#[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
 pub struct PendingTransactionConfig<N, T, P> {
     inner: PendingTransactionConfigInner,
