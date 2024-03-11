@@ -49,15 +49,9 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, 
     /// Watches for events that match the filter.
     ///
     /// Returns a stream of decoded events and raw logs.
+    #[doc(alias = "stream")]
+    #[doc(alias = "stream_with_meta")]
     pub async fn watch(&self) -> TransportResult<EventPoller<T, E>> {
-        let poller = self.provider.watch_logs(&self.filter).await?;
-        Ok(EventPoller::new(poller))
-    }
-
-    /// Watches for events that match the filter.
-    ///
-    /// Returns a stream of decoded events and raw logs.
-    pub async fn subscribe(&self) -> TransportResult<EventPoller<T, E>> {
         let poller = self.provider.watch_logs(&self.filter).await?;
         Ok(EventPoller::new(poller))
     }
