@@ -27,7 +27,8 @@ pub enum TxType {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(match u.int_in_range(0..=2)? {
+        Ok(match u.int_in_range(0..=3)? {
+            0 => TxType::Legacy,
             1 => TxType::Eip2930,
             2 => TxType::Eip1559,
             3 => TxType::Eip4844,
@@ -43,7 +44,7 @@ impl TryFrom<u8> for TxType {
         match value {
             0 => Err(Eip2718Error::UnexpectedType(value)),
             // SAFETY: repr(u8) with explicit discriminant
-            ..=3 => Ok(unsafe { std::mem::transmute(value) }),
+            1..=3 => Ok(unsafe { std::mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }
@@ -249,7 +250,8 @@ mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
+    use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
+    use std::{fs, path::PathBuf};
 
     #[test]
     #[cfg(feature = "k256")]
@@ -382,5 +384,19 @@ mod tests {
             }]),
         };
         test_encode_decode_roundtrip(tx);
+    }
+
+    #[test]
+    fn decode_encode_known_rpc_transaction() {
+        // test data pulled from hive test that sends blob transactions
+        let network_data_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/rpc_blob_transaction.rlp");
+        let data = fs::read_to_string(network_data_path).expect("Unable to read file");
+        let hex_data = hex::decode(data.trim()).unwrap();
+
+        let tx: TxEnvelope = TxEnvelope::decode_2718(&mut hex_data.as_slice()).unwrap();
+        let encoded = tx.encoded_2718();
+        assert_eq!(encoded, hex_data);
+        assert_eq!(tx.encode_2718_len(), hex_data.len());
     }
 }
