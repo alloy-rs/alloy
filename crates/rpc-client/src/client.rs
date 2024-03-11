@@ -35,9 +35,24 @@ impl RpcClient<Identity> {
 }
 
 impl<T> RpcClient<T> {
-    /// Create a new [`RpcClient`] with the given transport.
+    /// Creates a new [`RpcClient`] with the given transport.
     pub fn new(t: T, is_local: bool) -> Self {
         Self(Arc::new(RpcClientInner::new(t, is_local)))
+    }
+
+    /// Creates a new [`RpcClient`] with the given inner client.
+    pub fn from_inner(inner: RpcClientInner<T>) -> Self {
+        Self(Arc::new(inner))
+    }
+
+    /// Get a reference to the client.
+    pub fn inner(&self) -> &Arc<RpcClientInner<T>> {
+        &self.0
+    }
+
+    /// Convert the client into its inner type.
+    pub fn into_inner(self) -> Arc<RpcClientInner<T>> {
+        self.0
     }
 
     /// Get a [`Weak`] reference to the client.

@@ -5,7 +5,7 @@ use crate::{
     utils::EstimatorFunction,
 };
 use alloy_json_rpc::RpcReturn;
-use alloy_network::Network;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
@@ -44,6 +44,7 @@ pub struct RootProvider<N, T> {
 }
 
 impl<N: Network, T: Transport> RootProvider<N, T> {
+    /// Creates a new root provider from the given RPC client.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
@@ -196,8 +197,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Get a block by its number.
-    ///
-    /// TODO: Network associate
+    // TODO: Network associate
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
@@ -212,7 +212,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         tx: &mut N::TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<()> {
-        use alloy_network::TransactionBuilder;
         let gas = self.estimate_gas(&*tx, block).await;
 
         gas.map(|gas| tx.set_gas_limit(gas))
@@ -224,7 +223,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         tx: &mut N::TransactionRequest,
         estimator: Option<EstimatorFunction>,
     ) -> TransportResult<()> {
-        use alloy_network::TransactionBuilder;
         let gas = self.estimate_eip1559_fees(estimator).await;
 
         gas.map(|(max_fee_per_gas, max_priority_fee_per_gas)| {
