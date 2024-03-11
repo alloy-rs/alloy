@@ -13,6 +13,7 @@ body:
       description: What component is the feature for?
       multiple: true
       options:
+        - contract
         - consensus, eips, genesis
         - network, json-rpc
         - nodes
