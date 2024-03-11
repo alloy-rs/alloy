@@ -611,24 +611,13 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::HttpProvider;
-    use alloy_network::Ethereum;
-    use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
+    extern crate self as alloy_providers;
 
-    fn spawn_anvil() -> (HttpProvider<Ethereum>, AnvilInstance) {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-        (RootProvider::<Ethereum, _>::new(RpcClient::new(http, true)), anvil)
-    }
+    // NOTE: We cannot import the test-utils crate here due to a circular dependency.
+    include!("../../internal-test-utils/src/providers.rs");
 
     #[tokio::test]
     async fn object_safety() {

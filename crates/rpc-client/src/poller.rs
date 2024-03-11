@@ -53,14 +53,16 @@ where
     Params: RpcParam + 'static,
     Resp: RpcReturn + Clone,
 {
-    /// Create a new poller task with cloneable params.
+    /// Create a new poller task.
     pub fn new(client: WeakClient<Conn>, method: &'static str, params: Params) -> Self {
+        let poll_interval =
+            client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.default_poll_interval());
         Self {
             client,
             method,
             params,
             channel_size: 16,
-            poll_interval: Duration::from_secs(10),
+            poll_interval,
             limit: usize::MAX,
             _pd: PhantomData,
         }
@@ -114,7 +116,7 @@ where
         self
     }
 
-    /// Spawns the poller in a new Tokio task, returning a channel to receive the responses on.
+    /// Starts the poller in a new Tokio task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
         let span = debug_span!("poller", method = self.method);
@@ -166,12 +168,12 @@ where
         rx.into()
     }
 
-    /// Builds the poller and returns the stream of responses.
+    /// Starts the poller and returns the stream of responses.
     ///
     /// Note that this is currently equivalent to `self.spawn().into_stream()`, but this may change
     /// in the future.
     // TODO: can we name this type? This should be a different type from `PollChannel::into_stream`
-    pub fn into_stream(self) -> impl Stream<Item = Resp> {
+    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
         self.spawn().into_stream()
     }
 }
@@ -223,7 +225,7 @@ where
 
     /// Convert the poll channel into a stream.
     // TODO: can we name this type?
-    pub fn into_stream(self) -> impl Stream<Item = Resp> {
+    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
         self.into_stream_raw().flat_map(futures::stream::iter)
     }
 

@@ -8,6 +8,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
+    time::Duration,
 };
 use tower::{layer::util::Identity, ServiceBuilder};
 
@@ -148,6 +149,15 @@ impl<T> RpcClientInner<T> {
     #[inline]
     pub const fn new(t: T, is_local: bool) -> Self {
         Self { transport: t, is_local, id: AtomicU64::new(0) }
+    }
+
+    /// Returns the default poll interval for the client.
+    pub fn default_poll_interval(&self) -> Duration {
+        if self.is_local {
+            Duration::from_millis(250)
+        } else {
+            Duration::from_secs(7)
+        }
     }
 
     /// Returns a reference to the underlying transport.

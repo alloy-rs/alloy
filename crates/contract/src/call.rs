@@ -193,7 +193,8 @@ pub struct CallBuilder<N: Network, T, P, D> {
     request: N::TransactionRequest,
     block: Option<BlockId>,
     state: Option<StateOverride>,
-    provider: P,
+    /// The provider.
+    pub provider: P,
     decoder: D,
     transport: PhantomData<T>,
 }
@@ -428,6 +429,13 @@ impl<N: Network, T: Transport, P: Clone, D> CallBuilder<N, T, &P, D> {
 /// [`CallBuilder`] can be turned into a [`Future`] automatically with `.await`.
 ///
 /// Defaults to calling [`CallBuilder::call`].
+///
+/// # Note
+///
+/// This requires `Self: 'static` due to a current limitation in the Rust type system, namely that
+/// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
+/// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
+/// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
 impl<N, T, P, D> IntoFuture for CallBuilder<N, T, P, D>
 where
     N: Network,
@@ -554,7 +562,6 @@ mod tests {
         );
     }
 
-    // TODO: send_transaction, PendingTransaction
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
         let (provider, anvil) = spawn_anvil();

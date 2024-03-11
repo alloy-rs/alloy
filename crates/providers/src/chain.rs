@@ -7,7 +7,7 @@ use alloy_transport::{RpcError, Transport};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+use std::{num::NonZeroUsize, sync::Arc};
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
@@ -27,11 +27,7 @@ pub(crate) struct ChainStreamPoller<P, T: Transport + Clone> {
 
 impl<N: Network, T: Transport + Clone> ChainStreamPoller<RootProviderInner<N, T>, T> {
     pub(crate) fn from_root(p: &RootProvider<N, T>) -> Self {
-        let mut this = Self::new(Arc::downgrade(&p.inner), p.inner.weak_client());
-        if p.client().is_local() {
-            this.poll_task.set_poll_interval(Duration::from_secs(1));
-        }
-        this
+        Self::new(Arc::downgrade(&p.inner), p.inner.weak_client())
     }
 }
 
