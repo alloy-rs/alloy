@@ -1,7 +1,7 @@
 use super::types::{DerivationType, TrezorError};
 use alloy_consensus::{SignableTransaction, TxEip1559};
 use alloy_primitives::{hex, Address, ChainId, Parity, TxKind, B256, U256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use std::fmt;
 use trezor_client::client::Trezor;
@@ -72,19 +72,7 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let chain_id = match (self.chain_id(), tx.chain_id()) {
-            (Some(id), None) | (None, Some(id)) => id,
-            (Some(signer), Some(tx)) if signer != tx => {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx });
-            }
-            _ => {
-                return Err(TrezorError::MissingChainId.into());
-            }
-        };
-
-        let mut sig = self.sign_tx_inner(tx).await.map_err(alloy_signer::Error::other)?;
-        sig = sig.with_chain_id(chain_id);
-        Ok(sig)
+        sign_transaction_with_chain_id!(self, tx, self.sign_tx_inner(tx))
     }
 }
 

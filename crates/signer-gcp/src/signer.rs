@@ -1,6 +1,6 @@
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
     google::cloud::kms::{
@@ -153,23 +153,7 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        if let Some(chain_id) = self.chain_id {
-            if !tx.set_chain_id_checked(chain_id) {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch {
-                    signer: chain_id,
-                    // we can only end up here if the tx has a chain id
-                    tx: tx.chain_id().unwrap(),
-                });
-            }
-        }
-
-        let mut sig =
-            self.sign_hash(&tx.signature_hash()).await.map_err(alloy_signer::Error::other)?;
-
-        if let Some(chain_id) = self.chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()))
     }
 }
 

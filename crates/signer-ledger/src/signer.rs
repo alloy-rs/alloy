@@ -3,7 +3,7 @@
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use coins_ledger::{
     common::{APDUCommand, APDUData},
@@ -36,22 +36,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        if let Some(chain_id) = self.chain_id {
-            if !tx.set_chain_id_checked(chain_id) {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch {
-                    signer: chain_id,
-                    // we can only end up here if the tx has a chain id
-                    tx: tx.chain_id().unwrap(),
-                });
-            }
-        }
-        let rlp = tx.encoded_for_signing();
-        let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
-
-        if let Some(chain_id) = self.chain_id.or_else(|| tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        sign_transaction_with_chain_id!(self, tx, self.sign_tx_rlp(&tx.encoded_for_signing()))
     }
 }
 

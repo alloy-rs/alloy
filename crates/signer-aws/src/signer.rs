@@ -1,6 +1,6 @@
 use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use aws_sdk_kms::{
     error::SdkError,
@@ -101,15 +101,7 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let chain_id = self.chain_id().or(tx.chain_id());
-
-        let mut sig =
-            self.sign_hash(&tx.signature_hash()).await.map_err(alloy_signer::Error::other)?;
-
-        if let Some(chain_id) = chain_id {
-            sig = sig.with_chain_id(chain_id);
-        }
-        Ok(sig)
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()))
     }
 }
 
