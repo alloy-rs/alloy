@@ -43,8 +43,13 @@ impl From<JsonStorageKey> for String {
         // `eth_getProof` implementation in geth simply mirrors the input
         //
         // see the use of `hexKey` in the `eth_getProof` response:
-        // <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
+        // <https://github.com/ethereum/go-ethereum/blob/b87b9b45331f87fb1da379c5f17a81ebc3738c6e/internal/ethapi/api.go#L689-L763>
         let bytes = uint.to_be_bytes_trimmed_vec();
+        // Early return if the input is empty. This case is added to satisfy the hive tests.
+        // <https://github.com/ethereum/go-ethereum/blob/b87b9b45331f87fb1da379c5f17a81ebc3738c6e/internal/ethapi/api.go#L727-L729>
+        if bytes.is_empty() {
+            return "0x0".to_string();
+        }
         let mut hex = String::with_capacity(2 + bytes.len() * 2);
         hex.push_str("0x");
         for byte in bytes {
@@ -98,5 +103,16 @@ where
             Ok(Some(res_map))
         }
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_storage_key() {
+        let key = JsonStorageKey::default();
+        assert_eq!(String::from(key), String::from("0x0"));
     }
 }
