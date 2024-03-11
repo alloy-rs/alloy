@@ -7,6 +7,10 @@ use alloy_signer::{
 use async_trait::async_trait;
 
 /// A signer capable of signing any transaction for the given network.
+///
+/// Network crate authors should implement this trait on a type capable of signing any transaction
+/// (regardless of signature type) on a given network. Signer crate authors should instead implement
+/// [`TxSigner`] to signify signing capability for specific signature types.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait NetworkSigner<N: Network>: Send + Sync {
