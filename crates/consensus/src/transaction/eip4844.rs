@@ -154,9 +154,7 @@ impl TxEip4844Variant {
         }
     }
 
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let mut current_buf = *buf;
         let _header = Header::decode(&mut current_buf)?;
 
@@ -576,9 +574,7 @@ impl TxEip4844 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -653,10 +649,6 @@ impl SignableTransaction<Signature> for TxEip4844 {
 }
 
 impl Transaction for TxEip4844 {
-    fn chain_id(&self) -> Option<ChainId> {
-        Some(self.chain_id)
-    }
-
     fn input(&self) -> &[u8] {
         &self.input
     }
@@ -707,7 +699,7 @@ impl Decodable for TxEip4844 {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::decode_inner(data)
+        Self::decode_fields(data)
     }
 }
 
@@ -812,9 +804,7 @@ impl TxEip4844WithSidecar {
     /// This __does__ expect the bytes to start with a list header and include a signature.
     ///
     /// This is the inverse of [TxEip4844WithSidecar::encode_with_signature_fields].
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -862,7 +852,7 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         self.tx.encode_for_signing(out);
     }
 
-    fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature> {
+    fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
         let mut buf = Vec::with_capacity(self.tx.encoded_len_with_signature(&signature, false));
         // The sidecar is NOT included in the signed payload, only the transaction fields and the
         // type byte. Include the type byte.
@@ -1041,11 +1031,10 @@ pub(crate) fn kzg_to_versioned_hash(commitment: KzgCommitment) -> B256 {
 #[cfg(test)]
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
-    use crate::{TxEnvelope, TxKind};
+    use crate::{SignableTransaction, TxEnvelope};
     #[cfg(not(feature = "kzg"))]
     use alloy_eips::eip4844::{Blob, Bytes48};
-    use alloy_network::Transaction;
-    use alloy_primitives::{Signature, U256};
+    use alloy_primitives::{Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
     #[cfg(feature = "kzg")]
     use c_kzg::{Blob, Bytes48};

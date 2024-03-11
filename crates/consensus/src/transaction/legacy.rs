@@ -136,9 +136,7 @@ impl TxLegacy {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -279,9 +277,8 @@ impl Decodable for TxLegacy {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use crate::{TxKind, TxLegacy};
-    use alloy_network::Transaction;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use crate::{SignableTransaction, TxLegacy};
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
 
     #[test]
     fn recover_signer_legacy() {

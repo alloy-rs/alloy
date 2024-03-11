@@ -180,9 +180,7 @@ impl TxEip2930 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -270,7 +268,6 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 }
 
-
 impl Encodable for TxEip2930 {
     fn encode(&self, out: &mut dyn BufMut) {
         Header { list: true, payload_length: self.fields_len() }.encode(out);
@@ -292,16 +289,15 @@ impl Decodable for TxEip2930 {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::decode_inner(data)
+        Self::decode_fields(data)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::TxEip2930;
-    use crate::{TxEnvelope, TxKind};
-    use alloy_network::Transaction;
-    use alloy_primitives::{Address, Bytes, Signature, U256};
+    use crate::{SignableTransaction, TxEnvelope};
+    use alloy_primitives::{Address, Bytes, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]

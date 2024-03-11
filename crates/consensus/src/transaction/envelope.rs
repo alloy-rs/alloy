@@ -1,6 +1,7 @@
-use crate::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy};
+use crate::{
+    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
+};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_network::Signed;
 use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -229,7 +230,7 @@ impl Encodable2718 for TxEnvelope {
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
             // Legacy transactions have no difference between network and 2718
-            TxEnvelope::Legacy(_) => self.network_encode(out),
+            TxEnvelope::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
             TxEnvelope::Eip2930(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }

@@ -1,7 +1,6 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use std::mem;
 
@@ -190,9 +189,7 @@ impl TxEip1559 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(
-        buf: &mut &[u8],
-    ) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -303,6 +300,18 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 }
 
+impl Encodable for TxEip1559 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
+    }
+
+    fn length(&self) -> usize {
+        let payload_length = self.fields_len();
+        Header { list: true, payload_length }.length() + payload_length
+    }
+}
+
 impl Decodable for TxEip1559 {
     fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(data)?;
@@ -312,7 +321,7 @@ impl Decodable for TxEip1559 {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::decode_inner(data)
+        Self::decode_fields(data)
     }
 }
 
@@ -321,8 +330,7 @@ mod tests {
     use super::TxEip1559;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_network::Transaction;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
 
     #[test]
     fn recover_signer_eip1559() {
