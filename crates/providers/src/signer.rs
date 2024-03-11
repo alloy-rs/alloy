@@ -1,6 +1,5 @@
-use crate::{PendingTransaction, Provider, ProviderLayer};
+use crate::{PendingTransaction, PendingTransactionConfigInner, Provider, ProviderLayer};
 use alloy_network::{eip2718::Encodable2718, Network, NetworkSigner, TransactionBuilder};
-use alloy_primitives::B256;
 use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
@@ -88,14 +87,17 @@ where
         self.inner.weak_client()
     }
 
-    async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction> {
-        self.inner.new_pending_transaction(tx_hash).await
+    async fn watch_pending_transaction(
+        &self,
+        config: PendingTransactionConfigInner,
+    ) -> TransportResult<PendingTransaction> {
+        self.inner.watch_pending_transaction(config).await
     }
 
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> TransportResult<PendingTransactionConfigInner> {
         let envelope = tx.build(&self.signer).await.map_err(TransportErrorKind::custom)?;
         let rlp = envelope.encoded_2718();
 
@@ -108,7 +110,7 @@ mod tests {
     use crate::{Provider, ProviderBuilder, RootProvider};
     use alloy_network::{Ethereum, EthereumSigner};
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U256, U64};
+    use alloy_primitives::{address, b256, U256, U64};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;
@@ -139,13 +141,23 @@ mod tests {
             ..Default::default()
         };
 
-        let pending = provider.send_transaction(tx).await.unwrap();
-        let local_hash = pending.tx_hash;
-        let node_hash = pending.await.unwrap();
-        assert_eq!(local_hash, node_hash);
+        let config = provider.send_transaction(tx).await.unwrap();
+        let node_hash = *config.tx_hash();
         assert_eq!(
-            node_hash.to_string(),
-            "0xeb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64"
+            node_hash,
+            b256!("eb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64")
         );
+
+        let pending = config.with_provider(&provider).register().await.unwrap();
+        let local_hash = *pending.tx_hash();
+        assert_eq!(local_hash, node_hash);
+
+        let local_hash2 = pending.await.unwrap();
+        assert_eq!(local_hash2, node_hash);
+
+        let receipt =
+            provider.get_transaction_receipt(local_hash2).await.unwrap().expect("no receipt");
+        let receipt_hash = receipt.transaction_hash.expect("no receipt hash");
+        assert_eq!(receipt_hash, node_hash);
     }
 }

@@ -393,13 +393,13 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
     }
 
     /// Broadcasts the underlying transaction to the network.
-    // TODO: more docs referring to customizing PendingTransaction
+    ///
+    /// See [`Provider::send_transaction`] for more information.
     pub async fn send(
         &self,
-    ) -> Result<impl IntoFuture<Output = Result<Option<N::ReceiptResponse>>> + '_> {
-        let pending = self.provider.send_transaction(self.request.clone()).await?;
-
-        Ok(pending.and_then(|hash| self.provider.get_transaction_receipt(hash)).map_err(Into::into))
+    ) -> Result<impl Future<Output = Result<Option<N::ReceiptResponse>>> + '_> {
+        let config = self.provider.send_transaction(self.request.clone()).await?;
+        Ok(config.with_provider(&self.provider).get_receipt().map_err(Into::into))
     }
 
     /// Calculates the address that will be created by the transaction, if any.

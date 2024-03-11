@@ -90,6 +90,21 @@ impl<T: Transport> RpcClient<T> {
     }
 }
 
+impl<T: Transport + Clone> RpcClient<T> {
+    /// Boxes the transport.
+    ///
+    /// This will create a new client if this instance is not the only reference to the inner
+    /// client.
+    pub fn boxed(self) -> RpcClient<BoxTransport> {
+        let inner = match Arc::try_unwrap(self.0) {
+            Ok(inner) => inner,
+            // TODO: `id` is discarded.
+            Err(inner) => RpcClientInner::new(inner.transport.clone(), inner.is_local),
+        };
+        RpcClient::from_inner(inner.boxed())
+    }
+}
+
 impl<T> RpcClient<Http<T>> {
     /// Create a new [`BatchRequest`] builder.
     #[inline]
@@ -130,8 +145,27 @@ pub struct RpcClientInner<T> {
 
 impl<T> RpcClientInner<T> {
     /// Create a new [`RpcClient`] with the given transport.
+    #[inline]
     pub const fn new(t: T, is_local: bool) -> Self {
         Self { transport: t, is_local, id: AtomicU64::new(0) }
+    }
+
+    /// Returns a reference to the underlying transport.
+    #[inline]
+    pub fn transport(&self) -> &T {
+        &self.transport
+    }
+
+    /// Returns a mutable reference to the underlying transport.
+    #[inline]
+    pub fn transport_mut(&mut self) -> &mut T {
+        &mut self.transport
+    }
+
+    /// Consumes the client and returns the underlying transport.
+    #[inline]
+    pub fn into_transport(self) -> T {
+        self.transport
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -139,6 +173,7 @@ impl<T> RpcClientInner<T> {
     /// This function reserves an ID for the request, however the request
     /// is not sent. To send a request, use [`RpcClientInner::prepare`] and
     /// await the returned [`RpcCall`].
+    #[inline]
     pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
@@ -159,6 +194,7 @@ impl<T> RpcClientInner<T> {
     }
 
     /// Set the `is_local` flag.
+    #[inline]
     pub fn set_local(&mut self, is_local: bool) {
         self.is_local = is_local;
     }

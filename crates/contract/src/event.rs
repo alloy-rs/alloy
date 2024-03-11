@@ -1,4 +1,4 @@
-use alloy_providers::{new::FilterPoller, Network, Provider};
+use alloy_providers::{new::FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types::{Filter, Log};
 use alloy_sol_types::SolEvent;
 use alloy_transport::{Transport, TransportResult};
@@ -77,7 +77,7 @@ impl<N, T, P: Clone, E> Event<N, T, &P, E> {
 /// Polling configuration is available through the [`poller`](Self::poller) field.
 pub struct EventPoller<T, E> {
     /// The inner poller.
-    pub poller: FilterPoller<T, Log>,
+    pub poller: FilterPollerBuilder<T, Log>,
     _phantom: PhantomData<E>,
 }
 
@@ -93,7 +93,7 @@ impl<T: fmt::Debug, E> fmt::Debug for EventPoller<T, E> {
 impl<T: Transport + Clone, E: SolEvent> EventPoller<T, E> {
     /// Creates a new event poller with the provided filter poller.
     #[allow(clippy::missing_const_for_fn)]
-    pub fn new(poller: FilterPoller<T, Log>) -> Self {
+    pub fn new(poller: FilterPollerBuilder<T, Log>) -> Self {
         Self { poller, _phantom: PhantomData }
     }
 

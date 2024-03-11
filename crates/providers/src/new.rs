@@ -1,8 +1,7 @@
 use crate::{
     chain::ChainStreamPoller,
-    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, WatchConfig},
-    utils,
-    utils::EstimatorFunction,
+    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfigInner},
+    utils::{self, EstimatorFunction},
 };
 use alloy_json_rpc::RpcReturn;
 use alloy_network::{Network, TransactionBuilder};
@@ -34,13 +33,19 @@ pub type ProviderRef<'a, P> = &'a P;
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
 /// See [`PollerBuilder`] for more details.
-pub type FilterPoller<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
+pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
 pub struct RootProvider<N, T> {
     /// The inner state of the root provider.
     pub(crate) inner: Arc<RootProviderInner<N, T>>,
+}
+
+impl<N, T> Clone for RootProvider<N, T> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
 }
 
 impl<N: Network, T: Transport> RootProvider<N, T> {
@@ -51,10 +56,20 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 }
 
 impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
-    async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction> {
-        // TODO: Make this configurable.
-        let cfg = WatchConfig::new(tx_hash);
-        self.get_heart().watch_tx(cfg).await.map_err(|_| TransportErrorKind::backend_gone())
+    /// Boxes the inner client.
+    ///
+    /// This will create a new provider if this instance is not the only reference to the inner
+    /// client.
+    pub fn boxed(self) -> RootProvider<N, BoxTransport> {
+        let inner = Arc::unwrap_or_clone(self.inner);
+        RootProvider { inner: Arc::new(inner.boxed()) }
+    }
+
+    async fn new_pending_transaction(
+        &self,
+        config: PendingTransactionConfigInner,
+    ) -> TransportResult<PendingTransaction> {
+        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
     }
 
     #[inline]
@@ -75,6 +90,12 @@ pub(crate) struct RootProviderInner<N, T> {
     _network: PhantomData<N>,
 }
 
+impl<N, T> Clone for RootProviderInner<N, T> {
+    fn clone(&self) -> Self {
+        Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
+    }
+}
+
 impl<N, T> RootProviderInner<N, T> {
     pub(crate) fn new(client: RpcClient<T>) -> Self {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
@@ -86,6 +107,12 @@ impl<N, T> RootProviderInner<N, T> {
 
     fn client_ref(&self) -> ClientRef<'_, T> {
         self.client.get_ref()
+    }
+}
+
+impl<N, T: Transport + Clone> RootProviderInner<N, T> {
+    fn boxed(self) -> RootProviderInner<N, BoxTransport> {
+        RootProviderInner { client: self.client.boxed(), heart: self.heart, _network: PhantomData }
     }
 }
 
@@ -103,8 +130,13 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Returns a [`Weak`] RPC client used to send requests.
     fn weak_client(&self) -> WeakClient<T>;
 
-    /// Creates a new pending transaction from a transaction hash.
-    async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction>;
+    /// Watch for the confirmation of a single pending transaction with the given configuration.
+    ///
+    /// Note that this is handled internally rather than calling any specific RPC method.
+    async fn watch_pending_transaction(
+        &self,
+        config: PendingTransactionConfigInner,
+    ) -> TransportResult<PendingTransaction>;
 
     /// Notify the provider that we are interested in new blocks.
     ///
@@ -134,6 +166,10 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Get a list of values that have been added since the last poll.
+    ///
+    /// The return value depends on what stream `id` corresponds to.
+    /// See [`FilterChanges`] for all possible return values.
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
     async fn get_filter_changes<R: RpcReturn>(&self, id: U256) -> TransportResult<Vec<R>>
     where
         Self: Sized,
@@ -142,13 +178,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Get a list of values that have been added since the last poll.
-    async fn dyn_get_filter_changes<R: RpcReturn>(
-        &self,
-        id: U256,
-    ) -> TransportResult<Vec<FilterChanges>>
-    where
-        Self: Sized,
-    {
+    async fn dyn_get_filter_changes(&self, id: U256) -> TransportResult<Vec<FilterChanges>> {
         self.client().prepare("eth_getFilterChanges", (id,)).await
     }
 
@@ -157,7 +187,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
     /// details.
-    async fn watch_blocks(&self) -> TransportResult<FilterPoller<T, B256>> {
+    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -167,7 +197,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
     /// details.
-    async fn watch_pending_transactions(&self) -> TransportResult<FilterPoller<T, B256>> {
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
         let id = self.new_pending_transactions_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -177,7 +207,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
     /// details.
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPoller<T, Log>> {
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -192,7 +222,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         address: Address,
         tag: Option<BlockId>,
-    ) -> TransportResult<alloy_primitives::U256> {
+    ) -> TransportResult<U256> {
         self.client().prepare("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
     }
 
@@ -231,22 +261,26 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         })
     }
 
-    /// Broadcasts a transaction, returning a [`PendingTransaction`] that resolves once the
-    /// transaction has been confirmed.
+    /// Broadcasts a transaction to the network.
+    ///
+    /// Returns a type that can be used to configure how and when to await the transaction's
+    /// confirmation.
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> TransportResult<PendingTransactionConfigInner> {
         let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
-        self.new_pending_transaction(tx_hash).await
+        Ok(PendingTransactionConfigInner::new(tx_hash))
     }
 
-    /// Broadcasts a transaction's raw RLP bytes, returning a [`PendingTransaction`] that resolves
-    /// once the transaction has been confirmed.
-    async fn send_raw_transaction(&self, rlp_bytes: &[u8]) -> TransportResult<PendingTransaction> {
+    /// Broadcasts a raw transaction RLP bytes to the network.
+    async fn send_raw_transaction(
+        &self,
+        rlp_bytes: &[u8],
+    ) -> TransportResult<PendingTransactionConfigInner> {
         let rlp_hex = hex::encode(rlp_bytes);
         let tx_hash = self.client().prepare("eth_sendRawTransaction", (rlp_hex,)).await?;
-        self.new_pending_transaction(tx_hash).await
+        Ok(PendingTransactionConfigInner::new(tx_hash))
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -544,8 +578,11 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
     }
 
     #[inline]
-    async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction> {
-        RootProvider::new_pending_transaction(self, tx_hash).await
+    async fn watch_pending_transaction(
+        &self,
+        config: PendingTransactionConfigInner,
+    ) -> TransportResult<PendingTransaction> {
+        RootProvider::new_pending_transaction(self, config).await
     }
 }
 
@@ -563,9 +600,11 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
         self.weak_client()
     }
 
-    #[inline]
-    async fn new_pending_transaction(&self, _tx_hash: B256) -> TransportResult<PendingTransaction> {
-        unreachable!()
+    async fn watch_pending_transaction(
+        &self,
+        _config: PendingTransactionConfigInner,
+    ) -> TransportResult<PendingTransaction> {
+        unimplemented!()
     }
 }
 
@@ -580,8 +619,6 @@ mod tests {
     use alloy_transport_http::Http;
     use reqwest::Client;
 
-    struct _ObjectSafe<N: Network>(dyn Provider<N>);
-
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
     }
@@ -591,6 +628,41 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
         (RootProvider::<Ethereum, _>::new(RpcClient::new(http, true)), anvil)
+    }
+
+    #[tokio::test]
+    async fn object_safety() {
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil();
+
+        // These blocks are not necessary.
+        {
+            let refdyn = &provider as &dyn Provider<Ethereum, Http<reqwest::Client>>;
+            let num = refdyn.get_block_number().await.unwrap();
+            assert_eq!(0, num);
+        }
+
+        // Clones the underlying provider too.
+        {
+            let clone_boxed = provider.clone().boxed();
+            let num = clone_boxed.get_block_number().await.unwrap();
+            assert_eq!(0, num);
+        }
+
+        // Note the `Http` arg, vs no arg (defaulting to `BoxedTransport`) below.
+        {
+            let refdyn = &provider as &dyn Provider<Ethereum, Http<reqwest::Client>>;
+            let num = refdyn.get_block_number().await.unwrap();
+            assert_eq!(0, num);
+        }
+
+        let boxed = provider.boxed();
+        let num = boxed.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+
+        let boxed_boxdyn = Box::new(boxed) as Box<dyn Provider<Ethereum>>;
+        let num = boxed_boxdyn.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[tokio::test]
@@ -605,9 +677,23 @@ mod tests {
             gas: Some(U256::from(21000)),
             ..Default::default()
         };
+
+        let pending_tx = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let hash1 = *pending_tx.tx_hash();
+        let hash2 =
+            pending_tx.with_provider(&provider).watch().await.expect("failed to await pending tx");
+        assert_eq!(hash1, hash2);
+
         let pending_tx = provider.send_transaction(tx).await.expect("failed to send tx");
-        let hash1 = pending_tx.tx_hash;
-        let hash2 = pending_tx.await.expect("failed to await pending tx");
+        let hash1 = *pending_tx.tx_hash();
+        let hash2 = pending_tx
+            .with_provider(provider)
+            .get_receipt()
+            .await
+            .expect("failed to await pending tx")
+            .unwrap()
+            .transaction_hash
+            .unwrap();
         assert_eq!(hash1, hash2);
     }
 
@@ -671,10 +757,7 @@ mod tests {
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
         let block: Block = provider
-            .raw_request::<(alloy_primitives::FixedBytes<32>, bool), Block>(
-                "eth_getBlockByHash",
-                (hash, true),
-            )
+            .raw_request::<(B256, bool), Block>("eth_getBlockByHash", (hash, true))
             .await
             .unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
@@ -742,7 +825,7 @@ mod tests {
         let (provider, _anvil) = spawn_anvil();
 
         // Set the code
-        let addr = alloy_primitives::Address::with_last_byte(16);
+        let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
         let _code = provider
             .get_code_at(addr, BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest))
@@ -755,7 +838,7 @@ mod tests {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 
-        let addr = alloy_primitives::Address::with_last_byte(16);
+        let addr = Address::with_last_byte(16);
         let storage = provider.get_storage_at(addr, U256::ZERO, None).await.unwrap();
         assert_eq!(storage, U256::ZERO);
     }
