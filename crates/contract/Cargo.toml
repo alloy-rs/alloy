@@ -12,6 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-network.workspace = true
 alloy-providers.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport.workspace = true
@@ -21,8 +22,13 @@ alloy-json-abi.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
 
+futures-util.workspace = true
+
 thiserror.workspace = true
 
 [dev-dependencies]
+alloy-rpc-client.workspace = true
+alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true
+reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

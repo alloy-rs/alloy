@@ -28,7 +28,6 @@ futures.workspace = true
 lru = "0.12"
 reqwest.workspace = true
 serde.workspace = true
-thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 
@@ -36,8 +35,6 @@ tracing.workspace = true
 alloy-consensus.workspace = true
 alloy-node-bindings.workspace = true
 alloy-rlp.workspace = true
+alloy-signer.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
-
-[features]
-anvil = []

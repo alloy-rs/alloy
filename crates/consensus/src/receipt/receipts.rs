@@ -1,3 +1,4 @@
+use super::TxReceipt;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
@@ -28,7 +29,7 @@ impl Receipt {
     }
 }
 
-impl alloy_network::Receipt for Receipt {
+impl TxReceipt for Receipt {
     fn success(&self) -> bool {
         self.success
     }
@@ -51,13 +52,35 @@ impl alloy_network::Receipt for Receipt {
 /// This convenience type allows us to lazily calculate the bloom filter for a
 /// receipt, similar to [`Sealed`].
 ///
-/// [`Sealed`]: ::alloy_network::Sealed
+/// [`Sealed`]: crate::sealed::Sealed
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct ReceiptWithBloom {
     /// The receipt.
     pub receipt: Receipt,
     /// The bloom filter.
     pub bloom: Bloom,
+}
+
+impl TxReceipt for ReceiptWithBloom {
+    fn success(&self) -> bool {
+        self.receipt.success
+    }
+
+    fn bloom(&self) -> Bloom {
+        self.bloom
+    }
+
+    fn bloom_cheap(&self) -> Option<Bloom> {
+        Some(self.bloom)
+    }
+
+    fn cumulative_gas_used(&self) -> u64 {
+        self.receipt.cumulative_gas_used
+    }
+
+    fn logs(&self) -> &[Log] {
+        &self.receipt.logs
+    }
 }
 
 impl From<Receipt> for ReceiptWithBloom {
@@ -132,28 +155,6 @@ impl ReceiptWithBloom {
         }
         *buf = *b;
         Ok(this)
-    }
-}
-
-impl alloy_network::Receipt for ReceiptWithBloom {
-    fn success(&self) -> bool {
-        self.receipt.success
-    }
-
-    fn bloom(&self) -> Bloom {
-        self.bloom
-    }
-
-    fn bloom_cheap(&self) -> Option<Bloom> {
-        Some(self.bloom)
-    }
-
-    fn cumulative_gas_used(&self) -> u64 {
-        self.receipt.cumulative_gas_used
-    }
-
-    fn logs(&self) -> &[Log] {
-        &self.receipt.logs
     }
 }
 

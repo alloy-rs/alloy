@@ -53,3 +53,9 @@ pub enum TrezorError {
     #[error("could not retrieve device features")]
     Features,
 }
+
+impl From<TrezorError> for alloy_signer::Error {
+    fn from(error: TrezorError) -> Self {
+        alloy_signer::Error::other(error)
+    }
+}

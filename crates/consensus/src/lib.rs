@@ -21,15 +21,19 @@ mod header;
 pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
-pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
+pub use receipt::{Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt};
 
 mod transaction;
 pub use transaction::{
-    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType,
+    BlobTransactionSidecar, SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 
-pub use alloy_network::TxKind;
+mod sealed;
+pub use sealed::{Sealable, Sealed};
+
+mod signed;
+pub use signed::Signed;

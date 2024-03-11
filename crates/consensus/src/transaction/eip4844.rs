@@ -1,10 +1,9 @@
-use crate::{TxKind, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::{
     eip2930::AccessList,
     eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
 };
-use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
@@ -153,7 +152,64 @@ impl TxEip4844Variant {
 }
 
 impl Transaction for TxEip4844Variant {
-    type Signature = Signature;
+    fn chain_id(&self) -> Option<ChainId> {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => Some(tx.chain_id),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => Some(tx.tx().chain_id),
+        }
+    }
+
+    fn gas_limit(&self) -> u64 {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => tx.gas_limit,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
+        }
+    }
+
+    fn gas_price(&self) -> Option<U256> {
+        None
+    }
+
+    fn input(&self) -> &[u8] {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => tx.input.as_ref(),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
+        }
+    }
+
+    fn nonce(&self) -> u64 {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => tx.nonce,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().nonce,
+        }
+    }
+
+    fn to(&self) -> TxKind {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => tx.to,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to,
+        }
+    }
+
+    fn value(&self) -> U256 {
+        match self {
+            TxEip4844Variant::TxEip4844(tx) => tx.value,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.value,
+        }
+    }
+}
+
+impl SignableTransaction<Signature> for TxEip4844Variant {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        match self {
+            TxEip4844Variant::TxEip4844(ref mut inner) => {
+                inner.chain_id = chain_id;
+            }
+            TxEip4844Variant::TxEip4844WithSidecar(ref mut inner) => {
+                inner.tx.chain_id = chain_id;
+            }
+        }
+    }
 
     fn payload_len_for_signature(&self) -> usize {
         let payload_length = self.fields_len();
@@ -212,105 +268,6 @@ impl Transaction for TxEip4844Variant {
 
     fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         Self::encode_with_signature(self, signature, out, true);
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => Some(tx.chain_id),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => Some(tx.tx().chain_id),
-        }
-    }
-
-    fn gas_limit(&self) -> u64 {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.gas_limit,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
-        }
-    }
-
-    fn gas_price(&self) -> Option<U256> {
-        None
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.chain_id = chain_id,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.chain_id = chain_id,
-        }
-    }
-
-    fn input(&self) -> &[u8] {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.input.as_ref(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
-        }
-    }
-
-    fn input_mut(&mut self) -> &mut Bytes {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => &mut tx.input,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => &mut tx.tx.input,
-        }
-    }
-
-    fn nonce(&self) -> u64 {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.nonce,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().nonce,
-        }
-    }
-
-    fn set_gas_limit(&mut self, limit: u64) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.gas_limit = limit,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.gas_limit = limit,
-        }
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        let _ = price;
-    }
-
-    fn set_input(&mut self, data: Bytes) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.input = data,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.input = data,
-        }
-    }
-
-    fn set_nonce(&mut self, nonce: u64) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.nonce = nonce,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.nonce = nonce,
-        }
-    }
-
-    fn set_to(&mut self, to: TxKind) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.to = to,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to = to,
-        }
-    }
-
-    fn set_value(&mut self, value: U256) {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.value = value,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.value = value,
-        }
-    }
-
-    fn to(&self) -> TxKind {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.to,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to,
-        }
-    }
-
-    fn value(&self) -> U256 {
-        match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.value,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.value,
-        }
     }
 }
 
@@ -546,29 +503,6 @@ impl TxEip4844 {
         mem::size_of::<u128>() // max_fee_per_data_gas
     }
 
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require rlp header
-    pub(crate) fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1 + length_of_length(payload_length) + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx_type() as u8);
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-        self.encode_fields(out);
-        signature.encode(out);
-    }
-
     /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
     pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
         let len = self.payload_len_with_signature_without_header(signature);
@@ -587,7 +521,7 @@ impl TxEip4844 {
         TxType::Eip4844
     }
 
-    /// Encodes the 4844 transaction in RLP for signing.
+    /// Encodes the EIP-4844 transaction in RLP for signing.
     ///
     /// This encodes the transaction as:
     /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
@@ -609,105 +543,57 @@ impl TxEip4844 {
 }
 
 impl Transaction for TxEip4844 {
-    type Signature = Signature;
-
-    fn chain_id(&self) -> Option<ChainId> {
-        Some(self.chain_id)
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        let payload_length = self.fields_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self> {
-        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        buf.put_u8(TxType::Eip4844 as u8);
-        self.encode_signed(&signature, &mut buf);
-        let hash = keccak256(&buf);
-
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let tx = Self::decode_inner(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        Ok(tx.into_signed(signature))
-    }
-
-    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.encode_for_signing(out);
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        TxEip4844::encode_with_signature(self, signature, out, true);
-    }
-
     fn input(&self) -> &[u8] {
         &self.input
-    }
-
-    fn input_mut(&mut self) -> &mut Bytes {
-        &mut self.input
-    }
-
-    fn set_input(&mut self, input: Bytes) {
-        self.input = input;
     }
 
     fn to(&self) -> TxKind {
         self.to
     }
 
-    fn set_to(&mut self, to: TxKind) {
-        self.to = to;
-    }
-
     fn value(&self) -> U256 {
         self.value
     }
 
-    fn set_value(&mut self, value: U256) {
-        self.value = value;
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.chain_id = chain_id;
+    fn chain_id(&self) -> Option<ChainId> {
+        Some(self.chain_id)
     }
 
     fn nonce(&self) -> u64 {
         self.nonce
     }
 
-    fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
-
     fn gas_limit(&self) -> u64 {
         self.gas_limit
-    }
-
-    fn set_gas_limit(&mut self, limit: u64) {
-        self.gas_limit = limit;
     }
 
     fn gas_price(&self) -> Option<U256> {
         None
     }
+}
 
-    fn set_gas_price(&mut self, price: U256) {
-        let _ = price;
+impl Encodable for TxEip4844 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
+    }
+
+    fn length(&self) -> usize {
+        let payload_length = self.fields_len();
+        length_of_length(payload_length) + payload_length
+    }
+}
+
+impl Decodable for TxEip4844 {
+    fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(data)?;
+        let remaining_len = data.len();
+
+        if header.payload_length > remaining_len {
+            return Err(alloy_rlp::Error::InputTooShort);
+        }
+
+        Self::decode_inner(data)
     }
 }
 
@@ -775,83 +661,9 @@ impl TxEip4844WithSidecar {
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
     }
-
-    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
-    /// hash that for eip2718 does not require rlp header
-    pub(crate) fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
-        let payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
-        if with_header {
-            Header {
-                list: false,
-                payload_length: 1 + length_of_length(payload_length) + payload_length,
-            }
-            .encode(out);
-        }
-        out.put_u8(self.tx.tx_type() as u8);
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-        self.tx.encode_fields(out);
-        signature.encode(out);
-        self.sidecar.encode_inner(out);
-    }
 }
 
 impl Transaction for TxEip4844WithSidecar {
-    type Signature = Signature;
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let tx = TxEip4844::decode_inner(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-        let sidecar = BlobTransactionSidecar::decode_inner(buf).unwrap_or_default();
-
-        Ok(Self::from_tx_and_sidecar(tx, sidecar).into_signed(signature))
-    }
-
-    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844] EIP-2718
-        // payload fields:
-        // (BLOB_TX_TYPE ||
-        //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
-        //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
-        self.tx.encode_for_signing(out);
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.encode_with_signature(signature, out, true)
-    }
-
-    fn into_signed(self, signature: Signature) -> Signed<Self, Self::Signature> {
-        let payload_length = 1 + self.tx.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        // The sidecar is NOT included in the signed payload, only the transaction fields and the
-        // type byte. Include the type byte.
-        buf.put_u8(TxType::Eip4844 as u8);
-        // Include the transaction fields.
-        self.tx.encode_signed(&signature, &mut buf);
-        let hash = keccak256(&buf);
-
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
-    }
-
-    fn payload_len_for_signature(&self) -> usize {
-        // The payload length is the length of the `transaction_payload_body` list.
-        // The sidecar is NOT included.
-        self.tx.payload_len_for_signature()
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         self.tx.chain_id()
     }
@@ -868,40 +680,8 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.nonce()
     }
 
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.tx.set_chain_id(chain_id);
-    }
-
-    fn set_gas_limit(&mut self, limit: u64) {
-        self.tx.set_gas_limit(limit);
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        self.tx.set_gas_price(price);
-    }
-
-    fn set_to(&mut self, to: TxKind) {
-        self.tx.set_to(to);
-    }
-
-    fn set_input(&mut self, data: Bytes) {
-        self.tx.set_input(data);
-    }
-
-    fn set_nonce(&mut self, nonce: u64) {
-        self.tx.set_nonce(nonce);
-    }
-
-    fn set_value(&mut self, value: U256) {
-        self.tx.set_value(value);
-    }
-
     fn to(&self) -> TxKind {
         self.tx.to()
-    }
-
-    fn signature_hash(&self) -> B256 {
-        self.tx.signature_hash()
     }
 
     fn value(&self) -> U256 {
@@ -910,10 +690,6 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn input(&self) -> &[u8] {
         self.tx.input()
-    }
-
-    fn input_mut(&mut self) -> &mut Bytes {
-        self.tx.input_mut()
     }
 }
 

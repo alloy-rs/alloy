@@ -1,8 +1,8 @@
-//! Misc Optimism-specific types
-use alloy_primitives::{B256, U128, U256, U64};
-use serde::{Deserialize, Serialize};
+//! Misc Optimism-specific types.
 
 use crate::other::OtherFields;
+use alloy_primitives::{B256, U128, U256, U64};
+use serde::{Deserialize, Serialize};
 
 /// Optimism specific transaction fields
 #[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,9 +84,8 @@ mod l1_fee_scalar_serde {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
-
     use super::*;
+    use serde_json::{json, Value};
 
     #[test]
     fn serialize_empty_optimism_transaction_receipt_fields_struct() {

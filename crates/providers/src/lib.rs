@@ -16,11 +16,20 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use alloy_transport_http::Http;
+use reqwest::Client as ReqwestClient;
+
+/// Type alias for a [`RootProvider`] using the [`Http`] transport.
+pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+
 #[macro_use]
 extern crate tracing;
 
 mod builder;
-pub use builder::{ProviderBuilder, ProviderLayer, Stack};
+pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
+
+mod signer;
+pub use signer::{SignerLayer, SignerProvider};
 
 mod chain;
 
@@ -28,9 +37,8 @@ mod heart;
 pub use heart::{PendingTransaction, WatchConfig};
 
 pub mod new;
-pub use new::{Provider, ProviderRef, RootProvider, WeakProvider};
+
+#[doc(inline)]
+pub use new::{AnvilProvider, Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
 
 pub mod utils;
-
-// TODO: remove
-pub mod tmp;

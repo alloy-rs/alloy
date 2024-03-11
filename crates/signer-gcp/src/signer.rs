@@ -1,5 +1,6 @@
+use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
     google::cloud::kms::{
@@ -146,11 +147,23 @@ pub enum GcpSignerError {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl alloy_network::TxSigner<Signature> for GcpSigner {
+    #[inline]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()).await)
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for GcpSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
-    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
-        self.sign_digest_inner(&hash).await.map_err(alloy_signer::Error::other)
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
+        self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
 
     #[inline]

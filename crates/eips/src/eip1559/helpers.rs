@@ -63,9 +63,8 @@ pub fn calc_next_block_base_fee(
 
 #[cfg(test)]
 mod tests {
-    use crate::eip1559::constants::{MIN_PROTOCOL_BASE_FEE, MIN_PROTOCOL_BASE_FEE_U256};
-
     use super::*;
+    use crate::eip1559::constants::{MIN_PROTOCOL_BASE_FEE, MIN_PROTOCOL_BASE_FEE_U256};
 
     #[test]
     fn min_protocol_sanity() {

@@ -1,5 +1,6 @@
+use alloy_consensus::SignableTransaction;
 use alloy_primitives::{hex, Address, ChainId, B256};
-use alloy_signer::{Result, Signature, Signer};
+use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use aws_sdk_kms::{
     error::SdkError,
@@ -94,10 +95,22 @@ pub enum AwsSignerError {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl alloy_network::TxSigner<Signature> for AwsSigner {
+    #[inline]
+    async fn sign_transaction(
+        &self,
+        tx: &mut dyn SignableTransaction<Signature>,
+    ) -> Result<Signature> {
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()).await)
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Signer for AwsSigner {
     #[instrument(err)]
-    #[allow(clippy::blocks_in_conditions)] // instrument on async fn
-    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
+    #[allow(clippy::blocks_in_conditions)] // tracing::instrument on async fn
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_digest_inner(hash).await.map_err(alloy_signer::Error::other)
     }
 
@@ -148,19 +161,19 @@ impl AwsSigner {
     pub async fn sign_digest_with_key(
         &self,
         key_id: String,
-        digest: B256,
+        digest: &B256,
     ) -> Result<ecdsa::Signature, AwsSignerError> {
         request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: B256) -> Result<ecdsa::Signature, AwsSignerError> {
+    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
     /// Sign a digest with this signer's key and applies EIP-155.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_inner(&self, digest: B256) -> Result<Signature, AwsSignerError> {
+    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
         let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
         if let Some(chain_id) = self.chain_id {
@@ -182,7 +195,7 @@ async fn request_get_pubkey(
 async fn request_sign_digest(
     kms: &Client,
     key_id: String,
-    digest: B256,
+    digest: &B256,
 ) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
         .key_id(key_id)
@@ -212,7 +225,7 @@ fn decode_signature(resp: SignOutput) -> Result<ecdsa::Signature, AwsSignerError
 /// Recover an rsig from a signature under a known key by trial/error.
 fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
-    hash: B256,
+    hash: &B256,
     pubkey: &VerifyingKey,
 ) -> Signature {
     let signature = Signature::from_signature_and_parity(sig, false).unwrap();
@@ -229,8 +242,8 @@ fn sig_from_digest_bytes_trial_recovery(
 }
 
 /// Makes a trial recovery to check whether an RSig corresponds to a known `VerifyingKey`.
-fn check_candidate(signature: &Signature, hash: B256, pubkey: &VerifyingKey) -> bool {
-    signature.recover_from_prehash(&hash).map(|key| key == *pubkey).unwrap_or(false)
+fn check_candidate(signature: &Signature, hash: &B256, pubkey: &VerifyingKey) -> bool {
+    signature.recover_from_prehash(hash).map(|key| key == *pubkey).unwrap_or(false)
 }
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use optimism::OptimismTransactionReceiptFields;
 pub use receipt::TransactionReceipt;
+pub use request::{TransactionInput, TransactionRequest};
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 

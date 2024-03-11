@@ -64,7 +64,7 @@ pub struct Wallet<D> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
     #[inline]
-    async fn sign_hash(&self, hash: B256) -> Result<Signature> {
+    async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_hash_sync(hash)
     }
 
@@ -86,7 +86,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
 
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> {
     #[inline]
-    fn sign_hash_sync(&self, hash: B256) -> Result<Signature> {
+    fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
         let mut sig = Signature::from_signature_and_parity(recoverable_sig, recovery_id)?;
         if let Some(chain_id) = self.chain_id {
@@ -101,7 +101,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
     /// Construct a new wallet with an external [`PrehashSigner`].
     #[inline]
     pub const fn new_with_signer(signer: D, address: Address, chain_id: Option<ChainId>) -> Self {
@@ -115,8 +115,21 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
     }
 
     /// Consumes this wallet and returns its signer.
+    #[inline]
     pub fn into_signer(self) -> D {
         self.signer
+    }
+
+    /// Returns this wallet's chain ID.
+    #[inline]
+    pub const fn address(&self) -> Address {
+        self.address
+    }
+
+    /// Returns this wallet's chain ID.
+    #[inline]
+    pub const fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
     }
 }
 
