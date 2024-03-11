@@ -64,7 +64,7 @@ macro_rules! sign_transaction_with_chain_id {
             }
         }
 
-        let mut sig = $sign.await.map_err(alloy_signer::Error::other)?;
+        let mut sig = $sign.map_err(alloy_signer::Error::other)?;
 
         if let Some(chain_id) = $signer.chain_id().or_else(|| $tx.chain_id()) {
             sig = sig.with_chain_id(chain_id);

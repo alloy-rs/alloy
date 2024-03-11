@@ -267,7 +267,6 @@ mod tests {
     #[test]
     #[cfg(feature = "eip712")]
     fn typed_data() {
-        use crate::Signer;
         use alloy_primitives::{keccak256, Address, I256, U256};
         use alloy_sol_types::{eip712_domain, sol, SolStruct};
 

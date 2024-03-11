@@ -101,7 +101,7 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()))
+        sign_transaction_with_chain_id!(self, tx, self.sign_hash(&tx.signature_hash()).await)
     }
 }
 

@@ -101,7 +101,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
     /// Construct a new wallet with an external [`PrehashSigner`].
     #[inline]
     pub const fn new_with_signer(signer: D, address: Address, chain_id: Option<ChainId>) -> Self {
@@ -115,8 +115,21 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Wallet<D> {
     }
 
     /// Consumes this wallet and returns its signer.
+    #[inline]
     pub fn into_signer(self) -> D {
         self.signer
+    }
+
+    /// Returns this wallet's chain ID.
+    #[inline]
+    pub const fn address(&self) -> Address {
+        self.address
+    }
+
+    /// Returns this wallet's chain ID.
+    #[inline]
+    pub const fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
     }
 }
 

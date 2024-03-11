@@ -72,7 +72,7 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        sign_transaction_with_chain_id!(self, tx, self.sign_tx_inner(tx))
+        sign_transaction_with_chain_id!(self, tx, self.sign_tx_inner(tx).await)
     }
 }
 
