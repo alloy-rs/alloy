@@ -105,3 +105,14 @@ where
         None => Ok(None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_storage_key() {
+        let key = JsonStorageKey::default();
+        assert_eq!(String::from(key), String::from("0x0"));
+    }
+}
