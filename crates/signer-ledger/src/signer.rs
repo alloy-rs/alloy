@@ -36,19 +36,19 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        let chain_id = match (self.chain_id(), tx.chain_id()) {
-            (Some(signer), Some(tx)) if signer != tx => {
-                return Err(alloy_signer::Error::TransactionChainIdMismatch { signer, tx })
+        if let Some(chain_id) = self.chain_id {
+            if !tx.set_chain_id_checked(chain_id) {
+                return Err(alloy_signer::Error::TransactionChainIdMismatch {
+                    signer: chain_id,
+                    // we can only end up here if the tx has a chain id
+                    tx: tx.chain_id().unwrap(),
+                });
             }
-            (Some(signer), _) => Some(signer),
-            (None, Some(tx)) => Some(tx),
-            _ => None,
-        };
-
+        }
         let rlp = tx.encoded_for_signing();
         let mut sig = self.sign_tx_rlp(&rlp).await.map_err(alloy_signer::Error::other)?;
 
-        if let Some(chain_id) = chain_id.or_else(|| tx.chain_id()) {
+        if let Some(chain_id) = self.chain_id.or_else(|| tx.chain_id()) {
             sig = sig.with_chain_id(chain_id);
         }
         Ok(sig)

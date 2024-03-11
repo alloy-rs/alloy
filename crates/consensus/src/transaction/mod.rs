@@ -53,8 +53,27 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
 /// types, or in other networks. For example, in Optimism, the deposit transaction signature is the
 /// unit type `()`.
 pub trait SignableTransaction<Signature>: Transaction {
-    /// Set `chain_id` if it is not already set.
+    /// Sets `chain_id`.
+    ///
+    /// Prefer [`set_chain_id_checked`].
     fn set_chain_id(&mut self, chain_id: ChainId);
+
+    /// Set `chain_id` if it is not already set. Checks that the provided `chain_id` matches the
+    /// existing `chain_id` if it is already set, returning `false` if they do not match.
+    fn set_chain_id_checked(&mut self, chain_id: ChainId) -> bool {
+        match self.chain_id() {
+            Some(tx_chain_id) => {
+                if tx_chain_id != chain_id {
+                    return false;
+                }
+                self.set_chain_id(chain_id);
+            }
+            None => {
+                self.set_chain_id(chain_id);
+            }
+        }
+        true
+    }
 
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
