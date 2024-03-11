@@ -71,7 +71,7 @@ mod test {
     use crate::{TxSigner, TxSignerSync};
     use alloy_consensus::{SignableTransaction, TxLegacy};
     use alloy_primitives::{address, ChainId, Signature, U256};
-    use alloy_signer::{k256, Result, Signer};
+    use alloy_signer::{LocalWallet, Result, Signer};
 
     #[tokio::test]
     async fn signs_tx() {
@@ -90,7 +90,7 @@ mod test {
             tx: &mut dyn SignableTransaction<Signature>,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
-            let mut wallet: alloy_signer::Wallet<k256::ecdsa::SigningKey> =
+            let mut wallet: LocalWallet =
                 "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
             wallet.set_chain_id(chain_id);
 
