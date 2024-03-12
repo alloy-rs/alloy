@@ -83,7 +83,10 @@ where
     P: Provider<N, T>,
 {
     async fn get_next_nonce(&self, from: Address) -> TransportResult<U64> {
+        // locks dashmap internally for a short duration to clone the `Arc`
         let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
+
+        // locks the value (does not lock dashmap)
         let mut nonce = mutex.lock().await;
         match *nonce {
             Some(ref mut nonce) => {
@@ -91,6 +94,7 @@ where
                 Ok(U64::from(*nonce))
             }
             None => {
+                // initialize the nonce if we haven't seen this account before
                 let initial_nonce = self.inner.get_transaction_count(from, None).await?;
                 *nonce = Some(initial_nonce.to());
                 Ok(initial_nonce)
