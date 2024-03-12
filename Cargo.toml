@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "examples/*"]
 resolver = "2"
 
 [workspace.package]
@@ -10,7 +10,7 @@ authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/next"
 repository = "https://github.com/alloy-rs/next"
-exclude = ["benches/", "tests/"]
+exclude = ["benches/", "tests/", "examples/"]
 
 [workspace.metadata.docs.rs]
 all-features = true
