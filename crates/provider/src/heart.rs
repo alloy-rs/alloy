@@ -103,8 +103,8 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Sets the transaction hash.
-    pub fn with_tx_hash(mut self, tx_hash: B256) -> Self {
-        self.set_tx_hash(tx_hash);
+    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+        self.config.tx_hash = tx_hash;
         self
     }
 
@@ -119,8 +119,8 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Sets the number of confirmations to wait for.
-    pub fn with_confirmations(mut self, confirmations: u64) -> Self {
-        self.set_confirmations(confirmations);
+    pub const fn with_confirmations(mut self, confirmations: u64) -> Self {
+        self.config.confirmations = confirmations;
         self
     }
 
@@ -135,8 +135,8 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Sets the timeout.
-    pub fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
-        self.set_timeout(timeout);
+    pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.config.timeout = timeout;
         self
     }
 
@@ -196,7 +196,7 @@ impl<N, T, P: Clone> PendingTransactionBuilder<N, T, &P> {
 /// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[allow(missing_copy_implementations)]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
