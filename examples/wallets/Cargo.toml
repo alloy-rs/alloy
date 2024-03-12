@@ -15,6 +15,7 @@ exclude.workspace = true
 alloy-rpc-client = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-network = { workspace = true }
+alloy-node-bindings = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-providers = { workspace = true }
 alloy-signer = { workspace = true, features = ["mnemonic", "yubihsm"] }

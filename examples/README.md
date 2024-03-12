@@ -78,7 +78,7 @@
   - [ ] GCP
   - [ ] Mnemonic
   - [x] Ledger
-  - [ ] Local
+  - [x] Local
   - [ ] Permit hash
   - [ ] Sign message
   - [x] Trezor
