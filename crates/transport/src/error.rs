@@ -19,14 +19,18 @@ pub enum TransportErrorKind {
     /// This error is returned when a batch request is sent and the response
     /// does not contain a response for a request. For convenience the ID is
     /// specified.
-    #[error("Missing response for request with ID {0}.")]
+    #[error("missing response for request with ID {0}")]
     MissingBatchResponse(Id),
 
-    /// PubSub backend connection task has stopped.
-    #[error("PubSub backend connection task has stopped.")]
+    /// Backend connection task has stopped.
+    #[error("backend connection task has stopped")]
     BackendGone,
 
-    /// Custom error
+    /// Pubsub service is not available for the current provider.
+    #[error("subscriptions are not avalaible on this provider")]
+    PubsubUnavailable,
+
+    /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
 }
@@ -56,5 +60,10 @@ impl TransportErrorKind {
     /// Instantiate a new `TransportError::BackendGone`.
     pub const fn backend_gone() -> TransportError {
         RpcError::Transport(Self::BackendGone)
+    }
+
+    /// Instantiate a new `TransportError::PubsubUnavailable`.
+    pub const fn pubsub_unavailable() -> TransportError {
+        RpcError::Transport(Self::PubsubUnavailable)
     }
 }

@@ -42,6 +42,7 @@ pub trait Transport:
         Future = TransportFut<'static>,
     > + Send
     + Sync
+    + std::any::Any
     + 'static
 {
     /// Convert this transport into a boxed trait object.

@@ -114,6 +114,7 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 /// - The [`Subscription::recv_result`] and its variants will attempt to deserialize the
 ///  notifications and yield the `serde_json::Result` of the deserialization.
 #[derive(Debug)]
+#[must_use]
 pub struct Subscription<T> {
     pub(crate) inner: RawSubscription,
     _pd: std::marker::PhantomData<T>,

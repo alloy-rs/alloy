@@ -28,6 +28,9 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
+#[cfg(feature = "pubsub")]
+use alloy_pubsub::{PubSubFrontend, Subscription};
+
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
 /// See [`PollerBuilder`] for more details.
@@ -67,6 +70,27 @@ impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
     pub fn boxed(self) -> RootProvider<N, BoxTransport> {
         let inner = Arc::unwrap_or_clone(self.inner);
         RootProvider { inner: Arc::new(inner.boxed()) }
+    }
+
+    /// Gets the subscription corresponding to the given RPC subscription ID.
+    #[cfg(feature = "pubsub")]
+    pub async fn get_subscription<R: RpcReturn>(
+        &self,
+        id: U256,
+    ) -> TransportResult<Subscription<R>> {
+        self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn pubsub_frontend(&self) -> TransportResult<&PubSubFrontend> {
+        (self.transport() as &dyn std::any::Any)
+            .downcast_ref::<PubSubFrontend>()
+            .ok_or_else(TransportErrorKind::pubsub_unavailable)
+    }
+
+    #[cfg(feature = "pubsub")]
+    fn transport(&self) -> &T {
+        self.inner.client.transport()
     }
 
     #[inline]
@@ -150,6 +174,57 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         self.root().watch_pending_transaction(config).await
+    }
+
+    /// Subscribe to new block headers.
+    ///
+    /// Returns a stream of new block headers.
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().prepare("eth_subscribe", ("newHeads",)).await?;
+        self.root().get_subscription(id).await
+    }
+
+    /// Subscribe to new pending transactions.
+    ///
+    /// Returns a stream of new pending transaction hashes.
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_pending_transactions(&self) -> TransportResult<Subscription<B256>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().prepare("eth_subscribe", ("newPendingTransactions",)).await?;
+        self.root().get_subscription(id).await
+    }
+
+    /// Subscribe to new full pending transactions.
+    ///
+    /// Returns a stream of new pending transactions.
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_full_pending_transactions(
+        &self,
+    ) -> TransportResult<Subscription<N::TransactionResponse>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().prepare("eth_subscribe", ("newPendingTransactions", true)).await?;
+        self.root().get_subscription(id).await
+    }
+
+    /// Subscribe to an RPC event.
+    #[cfg(feature = "pubsub")]
+    #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
+    async fn subscribe<P, R>(&self, params: P) -> TransportResult<Subscription<R>>
+    where
+        P: RpcParam,
+        R: RpcReturn,
+        Self: Sized,
+    {
+        self.root().pubsub_frontend()?;
+        let id = self.client().prepare("eth_subscribe", params).await?;
+        self.root().get_subscription(id).await
+    }
+
+    /// Cancels a subscription given the subscription ID.
+    async fn unsubscribe(&self, id: U256) -> TransportResult<bool> {
+        self.client().prepare("eth_unsubscribe", (id,)).await
     }
 
     /// Watch for new blocks by polling the provider with
@@ -648,7 +723,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait AnvilProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
     /// Set the bytecode of a given account.
-    async fn set_code(&self, address: Address, code: &'static str) -> TransportResult<()> {
+    async fn set_code(&self, address: Address, code: &str) -> TransportResult<()> {
         self.client().prepare("anvil_setCode", (address, code)).await
     }
 }
@@ -772,6 +847,59 @@ mod tests {
         is_anvil_provider::<_, _, Box<dyn Provider<Ethereum>>>();
         is_anvil_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
         is_anvil_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_blocks_http() {
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil_with(|a| a.block_time(1));
+
+        let err = provider.subscribe_blocks().await.unwrap_err();
+        let alloy_json_rpc::RpcError::Transport(TransportErrorKind::PubsubUnavailable) = err else {
+            panic!("{err:?}");
+        };
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_blocks() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let anvil = Anvil::new().block_time(1).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let provider = RootProvider::<Ethereum, _>::new(client);
+
+        let sub = provider.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(2);
+        let mut n = 1;
+        while let Some(block) = stream.next().await {
+            assert_eq!(block.unwrap().header.number.unwrap(), U256::from(n));
+            n += 1;
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_blocks_boxed() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let anvil = Anvil::new().block_time(1).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let provider = RootProvider::<Ethereum, _>::new(client);
+        let provider = provider.boxed();
+
+        let sub = provider.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(2);
+        let mut n = 1;
+        while let Some(block) = stream.next().await {
+            assert_eq!(block.unwrap().header.number.unwrap(), U256::from(n));
+            n += 1;
+        }
     }
 
     #[tokio::test]
