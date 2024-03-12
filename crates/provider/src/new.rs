@@ -109,7 +109,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         address: Address,
         tag: Option<BlockId>,
-    ) -> TransportResult<alloy_primitives::U256> {
+    ) -> TransportResult<alloy_primitives::U64> {
         self.client().prepare("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
     }
 
@@ -579,7 +579,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(count, U256::from(0));
+        assert_eq!(count, U64::from(0));
     }
 
     #[tokio::test]
