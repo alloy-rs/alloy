@@ -1,22 +1,22 @@
 use crate::{PendingTransaction, Provider, ProviderLayer};
-use alloy_network::Network;
-use alloy_network::TransactionBuilder;
-use alloy_primitives::Address;
-use alloy_primitives::B256;
-use alloy_primitives::U64;
+use alloy_network::{Network, TransactionBuilder};
+use alloy_primitives::{Address, B256, U64};
 use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use std::marker::PhantomData;
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
+use std::{
+    marker::PhantomData,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 /// A layer that fills nonces on transactions.
 ///
-/// The layer will fetch the transaction count for any new account it sees, store it locally and increment the locally stored nonce as transactions are sent via [`Provider::send_transaction`].
+/// The layer will fetch the transaction count for any new account it sees, store it locally and
+/// increment the locally stored nonce as transactions are sent via [`Provider::send_transaction`].
 ///
-/// If you use layers that redirect the behavior of [`Provider::send_transaction`] (e.g. [`SignerLayer`]), you should add this layer before those.
+/// If you use layers that redirect the behavior of [`Provider::send_transaction`] (e.g.
+/// [`SignerLayer`]), you should add this layer before those.
 ///
 /// # Note
 ///
@@ -60,7 +60,8 @@ where
 ///
 /// If the transaction requests do not have a sender set, this provider will not set nonces.
 ///
-/// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`ManagedNonceLayer`].
+/// You cannot construct this provider directly. Use [`ProviderBuilder`] with a
+/// [`ManagedNonceLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 pub struct ManagedNonceProvider<N, T, P>
@@ -131,7 +132,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Provider, ProviderBuilder, RootProvider};
+    use crate::{ProviderBuilder, RootProvider};
     use alloy_network::{Ethereum, EthereumSigner};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, U256};
