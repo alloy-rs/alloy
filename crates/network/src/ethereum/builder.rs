@@ -4,10 +4,7 @@ use crate::{
 use alloy_consensus::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy};
 use alloy_primitives::{Address, TxKind, U256, U64};
 use alloy_rpc_types::request::TransactionRequest;
-use async_trait::async_trait;
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
         self.chain_id

@@ -25,6 +25,7 @@ alloy-primitives.workspace = true
 async-stream = "0.3"
 async-trait.workspace = true
 auto_impl.workspace = true
+dashmap = "5.5"
 futures.workspace = true
 lru = "0.12"
 reqwest.workspace = true

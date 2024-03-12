@@ -27,8 +27,7 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
-mod signer;
-pub use signer::{SignerLayer, SignerProvider};
+pub mod layers;
 
 mod chain;
 
