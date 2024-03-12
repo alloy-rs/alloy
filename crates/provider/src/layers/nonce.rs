@@ -4,11 +4,8 @@ use alloy_primitives::{Address, B256, U64};
 use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
-use dashmap::DashMap;
-use std::{
-    marker::PhantomData,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use dashmap::{mapref::entry::Entry, DashMap};
+use std::marker::PhantomData;
 
 /// A layer that fills nonces on transactions.
 ///
@@ -71,7 +68,7 @@ where
     P: Provider<N, T>,
 {
     inner: P,
-    nonces: DashMap<Address, AtomicU64>,
+    nonces: DashMap<Address, u64>,
     _phantom: PhantomData<(N, T)>,
 }
 
@@ -82,17 +79,20 @@ where
     P: Provider<N, T>,
 {
     async fn get_nonce(&self, from: Address) -> TransportResult<U64> {
-        // initialize the account nonce if it hasn't already been
-        if !self.nonces.contains_key(&from) {
-            let nonce = self.inner.get_transaction_count(from, None).await?;
-
-            // check again in case another thread filled the initial nonce
-            if !self.nonces.contains_key(&from) {
-                self.nonces.insert(from, AtomicU64::new(nonce.to()));
+        let nonce = match self.nonces.entry(from) {
+            Entry::Occupied(entry) => {
+                let next_nonce = entry.get() + 1;
+                entry.replace_entry(next_nonce);
+                next_nonce
             }
-        }
+            Entry::Vacant(entry) => {
+                let nonce: u64 = self.inner.get_transaction_count(from, None).await?.to();
+                entry.insert(nonce);
+                nonce
+            }
+        };
 
-        Ok(U64::from(self.nonces.get(&from).unwrap().fetch_add(1, Ordering::SeqCst)))
+        Ok(U64::from(nonce))
     }
 }
 
