@@ -81,7 +81,7 @@ where
     T: Transport + Clone,
     P: Provider<N, T>,
 {
-    async fn get_nonce(&self, from: Address) -> TransportResult<U64> {
+    async fn get_next_nonce(&self, from: Address) -> TransportResult<U64> {
         let nonce = match self.nonces.entry(from) {
             Entry::Occupied(entry) => {
                 let next_nonce = entry.get() + 1;
@@ -124,7 +124,7 @@ where
     ) -> TransportResult<PendingTransaction> {
         if tx.nonce().is_none() {
             if let Some(from) = tx.from() {
-                tx.set_nonce(self.get_nonce(from).await?);
+                tx.set_nonce(self.get_next_nonce(from).await?);
             }
         }
 
