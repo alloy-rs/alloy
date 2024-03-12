@@ -81,10 +81,20 @@ impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
         self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
     }
 
+    /// Unsubscribes from the subscription corresponding to the given RPC subscription ID.
+    #[cfg(feature = "pubsub")]
+    pub fn unsubscribe(&self, id: U256) -> TransportResult<()> {
+        self.pubsub_frontend()?.unsubscribe(id)
+    }
+
     #[cfg(feature = "pubsub")]
     fn pubsub_frontend(&self) -> TransportResult<&PubSubFrontend> {
-        (self.transport() as &dyn std::any::Any)
-            .downcast_ref::<PubSubFrontend>()
+        let t = self.transport() as &dyn std::any::Any;
+        t.downcast_ref::<PubSubFrontend>()
+            .or_else(|| {
+                t.downcast_ref::<BoxTransport>()
+                    .and_then(|t| t.as_any().downcast_ref::<PubSubFrontend>())
+            })
             .ok_or_else(TransportErrorKind::pubsub_unavailable)
     }
 
@@ -223,8 +233,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Cancels a subscription given the subscription ID.
-    async fn unsubscribe(&self, id: U256) -> TransportResult<bool> {
-        self.client().prepare("eth_unsubscribe", (id,)).await
+    #[cfg(feature = "pubsub")]
+    async fn unsubscribe(&self, id: U256) -> TransportResult<()> {
+        self.root().unsubscribe(id)
     }
 
     /// Watch for new blocks by polling the provider with
@@ -913,7 +924,6 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    #[ignore = "todo"]
     async fn subscribe_blocks_boxed() {
         use futures::stream::StreamExt;
 
@@ -1183,7 +1193,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Anvil has yet to implement the `eth_getBlockReceipts` method.
     async fn gets_block_receipts() {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();

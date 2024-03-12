@@ -25,6 +25,11 @@ impl BoxTransport {
     pub fn new<T: Transport + Clone + Send + Sync>(inner: T) -> Self {
         Self { inner: Box::new(inner) }
     }
+
+    /// Returns a reference to the inner transport.
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self.inner.as_any()
+    }
 }
 
 impl fmt::Debug for BoxTransport {
@@ -40,8 +45,9 @@ impl Clone for BoxTransport {
 }
 
 /// Helper trait for constructing [`BoxTransport`].
-trait CloneTransport: Transport {
+trait CloneTransport: Transport + std::any::Any {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync>;
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T> CloneTransport for T
@@ -50,6 +56,10 @@ where
 {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync> {
         Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
