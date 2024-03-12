@@ -1,8 +1,10 @@
 //! # Ledger Wallet Example
 
 use alloy_network::{Ethereum, EthereumSigner};
-use alloy_providers::{HttpProvider, Provider, ProviderBuilder, RootProvider};
+use alloy_primitives::{address, U256};
+use alloy_providers::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
+use alloy_rpc_types::request::TransactionRequest;
 use alloy_signer_ledger::{HDPath, LedgerSigner};
 use alloy_transport_http::Http;
 
@@ -29,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Send the transaction and wait for the receipt.
-    // TODO: Not configurable yet.
+    // TODO: Confirmation count is not configurable yet.
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.await?;
 
