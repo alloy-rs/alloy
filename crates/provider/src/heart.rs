@@ -1,6 +1,6 @@
 //! Block heartbeat and pending transaction watcher.
 
-use crate::Provider;
+use crate::{Provider, RootProvider};
 use alloy_network::Network;
 use alloy_primitives::{B256, U256};
 use alloy_rpc_types::Block;
@@ -10,7 +10,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     future::Future,
-    marker::PhantomData,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -31,7 +30,6 @@ use tokio::{
 ///     .await?
 ///     .with_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)));
-/// # let builder = builder.with_provider(&provider); // TODO
 /// // Register the pending transaction with the provider.
 /// let pending_transaction = builder.register().await?;
 /// // Wait for the transaction to be confirmed 2 times.
@@ -47,7 +45,6 @@ use tokio::{
 ///     .await?
 ///     .with_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
-/// #   .with_provider(&provider) // TODO
 ///     .watch()
 ///     .await?;
 /// # Ok(())
@@ -55,21 +52,23 @@ use tokio::{
 /// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
-pub struct PendingTransactionBuilder<N, T, P> {
+pub struct PendingTransactionBuilder<'a, N, T> {
     config: PendingTransactionConfig,
-    provider: P,
-    _phantom: PhantomData<(N, T)>,
+    provider: &'a RootProvider<N, T>,
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuilder<N, T, P> {
+impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: P, tx_hash: B256) -> Self {
+    pub const fn new(provider: &'a RootProvider<N, T>, tx_hash: B256) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
-    pub const fn from_config(provider: P, inner: PendingTransactionConfig) -> Self {
-        Self { config: inner, provider, _phantom: PhantomData }
+    pub const fn from_config(
+        provider: &'a RootProvider<N, T>,
+        config: PendingTransactionConfig,
+    ) -> Self {
+        Self { config, provider }
     }
 
     /// Returns the inner configuration.
@@ -83,12 +82,12 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Returns the provider.
-    pub const fn provider(&self) -> &P {
-        &self.provider
+    pub const fn provider(&self) -> &'a RootProvider<N, T> {
+        self.provider
     }
 
     /// Consumes this builder, returning the provider and the configuration.
-    pub fn split(self) -> (P, PendingTransactionConfig) {
+    pub fn split(self) -> (&'a RootProvider<N, T>, PendingTransactionConfig) {
         (self.provider, self.config)
     }
 
@@ -179,18 +178,6 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 }
 
-impl<N, T, P: Clone> PendingTransactionBuilder<N, T, &P> {
-    /// Clones the provider and returns a new pending transaction configuration with the cloned
-    /// provider.
-    pub fn with_cloned_provider(self) -> PendingTransactionBuilder<N, T, P> {
-        PendingTransactionBuilder {
-            config: self.config,
-            provider: self.provider.clone(),
-            _phantom: PhantomData,
-        }
-    }
-}
-
 /// Configuration for watching a pending transaction.
 ///
 /// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
@@ -264,10 +251,10 @@ impl PendingTransactionConfig {
     }
 
     /// Wraps this configuration with a provider to expose watching methods.
-    pub const fn with_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>(
+    pub const fn with_provider<N: Network, T: Transport + Clone>(
         self,
-        provider: P,
-    ) -> PendingTransactionBuilder<N, T, P> {
+        provider: &RootProvider<N, T>,
+    ) -> PendingTransactionBuilder<'_, N, T> {
         PendingTransactionBuilder::from_config(provider, self)
     }
 }

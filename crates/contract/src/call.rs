@@ -403,8 +403,8 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
     pub async fn send(
         &self,
     ) -> Result<impl Future<Output = Result<Option<N::ReceiptResponse>>> + '_> {
-        let config = self.provider.send_transaction(self.request.clone()).await?;
-        Ok(config.with_provider(&self.provider).get_receipt().map_err(Into::into))
+        let builder = self.provider.send_transaction(self.request.clone()).await?;
+        Ok(builder.get_receipt().map_err(Into::into))
     }
 
     /// Calculates the address that will be created by the transaction, if any.

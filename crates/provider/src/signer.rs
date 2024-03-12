@@ -1,6 +1,5 @@
-use crate::{PendingTransaction, PendingTransactionConfig, Provider, ProviderLayer};
+use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
 use alloy_network::{eip2718::Encodable2718, Network, NetworkSigner, TransactionBuilder};
-use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
 use std::marker::PhantomData;
@@ -81,25 +80,15 @@ where
     P: Provider<N, T>,
     S: NetworkSigner<N>,
 {
-    fn client(&self) -> ClientRef<'_, T> {
-        self.inner.client()
-    }
-
-    fn weak_client(&self) -> WeakClient<T> {
-        self.inner.weak_client()
-    }
-
-    async fn watch_pending_transaction(
-        &self,
-        config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
-        self.inner.watch_pending_transaction(config).await
+    #[inline]
+    fn root(&self) -> &RootProvider<N, T> {
+        self.inner.root()
     }
 
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionConfig> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
         let envelope = tx.build(&self.signer).await.map_err(TransportErrorKind::custom)?;
         let rlp = envelope.encoded_2718();
 
@@ -143,14 +132,14 @@ mod tests {
             ..Default::default()
         };
 
-        let config = provider.send_transaction(tx).await.unwrap();
-        let node_hash = *config.tx_hash();
+        let builder = provider.send_transaction(tx).await.unwrap();
+        let node_hash = *builder.tx_hash();
         assert_eq!(
             node_hash,
             b256!("eb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64")
         );
 
-        let pending = config.with_provider(&provider).register().await.unwrap();
+        let pending = builder.register().await.unwrap();
         let local_hash = *pending.tx_hash();
         assert_eq!(local_hash, node_hash);
 

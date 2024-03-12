@@ -4,6 +4,7 @@ use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
     utils::{self, EstimatorFunction},
+    PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_network::{Network, TransactionBuilder};
@@ -103,11 +104,11 @@ impl<N, T> RootProviderInner<N, T> {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
     }
 
-    fn weak_client(&self) -> WeakClient<T> {
+    pub(crate) fn weak_client(&self) -> WeakClient<T> {
         self.client.get_weak()
     }
 
-    fn client_ref(&self) -> ClientRef<'_, T> {
+    pub(crate) fn client_ref(&self) -> ClientRef<'_, T> {
         self.client.get_ref()
     }
 }
@@ -126,19 +127,31 @@ impl<N, T: Transport + Clone> RootProviderInner<N, T> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
 pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync {
+    /// Returns the root provider.
+    fn root(&self) -> &RootProvider<N, T>;
+
     /// Returns the RPC client used to send requests.
-    fn client(&self) -> ClientRef<'_, T>;
+    #[inline]
+    fn client(&self) -> ClientRef<'_, T> {
+        self.root().client()
+    }
 
     /// Returns a [`Weak`] RPC client used to send requests.
-    fn weak_client(&self) -> WeakClient<T>;
+    #[inline]
+    fn weak_client(&self) -> WeakClient<T> {
+        self.root().weak_client()
+    }
 
     /// Watch for the confirmation of a single pending transaction with the given configuration.
     ///
     /// Note that this is handled internally rather than calling any specific RPC method.
+    #[inline]
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction>;
+    ) -> TransportResult<PendingTransaction> {
+        self.root().watch_pending_transaction(config).await
+    }
 
     /// Watch for new blocks by polling the provider with
     /// [`eth_getFilterChanges`](Self::get_filter_changes).
@@ -339,7 +352,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///     .await?
     ///     .with_confirmations(2)
     ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
-    /// #   .with_provider(&provider) // TODO
     ///     .watch()
     ///     .await?;
     /// # Ok(())
@@ -348,9 +360,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionConfig> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
         let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
-        Ok(PendingTransactionConfig::new(tx_hash))
+        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
     /// Broadcasts a raw transaction RLP bytes to the network.
@@ -359,10 +371,10 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn send_raw_transaction(
         &self,
         rlp_bytes: &[u8],
-    ) -> TransportResult<PendingTransactionConfig> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
         let rlp_hex = hex::encode(rlp_bytes);
         let tx_hash = self.client().prepare("eth_sendRawTransaction", (rlp_hex,)).await?;
-        Ok(PendingTransactionConfig::new(tx_hash))
+        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -674,6 +686,11 @@ impl<P, N: Network, T: Transport + Clone> RawProvider<N, T> for P where P: Provi
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
     #[inline]
+    fn root(&self) -> &RootProvider<N, T> {
+        self
+    }
+
+    #[inline]
     fn client(&self) -> ClientRef<'_, T> {
         self.inner.client_ref()
     }
@@ -689,28 +706,6 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
-    }
-}
-
-// Internal implementation for [`ChainStreamPoller`].
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T> {
-    #[inline]
-    fn client(&self) -> ClientRef<'_, T> {
-        self.client_ref()
-    }
-
-    #[inline]
-    fn weak_client(&self) -> WeakClient<T> {
-        self.weak_client()
-    }
-
-    async fn watch_pending_transaction(
-        &self,
-        _config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
-        unimplemented!()
     }
 }
 
@@ -765,11 +760,19 @@ mod tests {
     fn object_safety_types() {
         fn is_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>() {}
         fn is_raw_provider<N: Network, T: Transport + Clone, P: RawProvider<N, T>>() {}
+        fn is_anvil_provider<N: Network, T: Transport + Clone, P: AnvilProvider<N, T>>() {}
 
         is_provider::<_, _, Box<dyn Provider<Ethereum>>>();
+        is_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
         is_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
+
         is_raw_provider::<_, _, Box<dyn Provider<Ethereum>>>();
+        is_raw_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
         is_raw_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
+
+        is_anvil_provider::<_, _, Box<dyn Provider<Ethereum>>>();
+        is_anvil_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
+        is_anvil_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
     }
 
     #[tokio::test]
@@ -785,16 +788,14 @@ mod tests {
             ..Default::default()
         };
 
-        let pending_tx = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
-        let hash1 = *pending_tx.tx_hash();
-        let hash2 =
-            pending_tx.with_provider(&provider).watch().await.expect("failed to await pending tx");
+        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let hash1 = *builder.tx_hash();
+        let hash2 = builder.watch().await.expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
 
-        let pending_tx = provider.send_transaction(tx).await.expect("failed to send tx");
-        let hash1 = *pending_tx.tx_hash();
-        let hash2 = pending_tx
-            .with_provider(provider)
+        let builder = provider.send_transaction(tx).await.expect("failed to send tx");
+        let hash1 = *builder.tx_hash();
+        let hash2 = builder
             .get_receipt()
             .await
             .expect("failed to await pending tx")
