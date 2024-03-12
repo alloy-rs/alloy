@@ -413,7 +413,8 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("trace_call", (request, trace_type, block)).await
     }
 
-    /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed on top of the given block with all `n - 1` transaction applied first.
+    /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
+    /// on top of the given block with all `n - 1` transaction applied first.
     ///
     /// Allows tracing dependent transactions.
     ///
