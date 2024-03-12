@@ -28,6 +28,12 @@ const MAX_RETRIES: usize = 3;
 ///
 /// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
 /// method.
+///
+/// # Examples
+///
+/// ```rust
+/// #
+/// ```
 // TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]

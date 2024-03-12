@@ -65,13 +65,6 @@ impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
         RootProvider { inner: Arc::new(inner.boxed()) }
     }
 
-    async fn new_pending_transaction(
-        &self,
-        config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
-        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
-    }
-
     #[inline]
     fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
@@ -605,7 +598,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
         &self,
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
-        RootProvider::new_pending_transaction(self, config).await
+        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
     }
 }
 
