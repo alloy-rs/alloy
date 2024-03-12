@@ -8,7 +8,7 @@ use std::str::FromStr;
 ///
 ///
 /// ```rust
-/// use alloy_rpc_types::num::U64HexOrNumber;
+/// use alloy_serde::num::U64HexOrNumber;
 /// let number_json = "100";
 /// let hex_json = "\"0x64\"";
 ///
