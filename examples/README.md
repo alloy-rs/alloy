@@ -74,6 +74,8 @@
   - [ ] Transfer ETH
   - [ ] Transfer ERC20 token
 - [ ] Wallets
+  - [ ] AWS
+  - [ ] GCP
   - [ ] Mnemonic
   - [x] Ledger
   - [ ] Local

@@ -17,7 +17,7 @@ alloy-rpc-types = { workspace = true }
 alloy-network = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-providers = { workspace = true }
-alloy-signer = { workspace = true }
+alloy-signer = { workspace = true, features = ["mnemonic", "yubihsm"] }
 # alloy-signer-aws = { workspace = true }
 # alloy-signer-gcp = { workspace = true }
 alloy-signer-ledger = { workspace = true }
