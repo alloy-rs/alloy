@@ -407,7 +407,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn trace_call(
         &self,
         request: &N::TransactionRequest,
-        trace_type: Vec<TraceType>,
+        trace_type: &[TraceType],
         block: Option<BlockId>,
     ) -> TransportResult<TraceResults> {
         self.client().prepare("trace_call", (request, trace_type, block)).await
