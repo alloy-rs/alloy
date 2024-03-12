@@ -38,6 +38,7 @@ pub struct RootProvider<N, T> {
 }
 
 impl<N: Network, T: Transport> RootProvider<N, T> {
+    /// Create a new root provider.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
@@ -375,6 +376,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         Ok((max_fee_per_gas, max_priority_fee_per_gas))
     }
 
+    /// Get the account and storage values of the specified account including the merkle proofs.
+    ///
+    /// This call can be used to verify that the data has not been tampered with.
     async fn get_proof(
         &self,
         address: Address,
@@ -384,6 +388,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_getProof", (address, keys, block.unwrap_or_default())).await
     }
 
+    /// Create an [EIP-2930] access list.
+    ///
+    /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
     async fn create_access_list(
         &self,
         request: &N::TransactionRequest,
@@ -402,6 +409,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     // todo: move to extension trait
+    /// Trace the given transaction.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
     async fn debug_trace_transaction(
         &self,
         hash: TxHash,
@@ -411,6 +423,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     // todo: move to extension trait
+    /// Trace all transactions in the given block.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
     async fn trace_block(
         &self,
         block: BlockNumberOrTag,

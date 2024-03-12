@@ -11,8 +11,10 @@ use std::marker::PhantomData;
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
 pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
+    /// The provider constructed by this layer.
     type Provider: Provider<N, T>;
 
+    /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
 }
 
