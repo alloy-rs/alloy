@@ -14,6 +14,19 @@ use std::str::FromStr;
 use {elliptic_curve::rand_core, std::path::Path};
 
 impl Wallet<SigningKey> {
+    /// Creates a new Wallet instance from a [`SigningKey`].
+    ///
+    /// This can also be used to create a Wallet from a [`SecretKey`](K256SecretKey).
+    /// See also the `From` implementations.
+    #[doc(alias = "from_private_key")]
+    #[doc(alias = "new_private_key")]
+    #[doc(alias = "new_pk")]
+    #[inline]
+    pub fn from_signing_key(signer: SigningKey) -> Self {
+        let address = secret_key_to_address(&signer);
+        Self::new_with_signer(signer, address, None)
+    }
+
     /// Creates a new Wallet instance from a raw scalar serialized as a [`B256`] byte array.
     ///
     /// This is identical to [`from_field_bytes`](Self::from_field_bytes).
@@ -25,7 +38,7 @@ impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a raw scalar serialized as a [`FieldBytes`] byte array.
     #[inline]
     pub fn from_field_bytes(bytes: &FieldBytes) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_bytes(bytes).map(Self::new_pk)
+        SigningKey::from_bytes(bytes).map(Self::from_signing_key)
     }
 
     /// Creates a new Wallet instance from a raw scalar serialized as a byte slice.
@@ -33,7 +46,7 @@ impl Wallet<SigningKey> {
     /// Byte slices shorter than the field size (32 bytes) are handled by zero padding the input.
     #[inline]
     pub fn from_slice(bytes: &[u8]) -> Result<Self, ecdsa::Error> {
-        SigningKey::from_slice(bytes).map(Self::new_pk)
+        SigningKey::from_slice(bytes).map(Self::from_signing_key)
     }
 
     /// Creates a new random keypair seeded with [`rand::thread_rng()`].
@@ -45,13 +58,7 @@ impl Wallet<SigningKey> {
     /// Creates a new random keypair seeded with the provided RNG.
     #[inline]
     pub fn random_with<R: Rng + CryptoRng>(rng: &mut R) -> Self {
-        Self::new_pk(SigningKey::random(rng))
-    }
-
-    #[inline]
-    fn new_pk(signer: SigningKey) -> Self {
-        let address = secret_key_to_address(&signer);
-        Self::new_with_signer(signer, address, None)
+        Self::from_signing_key(SigningKey::random(rng))
     }
 
     /// Borrow the secret [`NonZeroScalar`] value for this key.
@@ -146,13 +153,13 @@ impl PartialEq for Wallet<SigningKey> {
 
 impl From<SigningKey> for Wallet<SigningKey> {
     fn from(value: SigningKey) -> Self {
-        Self::new_pk(value)
+        Self::from_signing_key(value)
     }
 }
 
 impl From<K256SecretKey> for Wallet<SigningKey> {
     fn from(value: K256SecretKey) -> Self {
-        Self::new_pk(value.into())
+        Self::from_signing_key(value.into())
     }
 }
 
@@ -168,9 +175,8 @@ impl FromStr for Wallet<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LocalWallet, Result, SignableTx, Signer, SignerSync};
-    use alloy_consensus::TxLegacy;
-    use alloy_primitives::{address, b256, ChainId, Signature, U256};
+    use crate::{LocalWallet, SignerSync};
+    use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
     use tempfile::tempdir;
@@ -258,85 +264,9 @@ mod tests {
         assert_eq!(recovered2, address);
     }
 
-    #[tokio::test]
-    async fn signs_tx() {
-        async fn sign_tx_test(tx: &mut TxLegacy, chain_id: Option<ChainId>) -> Result<Signature> {
-            let mut before = tx.clone();
-            let sig = sign_dyn_tx_test(tx, chain_id).await?;
-            if let Some(chain_id) = chain_id {
-                assert_eq!(tx.chain_id, Some(chain_id), "chain ID was not set");
-                before.chain_id = Some(chain_id);
-            }
-            assert_eq!(*tx, before);
-            Ok(sig)
-        }
-
-        async fn sign_dyn_tx_test(
-            tx: &mut SignableTx,
-            chain_id: Option<ChainId>,
-        ) -> Result<Signature> {
-            let mut wallet: Wallet<SigningKey> =
-                "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-            wallet.set_chain_id(chain_id);
-
-            let sig = wallet.sign_transaction_sync(tx)?;
-            let sighash = tx.signature_hash();
-            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address);
-
-            let sig_async = wallet.sign_transaction(tx).await.unwrap();
-            assert_eq!(sig_async, sig);
-
-            Ok(sig)
-        }
-
-        // retrieved test vector from:
-        // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
-        let mut tx = TxLegacy {
-            to: alloy_consensus::TxKind::Call(address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55")),
-            value: U256::from(1_000_000_000),
-            gas_limit: 2_000_000,
-            nonce: 0,
-            gas_price: 21_000_000_000,
-            input: Default::default(),
-            chain_id: None,
-        };
-        let sig_none = sign_tx_test(&mut tx, None).await.unwrap();
-
-        tx.chain_id = Some(1);
-        let sig_1 = sign_tx_test(&mut tx, None).await.unwrap();
-        let expected = "c9cf86333bcb065d140032ecaab5d9281bde80f21b9687b3e94161de42d51895727a108a0b8d101465414033c3f705a9c7b826e596766046ee1183dbc8aeaa6825".parse().unwrap();
-        assert_eq!(sig_1, expected);
-        assert_ne!(sig_1, sig_none);
-
-        tx.chain_id = Some(2);
-        let sig_2 = sign_tx_test(&mut tx, None).await.unwrap();
-        assert_ne!(sig_2, sig_1);
-        assert_ne!(sig_2, sig_none);
-
-        // Sets chain ID.
-        tx.chain_id = None;
-        let sig_none_none = sign_tx_test(&mut tx, None).await.unwrap();
-        assert_eq!(sig_none_none, sig_none);
-
-        tx.chain_id = None;
-        let sig_none_1 = sign_tx_test(&mut tx, Some(1)).await.unwrap();
-        assert_eq!(sig_none_1, sig_1);
-
-        tx.chain_id = None;
-        let sig_none_2 = sign_tx_test(&mut tx, Some(2)).await.unwrap();
-        assert_eq!(sig_none_2, sig_2);
-
-        // Errors on mismatch.
-        tx.chain_id = Some(2);
-        let error = sign_tx_test(&mut tx, Some(1)).await.unwrap_err();
-        let expected_error = crate::Error::TransactionChainIdMismatch { signer: 1, tx: 2 };
-        assert_eq!(error.to_string(), expected_error.to_string());
-    }
-
     #[test]
     #[cfg(feature = "eip712")]
     fn typed_data() {
-        use crate::Signer;
         use alloy_dyn_abi::eip712::TypedData;
         use alloy_primitives::{keccak256, Address, I256, U256};
         use alloy_sol_types::{eip712_domain, sol, SolStruct};
@@ -373,7 +303,7 @@ mod tests {
         let hash = foo_bar.eip712_signing_hash(&domain);
         let sig = wallet.sign_typed_data_sync(&foo_bar, &domain).unwrap();
         assert_eq!(sig.recover_address_from_prehash(&hash).unwrap(), wallet.address());
-        assert_eq!(wallet.sign_hash_sync(hash).unwrap(), sig);
+        assert_eq!(wallet.sign_hash_sync(&hash).unwrap(), sig);
         let foo_bar_dynamic = TypedData::from_struct(&foo_bar, Some(domain));
         let dynamic_hash = foo_bar_dynamic.eip712_signing_hash().unwrap();
         let sig_dynamic = wallet.sign_dynamic_typed_data_sync(&foo_bar_dynamic).unwrap();
@@ -381,7 +311,7 @@ mod tests {
             sig_dynamic.recover_address_from_prehash(&dynamic_hash).unwrap(),
             wallet.address()
         );
-        assert_eq!(wallet.sign_hash_sync(dynamic_hash).unwrap(), sig_dynamic);
+        assert_eq!(wallet.sign_hash_sync(&dynamic_hash).unwrap(), sig_dynamic);
     }
 
     #[test]

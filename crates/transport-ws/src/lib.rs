@@ -60,8 +60,8 @@ impl<T> WsBackend<T> {
                     return Err(());
                 }
             }
-            Err(e) => {
-                error!(e = %e, "Failed to deserialize message");
+            Err(err) => {
+                error!(%err, "Failed to deserialize message");
                 return Err(());
             }
         }

@@ -1,4 +1,4 @@
-use crate::{eth::log::Log as RpcLog, BlockNumberOrTag, Log, Transaction};
+use crate::{eth::log::Log as RpcLog, BlockNumberOrTag, Transaction};
 use alloy_primitives::{keccak256, Address, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
 use serde::{
@@ -812,18 +812,18 @@ impl FilteredParams {
         self.filter.as_ref().map_or(false, |f| f.is_pending_block_filter())
     }
 
-    /// Returns `true` if the filter matches the given log.
-    pub fn filter_address(&self, log: &Log) -> bool {
-        self.filter.as_ref().map(|f| f.address.matches(&log.address)).unwrap_or(true)
+    /// Returns `true` if the filter matches the given address.
+    pub fn filter_address(&self, address: &Address) -> bool {
+        self.filter.as_ref().map(|f| f.address.matches(address)).unwrap_or(true)
     }
 
-    /// Returns `true` if the log matches the filter's topics
-    pub fn filter_topics(&self, log: &Log) -> bool {
+    /// Returns `true` if the log matches the the given topics
+    pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
         let topics = match self.filter.as_ref() {
             None => return true,
             Some(f) => &f.topics,
         };
-        for topic_tuple in topics.iter().zip_longest(log.topics.iter()) {
+        for topic_tuple in topics.iter().zip_longest(log_topics.iter()) {
             match topic_tuple {
                 // We exhausted the `log.topics`, so if there's a filter set for
                 // this topic index, there is no match. Otherwise (empty filter), continue.

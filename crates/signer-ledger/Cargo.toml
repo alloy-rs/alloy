@@ -12,11 +12,12 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-consensus.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-coins-ledger = { version = "0.9.1", default-features = false }
+coins-ledger = { version = "0.10", default-features = false }
 futures-util.workspace = true
 semver.workspace = true
 thiserror.workspace = true
@@ -24,6 +25,7 @@ tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
+alloy-network.workspace = true
 
 [dev-dependencies]
 alloy-consensus.workspace = true

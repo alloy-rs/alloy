@@ -40,11 +40,19 @@ alloy-transport-http = { version = "0.1.0", default-features = false, path = "cr
 alloy-transport-ipc = { version = "0.1.0", default-features = false, path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crates/transport-ws" }
 
-alloy-core = { version = "0.6.3", default-features = false, features = ["std"] }
-alloy-dyn-abi = { version = "0.6.3", default-features = false, features = ["std"] }
-alloy-json-abi = { version = "0.6.3", default-features = false, features = ["std"] }
-alloy-primitives = { version = "0.6.3", default-features = false, features = ["std"] }
-alloy-sol-types = { version = "0.6.3", default-features = false, features = ["std"] }
+alloy-core = { version = "0.6.4", default-features = false, features = ["std"] }
+alloy-dyn-abi = { version = "0.6.4", default-features = false, features = [
+    "std",
+] }
+alloy-json-abi = { version = "0.6.4", default-features = false, features = [
+    "std",
+] }
+alloy-primitives = { version = "0.6.4", default-features = false, features = [
+    "std",
+] }
+alloy-sol-types = { version = "0.6.4", default-features = false, features = [
+    "std",
+] }
 
 alloy-rlp = "0.3"
 
@@ -53,38 +61,44 @@ ethereum_ssz_derive = "0.5"
 ethereum_ssz = "0.5"
 
 # crypto
-elliptic-curve = { version = "0.13", default-features = false, features = ["std"] }
-k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"] }
+elliptic-curve = { version = "0.13", default-features = false, features = [
+    "std",
+] }
+k256 = { version = "0.13", default-features = false, features = [
+    "ecdsa",
+    "std",
+] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }
 spki = { version = "0.7", default-features = false, features = ["std"] }
 
 # async
-async-trait = "0.1.74"
-futures = "0.3.29"
-futures-util = "0.3.29"
-futures-executor = "0.3.29"
+async-trait = "0.1"
+futures = "0.3"
+futures-util = "0.3"
+futures-executor = "0.3"
 
-hyper = "0.14.27"
-tokio = "1.33"
+hyper = "0.14"
+tokio = "1"
 tokio-util = "0.7"
-tower = { version = "0.4.13", features = ["util"] }
+tokio-stream = "0.1"
+tower = { version = "0.4", features = ["util"] }
 
-tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # misc
-auto_impl = "1.1"
-base64 = "0.21"
+auto_impl = "1.2"
+base64 = "0.22"
 bimap = "0.6"
 home = "0.5"
 itertools = "0.12"
-once_cell = "1.17"
+once_cell = "1.19"
 pin-project = "1.1"
-rand = "0.8.5"
-reqwest = { version = "0.11.18", default-features = false }
+rand = "0.8"
+reqwest = { version = "0.11", default-features = false }
 semver = "1.0"
 thiserror = "1.0"
-url = "2.4"
+url = "2.5"
 
 ## serde
 serde = { version = "1.0", features = ["derive"] }
@@ -97,9 +111,9 @@ proptest = "1.4"
 proptest-derive = "0.4"
 serial_test = "3.0"
 similar-asserts = "1.5"
-tempfile = "3.8"
+tempfile = "3.10"
 
 # TODO: Keep around until alloy-contract is stable.
 # This should only be used in `alloy-contract` tests.
-# [patch.crates-io]
-# alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "18b0509950c90d9ec38f25913b692ae4cdd6f227" }
+[patch.crates-io]
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ab0cab1047a088be6cffa4e7a2fcde7cf77aa460" }

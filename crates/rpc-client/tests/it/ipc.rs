@@ -3,7 +3,6 @@ use alloy_primitives::U64;
 use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{ClientBuilder, RpcCall, RpcClient};
 use alloy_transport_ipc::IpcConnect;
-use std::borrow::Cow;
 use tempfile::NamedTempFile;
 
 async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
@@ -23,15 +22,11 @@ async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
     (client, geth)
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
 async fn it_makes_a_request() {
     let (client, _geth) = connect().await;
-
-    let params: Cow<'static, _> = Cow::Owned(vec![]);
-
-    let req: RpcCall<_, Cow<'static, Vec<String>>, U64> = client.prepare("eth_blockNumber", params);
-
+    let req: RpcCall<_, (), U64> = client.prepare("eth_blockNumber", ());
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
-
-    timeout.await.unwrap().unwrap();
+    let res = timeout.await.unwrap().unwrap();
+    assert!(res.to::<u64>() <= 3);
 }

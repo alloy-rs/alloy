@@ -12,7 +12,6 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-network.workspace = true
 alloy-primitives = { workspace = true, features = ["k256"] }
 
 auto_impl.workspace = true
@@ -34,11 +33,16 @@ coins-bip32 = { version = "0.8.7", default-features = false, optional = true }
 coins-bip39 = { version = "0.8.7", default-features = false, optional = true }
 
 # yubi
-yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
+yubihsm = { version = "0.42", features = [
+    "secp256k1",
+    "http",
+    "usb",
+], optional = true }
 
 [dev-dependencies]
 serde.workspace = true
 alloy-consensus.workspace = true
+alloy-network.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
@@ -46,7 +50,9 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 # need to enable features for tests
 yubihsm = { version = "0.42", features = ["mockhsm"] }
-coins-bip39 = { version = "0.8.7", default-features = false, features = ["english"] }
+coins-bip39 = { version = "0.8.7", default-features = false, features = [
+    "english",
+] }
 
 [features]
 eip712 = ["dep:alloy-sol-types"]

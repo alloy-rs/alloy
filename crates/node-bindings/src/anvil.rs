@@ -10,6 +10,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+use thiserror::Error;
 
 /// How long we will wait for anvil to indicate that it is ready.
 const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
@@ -63,6 +64,38 @@ impl Drop for AnvilInstance {
     fn drop(&mut self) {
         self.pid.kill().expect("could not kill anvil");
     }
+}
+
+/// Errors that can occur when working with the [`Anvil`].
+#[derive(Debug, Error)]
+pub enum AnvilError {
+    /// Spawning the anvil process failed.
+    #[error("could not start anvil: {0}")]
+    SpawnError(std::io::Error),
+
+    /// Timed out waiting for a message from anvil's stderr.
+    #[error("timedout occurred: {0}")]
+    Timeout(String),
+
+    /// A line could not be read from the geth stderr.
+    #[error("could not read line from anvil stderr: {0}")]
+    ReadLineError(std::io::Error),
+
+    /// The child anvil process's stderr was not captured.
+    #[error("could not get stderr for anvil child process")]
+    NoStderr,
+
+    /// The private key could not be parsed.
+    #[error("could not parse private key")]
+    ParsePrivateKeyError,
+
+    /// An error occurred while deserializing a private key.
+    #[error("could not deserialize private key from bytes")]
+    DeserializePrivateKeyError,
+
+    /// An error occurred while parsing a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
 }
 
 /// Builder for launching `anvil`.
@@ -215,6 +248,11 @@ impl Anvil {
     /// If spawning the instance fails at any point.
     #[track_caller]
     pub fn spawn(self) -> AnvilInstance {
+        self.try_spawn().unwrap()
+    }
+
+    /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
+    pub fn try_spawn(self) -> Result<AnvilInstance, AnvilError> {
         let mut cmd = if let Some(ref prg) = self.program {
             Command::new(prg)
         } else {
@@ -251,9 +289,9 @@ impl Anvil {
 
         cmd.args(self.args);
 
-        let mut child = cmd.spawn().expect("couldnt start anvil");
+        let mut child = cmd.spawn().map_err(AnvilError::SpawnError)?;
 
-        let stdout = child.stdout.take().expect("Unable to get stdout for anvil child process");
+        let stdout = child.stdout.take().ok_or(AnvilError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -266,11 +304,13 @@ impl Anvil {
             if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
                 <= Instant::now()
             {
-                panic!("Timed out waiting for anvil to start. Is anvil installed?")
+                return Err(AnvilError::Timeout(
+                    "Timed out waiting for anvil to start. Is anvil installed?".to_string(),
+                ));
             }
 
             let mut line = String::new();
-            reader.read_line(&mut line).expect("Failed to read line from anvil process");
+            reader.read_line(&mut line).map_err(AnvilError::ReadLineError)?;
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port
@@ -285,14 +325,11 @@ impl Anvil {
             }
 
             if is_private_key && line.starts_with('(') {
-                let key_str = line
-                    .split("0x")
-                    .last()
-                    .unwrap_or_else(|| panic!("could not parse private key: {}", line))
-                    .trim();
-                let key_hex = hex::decode(key_str).expect("could not parse as hex");
+                let key_str =
+                    line.split("0x").last().ok_or(AnvilError::ParsePrivateKeyError)?.trim();
+                let key_hex = hex::decode(key_str).map_err(AnvilError::FromHexError)?;
                 let key = K256SecretKey::from_bytes((&key_hex[..]).into())
-                    .expect("did not get private key");
+                    .map_err(|_| AnvilError::DeserializePrivateKeyError)?;
                 addresses.push(Address::from_public_key(SigningKey::from(&key).verifying_key()));
                 private_keys.push(key);
             }
@@ -305,13 +342,13 @@ impl Anvil {
             }
         }
 
-        AnvilInstance {
+        Ok(AnvilInstance {
             pid: child,
             private_keys,
             addresses,
             port,
             chain_id: self.chain_id.or(chain_id),
-        }
+        })
     }
 }
 

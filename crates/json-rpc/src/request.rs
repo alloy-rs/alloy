@@ -150,7 +150,6 @@ where
 
         // Params may be omitted if it is 0-sized
         if sized_params {
-            // TODO: remove unwrap
             map.serialize_entry("params", &self.params)?;
         }
 

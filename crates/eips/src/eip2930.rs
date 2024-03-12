@@ -2,6 +2,8 @@
 //!
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
 use std::mem;

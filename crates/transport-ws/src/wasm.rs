@@ -53,7 +53,7 @@ impl WsBackend<Fuse<WsStream>> {
     /// Spawn this backend on a loop.
     pub fn spawn(mut self) {
         let fut = async move {
-            let mut err = false;
+            let mut errored = false;
             loop {
                 // We bias the loop as follows
                 // 1. New dispatch to server.
@@ -71,9 +71,9 @@ impl WsBackend<Fuse<WsStream>> {
                     inst = self.interface.recv_from_frontend() => {
                         match inst {
                             Some(msg) => {
-                                if let Err(e) = self.send(msg).await {
-                                    error!(err = %e, "WS connection error");
-                                    err = true;
+                                if let Err(err) = self.send(msg).await {
+                                    error!(%err, "WS connection error");
+                                    errored = true;
                                     break
                                 }
                             },
@@ -86,19 +86,19 @@ impl WsBackend<Fuse<WsStream>> {
                     resp = self.socket.next() => {
                         match resp {
                             Some(item) => {
-                                err = self.handle(item).await.is_err();
-                                if err { break }
+                                errored = self.handle(item).await.is_err();
+                                if errored { break }
                             },
                             None => {
                                 error!("WS server has gone away");
-                                err = true;
+                                errored = true;
                                 break
                             },
                         }
                     }
                 }
             }
-            if err {
+            if errored {
                 self.interface.close_with_error();
             }
         };

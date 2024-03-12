@@ -1,6 +1,5 @@
-use crate::{TxEip1559, TxEip2930, TxEip4844, TxLegacy};
+use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_network::Signed;
 use alloy_rlp::{length_of_length, Decodable, Encodable};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -65,12 +64,22 @@ pub enum TxEnvelope {
     Legacy(Signed<TxLegacy>),
     /// A [`TxLegacy`] tagged with type 0.
     TaggedLegacy(Signed<TxLegacy>),
-    /// A [`TxEip2930`].
+    /// A [`TxEip2930`] tagged with type 1.
     Eip2930(Signed<TxEip2930>),
-    /// A [`TxEip1559`].
+    /// A [`TxEip1559`] tagged with type 2.
     Eip1559(Signed<TxEip1559>),
-    /// A [`TxEip4844`].
-    Eip4844(Signed<TxEip4844>),
+    /// A TxEip4844 tagged with type 3.
+    /// An EIP-4844 transaction has two network representations:
+    /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve
+    /// historical transactions.. 2 - The transaction with a sidecar, which is the form used to
+    /// send transactions to the network.
+    Eip4844(Signed<TxEip4844Variant>),
+}
+
+impl From<Signed<TxLegacy>> for TxEnvelope {
+    fn from(v: Signed<TxLegacy>) -> Self {
+        Self::Legacy(v)
+    }
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
@@ -82,6 +91,12 @@ impl From<Signed<TxEip2930>> for TxEnvelope {
 impl From<Signed<TxEip1559>> for TxEnvelope {
     fn from(v: Signed<TxEip1559>) -> Self {
         Self::Eip1559(v)
+    }
+}
+
+impl From<Signed<TxEip4844Variant>> for TxEnvelope {
+    fn from(v: Signed<TxEip4844Variant>) -> Self {
+        Self::Eip4844(v)
     }
 }
 
@@ -198,9 +213,9 @@ impl Encodable2718 for TxEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_network::{Transaction, TxKind};
-    use alloy_primitives::{Address, Bytes, Signature, B256, U256};
+    use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
 
     #[test]
     #[cfg(feature = "k256")]
@@ -248,6 +263,7 @@ mod tests {
     // Test vector from https://sepolia.etherscan.io/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
     // Blobscan: https://sepolia.blobscan.com/tx/0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
     fn test_decode_live_4844_tx() {
+        use crate::Transaction;
         use alloy_primitives::{address, b256};
 
         // https://sepolia.etherscan.io/getRawTx?tx=0x9a22ccb0029bc8b0ddd073be1a1d923b7ae2b2ea52100bae0db4424f9107e9c0
@@ -260,10 +276,16 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(tx.tx().to, TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064")));
+        assert_eq!(
+            tx.tx().to(),
+            TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064"))
+        );
+
+        // Assert this is the correct variant of the EIP-4844 enum, which only contains the tx.
+        assert!(matches!(tx.tx(), TxEip4844Variant::TxEip4844(_)));
 
         assert_eq!(
-            tx.tx().blob_versioned_hashes,
+            tx.tx().tx().blob_versioned_hashes,
             vec![
                 b256!("012ec3d6f66766bedb002a190126b3549fce0047de0d4c25cffce0dc1c57921a"),
                 b256!("0152d8e24762ff22b1cfd9f8c0683786a7ca63ba49973818b3d1e9512cd2cec4"),
@@ -277,9 +299,9 @@ mod tests {
         assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
-    fn test_encode_decode_roundtrip<T: Transaction>(tx: T)
+    fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(tx: T)
     where
-        Signed<T, T::Signature>: Into<TxEnvelope>,
+        Signed<T>: Into<TxEnvelope>,
     {
         let signature = Signature::test_signature();
         let tx_signed = tx.into_signed(signature);

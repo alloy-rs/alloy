@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 //! Geth tracing types
 
+use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
 use alloy_rpc_types::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
@@ -19,6 +20,7 @@ pub use self::{
 
 pub mod call;
 pub mod four_byte;
+pub mod mux;
 pub mod noop;
 pub mod pre_state;
 
@@ -116,6 +118,8 @@ pub enum GethTrace {
     PreStateTracer(PreStateFrame),
     /// An empty json response
     NoopTracer(NoopFrame),
+    /// The response for mux tracer
+    MuxTracer(MuxFrame),
     /// Any other trace response, such as custom javascript response objects
     JS(serde_json::Value),
 }
@@ -150,10 +154,16 @@ impl From<NoopFrame> for GethTrace {
     }
 }
 
+impl From<MuxFrame> for GethTrace {
+    fn from(value: MuxFrame) -> Self {
+        GethTrace::MuxTracer(value)
+    }
+}
+
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
-#[derive(Debug, Copy, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Debug, Copy, PartialEq, Eq, Clone, Hash, Deserialize, Serialize)]
 pub enum GethDebugBuiltInTracerType {
     /// The 4byteTracer collects the function selectors of every function executed in the lifetime
     /// of a transaction, along with the size of the supplied call data. The result is a
@@ -179,6 +189,9 @@ pub enum GethDebugBuiltInTracerType {
     /// This tracer is noop. It returns an empty object and is only meant for testing the setup.
     #[serde(rename = "noopTracer")]
     NoopTracer,
+    /// The mux tracer is a tracer that can run multiple tracers at once.
+    #[serde(rename = "muxTracer")]
+    MuxTracer,
 }
 
 /// Available tracers
@@ -233,8 +246,16 @@ impl GethDebugTracerConfig {
         self.0
     }
 
-    /// Returns the [PreStateConfig] if it is a call config.
+    /// Returns the [PreStateConfig] if it is a prestate config.
     pub fn into_pre_state_config(self) -> Result<PreStateConfig, serde_json::Error> {
+        if self.0.is_null() {
+            return Ok(Default::default());
+        }
+        self.from_value()
+    }
+
+    /// Returns the [MuxConfig] if it is a mux config.
+    pub fn into_mux_config(self) -> Result<MuxConfig, serde_json::Error> {
         if self.0.is_null() {
             return Ok(Default::default());
         }
@@ -572,8 +593,20 @@ mod tests {
                 "input": "0xa9059cbb000000000000000000000000e3f85a274c1edbea2f2498cf5978f41961cf8b5b0000000000000000000000000000000000000000000000000000000068c8f380",
                 "value": "0x0",
                 "type": "CALL"
-            }
+            },
+            "txHash": "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"
         }"#;
-        let _result: TraceResult = serde_json::from_str(s).unwrap();
+        let result: TraceResult = serde_json::from_str(s).unwrap();
+        let hash = result.tx_hash().unwrap();
+        assert_eq!(
+            hash,
+            "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"
+                .parse::<B256>()
+                .unwrap()
+        );
+
+        let de = serde_json::to_value(&result).unwrap();
+        let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
+        similar_asserts::assert_eq!(val, de);
     }
 }

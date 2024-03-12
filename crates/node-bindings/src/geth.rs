@@ -14,6 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tempfile::tempdir;
+use thiserror::Error;
 
 /// How long we will wait for geth to indicate that it is ready.
 const GETH_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -168,6 +169,44 @@ impl Default for PrivateNetOptions {
     fn default() -> Self {
         Self { p2p_port: None, discovery: true }
     }
+}
+
+/// Errors that can occur when working with the [`Geth`].
+#[derive(Debug, Error)]
+pub enum GethError {
+    /// Clique private key error
+    #[error("clique address error: {0}")]
+    CliqueAddressError(String),
+    /// The chain id was not set.
+    #[error("the chain id was not set")]
+    ChainIdNotSet,
+    /// Could not create the data directory.
+    #[error("could not create directory: {0}")]
+    CreateDirError(std::io::Error),
+    /// No stderr was captured from the child process.
+    #[error("no stderr was captured from the process")]
+    NoStderr,
+    /// Timed out waiting for geth to start.
+    #[error("timedout occurred: {0}")]
+    Timeout(String),
+    /// Encountered a fatal error.
+    #[error("fatal error: {0}")]
+    Fatal(String),
+    /// A line could not be read from the geth stderr.
+    #[error("could not read line from geth stderr: {0}")]
+    ReadLineError(std::io::Error),
+    /// Genesis error
+    #[error("genesis error occurred: {0}")]
+    GenesisError(String),
+    /// Geth init error
+    #[error("geth init error occurred")]
+    InitError,
+    /// Spawn geth error
+    #[error("could not spawn geth: {0}")]
+    SpawnError(std::io::Error),
+    /// Wait error
+    #[error("could not wait for geth to exit: {0}")]
+    WaitError(std::io::Error),
 }
 
 /// Builder for launching `geth`.
@@ -357,7 +396,12 @@ impl Geth {
     ///
     /// If spawning the instance fails at any point.
     #[track_caller]
-    pub fn spawn(mut self) -> GethInstance {
+    pub fn spawn(self) -> GethInstance {
+        self.try_spawn().unwrap()
+    }
+
+    /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
+    pub fn try_spawn(mut self) -> Result<GethInstance, GethError> {
         let bin_path = match self.program.as_ref() {
             Some(bin) => bin.as_os_str(),
             None => GETH.as_ref(),
@@ -403,7 +447,9 @@ impl Geth {
                 let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
                 genesis.config.clique = Some(clique_config);
 
-                let clique_addr = clique_addr.expect("is_clique == true");
+                let clique_addr = clique_addr.ok_or(GethError::CliqueAddressError(
+                    "could not calculates the address of the Clique consensus address.".to_string(),
+                ))?;
 
                 // set the extraData field
                 let extra_data_bytes =
@@ -416,10 +462,12 @@ impl Geth {
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
-            let clique_addr = self.clique_address().expect("is_clique == true");
+            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddressError(
+                "could not calculates the address of the Clique consensus address.".to_string(),
+            ))?;
 
             self.genesis = Some(Genesis::clique_genesis(
-                self.chain_id.expect("chain id must be set in clique mode"),
+                self.chain_id.ok_or(GethError::ChainIdNotSet)?,
                 clique_addr,
             ));
 
@@ -431,18 +479,20 @@ impl Geth {
 
         if let Some(ref genesis) = self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path =
-                tempdir().expect("should be able to create temp dir for genesis init").into_path();
+            let temp_genesis_dir_path = tempdir().map_err(GethError::CreateDirError)?.into_path();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
 
             // create the genesis file
-            let mut file = File::create(&temp_genesis_path).expect("could not create genesis file");
+            let mut file = File::create(&temp_genesis_path).map_err(|_| {
+                GethError::GenesisError("could not create genesis file".to_string())
+            })?;
 
             // serialize genesis and write to file
-            serde_json::to_writer_pretty(&mut file, &genesis)
-                .expect("could not write genesis to file");
+            serde_json::to_writer_pretty(&mut file, &genesis).map_err(|_| {
+                GethError::GenesisError("could not write genesis to file".to_string())
+            })?;
 
             let mut init_cmd = Command::new(bin_path);
             if let Some(ref data_dir) = self.data_dir {
@@ -455,16 +505,18 @@ impl Geth {
             init_cmd.arg("init").arg(temp_genesis_path);
             let res = init_cmd
                 .spawn()
-                .expect("failed to spawn geth init")
+                .map_err(GethError::SpawnError)?
                 .wait()
-                .expect("failed to wait for geth init to exit");
+                .map_err(GethError::WaitError)?;
+            // .expect("failed to wait for geth init to exit");
             if !res.success() {
-                panic!("geth init failed");
+                return Err(GethError::InitError);
             }
 
             // clean up the temp dir which is now persisted
-            std::fs::remove_dir_all(temp_genesis_dir_path)
-                .expect("could not remove genesis temp dir");
+            std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
+                GethError::GenesisError("could not remove genesis temp dir".to_string())
+            })?;
         }
 
         if let Some(ref data_dir) = self.data_dir {
@@ -472,7 +524,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).expect("could not create data dir");
+                create_dir(data_dir).map_err(GethError::CreateDirError)?;
             }
         }
 
@@ -509,9 +561,9 @@ impl Geth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        let mut child = cmd.spawn().expect("couldnt start geth");
+        let mut child = cmd.spawn().map_err(GethError::SpawnError)?;
 
-        let stderr = child.stderr.expect("Unable to get stderr for geth child process");
+        let stderr = child.stderr.ok_or(GethError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
@@ -523,11 +575,14 @@ impl Geth {
 
         loop {
             if start + GETH_STARTUP_TIMEOUT <= Instant::now() {
-                panic!("Timed out waiting for geth to start. Is geth installed?")
+                // panic!("Timed out waiting for geth to start. Is geth installed?")
+                return Err(GethError::Timeout(
+                    "Timed out waiting for geth to start. Is geth installed?".to_string(),
+                ));
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).expect("Failed to read line from geth process");
+            reader.read_line(&mut line).map_err(GethError::ReadLineError)?;
 
             if matches!(self.mode, GethMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
@@ -559,7 +614,7 @@ impl Geth {
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                panic!("{line}");
+                return Err(GethError::Fatal(line));
             }
 
             if p2p_started && http_started {
@@ -569,7 +624,7 @@ impl Geth {
 
         child.stderr = Some(reader.into_inner());
 
-        GethInstance {
+        Ok(GethInstance {
             pid: child,
             port,
             ipc: self.ipc_path,
@@ -577,7 +632,7 @@ impl Geth {
             p2p_port,
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
-        }
+        })
     }
 }
 

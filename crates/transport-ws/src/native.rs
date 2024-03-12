@@ -88,7 +88,7 @@ impl WsBackend<TungsteniteStream> {
     /// Spawn a new backend task.
     pub fn spawn(mut self) {
         let fut = async move {
-            let mut err = false;
+            let mut errored = false;
             let keepalive = sleep(Duration::from_secs(KEEPALIVE));
             tokio::pin!(keepalive);
             loop {
@@ -111,9 +111,9 @@ impl WsBackend<TungsteniteStream> {
                             Some(msg) => {
                                 // Reset the keepalive timer.
                                 keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
-                                if let Err(e) = self.send(msg).await {
-                                    error!(err = %e, "WS connection error");
-                                    err = true;
+                                if let Err(err) = self.send(msg).await {
+                                    error!(%err, "WS connection error");
+                                    errored = true;
                                     break
                                 }
                             },
@@ -128,33 +128,33 @@ impl WsBackend<TungsteniteStream> {
                     _ = &mut keepalive => {
                         // Reset the keepalive timer.
                         keepalive.set(sleep(Duration::from_secs(KEEPALIVE)));
-                        if let Err(e) = self.socket.send(Message::Ping(vec![])).await {
-                            error!(err = %e, "WS connection error");
-                            err = true;
+                        if let Err(err) = self.socket.send(Message::Ping(vec![])).await {
+                            error!(%err, "WS connection error");
+                            errored = true;
                             break
                         }
                     }
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
-                                err = self.handle(item).await.is_err();
-                                if err { break }
+                                errored = self.handle(item).await.is_err();
+                                if errored { break }
                             },
-                            Some(Err(e)) => {
-                                error!(err = %e, "WS connection error");
-                                err = true;
+                            Some(Err(err)) => {
+                                error!(%err, "WS connection error");
+                                errored = true;
                                 break
                             }
                             None => {
                                 error!("WS server has gone away");
-                                err = true;
+                                errored = true;
                                 break
                             },
                         }
                     }
                 }
             }
-            if err {
+            if errored {
                 self.interface.close_with_error();
             }
         };

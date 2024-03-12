@@ -17,18 +17,18 @@
 
 use alloy_eips::eip2718::Eip2718Envelope;
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::B256;
-
-mod sealed;
-pub use sealed::{Sealable, Sealed};
+use alloy_primitives::{Address, B256};
 
 mod transaction;
-pub use transaction::{Eip1559Transaction, Signed, Transaction, TxKind};
-
-mod receipt;
-pub use receipt::Receipt;
+pub use transaction::{
+    BuilderResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    TxSignerSync,
+};
 
 pub use alloy_eips::eip2718;
+
+mod ethereum;
+pub use ethereum::{Ethereum, EthereumSigner};
 
 /// A list of transactions, either hydrated or hashes.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -50,18 +50,30 @@ pub struct BlockResponse<N: Network> {
     transactions: TransactionList<N::TransactionResponse>,
 }
 
-/// Captures type info for network-specific RPC requests/responses.
-pub trait Network: Sized + Send + Sync + 'static {
-    #[doc(hidden)]
-    /// Asserts that this trait can only be implemented on a ZST.
-    const __ASSERT_ZST: () = {
-        assert!(std::mem::size_of::<Self>() == 0, "Network must be a ZST");
-    };
+/// A receipt response.
+///
+/// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
+///
+/// [`TxReceipt`]: alloy_consensus::TxReceipt
+pub trait ReceiptResponse {
+    /// Address of the created contract, or `None` if the transaction was not a deployment.
+    fn contract_address(&self) -> Option<Address>;
+}
 
+/// Captures type info for network-specific RPC requests/responses.
+///
+/// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
+// todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
+// generic over tx/header type
+pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     // -- Consensus types --
 
     /// The network transaction envelope type.
     type TxEnvelope: Eip2718Envelope;
+
+    /// An enum over the various transaction types.
+    type UnsignedTx;
+
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
     /// The network header type.
@@ -70,11 +82,11 @@ pub trait Network: Sized + Send + Sync + 'static {
     // -- JSON RPC types --
 
     /// The JSON body of a transaction request.
-    type TransactionRequest: RpcObject + Transaction; // + TransactionBuilder
+    type TransactionRequest: RpcObject + TransactionBuilder<Self> + std::fmt::Debug;
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.
-    type ReceiptResponse: RpcObject;
+    type ReceiptResponse: RpcObject + ReceiptResponse;
     /// The JSON body of a header response, as flattened into
     /// [`BlockResponse`].
     type HeaderResponse: RpcObject;

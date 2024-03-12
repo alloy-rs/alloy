@@ -66,7 +66,7 @@ impl From<YubiSigner<Secp256k1>> for Wallet<YubiSigner<Secp256k1>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Signer, SignerSync};
+    use crate::SignerSync;
     use alloy_primitives::{address, hex};
 
     #[test]

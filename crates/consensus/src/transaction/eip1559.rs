@@ -1,7 +1,6 @@
-use crate::{TxKind, TxType};
+use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_network::{Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
@@ -182,33 +181,40 @@ impl TxEip1559 {
     }
 }
 
-impl Encodable for TxEip1559 {
-    fn encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.fields_len() }.encode(out);
-        self.encode_fields(out);
-    }
-
-    fn length(&self) -> usize {
-        let payload_length = self.fields_len();
-        length_of_length(payload_length) + payload_length
-    }
-}
-
-impl Decodable for TxEip1559 {
-    fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(data)?;
-        let remaining_len = data.len();
-
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-
-        Self::decode_inner(data)
-    }
-}
-
 impl Transaction for TxEip1559 {
-    type Signature = Signature;
+    fn input(&self) -> &[u8] {
+        &self.input
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        Some(self.chain_id)
+    }
+
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    fn gas_price(&self) -> Option<U256> {
+        None
+    }
+}
+
+impl SignableTransaction<Signature> for TxEip1559 {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
         out.put_u8(self.tx_type() as u8);
@@ -239,7 +245,7 @@ impl Transaction for TxEip1559 {
         TxEip1559::encode_with_signature(self, signature, out)
     }
 
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<alloy_network::Signed<Self>> {
+    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
@@ -250,75 +256,39 @@ impl Transaction for TxEip1559 {
 
         Ok(tx.into_signed(signature))
     }
+}
 
-    fn input(&self) -> &[u8] {
-        &self.input
+impl Encodable for TxEip1559 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() }.encode(out);
+        self.encode_fields(out);
     }
 
-    fn input_mut(&mut self) -> &mut Bytes {
-        &mut self.input
+    fn length(&self) -> usize {
+        let payload_length = self.fields_len();
+        length_of_length(payload_length) + payload_length
     }
+}
 
-    fn set_input(&mut self, input: Bytes) {
-        self.input = input;
-    }
+impl Decodable for TxEip1559 {
+    fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(data)?;
+        let remaining_len = data.len();
 
-    fn to(&self) -> TxKind {
-        self.to
-    }
+        if header.payload_length > remaining_len {
+            return Err(alloy_rlp::Error::InputTooShort);
+        }
 
-    fn set_to(&mut self, to: TxKind) {
-        self.to = to;
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
-    fn set_value(&mut self, value: U256) {
-        self.value = value;
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        Some(self.chain_id)
-    }
-
-    fn set_chain_id(&mut self, chain_id: ChainId) {
-        self.chain_id = chain_id;
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
-
-    fn set_nonce(&mut self, nonce: u64) {
-        self.nonce = nonce;
-    }
-
-    fn gas_limit(&self) -> u64 {
-        self.gas_limit
-    }
-
-    fn set_gas_limit(&mut self, limit: u64) {
-        self.gas_limit = limit;
-    }
-
-    fn gas_price(&self) -> Option<U256> {
-        None
-    }
-
-    fn set_gas_price(&mut self, price: U256) {
-        let _ = price;
+        Self::decode_inner(data)
     }
 }
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
-    use crate::TxKind;
+    use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_network::Transaction;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, B256, U256};
     use alloy_rlp::Encodable;
 
     #[test]
