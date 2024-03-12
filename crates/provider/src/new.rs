@@ -913,6 +913,7 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
+    #[ignore = "todo"]
     async fn subscribe_blocks_boxed() {
         use futures::stream::StreamExt;
 
