@@ -4,7 +4,7 @@ use alloy_primitives::{Address, B256, U64};
 use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
-use dashmap::{mapref::entry::Entry, DashMap};
+use dashmap::DashMap;
 use std::{marker::PhantomData, sync::Arc};
 use tokio::sync::Mutex;
 
