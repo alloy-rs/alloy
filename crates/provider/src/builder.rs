@@ -19,6 +19,7 @@ pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
 }
 
 /// An identity layer that does nothing.
+#[derive(Debug, Clone, Copy)]
 pub struct Identity;
 
 impl<P, N, T> ProviderLayer<P, N, T> for Identity
@@ -34,6 +35,8 @@ where
     }
 }
 
+/// A stack of two providers.
+#[derive(Debug)]
 pub struct Stack<Inner, Outer> {
     inner: Inner,
     outer: Outer,
@@ -41,7 +44,7 @@ pub struct Stack<Inner, Outer> {
 
 impl<Inner, Outer> Stack<Inner, Outer> {
     /// Create a new `Stack`.
-    pub fn new(inner: Inner, outer: Outer) -> Self {
+    pub const fn new(inner: Inner, outer: Outer) -> Self {
         Stack { inner, outer }
     }
 }
@@ -69,6 +72,7 @@ where
 /// around maintaining the network and transport types.
 ///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
+#[derive(Debug)]
 pub struct ProviderBuilder<L, N = ()> {
     layer: L,
 
@@ -76,7 +80,8 @@ pub struct ProviderBuilder<L, N = ()> {
 }
 
 impl<N> ProviderBuilder<Identity, N> {
-    pub fn new() -> Self {
+    /// Create a new [`ProviderBuilder`].
+    pub const fn new() -> Self {
         ProviderBuilder { layer: Identity, network: PhantomData }
     }
 }

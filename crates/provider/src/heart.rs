@@ -16,7 +16,7 @@ use tokio::{
 };
 
 /// A configuration object for watching for transaction confirmation.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct WatchConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
@@ -30,7 +30,7 @@ pub struct WatchConfig {
 
 impl WatchConfig {
     /// Create a new watch for a transaction.
-    pub fn new(tx_hash: B256) -> Self {
+    pub const fn new(tx_hash: B256) -> Self {
         Self { tx_hash, confirmations: 0, timeout: None }
     }
 
@@ -40,7 +40,7 @@ impl WatchConfig {
     }
 
     /// Set the number of confirmations to wait for.
-    pub fn with_confirmations(mut self, confirmations: u64) -> Self {
+    pub const fn with_confirmations(mut self, confirmations: u64) -> Self {
         self.confirmations = confirmations;
         self
     }
@@ -51,7 +51,7 @@ impl WatchConfig {
     }
 
     /// Set the timeout for the transaction.
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
@@ -129,7 +129,7 @@ impl HeartbeatHandle {
 
     /// Returns a watcher that always sees the latest block.
     #[allow(dead_code)]
-    pub(crate) fn latest(&self) -> &watch::Receiver<Option<Block>> {
+    pub(crate) const fn latest(&self) -> &watch::Receiver<Option<Block>> {
         &self.latest
     }
 }
