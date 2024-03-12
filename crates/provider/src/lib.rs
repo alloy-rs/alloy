@@ -38,7 +38,7 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 pub mod new;
 
 #[doc(inline)]
-pub use new::{AnvilProvider, Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
+pub use new::{AnvilProvider, Provider, RawProvider, RootProvider};
 
 pub mod utils;
 

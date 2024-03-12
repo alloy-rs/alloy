@@ -25,14 +25,8 @@ use serde_json::value::RawValue;
 use std::{
     fmt,
     marker::PhantomData,
-    sync::{Arc, OnceLock, Weak},
+    sync::{Arc, OnceLock},
 };
-
-/// A [`Provider`] in a [`Weak`] reference.
-pub type WeakProvider<P> = Weak<P>;
-
-/// A borrowed [`Provider`].
-pub type ProviderRef<'a, P> = &'a P;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -131,12 +125,16 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     fn root(&self) -> &RootProvider<N, T>;
 
     /// Returns the RPC client used to send requests.
+    ///
+    /// NOTE: this method should not be overridden.
     #[inline]
     fn client(&self) -> ClientRef<'_, T> {
         self.root().client()
     }
 
     /// Returns a [`Weak`] RPC client used to send requests.
+    ///
+    /// NOTE: this method should not be overridden.
     #[inline]
     fn weak_client(&self) -> WeakClient<T> {
         self.root().weak_client()
@@ -144,7 +142,8 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
 
     /// Watch for the confirmation of a single pending transaction with the given configuration.
     ///
-    /// Note that this is handled internally rather than calling any specific RPC method.
+    /// Note that this is handled internally rather than calling any specific RPC method, and as
+    /// such should not be overridden.
     #[inline]
     async fn watch_pending_transaction(
         &self,

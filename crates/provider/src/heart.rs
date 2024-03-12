@@ -167,6 +167,10 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     /// Waits for the transaction to confirm with the given number of confirmations, and
     /// then fetches its receipt.
     ///
+    /// Note that this method will call `eth_getTransactionReceipt` on the [**root
+    /// provider**](RootProvider), and not on a specific network provider. This means that any
+    /// overrides or customizations made to the network provider will not be used.
+    ///
     /// See:
     /// - [`register`](Self::register): for registering the transaction without waiting for it to be
     ///   confirmed.
