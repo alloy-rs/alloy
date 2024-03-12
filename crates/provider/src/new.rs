@@ -1,3 +1,5 @@
+//! Ethereum JSON-RPC provider.
+
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
