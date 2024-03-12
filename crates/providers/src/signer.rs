@@ -1,4 +1,4 @@
-use crate::{PendingTransaction, PendingTransactionConfigInner, Provider, ProviderLayer};
+use crate::{PendingTransaction, PendingTransactionConfig, Provider, ProviderLayer};
 use alloy_network::{eip2718::Encodable2718, Network, NetworkSigner, TransactionBuilder};
 use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
@@ -89,7 +89,7 @@ where
 
     async fn watch_pending_transaction(
         &self,
-        config: PendingTransactionConfigInner,
+        config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         self.inner.watch_pending_transaction(config).await
     }
@@ -97,7 +97,7 @@ where
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionConfigInner> {
+    ) -> TransportResult<PendingTransactionConfig> {
         let envelope = tx.build(&self.signer).await.map_err(TransportErrorKind::custom)?;
         let rlp = envelope.encoded_2718();
 

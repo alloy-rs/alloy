@@ -34,7 +34,7 @@ pub use signer::{SignerLayer, SignerProvider};
 mod chain;
 
 mod heart;
-pub use heart::{PendingTransaction, PendingTransactionConfigInner};
+pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
 pub mod new;
 

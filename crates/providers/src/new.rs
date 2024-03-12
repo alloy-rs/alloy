@@ -1,6 +1,6 @@
 use crate::{
     chain::ChainStreamPoller,
-    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfigInner},
+    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
     utils::{self, EstimatorFunction},
 };
 use alloy_json_rpc::RpcReturn;
@@ -67,7 +67,7 @@ impl<N: Network, T: Transport + Clone> RootProvider<N, T> {
 
     async fn new_pending_transaction(
         &self,
-        config: PendingTransactionConfigInner,
+        config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
     }
@@ -135,7 +135,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Note that this is handled internally rather than calling any specific RPC method.
     async fn watch_pending_transaction(
         &self,
-        config: PendingTransactionConfigInner,
+        config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction>;
 
     /// Notify the provider that we are interested in new blocks.
@@ -151,7 +151,8 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
-    /// See also [`watch_blocks`](Self::watch_blocks) to configure a poller.
+    /// See also [`watch_pending_transactions`](Self::watch_pending_transactions) to configure a
+    /// poller.
     async fn new_pending_transactions_filter(&self) -> TransportResult<U256> {
         self.client().prepare("eth_newPendingTransactionFilter", ()).await
     }
@@ -178,7 +179,10 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Get a list of values that have been added since the last poll.
-    async fn dyn_get_filter_changes(&self, id: U256) -> TransportResult<Vec<FilterChanges>> {
+    ///
+    /// This returns an enum over all possible return values. You probably want to use
+    /// [`get_filter_changes`](Self::get_filter_changes) instead.
+    async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
         self.client().prepare("eth_getFilterChanges", (id,)).await
     }
 
@@ -265,22 +269,41 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a type that can be used to configure how and when to await the transaction's
     /// confirmation.
+    ///
+    /// # Examples
+    ///
+    /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
+    ///
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// let tx_hash = provider.send_transaction(tx)
+    ///     .await?
+    ///     .with_confirmations(2)
+    ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
+    /// #   .with_provider(&provider) // TODO
+    ///     .watch()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionConfigInner> {
+    ) -> TransportResult<PendingTransactionConfig> {
         let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
-        Ok(PendingTransactionConfigInner::new(tx_hash))
+        Ok(PendingTransactionConfig::new(tx_hash))
     }
 
     /// Broadcasts a raw transaction RLP bytes to the network.
+    ///
+    /// See [`send_transaction`](Self::send_transaction) for more details.
     async fn send_raw_transaction(
         &self,
         rlp_bytes: &[u8],
-    ) -> TransportResult<PendingTransactionConfigInner> {
+    ) -> TransportResult<PendingTransactionConfig> {
         let rlp_hex = hex::encode(rlp_bytes);
         let tx_hash = self.client().prepare("eth_sendRawTransaction", (rlp_hex,)).await?;
-        Ok(PendingTransactionConfigInner::new(tx_hash))
+        Ok(PendingTransactionConfig::new(tx_hash))
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -580,7 +603,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
     #[inline]
     async fn watch_pending_transaction(
         &self,
-        config: PendingTransactionConfigInner,
+        config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         RootProvider::new_pending_transaction(self, config).await
     }
@@ -602,7 +625,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
 
     async fn watch_pending_transaction(
         &self,
-        _config: PendingTransactionConfigInner,
+        _config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
         unimplemented!()
     }

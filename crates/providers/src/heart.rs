@@ -18,33 +18,67 @@ use tokio::{
     sync::{mpsc, oneshot, watch},
 };
 
-/// A configuration object for watching for transaction confirmation.
+/// A builder for configuring a pending transaction watcher.
+///
+/// # Examples
+///
+/// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
+///
+/// ```no_run
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// // Send a transaction, and configure the pending transaction.
+/// let builder = provider.send_transaction(tx)
+///     .await?
+///     .with_confirmations(2)
+///     .with_timeout(Some(std::time::Duration::from_secs(60)));
+/// # let builder = builder.with_provider(&provider); // TODO
+/// // Register the pending transaction with the provider.
+/// let pending_transaction = builder.register().await?;
+/// // Wait for the transaction to be confirmed 2 times.
+/// let tx_hash = pending_transaction.await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// This can also be more concisely written using `watch`:
+/// ```no_run
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// let tx_hash = provider.send_transaction(tx)
+///     .await?
+///     .with_confirmations(2)
+///     .with_timeout(Some(std::time::Duration::from_secs(60)))
+/// #   .with_provider(&provider) // TODO
+///     .watch()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
-pub struct PendingTransactionConfig<N, T, P> {
-    inner: PendingTransactionConfigInner,
+pub struct PendingTransactionBuilder<N, T, P> {
+    inner: PendingTransactionConfig,
     provider: P,
     _phantom: PhantomData<(N, T)>,
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionConfig<N, T, P> {
+impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuilder<N, T, P> {
     /// Creates a new pending transaction configuration.
     pub fn new(provider: P, tx_hash: B256) -> Self {
-        Self::from_inner(provider, PendingTransactionConfigInner::new(tx_hash))
+        Self::from_inner(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction configuration.
-    pub fn from_inner(provider: P, inner: PendingTransactionConfigInner) -> Self {
+    pub fn from_inner(provider: P, inner: PendingTransactionConfig) -> Self {
         Self { inner, provider, _phantom: PhantomData }
     }
 
     /// Returns the inner configuration.
-    pub fn inner(&self) -> &PendingTransactionConfigInner {
+    pub fn inner(&self) -> &PendingTransactionConfig {
         &self.inner
     }
 
     /// Consumes this configuration, returning the inner configuration.
-    pub fn into_inner(self) -> PendingTransactionConfigInner {
+    pub fn into_inner(self) -> PendingTransactionConfig {
         self.inner
     }
 
@@ -54,7 +88,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionConf
     }
 
     /// Consumes this configuration, returning the provider and the inner configuration.
-    pub fn split(self) -> (P, PendingTransactionConfigInner) {
+    pub fn split(self) -> (P, PendingTransactionConfig) {
         (self.provider, self.inner)
     }
 
@@ -115,6 +149,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionConf
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
+    #[doc(alias = "build")]
     pub async fn register(self) -> TransportResult<PendingTransaction> {
         self.provider.watch_pending_transaction(self.inner).await
     }
@@ -144,11 +179,11 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionConf
     }
 }
 
-impl<N, T, P: Clone> PendingTransactionConfig<N, T, &P> {
+impl<N, T, P: Clone> PendingTransactionBuilder<N, T, &P> {
     /// Clones the provider and returns a new pending transaction configuration with the cloned
     /// provider.
-    pub fn with_cloned_provider(self) -> PendingTransactionConfig<N, T, P> {
-        PendingTransactionConfig {
+    pub fn with_cloned_provider(self) -> PendingTransactionBuilder<N, T, P> {
+        PendingTransactionBuilder {
             inner: self.inner,
             provider: self.provider.clone(),
             _phantom: PhantomData,
@@ -156,13 +191,13 @@ impl<N, T, P: Clone> PendingTransactionConfig<N, T, &P> {
     }
 }
 
-/// A configuration object for watching for transaction confirmation.
+/// Configuration for watching a pending transaction.
 ///
-/// This object is not directly usable, but can be used to create a [`PendingTransactionConfig`]
-/// to watch for a transaction.
+/// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
+/// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Debug)]
-pub struct PendingTransactionConfigInner {
+pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
 
@@ -173,7 +208,7 @@ pub struct PendingTransactionConfigInner {
     timeout: Option<Duration>,
 }
 
-impl PendingTransactionConfigInner {
+impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
     pub fn new(tx_hash: B256) -> Self {
         Self { tx_hash, confirmations: 0, timeout: None }
@@ -231,13 +266,13 @@ impl PendingTransactionConfigInner {
     pub fn with_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>(
         self,
         provider: P,
-    ) -> PendingTransactionConfig<N, T, P> {
-        PendingTransactionConfig::from_inner(provider, self)
+    ) -> PendingTransactionBuilder<N, T, P> {
+        PendingTransactionBuilder::from_inner(provider, self)
     }
 }
 
 struct TxWatcher {
-    config: PendingTransactionConfigInner,
+    config: PendingTransactionConfig,
     tx: oneshot::Sender<()>,
 }
 
@@ -249,7 +284,11 @@ impl TxWatcher {
     }
 }
 
-/// Represents a transaction that is either yet to be confirmed or has been confirmed
+/// Represents a transaction that is yet to be confirmed a specified number of times.
+///
+/// This struct is a future created by [`PendingTransactionBuilder`] that resolves to the
+/// transaction hash once the underlying transaction has been confirmed the specified number of
+/// times in the network.
 pub struct PendingTransaction {
     /// The transaction hash.
     pub(crate) tx_hash: B256,
@@ -296,8 +335,8 @@ impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
     pub(crate) async fn watch_tx(
         &self,
-        config: PendingTransactionConfigInner,
-    ) -> Result<PendingTransaction, PendingTransactionConfigInner> {
+        config: PendingTransactionConfig,
+    ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
         match self.tx.send(TxWatcher { config, tx }).await {
