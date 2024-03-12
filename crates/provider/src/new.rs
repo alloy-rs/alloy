@@ -20,6 +20,7 @@ use alloy_rpc_types::{
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
 use std::{
+    fmt,
     marker::PhantomData,
     sync::{Arc, OnceLock, Weak},
 };
@@ -45,6 +46,12 @@ pub struct RootProvider<N, T> {
 impl<N, T> Clone for RootProvider<N, T> {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone() }
+    }
+}
+
+impl<N, T: fmt::Debug> fmt::Debug for RootProvider<N, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
     }
 }
 

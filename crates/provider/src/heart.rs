@@ -197,6 +197,7 @@ impl<N, T, P: Clone> PendingTransactionBuilder<N, T, &P> {
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Debug)]
+#[allow(missing_copy_implementations)]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
