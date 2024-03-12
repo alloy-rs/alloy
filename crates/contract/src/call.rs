@@ -3,11 +3,10 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256, U64};
-use alloy_provider::Provider;
+use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
-use futures_util::TryFutureExt;
 use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
@@ -390,22 +389,17 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
         if !self.request.to().is_some_and(|to| to.is_create()) {
             return Err(Error::NotADeploymentTransaction);
         }
-        let pending_tx = self.send().await?;
-        let receipt = pending_tx.await?;
-        receipt
-            .ok_or(Error::ContractNotDeployed)?
-            .contract_address()
-            .ok_or(Error::ContractNotDeployed)
+        let pending_transaction = self.send().await?;
+        let receipt = pending_transaction.get_receipt().await?.ok_or(Error::ContractNotDeployed)?;
+        receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 
     /// Broadcasts the underlying transaction to the network.
     ///
+    /// Returns a builder for configuring the pending transaction watcher.
     /// See [`Provider::send_transaction`] for more information.
-    pub async fn send(
-        &self,
-    ) -> Result<impl Future<Output = Result<Option<N::ReceiptResponse>>> + '_> {
-        let builder = self.provider.send_transaction(self.request.clone()).await?;
-        Ok(builder.get_receipt().map_err(Into::into))
+    pub async fn send(&self) -> Result<PendingTransactionBuilder<'_, N, T>> {
+        Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
     /// Calculates the address that will be created by the transaction, if any.

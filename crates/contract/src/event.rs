@@ -167,7 +167,8 @@ mod tests {
 
         let poller = event.watch().await.unwrap();
 
-        let _receipt = contract.doEmit().send().await.unwrap().await.unwrap().expect("no receipt");
+        let _receipt =
+            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
         let expected_event = MyContract::MyEvent {
             _0: 42,
             _1: "hello".to_string(),
