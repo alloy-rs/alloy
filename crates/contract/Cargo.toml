@@ -13,7 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-network.workspace = true
-alloy-providers.workspace = true
+alloy-provider.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport.workspace = true
 

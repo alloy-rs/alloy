@@ -20,7 +20,7 @@ alloy-eips = { workspace = true, default-features = false, optional = true }
 alloy-genesis = { workspace = true, default-features = false, optional = true }
 alloy-network = { workspace = true, default-features = false, optional = true }
 alloy-node-bindings = { workspace = true, default-features = false, optional = true }
-alloy-providers = { workspace = true, default-features = false, optional = true }
+alloy-provider = { workspace = true, default-features = false, optional = true }
 alloy-pubsub = { workspace = true, default-features = false, optional = true }
 
 # rpc
@@ -81,7 +81,10 @@ eip712 = [
 
 # alloy
 default-tls = ["reqwest?/default-tls"]
-jsonrpsee-types = ["alloy-rpc-types?/jsonrpsee-types", "alloy-rpc-engine-types?/jsonrpsee-types"]
+jsonrpsee-types = [
+    "alloy-rpc-types?/jsonrpsee-types",
+    "alloy-rpc-engine-types?/jsonrpsee-types",
+]
 
 consensus = ["dep:alloy-consensus"]
 eips = ["dep:alloy-eips"]
@@ -92,7 +95,7 @@ node-bindings = ["dep:alloy-node-bindings"]
 contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
 
 ## providers
-providers = ["dep:alloy-providers"]
+providers = ["dep:alloy-provider"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "transport-ws"]
 provider-ipc = ["providers", "transport-ipc"]

@@ -96,11 +96,11 @@ pub use alloy_node_bindings as node_bindings;
 
 /// Interface with an Ethereum blockchain.
 ///
-/// See [`alloy_providers`] for more details.
+/// See [`alloy_provider`] for more details.
 #[cfg(feature = "providers")]
 pub mod providers {
     #[doc(inline)]
-    pub use alloy_providers::*;
+    pub use alloy_provider::*;
 
     // TODO: provider type aliases
     // #[cfg(feature = "provider-http")]
@@ -171,7 +171,7 @@ pub mod signers {
 #[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
 #[cfg_attr(
     not(feature = "providers"),
-    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/providers"
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
 )]
 #[cfg(feature = "transports")]
 pub mod transports {
@@ -199,7 +199,7 @@ pub mod transports {
 #[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
 #[cfg_attr(
     not(feature = "providers"),
-    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/providers"
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
 )]
 #[cfg(feature = "pubsub")]
 pub mod pubsub {
