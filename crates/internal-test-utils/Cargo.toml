@@ -14,7 +14,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-node-bindings.workspace = true
-alloy-providers.workspace = true
+alloy-provider.workspace = true
 alloy-rpc-client.workspace = true
 alloy-transport-http.workspace = true
 reqwest.workspace = true

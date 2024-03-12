@@ -3,4 +3,4 @@
 crates/json-rpc     @prestwich
 crates/transports   @evalir @prestwich
 crates/networks     @prestwich
-crates/providers    @evalir @prestwich
+crates/provider    @evalir @prestwich

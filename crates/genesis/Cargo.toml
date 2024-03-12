@@ -13,7 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives.workspace = true
-alloy-rpc-types.workspace = true
+alloy-serde.workspace = true
 
 # serde
 serde.workspace = true

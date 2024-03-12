@@ -1,6 +1,6 @@
 use crate::Error;
 use alloy_primitives::Address;
-use alloy_providers::{new::FilterPollerBuilder, Network, Provider};
+use alloy_provider::{new::FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types::{Filter, Log};
 use alloy_sol_types::SolEvent;
 use alloy_transport::{Transport, TransportResult};

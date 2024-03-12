@@ -25,7 +25,7 @@ use tokio::{
 /// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
 ///
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// // Send a transaction, and configure the pending transaction.
 /// let builder = provider.send_transaction(tx)
 ///     .await?
@@ -42,7 +42,7 @@ use tokio::{
 ///
 /// This can also be more concisely written using `watch`:
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// let tx_hash = provider.send_transaction(tx)
 ///     .await?
 ///     .with_confirmations(2)
@@ -63,17 +63,17 @@ pub struct PendingTransactionBuilder<N, T, P> {
 
 impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuilder<N, T, P> {
     /// Creates a new pending transaction builder.
-    pub fn new(provider: P, tx_hash: B256) -> Self {
+    pub const fn new(provider: P, tx_hash: B256) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
-    pub fn from_config(provider: P, inner: PendingTransactionConfig) -> Self {
+    pub const fn from_config(provider: P, inner: PendingTransactionConfig) -> Self {
         Self { config: inner, provider, _phantom: PhantomData }
     }
 
     /// Returns the inner configuration.
-    pub fn inner(&self) -> &PendingTransactionConfig {
+    pub const fn inner(&self) -> &PendingTransactionConfig {
         &self.config
     }
 
@@ -83,7 +83,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Returns the provider.
-    pub fn provider(&self) -> &P {
+    pub const fn provider(&self) -> &P {
         &self.provider
     }
 
@@ -93,7 +93,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Returns the transaction hash.
-    pub fn tx_hash(&self) -> &B256 {
+    pub const fn tx_hash(&self) -> &B256 {
         self.config.tx_hash()
     }
 
@@ -109,7 +109,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Returns the number of confirmations to wait for.
-    pub fn confirmations(&self) -> u64 {
+    pub const fn confirmations(&self) -> u64 {
         self.config.confirmations()
     }
 
@@ -125,7 +125,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     }
 
     /// Returns the timeout.
-    pub fn timeout(&self) -> Option<Duration> {
+    pub const fn timeout(&self) -> Option<Duration> {
         self.config.timeout()
     }
 
@@ -210,12 +210,12 @@ pub struct PendingTransactionConfig {
 
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
-    pub fn new(tx_hash: B256) -> Self {
+    pub const fn new(tx_hash: B256) -> Self {
         Self { tx_hash, confirmations: 0, timeout: None }
     }
 
     /// Returns the transaction hash.
-    pub fn tx_hash(&self) -> &B256 {
+    pub const fn tx_hash(&self) -> &B256 {
         &self.tx_hash
     }
 
@@ -225,13 +225,13 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the transaction hash.
-    pub fn with_tx_hash(mut self, tx_hash: B256) -> Self {
-        self.set_tx_hash(tx_hash);
+    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+        self.tx_hash = tx_hash;
         self
     }
 
     /// Returns the number of confirmations to wait for.
-    pub fn confirmations(&self) -> u64 {
+    pub const fn confirmations(&self) -> u64 {
         self.confirmations
     }
 
@@ -241,13 +241,13 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the number of confirmations to wait for.
-    pub fn with_confirmations(mut self, confirmations: u64) -> Self {
-        self.set_confirmations(confirmations);
+    pub const fn with_confirmations(mut self, confirmations: u64) -> Self {
+        self.confirmations = confirmations;
         self
     }
 
     /// Returns the timeout.
-    pub fn timeout(&self) -> Option<Duration> {
+    pub const fn timeout(&self) -> Option<Duration> {
         self.timeout
     }
 
@@ -257,13 +257,13 @@ impl PendingTransactionConfig {
     }
 
     /// Sets the timeout.
-    pub fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
-        self.set_timeout(timeout);
+    pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
         self
     }
 
     /// Wraps this configuration with a provider to expose watching methods.
-    pub fn with_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>(
+    pub const fn with_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>(
         self,
         provider: P,
     ) -> PendingTransactionBuilder<N, T, P> {
@@ -347,7 +347,7 @@ impl HeartbeatHandle {
 
     /// Returns a watcher that always sees the latest block.
     #[allow(dead_code)]
-    pub(crate) fn latest(&self) -> &watch::Receiver<Option<Block>> {
+    pub(crate) const fn latest(&self) -> &watch::Receiver<Option<Block>> {
         &self.latest
     }
 }

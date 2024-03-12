@@ -1,5 +1,5 @@
 [package]
-name = "alloy-providers"
+name = "alloy-provider"
 description = "Interface with an Ethereum blockchain"
 
 version.workspace = true

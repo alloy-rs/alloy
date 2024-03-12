@@ -1,5 +1,5 @@
 use alloy_node_bindings::{Anvil, AnvilInstance};
-use alloy_providers::{network::Ethereum, HttpProvider};
+use alloy_provider::{network::Ethereum, HttpProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_transport_http::Http;
 use reqwest::Client;

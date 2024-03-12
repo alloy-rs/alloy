@@ -3,7 +3,7 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256, U64};
-use alloy_providers::Provider;
+use alloy_provider::Provider;
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
@@ -480,7 +480,7 @@ mod tests {
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex};
-    use alloy_providers::{HttpProvider, Provider, RootProvider};
+    use alloy_provider::{HttpProvider, Provider, RootProvider};
     use alloy_rpc_client::RpcClient;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;

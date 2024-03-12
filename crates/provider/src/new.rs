@@ -142,7 +142,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Get the next 5 blocks:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     ///
     /// let poller = provider.watch_blocks().await?;
@@ -169,7 +169,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Get the next 5 pending transactions:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     ///
     /// let poller = provider.watch_pending_transactions().await?;
@@ -196,7 +196,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Get the next 5 USDC transfer logs:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_primitives::{address, b256};
     /// use alloy_rpc_types::Filter;
     /// use futures::StreamExt;
@@ -325,7 +325,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
     /// let tx_hash = provider.send_transaction(tx)
     ///     .await?
     ///     .with_confirmations(2)
@@ -690,12 +690,13 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProviderInner<N, T
 }
 
 #[cfg(test)]
+#[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
 
-    extern crate self as alloy_providers;
+    extern crate self as alloy_provider;
 
     // NOTE: We cannot import the test-utils crate here due to a circular dependency.
     include!("../../internal-test-utils/src/providers.rs");

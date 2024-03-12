@@ -83,7 +83,7 @@ jobs:
             --exclude alloy-internal-test-utils \
             --exclude alloy-network \
             --exclude alloy-node-bindings \
-            --exclude alloy-providers \
+            --exclude alloy-provider \
             --exclude alloy-signer \
             --exclude alloy-signer-aws \
             --exclude alloy-signer-gcp \

@@ -8,7 +8,7 @@ use std::str::FromStr;
 ///
 ///
 /// ```rust
-/// use alloy_rpc_types::num::U64HexOrNumber;
+/// use alloy_serde::num::U64HexOrNumber;
 /// let number_json = "100";
 /// let hex_json = "\"0x64\"";
 ///
@@ -113,7 +113,7 @@ pub mod u64_hex_opt {
 
 /// serde functions for handling primitive `u64` as [U64]
 pub mod u64_hex_or_decimal {
-    use crate::serde_helpers::num::U64HexOrNumber;
+    use crate::num::U64HexOrNumber;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
@@ -133,7 +133,7 @@ pub mod u64_hex_or_decimal {
 
 /// serde functions for handling primitive optional `u64` as [U64]
 pub mod u64_hex_or_decimal_opt {
-    use crate::serde_helpers::num::U64HexOrNumber;
+    use crate::num::U64HexOrNumber;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or

@@ -26,13 +26,14 @@ use std::marker::PhantomData;
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct SignerLayer<S> {
     signer: S,
 }
 
 impl<S> SignerLayer<S> {
     /// Creates a new signing layer with the given signer.
-    pub fn new(signer: S) -> Self {
+    pub const fn new(signer: S) -> Self {
         Self { signer }
     }
 }
@@ -60,6 +61,7 @@ where
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`SignerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
+#[derive(Debug)]
 pub struct SignerProvider<N, T, P, S>
 where
     N: Network,

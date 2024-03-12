@@ -4,6 +4,8 @@ use async_trait::async_trait;
 use auto_impl::auto_impl;
 
 #[cfg(feature = "eip712")]
+use alloy_dyn_abi::eip712::TypedData;
+#[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
 /// Asynchronous Ethereum signer.
@@ -45,6 +47,15 @@ pub trait Signer<Sig = Signature>: Send + Sync {
         Self: Sized,
     {
         self.sign_hash(&payload.eip712_signing_hash(domain)).await
+    }
+
+    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
+    /// sized.
+    #[cfg(feature = "eip712")]
+    #[inline]
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Sig> {
+        let hash = payload.eip712_signing_hash()?;
+        self.sign_hash(&hash).await
     }
 
     /// Returns the signer's Ethereum Address.
@@ -103,6 +114,17 @@ pub trait SignerSync<Sig = Signature> {
         Self: Sized,
     {
         self.sign_hash_sync(&payload.eip712_signing_hash(domain))
+    }
+
+    /// Encodes and signs the typed data according to [EIP-712] for Signers that are not dynamically
+    /// sized.
+    ///
+    /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
+    #[cfg(feature = "eip712")]
+    #[inline]
+    fn sign_dynamic_typed_data_sync(&self, payload: &TypedData) -> Result<Sig> {
+        let hash = payload.eip712_signing_hash()?;
+        self.sign_hash_sync(&hash)
     }
 
     /// Returns the signer's chain ID.

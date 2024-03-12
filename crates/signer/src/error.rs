@@ -20,6 +20,9 @@ pub enum Error {
         /// The chain ID provided by the transaction.
         tx: u64,
     },
+    /// [`alloy_dyn_abi`] error.
+    #[error(transparent)]
+    DynAbiError(#[from] alloy_dyn_abi::Error),
     /// [`ecdsa`] error.
     #[error(transparent)]
     Ecdsa(#[from] ecdsa::Error),
