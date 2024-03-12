@@ -194,6 +194,7 @@ pub struct CallBuilder<N: Network, T, P, D> {
     block: Option<BlockId>,
     state: Option<StateOverride>,
     /// The provider.
+    // NOTE: This is public due to usage in `sol!`, please avoid changing it.
     pub provider: P,
     decoder: D,
     transport: PhantomData<T>,
