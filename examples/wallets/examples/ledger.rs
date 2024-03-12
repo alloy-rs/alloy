@@ -1,4 +1,4 @@
-//! # Ledger Wallet Example
+//! Ledger Wallet Example
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_primitives::{address, U256};
@@ -10,22 +10,22 @@ use alloy_transport_http::Http;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let http = Http::new("http://localhost:8545".parse()?);
-
     // Instantiate the application by acquiring a lock on the Ledger device.
-    let ledger = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
+    let signer = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
 
     // Create a provider with the signer and the network.
     let provider = ProviderBuilder::<_, Ethereum>::new()
-        .signer(EthereumSigner::from(ledger))
+        .signer(EthereumSigner::from(signer))
         .network::<Ethereum>()
-        .provider(RootProvider::new(RpcClient::new(http, true)));
+        .provider(RootProvider::new(RpcClient::new(
+            Http::new("http://localhost:8545".parse()?),
+            true,
+        )));
 
     // Create a transaction.
     let tx = TransactionRequest {
         value: Some(U256::from(100)),
         to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
-        nonce: Some(U64::from(0)),
         gas_price: Some(U256::from(20e9)),
         gas: Some(U256::from(21000)),
         ..Default::default()

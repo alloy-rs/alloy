@@ -1,4 +1,4 @@
-//! # Mnemonic Wallet Example
+//! Mnemonic Wallet Example
 
 use alloy_signer::{coins_bip39::English, MnemonicBuilder};
 

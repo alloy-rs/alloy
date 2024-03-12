@@ -76,7 +76,7 @@
 - [ ] Wallets
   - [ ] AWS
   - [ ] GCP
-  - [ ] Mnemonic
+  - [x] Mnemonic
   - [x] Ledger
   - [x] Local
   - [ ] Permit hash
