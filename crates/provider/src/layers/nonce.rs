@@ -34,9 +34,9 @@ use std::{
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
+/// ```
 ///
 /// [`SignerLayer`]: crate::layers::SignerLayer
-/// ```
 pub struct ManagedNonceLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for ManagedNonceLayer
