@@ -12,4 +12,15 @@ repository.workspace = true
 exclude.workspace = true
 
 [dev-dependencies]
+alloy-rpc-client = { workspace = true, features = ["reqwest"] }
+# alloy-core = { workspace = true }
+alloy-network = { workspace = true }
+alloy-providers = { workspace = true }
+# alloy-signer = { workspace = true }
+# alloy-signer-aws = { workspace = true }
+# alloy-signer-gcp = { workspace = true }
+# alloy-signer-ledger = { workspace = true }
+# alloy-signer-trezor = { workspace = true }
+alloy-transport-http = { workspace = true }
+
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
