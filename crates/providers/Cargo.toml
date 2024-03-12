@@ -28,7 +28,7 @@ auto_impl.workspace = true
 futures.workspace = true
 lru = "0.12"
 reqwest.workspace = true
-serde.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 

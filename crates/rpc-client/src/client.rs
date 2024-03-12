@@ -47,7 +47,7 @@ impl<T> RpcClient<T> {
     }
 
     /// Get a reference to the client.
-    pub fn inner(&self) -> &Arc<RpcClientInner<T>> {
+    pub const fn inner(&self) -> &Arc<RpcClientInner<T>> {
         &self.0
     }
 
@@ -154,7 +154,7 @@ impl<T> RpcClientInner<T> {
     }
 
     /// Returns the default poll interval for the client.
-    pub fn default_poll_interval(&self) -> Duration {
+    pub const fn default_poll_interval(&self) -> Duration {
         if self.is_local {
             Duration::from_millis(250)
         } else {
@@ -164,7 +164,7 @@ impl<T> RpcClientInner<T> {
 
     /// Returns a reference to the underlying transport.
     #[inline]
-    pub fn transport(&self) -> &T {
+    pub const fn transport(&self) -> &T {
         &self.transport
     }
 
