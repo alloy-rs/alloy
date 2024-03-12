@@ -11,7 +11,7 @@ use alloy_primitives::{
 use alloy_rpc_client::{ClientRef, RpcClient, WeakClient};
 use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
-    parity::LocalizedTransactionTrace,
+    parity::{LocalizedTransactionTrace, TraceResults, TraceType},
 };
 use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
@@ -397,6 +397,36 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed> {
         self.client().prepare("eth_createAccessList", (request, block.unwrap_or_default())).await
+    }
+
+    /// Executes the given transaction and returns a number of possible traces.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn trace_call(
+        &self,
+        request: &N::TransactionRequest,
+        trace_type: &[TraceType],
+        block: Option<BlockId>,
+    ) -> TransportResult<TraceResults> {
+        self.client().prepare("trace_call", (request, trace_type, block)).await
+    }
+
+    /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
+    /// on top of the given block with all `n - 1` transaction applied first.
+    ///
+    /// Allows tracing dependent transactions.
+    ///
+    /// # Note
+    ///
+    /// Not all nodes support this call.
+    async fn trace_call_many(
+        &self,
+        request: &[(N::TransactionRequest, Vec<TraceType>)],
+        block: Option<BlockId>,
+    ) -> TransportResult<TraceResults> {
+        self.client().prepare("trace_callMany", (request, block)).await
     }
 
     // todo: move to extension trait
