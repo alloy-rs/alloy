@@ -113,10 +113,7 @@ impl<L, N> ProviderBuilder<L, N> {
     ///
     /// See [`SignerLayer`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>> {
-        ProviderBuilder {
-            layer: Stack::new(SignerLayer::new(signer), self.layer),
-            network: PhantomData,
-        }
+        self.layer(SignerLayer::new(signer))
     }
 
     /// Change the network.
