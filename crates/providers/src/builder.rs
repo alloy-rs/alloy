@@ -39,7 +39,7 @@ pub struct Stack<Inner, Outer> {
 
 impl<Inner, Outer> Stack<Inner, Outer> {
     /// Create a new `Stack`.
-    pub fn new(inner: Inner, outer: Outer) -> Self {
+    pub const fn new(inner: Inner, outer: Outer) -> Self {
         Stack { inner, outer }
     }
 }
@@ -74,7 +74,8 @@ pub struct ProviderBuilder<L, N = ()> {
 }
 
 impl<N> ProviderBuilder<Identity, N> {
-    pub fn new() -> Self {
+    /// Create a new [`ProviderBuilder`].
+    pub const fn new() -> Self {
         ProviderBuilder { layer: Identity, network: PhantomData }
     }
 }

@@ -27,13 +27,14 @@ use std::marker::PhantomData;
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct SignerLayer<S> {
     signer: S,
 }
 
 impl<S> SignerLayer<S> {
     /// Creates a new signing layer with the given signer.
-    pub fn new(signer: S) -> Self {
+    pub const fn new(signer: S) -> Self {
         Self { signer }
     }
 }
