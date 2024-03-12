@@ -131,6 +131,42 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction>;
 
+    /// Watch for new blocks by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+        let id = self.new_block_filter().await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new pending transaction by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// let poller = provider.watch_pending_transactions().await?;
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+        let id = self.new_pending_transactions_filter().await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new logs using the given filter by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
+        let id = self.new_filter(filter).await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
     /// Notify the provider that we are interested in new blocks.
     ///
     /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
@@ -177,36 +213,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// [`get_filter_changes`](Self::get_filter_changes) instead.
     async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
         self.client().prepare("eth_getFilterChanges", (id,)).await
-    }
-
-    /// Watch for new blocks by polling the provider with
-    /// [`eth_getFilterChanges`](Self::get_filter_changes).
-    ///
-    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
-    /// details.
-    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
-        let id = self.new_block_filter().await?;
-        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
-    }
-
-    /// Watch for new pending transaction by polling the provider with
-    /// [`eth_getFilterChanges`](Self::get_filter_changes).
-    ///
-    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
-    /// details.
-    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
-        let id = self.new_pending_transactions_filter().await?;
-        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
-    }
-
-    /// Watch for new logs using the given filter by polling the provider with
-    /// [`eth_getFilterChanges`](Self::get_filter_changes).
-    ///
-    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
-    /// details.
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
-        let id = self.new_filter(filter).await?;
-        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
     /// Get the last block number available.
