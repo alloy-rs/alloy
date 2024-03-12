@@ -133,13 +133,13 @@ pub struct ExecutionPayloadV1 {
     pub receipts_root: B256,
     pub logs_bloom: Bloom,
     pub prev_randao: B256,
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub block_number: u64,
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub gas_limit: u64,
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub gas_used: u64,
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub timestamp: u64,
     pub extra_data: Bytes,
     pub base_fee_per_gas: U256,
@@ -272,11 +272,11 @@ pub struct ExecutionPayloadV3 {
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub excess_blob_gas: u64,
 }
 
@@ -664,7 +664,7 @@ pub struct ExecutionPayloadBodyV1 {
 #[serde(rename_all = "camelCase")]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
-    #[serde(with = "alloy_rpc_types::serde_helpers::u64_hex")]
+    #[serde(with = "alloy_serde::u64_hex")]
     pub timestamp: u64,
     /// Value for the `prevRandao` field of the new payload
     pub prev_randao: B256,

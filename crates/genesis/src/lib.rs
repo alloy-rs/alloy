@@ -18,7 +18,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_rpc_types::serde_helpers::{
+use alloy_serde::{
     json_u256::{deserialize_json_ttd_opt, deserialize_json_u256},
     num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
