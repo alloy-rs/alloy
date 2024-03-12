@@ -389,8 +389,8 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
         if !self.request.to().is_some_and(|to| to.is_create()) {
             return Err(Error::NotADeploymentTransaction);
         }
-        let pending_transaction = self.send().await?;
-        let receipt = pending_transaction.get_receipt().await?.ok_or(Error::ContractNotDeployed)?;
+        let pending_tx = self.send().await?;
+        let receipt = pending_tx.get_receipt().await?;
         receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 

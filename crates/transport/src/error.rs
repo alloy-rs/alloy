@@ -30,6 +30,10 @@ pub enum TransportErrorKind {
     #[error("subscriptions are not avalaible on this provider")]
     PubsubUnavailable,
 
+    /// Transaction confirmed but `get_transaction_receipt` returned `None`.
+    #[error("transaction confirmed but receipt returned was null")]
+    MissingReceipt,
+
     /// Custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn StdError + Send + Sync + 'static>),
@@ -65,5 +69,10 @@ impl TransportErrorKind {
     /// Instantiate a new `TransportError::PubsubUnavailable`.
     pub const fn pubsub_unavailable() -> TransportError {
         RpcError::Transport(Self::PubsubUnavailable)
+    }
+
+    /// Instantiate a new `TransportError::MissingReceipt`.
+    pub const fn missing_receipt() -> TransportError {
+        RpcError::Transport(Self::MissingReceipt)
     }
 }

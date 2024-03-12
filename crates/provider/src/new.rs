@@ -967,7 +967,6 @@ mod tests {
             .get_receipt()
             .await
             .expect("failed to await pending tx")
-            .unwrap()
             .transaction_hash
             .unwrap();
         assert_eq!(hash1, hash2);

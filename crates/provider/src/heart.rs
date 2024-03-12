@@ -31,9 +31,9 @@ use tokio::{
 ///     .with_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)));
 /// // Register the pending transaction with the provider.
-/// let pending_transaction = builder.register().await?;
+/// let pending_tx = builder.register().await?;
 /// // Wait for the transaction to be confirmed 2 times.
-/// let tx_hash = pending_transaction.await?;
+/// let tx_hash = pending_tx.await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -175,10 +175,11 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     /// - [`register`](Self::register): for registering the transaction without waiting for it to be
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
-    pub async fn get_receipt(self) -> TransportResult<Option<N::ReceiptResponse>> {
+    pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
         let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
         let hash = pending_tx.await?;
-        self.provider.get_transaction_receipt(hash).await
+        let receipt = self.provider.get_transaction_receipt(hash).await?;
+        receipt.ok_or_else(TransportErrorKind::missing_receipt)
     }
 }
 
