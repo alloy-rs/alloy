@@ -3,7 +3,7 @@ use crate::{
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
     utils::{self, EstimatorFunction},
 };
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
@@ -18,7 +18,7 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
-use serde::{de::DeserializeOwned, Serialize};
+use serde_json::value::RawValue;
 use std::{
     marker::PhantomData,
     sync::{Arc, OnceLock, Weak},
@@ -626,12 +626,20 @@ pub trait RawProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider
     /// Sends a raw JSON-RPC request.
     async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
     where
-        P: Serialize + Send + Sync + Clone,
-        R: Serialize + DeserializeOwned + Send + Sync + Unpin + 'static,
-        Self: Sync,
+        P: RpcParam,
+        R: RpcReturn,
+        Self: Sized,
     {
-        let res: R = self.client().prepare(method, &params).await?;
-        Ok(res)
+        self.client().prepare(method, &params).await
+    }
+
+    /// Sends a raw JSON-RPC request with type-erased parameters and return.
+    async fn raw_request_dyn(
+        &self,
+        method: &'static str,
+        params: &RawValue,
+    ) -> TransportResult<Box<RawValue>> {
+        self.client().prepare(method, params).await
     }
 }
 
@@ -725,6 +733,17 @@ mod tests {
         let boxed_boxdyn = Box::new(boxed) as Box<dyn Provider<Ethereum>>;
         let num = boxed_boxdyn.get_block_number().await.unwrap();
         assert_eq!(0, num);
+    }
+
+    #[test]
+    fn object_safety_types() {
+        fn is_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>() {}
+        fn is_raw_provider<N: Network, T: Transport + Clone, P: RawProvider<N, T>>() {}
+
+        is_provider::<_, _, Box<dyn Provider<Ethereum>>>();
+        is_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
+        is_raw_provider::<_, _, Box<dyn Provider<Ethereum>>>();
+        is_raw_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
     }
 
     #[tokio::test]
