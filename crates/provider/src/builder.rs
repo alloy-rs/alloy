@@ -1,6 +1,6 @@
 use crate::{
+    layers::SignerLayer,
     new::{Provider, RootProvider},
-    SignerLayer,
 };
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
@@ -113,10 +113,7 @@ impl<L, N> ProviderBuilder<L, N> {
     ///
     /// See [`SignerLayer`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>> {
-        ProviderBuilder {
-            layer: Stack::new(SignerLayer::new(signer), self.layer),
-            network: PhantomData,
-        }
+        self.layer(SignerLayer::new(signer))
     }
 
     /// Change the network.

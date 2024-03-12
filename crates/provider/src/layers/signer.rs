@@ -20,7 +20,7 @@ use std::marker::PhantomData;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::<_, Ethereum>::new()
-///     .layer(SignerLayer::new(EthereumSigner::from(signer)))
+///     .signer(EthereumSigner::from(signer))
 ///     .network::<Ethereum>()
 ///     .provider(RootProvider::new(transport));
 ///
@@ -55,7 +55,7 @@ where
 
 /// A locally-signing provider.
 ///
-/// Signs transactions locally using a [`NetworkSigner`]
+/// Signs transactions locally using a [`NetworkSigner`].
 ///
 /// # Note
 ///
