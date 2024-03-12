@@ -38,6 +38,7 @@ use tokio::sync::Mutex;
 /// ```
 ///
 /// [`SignerLayer`]: crate::layers::SignerLayer
+#[derive(Debug, Clone, Copy)]
 pub struct ManagedNonceLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for ManagedNonceLayer
@@ -65,6 +66,7 @@ where
 /// [`ManagedNonceLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
+#[derive(Debug, Clone)]
 pub struct ManagedNonceProvider<N, T, P>
 where
     N: Network,
