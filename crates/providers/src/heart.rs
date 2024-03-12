@@ -56,30 +56,30 @@ use tokio::{
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
 pub struct PendingTransactionBuilder<N, T, P> {
-    inner: PendingTransactionConfig,
+    config: PendingTransactionConfig,
     provider: P,
     _phantom: PhantomData<(N, T)>,
 }
 
 impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuilder<N, T, P> {
-    /// Creates a new pending transaction configuration.
+    /// Creates a new pending transaction builder.
     pub fn new(provider: P, tx_hash: B256) -> Self {
-        Self::from_inner(provider, PendingTransactionConfig::new(tx_hash))
+        Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
-    /// Creates a new pending transaction configuration.
-    pub fn from_inner(provider: P, inner: PendingTransactionConfig) -> Self {
-        Self { inner, provider, _phantom: PhantomData }
+    /// Creates a new pending transaction builder from the given configuration.
+    pub fn from_config(provider: P, inner: PendingTransactionConfig) -> Self {
+        Self { config: inner, provider, _phantom: PhantomData }
     }
 
     /// Returns the inner configuration.
     pub fn inner(&self) -> &PendingTransactionConfig {
-        &self.inner
+        &self.config
     }
 
-    /// Consumes this configuration, returning the inner configuration.
+    /// Consumes this builder, returning the inner configuration.
     pub fn into_inner(self) -> PendingTransactionConfig {
-        self.inner
+        self.config
     }
 
     /// Returns the provider.
@@ -87,19 +87,19 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
         &self.provider
     }
 
-    /// Consumes this configuration, returning the provider and the inner configuration.
+    /// Consumes this builder, returning the provider and the configuration.
     pub fn split(self) -> (P, PendingTransactionConfig) {
-        (self.provider, self.inner)
+        (self.provider, self.config)
     }
 
     /// Returns the transaction hash.
     pub fn tx_hash(&self) -> &B256 {
-        self.inner.tx_hash()
+        self.config.tx_hash()
     }
 
     /// Sets the transaction hash.
     pub fn set_tx_hash(&mut self, tx_hash: B256) {
-        self.inner.set_tx_hash(tx_hash);
+        self.config.set_tx_hash(tx_hash);
     }
 
     /// Sets the transaction hash.
@@ -110,12 +110,12 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
 
     /// Returns the number of confirmations to wait for.
     pub fn confirmations(&self) -> u64 {
-        self.inner.confirmations()
+        self.config.confirmations()
     }
 
     /// Sets the number of confirmations to wait for.
     pub fn set_confirmations(&mut self, confirmations: u64) {
-        self.inner.set_confirmations(confirmations);
+        self.config.set_confirmations(confirmations);
     }
 
     /// Sets the number of confirmations to wait for.
@@ -126,12 +126,12 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
 
     /// Returns the timeout.
     pub fn timeout(&self) -> Option<Duration> {
-        self.inner.timeout()
+        self.config.timeout()
     }
 
     /// Sets the timeout.
     pub fn set_timeout(&mut self, timeout: Option<Duration>) {
-        self.inner.set_timeout(timeout);
+        self.config.set_timeout(timeout);
     }
 
     /// Sets the timeout.
@@ -151,7 +151,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     ///   confirmed.
     #[doc(alias = "build")]
     pub async fn register(self) -> TransportResult<PendingTransaction> {
-        self.provider.watch_pending_transaction(self.inner).await
+        self.provider.watch_pending_transaction(self.config).await
     }
 
     /// Waits for the transaction to confirm with the given number of confirmations.
@@ -173,7 +173,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> PendingTransactionBuil
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<Option<N::ReceiptResponse>> {
-        let pending_tx = self.provider.watch_pending_transaction(self.inner).await?;
+        let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
         let hash = pending_tx.await?;
         self.provider.get_transaction_receipt(hash).await
     }
@@ -184,7 +184,7 @@ impl<N, T, P: Clone> PendingTransactionBuilder<N, T, &P> {
     /// provider.
     pub fn with_cloned_provider(self) -> PendingTransactionBuilder<N, T, P> {
         PendingTransactionBuilder {
-            inner: self.inner,
+            config: self.config,
             provider: self.provider.clone(),
             _phantom: PhantomData,
         }
@@ -267,7 +267,7 @@ impl PendingTransactionConfig {
         self,
         provider: P,
     ) -> PendingTransactionBuilder<N, T, P> {
-        PendingTransactionBuilder::from_inner(provider, self)
+        PendingTransactionBuilder::from_config(provider, self)
     }
 }
 
