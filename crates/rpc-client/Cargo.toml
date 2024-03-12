@@ -41,6 +41,7 @@ alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
 
 tempfile = "3"
+futures-util.workspace = true
 
 [features]
 default = ["reqwest"]

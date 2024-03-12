@@ -77,6 +77,8 @@ impl<T: Transport> RpcClient<T> {
     }
 
     /// Build a poller that polls a method with the given parameters.
+    ///
+    /// See [`PollerBuilder`] for examples and more details.
     pub fn prepare_static_poller<Params, Resp>(
         &self,
         method: &'static str,

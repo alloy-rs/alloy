@@ -29,10 +29,29 @@ const MAX_RETRIES: usize = 3;
 /// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
 /// method.
 ///
+/// Alternatively, [`into_stream`](Self::into_stream) can be used to directly return a stream of
+/// responses on the current thread. This is currently equivalent to `spawn().into_stream()`, but
+/// this may change in the future.
+///
 /// # Examples
 ///
-/// ```rust
-/// #
+/// Poll `eth_blockNumber` every 5 seconds:
+///
+/// ```no_run
+/// # async fn example<T: alloy_transport::Transport + Clone>(client: alloy_rpc_client::RpcClient<T>) -> Result<(), Box<dyn std::error::Error>> {
+/// use alloy_primitives::U64;
+/// use alloy_rpc_client::PollerBuilder;
+/// use futures_util::StreamExt;
+///
+/// let poller: PollerBuilder<_, (), U64> = client
+///     .prepare_static_poller("eth_blockNumber", ())
+///     .with_poll_interval(std::time::Duration::from_secs(5));
+/// let mut stream = poller.into_stream();
+/// while let Some(block_number) = stream.next().await {
+///    println!("polled block number: {block_number}");
+/// }
+/// # Ok(())
+/// # }
 /// ```
 // TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
