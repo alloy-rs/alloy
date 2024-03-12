@@ -77,7 +77,7 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     }
 
     /// Consumes this builder, returning the inner configuration.
-    pub fn into_inner(self) -> PendingTransactionConfig {
+    pub const fn into_inner(self) -> PendingTransactionConfig {
         self.config
     }
 
@@ -87,7 +87,7 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     }
 
     /// Consumes this builder, returning the provider and the configuration.
-    pub fn split(self) -> (&'a RootProvider<N, T>, PendingTransactionConfig) {
+    pub const fn split(self) -> (&'a RootProvider<N, T>, PendingTransactionConfig) {
         (self.provider, self.config)
     }
 
