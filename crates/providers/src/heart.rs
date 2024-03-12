@@ -16,7 +16,7 @@ use tokio::{
 };
 
 /// A configuration object for watching for transaction confirmation.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct WatchConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,

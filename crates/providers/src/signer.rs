@@ -62,6 +62,7 @@ where
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`SignerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
+#[derive(Debug)]
 pub struct SignerProvider<N, T, P, S>
 where
     N: Network,
