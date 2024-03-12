@@ -136,6 +136,23 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
     /// details.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 blocks:
+    ///
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_blocks().await?;
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(block_hash) = stream.next().await {
+    ///    println!("new block: {block_hash}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
@@ -149,9 +166,20 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// # Examples
     ///
+    /// Get the next 5 pending transactions:
+    ///
     /// ```no_run
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
     /// let poller = provider.watch_pending_transactions().await?;
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(tx_hash) = stream.next().await {
+    ///    println!("pending transaction: {tx_hash}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
         let id = self.new_pending_transactions_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
@@ -162,6 +190,29 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
     /// details.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 USDC transfer logs:
+    ///
+    /// ```no_run
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_providers::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_primitives::{address, b256};
+    /// use alloy_rpc_types::Filter;
+    /// use futures::StreamExt;
+    ///
+    /// let address = address!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48");
+    /// let transfer_signature = b256!("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef");
+    /// let filter = Filter::new().address(address).event_signature(transfer_signature);
+    ///
+    /// let poller = provider.watch_logs(&filter).await?;
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(log) = stream.next().await {
+    ///    println!("{log:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
@@ -186,7 +237,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_newPendingTransactionFilter", ()).await
     }
 
-    /// Notify the provider that we are interested in new logs using the given filter.
+    /// Notify the provider that we are interested in logs that match the given filter.
     ///
     /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
     ///

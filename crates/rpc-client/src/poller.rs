@@ -248,14 +248,14 @@ where
         Self { rx: self.rx.resubscribe() }
     }
 
-    /// Convert the poll channel into a stream.
+    /// Converts the poll channel into a stream.
     // TODO: can we name this type?
     pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
-        self.into_stream_raw().flat_map(futures::stream::iter)
+        self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
     }
 
-    /// Convert the poll channel into a stream that also yields [lag
-    /// errors](tokio_stream::wrappers::errors::BroadcastStreamRecvError).
+    /// Converts the poll channel into a stream that also yields
+    /// [lag errors](tokio_stream::wrappers::errors::BroadcastStreamRecvError).
     pub fn into_stream_raw(self) -> BroadcastStream<Resp> {
         self.rx.into()
     }
