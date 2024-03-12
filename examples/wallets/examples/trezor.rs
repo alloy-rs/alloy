@@ -1,23 +1,23 @@
-//! # Ledger Wallet Example
+//! # Trezor Wallet Example
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_primitives::{address, U256};
 use alloy_providers::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
-use alloy_signer_ledger::{HDPath, LedgerSigner};
+use alloy_signer_trezor::{TrezorHDPath, TrezorSigner}; // NOTE: `TrezorHDPath` => `HDPath`
 use alloy_transport_http::Http;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let http = Http::new("http://localhost:8545".parse()?);
 
-    // Instantiate the application by acquiring a lock on the Ledger device.
-    let ledger = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
+    // Instantiate the application by acquiring a lock on the Trezor device.
+    let trezor = TrezorSigner::new(TrezorHDPath::TrezorLive(0), Some(1)).await?;
 
     // Create a provider with the signer and the network.
     let provider = ProviderBuilder::<_, Ethereum>::new()
-        .signer(EthereumSigner::from(ledger))
+        .signer(EthereumSigner::from(trezor))
         .network::<Ethereum>()
         .provider(RootProvider::new(RpcClient::new(http, true)));
 

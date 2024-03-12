@@ -79,5 +79,5 @@
   - [ ] Local
   - [ ] Permit hash
   - [ ] Sign message
-  - [ ] Trezor
+  - [x] Trezor
   - [ ] Yubi

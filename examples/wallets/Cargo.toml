@@ -21,7 +21,7 @@ alloy-signer = { workspace = true }
 # alloy-signer-aws = { workspace = true }
 # alloy-signer-gcp = { workspace = true }
 alloy-signer-ledger = { workspace = true }
-# alloy-signer-trezor = { workspace = true }
+alloy-signer-trezor = { workspace = true }
 alloy-transport-http = { workspace = true }
 
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
