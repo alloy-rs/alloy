@@ -5,7 +5,8 @@ use alloy_rpc_client::{ClientRef, WeakClient};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use dashmap::{mapref::entry::Entry, DashMap};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
+use tokio::sync::Mutex;
 
 /// A layer that fills nonces on transactions.
 ///
@@ -71,7 +72,7 @@ where
     P: Provider<N, T>,
 {
     inner: P,
-    nonces: DashMap<Address, u64>,
+    nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
     _phantom: PhantomData<(N, T)>,
 }
 
@@ -82,20 +83,19 @@ where
     P: Provider<N, T>,
 {
     async fn get_next_nonce(&self, from: Address) -> TransportResult<U64> {
-        let nonce = match self.nonces.entry(from) {
-            Entry::Occupied(entry) => {
-                let next_nonce = entry.get() + 1;
-                entry.replace_entry(next_nonce);
-                next_nonce
+        let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
+        let mut nonce = mutex.lock().await;
+        match *nonce {
+            Some(ref mut nonce) => {
+                *nonce += 1;
+                Ok(U64::from(*nonce))
             }
-            Entry::Vacant(entry) => {
-                let nonce: u64 = self.inner.get_transaction_count(from, None).await?.to();
-                entry.insert(nonce);
-                nonce
+            None => {
+                let initial_nonce = self.inner.get_transaction_count(from, None).await?;
+                *nonce = Some(initial_nonce.to());
+                Ok(initial_nonce)
             }
-        };
-
-        Ok(U64::from(nonce))
+        }
     }
 }
 
