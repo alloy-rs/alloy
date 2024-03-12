@@ -17,7 +17,7 @@ body:
         - consensus, eips, genesis
         - network, json-rpc
         - nodes
-        - providers, pubsub
+        - provider, pubsub
         - rpc
         - signers
         - transports
