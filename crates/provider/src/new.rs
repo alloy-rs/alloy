@@ -156,7 +156,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.root().client()
     }
 
-    /// Returns a [`Weak`] RPC client used to send requests.
+    /// Returns a [`Weak`](std::sync::Weak) RPC client used to send requests.
     ///
     /// NOTE: this method should not be overridden.
     #[inline]
