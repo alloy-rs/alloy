@@ -44,7 +44,7 @@ pub struct FeeHistory {
     ///
     /// # Note
     ///
-    /// The `Option` is only for compatability with Erigon and Geth.
+    /// The `Option` is only for compatibility with Erigon and Geth.
     pub gas_used_ratio: Vec<f64>,
     /// An array of block base fees per blob gas. This includes the next block after the newest
     /// of  the returned range, because this value can be derived from the newest block. Zeroes

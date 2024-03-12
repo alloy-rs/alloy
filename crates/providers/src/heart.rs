@@ -1,4 +1,4 @@
-//! Block hearbeat and pending transaction watcher.
+//! Block heartbeat and pending transaction watcher.
 
 use crate::Provider;
 use alloy_network::Network;

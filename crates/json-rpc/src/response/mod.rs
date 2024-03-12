@@ -88,7 +88,7 @@ where
     ErrData: Borrow<RawValue> + 'a,
 {
     /// Attempt to deserialize the error payload, borrowing from the payload if
-    /// necesary.
+    /// necessary.
     ///
     /// See [`ResponsePayload::try_error_as`].
     pub fn try_error_as<T: Deserialize<'a>>(&'a self) -> Option<serde_json::Result<T>> {

@@ -90,17 +90,17 @@ where
         self
     }
 
-    /// Retuns the limit on the number of succesful polls.
+    /// Returns the limit on the number of successful polls.
     pub const fn limit(&self) -> usize {
         self.limit
     }
 
-    /// Sets a limit on the number of succesful polls.
+    /// Sets a limit on the number of successful polls.
     pub fn set_limit(&mut self, limit: Option<usize>) {
         self.limit = limit.unwrap_or(usize::MAX);
     }
 
-    /// Sets a limit on the number of succesful polls.
+    /// Sets a limit on the number of successful polls.
     pub fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.set_limit(limit);
         self

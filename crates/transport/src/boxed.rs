@@ -6,7 +6,7 @@ use tower::Service;
 /// A boxed, Clone-able [`Transport`] trait object.
 ///
 /// This type allows RPC clients to use a type-erased transport. It is
-/// [`Clone`] and [`Send`] + [`Sync`], and implementes [`Transport`]. This
+/// [`Clone`] and [`Send`] + [`Sync`], and implements [`Transport`]. This
 /// allows for complex behavior abstracting across several different clients
 /// with different transport types.
 ///

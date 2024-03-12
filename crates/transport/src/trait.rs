@@ -6,7 +6,7 @@ use tower::Service;
 ///
 /// `Transports` should be instantiated via the [`TransportConnect`] trait.
 ///
-/// Transports are reponsible for the following:
+/// Transports are responsible for the following:
 ///
 /// - Communicating with the RPC server.
 /// - Managing any ongoing connection or communication resource.
