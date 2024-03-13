@@ -17,6 +17,7 @@ exclude.workspace = true
 alloy-primitives.workspace = true
 alloy-sol-types = { workspace = true, features = ["json"] }
 alloy-provider = { workspace = true, features = ["pubsub", "ws"] }
+alloy-contract.workspace = true
 alloy-pubsub.workspace = true
 alloy-rpc-types.workspace = true
 alloy-rpc-client.workspace = true
