@@ -1,5 +1,5 @@
 use crate::{layers::SignerLayer, Provider, RootProvider};
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
 use std::marker::PhantomData;
@@ -70,9 +70,8 @@ where
 ///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 #[derive(Debug)]
-pub struct ProviderBuilder<L, N = ()> {
+pub struct ProviderBuilder<L, N = Ethereum> {
     layer: L,
-
     network: PhantomData<N>,
 }
 
@@ -99,17 +98,16 @@ impl<L, N> ProviderBuilder<L, N> {
     /// [`tower::ServiceBuilder`]. The first layer added will be the first to
     /// see the request.
     ///
-    ///
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
-    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>> {
+    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>, N> {
         ProviderBuilder { layer: Stack::new(layer, self.layer), network: PhantomData }
     }
 
     /// Add a signer layer to the stack being built.
     ///
     /// See [`SignerLayer`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>> {
+    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, N> {
         self.layer(SignerLayer::new(signer))
     }
 
