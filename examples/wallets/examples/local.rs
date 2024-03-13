@@ -3,7 +3,7 @@
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_node_bindings::Anvil;
 use alloy_primitives::{U256, U64};
-use alloy_providers::{Provider, ProviderBuilder, RootProvider};
+use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
 use alloy_signer::LocalWallet;

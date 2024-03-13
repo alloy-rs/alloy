@@ -12,13 +12,10 @@ repository.workspace = true
 exclude.workspace = true
 
 [dev-dependencies]
-alloy-contract = { workspace = true }
-alloy-dyn-abi = { workspace = true }
-alloy-eips = { workspace = true }
 alloy-network = { workspace = true }
 alloy-node-bindings = { workspace = true }
 alloy-primitives = { workspace = true }
-alloy-providers = { workspace = true }
+alloy-provider = { workspace = true }
 alloy-rpc-client = { workspace = true }
 alloy-rpc-types = { workspace = true }
 alloy-signer = { workspace = true, features = [
