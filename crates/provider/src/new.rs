@@ -194,9 +194,31 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.root().watch_pending_transaction(config).await
     }
 
-    /// Subscribe to new block headers.
+    /// Subscribe to a stream of new block headers.
     ///
-    /// Returns a stream of new block headers.
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
+    /// client does not support it.
+    ///
+    /// For a polling alternative available over HTTP, use [`Provider::watch_blocks`].
+    /// However, be aware that polling increases RPC usage drastically.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_blocks().await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(block) = stream.next().await {
+    ///    println!("new block: {block:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "pubsub")]
     async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
         self.root().pubsub_frontend()?;
@@ -204,9 +226,31 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.root().get_subscription(id).await
     }
 
-    /// Subscribe to new pending transactions.
+    /// Subscribe to a stream of pending transaction hashes.
     ///
-    /// Returns a stream of new pending transaction hashes.
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
+    /// client does not support it.
+    ///
+    /// For a polling alternative available over HTTP, use [`Provider::watch_pending_transactions`].
+    /// However, be aware that polling increases RPC usage drastically.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_pending_transactions().await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(tx_hash) = stream.next().await {
+    ///    println!("new pending transaction hash: {tx_hash}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "pubsub")]
     async fn subscribe_pending_transactions(&self) -> TransportResult<Subscription<B256>> {
         self.root().pubsub_frontend()?;
@@ -214,9 +258,36 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.root().get_subscription(id).await
     }
 
-    /// Subscribe to new full pending transactions.
+    /// Subscribe to a stream of pending transaction bodies.
     ///
-    /// Returns a stream of new pending transactions.
+    /// # Support
+    ///
+    /// This endpoint is compatible only with Geth client version 1.11.0 or later.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
+    /// client does not support it.
+    ///
+    /// For a polling alternative available over HTTP, use
+    /// [`Provider::watch_full_pending_transactions`]. However, be aware that polling increases
+    /// RPC usage drastically.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let sub = provider.subscribe_full_pending_transactions().await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(tx) = stream.next().await {
+    ///    println!("{tx:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     #[cfg(feature = "pubsub")]
     async fn subscribe_full_pending_transactions(
         &self,
@@ -257,7 +328,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Get the next 5 blocks:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     ///
     /// let poller = provider.watch_blocks().await?;
@@ -281,22 +352,55 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// # Examples
     ///
-    /// Get the next 5 pending transactions:
+    /// Get the next 5 pending transaction hashes:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     ///
     /// let poller = provider.watch_pending_transactions().await?;
     /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
     /// while let Some(tx_hash) = stream.next().await {
-    ///    println!("pending transaction: {tx_hash}");
+    ///    println!("new pending transaction hash: {tx_hash}");
     /// }
     /// # Ok(())
     /// # }
     /// ```
     async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
-        let id = self.new_pending_transactions_filter().await?;
+        let id = self.new_pending_transactions_filter(false).await?;
+        Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new pending transaction bodies by polling the provider with
+    /// [`eth_getFilterChanges`](Self::get_filter_changes).
+    ///
+    /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
+    /// details.
+    ///
+    /// # Support
+    ///
+    /// This endpoint might not be supported by all clients.
+    ///
+    /// # Examples
+    ///
+    /// Get the next 5 pending transaction bodies:
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    ///
+    /// let poller = provider.watch_full_pending_transactions().await?;
+    /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
+    /// while let Some(tx) = stream.next().await {
+    ///    println!("new pending transaction: {tx:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn watch_full_pending_transactions(
+        &self,
+    ) -> TransportResult<FilterPollerBuilder<T, N::TransactionResponse>> {
+        let id = self.new_pending_transactions_filter(true).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
 
@@ -311,7 +415,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Get the next 5 USDC transfer logs:
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_primitives::{address, b256};
     /// use alloy_rpc_types::Filter;
     /// use futures::StreamExt;
@@ -323,7 +427,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// let poller = provider.watch_logs(&filter).await?;
     /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
     /// while let Some(log) = stream.next().await {
-    ///    println!("{log:#?}");
+    ///    println!("new log: {log:#?}");
     /// }
     /// # Ok(())
     /// # }
@@ -342,14 +446,19 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().prepare("eth_newBlockFilter", ()).await
     }
 
-    /// Notify the provider that we are interested in new blocks.
+    /// Notify the provider that we are interested in new pending transactions.
+    ///
+    /// If `full` is `true`, the stream will consist of full transaction bodies instead of just the
+    /// hashes. This not supported by all clients.
     ///
     /// Returns the ID to use with [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
     /// See also [`watch_pending_transactions`](Self::watch_pending_transactions) to configure a
     /// poller.
-    async fn new_pending_transactions_filter(&self) -> TransportResult<U256> {
-        self.client().prepare("eth_newPendingTransactionFilter", ()).await
+    async fn new_pending_transactions_filter(&self, full: bool) -> TransportResult<U256> {
+        // NOTE: We don't want to send `false` as the client might not support it.
+        let param = if full { &[true][..] } else { &[] };
+        self.client().prepare("eth_newPendingTransactionFilter", param).await
     }
 
     /// Notify the provider that we are interested in logs that match the given filter.
