@@ -4,7 +4,7 @@ These examples demonstrate the main features of Alloy and how to use them.
 To run an example, use the command `cargo run --example <Example>`.
 
 ```sh
-cargo run --example mnemonic-signer
+cargo run --example mnemonic_signer
 ```
 
 ---
