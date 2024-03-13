@@ -4,7 +4,9 @@
 
 #![allow(unknown_lints, non_local_definitions)]
 
-use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+pub(crate) use alloc::vec::Vec;
+
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
 use core::mem;
