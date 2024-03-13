@@ -13,10 +13,9 @@ cargo run --example mnemonic
 
 - [ ] Address book
 - [ ] Anvil
-    - [x] Deploy contract
-    - [x] Fork
-    - [x] Local
-    - [ ] Testing
+    - [x] [Deploy contract](./anvil/examples/deploy_contract_anvil.rs)
+    - [x] [Fork](./anvil/examples/fork_anvil.rs)
+    - [x] [Local](./anvil/examples/local_anvil.rs)
 - [ ] Big numbers
     - [ ] Comparison and equivalence
     - [ ] Conversion
