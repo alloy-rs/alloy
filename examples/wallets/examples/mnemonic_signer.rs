@@ -2,9 +2,6 @@
 
 use alloy_signer::{coins_bip39::English, MnemonicBuilder};
 
-// NOTE: `rand` is not exported anymore, now private.
-use rand;
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let phrase = "work man father plunge mystery proud hollow address reunion sauce theory bonus";

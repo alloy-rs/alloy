@@ -10,6 +10,7 @@ use alloy_signer::{
     YubiWallet,
 };
 use alloy_transport_http::Http;
+use reqwest::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer = YubiWallet::connect(connector, Credentials::default(), 0);
 
     // Create a provider with the signer and the network.
-    let http = Http::new("http://localhost:8545".parse()?);
+    let http = Http::<Client>::new("http://localhost:8545".parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
         .signer(EthereumSigner::from(signer))
         .network::<Ethereum>()

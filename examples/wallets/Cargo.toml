@@ -29,5 +29,6 @@ alloy-sol-types.workspace = true
 alloy-transport-http.workspace = true
 
 rand.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

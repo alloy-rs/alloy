@@ -8,6 +8,7 @@ use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
 use alloy_signer::LocalWallet;
 use alloy_transport_http::Http;
+use reqwest::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bob: LocalWallet = anvil.keys()[1].clone().into();
 
     // Create a provider with a signer and the network.
-    let http = Http::new(anvil.endpoint().parse()?);
+    let http = Http::<Client>::new(anvil.endpoint().parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
         .signer(EthereumSigner::from(alice))
         .network::<Ethereum>()
