@@ -1,6 +1,6 @@
 use crate::{
+    layers::SignerLayer,
     new::{Provider, RootProvider},
-    SignerLayer,
 };
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
@@ -11,12 +11,15 @@ use std::marker::PhantomData;
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
 pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
+    /// The provider constructed by this layer.
     type Provider: Provider<N, T>;
 
+    /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
 }
 
 /// An identity layer that does nothing.
+#[derive(Debug, Clone, Copy)]
 pub struct Identity;
 
 impl<P, N, T> ProviderLayer<P, N, T> for Identity
@@ -32,6 +35,8 @@ where
     }
 }
 
+/// A stack of two providers.
+#[derive(Debug)]
 pub struct Stack<Inner, Outer> {
     inner: Inner,
     outer: Outer,
@@ -39,7 +44,7 @@ pub struct Stack<Inner, Outer> {
 
 impl<Inner, Outer> Stack<Inner, Outer> {
     /// Create a new `Stack`.
-    pub fn new(inner: Inner, outer: Outer) -> Self {
+    pub const fn new(inner: Inner, outer: Outer) -> Self {
         Stack { inner, outer }
     }
 }
@@ -67,6 +72,7 @@ where
 /// around maintaining the network and transport types.
 ///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
+#[derive(Debug)]
 pub struct ProviderBuilder<L, N = ()> {
     layer: L,
 
@@ -74,7 +80,8 @@ pub struct ProviderBuilder<L, N = ()> {
 }
 
 impl<N> ProviderBuilder<Identity, N> {
-    pub fn new() -> Self {
+    /// Create a new [`ProviderBuilder`].
+    pub const fn new() -> Self {
         ProviderBuilder { layer: Identity, network: PhantomData }
     }
 }
@@ -106,10 +113,7 @@ impl<L, N> ProviderBuilder<L, N> {
     ///
     /// See [`SignerLayer`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>> {
-        ProviderBuilder {
-            layer: Stack::new(SignerLayer::new(signer), self.layer),
-            network: PhantomData,
-        }
+        self.layer(SignerLayer::new(signer))
     }
 
     /// Change the network.

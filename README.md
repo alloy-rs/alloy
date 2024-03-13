@@ -26,7 +26,7 @@ This repository contains the following crates:
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
 - [`alloy-network`] - Network abstraction for RPC types
 - [`alloy-node-bindings`] - Ethereum execution-layer client bindings
-- [`alloy-providers`] - Interface with an Ethereum blockchain
+- [`alloy-provider`] - Interface with an Ethereum blockchain
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Ethereum JSON-RPC types
@@ -50,7 +50,7 @@ This repository contains the following crates:
 [`alloy-json-rpc`]: crates/json-rpc
 [`alloy-network`]: crates/network
 [`alloy-node-bindings`]: crates/node-bindings
-[`alloy-providers`]: crates/providers
+[`alloy-provider`]: crates/provider
 [`alloy-pubsub`]: crates/pubsub
 [`alloy-rpc-client`]: crates/rpc-client
 [`alloy-rpc-engine-types`]: crates/rpc-engine-types

@@ -20,7 +20,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod eth;
-pub mod serde_helpers;
 
+pub use alloy_serde as serde_helpers;
 pub use eth::*;
-pub use serde_helpers::*;

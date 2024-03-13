@@ -20,20 +20,21 @@ use std::marker::PhantomData;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::<_, Ethereum>::new()
-///     .layer(SignerLayer::new(EthereumSigner::from(signer)))
+///     .signer(EthereumSigner::from(signer))
 ///     .network::<Ethereum>()
 ///     .provider(RootProvider::new(transport));
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 /// ```
+#[derive(Debug)]
 pub struct SignerLayer<S> {
     signer: S,
 }
 
 impl<S> SignerLayer<S> {
     /// Creates a new signing layer with the given signer.
-    pub fn new(signer: S) -> Self {
+    pub const fn new(signer: S) -> Self {
         Self { signer }
     }
 }
@@ -54,13 +55,14 @@ where
 
 /// A locally-signing provider.
 ///
-/// Signs transactions locally using a [`NetworkSigner`]
+/// Signs transactions locally using a [`NetworkSigner`].
 ///
 /// # Note
 ///
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`SignerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
+#[derive(Debug)]
 pub struct SignerProvider<N, T, P, S>
 where
     N: Network,

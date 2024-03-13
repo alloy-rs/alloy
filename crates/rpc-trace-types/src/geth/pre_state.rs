@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_rpc_types::serde_helpers::num::from_int_or_hex_opt;
+use alloy_serde::num::from_int_or_hex_opt;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map, BTreeMap};
 

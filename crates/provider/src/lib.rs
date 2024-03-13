@@ -9,7 +9,7 @@
     // missing_debug_implementations,
     // missing_docs,
     unreachable_pub,
-    // clippy::missing_const_for_fn,
+    clippy::missing_const_for_fn,
     rustdoc::all
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
@@ -28,8 +28,7 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
-mod signer;
-pub use signer::{SignerLayer, SignerProvider};
+pub mod layers;
 
 mod chain;
 

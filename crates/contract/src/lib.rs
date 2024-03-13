@@ -35,6 +35,6 @@ pub use call::*;
 #[doc(hidden)]
 pub mod private {
     pub use alloy_network::Network;
-    pub use alloy_providers::Provider;
+    pub use alloy_provider::Provider;
     pub use alloy_transport::Transport;
 }

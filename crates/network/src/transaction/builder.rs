@@ -1,7 +1,6 @@
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256, U64};
-use async_trait::async_trait;
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
@@ -44,8 +43,6 @@ pub type BuilderResult<T, E = TransactionBuilderError> = std::result::Result<T, 
 ///
 /// Transaction builders should be able to construct all available transaction types on a given
 /// network.
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
@@ -196,5 +193,8 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn build_unsigned(self) -> BuilderResult<N::UnsignedTx>;
 
     /// Build a signed transaction.
-    async fn build<S: NetworkSigner<N>>(self, signer: &S) -> BuilderResult<N::TxEnvelope>;
+    fn build<S: NetworkSigner<N>>(
+        self,
+        signer: &S,
+    ) -> impl std::future::Future<Output = BuilderResult<N::TxEnvelope>> + Send;
 }

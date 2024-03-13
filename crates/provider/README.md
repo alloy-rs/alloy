@@ -1,4 +1,4 @@
-# alloy-providers
+# alloy-provider
 
 <!-- TODO: links, docs, examples, etc -->
 
