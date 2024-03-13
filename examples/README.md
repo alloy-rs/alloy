@@ -85,13 +85,13 @@ cargo run --example mnemonic
   - [ ] Transfer ETH
   - [ ] Transfer ERC20 token
 - [ ] Wallets
-  - [ ] AWS
-  - [ ] GCP
-  - [x] [Ledger](./wallets/examples/ledger.rs)
-  - [x] [Local](./wallets/examples/local.rs)
-  - [x] [Mnemonic](./wallets/examples/mnemonic.rs)
+  - [ ] AWS signer
+  - [ ] GCP signer
+  - [x] [Ledger signer](./wallets/examples/ledger_signer.rs)
+  - [x] [Private key signer](./wallets/examples/private_key_signer.rs)
+  - [x] [Mnemonic signer](./wallets/examples/mnemonic_signer.rs)
   - [x] [Sign message](./wallets/examples/sign_message.rs)
   - [x] [Sign permit hash](./wallets/examples/sign_permit_hash.rs)
-  - [x] [Trezor](./wallets/examples/trezor.rs)
-  - [x] [Yubi](./wallets/examples/yubi.rs)
-  - [ ] Keystore
+  - [x] [Trezor signer](./wallets/examples/trezor_signer.rs)
+  - [x] [Yubi signer](./wallets/examples/yubi_signer.rs)
+  - [ ] Keystore signer
