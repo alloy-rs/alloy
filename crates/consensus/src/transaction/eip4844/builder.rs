@@ -322,22 +322,14 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         self,
         settings: &KzgSettings,
     ) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
-        let commitments = self
-            .inner
-            .blobs
-            .iter()
-            .map(|blob| KzgCommitment::blob_to_kzg_commitment(blob, settings).map(|c| c.to_bytes()))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let proofs = self
-            .inner
-            .blobs
-            .iter()
-            .zip(commitments.iter())
-            .map(|(blob, commitment)| {
-                KzgProof::compute_blob_kzg_proof(blob, commitment, settings).map(|p| p.to_bytes())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut commitments = Vec::with_capacity(self.inner.blobs.len());
+        let mut proofs = Vec::with_capacity(self.inner.blobs.len());
+        for blob in self.inner.blobs.iter() {
+            let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
+            let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
+            commitments.push(commitment.to_bytes());
+            proofs.push(proof.to_bytes());
+        }
 
         Ok(crate::BlobTransactionSidecar { blobs: self.inner.blobs, commitments, proofs })
     }
