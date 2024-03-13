@@ -9,7 +9,7 @@ use std::borrow::Borrow;
 /// transport, or serde errors.
 ///
 /// The common cases are:
-/// - `Ok(T)` - The server returned a succesful response.
+/// - `Ok(T)` - The server returned a successful response.
 /// - `Err(RpcError::ErrorResponse(ErrResp))` - The server returned an error response.
 /// - `Err(RpcError::SerError(E))` - A serialization error occurred.
 /// - `Err(RpcError::DeserError { err: E, text: String })` - A deserialization error occurred.

@@ -1,8 +1,10 @@
-//! Block Hearbeat and Transaction Watcher
+//! Block heartbeat and pending transaction watcher.
 
+use crate::{Provider, RootProvider};
+use alloy_network::Network;
 use alloy_primitives::{B256, U256};
 use alloy_rpc_types::Block;
-use alloy_transport::{utils::Spawnable, TransportErrorKind, TransportResult};
+use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -15,9 +17,180 @@ use tokio::{
     sync::{mpsc, oneshot, watch},
 };
 
-/// A configuration object for watching for transaction confirmation.
-#[derive(Debug, Clone, Copy)]
-pub struct WatchConfig {
+/// A builder for configuring a pending transaction watcher.
+///
+/// # Examples
+///
+/// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
+///
+/// ```no_run
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// // Send a transaction, and configure the pending transaction.
+/// let builder = provider.send_transaction(tx)
+///     .await?
+///     .with_confirmations(2)
+///     .with_timeout(Some(std::time::Duration::from_secs(60)));
+/// // Register the pending transaction with the provider.
+/// let pending_tx = builder.register().await?;
+/// // Wait for the transaction to be confirmed 2 times.
+/// let tx_hash = pending_tx.await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// This can also be more concisely written using `watch`:
+/// ```no_run
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// let tx_hash = provider.send_transaction(tx)
+///     .await?
+///     .with_confirmations(2)
+///     .with_timeout(Some(std::time::Duration::from_secs(60)))
+///     .watch()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
+#[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
+#[derive(Debug)]
+pub struct PendingTransactionBuilder<'a, N, T> {
+    config: PendingTransactionConfig,
+    provider: &'a RootProvider<N, T>,
+}
+
+impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
+    /// Creates a new pending transaction builder.
+    pub const fn new(provider: &'a RootProvider<N, T>, tx_hash: B256) -> Self {
+        Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
+    }
+
+    /// Creates a new pending transaction builder from the given configuration.
+    pub const fn from_config(
+        provider: &'a RootProvider<N, T>,
+        config: PendingTransactionConfig,
+    ) -> Self {
+        Self { config, provider }
+    }
+
+    /// Returns the inner configuration.
+    pub const fn inner(&self) -> &PendingTransactionConfig {
+        &self.config
+    }
+
+    /// Consumes this builder, returning the inner configuration.
+    pub const fn into_inner(self) -> PendingTransactionConfig {
+        self.config
+    }
+
+    /// Returns the provider.
+    pub const fn provider(&self) -> &'a RootProvider<N, T> {
+        self.provider
+    }
+
+    /// Consumes this builder, returning the provider and the configuration.
+    pub const fn split(self) -> (&'a RootProvider<N, T>, PendingTransactionConfig) {
+        (self.provider, self.config)
+    }
+
+    /// Returns the transaction hash.
+    pub const fn tx_hash(&self) -> &B256 {
+        self.config.tx_hash()
+    }
+
+    /// Sets the transaction hash.
+    pub fn set_tx_hash(&mut self, tx_hash: B256) {
+        self.config.set_tx_hash(tx_hash);
+    }
+
+    /// Sets the transaction hash.
+    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+        self.config.tx_hash = tx_hash;
+        self
+    }
+
+    /// Returns the number of confirmations to wait for.
+    pub const fn confirmations(&self) -> u64 {
+        self.config.confirmations()
+    }
+
+    /// Sets the number of confirmations to wait for.
+    pub fn set_confirmations(&mut self, confirmations: u64) {
+        self.config.set_confirmations(confirmations);
+    }
+
+    /// Sets the number of confirmations to wait for.
+    pub const fn with_confirmations(mut self, confirmations: u64) -> Self {
+        self.config.confirmations = confirmations;
+        self
+    }
+
+    /// Returns the timeout.
+    pub const fn timeout(&self) -> Option<Duration> {
+        self.config.timeout()
+    }
+
+    /// Sets the timeout.
+    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+        self.config.set_timeout(timeout);
+    }
+
+    /// Sets the timeout.
+    pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.config.timeout = timeout;
+        self
+    }
+
+    /// Registers the watching configuration with the provider.
+    ///
+    /// This does not wait for the transaction to be confirmed, but returns a [`PendingTransaction`]
+    /// that can be awaited at a later moment.
+    ///
+    /// See:
+    /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
+    /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
+    ///   confirmed.
+    #[doc(alias = "build")]
+    pub async fn register(self) -> TransportResult<PendingTransaction> {
+        self.provider.watch_pending_transaction(self.config).await
+    }
+
+    /// Waits for the transaction to confirm with the given number of confirmations.
+    ///
+    /// See:
+    /// - [`register`](Self::register): for registering the transaction without waiting for it to be
+    ///   confirmed.
+    /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
+    ///   confirmed.
+    pub async fn watch(self) -> TransportResult<B256> {
+        self.register().await?.await
+    }
+
+    /// Waits for the transaction to confirm with the given number of confirmations, and
+    /// then fetches its receipt.
+    ///
+    /// Note that this method will call `eth_getTransactionReceipt` on the [**root
+    /// provider**](RootProvider), and not on a specific network provider. This means that any
+    /// overrides or customizations made to the network provider will not be used.
+    ///
+    /// See:
+    /// - [`register`](Self::register): for registering the transaction without waiting for it to be
+    ///   confirmed.
+    /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
+    pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
+        let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
+        let hash = pending_tx.await?;
+        let receipt = self.provider.get_transaction_receipt(hash).await?;
+        receipt.ok_or_else(TransportErrorKind::missing_receipt)
+    }
+}
+
+/// Configuration for watching a pending transaction.
+///
+/// This type can be used to create a [`PendingTransactionBuilder`], but in general it is only used
+/// internally.
+#[must_use = "this type does nothing unless you call `with_provider`"]
+#[derive(Clone, Debug)]
+#[allow(missing_copy_implementations)]
+pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
 
@@ -28,37 +201,71 @@ pub struct WatchConfig {
     timeout: Option<Duration>,
 }
 
-impl WatchConfig {
+impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
     pub const fn new(tx_hash: B256) -> Self {
         Self { tx_hash, confirmations: 0, timeout: None }
     }
 
-    /// Set the number of confirmations to wait for.
+    /// Returns the transaction hash.
+    pub const fn tx_hash(&self) -> &B256 {
+        &self.tx_hash
+    }
+
+    /// Sets the transaction hash.
+    pub fn set_tx_hash(&mut self, tx_hash: B256) {
+        self.tx_hash = tx_hash;
+    }
+
+    /// Sets the transaction hash.
+    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+        self.tx_hash = tx_hash;
+        self
+    }
+
+    /// Returns the number of confirmations to wait for.
+    pub const fn confirmations(&self) -> u64 {
+        self.confirmations
+    }
+
+    /// Sets the number of confirmations to wait for.
     pub fn set_confirmations(&mut self, confirmations: u64) {
         self.confirmations = confirmations;
     }
 
-    /// Set the number of confirmations to wait for.
+    /// Sets the number of confirmations to wait for.
     pub const fn with_confirmations(mut self, confirmations: u64) -> Self {
         self.confirmations = confirmations;
         self
     }
 
-    /// Set the timeout for the transaction.
-    pub fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = Some(timeout);
+    /// Returns the timeout.
+    pub const fn timeout(&self) -> Option<Duration> {
+        self.timeout
     }
 
-    /// Set the timeout for the transaction.
-    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
+    /// Sets the timeout.
+    pub fn set_timeout(&mut self, timeout: Option<Duration>) {
+        self.timeout = timeout;
+    }
+
+    /// Sets the timeout.
+    pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
         self
+    }
+
+    /// Wraps this configuration with a provider to expose watching methods.
+    pub const fn with_provider<N: Network, T: Transport + Clone>(
+        self,
+        provider: &RootProvider<N, T>,
+    ) -> PendingTransactionBuilder<'_, N, T> {
+        PendingTransactionBuilder::from_config(provider, self)
     }
 }
 
 struct TxWatcher {
-    config: WatchConfig,
+    config: PendingTransactionConfig,
     tx: oneshot::Sender<()>,
 }
 
@@ -70,7 +277,11 @@ impl TxWatcher {
     }
 }
 
-/// A pending transaction that can be awaited.
+/// Represents a transaction that is yet to be confirmed a specified number of times.
+///
+/// This struct is a future created by [`PendingTransactionBuilder`] that resolves to the
+/// transaction hash once the underlying transaction has been confirmed the specified number of
+/// times in the network.
 pub struct PendingTransaction {
     /// The transaction hash.
     pub(crate) tx_hash: B256,
@@ -106,7 +317,7 @@ impl Future for PendingTransaction {
 }
 
 /// A handle to the heartbeat task.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
     #[allow(dead_code)]
@@ -117,8 +328,8 @@ impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
     pub(crate) async fn watch_tx(
         &self,
-        config: WatchConfig,
-    ) -> Result<PendingTransaction, WatchConfig> {
+        config: PendingTransactionConfig,
+    ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
         match self.tx.send(TxWatcher { config, tx }).await {

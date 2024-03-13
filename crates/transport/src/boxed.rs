@@ -6,7 +6,7 @@ use tower::Service;
 /// A boxed, Clone-able [`Transport`] trait object.
 ///
 /// This type allows RPC clients to use a type-erased transport. It is
-/// [`Clone`] and [`Send`] + [`Sync`], and implementes [`Transport`]. This
+/// [`Clone`] and [`Send`] + [`Sync`], and implements [`Transport`]. This
 /// allows for complex behavior abstracting across several different clients
 /// with different transport types.
 ///
@@ -25,6 +25,11 @@ impl BoxTransport {
     pub fn new<T: Transport + Clone + Send + Sync>(inner: T) -> Self {
         Self { inner: Box::new(inner) }
     }
+
+    /// Returns a reference to the inner transport.
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self.inner.as_any()
+    }
 }
 
 impl fmt::Debug for BoxTransport {
@@ -40,8 +45,9 @@ impl Clone for BoxTransport {
 }
 
 /// Helper trait for constructing [`BoxTransport`].
-trait CloneTransport: Transport {
+trait CloneTransport: Transport + std::any::Any {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync>;
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T> CloneTransport for T
@@ -50,6 +56,10 @@ where
 {
     fn clone_box(&self) -> Box<dyn CloneTransport + Send + Sync> {
         Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

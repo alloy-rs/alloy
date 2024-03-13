@@ -1,7 +1,6 @@
-use crate::{PendingTransaction, Provider, ProviderLayer};
+use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{Address, B256, U64};
-use alloy_rpc_client::{ClientRef, WeakClient};
+use alloy_primitives::{Address, U64};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -112,22 +111,15 @@ where
     T: Transport + Clone,
     P: Provider<N, T>,
 {
-    fn client(&self) -> ClientRef<'_, T> {
-        self.inner.client()
-    }
-
-    fn weak_client(&self) -> WeakClient<T> {
-        self.inner.weak_client()
-    }
-
-    async fn new_pending_transaction(&self, tx_hash: B256) -> TransportResult<PendingTransaction> {
-        self.inner.new_pending_transaction(tx_hash).await
+    #[inline]
+    fn root(&self) -> &RootProvider<N, T> {
+        self.inner.root()
     }
 
     async fn send_transaction(
         &self,
         mut tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
         if tx.nonce().is_none() {
             if let Some(from) = tx.from() {
                 tx.set_nonce(self.get_next_nonce(from).await?);
@@ -141,7 +133,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, RootProvider};
+    use crate::ProviderBuilder;
     use alloy_network::{Ethereum, EthereumSigner};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, U256};
@@ -201,12 +193,12 @@ mod tests {
         };
 
         let pending = provider.send_transaction(tx.clone()).await.unwrap();
-        let tx_hash = pending.await.unwrap();
+        let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce, U64::from(0));
 
         let pending = provider.send_transaction(tx).await.unwrap();
-        let tx_hash = pending.await.unwrap();
+        let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce, U64::from(1));
     }
