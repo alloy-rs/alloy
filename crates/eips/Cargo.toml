@@ -37,4 +37,4 @@ std = [
     "serde/std",
 ]
 serde = ["dep:serde", "alloy-primitives/serde"]
-arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
