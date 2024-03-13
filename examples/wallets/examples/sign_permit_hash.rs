@@ -37,10 +37,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         deadline: U256::from(0),
     };
 
-    // Hash typed structured data according to EIP-712.
+    // Derive the EIP-712 signing hash.
     let hash = permit.eip712_signing_hash(&domain);
 
-    // Sign the hash with the wallet.
+    // Sign the hash asynchronously with the wallet.
     let signature = wallet.sign_typed_data(&permit, &domain).await?;
 
     println!(

@@ -1,6 +1,6 @@
 //! Message Sign Example
 
-use alloy_signer::{LocalWallet, Signer, SignerSync};
+use alloy_signer::{LocalWallet, Signer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,16 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The message to sign.
     let message = b"hello";
 
-    // Sign message synchronously from the wallet and print out signature produced.
-    let signature = wallet.sign_message_sync(message)?;
-
-    println!("Signature produced by {:?}: {:?}", wallet.address(), signature);
-    println!(
-        "Signature recovered address: {:?}",
-        signature.recover_address_from_msg(&message[..]).unwrap()
-    );
-
-    // Sign message asynchronously from the wallet and print out signature produced.
+    // Sign the message asynchronously with the wallet.
     let signature = wallet.sign_message(message).await?;
 
     println!("Signature produced by {:?}: {:?}", wallet.address(), signature);

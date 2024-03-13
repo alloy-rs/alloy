@@ -5,7 +5,7 @@ use alloy_primitives::{address, U256};
 use alloy_providers::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
-use alloy_signer_trezor::{TrezorHDPath, TrezorSigner}; // NOTE: `TrezorHDPath` => `HDPath`
+use alloy_signer_trezor::{TrezorHDPath, TrezorSigner};
 use alloy_transport_http::Http;
 
 #[tokio::main]
