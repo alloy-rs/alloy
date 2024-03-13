@@ -24,6 +24,8 @@ sol! {
     #[sol(rpc)] // <-- Important! Generates the `MyContract` struct and function methods.
     #[sol(bytecode = "0x1234")] // <-- Generates the `BYTECODE` static and the `deploy` method.
     contract MyContract {
+        constructor(address) {} // The `deploy` method will also include any constructor arguments.
+
         #[derive(Debug)]
         function doStuff(uint a, bool b) public payable returns(address c, bytes32 d);
     }
@@ -34,7 +36,8 @@ let provider = RootProvider::<Ethereum, _>::new_http("http://localhost:8545".par
 
 // If `#[sol(bytecode = "0x...")]` is provided, the contract can be deployed with `MyContract::deploy`,
 // and a new instance will be created.
-let contract = MyContract::deploy(&provider).await?;
+let constructor_arg = Address::ZERO;
+let contract = MyContract::deploy(&provider, constructor_arg).await?;
 
 // Otherwise, or if already deployed, a new contract instance can be created with `MyContract::new`.
 let address = Address::ZERO;
