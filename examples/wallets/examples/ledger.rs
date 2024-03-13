@@ -1,4 +1,4 @@
-//! Ledger Wallet Example
+//! Example of signing and sending a transaction using a Ledger device.
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_primitives::{address, U256};

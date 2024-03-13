@@ -1,4 +1,4 @@
-//! Yubi Wallet Example
+//! Example of signing and sending a transaction using a Yubi device.
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_primitives::{address, U256};

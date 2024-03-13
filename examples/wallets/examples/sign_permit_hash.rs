@@ -1,4 +1,4 @@
-//! Permit Hash Signing Example
+//! Example of signing a permit hash using a wallet.
 
 use alloy_primitives::{address, keccak256, U256};
 use alloy_signer::{LocalWallet, Signer};

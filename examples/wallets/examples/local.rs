@@ -1,4 +1,4 @@
-//! Local Wallet Example
+//! Example of using a local wallet to sign and broadcast a transaction on a local Anvil node.
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_node_bindings::Anvil;
