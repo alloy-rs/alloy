@@ -35,6 +35,15 @@ impl RpcClient<Identity> {
     }
 }
 
+impl RpcClient<Http<reqwest::Client>> {
+    /// Create a new [`RpcClient`] with an HTTP transport.
+    pub fn new_http(url: reqwest::Url) -> Self {
+        let http = Http::new(url);
+        let is_local = http.guess_local();
+        Self::new(http, is_local)
+    }
+}
+
 impl<T> RpcClient<T> {
     /// Creates a new [`RpcClient`] with the given transport.
     pub fn new(t: T, is_local: bool) -> Self {

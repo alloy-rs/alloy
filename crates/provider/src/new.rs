@@ -21,6 +21,7 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
     fmt,
@@ -52,6 +53,13 @@ impl<N, T> Clone for RootProvider<N, T> {
 impl<N, T: fmt::Debug> fmt::Debug for RootProvider<N, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
+    }
+}
+
+impl<N: Network> RootProvider<N, Http<reqwest::Client>> {
+    /// Creates a new HTTP root provider from the given URL.
+    pub fn new_http(url: reqwest::Url) -> Self {
+        Self::new(RpcClient::new_http(url))
     }
 }
 
