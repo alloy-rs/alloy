@@ -2,8 +2,15 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
+#[cfg(not(feature = "std"))]
+use crate::alloc::{vec, vec::Vec};
+
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{BufMut, Header, EMPTY_STRING_CODE};
+use core::{
+    fmt,
+    fmt::{Display, Formatter},
+};
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;
@@ -11,18 +18,31 @@ const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
-    #[error(transparent)]
-    RlpError(#[from] alloy_rlp::Error),
+    RlpError(alloy_rlp::Error),
     /// Got an unexpected type flag while decoding.
-    #[error("Unexpected type flag. Got {0}.")]
     UnexpectedType(u8),
-    /// Some other error occurred.
-    #[error(transparent)]
-    Custom(#[from] Box<dyn std::error::Error>),
 }
+
+impl Display for Eip2718Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RlpError(err) => write!(f, "{err}"),
+            Self::UnexpectedType(t) => write!(f, "Unexpected type flag. Got {t}."),
+        }
+    }
+}
+
+impl From<alloy_rlp::Error> for Eip2718Error {
+    fn from(err: alloy_rlp::Error) -> Self {
+        Self::RlpError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Eip2718Error {}
 
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
