@@ -21,7 +21,7 @@ use alloy_provider::RootProvider;
 use alloy_sol_types::sol;
 
 sol! {
-    #[sol(rpc)] // <-- Important! Generates the `MyContract` struct and function methods.
+    #[sol(rpc)] // <-- Important! Generates the necessary `MyContract` struct and function methods.
     #[sol(bytecode = "0x1234")] // <-- Generates the `BYTECODE` static and the `deploy` method.
     contract MyContract {
         constructor(address) {} // The `deploy` method will also include any constructor arguments.
