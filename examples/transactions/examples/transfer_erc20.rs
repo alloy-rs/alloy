@@ -35,9 +35,10 @@ async fn main() -> Result<()> {
 
     let pending_tx = provider.send_transaction(transfer_tx).await?;
 
-    let tx_hash = pending_tx.tx_hash().to_owned();
+    println!("Transfer tx: {:?}", pending_tx.tx_hash());
 
-    let _tx = provider.get_transaction_by_hash(tx_hash).await?;
+    // Wait for confirmation
+    let _ = pending_tx.with_confirmations(1);
 
     let to_bal = balance_of(&provider, to, contract_address).await?;
     let from_bal = balance_of(&provider, from, contract_address).await?;
