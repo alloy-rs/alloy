@@ -886,24 +886,16 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.client().prepare("trace_block", (block,)).await
     }
-}
 
-/// Extension trait for Anvil specific JSON-RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait AnvilProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
+    /* ------------------------------------------ anvil ----------------------------------------- */
+
     /// Set the bytecode of a given account.
     async fn set_code(&self, address: Address, code: &str) -> TransportResult<()> {
         self.client().prepare("anvil_setCode", (address, code)).await
     }
-}
 
-impl<P, N: Network, T: Transport + Clone> AnvilProvider<N, T> for P where P: Provider<N, T> {}
+    /* ---------------------------------------- raw calls --------------------------------------- */
 
-/// Extension trait for raw RPC requests.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait RawProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
     /// Sends a raw JSON-RPC request.
     async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
     where
@@ -923,8 +915,6 @@ pub trait RawProvider<N: Network, T: Transport + Clone = BoxTransport>: Provider
         self.client().prepare(method, params).await
     }
 }
-
-impl<P, N: Network, T: Transport + Clone> RawProvider<N, T> for P where P: Provider<N, T> {}
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -998,25 +988,6 @@ mod tests {
         let boxed_boxdyn = Box::new(boxed) as Box<dyn Provider<Ethereum>>;
         let num = boxed_boxdyn.get_block_number().await.unwrap();
         assert_eq!(0, num);
-    }
-
-    #[test]
-    fn object_safety_types() {
-        fn is_provider<N: Network, T: Transport + Clone, P: Provider<N, T>>() {}
-        fn is_raw_provider<N: Network, T: Transport + Clone, P: RawProvider<N, T>>() {}
-        fn is_anvil_provider<N: Network, T: Transport + Clone, P: AnvilProvider<N, T>>() {}
-
-        is_provider::<_, _, Box<dyn Provider<Ethereum>>>();
-        is_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
-        is_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
-
-        is_raw_provider::<_, _, Box<dyn Provider<Ethereum>>>();
-        is_raw_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
-        is_raw_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
-
-        is_anvil_provider::<_, _, Box<dyn Provider<Ethereum>>>();
-        is_anvil_provider::<_, _, Box<dyn AnvilProvider<Ethereum>>>();
-        is_anvil_provider::<_, _, Box<dyn RawProvider<Ethereum>>>();
     }
 
     #[cfg(feature = "ws")]
@@ -1112,8 +1083,6 @@ mod tests {
 
     #[tokio::test]
     async fn gets_block_number_with_raw_req() {
-        use super::RawProvider;
-
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 
@@ -1151,8 +1120,6 @@ mod tests {
 
     #[tokio::test]
     async fn gets_block_by_hash_with_raw_req() {
-        use super::RawProvider;
-
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 

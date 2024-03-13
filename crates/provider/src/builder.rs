@@ -1,7 +1,4 @@
-use crate::{
-    layers::SignerLayer,
-    new::{Provider, RootProvider},
-};
+use crate::{layers::SignerLayer, Provider, RootProvider};
 use alloy_network::Network;
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
