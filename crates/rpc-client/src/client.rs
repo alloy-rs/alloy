@@ -35,6 +35,7 @@ impl RpcClient<Identity> {
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl RpcClient<Http<reqwest::Client>> {
     /// Create a new [`RpcClient`] with an HTTP transport.
     pub fn new_http(url: reqwest::Url) -> Self {
