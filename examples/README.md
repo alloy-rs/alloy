@@ -1,5 +1,16 @@
 # Examples
 
+These examples demonstrate the main features of Alloy and how to use them. 
+To run an example, use the command `cargo run --example <Example>`.
+
+```sh
+cargo run --example mnemonic
+```
+
+---
+
+## Table of Contents
+
 - [ ] Address book
 - [ ] Anvil
     - [ ] Boot anvil
@@ -76,11 +87,11 @@
 - [ ] Wallets
   - [ ] AWS
   - [ ] GCP
-  - [x] Mnemonic
-  - [x] Ledger
-  - [x] Local
-  - [x] Permit hash
-  - [x] Sign message
-  - [x] Trezor
-  - [x] Yubi
+  - [x] [Ledger](./wallets/examples/ledger.rs)
+  - [x] [Local](./wallets/examples/local.rs)
+  - [x] [Mnemonic](./wallets/examples/mnemonic.rs)
+  - [x] [Sign message](./wallets/examples/sign_message.rs)
+  - [x] [Sign permit hash](./wallets/examples/sign_permit_hash.rs)
+  - [x] [Trezor](./wallets/examples/trezor.rs)
+  - [x] [Yubi](./wallets/examples/yubi.rs)
   - [ ] Keystore
