@@ -1,0 +1,18 @@
+[package]
+name = "examples-anvil"
+publish = false
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dev-dependencies]
+alloy-contract = { workspace = true }
+alloy-node-bindings = { workspace = true }
+
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

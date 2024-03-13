@@ -13,9 +13,9 @@ cargo run --example mnemonic
 
 - [ ] Address book
 - [ ] Anvil
-    - [ ] Boot anvil
+    - [x] Boot anvil
     - [ ] Deploy contracts
-    - [ ] Fork
+    - [x] Fork
     - [ ] Testing
 - [ ] Big numbers
     - [ ] Comparison and equivalence
