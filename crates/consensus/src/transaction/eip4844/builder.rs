@@ -62,7 +62,7 @@ impl PartialSidecar {
         self.fe == 0
     }
 
-    /// Push an empty blob to the builder, and reset the unused counter.
+    /// Push an empty blob to the builder.
     fn push_empty_blob(&mut self) {
         self.blobs.push(Blob::new([0u8; BYTES_PER_BLOB]));
     }
@@ -80,12 +80,8 @@ impl PartialSidecar {
     }
 
     /// Get the index of the first unused field element in the current blob.
-    const fn first_unused_fe_index_in_current_blob(&self) -> Option<usize> {
-        if self.fe_in_current_blob() as u64 == FIELD_ELEMENTS_PER_BLOB {
-            None
-        } else {
-            Some(self.fe_in_current_blob())
-        }
+    const fn first_unused_fe_index_in_current_blob(&self) -> usize {
+        self.fe_in_current_blob()
     }
 
     /// Get a mutable reference to the current blob.
@@ -101,10 +97,7 @@ impl PartialSidecar {
 
     /// Get a mutable reference to the next unused field element.
     fn next_unused_fe_mut(&mut self) -> &mut [u8] {
-        if self.first_unused_fe_index_in_current_blob().is_none() {
-            self.push_empty_blob();
-        }
-        self.fe_at_mut(self.first_unused_fe_index_in_current_blob().expect(""))
+        self.fe_at_mut(self.first_unused_fe_index_in_current_blob())
     }
 
     /// Ingest a field element into the current blobs.
@@ -113,6 +106,7 @@ impl PartialSidecar {
     ///
     /// If there are not enough free FEs to encode the data.
     pub fn ingest_valid_fe(&mut self, data: WholeFe<'_>) {
+        self.alloc_fes(1);
         self.next_unused_fe_mut().copy_from_slice(data.as_ref());
         self.fe += 1;
     }
