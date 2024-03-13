@@ -57,6 +57,12 @@ pub enum TxEip4844Variant {
     TxEip4844WithSidecar(TxEip4844WithSidecar),
 }
 
+impl From<TxEip4844WithSidecar> for TxEip4844Variant {
+    fn from(tx: TxEip4844WithSidecar) -> Self {
+        TxEip4844Variant::TxEip4844WithSidecar(tx)
+    }
+}
+
 impl From<TxEip4844> for TxEip4844Variant {
     fn from(tx: TxEip4844) -> Self {
         TxEip4844Variant::TxEip4844(tx)
@@ -121,33 +127,61 @@ impl TxEip4844Variant {
         let payload_length = match self {
             TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
             TxEip4844Variant::TxEip4844WithSidecar(tx) => {
-                tx.tx().fields_len() + signature.rlp_vrs_len()
+                let payload_length = tx.tx().fields_len() + signature.rlp_vrs_len();
+                let inner_header = Header { list: true, payload_length };
+                inner_header.length() + payload_length + tx.sidecar().fields_len()
             }
         };
 
         if with_header {
             Header {
                 list: false,
-                payload_length: 1 + length_of_length(payload_length) + payload_length,
+                payload_length: 1
+                    + Header { list: false, payload_length }.length()
+                    + payload_length,
             }
             .encode(out);
         }
         out.put_u8(self.tx_type() as u8);
 
-        let header = Header { list: true, payload_length };
-        header.encode(out);
-
         match self {
             TxEip4844Variant::TxEip4844(tx) => {
-                tx.encode_fields(out);
-                signature.encode(out);
+                tx.encode_with_signature_fields(signature, out);
             }
             TxEip4844Variant::TxEip4844WithSidecar(tx) => {
-                tx.tx().encode_fields(out);
-                signature.encode(out);
-                tx.sidecar().encode_inner(out);
+                tx.encode_with_signature_fields(signature, out);
             }
         }
+    }
+
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let mut current_buf = *buf;
+        let _header = Header::decode(&mut current_buf)?;
+
+        // There are two possibilities when decoding a signed EIP-4844 transaction:
+        // If it's a historical transaction, it will only have the transaction fields, and no
+        // sidecar. If it's a transaction received during the gossip stage or sent through
+        // eth_sendRawTransaction, it will have the transaction fields and a sidecar.
+        //
+        // To disambiguate, we try to decode two list headers. If there is only one list header, we
+        // assume it's a historical transaction. If there are two, we know the transaction contains
+        // a sidecar.
+        let header = Header::decode(&mut current_buf)?;
+        if header.list {
+            let tx = TxEip4844WithSidecar::decode_signed_fields(buf)?;
+            let (tx, signature, hash) = tx.into_parts();
+            return Ok(Signed::new_unchecked(
+                TxEip4844Variant::TxEip4844WithSidecar(tx),
+                signature,
+                hash,
+            ));
+        }
+
+        // Since there is not a second list header, this is a historical 4844 transaction without a
+        // sidecar.
+        let tx = TxEip4844::decode_signed_fields(buf)?;
+        let (tx, signature, hash) = tx.into_parts();
+        Ok(Signed::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash))
     }
 }
 
@@ -221,40 +255,14 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
         let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
         let mut buf = Vec::with_capacity(payload_length);
         buf.put_u8(TxType::Eip4844 as u8);
-        self.encode_signed(&signature, &mut buf);
+        // we use the inner tx to encode the fields
+        self.tx().encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
         // Drop any v chain id value to ensure the signature format is correct at the time of
         // combination for an EIP-4844 transaction. V should indicate the y-parity of the
         // signature.
         Signed::new_unchecked(self, signature.with_parity_bool(), hash)
-    }
-
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let tx = TxEip4844::decode_inner(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        // There are two possibilities when decoding a signed EIP-4844 transaction:
-        // If it's a historical transaction, it will only have the transaction fields, and no
-        // sidecar. If it's a transaction received during the gossip stage or sent through
-        // eth_sendRawTransaction, it will have the transaction fields and a sidecar.
-        // To disambiguate, we try to decode the sidecar in all instances, and if it fails, we
-        // assume it's a historical transaction.
-        let sidecar = BlobTransactionSidecar::decode_inner(buf);
-
-        if let Ok(sidecar) = sidecar {
-            Ok(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar::from_tx_and_sidecar(
-                tx, sidecar,
-            ))
-            .into_signed(signature))
-        } else {
-            Ok(TxEip4844Variant::TxEip4844(tx).into_signed(signature))
-        }
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -264,10 +272,6 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
         //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
         //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
         self.tx().encode_for_signing(out);
-    }
-
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        Self::encode_with_signature(self, signature, out, true);
     }
 }
 
@@ -439,7 +443,7 @@ impl TxEip4844 {
     /// - `access_list`
     /// - `max_fee_per_blob_gas`
     /// - `blob_versioned_hashes`
-    pub fn decode_inner(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    pub fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
             nonce: Decodable::decode(buf)?,
@@ -503,17 +507,94 @@ impl TxEip4844 {
         mem::size_of::<u128>() // max_fee_per_data_gas
     }
 
-    /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
-    pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
-        let len = self.payload_len_with_signature_without_header(signature);
-        length_of_length(len) + len
+    /// Returns what the encoded length should be, if the transaction were RLP encoded with the
+    /// given signature, depending on the value of `with_header`.
+    ///
+    /// If `with_header` is `true`, the payload length will include the RLP header length.
+    /// If `with_header` is `false`, the payload length will not include the RLP header length.
+    pub(crate) fn encoded_len_with_signature(
+        &self,
+        signature: &Signature,
+        with_header: bool,
+    ) -> usize {
+        // this counts the tx fields and signature fields
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+
+        // this counts:
+        // * tx type byte
+        // * inner header length
+        // * inner payload length
+        let inner_payload_length =
+            1 + Header { list: true, payload_length }.length() + payload_length;
+
+        if with_header {
+            // header length plus length of the above, wrapped with a string header
+            Header { list: false, payload_length: inner_payload_length }.length()
+                + inner_payload_length
+        } else {
+            inner_payload_length
+        }
     }
 
-    /// Output the length of the RLP signed transaction encoding, _without_ a RLP header.
-    pub fn payload_len_with_signature_without_header(&self, signature: &Signature) -> usize {
+    /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
+    /// hash that for eip2718 does not require a rlp header
+    pub(crate) fn encode_with_signature(
+        &self,
+        signature: &Signature,
+        out: &mut dyn BufMut,
+        with_header: bool,
+    ) {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
+        if with_header {
+            Header {
+                list: false,
+                payload_length: 1 + Header { list: true, payload_length }.length() + payload_length,
+            }
+            .encode(out);
+        }
+        out.put_u8(self.tx_type() as u8);
+        self.encode_with_signature_fields(signature, out);
+    }
+
+    /// Encodes the transaction from RLP bytes, including the signature. This __does not__ encode a
+    /// tx type byte or string header.
+    ///
+    /// This __does__ encode a list header and include a signature.
+    pub(crate) fn encode_with_signature_fields(&self, signature: &Signature, out: &mut dyn BufMut) {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        let header = Header { list: true, payload_length };
+        header.encode(out);
+        self.encode_fields(out);
+        signature.write_rlp_vrs(out);
+    }
+
+    /// Decodes the transaction from RLP bytes, including the signature.
+    ///
+    /// This __does not__ expect the bytes to start with a transaction type byte or string
+    /// header.
+    ///
+    /// This __does__ expect the bytes to start with a list header and include a signature.
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        // record original length so we can check encoding
+        let original_len = buf.len();
+
+        let tx = Self::decode_fields(buf)?;
+        let signature = Signature::decode_rlp_vrs(buf)?;
+
+        let signed = tx.into_signed(signature);
+        if buf.len() + header.payload_length != original_len {
+            return Err(alloy_rlp::Error::ListLengthMismatch {
+                expected: header.payload_length,
+                got: original_len - buf.len(),
+            });
+        }
+
+        Ok(signed)
     }
 
     /// Get transaction type
@@ -538,7 +619,32 @@ impl TxEip4844 {
     pub fn payload_len_for_signature(&self) -> usize {
         let payload_length = self.fields_len();
         // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
+        1 + Header { list: true, payload_length }.length() + payload_length
+    }
+}
+
+impl SignableTransaction<Signature> for TxEip4844 {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        self.payload_len_for_signature()
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self> {
+        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
+        self.encode_with_signature(&signature, &mut buf, false);
+        let hash = keccak256(&buf);
+
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.encode_for_signing(out);
     }
 }
 
@@ -593,7 +699,7 @@ impl Decodable for TxEip4844 {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::decode_inner(data)
+        Self::decode_fields(data)
     }
 }
 
@@ -660,6 +766,112 @@ impl TxEip4844WithSidecar {
     /// [BlobTransactionSidecar].
     pub fn into_parts(self) -> (TxEip4844, BlobTransactionSidecar) {
         (self.tx, self.sidecar)
+    }
+
+    /// Encodes the transaction from RLP bytes, including the signature. This __does not__ encode a
+    /// tx type byte or string header.
+    ///
+    /// This __does__ encode a list header and include a signature.
+    ///
+    /// This encodes the following:
+    /// `rlp([tx_payload, blobs, commitments, proofs])`
+    ///
+    /// where `tx_payload` is the RLP encoding of the [TxEip4844] transaction fields:
+    /// `rlp([chain_id, nonce, max_priority_fee_per_gas, ..., v, r, s])`
+    pub(crate) fn encode_with_signature_fields(&self, signature: &Signature, out: &mut dyn BufMut) {
+        let inner_payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
+        let inner_header = Header { list: true, payload_length: inner_payload_length };
+
+        let outer_payload_length =
+            inner_header.length() + inner_payload_length + self.sidecar.fields_len();
+        let outer_header = Header { list: true, payload_length: outer_payload_length };
+
+        // write the two headers
+        outer_header.encode(out);
+        inner_header.encode(out);
+
+        // now write the fields
+        self.tx.encode_fields(out);
+        signature.write_rlp_vrs(out);
+        self.sidecar.encode_inner(out);
+    }
+
+    /// Decodes the transaction from RLP bytes, including the signature.
+    ///
+    /// This __does not__ expect the bytes to start with a transaction type byte or string
+    /// header.
+    ///
+    /// This __does__ expect the bytes to start with a list header and include a signature.
+    ///
+    /// This is the inverse of [TxEip4844WithSidecar::encode_with_signature_fields].
+    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+
+        // record original length so we can check encoding
+        let original_len = buf.len();
+
+        // decode the inner tx
+        let inner_tx = TxEip4844::decode_signed_fields(buf)?;
+
+        // decode the sidecar
+        let sidecar = BlobTransactionSidecar::decode_inner(buf)?;
+
+        if buf.len() + header.payload_length != original_len {
+            return Err(alloy_rlp::Error::ListLengthMismatch {
+                expected: header.payload_length,
+                got: original_len - buf.len(),
+            });
+        }
+
+        let (tx, signature, hash) = inner_tx.into_parts();
+
+        // create unchecked signed tx because these checks should have happened during construction
+        // of `Signed<TxEip4844>` in `TxEip4844::decode_signed_fields`
+        Ok(Signed::new_unchecked(
+            TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar),
+            signature,
+            hash,
+        ))
+    }
+}
+
+impl SignableTransaction<Signature> for TxEip4844WithSidecar {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.tx.chain_id = chain_id;
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        // A signature for a [TxEip4844WithSidecar] is a signature over the [TxEip4844] EIP-2718
+        // payload fields:
+        // (BLOB_TX_TYPE ||
+        //   rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to, value,
+        //     data, access_list, max_fee_per_blob_gas, blob_versioned_hashes]))
+        self.tx.encode_for_signing(out);
+    }
+
+    fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
+        let mut buf = Vec::with_capacity(self.tx.encoded_len_with_signature(&signature, false));
+        // The sidecar is NOT included in the signed payload, only the transaction fields and the
+        // type byte. Include the type byte.
+        //
+        // Include the transaction fields, making sure to __not__ use the sidecar, and __not__
+        // encode a header.
+        self.tx.encode_with_signature(&signature, &mut buf, false);
+        let hash = keccak256(&buf);
+
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        // The payload length is the length of the `transaction_payload_body` list.
+        // The sidecar is NOT included.
+        self.tx.payload_len_for_signature()
     }
 }
 
@@ -814,4 +1026,75 @@ pub(crate) fn kzg_to_versioned_hash(commitment: KzgCommitment) -> B256 {
     let mut res = sha2::Sha256::digest(commitment.as_slice());
     res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
     B256::new(res.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
+    use crate::{SignableTransaction, TxEnvelope};
+    #[cfg(not(feature = "kzg"))]
+    use alloy_eips::eip4844::{Blob, Bytes48};
+    use alloy_primitives::{Signature, TxKind, U256};
+    use alloy_rlp::{Decodable, Encodable};
+    #[cfg(feature = "kzg")]
+    use c_kzg::{Blob, Bytes48};
+
+    #[test]
+    fn different_sidecar_same_hash() {
+        // this should make sure that the hash calculated for the `into_signed` conversion does not
+        // change if the sidecar is different
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 1,
+            max_priority_fee_per_gas: 1,
+            max_fee_per_gas: 1,
+            gas_limit: 1,
+            to: TxKind::Call(Default::default()),
+            value: U256::from(1),
+            access_list: Default::default(),
+            blob_versioned_hashes: vec![Default::default()],
+            max_fee_per_blob_gas: 1,
+            input: Default::default(),
+        };
+        let sidecar = BlobTransactionSidecar {
+            blobs: vec![Blob::from([2; 131072])],
+            commitments: vec![Bytes48::from([3; 48])],
+            proofs: vec![Bytes48::from([4; 48])],
+        };
+        let mut tx = TxEip4844WithSidecar { tx, sidecar };
+        let signature = Signature::test_signature();
+
+        // turn this transaction into_signed
+        let expected_signed = tx.clone().into_signed(signature);
+
+        // change the sidecar, adding a single (blob, commitment, proof) pair
+        tx.sidecar = BlobTransactionSidecar {
+            blobs: vec![Blob::from([1; 131072])],
+            commitments: vec![Bytes48::from([1; 48])],
+            proofs: vec![Bytes48::from([1; 48])],
+        };
+
+        // turn this transaction into_signed
+        let actual_signed = tx.into_signed(signature);
+
+        // the hashes should be the same
+        assert_eq!(expected_signed.hash(), actual_signed.hash());
+
+        // convert to envelopes
+        let expected_envelope: TxEnvelope = expected_signed.into();
+        let actual_envelope: TxEnvelope = actual_signed.into();
+
+        // now encode the transaction and check the length
+        let mut buf = Vec::new();
+        expected_envelope.encode(&mut buf);
+        assert_eq!(buf.len(), expected_envelope.length());
+
+        // ensure it's also the same size that `actual` claims to be, since we just changed the
+        // sidecar values.
+        assert_eq!(buf.len(), actual_envelope.length());
+
+        // now decode the transaction and check the values
+        let decoded = TxEnvelope::decode(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, expected_envelope);
+    }
 }
