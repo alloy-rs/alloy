@@ -1,4 +1,4 @@
-//! Message Sign Example
+//! Example of signing a message with a wallet.
 
 use alloy_signer::{LocalWallet, Signer};
 
