@@ -1,0 +1,34 @@
+[package]
+name = "examples-transactions"
+version = "0.0.0"
+publish = false
+
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dev-dependencies]
+# alloy-core.workspace = true
+alloy-primitives = { version = "0.6.4", default-features = false, features = [
+    "std",
+] }
+alloy-sol-types = { workspace = true, features = ["json"] }
+alloy-provider = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-rpc-trace-types = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-node-bindings = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-transport = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-transport-ipc = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+alloy-network = { git = "https://github.com/alloy-rs/alloy", default-features = false }
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
+eyre = "0.6.12"
+reqwest = "0.11.26"
