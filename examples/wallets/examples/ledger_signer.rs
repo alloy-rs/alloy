@@ -31,10 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Broadcast the transaction and wait for the receipt.
-    let pending_tx = provider.send_transaction(tx).await?.with_confirmations(3).register();
-    let receipt = pending_tx.await?;
+    let receipt = provider.send_transaction(tx).await?.with_confirmations(3).get_receipt().await?;
 
-    println!("Transaction receipt: {:?}", receipt);
+    println!("Send transaction: {:?}", receipt.transaction_hash.unwrap());
 
     Ok(())
 }

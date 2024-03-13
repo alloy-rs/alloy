@@ -13,7 +13,7 @@ use reqwest::Client;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spin up an Anvil node.
-    let anvil = Anvil::new().spawn();
+    let anvil = Anvil::new().block_time(1).spawn();
 
     // Set up the wallets.
     let alice: LocalWallet = anvil.keys()[0].clone().into();
@@ -37,10 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Broadcast the transaction and wait for the receipt.
-    let pending_tx = provider.send_transaction(tx).await?.with_confirmations(3).register();
-    let receipt = pending_tx.await?;
+    let receipt = provider.send_transaction(tx).await?.with_confirmations(1).get_receipt().await?;
 
-    println!("Transaction receipt: {:?}", receipt);
+    println!("Send transaction: {:?}", receipt.transaction_hash.unwrap());
 
     Ok(())
 }
