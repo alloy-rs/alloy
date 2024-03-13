@@ -23,4 +23,5 @@ alloy-signer.workspace = true
 alloy-sol-types.workspace = true
 alloy-transport-http.workspace = true
 
+reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
