@@ -101,10 +101,6 @@ impl PartialSidecar {
     }
 
     /// Ingest a field element into the current blobs.
-    ///
-    /// # Panics
-    ///
-    /// If there are not enough free FEs to encode the data.
     pub fn ingest_valid_fe(&mut self, data: WholeFe<'_>) {
         self.alloc_fes(1);
         self.next_unused_fe_mut().copy_from_slice(data.as_ref());
