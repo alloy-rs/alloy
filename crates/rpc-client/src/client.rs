@@ -1,4 +1,4 @@
-use crate::{poller::PollTask, BatchRequest, ClientBuilder, RpcCall};
+use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
@@ -8,6 +8,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
+    time::Duration,
 };
 use tower::{layer::util::Identity, ServiceBuilder};
 
@@ -34,10 +35,35 @@ impl RpcClient<Identity> {
     }
 }
 
+#[cfg(feature = "reqwest")]
+impl RpcClient<Http<reqwest::Client>> {
+    /// Create a new [`RpcClient`] with an HTTP transport.
+    pub fn new_http(url: reqwest::Url) -> Self {
+        let http = Http::new(url);
+        let is_local = http.guess_local();
+        Self::new(http, is_local)
+    }
+}
+
 impl<T> RpcClient<T> {
-    /// Create a new [`RpcClient`] with the given transport.
+    /// Creates a new [`RpcClient`] with the given transport.
     pub fn new(t: T, is_local: bool) -> Self {
         Self(Arc::new(RpcClientInner::new(t, is_local)))
+    }
+
+    /// Creates a new [`RpcClient`] with the given inner client.
+    pub fn from_inner(inner: RpcClientInner<T>) -> Self {
+        Self(Arc::new(inner))
+    }
+
+    /// Get a reference to the client.
+    pub const fn inner(&self) -> &Arc<RpcClientInner<T>> {
+        &self.0
+    }
+
+    /// Convert the client into its inner type.
+    pub fn into_inner(self) -> Arc<RpcClientInner<T>> {
+        self.0
     }
 
     /// Get a [`Weak`] reference to the client.
@@ -60,21 +86,35 @@ impl<T: Transport> RpcClient<T> {
         ClientBuilder::default().connect(connect).await
     }
 
-    /// Poll a method with the given parameters.
+    /// Build a poller that polls a method with the given parameters.
     ///
-    /// A [`PollTask`]
+    /// See [`PollerBuilder`] for examples and more details.
     pub fn prepare_static_poller<Params, Resp>(
         &self,
         method: &'static str,
         params: Params,
-    ) -> PollTask<T, Params, Resp>
+    ) -> PollerBuilder<T, Params, Resp>
     where
         T: Clone,
         Params: RpcParam + 'static,
         Resp: RpcReturn + Clone,
     {
-        let request: Request<Params> = self.make_request(method, params);
-        PollTask::new(self.get_weak(), method, request.params)
+        PollerBuilder::new(self.get_weak(), method, params)
+    }
+}
+
+impl<T: Transport + Clone> RpcClient<T> {
+    /// Boxes the transport.
+    ///
+    /// This will create a new client if this instance is not the only reference to the inner
+    /// client.
+    pub fn boxed(self) -> RpcClient<BoxTransport> {
+        let inner = match Arc::try_unwrap(self.0) {
+            Ok(inner) => inner,
+            // TODO: `id` is discarded.
+            Err(inner) => RpcClientInner::new(inner.transport.clone(), inner.is_local),
+        };
+        RpcClient::from_inner(inner.boxed())
     }
 }
 
@@ -118,8 +158,36 @@ pub struct RpcClientInner<T> {
 
 impl<T> RpcClientInner<T> {
     /// Create a new [`RpcClient`] with the given transport.
+    #[inline]
     pub const fn new(t: T, is_local: bool) -> Self {
         Self { transport: t, is_local, id: AtomicU64::new(0) }
+    }
+
+    /// Returns the default poll interval for the client.
+    pub const fn default_poll_interval(&self) -> Duration {
+        if self.is_local {
+            Duration::from_millis(250)
+        } else {
+            Duration::from_secs(7)
+        }
+    }
+
+    /// Returns a reference to the underlying transport.
+    #[inline]
+    pub const fn transport(&self) -> &T {
+        &self.transport
+    }
+
+    /// Returns a mutable reference to the underlying transport.
+    #[inline]
+    pub fn transport_mut(&mut self) -> &mut T {
+        &mut self.transport
+    }
+
+    /// Consumes the client and returns the underlying transport.
+    #[inline]
+    pub fn into_transport(self) -> T {
+        self.transport
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.
@@ -127,6 +195,7 @@ impl<T> RpcClientInner<T> {
     /// This function reserves an ID for the request, however the request
     /// is not sent. To send a request, use [`RpcClientInner::prepare`] and
     /// await the returned [`RpcCall`].
+    #[inline]
     pub fn make_request<Params: RpcParam>(
         &self,
         method: &'static str,
@@ -147,6 +216,7 @@ impl<T> RpcClientInner<T> {
     }
 
     /// Set the `is_local` flag.
+    #[inline]
     pub fn set_local(&mut self, is_local: bool) {
         self.is_local = is_local;
     }
@@ -175,6 +245,7 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     /// Serialization is done lazily. It will not be performed until the call
     /// is awaited. This means that if a serializer error occurs, it will not
     /// be caught until the call is awaited.
+    #[doc(alias = "request")]
     pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,

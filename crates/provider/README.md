@@ -25,6 +25,12 @@ The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 [`ethers.js`]: https://docs.ethers.org/v6/
 
+## Feature flags
+
+- `pubsub` - Enable support for subscription methods.
+- `ws` - Enable WebSocket support. Implictly enables `pubsub`.
+- `ipc` - Enable IPC support. Implictly enables `pubsub`.
+
 ## Usage
 
 TODO :)

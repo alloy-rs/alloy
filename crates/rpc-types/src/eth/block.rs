@@ -377,7 +377,7 @@ pub enum BlockError {
 /// a boolean requireCanonical field.
 /// If false, an RPC call should raise if a block
 /// matching the hash is not found.
-/// If true, an RPC call should additionaly raise if
+/// If true, an RPC call should additionally raise if
 /// the block is not in the canonical chain.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]

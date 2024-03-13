@@ -23,6 +23,19 @@ pub struct WsConnect {
     pub auth: Option<Authorization>,
 }
 
+impl WsConnect {
+    /// Creates a new websocket connection configuration.
+    pub fn new<S: Into<String>>(url: S) -> Self {
+        Self::with_auth(url, None)
+    }
+
+    /// Creates a new websocket connection configuration with an authorization
+    /// header.
+    pub fn with_auth<S: Into<String>>(url: S, auth: Option<Authorization>) -> Self {
+        Self { url: url.into(), auth }
+    }
+}
+
 impl IntoClientRequest for WsConnect {
     fn into_client_request(self) -> tungstenite::Result<tungstenite::handshake::client::Request> {
         let mut request: http::Request<()> = self.url.into_client_request()?;

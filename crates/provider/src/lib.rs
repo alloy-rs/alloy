@@ -4,10 +4,9 @@
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
 #![warn(
-    // TODO:
-    // missing_copy_implementations,
-    // missing_debug_implementations,
-    // missing_docs,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    missing_docs,
     unreachable_pub,
     clippy::missing_const_for_fn,
     rustdoc::all
@@ -33,11 +32,14 @@ pub mod layers;
 mod chain;
 
 mod heart;
-pub use heart::{PendingTransaction, WatchConfig};
+pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
 pub mod new;
 
 #[doc(inline)]
-pub use new::{AnvilProvider, Provider, ProviderRef, RawProvider, RootProvider, WeakProvider};
+pub use new::{AnvilProvider, Provider, RawProvider, RootProvider};
 
 pub mod utils;
+
+#[doc(no_inline)]
+pub use alloy_network::{self as network, Network};

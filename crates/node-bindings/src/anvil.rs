@@ -20,7 +20,7 @@ const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
 /// Construct this using [`Anvil`].
 #[derive(Debug)]
 pub struct AnvilInstance {
-    pid: Child,
+    child: Child,
     private_keys: Vec<K256SecretKey>,
     addresses: Vec<Address>,
     port: u16,
@@ -28,6 +28,16 @@ pub struct AnvilInstance {
 }
 
 impl AnvilInstance {
+    /// Returns a reference to the child process.
+    pub fn child(&self) -> &Child {
+        &self.child
+    }
+
+    /// Returns a mutable reference to the child process.
+    pub fn child_mut(&mut self) -> &mut Child {
+        &mut self.child
+    }
+
     /// Returns the private keys used to instantiate this instance
     pub fn keys(&self) -> &[K256SecretKey] {
         &self.private_keys
@@ -62,7 +72,7 @@ impl AnvilInstance {
 
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
-        self.pid.kill().expect("could not kill anvil");
+        self.child.kill().expect("could not kill anvil");
     }
 }
 
@@ -74,8 +84,8 @@ pub enum AnvilError {
     SpawnError(std::io::Error),
 
     /// Timed out waiting for a message from anvil's stderr.
-    #[error("timedout occurred: {0}")]
-    Timeout(String),
+    #[error("timed out waiting for anvil to spawn; is anvil installed?")]
+    Timeout,
 
     /// A line could not be read from the geth stderr.
     #[error("could not read line from anvil stderr: {0}")]
@@ -183,8 +193,8 @@ impl Anvil {
     }
 
     /// Sets the chain_id the `anvil` instance will use.
-    pub fn chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
-        self.chain_id = Some(chain_id.into());
+    pub fn chain_id(mut self, chain_id: u64) -> Self {
+        self.chain_id = Some(chain_id);
         self
     }
 
@@ -195,16 +205,16 @@ impl Anvil {
     }
 
     /// Sets the block-time in seconds which will be used when the `anvil` instance is launched.
-    pub fn block_time<T: Into<u64>>(mut self, block_time: T) -> Self {
-        self.block_time = Some(block_time.into());
+    pub fn block_time(mut self, block_time: u64) -> Self {
+        self.block_time = Some(block_time);
         self
     }
 
     /// Sets the `fork-block-number` which will be used in addition to [`Self::fork`].
     ///
     /// **Note:** if set, then this requires `fork` to be set as well
-    pub fn fork_block_number<T: Into<u64>>(mut self, fork_block_number: T) -> Self {
-        self.fork_block_number = Some(fork_block_number.into());
+    pub fn fork_block_number(mut self, fork_block_number: u64) -> Self {
+        self.fork_block_number = Some(fork_block_number);
         self
     }
 
@@ -236,8 +246,8 @@ impl Anvil {
     }
 
     /// Sets the timeout which will be used when the `anvil` instance is launched.
-    pub fn timeout<T: Into<u64>>(mut self, timeout: T) -> Self {
-        self.timeout = Some(timeout.into());
+    pub fn timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
         self
     }
 
@@ -291,7 +301,7 @@ impl Anvil {
 
         let mut child = cmd.spawn().map_err(AnvilError::SpawnError)?;
 
-        let stdout = child.stdout.take().ok_or(AnvilError::NoStderr)?;
+        let stdout = child.stdout.as_mut().ok_or(AnvilError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stdout);
@@ -304,13 +314,12 @@ impl Anvil {
             if start + Duration::from_millis(self.timeout.unwrap_or(ANVIL_STARTUP_TIMEOUT_MILLIS))
                 <= Instant::now()
             {
-                return Err(AnvilError::Timeout(
-                    "Timed out waiting for anvil to start. Is anvil installed?".to_string(),
-                ));
+                return Err(AnvilError::Timeout);
             }
 
             let mut line = String::new();
             reader.read_line(&mut line).map_err(AnvilError::ReadLineError)?;
+            trace!(target: "anvil", line);
             if let Some(addr) = line.strip_prefix("Listening on") {
                 // <Listening on 127.0.0.1:8545>
                 // parse the actual port
@@ -343,7 +352,7 @@ impl Anvil {
         }
 
         Ok(AnvilInstance {
-            pid: child,
+            child,
             private_keys,
             addresses,
             port,

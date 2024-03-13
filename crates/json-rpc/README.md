@@ -27,7 +27,7 @@ Requests are sent via transports (see [alloy-transports]). This results in 1 of
 
 [alloy-transports]: ../transports
 
-### Limitiations
+### Limitations
 
 - This library models the method name as a `&'static str`, and is therefore
   unsuitable for use with RPC servers with dynamic method names.

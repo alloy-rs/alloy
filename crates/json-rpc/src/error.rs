@@ -5,11 +5,11 @@ use serde_json::value::RawValue;
 #[derive(Debug, thiserror::Error)]
 pub enum RpcError<E, ErrResp = Box<RawValue>> {
     /// Server returned an error response.
-    #[error("Server returned an error response: {0}")]
+    #[error("server returned an error response: {0}")]
     ErrorResp(ErrorPayload<ErrResp>),
 
     /// JSON serialization error.
-    #[error("Serialization error: {0}")]
+    #[error("serialization error: {0}")]
     SerError(
         /// The underlying serde_json error.
         // To avoid accidentally confusing ser and deser errors, we do not use
@@ -18,7 +18,7 @@ pub enum RpcError<E, ErrResp = Box<RawValue>> {
         serde_json::Error,
     ),
     /// JSON deserialization error.
-    #[error("Deserialization error: {err}")]
+    #[error("deserialization error: {err}")]
     DeserError {
         /// The underlying serde_json error.
         // To avoid accidentally confusing ser and deser errors, we do not use
@@ -32,7 +32,7 @@ pub enum RpcError<E, ErrResp = Box<RawValue>> {
     /// Transport error.
     ///
     /// This variant is used when the error occurs during communication.
-    #[error("Error during transport: {0}")]
+    #[error(transparent)]
     Transport(
         /// The underlying transport error.
         #[from]

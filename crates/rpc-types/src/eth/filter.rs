@@ -85,7 +85,7 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
 }
 
 impl<T: Eq + Hash> FilterSet<T> {
-    /// Returns wheter the filter is empty
+    /// Returns whether the filter is empty
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -255,13 +255,12 @@ impl FilterBlockOption {
 /// Filter for logs.
 #[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Filter {
-    /// Filter block options, specifying on which blocks the filter should
-    /// match.
+    /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
     pub block_option: FilterBlockOption,
     /// Address
     pub address: FilterSet<Address>,
-    /// Topics (maxmimum of 4)
+    /// Topics (maximum of 4)
     pub topics: [Topic; 4],
 }
 
@@ -846,30 +845,30 @@ impl FilteredParams {
         true
     }
 }
+
 /// Response of the `eth_getFilterChanges` RPC.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
 pub enum FilterChanges {
+    /// Empty result.
+    #[serde(with = "empty_array")]
+    Empty,
     /// New logs.
     Logs(Vec<RpcLog>),
-    /// New hashes (block or transactions)
+    /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
     Transactions(Vec<Transaction>),
-    /// Empty result,
-    Empty,
 }
 
-impl Serialize for FilterChanges {
-    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+mod empty_array {
+    use serde::{Serialize, Serializer};
+
+    pub(super) fn serialize<S>(s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        match self {
-            FilterChanges::Logs(logs) => logs.serialize(s),
-            FilterChanges::Hashes(hashes) => hashes.serialize(s),
-            FilterChanges::Transactions(transactions) => transactions.serialize(s),
-            FilterChanges::Empty => (&[] as &[serde_json::Value]).serialize(s),
-        }
+        (&[] as &[()]).serialize(s)
     }
 }
 
@@ -881,8 +880,9 @@ impl<'de> Deserialize<'de> for FilterChanges {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum Changes {
-            Logs(Vec<RpcLog>),
             Hashes(Vec<B256>),
+            Logs(Vec<RpcLog>),
+            Transactions(Vec<Transaction>),
         }
 
         let changes = Changes::deserialize(deserializer)?;
@@ -899,6 +899,13 @@ impl<'de> Deserialize<'de> for FilterChanges {
                     FilterChanges::Empty
                 } else {
                     FilterChanges::Hashes(vals)
+                }
+            }
+            Changes::Transactions(vals) => {
+                if vals.is_empty() {
+                    FilterChanges::Empty
+                } else {
+                    FilterChanges::Transactions(vals)
                 }
             }
         };
