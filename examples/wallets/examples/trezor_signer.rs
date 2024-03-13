@@ -7,6 +7,7 @@ use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
 use alloy_signer_trezor::{TrezorHDPath, TrezorSigner};
 use alloy_transport_http::Http;
+use reqwest::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer = TrezorSigner::new(TrezorHDPath::TrezorLive(0), Some(1)).await?;
 
     // Create a provider with the signer and the network.
-    let http = Http::new("http://localhost:8545".parse()?);
+    let http = Http::<Client>::new("http://localhost:8545".parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
         .signer(EthereumSigner::from(signer))
         .network::<Ethereum>()
