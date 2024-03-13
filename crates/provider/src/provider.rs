@@ -234,7 +234,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     #[cfg(feature = "pubsub")]
     async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
         self.root().pubsub_frontend()?;
-        let id = self.client().prepare("eth_subscribe", ("newHeads",)).await?;
+        let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
     }
 
@@ -266,7 +266,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     #[cfg(feature = "pubsub")]
     async fn subscribe_pending_transactions(&self) -> TransportResult<Subscription<B256>> {
         self.root().pubsub_frontend()?;
-        let id = self.client().prepare("eth_subscribe", ("newPendingTransactions",)).await?;
+        let id = self.client().request("eth_subscribe", ("newPendingTransactions",)).await?;
         self.root().get_subscription(id).await
     }
 
@@ -305,7 +305,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
     ) -> TransportResult<Subscription<N::TransactionResponse>> {
         self.root().pubsub_frontend()?;
-        let id = self.client().prepare("eth_subscribe", ("newPendingTransactions", true)).await?;
+        let id = self.client().request("eth_subscribe", ("newPendingTransactions", true)).await?;
         self.root().get_subscription(id).await
     }
 
@@ -319,7 +319,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         Self: Sized,
     {
         self.root().pubsub_frontend()?;
-        let id = self.client().prepare("eth_subscribe", params).await?;
+        let id = self.client().request("eth_subscribe", params).await?;
         self.root().get_subscription(id).await
     }
 
@@ -455,7 +455,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// See also [`watch_blocks`](Self::watch_blocks) to configure a poller.
     async fn new_block_filter(&self) -> TransportResult<U256> {
-        self.client().prepare("eth_newBlockFilter", ()).await
+        self.client().request("eth_newBlockFilter", ()).await
     }
 
     /// Notify the provider that we are interested in new pending transactions.
@@ -470,7 +470,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn new_pending_transactions_filter(&self, full: bool) -> TransportResult<U256> {
         // NOTE: We don't want to send `false` as the client might not support it.
         let param = if full { &[true][..] } else { &[] };
-        self.client().prepare("eth_newPendingTransactionFilter", param).await
+        self.client().request("eth_newPendingTransactionFilter", param).await
     }
 
     /// Notify the provider that we are interested in logs that match the given filter.
@@ -479,7 +479,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ///
     /// See also [`watch_logs`](Self::watch_logs) to configure a poller.
     async fn new_filter(&self, filter: &Filter) -> TransportResult<U256> {
-        self.client().prepare("eth_newFilter", (filter,)).await
+        self.client().request("eth_newFilter", (filter,)).await
     }
 
     /// Get a list of values that have been added since the last poll.
@@ -491,7 +491,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     where
         Self: Sized,
     {
-        self.client().prepare("eth_getFilterChanges", (id,)).await
+        self.client().request("eth_getFilterChanges", (id,)).await
     }
 
     /// Get a list of values that have been added since the last poll.
@@ -499,12 +499,12 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// This returns an enum over all possible return values. You probably want to use
     /// [`get_filter_changes`](Self::get_filter_changes) instead.
     async fn get_filter_changes_dyn(&self, id: U256) -> TransportResult<FilterChanges> {
-        self.client().prepare("eth_getFilterChanges", (id,)).await
+        self.client().request("eth_getFilterChanges", (id,)).await
     }
 
     /// Get the last block number available.
     async fn get_block_number(&self) -> TransportResult<BlockNumber> {
-        self.client().prepare("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
+        self.client().request("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
 
     /// Gets the transaction count of the corresponding address.
@@ -513,7 +513,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         address: Address,
         tag: Option<BlockId>,
     ) -> TransportResult<U64> {
-        self.client().prepare("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
+        self.client().request("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
     }
 
     /// Get a block by its number.
@@ -523,7 +523,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        self.client().prepare("eth_getBlockByNumber", (number, hydrate)).await
+        self.client().request("eth_getBlockByNumber", (number, hydrate)).await
     }
 
     /// Populates the legacy gas price field of the given transaction request.
@@ -575,7 +575,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
-        let tx_hash = self.client().prepare("eth_sendTransaction", (tx,)).await?;
+        let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
@@ -587,14 +587,14 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         rlp_bytes: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
         let rlp_hex = hex::encode(rlp_bytes);
-        let tx_hash = self.client().prepare("eth_sendRawTransaction", (rlp_hex,)).await?;
+        let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
     async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256> {
         self.client()
-            .prepare(
+            .request(
                 "eth_getBalance",
                 (address, tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))),
             )
@@ -615,22 +615,22 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         hash: BlockHash,
         full: bool,
     ) -> TransportResult<Option<Block>> {
-        self.client().prepare("eth_getBlockByHash", (hash, full)).await
+        self.client().request("eth_getBlockByHash", (hash, full)).await
     }
 
     /// Gets the client version of the chain client().
     async fn get_client_version(&self) -> TransportResult<String> {
-        self.client().prepare("web3_clientVersion", ()).await
+        self.client().request("web3_clientVersion", ()).await
     }
 
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<U64> {
-        self.client().prepare("eth_chainId", ()).await
+        self.client().request("eth_chainId", ()).await
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
     async fn get_net_version(&self) -> TransportResult<U64> {
-        self.client().prepare("net_version", ()).await
+        self.client().request("net_version", ()).await
     }
 
     /// Gets the specified storage value from [Address].
@@ -640,12 +640,12 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         key: U256,
         tag: Option<BlockId>,
     ) -> TransportResult<StorageValue> {
-        self.client().prepare("eth_getStorageAt", (address, key, tag.unwrap_or_default())).await
+        self.client().request("eth_getStorageAt", (address, key, tag.unwrap_or_default())).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].
     async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
-        self.client().prepare("eth_getCode", (address, tag)).await
+        self.client().request("eth_getCode", (address, tag)).await
     }
 
     /// Gets a transaction by its [TxHash].
@@ -653,23 +653,23 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         hash: TxHash,
     ) -> TransportResult<N::TransactionResponse> {
-        self.client().prepare("eth_getTransactionByHash", (hash,)).await
+        self.client().request("eth_getTransactionByHash", (hash,)).await
     }
 
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
-        self.client().prepare("eth_getLogs", (filter,)).await
+        self.client().request("eth_getLogs", (filter,)).await
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
     async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
-        self.client().prepare("eth_accounts", ()).await
+        self.client().request("eth_accounts", ()).await
     }
 
     /// Gets the current gas price.
     async fn get_gas_price(&self) -> TransportResult<U256> {
-        self.client().prepare("eth_gasPrice", ()).await
+        self.client().request("eth_gasPrice", ()).await
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -677,7 +677,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         hash: TxHash,
     ) -> TransportResult<Option<N::ReceiptResponse>> {
-        self.client().prepare("eth_getTransactionReceipt", (hash,)).await
+        self.client().request("eth_getTransactionReceipt", (hash,)).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -688,7 +688,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         last_block: BlockNumberOrTag,
         reward_percentiles: &[f64],
     ) -> TransportResult<FeeHistory> {
-        self.client().prepare("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
+        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
@@ -696,24 +696,24 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
-        self.client().prepare("eth_getBlockReceipts", (block,)).await
+        self.client().request("eth_getBlockReceipts", (block,)).await
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
     async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
         match tag {
             BlockId::Hash(hash) => {
-                self.client().prepare("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
+                self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
             }
             BlockId::Number(number) => {
-                self.client().prepare("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
+                self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
             }
         }
     }
 
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus> {
-        self.client().prepare("eth_syncing", ()).await
+        self.client().request("eth_syncing", ()).await
     }
 
     /// Execute a smart contract call with a transaction request, without publishing a transaction.
@@ -722,7 +722,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         tx: &N::TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<Bytes> {
-        self.client().prepare("eth_call", (tx, block.unwrap_or_default())).await
+        self.client().request("eth_call", (tx, block.unwrap_or_default())).await
     }
 
     /// Execute a smart contract call with a transaction request and state overrides, without
@@ -737,7 +737,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         block: Option<BlockId>,
         state: StateOverride,
     ) -> TransportResult<Bytes> {
-        self.client().prepare("eth_call", (tx, block.unwrap_or_default(), state)).await
+        self.client().request("eth_call", (tx, block.unwrap_or_default(), state)).await
     }
 
     /// Estimate the gas needed for a transaction.
@@ -747,9 +747,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         block: Option<BlockId>,
     ) -> TransportResult<U256> {
         if let Some(block_id) = block {
-            self.client().prepare("eth_estimateGas", (tx, block_id)).await
+            self.client().request("eth_estimateGas", (tx, block_id)).await
         } else {
-            self.client().prepare("eth_estimateGas", (tx,)).await
+            self.client().request("eth_estimateGas", (tx,)).await
         }
     }
 
@@ -807,7 +807,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         keys: Vec<StorageKey>,
         block: Option<BlockId>,
     ) -> TransportResult<EIP1186AccountProofResponse> {
-        self.client().prepare("eth_getProof", (address, keys, block.unwrap_or_default())).await
+        self.client().request("eth_getProof", (address, keys, block.unwrap_or_default())).await
     }
 
     /// Create an [EIP-2930] access list.
@@ -818,7 +818,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         request: &N::TransactionRequest,
         block: Option<BlockId>,
     ) -> TransportResult<AccessListWithGasUsed> {
-        self.client().prepare("eth_createAccessList", (request, block.unwrap_or_default())).await
+        self.client().request("eth_createAccessList", (request, block.unwrap_or_default())).await
     }
 
     /// Executes the given transaction and returns a number of possible traces.
@@ -832,7 +832,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         trace_type: &[TraceType],
         block: Option<BlockId>,
     ) -> TransportResult<TraceResults> {
-        self.client().prepare("trace_call", (request, trace_type, block)).await
+        self.client().request("trace_call", (request, trace_type, block)).await
     }
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
@@ -848,7 +848,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         request: &[(N::TransactionRequest, Vec<TraceType>)],
         block: Option<BlockId>,
     ) -> TransportResult<TraceResults> {
-        self.client().prepare("trace_callMany", (request, block)).await
+        self.client().request("trace_callMany", (request, block)).await
     }
 
     // todo: move to extension trait
@@ -857,7 +857,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.client().prepare("trace_transaction", (hash,)).await
+        self.client().request("trace_transaction", (hash,)).await
     }
 
     // todo: move to extension trait
@@ -871,7 +871,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         hash: TxHash,
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<GethTrace> {
-        self.client().prepare("debug_traceTransaction", (hash, trace_options)).await
+        self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
 
     // todo: move to extension trait
@@ -884,14 +884,14 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.client().prepare("trace_block", (block,)).await
+        self.client().request("trace_block", (block,)).await
     }
 
     /* ------------------------------------------ anvil ----------------------------------------- */
 
     /// Set the bytecode of a given account.
     async fn set_code(&self, address: Address, code: &str) -> TransportResult<()> {
-        self.client().prepare("anvil_setCode", (address, code)).await
+        self.client().request("anvil_setCode", (address, code)).await
     }
 
     /* ---------------------------------------- raw calls --------------------------------------- */
@@ -903,7 +903,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         R: RpcReturn,
         Self: Sized,
     {
-        self.client().prepare(method, &params).await
+        self.client().request(method, &params).await
     }
 
     /// Sends a raw JSON-RPC request with type-erased parameters and return.
@@ -912,7 +912,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         method: &'static str,
         params: &RawValue,
     ) -> TransportResult<Box<RawValue>> {
-        self.client().prepare(method, params).await
+        self.client().request(method, params).await
     }
 }
 

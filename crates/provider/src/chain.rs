@@ -85,7 +85,7 @@ impl<N: Network, T: Transport + Clone> ChainStreamPoller<N, T> {
             let mut retries = MAX_RETRIES;
             for number in self.next_yield..=block_number {
                 debug!(number, "fetching block");
-                let block = match client.prepare("eth_getBlockByNumber", (U64::from(number), false)).await {
+                let block = match client.request("eth_getBlockByNumber", (U64::from(number), false)).await {
                     Ok(Some(block)) => block,
                     Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
                         debug!(number, %err, "failed to fetch block, retrying");

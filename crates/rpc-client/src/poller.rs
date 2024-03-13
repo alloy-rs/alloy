@@ -165,7 +165,7 @@ where
 
                 loop {
                     trace!("polling");
-                    match client.prepare(self.method, params).await {
+                    match client.request(self.method, params).await {
                         Ok(resp) => {
                             if tx.send(resp).is_err() {
                                 debug!("channel closed");
