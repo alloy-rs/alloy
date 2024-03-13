@@ -30,9 +30,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Broadcast the transaction and wait for the receipt.
-    // TODO: Confirmation count is not configurable yet.
-    let pending_tx = provider.send_transaction(tx).await?;
-    let receipt = pending_tx.await?;
+    let builder = provider.send_transaction(tx).await?.with_confirmations(3).register();
+    let receipt = builder.await?;
 
     println!("Transaction receipt: {:?}", receipt);
 
