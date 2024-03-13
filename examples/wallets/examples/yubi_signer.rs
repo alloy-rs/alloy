@@ -1,17 +1,26 @@
-//! Example of signing and sending a transaction using a Ledger device.
+//! Example of signing and sending a transaction using a Yubi device.
 
 use alloy_network::{Ethereum, EthereumSigner};
 use alloy_primitives::{address, U256};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
-use alloy_signer_ledger::{HDPath, LedgerSigner};
+use alloy_signer::{
+    yubihsm::{Connector, Credentials, UsbConfig},
+    YubiWallet,
+};
 use alloy_transport_http::Http;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Instantiate the application by acquiring a lock on the Ledger device.
-    let signer = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
+    // We use USB for the example, but you can connect over HTTP as well. Refer
+    // to the [YubiHSM](https://docs.rs/yubihsm/0.34.0/yubihsm/) docs for more information.
+    let connector = Connector::usb(&UsbConfig::default());
+
+    // Instantiate the connection to the YubiKey. Alternatively, use the
+    // `from_key` method to upload a key you already have, or the `new` method
+    // to generate a new keypair.
+    let signer = YubiWallet::connect(connector, Credentials::default(), 0);
 
     // Create a provider with the signer and the network.
     let http = Http::new("http://localhost:8545".parse()?);
@@ -30,8 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Broadcast the transaction and wait for the receipt.
-    let builder = provider.send_transaction(tx).await?.with_confirmations(3).register();
-    let receipt = builder.await?;
+    let pending_tx = provider.send_transaction(tx).await?.with_confirmations(3).register();
+    let receipt = pending_tx.await?;
 
     println!("Transaction receipt: {:?}", receipt);
 
