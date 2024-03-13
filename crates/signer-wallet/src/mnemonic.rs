@@ -3,7 +3,8 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
-use crate::{utils::secret_key_to_address, Wallet, WalletError};
+use crate::{Wallet, WalletError};
+use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;

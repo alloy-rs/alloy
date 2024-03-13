@@ -1,8 +1,8 @@
 //! [`k256`] wallet implementation.
 
 use super::{Wallet, WalletError};
-use crate::utils::secret_key_to_address;
 use alloy_primitives::{hex, B256};
+use alloy_signer::utils::secret_key_to_address;
 use k256::{
     ecdsa::{self, SigningKey},
     FieldBytes, NonZeroScalar, SecretKey as K256SecretKey,

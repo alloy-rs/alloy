@@ -1,7 +1,7 @@
 //! [YubiHSM2](yubihsm) wallet implementation.
 
 use super::Wallet;
-use crate::utils::raw_public_key_to_address;
+use alloy_signer::utils::raw_public_key_to_address;
 use elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::{PublicKey, Secp256k1};
 use yubihsm::{

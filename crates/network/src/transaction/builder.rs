@@ -1,6 +1,7 @@
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256, U64};
+use alloy_transport::impl_future;
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
@@ -196,5 +197,5 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn build<S: NetworkSigner<N>>(
         self,
         signer: &S,
-    ) -> impl std::future::Future<Output = BuilderResult<N::TxEnvelope>> + Send;
+    ) -> impl_future!(<Output = BuilderResult<N::TxEnvelope>>);
 }

@@ -36,6 +36,7 @@ alloy-signer-aws = { workspace = true, default-features = false, optional = true
 alloy-signer-gcp = { workspace = true, default-features = false, optional = true }
 alloy-signer-ledger = { workspace = true, default-features = false, optional = true }
 alloy-signer-trezor = { workspace = true, default-features = false, optional = true }
+alloy-signer-wallet = { workspace = true, default-features = false, optional = true }
 
 # transport
 alloy-transport = { workspace = true, default-features = false, optional = true }
@@ -81,10 +82,7 @@ eip712 = [
 
 # alloy
 default-tls = ["reqwest?/default-tls"]
-jsonrpsee-types = [
-    "alloy-rpc-types?/jsonrpsee-types",
-    "alloy-rpc-engine-types?/jsonrpsee-types",
-]
+jsonrpsee-types = ["alloy-rpc-types?/jsonrpsee-types", "alloy-rpc-engine-types?/jsonrpsee-types"]
 
 consensus = ["dep:alloy-consensus"]
 eips = ["dep:alloy-eips"]
@@ -114,11 +112,11 @@ rpc-types-trace = ["rpc-types", "dep:alloy-rpc-trace-types"]
 
 ## signers
 signers = ["dep:alloy-signer"]
-### Default signer extensions
-signer-keystore = ["signers", "alloy-signer?/keystore"]
-signer-mnemonic = ["signers", "alloy-signer?/mnemonic"]
-signer-yubihsm = ["signers", "alloy-signer?/yubihsm"]
 ### Signer implementations
+signer-wallet = ["signers", "dep:alloy-signer-wallet"]
+signer-keystore = ["signer-wallet", "alloy-signer-wallet?/keystore"]
+signer-mnemonic = ["signer-wallet", "alloy-signer-wallet?/mnemonic"]
+signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
 signer-aws = ["signers", "dep:alloy-signer-aws"]
 signer-gcp = ["signers", "dep:alloy-signer-gcp"]
 signer-ledger = ["signers", "dep:alloy-signer-ledger"]

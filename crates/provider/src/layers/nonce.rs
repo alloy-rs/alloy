@@ -147,7 +147,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
@@ -172,7 +172,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
