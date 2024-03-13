@@ -19,10 +19,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bob: LocalWallet = anvil.keys()[1].clone().into();
 
     // Create a provider with a signer and the network.
+    let http = Http::new(anvil.endpoint().parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
         .signer(EthereumSigner::from(alice))
         .network::<Ethereum>()
-        .provider(RootProvider::new(RpcClient::new(Http::new(anvil.endpoint().parse()?), true)));
+        .provider(RootProvider::new(RpcClient::new(http, true)));
 
     // Create a transaction.
     let tx = TransactionRequest {

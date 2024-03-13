@@ -23,13 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let signer = YubiWallet::connect(connector, Credentials::default(), 0);
 
     // Create a provider with the signer and the network.
+    let http = Http::new("http://localhost:8545".parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
         .signer(EthereumSigner::from(signer))
         .network::<Ethereum>()
-        .provider(RootProvider::new(RpcClient::new(
-            Http::new("http://localhost:8545".parse()?),
-            true,
-        )));
+        .provider(RootProvider::new(RpcClient::new(http, true)));
 
     // Create a transaction.
     let tx = TransactionRequest {
