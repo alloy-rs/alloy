@@ -1,8 +1,10 @@
-use alloy_network::Ethereum;
+use alloy_contract::SolCallBuilder;
+use alloy_network::{Ethereum, EthereumSigner};
 use alloy_node_bindings::Anvil;
-use alloy_primitives::{Address, U256};
-use alloy_provider::{ProviderBuilder, RootProvider};
+use alloy_primitives::{Address, U256, U64};
+use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
+use alloy_signer::LocalWallet;
 use alloy_sol_types::sol;
 use alloy_transport_http::Http;
 
@@ -12,11 +14,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure `anvil` is available in $PATH
     let anvil = Anvil::new().spawn();
 
-    // Create a provider.
+    // Set up wallet
+    let wallet: LocalWallet = anvil.keys()[0].clone().into();
+
+    // Create a provider with a signer and the network.
     let http = Http::new(anvil.endpoint().parse()?);
     let provider = ProviderBuilder::<_, Ethereum>::new()
+        .signer(EthereumSigner::from(wallet))
         .network::<Ethereum>()
         .provider(RootProvider::new(RpcClient::new(http, true)));
+
+    println!("Anvil running at `{}`", anvil.endpoint());
 
     // Create a contract.
     sol! {
@@ -34,24 +42,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Deploy the contract.
     let contract = Counter::new(Address::ZERO, &provider);
 
-    println!("Anvil running at `{}`", anvil.endpoint());
+    // Get the base fee for the block.
+    let base_fee = provider.get_gas_price().await?;
 
-    println!("Setting the number to 42...");
+    println!("Setting number to 42...");
 
-    contract.setNumber(U256::from(42)).send().await?;
+    // Set the number to 42.
+    let estimate = contract.setNumber(U256::from(42)).estimate_gas().await?;
+    let builder: SolCallBuilder<_, _, _, Counter::setNumberCall> =
+        contract.setNumber(U256::from(42)).nonce(U64::from(0)).gas(estimate).gas_price(base_fee);
+    builder.send().await?;
 
-    println!("Incrementing the number...");
+    println!("Incrementing number...");
 
-    contract.increment().send().await?;
+    // Increment the number to 43.
+    let estimate = contract.increment().estimate_gas().await?;
+    let builder: SolCallBuilder<_, _, _, Counter::incrementCall> =
+        contract.increment().nonce(U64::from(1)).gas(estimate).gas_price(base_fee);
+    builder.send().await?;
 
-    println!("Getting the number...");
+    println!("Retrieving number...");
 
-    // TODO: currently throws Error: AbiError(SolTypes(Overrun))
-    // let number = contract.number().call().await?;
+    // Retrieve the number, which should be 43.
+    // Error: AbiError(SolTypes(Overrun))
+    let estimate = contract.number().estimate_gas().await?;
+    let builder = contract.number().gas(estimate).gas_price(base_fee);
+    let Counter::numberReturn { _0 } = builder.call().await?;
 
-    // println!("Number is now: {}", number._0);
+    println!("Number: {:?}", _0);
 
     Ok(())
 }

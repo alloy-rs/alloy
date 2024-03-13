@@ -18,6 +18,7 @@ alloy-node-bindings = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-provider = { workspace = true }
 alloy-rpc-client = { workspace = true }
+alloy-signer = { workspace = true }
 alloy-sol-types = { workspace = true }
 alloy-transport-http = { workspace = true }
 
