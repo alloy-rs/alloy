@@ -1034,7 +1034,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.unwrap().header.number.unwrap(), U256::from(n));
+            assert_eq!(block.header.number.unwrap(), U256::from(n));
             n += 1;
         }
     }
@@ -1055,7 +1055,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.unwrap().header.number.unwrap(), U256::from(n));
+            assert_eq!(block.header.number.unwrap(), U256::from(n));
             n += 1;
         }
     }

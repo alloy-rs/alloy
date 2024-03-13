@@ -369,7 +369,7 @@ impl<T> SubscriptionStream<T> {
 }
 
 impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
-    type Item = Result<T, BroadcastStreamRecvError>;
+    type Item = T;
 
     fn poll_next(
         mut self: Pin<&mut Self>,
@@ -378,7 +378,7 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
         loop {
             match ready!(self.inner.poll_next_unpin(cx)) {
                 Some(Ok(value)) => match serde_json::from_str(value.get()) {
-                    Ok(item) => return task::Poll::Ready(Some(Ok(item))),
+                    Ok(item) => return task::Poll::Ready(Some(item)),
                     Err(err) => {
                         debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
                         error!(%err, %self.id, "failed deserializing subscription item");
