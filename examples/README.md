@@ -79,7 +79,8 @@
   - [x] Mnemonic
   - [x] Ledger
   - [x] Local
-  - [ ] Permit hash
-  - [ ] Sign message
+  - [x] Permit hash
+  - [x] Sign message
   - [x] Trezor
-  - [ ] Yubi
+  - [x] Yubi
+  - [ ] Keystore

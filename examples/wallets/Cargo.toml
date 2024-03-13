@@ -12,18 +12,25 @@ repository.workspace = true
 exclude.workspace = true
 
 [dev-dependencies]
-alloy-rpc-client = { workspace = true }
-alloy-rpc-types = { workspace = true }
+alloy-contract = { workspace = true }
+alloy-dyn-abi = { workspace = true }
+alloy-eips = { workspace = true }
 alloy-network = { workspace = true }
 alloy-node-bindings = { workspace = true }
 alloy-primitives = { workspace = true }
 alloy-providers = { workspace = true }
-alloy-signer = { workspace = true, features = ["mnemonic", "yubihsm"] }
-# alloy-signer-aws = { workspace = true }
-# alloy-signer-gcp = { workspace = true }
+alloy-rpc-client = { workspace = true }
+alloy-rpc-types = { workspace = true }
+alloy-signer = { workspace = true, features = [
+    "eip712",
+    "mnemonic",
+    "yubihsm",
+] }
 alloy-signer-ledger = { workspace = true }
 alloy-signer-trezor = { workspace = true }
+alloy-sol-types = { workspace = true }
 alloy-transport-http = { workspace = true }
 
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 rand = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
