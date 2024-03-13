@@ -5,7 +5,6 @@ use alloy_node_bindings::Anvil;
 use alloy_primitives::{U256, U64};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
-use alloy_rpc_trace_types::parity::TraceOutput;
 use alloy_signer::LocalWallet;
 use alloy_sol_types::sol;
 use alloy_transport_http::Http;
@@ -52,23 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Deploy the contract.
     let contract_builder = Counter::deploy_builder(&provider);
     let estimate = contract_builder.estimate_gas().await?;
-    let pending = contract_builder
-        .gas(estimate)
-        .gas_price(base_fee)
-        .nonce(U64::from(0))
-        .send()
-        .await?
-        .register()
-        .await?;
-    let receipt = pending.await?;
-
-    // Grab the contract address from the trace.
-    let mut traces = provider.trace_transaction(receipt).await?;
-    let trace = traces[0].trace.result.take().unwrap();
-    let contract_address = match trace {
-        TraceOutput::Create(trace) => trace.address,
-        _ => panic!("Expected create trace"),
-    };
+    let contract_address =
+        contract_builder.gas(estimate).gas_price(base_fee).nonce(U64::from(0)).deploy().await?;
 
     println!("Deployed contract at address: {:?}", contract_address);
 
@@ -77,18 +61,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let estimate = contract.setNumber(U256::from(42)).estimate_gas().await?;
     let builder =
         contract.setNumber(U256::from(42)).nonce(U64::from(1)).gas(estimate).gas_price(base_fee);
-    let pending = builder.send().await?.register().await?;
-    let receipt = pending.await?;
+    let receipt = builder.send().await?.get_receipt().await?;
 
-    println!("Set number to 42: {:?}", receipt);
+    println!("Set number to 42: {:?}", receipt.transaction_hash);
 
     // Increment the number to 43.
     let estimate = contract.increment().estimate_gas().await?;
     let builder = contract.increment().nonce(U64::from(2)).gas(estimate).gas_price(base_fee);
-    let pending = builder.send().await?.register().await?;
-    let receipt = pending.await?;
+    let receipt = builder.send().await?.get_receipt().await?;
 
-    println!("Incremented number: {:?}", receipt);
+    println!("Incremented number: {:?}", receipt.transaction_hash);
 
     // Retrieve the number, which should be 43.
     let Counter::numberReturn { _0 } = contract.number().call().await?;
