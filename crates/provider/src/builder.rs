@@ -113,9 +113,8 @@ impl<L, N> ProviderBuilder<L, N> {
 
     /// Change the network.
     ///
-    /// By default, the network is invalid, and contains the unit type `()`.
-    /// This method MUST be called before the provider is built. The `client`
-    /// and `provider` methods only exist when the network is valid.
+    /// By default, the network is `Ethereum`. This method must be called to configure a different
+    /// network.
     ///
     /// ```rust,ignore
     /// builder.network::<Arbitrum>()
