@@ -12,6 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rpc-trace-types.workspace = true
@@ -28,9 +29,11 @@ dashmap = "5.5"
 futures.workspace = true
 lru = "0.12"
 reqwest.workspace = true
-serde.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
+
+alloy-pubsub = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-consensus.workspace = true
@@ -39,3 +42,8 @@ alloy-rlp.workspace = true
 alloy-signer.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
+
+[features]
+pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
+ws = ["pubsub", "alloy-rpc-client/ws"]
+ipc = ["pubsub", "alloy-rpc-client/ipc"]

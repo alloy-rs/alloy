@@ -1,0 +1,21 @@
+[package]
+name = "alloy-internal-test-utils"
+description = "Internal testing utilities for Alloy"
+publish = false
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-node-bindings.workspace = true
+alloy-provider.workspace = true
+alloy-rpc-client.workspace = true
+alloy-transport-http.workspace = true
+reqwest.workspace = true
+tracing-subscriber = { workspace = true, features = ["fmt"] }

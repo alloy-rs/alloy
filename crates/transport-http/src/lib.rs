@@ -67,7 +67,7 @@ impl<T> Http<T> {
 
     /// Guess whether the URL is local, based on the hostname.
     ///
-    /// The ouput of this function is best-efforts, and should be checked if
+    /// The output of this function is best-efforts, and should be checked if
     /// possible. It simply returns `true` if the connection has no hostname,
     /// or the hostname is `localhost` or `127.0.0.1`.
     pub fn guess_local(&self) -> bool {

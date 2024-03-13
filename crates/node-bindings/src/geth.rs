@@ -178,7 +178,7 @@ pub enum GethError {
     #[error("clique address error: {0}")]
     CliqueAddressError(String),
     /// The chain id was not set.
-    #[error("the chain id was not set")]
+    #[error("the chain ID was not set")]
     ChainIdNotSet,
     /// Could not create the data directory.
     #[error("could not create directory: {0}")]
@@ -187,8 +187,8 @@ pub enum GethError {
     #[error("no stderr was captured from the process")]
     NoStderr,
     /// Timed out waiting for geth to start.
-    #[error("timedout occurred: {0}")]
-    Timeout(String),
+    #[error("timed out waiting for geth to spawn; is geth installed?")]
+    Timeout,
     /// Encountered a fatal error.
     #[error("fatal error: {0}")]
     Fatal(String),
@@ -325,14 +325,14 @@ impl Geth {
     ///
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
-    pub fn block_time<T: Into<u64>>(mut self, block_time: T) -> Self {
-        self.mode = GethMode::Dev(DevOptions { block_time: Some(block_time.into()) });
+    pub fn block_time(mut self, block_time: u64) -> Self {
+        self.mode = GethMode::Dev(DevOptions { block_time: Some(block_time) });
         self
     }
 
     /// Sets the chain id for the geth instance.
-    pub fn chain_id<T: Into<u64>>(mut self, chain_id: T) -> Self {
-        self.chain_id = Some(chain_id.into());
+    pub fn chain_id(mut self, chain_id: u64) -> Self {
+        self.chain_id = Some(chain_id);
         self
     }
 
@@ -575,10 +575,7 @@ impl Geth {
 
         loop {
             if start + GETH_STARTUP_TIMEOUT <= Instant::now() {
-                // panic!("Timed out waiting for geth to start. Is geth installed?")
-                return Err(GethError::Timeout(
-                    "Timed out waiting for geth to start. Is geth installed?".to_string(),
-                ));
+                return Err(GethError::Timeout);
             }
 
             let mut line = String::with_capacity(120);

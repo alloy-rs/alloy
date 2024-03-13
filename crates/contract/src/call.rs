@@ -3,11 +3,10 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256, U64};
-use alloy_provider::Provider;
+use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
-use futures_util::TryFutureExt;
 use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
@@ -193,7 +192,9 @@ pub struct CallBuilder<N: Network, T, P, D> {
     request: N::TransactionRequest,
     block: Option<BlockId>,
     state: Option<StateOverride>,
-    provider: P,
+    /// The provider.
+    // NOTE: This is public due to usage in `sol!`, please avoid changing it.
+    pub provider: P,
     decoder: D,
     transport: PhantomData<T>,
 }
@@ -218,14 +219,18 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> DynCallBuilder<N, T, P
     }
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall> SolCallBuilder<N, T, P, C> {
+#[doc(hidden)]
+impl<'a, N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall>
+    SolCallBuilder<N, T, &'a P, C>
+{
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
-    #[doc(hidden)]
-    pub fn new_sol(provider: P, address: &Address, call: &C) -> Self {
+    pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
         Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(Some(*address))
     }
+}
 
+impl<N: Network, T: Transport + Clone, P: Provider<N, T>, C: SolCall> SolCallBuilder<N, T, P, C> {
     /// Clears the decoder, returning a raw call builder.
     #[inline]
     pub fn clear_decoder(self) -> RawCallBuilder<N, T, P> {
@@ -385,21 +390,16 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
             return Err(Error::NotADeploymentTransaction);
         }
         let pending_tx = self.send().await?;
-        let receipt = pending_tx.await?;
-        receipt
-            .ok_or(Error::ContractNotDeployed)?
-            .contract_address()
-            .ok_or(Error::ContractNotDeployed)
+        let receipt = pending_tx.get_receipt().await?;
+        receipt.contract_address().ok_or(Error::ContractNotDeployed)
     }
 
     /// Broadcasts the underlying transaction to the network.
-    // TODO: more docs referring to customizing PendingTransaction
-    pub async fn send(
-        &self,
-    ) -> Result<impl IntoFuture<Output = Result<Option<N::ReceiptResponse>>> + '_> {
-        let pending = self.provider.send_transaction(self.request.clone()).await?;
-
-        Ok(pending.and_then(|hash| self.provider.get_transaction_receipt(hash)).map_err(Into::into))
+    ///
+    /// Returns a builder for configuring the pending transaction watcher.
+    /// See [`Provider::send_transaction`] for more information.
+    pub async fn send(&self) -> Result<PendingTransactionBuilder<'_, N, T>> {
+        Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
     /// Calculates the address that will be created by the transaction, if any.
@@ -428,6 +428,13 @@ impl<N: Network, T: Transport, P: Clone, D> CallBuilder<N, T, &P, D> {
 /// [`CallBuilder`] can be turned into a [`Future`] automatically with `.await`.
 ///
 /// Defaults to calling [`CallBuilder::call`].
+///
+/// # Note
+///
+/// This requires `Self: 'static` due to a current limitation in the Rust type system, namely that
+/// the associated future type, the returned future, must be a concrete type (`Box<dyn Future ...>`)
+/// and cannot be an opaque type (`impl Future ...`) because `impl Trait` in this position is not
+/// stable yet. See [rust-lang/rust#63063](https://github.com/rust-lang/rust/issues/63063).
 impl<N, T, P, D> IntoFuture for CallBuilder<N, T, P, D>
 where
     N: Network,
@@ -554,7 +561,6 @@ mod tests {
         );
     }
 
-    // TODO: send_transaction, PendingTransaction
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
         let (provider, anvil) = spawn_anvil();

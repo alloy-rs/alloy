@@ -114,6 +114,7 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 /// - The [`Subscription::recv_result`] and its variants will attempt to deserialize the
 ///  notifications and yield the `serde_json::Result` of the deserialization.
 #[derive(Debug)]
+#[must_use]
 pub struct Subscription<T> {
     pub(crate) inner: RawSubscription,
     _pd: std::marker::PhantomData<T>,
@@ -214,6 +215,26 @@ impl<T: DeserializeOwned> Subscription<T> {
         self.inner.try_recv().map(Into::into)
     }
 
+    /// Convert the subscription into a stream.
+    ///
+    /// Errors are logged and ignored.
+    pub fn into_stream(self) -> SubscriptionStream<T> {
+        SubscriptionStream {
+            id: self.inner.local_id,
+            inner: self.inner.into_stream(),
+            _pd: std::marker::PhantomData,
+        }
+    }
+
+    /// Convert the subscription into a stream that returns deserialization results.
+    pub fn into_result_stream(self) -> SubResultStream<T> {
+        SubResultStream {
+            id: self.inner.local_id,
+            inner: self.inner.into_stream(),
+            _pd: std::marker::PhantomData,
+        }
+    }
+
     /// Convert the subscription into a stream that may yield unexpected types.
     pub fn into_any_stream(self) -> SubAnyStream<T> {
         SubAnyStream {
@@ -262,15 +283,6 @@ impl<T: DeserializeOwned> Subscription<T> {
         }
     }
 
-    /// Convert the subscription into a stream.
-    pub fn into_stream(self) -> SubscriptionStream<T> {
-        SubscriptionStream {
-            id: self.inner.local_id,
-            inner: self.inner.into_stream(),
-            _pd: std::marker::PhantomData,
-        }
-    }
-
     /// Wrapper for [`blocking_recv`]. Block the current thread until a message
     /// is available, deserializing the message and returning the result.
     ///
@@ -300,16 +312,6 @@ impl<T: DeserializeOwned> Subscription<T> {
     ) -> Result<Result<T, serde_json::Error>, broadcast::error::TryRecvError> {
         self.inner.try_recv().map(|value| serde_json::from_str(value.get()))
     }
-
-    /// Convert the subscription into a stream that returns deserialization
-    /// results.
-    pub fn into_result_stream(self) -> SubResultStream<T> {
-        SubResultStream {
-            id: self.inner.local_id,
-            inner: self.inner.into_stream(),
-            _pd: std::marker::PhantomData,
-        }
-    }
 }
 
 /// A stream of notifications from the server, identified by a local ID. This
@@ -329,15 +331,22 @@ impl<T> SubAnyStream<T> {
 }
 
 impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
-    type Item = Result<SubscriptionItem<T>, BroadcastStreamRecvError>;
+    type Item = SubscriptionItem<T>;
 
     fn poll_next(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        match ready!(self.inner.poll_next_unpin(cx)) {
-            Some(value) => task::Poll::Ready(Some(value.map(Into::into))),
-            None => task::Poll::Ready(None),
+        loop {
+            match ready!(self.inner.poll_next_unpin(cx)) {
+                Some(Ok(value)) => return task::Poll::Ready(Some(value.into())),
+                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
+                    // This is OK.
+                    debug!(%err, %self.id, "stream lagged");
+                    continue;
+                }
+                None => return task::Poll::Ready(None),
+            }
         }
     }
 }
@@ -360,7 +369,7 @@ impl<T> SubscriptionStream<T> {
 }
 
 impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
-    type Item = Result<T, BroadcastStreamRecvError>;
+    type Item = T;
 
     fn poll_next(
         mut self: Pin<&mut Self>,
@@ -369,13 +378,18 @@ impl<T: DeserializeOwned> Stream for SubscriptionStream<T> {
         loop {
             match ready!(self.inner.poll_next_unpin(cx)) {
                 Some(Ok(value)) => match serde_json::from_str(value.get()) {
-                    Ok(item) => return task::Poll::Ready(Some(Ok(item))),
-                    Err(e) => {
-                        trace!(value = value.get(), error = ?e, "Received unexpected value in subscription.");
+                    Ok(item) => return task::Poll::Ready(Some(item)),
+                    Err(err) => {
+                        debug!(value = ?value.get(), %err, %self.id, "failed deserializing subscription item");
+                        error!(%err, %self.id, "failed deserializing subscription item");
                         continue;
                     }
                 },
-                Some(Err(e)) => return task::Poll::Ready(Some(Err(e))),
+                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
+                    // This is OK.
+                    debug!(%err, %self.id, "stream lagged");
+                    continue;
+                }
                 None => return task::Poll::Ready(None),
             }
         }
@@ -401,16 +415,24 @@ impl<T> SubResultStream<T> {
 }
 
 impl<T: DeserializeOwned> Stream for SubResultStream<T> {
-    type Item = Result<serde_json::Result<T>, BroadcastStreamRecvError>;
+    type Item = serde_json::Result<T>;
 
     fn poll_next(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<Option<Self::Item>> {
-        match ready!(self.inner.poll_next_unpin(cx)) {
-            Some(Ok(value)) => task::Poll::Ready(Some(Ok(serde_json::from_str(value.get())))),
-            Some(Err(e)) => task::Poll::Ready(Some(Err(e))),
-            None => task::Poll::Ready(None),
+        loop {
+            match ready!(self.inner.poll_next_unpin(cx)) {
+                Some(Ok(value)) => {
+                    return task::Poll::Ready(Some(serde_json::from_str(value.get())))
+                }
+                Some(Err(err @ BroadcastStreamRecvError::Lagged(_))) => {
+                    // This is OK.
+                    debug!(%err, %self.id, "stream lagged");
+                    continue;
+                }
+                None => return task::Poll::Ready(None),
+            }
         }
     }
 }

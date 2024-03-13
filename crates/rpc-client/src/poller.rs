@@ -1,6 +1,7 @@
 use crate::WeakClient;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_transport::{utils::Spawnable, Transport};
+use futures::{Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
@@ -15,14 +16,47 @@ use tracing::Instrument;
 /// The number of retries for polling a request.
 const MAX_RETRIES: usize = 3;
 
-/// A Poller task.
+/// A poller task builder.
+///
+/// This builder is used to create a poller task that repeatedly polls a method on a client and
+/// sends the responses to a channel. By default, this is done every 10 seconds, with a channel size
+/// of 16, and no limit on the number of successful polls. This is all configurable.
+///
+/// The builder is consumed using the [`spawn`](Self::spawn) method, which returns a channel to
+/// receive the responses. The task will continue to poll until either the client or the channel is
+/// dropped.
+///
+/// The channel can be converted into a stream using the [`into_stream`](PollChannel::into_stream)
+/// method.
+///
+/// Alternatively, [`into_stream`](Self::into_stream) can be used to directly return a stream of
+/// responses on the current thread. This is currently equivalent to `spawn().into_stream()`, but
+/// this may change in the future.
+///
+/// # Examples
+///
+/// Poll `eth_blockNumber` every 5 seconds:
+///
+/// ```no_run
+/// # async fn example<T: alloy_transport::Transport + Clone>(client: alloy_rpc_client::RpcClient<T>) -> Result<(), Box<dyn std::error::Error>> {
+/// use alloy_primitives::U64;
+/// use alloy_rpc_client::PollerBuilder;
+/// use futures_util::StreamExt;
+///
+/// let poller: PollerBuilder<_, (), U64> = client
+///     .prepare_static_poller("eth_blockNumber", ())
+///     .with_poll_interval(std::time::Duration::from_secs(5));
+/// let mut stream = poller.into_stream();
+/// while let Some(block_number) = stream.next().await {
+///    println!("polled block number: {block_number}");
+/// }
+/// # Ok(())
+/// # }
+/// ```
+// TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
-pub struct PollTask<Conn, Params, Resp>
-where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-{
+#[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
+pub struct PollerBuilder<Conn, Params, Resp> {
     /// The client to poll with.
     client: WeakClient<Conn>,
 
@@ -38,20 +72,22 @@ where
     _pd: PhantomData<fn() -> Resp>,
 }
 
-impl<Conn, Params, Resp> PollTask<Conn, Params, Resp>
+impl<Conn, Params, Resp> PollerBuilder<Conn, Params, Resp>
 where
     Conn: Transport + Clone,
     Params: RpcParam + 'static,
     Resp: RpcReturn + Clone,
 {
-    /// Create a new poller task with cloneable params.
+    /// Create a new poller task.
     pub fn new(client: WeakClient<Conn>, method: &'static str, params: Params) -> Self {
+        let poll_interval =
+            client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.default_poll_interval());
         Self {
             client,
             method,
             params,
             channel_size: 16,
-            poll_interval: Duration::from_secs(10),
+            poll_interval,
             limit: usize::MAX,
             _pd: PhantomData,
         }
@@ -73,17 +109,17 @@ where
         self
     }
 
-    /// Retuns the limit on the number of succesful polls.
+    /// Returns the limit on the number of successful polls.
     pub const fn limit(&self) -> usize {
         self.limit
     }
 
-    /// Sets a limit on the number of succesful polls.
+    /// Sets a limit on the number of successful polls.
     pub fn set_limit(&mut self, limit: Option<usize>) {
         self.limit = limit.unwrap_or(usize::MAX);
     }
 
-    /// Sets a limit on the number of succesful polls.
+    /// Sets a limit on the number of successful polls.
     pub fn with_limit(mut self, limit: Option<usize>) -> Self {
         self.set_limit(limit);
         self
@@ -105,7 +141,7 @@ where
         self
     }
 
-    /// Spawn the poller task, producing a stream of responses.
+    /// Starts the poller in a new Tokio task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
         let span = debug_span!("poller", method = self.method);
@@ -156,6 +192,15 @@ where
         fut.instrument(span).spawn_task();
         rx.into()
     }
+
+    /// Starts the poller and returns the stream of responses.
+    ///
+    /// Note that this is currently equivalent to `self.spawn().into_stream()`, but this may change
+    /// in the future.
+    // TODO: can we name this type? This should be a different type from `PollChannel::into_stream`
+    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
+        self.spawn().into_stream()
+    }
 }
 
 /// A channel yielding responses from a poller task.
@@ -203,8 +248,15 @@ where
         Self { rx: self.rx.resubscribe() }
     }
 
-    /// Convert the poll channel into a stream.
-    pub fn into_stream(self) -> BroadcastStream<Resp> {
+    /// Converts the poll channel into a stream.
+    // TODO: can we name this type?
+    pub fn into_stream(self) -> impl Stream<Item = Resp> + Unpin {
+        self.into_stream_raw().filter_map(|r| futures::future::ready(r.ok()))
+    }
+
+    /// Converts the poll channel into a stream that also yields
+    /// [lag errors](tokio_stream::wrappers::errors::BroadcastStreamRecvError).
+    pub fn into_stream_raw(self) -> BroadcastStream<Resp> {
         self.rx.into()
     }
 }

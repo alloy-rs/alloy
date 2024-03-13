@@ -1,9 +1,11 @@
-use crate::{CallBuilder, Interface, Result};
+use crate::{CallBuilder, Event, Interface, Result};
 use alloy_dyn_abi::DynSolValue;
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_network::Network;
 use alloy_primitives::{Address, Selector};
 use alloy_provider::Provider;
+use alloy_rpc_types::Filter;
+use alloy_sol_types::SolEvent;
 use alloy_transport::Transport;
 use std::marker::PhantomData;
 
@@ -96,6 +98,11 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T,
     ) -> Result<CallBuilder<N, T, &P, Function>> {
         let function = self.interface.get_from_selector(selector)?;
         CallBuilder::new_dyn(&self.provider, function, args)
+    }
+
+    /// Returns an [`Event`] builder with the provided filter.
+    pub fn event<E: SolEvent>(&self, filter: Filter) -> Event<N, T, &P, E> {
+        Event::new(&self.provider, filter)
     }
 }
 

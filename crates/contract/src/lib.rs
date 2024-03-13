@@ -21,6 +21,9 @@ extern crate self as alloy_contract;
 mod error;
 pub use error::*;
 
+mod event;
+pub use event::{Event, EventPoller};
+
 mod interface;
 pub use interface::*;
 
