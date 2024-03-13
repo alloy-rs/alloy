@@ -159,6 +159,18 @@ impl<N, T: Transport + Clone> RootProviderInner<N, T> {
 // todo: reorder
 /// Provider is parameterized with a network and a transport. The default
 /// transport is type-erased, but you can do `Provider<N, Http>`.
+///
+/// # Subscriptions
+///
+/// **IMPORTANT:** this is currently only available when `T` is `PubSubFrontend` or `BoxedClient`
+/// over `PubSubFrontend` due to an internal limitation. This means that layering transports will
+/// always disable subscription support. See [issue #296](https://github.com/alloy-rs/alloy/issues/296).
+///
+/// The provider supports `pubsub` subscriptions to new block headers and pending transactions. This
+/// is only available on `pubsub` clients, such as Websockets or IPC.
+///
+/// For a polling alternatives available over HTTP, use the `watch_*` methods. However, be aware
+/// that polling increases RPC usage drastically.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
