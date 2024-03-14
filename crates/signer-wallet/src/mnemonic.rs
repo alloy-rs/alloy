@@ -70,13 +70,12 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # Examples
     ///
     /// ```
-    /// use alloy_signer::{MnemonicBuilder, coins_bip39::English};
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_signer_wallet::{MnemonicBuilder, coins_bip39::English};
     ///
     /// let wallet = MnemonicBuilder::<English>::default()
     ///     .phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
     ///     .build()?;
-    ///
     /// # Ok(())
     /// # }
     /// ```
@@ -91,11 +90,10 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use alloy_signer::{coins_bip39::English, MnemonicBuilder};
-    ///
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
+    /// use alloy_signer_wallet::{coins_bip39::English, MnemonicBuilder};
     ///
+    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
     /// # Ok(())
     /// # }
     /// ```
