@@ -816,7 +816,7 @@ impl FilteredParams {
         self.filter.as_ref().map(|f| f.address.matches(address)).unwrap_or(true)
     }
 
-    /// Returns `true` if the log matches the the given topics
+    /// Returns `true` if the log matches the given topics
     pub fn filter_topics(&self, log_topics: &[B256]) -> bool {
         let topics = match self.filter.as_ref() {
             None => return true,
