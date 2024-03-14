@@ -3,7 +3,7 @@
 use alloy_primitives::U256;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
-pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 5;
+pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
 /// Multiplier for the current base fee to estimate max base fee for the next block.
 pub const EIP1559_BASE_FEE_MULTIPLIER: f64 = 2.0;
 /// The default percentile of gas premiums that are fetched for fee estimation.
