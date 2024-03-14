@@ -17,13 +17,13 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-elliptic-curve.workspace = true
 k256.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
 
 # keystore
+elliptic-curve = { workspace = true, optional = true }
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
 
 # mnemonic
@@ -47,6 +47,6 @@ yubihsm = { version = "0.42", features = ["mockhsm"] }
 coins-bip39 = { version = "0.8.7", default-features = false, features = ["english"] }
 
 [features]
-keystore = ["dep:eth-keystore"]
+keystore = ["dep:eth-keystore", "dep:elliptic-curve"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39"]
-yubihsm = ["dep:yubihsm"]
+yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
