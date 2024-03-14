@@ -18,11 +18,11 @@ cargo run --example mnemonic_signer
     - [ ] Fork
     - [ ] Testing
 - [ ] Big numbers
-    - [ ] Comparison and equivalence
-    - [ ] Conversion
-    - [ ] Creating Instances
-    - [ ] Math operations
-    - [ ] Utilities
+    - [x] [Comparison and equivalence](./big-numbers/examples/comparison_equivalence.rs)
+    - [x] [Conversion](./big-numbers/examples/conversion.rs)
+    - [x] [Creating Instances](./big-numbers/examples/create_instances.rs)
+    - [x] [Math operations](./big-numbers/examples/math_operations.rs)
+    - [x] [Math utilities](./big-numbers/examples/math_utilities.rs)
 - [ ] Contracts
     - [ ] Abigen
     - [ ] Compile
