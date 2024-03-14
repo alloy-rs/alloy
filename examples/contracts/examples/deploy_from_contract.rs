@@ -1,6 +1,6 @@
 //! Example of deploying a contract from Solidity code to Anvil and interacting with it.
 
-use alloy_network::{Ethereum, EthereumSigner};
+use alloy_network::EthereumSigner;
 use alloy_node_bindings::Anvil;
 use alloy_primitives::{U256, U64};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
@@ -38,9 +38,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a provider with a signer and the network.
     let http = Http::<Client>::new(anvil.endpoint().parse()?);
-    let provider = ProviderBuilder::<_, Ethereum>::new()
+    let provider = ProviderBuilder::new()
         .signer(EthereumSigner::from(wallet))
-        .network::<Ethereum>()
         .provider(RootProvider::new(RpcClient::new(http, true)));
 
     println!("Anvil running at `{}`", anvil.endpoint());
