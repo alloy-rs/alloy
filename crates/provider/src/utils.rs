@@ -3,14 +3,11 @@
 use alloy_primitives::{I256, U256};
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
-pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
+pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 5;
+/// Multiplier for the current base fee to estimate max base fee for the next block.
+pub const EIP1559_BASE_FEE_MULTIPLIER: f64 = 2.0;
 /// The default percentile of gas premiums that are fetched for fee estimation.
-pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 5.0;
-/// The default max priority fee per gas, used in case the base fee is within a threshold.
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE: u64 = 3_000_000_000;
-/// The threshold for base fee below which we use the default priority fee, and beyond which we
-/// estimate an appropriate value for priority fee.
-pub const EIP1559_FEE_ESTIMATION_PRIORITY_FEE_TRIGGER: u64 = 100_000_000_000;
+pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 /// The threshold max change/difference (in %) at which we will ignore the fee history values
 /// under it.
 pub const EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE: i64 = 200;
@@ -64,30 +61,10 @@ fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
     values[values.len() / 2]
 }
 
-fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
-    if base_fee_per_gas <= U256::from(40_000_000_000u64) {
-        base_fee_per_gas * U256::from(2)
-    } else if base_fee_per_gas <= U256::from(100_000_000_000u64) {
-        base_fee_per_gas * U256::from(16) / U256::from(10)
-    } else if base_fee_per_gas <= U256::from(200_000_000_000u64) {
-        base_fee_per_gas * U256::from(14) / U256::from(10)
-    } else {
-        base_fee_per_gas * U256::from(12) / U256::from(10)
-    }
-}
-
 /// The default EIP-1559 fee estimator which is based on the work by [MyCrypto](https://github.com/MyCryptoHQ/MyCrypto/blob/master/src/services/ApiService/Gas/eip1559.ts)
 pub fn eip1559_default_estimator(base_fee_per_gas: U256, rewards: Vec<Vec<U256>>) -> (U256, U256) {
-    let max_priority_fee_per_gas =
-        if base_fee_per_gas < U256::from(EIP1559_FEE_ESTIMATION_PRIORITY_FEE_TRIGGER) {
-            U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE)
-        } else {
-            std::cmp::max(
-                estimate_priority_fee(rewards),
-                U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE),
-            )
-        };
-    let potential_max_fee = base_fee_surged(base_fee_per_gas);
+    let max_priority_fee_per_gas = estimate_priority_fee(rewards);
+    let potential_max_fee = base_fee_per_gas * U256::from(EIP1559_BASE_FEE_MULTIPLIER);
     let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
         max_priority_fee_per_gas + potential_max_fee
     } else {
