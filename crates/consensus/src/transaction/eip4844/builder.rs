@@ -278,14 +278,24 @@ impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     pub fn from_slice(data: &[u8]) -> SidecarBuilder<T> {
         Self::from_coder_and_data(T::default(), data)
     }
+
+    /// Create a new builder with a pre-allocated capacity. This capacity is
+    /// measured in blobs, each of which is 256 KiB.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::from_coder_and_capacity(T::default(), capacity)
+    }
 }
 
 impl<T: SidecarCoder> SidecarBuilder<T> {
+    /// Instantiate a new builder with the provided coder and capacity. This
+    /// capacity is measured in blobs, each of which is 256 KiB.
+    pub fn from_coder_and_capacity(coder: T, capacity: usize) -> Self {
+        Self { inner: PartialSidecar::with_capacity(capacity), coder }
+    }
+
     /// Instantiate a new builder with the provided coder.
     pub fn from_coder(coder: T) -> Self {
-        let mut this = Self { inner: PartialSidecar::default(), coder };
-        this.inner.push_empty_blob();
-        this
+        Self::from_coder_and_capacity(coder, 1)
     }
 
     /// Calculate the length of bytes used by field elements in the builder.
@@ -303,7 +313,11 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
 
     /// Create a new builder from a slice of data.
     pub fn from_coder_and_data(coder: T, data: &[u8]) -> SidecarBuilder<T> {
-        let mut this = Self::from_coder(coder);
+        let required_fe = coder.required_fe(data);
+        let mut this = Self::from_coder_and_capacity(
+            coder,
+            required_fe.div_ceil(FIELD_ELEMENTS_PER_BLOB as usize),
+        );
         this.ingest(data);
         this
     }
