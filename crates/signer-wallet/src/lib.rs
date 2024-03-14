@@ -1,5 +1,3 @@
-//! In-memory (local) private key signer.
-
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
