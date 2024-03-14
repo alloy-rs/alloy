@@ -173,8 +173,6 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for Wallet<D> 
     }
 }
 
-// todo: these are implemented here because of a potential circular dep
-// we should move wallet/yubi etc. into its own crate
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<D> TxSigner<Signature> for Wallet<D>
