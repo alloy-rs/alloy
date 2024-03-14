@@ -120,6 +120,11 @@ commit signing. This option allows us to make small changes to your PR to bring
 it in line with these standards. It helps us get your PR in faster, and with
 less work from you.
 
+### Contributions Related to Spelling and Grammar
+
+At this time, we will not be accepting contributions that only fix spelling or grammatical errors in documentation, code or
+elsewhere.
+
 ### Cargo Commands
 
 This section lists some commonly needed commands.
