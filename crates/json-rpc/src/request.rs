@@ -2,12 +2,13 @@ use crate::{common::Id, RpcParam};
 use alloy_primitives::{keccak256, B256};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::borrow::Cow;
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
 #[derive(Debug, Clone)]
 pub struct RequestMeta {
     /// The method name.
-    pub method: &'static str,
+    pub method: Cow<'static, str>,
     /// The request ID.
     pub id: Id,
     /// Whether the request is a subscription, other than `eth_subscribe`.
@@ -16,13 +17,13 @@ pub struct RequestMeta {
 
 impl RequestMeta {
     /// Create a new `RequestMeta`.
-    pub const fn new(method: &'static str, id: Id) -> Self {
+    pub const fn new(method: Cow<'static, str>, id: Id) -> Self {
         Self { method, id, is_subscription: false }
     }
 
     /// Returns `true` if the request is a subscription.
-    pub const fn is_subscription(&self) -> bool {
-        self.is_subscription || matches!(self.method.as_bytes(), b"eth_subscribe")
+    pub fn is_subscription(&self) -> bool {
+        self.is_subscription || self.method == "eth_subscribe"
     }
 
     /// Indicates that the request is a non-standard subscription (i.e. not
@@ -51,12 +52,12 @@ pub struct Request<Params> {
 
 impl<Params> Request<Params> {
     /// Create a new `Request`.
-    pub const fn new(method: &'static str, id: Id, params: Params) -> Self {
-        Self { meta: RequestMeta::new(method, id), params }
+    pub fn new(method: impl Into<Cow<'static, str>>, id: Id, params: Params) -> Self {
+        Self { meta: RequestMeta::new(method.into(), id), params }
     }
 
     /// Returns `true` if the request is a subscription.
-    pub const fn is_subscription(&self) -> bool {
+    pub fn is_subscription(&self) -> bool {
         self.meta.is_subscription()
     }
 
@@ -146,7 +147,7 @@ where
         let sized_params = std::mem::size_of::<Params>() != 0;
 
         let mut map = serializer.serialize_map(Some(3 + sized_params as usize))?;
-        map.serialize_entry("method", self.meta.method)?;
+        map.serialize_entry("method", &self.meta.method[..])?;
 
         // Params may be omitted if it is 0-sized
         if sized_params {
@@ -194,8 +195,8 @@ impl SerializedRequest {
     }
 
     /// Returns the request method.
-    pub const fn method(&self) -> &'static str {
-        self.meta.method
+    pub const fn method(&self) -> &Cow<'static, str> {
+        &self.meta.method
     }
 
     /// Mark the request as a non-standard subscription (i.e. not
@@ -205,7 +206,7 @@ impl SerializedRequest {
     }
 
     /// Returns `true` if the request is a subscription.
-    pub const fn is_subscription(&self) -> bool {
+    pub fn is_subscription(&self) -> bool {
         self.meta.is_subscription()
     }
 

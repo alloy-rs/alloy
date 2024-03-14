@@ -24,6 +24,7 @@ use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResu
 use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
+    borrow::Cow,
     fmt,
     marker::PhantomData,
     sync::{Arc, OnceLock},
@@ -897,7 +898,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /* ---------------------------------------- raw calls --------------------------------------- */
 
     /// Sends a raw JSON-RPC request.
-    async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
+    async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcParam,
         R: RpcReturn,
@@ -909,7 +910,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Sends a raw JSON-RPC request with type-erased parameters and return.
     async fn raw_request_dyn(
         &self,
-        method: &'static str,
+        method: Cow<'static, str>,
         params: &RawValue,
     ) -> TransportResult<Box<RawValue>> {
         self.client().request(method, params).await
@@ -1086,7 +1087,7 @@ mod tests {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 
-        let num: U64 = provider.raw_request("eth_blockNumber", ()).await.unwrap();
+        let num: U64 = provider.raw_request("eth_blockNumber".into(), ()).await.unwrap();
         assert_eq!(0, num.to::<u64>())
     }
 
@@ -1128,7 +1129,7 @@ mod tests {
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
         let block: Block = provider
-            .raw_request::<(B256, bool), Block>("eth_getBlockByHash", (hash, true))
+            .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
             .await
             .unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);

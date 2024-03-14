@@ -41,7 +41,7 @@ impl InFlight {
     }
 
     /// Check if the request is a subscription.
-    pub(crate) const fn is_subscription(&self) -> bool {
+    pub(crate) fn is_subscription(&self) -> bool {
         self.request.is_subscription()
     }
 

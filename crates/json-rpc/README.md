@@ -29,8 +29,6 @@ Requests are sent via transports (see [alloy-transports]). This results in 1 of
 
 ### Limitations
 
-- This library models the method name as a `&'static str`, and is therefore
-  unsuitable for use with RPC servers with dynamic method names.
 - This library does not support borrowing response data from the deserializer.
   This is intended to simplify client implementations, but makes the library
   poorly suited for use in a high-performance server.
