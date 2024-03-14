@@ -1,0 +1,32 @@
+[package]
+name = "examples-providers"
+version = "0.0.0"
+publish = false
+
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dev-dependencies]
+alloy-primitives.workspace = true
+alloy-sol-types = { workspace = true, features = ["json"] }
+alloy-provider = { workspace = true, features = ["pubsub", "ws"] }
+alloy-contract.workspace = true
+alloy-pubsub.workspace = true
+alloy-rpc-types.workspace = true
+alloy-rpc-client.workspace = true
+alloy-rpc-trace-types.workspace = true
+alloy-node-bindings.workspace = true
+alloy-transport.workspace = true
+alloy-transport-http.workspace = true
+alloy-network.workspace = true
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
+eyre = "0.6.12"
+reqwest = "0.11.26"
+futures-util = "0.3"
