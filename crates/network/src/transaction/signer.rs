@@ -1,9 +1,5 @@
 use crate::Network;
 use alloy_consensus::SignableTransaction;
-use alloy_signer::{
-    k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId},
-    sign_transaction_with_chain_id, Signature, SignerSync, Wallet,
-};
 use async_trait::async_trait;
 
 /// A signer capable of signing any transaction for the given network.
@@ -63,32 +59,4 @@ pub trait TxSignerSync<Signature> {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature>;
-}
-
-// todo: these are implemented here because of a potential circular dep
-// we should move wallet/yubi etc. into its own crate
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D> TxSigner<Signature> for Wallet<D>
-where
-    D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
-{
-    async fn sign_transaction(
-        &self,
-        tx: &mut dyn SignableTransaction<Signature>,
-    ) -> alloy_signer::Result<Signature> {
-        sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
-    }
-}
-
-impl<D> TxSignerSync<Signature> for Wallet<D>
-where
-    D: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
-{
-    fn sign_transaction_sync(
-        &self,
-        tx: &mut dyn SignableTransaction<Signature>,
-    ) -> alloy_signer::Result<Signature> {
-        sign_transaction_with_chain_id!(self, tx, self.sign_hash_sync(&tx.signature_hash()))
-    }
 }

@@ -36,3 +36,7 @@ tracing-subscriber.workspace = true
 
 [features]
 eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]
+
+# WASM support
+browser = ["coins-ledger/browser"]
+node = ["coins-ledger/node"]

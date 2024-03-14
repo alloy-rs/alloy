@@ -71,7 +71,8 @@ where
     _phantom: PhantomData<(N, T)>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N, T, P, S> Provider<N, T> for SignerProvider<N, T, P, S>
 where
     N: Network,
@@ -112,7 +113,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
             .signer(EthereumSigner::from(wallet))

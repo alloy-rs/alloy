@@ -41,7 +41,7 @@ impl<N: Network, T: Transport + Clone> ChainStreamPoller<N, T> {
         }
     }
 
-    pub(crate) fn into_stream(mut self) -> impl Stream<Item = Block> + Send + 'static {
+    pub(crate) fn into_stream(mut self) -> impl Stream<Item = Block> + 'static {
         stream! {
         let mut poll_task = self.poll_task.spawn().into_stream_raw();
         'task: loop {

@@ -25,10 +25,10 @@ pub use transaction::{
     TxSignerSync,
 };
 
-pub use alloy_eips::eip2718;
-
 mod ethereum;
 pub use ethereum::{Ethereum, EthereumSigner};
+
+pub use alloy_eips::eip2718;
 
 /// A list of transactions, either hydrated or hashes.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

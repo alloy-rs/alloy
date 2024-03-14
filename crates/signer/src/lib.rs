@@ -21,28 +21,10 @@ pub use error::{Error, Result, UnsupportedSignerOperation};
 mod signer;
 pub use signer::{Signer, SignerSync};
 
-mod wallet;
-#[cfg(feature = "mnemonic")]
-pub use wallet::MnemonicBuilder;
-pub use wallet::{Wallet, WalletError};
-
 pub mod utils;
 
 pub use alloy_primitives::Signature;
 pub use k256;
-
-#[cfg(feature = "yubihsm")]
-pub use yubihsm;
-
-#[cfg(feature = "mnemonic")]
-pub use coins_bip39;
-
-/// A wallet instantiated with a locally stored private key
-pub type LocalWallet = Wallet<k256::ecdsa::SigningKey>;
-
-/// A wallet instantiated with a YubiHSM
-#[cfg(feature = "yubihsm")]
-pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 
 /// Utility to get and set the chain ID on a transaction and the resulting signature within a
 /// signer's `sign_transaction`.

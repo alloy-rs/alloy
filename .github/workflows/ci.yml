@@ -64,7 +64,7 @@ jobs:
       - run: cargo test --workspace --doc
       - run: cargo test --all-features --workspace --doc
 
-  wasm:
+  wasm-unknown:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -78,7 +78,7 @@ jobs:
           cache-on-failure: true
       - name: cargo hack
         run: |
-          cargo hack check --workspace --target wasm32-unknown-unknown \
+          cargo hack build --workspace --target wasm32-unknown-unknown \
             --exclude alloy-contract \
             --exclude alloy-internal-test-utils \
             --exclude alloy-network \
@@ -89,7 +89,31 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-wallet \
             --exclude alloy-transport-ipc
+
+  wasm-wasi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: wasm32-wasi
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: |
+          cargo hack build --workspace --target wasm32-wasi \
+            --exclude alloy-signer-gcp \
+            --exclude alloy-signer-ledger \
+            --exclude alloy-signer-trezor \
+            --exclude alloy-transport-ipc
+      # Ledger signer requires one of `browser` or `node` features.
+      - name: build ledger
+        run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
 
   feature-checks:
     runs-on: ubuntu-latest

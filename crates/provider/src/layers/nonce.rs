@@ -103,7 +103,8 @@ where
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N, T, P> Provider<N, T> for ManagedNonceProvider<N, T, P>
 where
     N: Network,
@@ -147,7 +148,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
@@ -172,7 +173,7 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)

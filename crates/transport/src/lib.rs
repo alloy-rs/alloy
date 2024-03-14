@@ -33,60 +33,16 @@ mod r#trait;
 pub use r#trait::Transport;
 
 pub use alloy_json_rpc::{RpcError, RpcResult};
+pub use futures_utils_wasm::{impl_future, BoxFuture};
 
 /// Misc. utilities for building transports.
 pub mod utils;
 
-pub use type_aliases::*;
+/// Pin-boxed future.
+pub type Pbf<'a, T, E> = futures_utils_wasm::BoxFuture<'a, Result<T, E>>;
 
-#[cfg(not(target_arch = "wasm32"))]
-mod type_aliases {
-    use crate::{TransportError, TransportResult};
-    use alloy_json_rpc::ResponsePacket;
+/// Future for transport-level requests.
+pub type TransportFut<'a, T = alloy_json_rpc::ResponsePacket, E = TransportError> = Pbf<'a, T, E>;
 
-    /// Pin-boxed future.
-    pub type Pbf<'a, T, E> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>>;
-
-    /// Future for Transport-level requests.
-    pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>>;
-
-    /// Future for RPC-level requests.
-    pub type RpcFut<'a, T> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = TransportResult<T>> + Send + 'a>>;
-
-    /// `impl Future` with a `Send` bound.
-    #[macro_export]
-    macro_rules! impl_future {
-        (<$($t:tt)+) => {
-            impl (::core::future::Future<$($t)+) + Send
-        };
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-mod type_aliases {
-    use crate::{TransportError, TransportResult};
-    use alloy_json_rpc::ResponsePacket;
-
-    /// Pin-boxed future.
-    pub type Pbf<'a, T, E> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'a>>;
-
-    /// Future for Transport-level requests.
-    pub type TransportFut<'a, T = ResponsePacket, E = TransportError> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + 'a>>;
-
-    /// Future for RPC-level requests.
-    pub type RpcFut<'a, T> =
-        std::pin::Pin<Box<dyn std::future::Future<Output = TransportResult<T>> + 'a>>;
-
-    /// `impl Future` without a `Send` bound.
-    #[macro_export]
-    macro_rules! impl_future {
-        (<$($t:tt)+) => {
-            impl ::core::future::Future<$($t)+
-        };
-    }
-}
+/// Future for RPC-level requests.
+pub type RpcFut<'a, T> = futures_utils_wasm::BoxFuture<'a, TransportResult<T>>;
