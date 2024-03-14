@@ -1,7 +1,7 @@
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256, U64};
-use alloy_transport::impl_future;
+use futures_utils_wasm::impl_future;
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]

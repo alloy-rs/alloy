@@ -22,6 +22,7 @@ pub enum Error {
     },
     /// [`alloy_dyn_abi`] error.
     #[error(transparent)]
+    #[cfg(feature = "eip712")]
     DynAbiError(#[from] alloy_dyn_abi::Error),
     /// [`ecdsa`] error.
     #[error(transparent)]

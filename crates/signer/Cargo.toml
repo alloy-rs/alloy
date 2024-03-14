@@ -14,15 +14,15 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["k256"] }
 
+async-trait.workspace = true
 auto_impl.workspace = true
 elliptic-curve.workspace = true
 k256.workspace = true
 thiserror.workspace = true
-async-trait.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
-alloy-dyn-abi = { workspace = true, features = ["eip712"] }
+alloy-dyn-abi = { workspace = true, optional = true, features = ["eip712"] }
 
 [dev-dependencies]
 serde.workspace = true
@@ -34,4 +34,4 @@ tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
-eip712 = ["dep:alloy-sol-types"]
+eip712 = ["dep:alloy-sol-types", "dep:alloy-dyn-abi"]
