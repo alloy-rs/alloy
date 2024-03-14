@@ -25,14 +25,15 @@ impl Default for PartialSidecar {
 }
 
 impl PartialSidecar {
-    /// Create a new builder.
+    /// Create a new builder, and push an empty blob to it. This is the default
+    /// constructor, and allocates space for 2 blobs (256 KiB). If you need more
+    /// space, use [`PartialSidecar::with_capacity`].
     pub fn new() -> Self {
-        // NB: vecs default to 100 capacity. Blobs are large. We don't want
-        // to allocate 100 blobs if we don't need them.
         Self::with_capacity(2)
     }
 
-    /// Create a new builder with a given capacity.
+    /// Create a new builder, preallocating room for `capacity` blobs, and push
+    /// an empty blob to it.
     pub fn with_capacity(capacity: usize) -> Self {
         let mut blobs = Vec::with_capacity(capacity);
         blobs.push(Blob::new([0u8; BYTES_PER_BLOB]));
@@ -174,6 +175,7 @@ pub trait SidecarCoder {
 /// - The right padding on the header word containing the data length.
 /// - Any right padding on the last word for each piece of data.
 #[derive(Debug, Copy, Clone, Default)]
+#[non_exhaustive]
 pub struct SimpleCoder;
 
 impl SimpleCoder {
