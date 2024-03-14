@@ -120,6 +120,8 @@ signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
 signer-aws = ["signers", "dep:alloy-signer-aws"]
 signer-gcp = ["signers", "dep:alloy-signer-gcp"]
 signer-ledger = ["signers", "dep:alloy-signer-ledger"]
+signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
+signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
 signer-trezor = ["signers", "dep:alloy-signer-trezor"]
 
 ## transports

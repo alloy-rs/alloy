@@ -21,7 +21,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&mut, Box)]
-pub trait Signer<Sig = Signature>: Send + Sync {
+pub trait Signer<Sig = Signature> {
     /// Signs the given hash.
     async fn sign_hash(&self, hash: &B256) -> Result<Sig>;
 
@@ -149,7 +149,7 @@ mod tests {
             }
         }
 
-        async fn test_unimplemented_signer<S: Signer + SignerSync>(s: &S) {
+        async fn test_unimplemented_signer<S: Signer + SignerSync + Send + Sync>(s: &S) {
             test_unsized_unimplemented_signer(s).await;
             test_unsized_unimplemented_signer_sync(s);
 
@@ -164,7 +164,7 @@ mod tests {
                 .is_err());
         }
 
-        async fn test_unsized_unimplemented_signer<S: Signer + ?Sized>(s: &S) {
+        async fn test_unsized_unimplemented_signer<S: Signer + ?Sized + Send + Sync>(s: &S) {
             assert_matches!(
                 s.sign_hash(&B256::ZERO).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
@@ -219,7 +219,10 @@ mod tests {
         }
 
         test_unimplemented_signer(&UnimplementedSigner).await;
-        test_unsized_unimplemented_signer(&UnimplementedSigner as &dyn Signer).await;
-        test_unsized_unimplemented_signer_sync(&UnimplementedSigner as &dyn SignerSync);
+        test_unsized_unimplemented_signer(&UnimplementedSigner as &(dyn Signer + Send + Sync))
+            .await;
+        test_unsized_unimplemented_signer_sync(
+            &UnimplementedSigner as &(dyn SignerSync + Send + Sync),
+        );
     }
 }
