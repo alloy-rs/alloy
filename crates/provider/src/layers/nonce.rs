@@ -26,10 +26,9 @@ use tokio::sync::Mutex;
 ///
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
-/// let provider = ProviderBuilder::<_, Ethereum>::new()
+/// let provider = ProviderBuilder::new()
 ///     .layer(ManagedNonceLayer)
 ///     .signer(EthereumSigner::from(signer)) // note the order!
-///     .network::<Ethereum>()
 ///     .provider(RootProvider::new(transport));
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -104,7 +103,8 @@ where
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N, T, P> Provider<N, T> for ManagedNonceProvider<N, T, P>
 where
     N: Network,
@@ -134,7 +134,7 @@ where
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_network::{Ethereum, EthereumSigner};
+    use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, U256};
     use alloy_rpc_client::RpcClient;
@@ -148,12 +148,11 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
-        let provider = ProviderBuilder::<_, Ethereum>::new()
+        let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
             .signer(EthereumSigner::from(wallet))
-            .network::<Ethereum>()
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
         let tx = TransactionRequest {
@@ -174,15 +173,14 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
-        let from = anvil.addresses()[0];
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
-        let provider = ProviderBuilder::<_, Ethereum>::new()
+        let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
             .signer(EthereumSigner::from(wallet))
-            .network::<Ethereum>()
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
+        let from = anvil.addresses()[0];
         let tx = TransactionRequest {
             from: Some(from),
             value: Some(U256::from(100)),

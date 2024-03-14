@@ -36,6 +36,7 @@ alloy-signer-aws = { version = "0.1.0", default-features = false, path = "crates
 alloy-signer-gcp = { version = "0.1.0", default-features = false, path = "crates/signer-gcp" }
 alloy-signer-ledger = { version = "0.1.0", default-features = false, path = "crates/signer-ledger" }
 alloy-signer-trezor = { version = "0.1.0", default-features = false, path = "crates/signer-trezor" }
+alloy-signer-wallet = { version = "0.1.0", default-features = false, path = "crates/signer-wallet" }
 alloy-transport = { version = "0.1.0", default-features = false, path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", default-features = false, path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", default-features = false, path = "crates/transport-ipc" }
@@ -66,6 +67,7 @@ async-trait = "0.1"
 futures = "0.3"
 futures-util = "0.3"
 futures-executor = "0.3"
+futures-utils-wasm = "0.1"
 
 hyper = "0.14"
 tokio = "1"
@@ -88,10 +90,11 @@ rand = "0.8"
 reqwest = { version = "0.11", default-features = false }
 semver = "1.0"
 thiserror = "1.0"
+thiserror-no-std = "2.0.2"
 url = "2.5"
 
 ## serde
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"], default-features = false }
 serde_json = "1.0"
 
 ## misc-testing
@@ -103,8 +106,12 @@ serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
 
-# TODO: Keep around until alloy-contract is stable.
-# This should only be used in `alloy-contract` tests.
+# TODO: Remove eventually.
 [patch.crates-io]
-# alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ab0cab1047a088be6cffa4e7a2fcde7cf77aa460" }
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", branch = "dani/sol-event-filters" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }

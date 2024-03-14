@@ -34,10 +34,8 @@ mod chain;
 mod heart;
 pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
-pub mod new;
-
-#[doc(inline)]
-pub use new::{AnvilProvider, Provider, RawProvider, RootProvider};
+mod provider;
+pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
 pub mod utils;
 

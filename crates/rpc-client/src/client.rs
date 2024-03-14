@@ -192,9 +192,9 @@ impl<T> RpcClientInner<T> {
 
     /// Build a `JsonRpcRequest` with the given method and params.
     ///
-    /// This function reserves an ID for the request, however the request
-    /// is not sent. To send a request, use [`RpcClientInner::prepare`] and
-    /// await the returned [`RpcCall`].
+    /// This function reserves an ID for the request, however the request is not sent.
+    ///
+    /// To send a request, use [`RpcClientInner::request`] and await the returned [`RpcCall`].
     #[inline]
     pub fn make_request<Params: RpcParam>(
         &self,
@@ -235,18 +235,18 @@ impl<T> RpcClientInner<T> {
 }
 
 impl<T: Transport + Clone> RpcClientInner<T> {
-    /// Prepare an [`RpcCall`].
+    /// Prepares an [`RpcCall`].
     ///
-    /// This function reserves an ID for the request, however the request
-    /// is not sent. To send a request, await the returned [`RpcCall`].
+    /// This function reserves an ID for the request, however the request is not sent.
+    /// To send a request, await the returned [`RpcCall`].
     ///
-    /// ### Note:
+    /// # Note
     ///
-    /// Serialization is done lazily. It will not be performed until the call
-    /// is awaited. This means that if a serializer error occurs, it will not
-    /// be caught until the call is awaited.
-    #[doc(alias = "request")]
-    pub fn prepare<Params: RpcParam, Resp: RpcReturn>(
+    /// Serialization is done lazily. It will not be performed until the call is awaited.
+    /// This means that if a serializer error occurs, it will not be caught until the call is
+    /// awaited.
+    #[doc(alias = "prepare")]
+    pub fn request<Params: RpcParam, Resp: RpcReturn>(
         &self,
         method: &'static str,
         params: Params,

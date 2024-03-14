@@ -2,8 +2,15 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
+#[cfg(not(feature = "std"))]
+use crate::alloc::{vec, vec::Vec};
+
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{BufMut, Header, EMPTY_STRING_CODE};
+use core::{
+    fmt,
+    fmt::{Display, Formatter},
+};
 
 // https://eips.ethereum.org/EIPS/eip-2718#transactiontype-only-goes-up-to-0x7f
 const TX_TYPE_BYTE_MAX: u8 = 0x7f;
@@ -11,18 +18,31 @@ const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
-    #[error(transparent)]
-    RlpError(#[from] alloy_rlp::Error),
+    RlpError(alloy_rlp::Error),
     /// Got an unexpected type flag while decoding.
-    #[error("Unexpected type flag. Got {0}.")]
     UnexpectedType(u8),
-    /// Some other error occurred.
-    #[error(transparent)]
-    Custom(#[from] Box<dyn std::error::Error>),
 }
+
+impl Display for Eip2718Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RlpError(err) => write!(f, "{err}"),
+            Self::UnexpectedType(t) => write!(f, "Unexpected type flag. Got {t}."),
+        }
+    }
+}
+
+impl From<alloy_rlp::Error> for Eip2718Error {
+    fn from(err: alloy_rlp::Error) -> Self {
+        Self::RlpError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Eip2718Error {}
 
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
@@ -43,15 +63,15 @@ pub trait Decodable2718: Sized {
     /// ## Note
     ///
     /// This should be a simple match block that invokes an inner type's RLP decoder.
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode the default variant.
     ///
     /// This function is invoked by [`Self::decode_2718`] when no type byte can be extracted.
-    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error>;
+    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode an EIP-2718 transaction into a concrete instance
-    fn decode_2718(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn decode_2718(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::extract_type_byte(buf)
             .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
             .unwrap_or_else(|| Self::fallback_decode(buf))
@@ -63,7 +83,7 @@ pub trait Decodable2718: Sized {
     /// type-flag prepended to an opaque inner encoding. The inner encoding is
     /// RLP for all current Ethereum transaction types, but may not be in future
     /// versions of the protocol.
-    fn network_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn network_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         // Keep the original buffer around by copying it.
         let mut h_decode = *buf;
         let h = Header::decode(&mut h_decode)?;
@@ -78,7 +98,7 @@ pub trait Decodable2718: Sized {
         let remaining_len = buf.len();
 
         if remaining_len == 0 || remaining_len < h.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort.into());
+            return Err(alloy_rlp::Error::InputTooShort);
         }
 
         let ty = buf[0];
@@ -90,7 +110,7 @@ pub trait Decodable2718: Sized {
         // string Header with payload_length of 1, we need to make sure this check is only
         // performed for transactions with a string header
         if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
-            return Err(alloy_rlp::Error::UnexpectedLength.into());
+            return Err(alloy_rlp::Error::UnexpectedLength);
         }
 
         Ok(tx)

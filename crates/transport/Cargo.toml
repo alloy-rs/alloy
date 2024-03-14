@@ -16,6 +16,7 @@ alloy-json-rpc.workspace = true
 
 base64.workspace = true
 futures-util.workspace = true
+futures-utils-wasm.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 serde.workspace = true
 thiserror.workspace = true

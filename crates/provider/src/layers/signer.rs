@@ -17,9 +17,8 @@ use std::marker::PhantomData;
 ///
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
-/// let provider = ProviderBuilder::<_, Ethereum>::new()
+/// let provider = ProviderBuilder::new()
 ///     .signer(EthereumSigner::from(signer))
-///     .network::<Ethereum>()
 ///     .provider(RootProvider::new(transport));
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -72,7 +71,8 @@ where
     _phantom: PhantomData<(N, T)>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N, T, P, S> Provider<N, T> for SignerProvider<N, T, P, S>
 where
     N: Network,
@@ -99,7 +99,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{Provider, ProviderBuilder, RootProvider};
-    use alloy_network::{Ethereum, EthereumSigner};
+    use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, U256, U64};
     use alloy_rpc_client::RpcClient;
@@ -113,14 +113,10 @@ mod tests {
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
 
-        let wallet = alloy_signer::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
-        // can we somehow remove the need for <_, Ethereum>? we NEED to call .network<Ethereum>
-        // note: we need to 1) add <_, Ethereum> 2) layer things, and then 3) call .network before
-        // we can call provider
-        let provider = ProviderBuilder::<_, Ethereum>::new()
+        let provider = ProviderBuilder::new()
             .signer(EthereumSigner::from(wallet))
-            .network::<Ethereum>()
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
         let tx = TransactionRequest {

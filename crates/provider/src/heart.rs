@@ -361,7 +361,7 @@ pub(crate) struct Heartbeat<S> {
     reap_at: BTreeMap<Instant, B256>,
 }
 
-impl<S: Stream<Item = Block>> Heartbeat<S> {
+impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
     /// Create a new heartbeat task.
     pub(crate) fn new(stream: S) -> Self {
         Self {
@@ -452,46 +452,67 @@ impl<S> Heartbeat<S> {
     }
 }
 
-impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
-    /// Spawn the heartbeat task, returning a [`HeartbeatHandle`]
-    pub(crate) fn spawn(mut self) -> HeartbeatHandle {
+#[cfg(target_arch = "wasm32")]
+impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
+    /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
         let (latest, latest_rx) = watch::channel(None::<Block>);
-        let (ix_tx, mut ixns) = mpsc::channel(16);
+        let (ix_tx, ixns) = mpsc::channel(16);
 
-        let fut = async move {
-            'shutdown: loop {
-                {
-                    let next_reap = self.next_reap();
-                    let sleep = std::pin::pin!(tokio::time::sleep_until(next_reap.into()));
-
-                    // We bias the select so that we always handle new messages
-                    // before checking blocks, and reap timeouts are last.
-                    select! {
-                        biased;
-
-                        // Watch for new transactions.
-                        ix_opt = ixns.recv() => match ix_opt {
-                            Some(to_watch) => self.handle_watch_ix(to_watch),
-                            None => break 'shutdown, // ix channel is closed
-                        },
-
-                        // Wake up to handle new blocks.
-                        block = self.stream.select_next_some() => {
-                            self.handle_new_block(block, &latest);
-                        },
-
-                        // This arm ensures we always wake up to reap timeouts,
-                        // even if there are no other events.
-                        _ = sleep => {},
-                    }
-                }
-
-                // Always reap timeouts
-                self.reap_timeouts();
-            }
-        };
-        fut.spawn_task();
+        self.into_future(latest, ixns).spawn_task();
 
         HeartbeatHandle { tx: ix_tx, latest: latest_rx }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
+    /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
+    pub(crate) fn spawn(self) -> HeartbeatHandle {
+        let (latest, latest_rx) = watch::channel(None::<Block>);
+        let (ix_tx, ixns) = mpsc::channel(16);
+
+        self.into_future(latest, ixns).spawn_task();
+
+        HeartbeatHandle { tx: ix_tx, latest: latest_rx }
+    }
+}
+
+impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
+    async fn into_future(
+        mut self,
+        latest: watch::Sender<Option<Block>>,
+        mut ixns: mpsc::Receiver<TxWatcher>,
+    ) {
+        'shutdown: loop {
+            {
+                let next_reap = self.next_reap();
+                let sleep = std::pin::pin!(tokio::time::sleep_until(next_reap.into()));
+
+                // We bias the select so that we always handle new messages
+                // before checking blocks, and reap timeouts are last.
+                select! {
+                    biased;
+
+                    // Watch for new transactions.
+                    ix_opt = ixns.recv() => match ix_opt {
+                        Some(to_watch) => self.handle_watch_ix(to_watch),
+                        None => break 'shutdown, // ix channel is closed
+                    },
+
+                    // Wake up to handle new blocks.
+                    block = self.stream.select_next_some() => {
+                        self.handle_new_block(block, &latest);
+                    },
+
+                    // This arm ensures we always wake up to reap timeouts,
+                    // even if there are no other events.
+                    _ = sleep => {},
+                }
+            }
+
+            // Always reap timeouts
+            self.reap_timeouts();
+        }
     }
 }
