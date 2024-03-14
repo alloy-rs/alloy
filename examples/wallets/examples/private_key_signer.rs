@@ -1,6 +1,6 @@
 //! Example of using a local wallet to sign and broadcast a transaction on a local Anvil node.
 
-use alloy_network::{Ethereum, EthereumSigner};
+use alloy_network::EthereumSigner;
 use alloy_node_bindings::Anvil;
 use alloy_primitives::{U256, U64};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
@@ -21,9 +21,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a provider with a signer and the network.
     let http = Http::<Client>::new(anvil.endpoint().parse()?);
-    let provider = ProviderBuilder::<_, Ethereum>::new()
+    let provider = ProviderBuilder::new()
         .signer(EthereumSigner::from(alice))
-        .network::<Ethereum>()
         .provider(RootProvider::new(RpcClient::new(http, true)));
 
     // Create a transaction.

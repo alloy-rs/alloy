@@ -1,6 +1,6 @@
 //! Example of signing and sending a transaction using a Ledger device.
 
-use alloy_network::{Ethereum, EthereumSigner};
+use alloy_network::EthereumSigner;
 use alloy_primitives::{address, U256};
 use alloy_provider::{Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
@@ -16,9 +16,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a provider with the signer and the network.
     let http = Http::<Client>::new("http://localhost:8545".parse()?);
-    let provider = ProviderBuilder::<_, Ethereum>::new()
+    let provider = ProviderBuilder::new()
         .signer(EthereumSigner::from(signer))
-        .network::<Ethereum>()
         .provider(RootProvider::new(RpcClient::new(http, true)));
 
     // Create a transaction.
