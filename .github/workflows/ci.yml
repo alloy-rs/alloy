@@ -111,6 +111,9 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-transport-ipc
+      # Ledger signer requires one of `browser` or `node` features.
+      - name: check ledger
+        run: cargo check -p alloy-signer-ledger --features browser --target wasm32-wasi
 
   feature-checks:
     runs-on: ubuntu-latest
