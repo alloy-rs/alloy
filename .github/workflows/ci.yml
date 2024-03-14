@@ -64,7 +64,7 @@ jobs:
       - run: cargo test --workspace --doc
       - run: cargo test --all-features --workspace --doc
 
-  wasm:
+  wasm-unknown:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -90,6 +90,26 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-signer-wallet \
+            --exclude alloy-transport-ipc
+
+  wasm-wasi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: wasm32-wasi
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: |
+          cargo hack check --workspace --target wasm32-wasi \
+            --exclude alloy-signer-gcp \
+            --exclude alloy-signer-ledger \
+            --exclude alloy-signer-trezor \
             --exclude alloy-transport-ipc
 
   feature-checks:

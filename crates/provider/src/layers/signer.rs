@@ -71,7 +71,8 @@ where
     _phantom: PhantomData<(N, T)>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N, T, P, S> Provider<N, T> for SignerProvider<N, T, P, S>
 where
     N: Network,
