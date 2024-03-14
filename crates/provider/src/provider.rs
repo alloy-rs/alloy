@@ -787,11 +787,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
 
         // use the provided fee estimator function, or fallback to the default implementation.
         let (max_fee_per_gas, max_priority_fee_per_gas) = if let Some(es) = estimator {
-            es(base_fee_per_gas, fee_history.reward.unwrap_or_default())
+            es(base_fee_per_gas, &fee_history.reward.unwrap_or_default())
         } else {
             utils::eip1559_default_estimator(
                 base_fee_per_gas,
-                fee_history.reward.unwrap_or_default(),
+                &fee_history.reward.unwrap_or_default(),
             )
         };
 
