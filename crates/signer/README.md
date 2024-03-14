@@ -21,18 +21,18 @@ Signer implementation in Alloy:
 Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-712)):
 
 ```rust
-use alloy_signer::{LocalWallet, Signer, SignerSync};
+use alloy_signer::{Signer, SignerSync};
 
-// Instantiate the wallet.
-let wallet = LocalWallet::random();
+// Instantiate a signer.
+let signer = alloy_signer_wallet::LocalWallet::random();
 
 // Sign a message.
 let message = "Some data";
-let signature = wallet.sign_message_sync(message.as_bytes())?;
+let signature = signer.sign_message_sync(message.as_bytes())?;
 
 // Recover the signer from the message.
 let recovered = signature.recover_address_from_msg(message)?;
-assert_eq!(recovered, wallet.address());
+assert_eq!(recovered, signer.address());
 # Ok::<_, Box<dyn std::error::Error>>(())
 ```
 
@@ -41,12 +41,12 @@ Sign a transaction:
 ```rust
 use alloy_consensus::TxLegacy;
 use alloy_primitives::{U256, address, bytes};
-use alloy_signer::{LocalWallet, Signer, SignerSync};
+use alloy_signer::{Signer, SignerSync};
 use alloy_network::{TxSignerSync};
 
-// Instantiate the wallet.
-let wallet = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
-    .parse::<LocalWallet>()?;
+// Instantiate a signer.
+let signer = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
+    .parse::<alloy_signer_wallet::LocalWallet>()?;
 
 // Create a transaction.
 let mut tx = TxLegacy {
@@ -60,6 +60,6 @@ let mut tx = TxLegacy {
 };
 
 // Sign it.
-let signature = wallet.sign_transaction_sync(&mut tx)?;
+let signature = signer.sign_transaction_sync(&mut tx)?;
 # Ok::<_, Box<dyn std::error::Error>>(())
 ```

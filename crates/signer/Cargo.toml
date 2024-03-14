@@ -25,11 +25,12 @@ alloy-sol-types = { workspace = true, optional = true }
 alloy-dyn-abi = { workspace = true, optional = true, features = ["eip712"] }
 
 [dev-dependencies]
-serde.workspace = true
 alloy-consensus.workspace = true
 alloy-network.workspace = true
+alloy-signer-wallet.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true
+serde.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

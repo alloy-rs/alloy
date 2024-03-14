@@ -63,9 +63,9 @@ pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// prefix the message being hashed with the `Ethereum Signed Message` domain separator.
 ///
 /// ```
-/// use alloy_signer::{LocalWallet, Signer, SignerSync};
+/// use alloy_signer::{Signer, SignerSync};
 ///
-/// let wallet = LocalWallet::random();
+/// let wallet = alloy_signer_wallet::LocalWallet::random();
 ///
 /// // Optionally, the wallet's chain id can be set, in order to use EIP-155
 /// // replay protection with different chains

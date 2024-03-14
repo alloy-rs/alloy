@@ -89,6 +89,7 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
+            --exclude alloy-signer-wallet \
             --exclude alloy-transport-ipc
 
   feature-checks:
