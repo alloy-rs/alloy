@@ -19,7 +19,8 @@ alloy-primitives.workspace = true
 alloy-provider.workspace = true
 alloy-rpc-client.workspace = true
 alloy-signer.workspace = true
-alloy-sol-types = { workspace = true, features = ["std", "json"] }
+alloy-sol-types = { workspace = true, features = ["json"] }
 alloy-transport-http.workspace = true
+
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
