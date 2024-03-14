@@ -26,8 +26,9 @@ impl Default for PartialSidecar {
 
 impl PartialSidecar {
     /// Create a new builder, and push an empty blob to it. This is the default
-    /// constructor, and allocates space for 2 blobs (256 KiB). If you need more
-    /// space, use [`PartialSidecar::with_capacity`].
+    /// constructor, and allocates space for 2 blobs (256 KiB). If you want to
+    /// preallocate a specific number of blobs, use
+    /// [`PartialSidecar::with_capacity`].
     pub fn new() -> Self {
         Self::with_capacity(2)
     }
@@ -270,17 +271,22 @@ where
 
 impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     /// Instantiate a new builder and new coder instance.
+    ///
+    /// By default, this allocates space for 2 blobs (256 KiB). If you want to
+    /// preallocate a specific number of blobs, use
+    /// [`SidecarBuilder::with_capacity`].
     pub fn new() -> Self {
         Self::from_coder(T::default())
     }
 
-    /// Create a new builder from a slice of data.
+    /// Create a new builder from a slice of data by calling
+    /// [`SidecarBuilder::from_coder_and_data`]
     pub fn from_slice(data: &[u8]) -> SidecarBuilder<T> {
         Self::from_coder_and_data(T::default(), data)
     }
 
     /// Create a new builder with a pre-allocated capacity. This capacity is
-    /// measured in blobs, each of which is 256 KiB.
+    /// measured in blobs, each of which is 128 KiB.
     pub fn with_capacity(capacity: usize) -> Self {
         Self::from_coder_and_capacity(T::default(), capacity)
     }
@@ -288,12 +294,17 @@ impl<T: SidecarCoder + Default> SidecarBuilder<T> {
 
 impl<T: SidecarCoder> SidecarBuilder<T> {
     /// Instantiate a new builder with the provided coder and capacity. This
-    /// capacity is measured in blobs, each of which is 256 KiB.
+    /// capacity is measured in blobs, each of which is 128 KiB.
     pub fn from_coder_and_capacity(coder: T, capacity: usize) -> Self {
         Self { inner: PartialSidecar::with_capacity(capacity), coder }
     }
 
     /// Instantiate a new builder with the provided coder.
+    ///
+    /// This is equivalent to calling
+    /// [`SidecarBuilder::from_coder_and_capacity`] with a capacity of 1.
+    /// If you want to preallocate a specific number of blobs, use
+    /// [`SidecarBuilder::from_coder_and_capacity`].
     pub fn from_coder(coder: T) -> Self {
         Self::from_coder_and_capacity(coder, 1)
     }
