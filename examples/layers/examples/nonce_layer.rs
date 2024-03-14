@@ -1,14 +1,12 @@
-//! Example of the signer layer.
+//! Example of using the `ManagedNonceLayer` in the provider.
 
-use alloy_network::{Ethereum, EthereumSigner};
-use alloy_primitives::{address, U256};
-use alloy_provider::{
-    layers::{self, ManagedNonceLayer},
-    Provider, ProviderBuilder, RootProvider,
-};
+use alloy_network::EthereumSigner;
+use alloy_node_bindings::Anvil;
+use alloy_primitives::{address, U256, U64};
+use alloy_provider::{layers::ManagedNonceLayer, Provider, ProviderBuilder, RootProvider};
 use alloy_rpc_client::RpcClient;
 use alloy_rpc_types::request::TransactionRequest;
-use alloy_signer_ledger::{HDPath, LedgerSigner};
+use alloy_signer::LocalWallet;
 use alloy_transport_http::Http;
 use reqwest::Client;
 
@@ -23,19 +21,23 @@ use reqwest::Client;
 /// in the correct order, or if you want to avoid having to manually manage the nonce yourself.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Instantiate the application by acquiring a lock on the Ledger device.
-    let signer = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
+    // Spin up a local Anvil node.
+    // Ensure `anvil` is available in $PATH
+    let anvil = Anvil::new().spawn();
 
-    // Create a provider with the signer and the network.
-    let http = Http::<Client>::new("http://localhost:8545".parse()?);
-    let provider = ProviderBuilder::<_, Ethereum>::new()
-        .signer(EthereumSigner::from(signer))
-        .layer(layers::ManagedNonceLayer)
-        .network::<Ethereum>()
+    // Set up the wallets.
+    let wallet: LocalWallet = anvil.keys()[0].clone().into();
+    let from = wallet.address();
+
+    // Create a provider with a signer and the network.
+    let http = Http::<Client>::new(anvil.endpoint().parse()?);
+    let provider = ProviderBuilder::new()
+        .layer(ManagedNonceLayer)
+        .signer(EthereumSigner::from(wallet))
         .provider(RootProvider::new(RpcClient::new(http, true)));
 
-    // Create a transaction.
     let tx = TransactionRequest {
+        from: Some(from),
         value: Some(U256::from(100)),
         to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
         gas_price: Some(U256::from(20e9)),
@@ -43,10 +45,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    // Broadcast the transaction and wait for the receipt.
-    let receipt = provider.send_transaction(tx).await?.with_confirmations(3).get_receipt().await?;
+    let pending = provider.send_transaction(tx.clone()).await?;
+    let tx_hash = pending.watch().await?;
+    let mined_tx = provider.get_transaction_by_hash(tx_hash).await?;
+    assert_eq!(mined_tx.nonce, U64::from(0));
 
-    println!("Send transaction: {:?}", receipt.transaction_hash.unwrap());
+    println!("Transaction sent with nonce: {}", mined_tx.nonce);
+
+    let pending = provider.send_transaction(tx).await?;
+    let tx_hash = pending.watch().await?;
+    let mined_tx = provider.get_transaction_by_hash(tx_hash).await?;
+    assert_eq!(mined_tx.nonce, U64::from(1));
+
+    println!("Transaction sent with nonce: {}", mined_tx.nonce);
 
     Ok(())
 }
