@@ -28,7 +28,7 @@ pub enum TransportErrorKind {
     BackendGone,
 
     /// Pubsub service is not available for the current provider.
-    #[error("subscriptions are not avalaible on this provider")]
+    #[error("subscriptions are not available on this provider")]
     PubsubUnavailable,
 
     /// Transaction confirmed but `get_transaction_receipt` returned `None`.
