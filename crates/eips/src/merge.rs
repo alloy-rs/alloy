@@ -1,6 +1,6 @@
 //! Constants related to the beacon chain consensus.
 
-use std::time::Duration;
+use core::time::Duration;
 
 /// An EPOCH is a series of 32 slots.
 pub const EPOCH_SLOTS: u64 = 32;

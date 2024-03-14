@@ -1,6 +1,8 @@
-use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy};
+use crate::{
+    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
+};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_rlp::{length_of_length, Decodable, Encodable};
+use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -12,7 +14,7 @@ use alloy_rlp::{length_of_length, Decodable, Encodable};
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum TxType {
-    /// Wrapped legacy transaction type.
+    /// Legacy transaction type.
     Legacy = 0,
     /// EIP-2930 transaction type.
     Eip2930 = 1,
@@ -25,7 +27,7 @@ pub enum TxType {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(match u.int_in_range(0..=2)? {
+        Ok(match u.int_in_range(0..=3)? {
             0 => TxType::Legacy,
             1 => TxType::Eip2930,
             2 => TxType::Eip1559,
@@ -40,8 +42,9 @@ impl TryFrom<u8> for TxType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
+            0 => Err(Eip2718Error::UnexpectedType(value)),
             // SAFETY: repr(u8) with explicit discriminant
-            ..=3 => Ok(unsafe { std::mem::transmute(value) }),
+            1..=3 => Ok(unsafe { std::mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }
@@ -62,8 +65,6 @@ impl TryFrom<u8> for TxType {
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     Legacy(Signed<TxLegacy>),
-    /// A [`TxLegacy`] tagged with type 0.
-    TaggedLegacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
@@ -71,7 +72,9 @@ pub enum TxEnvelope {
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
     /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve
-    /// historical transactions.. 2 - The transaction with a sidecar, which is the form used to
+    /// historical transactions..
+    ///
+    /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
     Eip4844(Signed<TxEip4844Variant>),
 }
@@ -100,31 +103,71 @@ impl From<Signed<TxEip4844Variant>> for TxEnvelope {
     }
 }
 
+impl From<Signed<TxEip4844>> for TxEnvelope {
+    fn from(v: Signed<TxEip4844>) -> Self {
+        let (tx, signature, hash) = v.into_parts();
+        Self::Eip4844(Signed::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash))
+    }
+}
+
+impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
+    fn from(v: Signed<TxEip4844WithSidecar>) -> Self {
+        let (tx, signature, hash) = v.into_parts();
+        Self::Eip4844(Signed::new_unchecked(
+            TxEip4844Variant::TxEip4844WithSidecar(tx),
+            signature,
+            hash,
+        ))
+    }
+}
+
 impl TxEnvelope {
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
         match self {
-            Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
+            Self::Legacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
         }
     }
 
-    /// Return the length of the inner txn.
+    /// Return the length of the inner txn, __without a type byte__.
     pub fn inner_length(&self) -> usize {
         match self {
-            Self::Legacy(t) | Self::TaggedLegacy(t) => t.length(),
-            Self::Eip2930(t) => t.length(),
-            Self::Eip1559(t) => t.length(),
-            Self::Eip4844(t) => t.length(),
+            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Eip2930(t) => {
+                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
+                Header { list: true, payload_length }.length() + payload_length
+            }
+            Self::Eip1559(t) => {
+                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
+                Header { list: true, payload_length }.length() + payload_length
+            }
+            Self::Eip4844(t) => match t.tx() {
+                TxEip4844Variant::TxEip4844(tx) => {
+                    let payload_length = tx.fields_len() + t.signature().rlp_vrs_len();
+                    Header { list: true, payload_length }.length() + payload_length
+                }
+                TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+                    let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
+                    let inner_header = Header { list: true, payload_length: inner_payload_length };
+
+                    let outer_payload_length =
+                        inner_header.length() + inner_payload_length + tx.sidecar.fields_len();
+                    let outer_header = Header { list: true, payload_length: outer_payload_length };
+
+                    outer_header.length() + outer_payload_length
+                }
+            },
         }
     }
 
     /// Return the RLP payload length of the network-serialized wrapper
     fn rlp_payload_length(&self) -> usize {
         if let Self::Legacy(t) = self {
-            return t.length();
+            let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
+            return Header { list: true, payload_length }.length() + payload_length;
         }
         // length of inner tx body
         let inner_length = self.inner_length();
@@ -141,34 +184,33 @@ impl Encodable for TxEnvelope {
     fn length(&self) -> usize {
         let mut payload_length = self.rlp_payload_length();
         if !self.is_legacy() {
-            payload_length += length_of_length(payload_length);
+            payload_length += Header { list: false, payload_length }.length();
         }
+
         payload_length
     }
 }
 
 impl Decodable for TxEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        match Self::network_decode(buf) {
-            Ok(t) => Ok(t),
-            Err(Eip2718Error::RlpError(e)) => Err(e),
-            Err(_) => Err(alloy_rlp::Error::Custom("Unexpected type")),
-        }
+        Self::network_decode(buf)
     }
 }
 
 impl Decodable2718 for TxEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
-        match ty.try_into()? {
-            TxType::Legacy => Ok(Self::TaggedLegacy(Decodable::decode(buf)?)),
-            TxType::Eip2930 => Ok(Self::Eip2930(Decodable::decode(buf)?)),
-            TxType::Eip1559 => Ok(Self::Eip1559(Decodable::decode(buf)?)),
-            TxType::Eip4844 => Ok(Self::Eip4844(Decodable::decode(buf)?)),
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
+            TxType::Eip2930 => Ok(Self::Eip2930(TxEip2930::decode_signed_fields(buf)?)),
+            TxType::Eip1559 => Ok(Self::Eip1559(TxEip1559::decode_signed_fields(buf)?)),
+            TxType::Eip4844 => Ok(Self::Eip4844(TxEip4844Variant::decode_signed_fields(buf)?)),
+            TxType::Legacy => {
+                Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
+            }
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
-        Ok(TxEnvelope::Legacy(Decodable::decode(buf)?))
+    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(TxEnvelope::Legacy(TxLegacy::decode_signed_fields(buf)?))
     }
 }
 
@@ -176,7 +218,6 @@ impl Encodable2718 for TxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
             Self::Legacy(_) => None,
-            Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
             Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
@@ -189,22 +230,16 @@ impl Encodable2718 for TxEnvelope {
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
-            TxEnvelope::Legacy(tx) => tx.encode(out),
-            TxEnvelope::TaggedLegacy(tx) => {
-                out.put_u8(TxType::Legacy as u8);
-                tx.encode(out);
-            }
+            // Legacy transactions have no difference between network and 2718
+            TxEnvelope::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
             TxEnvelope::Eip2930(tx) => {
-                out.put_u8(TxType::Eip2930 as u8);
-                tx.encode(out);
+                tx.tx().encode_with_signature(tx.signature(), out, false);
             }
             TxEnvelope::Eip1559(tx) => {
-                out.put_u8(TxType::Eip1559 as u8);
-                tx.encode(out);
+                tx.tx().encode_with_signature(tx.signature(), out, false);
             }
             TxEnvelope::Eip4844(tx) => {
-                out.put_u8(TxType::Eip4844 as u8);
-                tx.encode(out);
+                tx.tx().encode_with_signature(tx.signature(), out, false);
             }
         }
     }
@@ -215,7 +250,8 @@ mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
+    use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
+    use std::{fs, path::PathBuf};
 
     #[test]
     #[cfg(feature = "k256")]
@@ -254,6 +290,10 @@ mod tests {
         };
 
         assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
+        assert_eq!(
+            tx.hash().to_string(),
+            "0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4"
+        );
         let from = tx.recover_signer().unwrap();
         assert_eq!(from, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
     }
@@ -344,5 +384,19 @@ mod tests {
             }]),
         };
         test_encode_decode_roundtrip(tx);
+    }
+
+    #[test]
+    fn decode_encode_known_rpc_transaction() {
+        // test data pulled from hive test that sends blob transactions
+        let network_data_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/rpc_blob_transaction.rlp");
+        let data = fs::read_to_string(network_data_path).expect("Unable to read file");
+        let hex_data = hex::decode(data.trim()).unwrap();
+
+        let tx: TxEnvelope = TxEnvelope::decode_2718(&mut hex_data.as_slice()).unwrap();
+        let encoded = tx.encoded_2718();
+        assert_eq!(encoded, hex_data);
+        assert_eq!(tx.encode_2718_len(), hex_data.len());
     }
 }

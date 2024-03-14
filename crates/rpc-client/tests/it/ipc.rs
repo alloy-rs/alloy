@@ -25,7 +25,7 @@ async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
 #[tokio::test]
 async fn it_makes_a_request() {
     let (client, _geth) = connect().await;
-    let req: RpcCall<_, (), U64> = client.prepare("eth_blockNumber", ());
+    let req: RpcCall<_, (), U64> = client.request("eth_blockNumber", ());
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
     let res = timeout.await.unwrap().unwrap();
     assert!(res.to::<u64>() <= 3);
