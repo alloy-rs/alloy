@@ -1,8 +1,6 @@
 use alloy_network::Ethereum;
 use alloy_provider::{Provider, RootProvider};
-use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{RpcClient, WsConnect};
-// use alloy_transport_ws::WsConnect;
 use eyre::Result;
 use futures_util::StreamExt;
 
