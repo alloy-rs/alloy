@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use alloy_primitives::{Address, Bytes, B256, B512, U256, U64};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
@@ -26,12 +25,19 @@ pub struct EIP1186StorageProof {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EIP1186AccountProofResponse {
+    /// The account address.
     pub address: Address,
+    /// The account balance.
     pub balance: U256,
+    /// The hash of the code of the account.
     pub code_hash: B256,
+    /// The account nonce.
     pub nonce: U64,
+    /// The hash of the storage of the account.
     pub storage_hash: B256,
+    /// The account proof.
     pub account_proof: Vec<Bytes>,
+    /// The storage proof.
     pub storage_proof: Vec<EIP1186StorageProof>,
 }
 

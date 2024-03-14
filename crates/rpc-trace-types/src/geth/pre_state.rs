@@ -1,3 +1,5 @@
+//! Pre-state Geth tracer types.
+
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::num::from_int_or_hex_opt;
 use serde::{Deserialize, Serialize};
@@ -127,16 +129,20 @@ impl DiffStateKind {
 /// Represents the state of an account
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AccountState {
+    /// The optional balance of the account.
     #[serde(
         default,
         deserialize_with = "from_int_or_hex_opt",
         skip_serializing_if = "Option::is_none"
     )]
     pub balance: Option<U256>,
+    /// The optional code of the account.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<Bytes>,
+    /// The optional nonce of the account.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<u64>,
+    /// The storage of the account.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub storage: BTreeMap<B256, B256>,
 }
@@ -175,9 +181,12 @@ impl AccountState {
 /// Helper type to track the kind of change of an [AccountState].
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountChangeKind {
+    /// The account was modified.
     #[default]
     Modify,
+    /// The account was created.
     Create,
+    /// The account was selfdestructed.
     SelfDestruct,
 }
 
@@ -199,13 +208,12 @@ impl AccountChangeKind {
 }
 
 /// The config for the prestate tracer.
-///
-/// If `diffMode` is set to true, the response frame includes all the account and storage diffs for
-/// the transaction. If it's missing or set to false it only returns the accounts and storage
-/// necessary to execute the transaction.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreStateConfig {
+    /// If `diffMode` is set to true, the response frame includes all the account and storage diffs
+    /// for the transaction. If it's missing or set to false it only returns the accounts and
+    /// storage necessary to execute the transaction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diff_mode: Option<bool>,
 }

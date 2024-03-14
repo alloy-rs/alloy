@@ -23,24 +23,27 @@ pub enum SubscriptionResult {
     SyncState(PubSubSyncStatus),
 }
 
-/// Response type for a SyncStatus subscription
+/// Response type for a SyncStatus subscription.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PubSubSyncStatus {
-    /// If not currently syncing, this should always be `false`
+    /// If not currently syncing, this should always be `false`.
     Simple(bool),
-    /// Current Stats about syncing
+    /// Syncing metadata.
     Detailed(SyncStatusMetadata),
 }
 
-/// Sync status infos
+/// Sync status metadata.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(missing_docs)]
 pub struct SyncStatusMetadata {
+    /// Whether the node is currently syncing.
     pub syncing: bool,
+    /// The starting block.
     pub starting_block: u64,
+    /// The current block.
     pub current_block: u64,
+    /// The highest block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub highest_block: Option<u64>,
 }

@@ -125,25 +125,38 @@ pub struct ExecutionPayloadEnvelopeV3 {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-#[allow(missing_docs)]
 pub struct ExecutionPayloadV1 {
+    /// The parent hash of the block.
     pub parent_hash: B256,
+    /// The fee recipient of the block.
     pub fee_recipient: Address,
+    /// The state root of the block.
     pub state_root: B256,
+    /// The receipts root of the block.
     pub receipts_root: B256,
+    /// The logs bloom of the block.
     pub logs_bloom: Bloom,
+    /// The previous randao of the block.
     pub prev_randao: B256,
+    /// The block number.
     #[serde(with = "alloy_serde::u64_hex")]
     pub block_number: u64,
+    /// The gas limit of the block.
     #[serde(with = "alloy_serde::u64_hex")]
     pub gas_limit: u64,
+    /// The gas used of the block.
     #[serde(with = "alloy_serde::u64_hex")]
     pub gas_used: u64,
+    /// The timestamp of the block.
     #[serde(with = "alloy_serde::u64_hex")]
     pub timestamp: u64,
+    /// The extra data of the block.
     pub extra_data: Bytes,
+    /// The base fee per gas of the block.
     pub base_fee_per_gas: U256,
+    /// The block hash of the block.
     pub block_hash: B256,
+    /// The transactions of the block.
     pub transactions: Vec<Bytes>,
 }
 
