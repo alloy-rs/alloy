@@ -1,6 +1,5 @@
 use crate::Signed;
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
-use alloy_rlp::BufMut;
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -98,18 +97,6 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// Convert to a signed transaction by adding a signature and computing the
     /// hash.
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature>
-    where
-        Self: Sized;
-
-    /// Encode with a signature. This encoding is usually RLP, but may be
-    /// different for future EIP-2718 transaction types.
-    fn encode_signed(&self, signature: &Signature, out: &mut dyn BufMut);
-
-    /// Decode a signed transaction. This decoding is usually RLP, but may be
-    /// different for future EIP-2718 transaction types.
-    ///
-    /// This MUST be the inverse of [`SignableTransaction::encode_signed`].
-    fn decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self, Signature>>
     where
         Self: Sized;
 }

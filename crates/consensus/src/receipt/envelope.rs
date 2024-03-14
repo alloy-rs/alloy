@@ -1,5 +1,5 @@
 use crate::{Receipt, ReceiptWithBloom, TxType};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
@@ -16,8 +16,6 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 pub enum ReceiptEnvelope {
     /// Receipt envelope with no type flag.
     Legacy(ReceiptWithBloom),
-    /// Receipt envelope with type flag 0.
-    TaggedLegacy(ReceiptWithBloom),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
@@ -36,7 +34,7 @@ impl ReceiptEnvelope {
     /// Return the [`TxType`] of the inner receipt.
     pub const fn tx_type(&self) -> TxType {
         match self {
-            Self::Legacy(_) | Self::TaggedLegacy(_) => TxType::Legacy,
+            Self::Legacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
@@ -47,11 +45,7 @@ impl ReceiptEnvelope {
     /// however, future receipt types may be added.
     pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom> {
         match self {
-            Self::Legacy(t)
-            | Self::TaggedLegacy(t)
-            | Self::Eip2930(t)
-            | Self::Eip1559(t)
-            | Self::Eip4844(t) => Some(t),
+            Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => Some(t),
         }
     }
 
@@ -59,11 +53,9 @@ impl ReceiptEnvelope {
     /// receipt types may be added.
     pub const fn as_receipt(&self) -> Option<&Receipt> {
         match self {
-            Self::Legacy(t)
-            | Self::TaggedLegacy(t)
-            | Self::Eip2930(t)
-            | Self::Eip1559(t)
-            | Self::Eip4844(t) => Some(&t.receipt),
+            Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => {
+                Some(&t.receipt)
+            }
         }
     }
 
@@ -100,7 +92,6 @@ impl Decodable for ReceiptEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         match Self::network_decode(buf) {
             Ok(t) => Ok(t),
-            Err(Eip2718Error::RlpError(e)) => Err(e),
             Err(_) => Err(alloy_rlp::Error::Custom("Unexpected type")),
         }
     }
@@ -110,7 +101,6 @@ impl Encodable2718 for ReceiptEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
             Self::Legacy(_) => None,
-            Self::TaggedLegacy(_) => Some(TxType::Legacy as u8),
             Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
             Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
             Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
@@ -131,17 +121,19 @@ impl Encodable2718 for ReceiptEnvelope {
 }
 
 impl Decodable2718 for ReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let receipt = Decodable::decode(buf)?;
-        match ty.try_into()? {
-            TxType::Legacy => Ok(Self::TaggedLegacy(receipt)),
+        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))? {
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
             TxType::Eip4844 => Ok(Self::Eip4844(receipt)),
+            TxType::Legacy => {
+                Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
+            }
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self::Legacy(Decodable::decode(buf)?))
     }
 }
@@ -149,12 +141,11 @@ impl Decodable2718 for ReceiptEnvelope {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for ReceiptEnvelope {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tx_type = u.int_in_range(-1..=2)?;
+        let tx_type = u.int_in_range(0..=2)?;
         let receipt = Receipt::arbitrary(u)?.with_bloom();
 
         match tx_type {
-            -1 => Ok(Self::Legacy(receipt)),
-            0 => Ok(Self::TaggedLegacy(receipt)),
+            0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),
             _ => unreachable!(),
