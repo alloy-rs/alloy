@@ -36,16 +36,9 @@ cargo run --example mnemonic_signer
 - [ ] Events
   - [ ] Logs and filtering
   - [ ] Solidity topics
-- [ ] Middleware
-  - [ ] Builder
-  - [ ] Create custom middleware
-  - [ ] Gas escalator
-  - [ ] Gas oracle
-  - [ ] Nonce manager
-  - [ ] Policy
-  - [ ] Signer
-  - [ ] Time lag
-  - [ ] Transformer
+- [x] Layers
+  - [x] [Nonce manager](./layers/examples/nonce_layer.rs)
+  - [x] [Signature manager](./layers/examples/signer_layer.rs)
 - [ ] Providers
   - [ ] Http
   - [ ] IPC
