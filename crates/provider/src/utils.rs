@@ -23,11 +23,11 @@ fn estimate_priority_fee(rewards: &[Vec<U256>]) -> U256 {
 
     // Return the median.
     let n = rewards.len();
-    
+
     if n % 2 == 0 {
         (*rewards[n / 2 - 1] + *rewards[n / 2]) / U256::from(2)
     } else {
-        *rewards[(n + 1) / 2]
+        *rewards[n / 2]
     }
 }
 
