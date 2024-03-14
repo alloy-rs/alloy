@@ -20,8 +20,15 @@ fn estimate_priority_fee(rewards: &[Vec<U256>]) -> U256 {
     }
 
     rewards.sort();
+
     // Return the median.
-    *rewards[rewards.len() / 2]
+    let n = rewards.len();
+    
+    if n % 2 == 0 {
+        (*rewards[n / 2 - 1] + *rewards[n / 2]) / U256::from(2)
+    } else {
+        *rewards[(n + 1) / 2]
+    }
 }
 
 /// The default EIP-1559 fee estimator which is based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56)
