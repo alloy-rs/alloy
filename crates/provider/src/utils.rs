@@ -38,3 +38,49 @@ pub fn eip1559_default_estimator(base_fee_per_gas: U256, rewards: &[Vec<U256>]) 
     let potential_max_fee = base_fee_per_gas * U256::from(EIP1559_BASE_FEE_MULTIPLIER);
     (potential_max_fee, max_priority_fee_per_gas)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::vec;
+
+    use super::*;
+
+    #[test]
+    fn test_estimate_priority_fee() {
+        let rewards = vec![
+            vec![U256::from(10_000_000_000_u64)],
+            vec![U256::from(200_000_000_000_u64)],
+            vec![U256::from(3_000_000_000_u64)],
+        ];
+        assert_eq!(super::estimate_priority_fee(&rewards), U256::from(10_000_000_000_u64));
+
+        let rewards = vec![
+            vec![U256::from(400_000_000_000_u64)],
+            vec![U256::from(2_000_000_000_u64)],
+            vec![U256::from(5_000_000_000_u64)],
+            vec![U256::from(3_000_000_000_u64)],
+        ];
+
+        assert_eq!(super::estimate_priority_fee(&rewards), U256::from(4_000_000_000_u64));
+
+        let rewards = vec![vec![U256::from(0)], vec![U256::from(0)], vec![U256::from(0)]];
+
+        assert_eq!(super::estimate_priority_fee(&rewards), U256::from(0));
+
+        assert_eq!(super::estimate_priority_fee(&vec![]), U256::from(0));
+    }
+
+    #[test]
+    fn test_eip1559_default_estimator() {
+        let base_fee_per_gas = U256::from(1_000_000_000_u64);
+        let rewards = vec![
+            vec![U256::from(200_000_000_000_u64)],
+            vec![U256::from(200_000_000_000_u64)],
+            vec![U256::from(300_000_000_000_u64)],
+        ];
+        assert_eq!(
+            super::eip1559_default_estimator(base_fee_per_gas, &rewards),
+            (U256::from(2_000_000_000_u64), U256::from(200_000_000_000_u64))
+        );
+    }
+}
