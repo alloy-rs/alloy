@@ -1,6 +1,8 @@
-use alloc::fmt::Write;
-use alloc::string::{String, ToString};
-use alloc::collections::BTreeMap;
+use alloc::{
+    collections::BTreeMap,
+    fmt::Write,
+    string::{String, ToString},
+};
 
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};

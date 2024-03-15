@@ -1,7 +1,7 @@
 //! Json U256 serde helpers.
 
-use core::str::FromStr;
 use alloc::{fmt, format, string::String};
+use core::str::FromStr;
 
 use alloy_primitives::U256;
 use serde::{

@@ -1,7 +1,6 @@
 //! Numeric serde helpers.
 
-use alloc::str::FromStr;
-use alloc::string::ToString;
+use alloc::{str::FromStr, string::ToString};
 
 use alloy_primitives::{U256, U64};
 use serde::{de, Deserialize, Deserializer, Serialize};

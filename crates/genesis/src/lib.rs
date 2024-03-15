@@ -20,7 +20,7 @@
 
 extern crate alloc;
 
-use alloc::collections::{BTreeMap};
+use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
@@ -541,8 +541,8 @@ pub struct CliqueConfig {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
     use super::*;
+    use alloc::vec;
     use alloy_primitives::hex;
     use core::str::FromStr;
 
