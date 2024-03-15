@@ -95,7 +95,7 @@ url = "2.5"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = ["derive"] }
-serde_json = { version = "1.0" }
+serde_json = "1.0"
 
 ## misc-testing
 arbitrary = "1.3"
