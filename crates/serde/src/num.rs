@@ -1,7 +1,8 @@
 //! Numeric serde helpers.
 
-#[allow(unused_imports)]
-use alloc::{str::FromStr, string::ToString};
+#[cfg(not(feature = "std"))]
+use alloc::string::ToString;
+use core::str::FromStr;
 
 use alloy_primitives::{U256, U64};
 use serde::{de, Deserialize, Deserializer, Serialize};

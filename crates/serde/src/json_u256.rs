@@ -1,7 +1,8 @@
 //! Json U256 serde helpers.
 
-#[allow(unused_imports)]
-use alloc::{fmt, format, string::String};
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+use alloc::{fmt, format};
 use core::str::FromStr;
 
 use alloy_primitives::U256;
@@ -179,7 +180,7 @@ where
 #[cfg(test)]
 mod test {
     use super::JsonU256;
-    #[allow(unused_imports)]
+    #[cfg(not(feature = "std"))]
     use alloc::{vec, vec::Vec};
     use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};

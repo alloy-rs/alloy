@@ -1,4 +1,5 @@
-#[allow(unused_imports)]
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
 use alloc::{
     collections::BTreeMap,
     fmt::Write,
