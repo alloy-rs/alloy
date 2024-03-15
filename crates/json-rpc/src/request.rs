@@ -195,7 +195,7 @@ impl SerializedRequest {
     }
 
     /// Returns the request method.
-    pub const fn method(&self) -> &Cow<'static, str> {
+    pub fn method(&self) -> &str {
         &self.meta.method
     }
 
