@@ -1,11 +1,14 @@
 //! Json U256 serde helpers.
+
+use core::str::FromStr;
+use alloc::{fmt, format, string::String};
+
 use alloy_primitives::U256;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use serde_json::Value;
-use std::{fmt, str::FromStr};
 
 /// Wrapper around primitive U256 type that also supports deserializing numbers
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]

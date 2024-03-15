@@ -12,9 +12,8 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-# ethereum
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-
+# serde
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 
@@ -25,3 +24,12 @@ alloy-primitives = { workspace = true, features = [
   "serde",
   "arbitrary",
 ] }
+
+[features]
+default = ["std"]
+std = [
+  "alloy-primitives/std",
+  # serde
+  "serde/std",
+  "serde_json/std",
+]
