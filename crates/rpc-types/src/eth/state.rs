@@ -10,7 +10,6 @@ pub type StateOverride = HashMap<Address, AccountOverride>;
 /// Custom account override used in call
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-#[allow(missing_docs)]
 pub struct AccountOverride {
     /// Fake balance to set for the account before executing the call.
     #[serde(default, skip_serializing_if = "Option::is_none")]

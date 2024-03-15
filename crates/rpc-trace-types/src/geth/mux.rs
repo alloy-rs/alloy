@@ -1,3 +1,5 @@
+//! Geth `muxTracer` types.
+
 use crate::geth::{GethDebugBuiltInTracerType, GethDebugTracerConfig, GethTrace};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

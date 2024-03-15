@@ -1,5 +1,4 @@
-#![allow(missing_docs)]
-//! Geth tracing types
+//! Geth tracing types.
 
 use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
