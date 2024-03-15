@@ -179,6 +179,7 @@ where
 #[cfg(test)]
 mod test {
     use super::JsonU256;
+    #[allow(unused_imports)]
     use alloc::{vec, vec::Vec};
     use alloy_primitives::U256;
     use serde::{Deserialize, Serialize};
