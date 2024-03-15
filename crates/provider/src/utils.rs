@@ -41,9 +41,8 @@ pub fn eip1559_default_estimator(base_fee_per_gas: U256, rewards: &[Vec<U256>]) 
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
     use super::*;
+    use std::vec;
 
     #[test]
     fn test_estimate_priority_fee() {
@@ -67,7 +66,7 @@ mod tests {
 
         assert_eq!(super::estimate_priority_fee(&rewards), U256::from(0));
 
-        assert_eq!(super::estimate_priority_fee(&vec![]), U256::from(0));
+        assert_eq!(super::estimate_priority_fee(&[]), U256::from(0));
     }
 
     #[test]
