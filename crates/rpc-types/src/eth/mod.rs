@@ -15,7 +15,7 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
-pub mod withdrawal;
+pub use alloy_eips::withdrawal;
 mod work;
 
 pub use account::*;

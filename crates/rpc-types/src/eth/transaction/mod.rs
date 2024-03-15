@@ -1,7 +1,7 @@
 //! RPC types for transactions
 
 use crate::eth::other::OtherFields;
-pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
+pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
@@ -11,7 +11,6 @@ pub use request::{TransactionInput, TransactionRequest};
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 
-mod access_list;
 mod common;
 pub mod kzg;
 pub mod optimism;

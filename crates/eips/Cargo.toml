@@ -14,9 +14,11 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
 alloy-rlp = { workspace = true, features = ["derive"] }
+alloy-serde.workspace = true
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
+serde_json.workspace = true
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
