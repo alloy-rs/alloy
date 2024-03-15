@@ -1,5 +1,6 @@
 //! Json U256 serde helpers.
 
+#[allow(unused_imports)]
 use alloc::{fmt, format, string::String};
 use core::str::FromStr;
 

@@ -1,5 +1,6 @@
 //! Numeric serde helpers.
 
+#[allow(unused_imports)]
 use alloc::{str::FromStr, string::ToString};
 
 use alloy_primitives::{U256, U64};

@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use alloc::{
     collections::BTreeMap,
     fmt::Write,
