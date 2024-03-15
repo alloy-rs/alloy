@@ -13,7 +13,7 @@ impl<T> IpcConnect<T> {
     /// Create a new IPC connection object for any type T that can be converted into IpcConnect<T>.
     pub fn new(inner: T) -> Self
     where
-        Self: From<T>,
+        Self: alloy_pubsub::PubSubConnect + From<T>,
     {
         IpcConnect::from(inner)
     }
