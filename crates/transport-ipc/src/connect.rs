@@ -9,6 +9,16 @@ pub struct IpcConnect<T> {
     inner: T,
 }
 
+impl<T> IpcConnect<T> {
+    /// Create a new IPC connection object for any type T that can be converted into IpcConnect<T>.
+    pub fn new(inner: T) -> Self
+    where
+        Self: From<T>,
+    {
+        IpcConnect::from(inner)
+    }
+}
+
 macro_rules! impl_connect {
     ($target:ty) => {
         impl From<$target> for IpcConnect<$target> {
