@@ -49,6 +49,13 @@ where
         let gas_estimate = self.inner.estimate_gas(tx, None).await?;
         Ok(gas_estimate)
     }
+
+    async fn get_eip1159_fees_estimate(&self) -> TransportResult<(U256, U256)> {
+        let (max_fee_per_gas, max_priority_fee_per_gas) =
+            self.inner.estimate_eip1559_fees(None).await?;
+
+        Ok((max_fee_per_gas, max_priority_fee_per_gas))
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -76,6 +83,13 @@ where
             tx.set_gas_limit(gas_estimate);
         }
 
+        if tx.max_fee_per_gas().is_none() && tx.max_priority_fee_per_gas().is_none() {
+            let (max_fee_per_gas, max_priority_fee_per_gas) =
+                self.get_eip1159_fees_estimate().await?;
+
+            tx.set_max_fee_per_gas(max_fee_per_gas);
+            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        }
         self.inner.send_transaction(tx).await
     }
 }
