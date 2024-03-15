@@ -5,6 +5,7 @@ use futures::{Stream, StreamExt};
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{
+    borrow::Cow,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     time::Duration,
@@ -61,7 +62,7 @@ pub struct PollerBuilder<Conn, Params, Resp> {
     client: WeakClient<Conn>,
 
     /// Request Method
-    method: &'static str,
+    method: Cow<'static, str>,
     params: Params,
 
     // config options
@@ -79,12 +80,16 @@ where
     Resp: RpcReturn + Clone,
 {
     /// Create a new poller task.
-    pub fn new(client: WeakClient<Conn>, method: &'static str, params: Params) -> Self {
+    pub fn new(
+        client: WeakClient<Conn>,
+        method: impl Into<Cow<'static, str>>,
+        params: Params,
+    ) -> Self {
         let poll_interval =
             client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.default_poll_interval());
         Self {
             client,
-            method,
+            method: method.into(),
             params,
             channel_size: 16,
             poll_interval,
@@ -144,7 +149,7 @@ where
     /// Starts the poller in a new Tokio task, returning a channel to receive the responses on.
     pub fn spawn(self) -> PollChannel<Resp> {
         let (tx, rx) = broadcast::channel(self.channel_size);
-        let span = debug_span!("poller", method = self.method);
+        let span = debug_span!("poller", method = %self.method);
         let fut = async move {
             let mut params = ParamsOnce::Typed(self.params);
             let mut retries = MAX_RETRIES;
@@ -165,7 +170,7 @@ where
 
                 loop {
                     trace!("polling");
-                    match client.request(self.method, params).await {
+                    match client.request(self.method.clone(), params).await {
                         Ok(resp) => {
                             if tx.send(resp).is_err() {
                                 debug!("channel closed");

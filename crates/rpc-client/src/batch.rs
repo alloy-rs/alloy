@@ -114,7 +114,6 @@ impl<'a, Conn> BatchRequest<'a, Conn>
 where
     Conn: Transport + Clone,
 {
-    #[must_use = "Waiters do nothing unless polled. A Waiter will never resolve unless the batch is sent!"]
     /// Add a call to the batch.
     ///
     /// ### Errors
@@ -122,7 +121,7 @@ where
     /// If the request cannot be serialized, this will return an error.
     pub fn add_call<Params: RpcParam, Resp: RpcReturn>(
         &mut self,
-        method: &'static str,
+        method: impl Into<Cow<'static, str>>,
         params: &Params,
     ) -> TransportResult<Waiter<Resp>> {
         let request = self.transport.make_request(method, Cow::Borrowed(params));
