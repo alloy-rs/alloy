@@ -33,4 +33,4 @@ pub use eip4844::{calc_blob_gasprice, calc_excess_blob_gas};
 
 pub mod merge;
 
-pub mod withdrawal;
+pub mod eip4895;

@@ -15,7 +15,7 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
-pub use alloy_eips::withdrawal;
+pub use alloy_eips::eip4895;
 mod work;
 
 pub use account::*;
@@ -28,5 +28,5 @@ pub use log::*;
 pub use raw_log::{logs_bloom, Log as RawLog};
 pub use syncing::*;
 pub use transaction::*;
-pub use withdrawal::Withdrawal;
+pub use eip4895::Withdrawal;
 pub use work::Work;

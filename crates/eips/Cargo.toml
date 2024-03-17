@@ -18,7 +18,6 @@ alloy-serde.workspace = true
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
-serde_json.workspace = true
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -29,6 +28,7 @@ proptest-derive = { workspace = true, optional = true }
 arbitrary = { workspace = true, features = ["derive"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+serde_json.workspace = true
 
 [features]
 default = ["std"]
