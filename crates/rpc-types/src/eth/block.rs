@@ -27,8 +27,8 @@ pub struct Block {
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
     #[serde(
-        skip_serializing_if = "BlockTransactions::is_uncle",
-        default = "BlockTransactions::uncle"
+        default = "BlockTransactions::uncle",
+        skip_serializing_if = "BlockTransactions::is_uncle"
     )]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
@@ -1255,7 +1255,7 @@ mod tests {
         let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
-    
+
     #[test]
     fn serde_block_containing_uncles() {
         let s = r#"{

@@ -233,7 +233,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
+    async fn subscribe_blocks(&self) -> TransportResult<Subscription<N::HeaderResponse>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -1005,7 +1005,7 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    async fn subscribe_blocks() {
+    async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
         init_tracing();
@@ -1018,8 +1018,24 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.number.unwrap(), U256::from(n));
             n += 1;
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "ws")]
+    async fn subscribe_blocks_ws_remote() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
+        let ws = alloy_rpc_client::WsConnect::new(url);
+        let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
+        let p = RootProvider::<Ethereum, _>::new(client);
+        let mut stream = p.subscribe_blocks().await.unwrap().into_stream();
+        while let Some(block) = stream.next().await {
+            println!("New block {:?}", block);
         }
     }
 
@@ -1039,7 +1055,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.number.unwrap(), U256::from(n));
             n += 1;
         }
     }
