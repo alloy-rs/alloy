@@ -390,6 +390,7 @@ mod tests {
         //even though the block time is a f64, it should be passed as a whole number
         let anvil = Anvil::new().block_time(12);
         assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+        let _ = anvil.spawn();
     }
 
     #[test]
