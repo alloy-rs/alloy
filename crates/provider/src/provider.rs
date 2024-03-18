@@ -233,7 +233,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(&self) -> TransportResult<Subscription<N::HeaderResponse>> {
+    async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -1018,7 +1018,30 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.number.unwrap(), U256::from(n));
+            assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
+            n += 1;
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn subscribe_blocks_ws_boxed() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let anvil = Anvil::new().block_time(1).spawn();
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let provider = RootProvider::<Ethereum, _>::new(client);
+        let provider = provider.boxed();
+
+        let sub = provider.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(2);
+        let mut n = 1;
+        while let Some(block) = stream.next().await {
+            assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
     }
@@ -1036,27 +1059,7 @@ mod tests {
         let mut stream = p.subscribe_blocks().await.unwrap().into_stream();
         while let Some(block) = stream.next().await {
             println!("New block {:?}", block);
-        }
-    }
-
-    #[cfg(feature = "ws")]
-    #[tokio::test]
-    async fn subscribe_blocks_boxed() {
-        use futures::stream::StreamExt;
-
-        init_tracing();
-        let anvil = Anvil::new().block_time(1).spawn();
-        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-        let client = RpcClient::connect_pubsub(ws).await.unwrap();
-        let provider = RootProvider::<Ethereum, _>::new(client);
-        let provider = provider.boxed();
-
-        let sub = provider.subscribe_blocks().await.unwrap();
-        let mut stream = sub.into_stream().take(2);
-        let mut n = 1;
-        while let Some(block) = stream.next().await {
-            assert_eq!(block.number.unwrap(), U256::from(n));
-            n += 1;
+            assert!(block.header.number.unwrap() > U256::ZERO);
         }
     }
 

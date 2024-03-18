@@ -22,7 +22,7 @@ pub struct Block {
     #[serde(flatten)]
     pub header: Header,
     /// Uncles' hashes.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
@@ -32,6 +32,7 @@ pub struct Block {
     )]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<U256>,
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -131,27 +132,34 @@ pub enum BlockTransactions {
 
 impl BlockTransactions {
     /// Converts `self` into `Hashes`.
+    #[inline]
     pub fn convert_to_hashes(&mut self) {
-        *self = Self::Hashes(self.hashes().copied().collect());
+        if !self.is_hashes() {
+            *self = Self::Hashes(self.hashes().copied().collect());
+        }
     }
 
     /// Converts `self` into `Hashes`.
+    #[inline]
     pub fn into_hashes(mut self) -> Self {
         self.convert_to_hashes();
         self
     }
 
     /// Check if the enum variant is used for hashes.
+    #[inline]
     pub const fn is_hashes(&self) -> bool {
         matches!(self, Self::Hashes(_))
     }
 
     /// Returns true if the enum variant is used for full transactions.
+    #[inline]
     pub const fn is_full(&self) -> bool {
         matches!(self, Self::Full(_))
     }
 
     /// Returns true if the enum variant is used for an uncle response.
+    #[inline]
     pub const fn is_uncle(&self) -> bool {
         matches!(self, Self::Uncle)
     }
@@ -176,26 +184,21 @@ impl BlockTransactions {
     }
 
     /// Returns an instance of BlockTransactions with the Uncle special case.
+    #[inline]
     pub const fn uncle() -> Self {
         Self::Uncle
     }
 
     /// Returns the number of transactions.
+    #[inline]
     pub fn len(&self) -> usize {
-        match self {
-            BlockTransactions::Hashes(hashes) => hashes.len(),
-            BlockTransactions::Full(txs) => txs.len(),
-            BlockTransactions::Uncle => 0,
-        }
+        self.hashes().len()
     }
 
     /// Whether the block has no transactions.
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        match self {
-            BlockTransactions::Hashes(hashes) => hashes.is_empty(),
-            BlockTransactions::Full(txs) => txs.is_empty(),
-            BlockTransactions::Uncle => true,
-        }
+        self.len() == 0
     }
 }
 
