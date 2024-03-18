@@ -2,7 +2,7 @@
 
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
-use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
+use alloy_primitives::{Address, Bytes, B256, U256, U8};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use optimism::OptimismTransactionReceiptFields;
@@ -44,18 +44,18 @@ pub struct Transaction {
     pub value: U256,
     /// Gas Price
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gas_price: Option<U128>,
+    pub gas_price: Option<U256>,
     /// Gas amount
     pub gas: U256,
     /// Max BaseFeePerGas the user is willing to pay.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_gas: Option<U128>,
+    pub max_fee_per_gas: Option<U256>,
     /// The miner's tip.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_priority_fee_per_gas: Option<U128>,
+    pub max_priority_fee_per_gas: Option<U256>,
     /// Configured max fee per blob gas for eip-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_blob_gas: Option<U128>,
+    pub max_fee_per_blob_gas: Option<U256>,
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
@@ -64,7 +64,7 @@ pub struct Transaction {
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    pub chain_id: Option<U64>,
+    pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blob_versioned_hashes: Vec<B256>,
@@ -72,13 +72,13 @@ pub struct Transaction {
     ///
     /// Pre-pay to warm storage access.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_list: Option<Vec<AccessListItem>>,
+    pub access_list: Option<AccessList>,
     /// EIP2718
     ///
     /// Transaction type, Some(2) for EIP-1559 transaction,
     /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub transaction_type: Option<U64>,
+    pub transaction_type: Option<U8>,
 
     /// Arbitrary extra fields.
     ///
