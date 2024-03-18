@@ -38,6 +38,7 @@ pub trait Signer<Sig = Signature> {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
+    #[auto_impl(keep_default_for(&mut, Box))]
     async fn sign_typed_data<T: SolStruct + Send + Sync>(
         &self,
         payload: &T,
@@ -109,6 +110,7 @@ pub trait SignerSync<Sig = Signature> {
     /// [EIP-712]: https://eips.ethereum.org/EIPS/eip-712
     #[cfg(feature = "eip712")]
     #[inline]
+    #[auto_impl(keep_default_for(&, &mut, Box, Rc, Arc))]
     fn sign_typed_data_sync<T: SolStruct>(&self, payload: &T, domain: &Eip712Domain) -> Result<Sig>
     where
         Self: Sized,
@@ -136,6 +138,7 @@ mod tests {
     use super::*;
     use crate::{Error, UnsupportedSignerOperation};
     use assert_matches::assert_matches;
+    use std::sync::Arc;
 
     struct _ObjectSafe(Box<dyn Signer>, Box<dyn SignerSync>);
 
@@ -143,7 +146,7 @@ mod tests {
     async fn unimplemented() {
         #[cfg(feature = "eip712")]
         alloy_sol_types::sol! {
-            #[derive(Default)]
+            #[derive(Default, serde::Serialize)]
             struct Eip712Data {
                 uint64 a;
             }
@@ -174,6 +177,15 @@ mod tests {
                 s.sign_message(&[]).await,
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
+
+            #[cfg(feature = "eip712")]
+            assert_matches!(
+                s.sign_dynamic_typed_data(&TypedData::from_struct(&Eip712Data::default(), None))
+                    .await,
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            );
+
+            assert_eq!(s.chain_id(), None);
         }
 
         fn test_unsized_unimplemented_signer_sync<S: SignerSync + ?Sized>(s: &S) {
@@ -186,6 +198,17 @@ mod tests {
                 s.sign_message_sync(&[]),
                 Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
             );
+
+            #[cfg(feature = "eip712")]
+            assert_matches!(
+                s.sign_dynamic_typed_data_sync(&TypedData::from_struct(
+                    &Eip712Data::default(),
+                    None
+                )),
+                Err(Error::UnsupportedOperation(UnsupportedSignerOperation::SignHash))
+            );
+
+            assert_eq!(s.chain_id_sync(), None);
         }
 
         struct UnimplementedSigner;
@@ -223,6 +246,18 @@ mod tests {
             .await;
         test_unsized_unimplemented_signer_sync(
             &UnimplementedSigner as &(dyn SignerSync + Send + Sync),
+        );
+
+        test_unsized_unimplemented_signer(
+            &(Box::new(UnimplementedSigner) as Box<dyn Signer + Send + Sync>),
+        )
+        .await;
+        test_unsized_unimplemented_signer_sync(
+            &(Box::new(UnimplementedSigner) as Box<dyn SignerSync + Send + Sync>),
+        );
+
+        test_unsized_unimplemented_signer_sync(
+            &(Arc::new(UnimplementedSigner) as Arc<dyn SignerSync + Send + Sync>),
         );
     }
 }
