@@ -8,23 +8,23 @@ use std::marker::PhantomData;
 /// A layer that provides gas estimation for transactions.
 /// Populates the gas price and gas limit for transactions.
 #[derive(Debug, Clone, Copy)]
-pub struct GasEstimatorLayer;
+pub struct FillTxLayer;
 
-impl<P, N, T> ProviderLayer<P, N, T> for GasEstimatorLayer
+impl<P, N, T> ProviderLayer<P, N, T> for FillTxLayer
 where
     P: Provider<N, T>,
     N: Network,
     T: Transport + Clone,
 {
-    type Provider = GasEstimatorProvider<N, T, P>;
+    type Provider = FillTxProvider<N, T, P>;
     fn layer(&self, inner: P) -> Self::Provider {
-        GasEstimatorProvider { inner, _phantom: PhantomData }
+        FillTxProvider { inner, _phantom: PhantomData }
     }
 }
 
 /// A provider that provides gas estimation for transactions.
 #[derive(Debug, Clone)]
-pub struct GasEstimatorProvider<N, T, P>
+pub struct FillTxProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
@@ -34,7 +34,7 @@ where
     _phantom: PhantomData<(N, T)>,
 }
 
-impl<N, T, P> GasEstimatorProvider<N, T, P>
+impl<N, T, P> FillTxProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
@@ -60,7 +60,7 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N, T, P> Provider<N, T> for GasEstimatorProvider<N, T, P>
+impl<N, T, P> Provider<N, T> for FillTxProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
@@ -181,7 +181,7 @@ mod tests {
 
         let provider = ProviderBuilder::new()
             .layer(ManagedNonceLayer)
-            .layer(GasEstimatorLayer)
+            .layer(FillTxLayer)
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
