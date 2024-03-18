@@ -84,40 +84,40 @@ where
                 let gas_estimate = self.get_gas_estimate(&tx);
                 let eip1559_fees = self.get_eip1159_fees_estimate();
 
-                let (gas_price, gas_estimate, eip1559_fees) =
-                    futures::join!(gas_price, gas_estimate, eip1559_fees);
-
-                let gas_price = gas_price.unwrap();
-                let gas_estimate = gas_estimate.unwrap();
-                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
-
-                (
-                    Some(gas_price),
-                    Some(gas_estimate),
-                    Some((max_fee_per_gas, max_priority_fee_per_gas)),
-                )
+                match futures::join!(gas_price, gas_estimate, eip1559_fees) {
+                    (
+                        Ok(gas_price),
+                        Ok(gas_estimate),
+                        Ok((max_fee_per_gas, max_priority_fee_per_gas)),
+                    ) => (
+                        Some(gas_price),
+                        Some(gas_estimate),
+                        Some((max_fee_per_gas, max_priority_fee_per_gas)),
+                    ),
+                    _ => (None, None, None),
+                }
             }
             (true, true, false) => {
                 let gas_price = self.get_gas_price();
                 let gas_estimate = self.get_gas_estimate(&tx);
 
-                let (gas_price, gas_estimate) = futures::join!(gas_price, gas_estimate);
-
-                let gas_price = gas_price.unwrap();
-                let gas_estimate = gas_estimate.unwrap();
-
-                (Some(gas_price), Some(gas_estimate), None)
+                match futures::join!(gas_price, gas_estimate) {
+                    (Ok(gas_price), Ok(gas_estimate)) => {
+                        (Some(gas_price), Some(gas_estimate), None)
+                    }
+                    _ => (None, None, None),
+                }
             }
             (true, false, true) => {
                 let gas_price = self.get_gas_price();
                 let eip1559_fees = self.get_eip1159_fees_estimate();
 
-                let (gas_price, eip1559_fees) = futures::join!(gas_price, eip1559_fees);
-                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
-
-                let gas_price = gas_price.unwrap();
-
-                (Some(gas_price), None, Some((max_fee_per_gas, max_priority_fee_per_gas)))
+                match futures::join!(gas_price, eip1559_fees) {
+                    (Ok(gas_price), Ok((max_fee_per_gas, max_priority_fee_per_gas))) => {
+                        (Some(gas_price), None, Some((max_fee_per_gas, max_priority_fee_per_gas)))
+                    }
+                    _ => (None, None, None),
+                }
             }
             (true, false, false) => {
                 let gas_price = self.get_gas_price().await?;
@@ -127,12 +127,14 @@ where
                 let gas_estimate = self.get_gas_estimate(&tx);
                 let eip1559_fees = self.get_eip1159_fees_estimate();
 
-                let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate, eip1559_fees);
-                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
-
-                let gas_estimate = gas_estimate.unwrap();
-
-                (None, Some(gas_estimate), Some((max_fee_per_gas, max_priority_fee_per_gas)))
+                match futures::join!(gas_estimate, eip1559_fees) {
+                    (Ok(gas_estimate), Ok((max_fee_per_gas, max_priority_fee_per_gas))) => (
+                        None,
+                        Some(gas_estimate),
+                        Some((max_fee_per_gas, max_priority_fee_per_gas)),
+                    ),
+                    _ => (None, None, None),
+                }
             }
             (false, false, true) => {
                 let (max_fee_per_gas, max_priority_fee_per_gas) =
