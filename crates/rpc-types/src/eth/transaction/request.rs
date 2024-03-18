@@ -242,26 +242,10 @@ impl From<Option<Bytes>> for TransactionInput {
 
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> TransactionRequest {
-        TransactionRequest {
-            from: Some(tx.from),
-            to: tx.to,
-            gas: Some(tx.gas),
-            gas_price: tx.gas_price,
-            value: Some(tx.value),
-            input: tx.input.into(),
-            nonce: Some(tx.nonce),
-            chain_id: tx.chain_id,
-            access_list: tx.access_list,
-            transaction_type: tx.transaction_type,
-            max_fee_per_gas: tx.max_fee_per_gas,
-            max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-            max_fee_per_blob_gas: tx.max_fee_per_blob_gas,
-            blob_versioned_hashes: Some(tx.blob_versioned_hashes),
-            sidecar: None,
-            other: OtherFields::default(),
-        }
+        tx.into_request()
     }
 }
+
 /// Error thrown when both `data` and `input` fields are set and not equal.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]

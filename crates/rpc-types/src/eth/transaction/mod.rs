@@ -88,6 +88,33 @@ pub struct Transaction {
     pub other: OtherFields,
 }
 
+impl Transaction {
+    /// Converts [Transaction] into [TransactionRequest].
+    ///
+    /// During this conversion data for [TransactionRequest::sidecar] is lost as it is not part of
+    /// [Transaction].
+    pub fn into_request(self) -> TransactionRequest {
+        TransactionRequest {
+            from: Some(self.from),
+            to: self.to,
+            gas: Some(self.gas),
+            gas_price: self.gas_price,
+            value: Some(self.value),
+            input: self.input.into(),
+            nonce: Some(self.nonce),
+            chain_id: self.chain_id,
+            access_list: self.access_list,
+            transaction_type: self.transaction_type,
+            max_fee_per_gas: self.max_fee_per_gas,
+            max_priority_fee_per_gas: self.max_priority_fee_per_gas,
+            max_fee_per_blob_gas: self.max_fee_per_blob_gas,
+            blob_versioned_hashes: Some(self.blob_versioned_hashes),
+            sidecar: None,
+            other: OtherFields::default(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
