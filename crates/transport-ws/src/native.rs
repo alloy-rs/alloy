@@ -72,9 +72,9 @@ impl PubSubConnect for WsConnect {
 
 impl WsBackend<TungsteniteStream> {
     /// Handle a message from the server.
-    pub async fn handle(&mut self, msg: Message) -> Result<(), ()> {
+    pub fn handle(&mut self, msg: Message) -> Result<(), ()> {
         match msg {
-            Message::Text(text) => self.handle_text(text).await,
+            Message::Text(text) => self.handle_text(&text),
             Message::Close(frame) => {
                 if frame.is_some() {
                     error!(?frame, "Received close frame with data");
@@ -150,7 +150,7 @@ impl WsBackend<TungsteniteStream> {
                     resp = self.socket.next() => {
                         match resp {
                             Some(Ok(item)) => {
-                                errored = self.handle(item).await.is_err();
+                                errored = self.handle(item).is_err();
                                 if errored { break }
                             },
                             Some(Err(err)) => {

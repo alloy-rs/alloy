@@ -47,21 +47,19 @@ pub struct WsBackend<T> {
 
 impl<T> WsBackend<T> {
     /// Handle inbound text from the websocket.
-    #[instrument(skip(self))]
-    pub async fn handle_text(&mut self, t: String) -> Result<(), ()> {
-        debug!(text = t, "Received message from websocket");
+    pub fn handle_text(&mut self, text: &str) -> Result<(), ()> {
+        trace!(%text, "received message from websocket");
 
-        match serde_json::from_str(&t) {
+        match serde_json::from_str(text) {
             Ok(item) => {
-                trace!(?item, "Deserialized message");
-                let res = self.interface.send_to_frontend(item);
-                if res.is_err() {
-                    error!("Failed to send message to handler");
+                trace!(?item, "deserialized message");
+                if let Err(err) = self.interface.send_to_frontend(item) {
+                    error!(item=?err.0, "failed to send deserialized item to handler");
                     return Err(());
                 }
             }
             Err(err) => {
-                error!(%err, "Failed to deserialize message");
+                error!(%err, "failed to deserialize message");
                 return Err(());
             }
         }
