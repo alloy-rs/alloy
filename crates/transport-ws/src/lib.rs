@@ -47,6 +47,7 @@ pub struct WsBackend<T> {
 
 impl<T> WsBackend<T> {
     /// Handle inbound text from the websocket.
+    #[allow(clippy::result_unit_err)]
     pub fn handle_text(&mut self, text: &str) -> Result<(), ()> {
         trace!(%text, "received message from websocket");
 

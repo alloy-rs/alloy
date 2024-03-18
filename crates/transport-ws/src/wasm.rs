@@ -35,9 +35,10 @@ impl PubSubConnect for WsConnect {
 
 impl WsBackend<Fuse<WsStream>> {
     /// Handle a message from the websocket.
-    pub async fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
+    #[allow(clippy::result_unit_err)]
+    pub fn handle(&mut self, item: WsMessage) -> Result<(), ()> {
         match item {
-            WsMessage::Text(text) => self.handle_text(text).await,
+            WsMessage::Text(text) => self.handle_text(&text),
             WsMessage::Binary(_) => {
                 error!("Received binary message, expected text");
                 Err(())
@@ -86,7 +87,7 @@ impl WsBackend<Fuse<WsStream>> {
                     resp = self.socket.next() => {
                         match resp {
                             Some(item) => {
-                                errored = self.handle(item).await.is_err();
+                                errored = self.handle(item).is_err();
                                 if errored { break }
                             },
                             None => {
