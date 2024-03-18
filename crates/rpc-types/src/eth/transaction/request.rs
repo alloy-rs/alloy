@@ -1,7 +1,9 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Transaction};
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
+use crate::{
+    eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Transaction,
+};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
