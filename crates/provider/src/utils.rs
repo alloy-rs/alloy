@@ -14,12 +14,12 @@ pub type EstimatorFunction = fn(U256, &[Vec<U256>]) -> (U256, U256);
 
 fn estimate_priority_fee(rewards: &[Vec<U256>]) -> U256 {
     let mut rewards =
-        rewards.iter().filter_map(|r| r.first().filter(|r| **r > U256::ZERO)).collect::<Vec<_>>();
+        rewards.iter().filter_map(|r| r.first()).filter(|r| **r > U256::ZERO).collect::<Vec<_>>();
     if rewards.is_empty() {
         return U256::ZERO;
     }
 
-    rewards.sort();
+    rewards.sort_unstable();
 
     // Return the median.
     let n = rewards.len();

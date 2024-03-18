@@ -493,7 +493,7 @@ impl Serialize for BlockNumberOrTag {
         S: Serializer,
     {
         match *self {
-            BlockNumberOrTag::Number(ref x) => serializer.serialize_str(&format!("0x{x:x}")),
+            BlockNumberOrTag::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
             BlockNumberOrTag::Latest => serializer.serialize_str("latest"),
             BlockNumberOrTag::Finalized => serializer.serialize_str("finalized"),
             BlockNumberOrTag::Safe => serializer.serialize_str("safe"),
@@ -642,8 +642,8 @@ impl Serialize for BlockId {
     where
         S: Serializer,
     {
-        match *self {
-            BlockId::Hash(RpcBlockHash { ref block_hash, ref require_canonical }) => {
+        match self {
+            BlockId::Hash(RpcBlockHash { block_hash, require_canonical }) => {
                 let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
                 s.serialize_field("blockHash", block_hash)?;
                 if let Some(require_canonical) = require_canonical {
@@ -651,7 +651,7 @@ impl Serialize for BlockId {
                 }
                 s.end()
             }
-            BlockId::Number(ref num) => num.serialize(serializer),
+            BlockId::Number(num) => num.serialize(serializer),
         }
     }
 }
