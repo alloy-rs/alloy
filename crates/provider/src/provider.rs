@@ -1056,7 +1056,8 @@ mod tests {
         let ws = alloy_rpc_client::WsConnect::new(url);
         let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
         let p = RootProvider::<Ethereum, _>::new(client);
-        let mut stream = p.subscribe_blocks().await.unwrap().into_stream();
+        let sub = p.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(1);
         while let Some(block) = stream.next().await {
             println!("New block {:?}", block);
             assert!(block.header.number.unwrap() > U256::ZERO);
