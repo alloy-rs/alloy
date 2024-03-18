@@ -1084,11 +1084,8 @@ mod tests {
 
         let builder = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = *builder.tx_hash();
-        let hash2 = builder
-            .get_receipt()
-            .await
-            .expect("failed to await pending tx")
-            .transaction_hash;
+        let hash2 =
+            builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
     }
 
