@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TransactionReceipt {
     /// Transaction Hash.
-    pub transaction_hash: Option<B256>,
+    pub transaction_hash: B256,
     /// Index within the block.
     pub transaction_index: U64,
     /// Hash of the block this transaction was included within.
