@@ -91,8 +91,8 @@ pub struct Transaction {
 impl Transaction {
     /// Converts [Transaction] into [TransactionRequest].
     ///
-    /// During this conversion data for [TransactionRequest::sidecar] is lost as it is not part of
-    /// [Transaction].
+    /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
+    /// part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
         TransactionRequest {
             from: Some(self.from),
