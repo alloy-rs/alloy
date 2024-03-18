@@ -22,15 +22,17 @@ pub struct Block {
     #[serde(flatten)]
     pub header: Header,
     /// Uncles' hashes.
+    #[serde(default)]
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
     #[serde(
-        skip_serializing_if = "BlockTransactions::is_uncle",
-        default = "BlockTransactions::uncle"
+        default = "BlockTransactions::uncle",
+        skip_serializing_if = "BlockTransactions::is_uncle"
     )]
     pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<U256>,
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -130,27 +132,34 @@ pub enum BlockTransactions {
 
 impl BlockTransactions {
     /// Converts `self` into `Hashes`.
+    #[inline]
     pub fn convert_to_hashes(&mut self) {
-        *self = Self::Hashes(self.hashes().copied().collect());
+        if !self.is_hashes() {
+            *self = Self::Hashes(self.hashes().copied().collect());
+        }
     }
 
     /// Converts `self` into `Hashes`.
+    #[inline]
     pub fn into_hashes(mut self) -> Self {
         self.convert_to_hashes();
         self
     }
 
     /// Check if the enum variant is used for hashes.
+    #[inline]
     pub const fn is_hashes(&self) -> bool {
         matches!(self, Self::Hashes(_))
     }
 
     /// Returns true if the enum variant is used for full transactions.
+    #[inline]
     pub const fn is_full(&self) -> bool {
         matches!(self, Self::Full(_))
     }
 
     /// Returns true if the enum variant is used for an uncle response.
+    #[inline]
     pub const fn is_uncle(&self) -> bool {
         matches!(self, Self::Uncle)
     }
@@ -175,26 +184,21 @@ impl BlockTransactions {
     }
 
     /// Returns an instance of BlockTransactions with the Uncle special case.
+    #[inline]
     pub const fn uncle() -> Self {
         Self::Uncle
     }
 
     /// Returns the number of transactions.
+    #[inline]
     pub fn len(&self) -> usize {
-        match self {
-            BlockTransactions::Hashes(hashes) => hashes.len(),
-            BlockTransactions::Full(txs) => txs.len(),
-            BlockTransactions::Uncle => 0,
-        }
+        self.hashes().len()
     }
 
     /// Whether the block has no transactions.
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        match self {
-            BlockTransactions::Hashes(hashes) => hashes.is_empty(),
-            BlockTransactions::Full(txs) => txs.is_empty(),
-            BlockTransactions::Uncle => true,
-        }
+        self.len() == 0
     }
 }
 
@@ -1211,6 +1215,90 @@ mod tests {
         let block = serde_json::from_str::<RichBlock>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        assert_eq!(block, block2);
+    }
+
+    #[test]
+    fn serde_missing_uncles_block() {
+        let s = r#"{
+            "baseFeePerGas":"0x886b221ad",
+            "blobGasUsed":"0x0",
+            "difficulty":"0x0",
+            "excessBlobGas":"0x0",
+            "extraData":"0x6265617665726275696c642e6f7267",
+            "gasLimit":"0x1c9c380",
+            "gasUsed":"0xb0033c",
+            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
+            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
+            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
+            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
+            "nonce":"0x0000000000000000",
+            "number":"0x128c6df",
+            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
+            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
+            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
+            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+            "size":"0xdcc3",
+            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
+            "timestamp":"0x65f5f4c3",
+            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
+            "withdrawals":[
+               {
+                  "index":"0x24d80e6",
+                  "validatorIndex":"0x8b2b6",
+                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
+                  "amount":"0x1161f10"
+               }
+            ],
+            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
+         }"#;
+
+        let block = serde_json::from_str::<Block>(s).unwrap();
+        let serialized = serde_json::to_string(&block).unwrap();
+        let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
+        assert_eq!(block, block2);
+    }
+
+    #[test]
+    fn serde_block_containing_uncles() {
+        let s = r#"{
+            "baseFeePerGas":"0x886b221ad",
+            "blobGasUsed":"0x0",
+            "difficulty":"0x0",
+            "excessBlobGas":"0x0",
+            "extraData":"0x6265617665726275696c642e6f7267",
+            "gasLimit":"0x1c9c380",
+            "gasUsed":"0xb0033c",
+            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
+            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
+            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
+            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
+            "nonce":"0x0000000000000000",
+            "number":"0x128c6df",
+            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
+            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
+            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
+            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+            "size":"0xdcc3",
+            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
+            "timestamp":"0x65f5f4c3",
+            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
+            "uncles": ["0x123a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780", "0x489a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780"],
+            "withdrawals":[
+               {
+                  "index":"0x24d80e6",
+                  "validatorIndex":"0x8b2b6",
+                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
+                  "amount":"0x1161f10"
+               }
+            ],
+            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
+         }"#;
+
+        let block = serde_json::from_str::<Block>(s).unwrap();
+        assert!(block.uncles.len() == 2);
+        let serialized = serde_json::to_string(&block).unwrap();
+        let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 

@@ -1005,7 +1005,7 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    async fn subscribe_blocks() {
+    async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
         init_tracing();
@@ -1019,13 +1019,14 @@ mod tests {
         let mut n = 1;
         while let Some(block) = stream.next().await {
             assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
     }
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    async fn subscribe_blocks_boxed() {
+    async fn subscribe_blocks_ws_boxed() {
         use futures::stream::StreamExt;
 
         init_tracing();
@@ -1040,7 +1041,26 @@ mod tests {
         let mut n = 1;
         while let Some(block) = stream.next().await {
             assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "ws")]
+    async fn subscribe_blocks_ws_remote() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
+        let ws = alloy_rpc_client::WsConnect::new(url);
+        let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
+        let p = RootProvider::<Ethereum, _>::new(client);
+        let sub = p.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(1);
+        while let Some(block) = stream.next().await {
+            println!("New block {:?}", block);
+            assert!(block.header.number.unwrap() > U256::ZERO);
         }
     }
 
