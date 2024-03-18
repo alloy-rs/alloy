@@ -1088,8 +1088,7 @@ mod tests {
             .get_receipt()
             .await
             .expect("failed to await pending tx")
-            .transaction_hash
-            .unwrap();
+            .transaction_hash;
         assert_eq!(hash1, hash2);
     }
 
@@ -1286,7 +1285,7 @@ mod tests {
         assert!(receipt.is_some());
         let receipt = receipt.unwrap();
         assert_eq!(
-            receipt.transaction_hash.unwrap(),
+            receipt.transaction_hash,
             b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95")
         );
     }

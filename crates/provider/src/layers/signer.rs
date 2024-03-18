@@ -144,7 +144,7 @@ mod tests {
 
         let receipt =
             provider.get_transaction_receipt(local_hash2).await.unwrap().expect("no receipt");
-        let receipt_hash = receipt.transaction_hash.expect("no receipt hash");
+        let receipt_hash = receipt.transaction_hash;
         assert_eq!(receipt_hash, node_hash);
     }
 }
