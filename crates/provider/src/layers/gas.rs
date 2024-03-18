@@ -74,19 +74,84 @@ where
         &self,
         mut tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
-        if tx.gas_price().is_none() {
-            let gas_price = self.get_gas_price().await?;
+        let (gas_price, gas_limit, eip1559_fees) = match (
+            tx.gas_price().is_none(),
+            tx.gas_limit().is_none(),
+            (tx.max_fee_per_gas().is_none() && tx.max_priority_fee_per_gas().is_none()),
+        ) {
+            (true, true, true) => {
+                let gas_price = self.get_gas_price();
+                let gas_estimate = self.get_gas_estimate(&tx);
+                let eip1559_fees = self.get_eip1159_fees_estimate();
+
+                let (gas_price, gas_estimate, eip1559_fees) =
+                    futures::join!(gas_price, gas_estimate, eip1559_fees);
+
+                let gas_price = gas_price.unwrap();
+                let gas_estimate = gas_estimate.unwrap();
+                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
+
+                (
+                    Some(gas_price),
+                    Some(gas_estimate),
+                    Some((max_fee_per_gas, max_priority_fee_per_gas)),
+                )
+            }
+            (true, true, false) => {
+                let gas_price = self.get_gas_price();
+                let gas_estimate = self.get_gas_estimate(&tx);
+
+                let (gas_price, gas_estimate) = futures::join!(gas_price, gas_estimate);
+
+                let gas_price = gas_price.unwrap();
+                let gas_estimate = gas_estimate.unwrap();
+
+                (Some(gas_price), Some(gas_estimate), None)
+            }
+            (true, false, true) => {
+                let gas_price = self.get_gas_price();
+                let eip1559_fees = self.get_eip1159_fees_estimate();
+
+                let (gas_price, eip1559_fees) = futures::join!(gas_price, eip1559_fees);
+                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
+
+                let gas_price = gas_price.unwrap();
+
+                (Some(gas_price), None, Some((max_fee_per_gas, max_priority_fee_per_gas)))
+            }
+            (true, false, false) => {
+                let gas_price = self.get_gas_price().await?;
+                (Some(gas_price), None, None)
+            }
+            (false, true, true) => {
+                let gas_estimate = self.get_gas_estimate(&tx);
+                let eip1559_fees = self.get_eip1159_fees_estimate();
+
+                let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate, eip1559_fees);
+                let (max_fee_per_gas, max_priority_fee_per_gas) = eip1559_fees.unwrap();
+
+                let gas_estimate = gas_estimate.unwrap();
+
+                (None, Some(gas_estimate), Some((max_fee_per_gas, max_priority_fee_per_gas)))
+            }
+            (false, false, true) => {
+                let (max_fee_per_gas, max_priority_fee_per_gas) =
+                    self.get_eip1159_fees_estimate().await?;
+
+                (None, None, Some((max_fee_per_gas, max_priority_fee_per_gas)))
+            }
+            _ => (None, None, None),
+        };
+
+        if let Some(gas_price) = gas_price {
             tx.set_gas_price(gas_price);
         }
-        if tx.gas_limit().is_none() {
-            let gas_estimate = self.get_gas_estimate(&tx).await?;
-            tx.set_gas_limit(gas_estimate);
+
+        if let Some(gas_limit) = gas_limit {
+            tx.set_gas_limit(gas_limit);
         }
 
-        if tx.max_fee_per_gas().is_none() && tx.max_priority_fee_per_gas().is_none() {
-            let (max_fee_per_gas, max_priority_fee_per_gas) =
-                self.get_eip1159_fees_estimate().await?;
-
+        if let Some((max_fee_per_gas, max_priority_fee_per_gas)) = eip1559_fees {
             tx.set_max_fee_per_gas(max_fee_per_gas);
             tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
         }
