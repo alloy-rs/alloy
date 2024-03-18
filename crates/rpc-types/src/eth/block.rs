@@ -22,7 +22,7 @@ pub struct Block {
     #[serde(flatten)]
     pub header: Header,
     /// Uncles' hashes.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
