@@ -3,7 +3,6 @@
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
-use alloy_serde::num::u64_hex_or_decimal;
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use optimism::OptimismTransactionReceiptFields;
@@ -29,7 +28,7 @@ pub struct Transaction {
     /// Hash
     pub hash: B256,
     /// Nonce
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "alloy_serde::num::u64_hex")]
     pub nonce: u64,
     /// Block hash
     pub block_hash: Option<B256>,
