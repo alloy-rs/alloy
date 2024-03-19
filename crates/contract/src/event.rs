@@ -223,7 +223,7 @@ mod tests {
 
         #[cfg(feature = "pubsub")]
         let (provider, anvil) = spawn_anvil();
-        
+
         #[cfg(not(feature = "pubsub"))]
         let (provider, _anvil) = spawn_anvil();
 
