@@ -328,9 +328,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     /// use alloy_primitives::keccak256;
-    /// 
+    ///
     /// let signature = keccak256("Transfer(address,address,uint256)".as_bytes());
-    /// 
+    ///
     /// let sub = provider.subscribe_logs(&Filter::new().event_signature(signature)).await?;
     /// let mut stream = sub.into_stream().take(5);
     /// while let Some(tx) = stream.next().await {
@@ -340,10 +340,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(
-        &self,
-        filter: &Filter,
-    ) -> TransportResult<Subscription<Log>> {
+    async fn subscribe_logs(&self, filter: &Filter) -> TransportResult<Subscription<Log>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("logs", filter)).await?;
         self.root().get_subscription(id).await
