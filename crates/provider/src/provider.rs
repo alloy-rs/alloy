@@ -319,7 +319,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// client does not support it.
     ///
     /// For a polling alternative available over HTTP, use
-    /// [`Provider::watch_full_pending_transactions`]. However, be aware that polling increases
+    /// [`Provider::watch_logs`]. However, be aware that polling increases
     /// RPC usage drastically.
     ///
     /// # Examples
