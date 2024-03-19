@@ -101,7 +101,7 @@ mod tests {
     use crate::{Provider, ProviderBuilder, RootProvider};
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, b256, U256, U64};
+    use alloy_primitives::{address, b256, U256};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;
