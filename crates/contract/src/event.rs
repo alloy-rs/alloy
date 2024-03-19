@@ -220,7 +220,12 @@ mod tests {
     #[tokio::test]
     async fn event_filters() {
         init_tracing();
+
+        #[cfg(feature = "pubsub")]
         let (provider, anvil) = spawn_anvil();
+        
+        #[cfg(not(feature = "pubsub"))]
+        let (provider, _anvil) = spawn_anvil();
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
