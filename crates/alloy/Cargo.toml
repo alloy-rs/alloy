@@ -21,11 +21,11 @@ alloy-genesis = { workspace = true, default-features = false, optional = true }
 alloy-network = { workspace = true, default-features = false, optional = true }
 alloy-node-bindings = { workspace = true, default-features = false, optional = true }
 alloy-provider = { workspace = true, default-features = false, optional = true }
-alloy-pubsub = { workspace = true, default-features = false, optional = true }
+alloy-pubsub = { workspace = true, optional = true }
 
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
-alloy-rpc-client = { workspace = true, default-features = false, optional = true }
+alloy-rpc-client = { workspace = true, optional = true }
 alloy-rpc-engine-types = { workspace = true, default-features = false, optional = true }
 alloy-rpc-trace-types = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types = { workspace = true, default-features = false, optional = true }

@@ -22,6 +22,8 @@ use alloy_rpc_types::{
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
+use alloy_transport_ipc::IpcConnect;
+use alloy_transport_ws::WsConnect;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
@@ -68,6 +70,41 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     /// Creates a new root provider from the given RPC client.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
+    }
+
+    /// Creates a new root provider with a boxed transport from a string.
+    /// BoxTransport is used to allow for different transport types.
+    pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
+        RootProvider::<N, _>::connect(conn_str).await
+    }
+}
+
+impl<N: Network> RootProvider<N, BoxTransport> {
+    /// Creates a new root provider with a boxed transport from a string.
+    pub async fn connect(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
+        match utils::parse_str_to_tranport_type(conn_str) {
+            "http" => {
+                let provider =
+                    RootProvider::<N, _>::new_http(reqwest::Url::parse(conn_str).unwrap());
+
+                Ok(provider.boxed())
+            }
+            "ws" => {
+                let ws = WsConnect::new(conn_str);
+
+                let ws_client = RpcClient::connect_pubsub(ws).await?;
+
+                Ok(RootProvider::<N, _>::new(ws_client).boxed())
+            }
+            "ipc" => {
+                let ipc = IpcConnect::new(conn_str.to_string());
+
+                let ipc_client = RpcClient::connect_pubsub(ipc).await?;
+
+                Ok(RootProvider::<N, _>::new(ipc_client).boxed())
+            }
+            _ => Err(TransportErrorKind::custom_str("unsupported transport")),
+        }
     }
 }
 

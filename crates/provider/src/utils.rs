@@ -52,6 +52,17 @@ pub fn eip1559_default_estimator(
     Eip1559Estimation { max_fee_per_gas: potential_max_fee, max_priority_fee_per_gas }
 }
 
+/// Identifies the intended transport type from the given string.
+pub fn parse_str_to_tranport_type(s: &str) -> &str {
+    if s.starts_with("http://") || s.starts_with("https://") {
+        "http"
+    } else if s.starts_with("ws://") || s.starts_with("wss://") {
+        "ws"
+    } else {
+        "ipc"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
