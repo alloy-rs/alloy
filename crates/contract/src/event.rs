@@ -65,6 +65,15 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, 
         let poller = self.provider.watch_logs(&self.filter).await?;
         Ok(EventPoller::new(poller))
     }
+
+    /// Subscribes to the stream of events that match the filter.
+    ///
+    /// Returns a stream of decoded events and raw logs.
+    #[cfg(feature = "pubsub")]
+    pub async fn subscribe(&self) -> TransportResult<subscription::EventSubscription<E>> {
+        let sub = self.provider.subscribe_logs(&self.filter).await?;
+        Ok(subscription::EventSubscription::new(sub))
+    }
 }
 
 impl<N, T, P: Clone, E> Event<N, T, &P, E> {
@@ -131,10 +140,67 @@ fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
     E::decode_raw_log(log.topics.iter().copied(), &log.data, false)
 }
 
+#[cfg(feature = "pubsub")]
+pub(crate) mod subscription {
+    use super::*;
+    use alloy_pubsub::Subscription;
+
+    /// An event subscription.
+    ///
+    /// Underlying subscription is available through the [`sub`](Self::sub) field.
+    pub struct EventSubscription<E> {
+        /// The inner poller.
+        pub sub: Subscription<Log>,
+        _phantom: PhantomData<E>,
+    }
+
+    impl<E> std::ops::Deref for EventSubscription<E> {
+        type Target = Subscription<Log>;
+
+        #[inline]
+        fn deref(&self) -> &Self::Target {
+            &self.sub
+        }
+    }
+
+    impl<E> std::ops::DerefMut for EventSubscription<E> {
+        #[inline]
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.sub
+        }
+    }
+
+    impl<E> fmt::Debug for EventSubscription<E> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("EventSubscription")
+                .field("sub", &self.sub)
+                .field("event_type", &format_args!("{}", std::any::type_name::<E>()))
+                .finish()
+        }
+    }
+
+    impl<E: SolEvent> EventSubscription<E> {
+        /// Creates a new event subscription with the provided subscription.
+        #[allow(clippy::missing_const_for_fn)]
+        #[inline]
+        pub fn new(sub: Subscription<Log>) -> Self {
+            Self { sub, _phantom: PhantomData }
+        }
+
+        /// Converts the subscription into a stream.
+        pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
+            self.sub.into_stream().map(|log| decode_log(&log).map(|e| (e, log)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_network::Ethereum;
     use alloy_primitives::U256;
+    use alloy_provider::RootProvider;
+    use alloy_rpc_client::RpcClient;
     use alloy_sol_types::sol;
     use test_utils::{init_tracing, spawn_anvil};
 
@@ -154,7 +220,7 @@ mod tests {
     #[tokio::test]
     async fn event_filters() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
+        let (provider, anvil) = spawn_anvil();
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
@@ -189,5 +255,23 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
+
+        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let provider = RootProvider::<Ethereum, _>::new(client);
+
+        let contract = MyContract::new(*contract.address(), provider);
+        let event = contract.MyEvent_filter();
+
+        let sub = event.subscribe().await.unwrap();
+
+        contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+
+        let mut stream = sub.into_stream();
+
+        let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+        assert_eq!(stream_event, expected_event);
+        assert_eq!(stream_log.address, *contract.address());
+        assert_eq!(stream_log.block_number, Some(U256::from(3)));
     }
 }

@@ -22,7 +22,7 @@ mod error;
 pub use error::*;
 
 mod event;
-pub use event::{Event, EventPoller};
+pub use event::{subscription::EventSubscription, Event, EventPoller};
 
 mod interface;
 pub use interface::*;
