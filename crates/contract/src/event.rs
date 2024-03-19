@@ -256,7 +256,7 @@ mod tests {
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
 
-        #[cfg(feature = "pubsub")] 
+        #[cfg(feature = "pubsub")]
         {
             let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
             let client = RpcClient::connect_pubsub(ws).await.unwrap();
@@ -276,6 +276,5 @@ mod tests {
             assert_eq!(stream_log.address, *contract.address());
             assert_eq!(stream_log.block_number, Some(U256::from(3)));
         }
-        
     }
 }
