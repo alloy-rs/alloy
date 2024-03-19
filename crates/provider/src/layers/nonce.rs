@@ -136,7 +136,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U256, U64};
+    use alloy_primitives::{address, U256};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;
@@ -193,11 +193,11 @@ mod tests {
         let pending = provider.send_transaction(tx.clone()).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
-        assert_eq!(mined_tx.nonce, U64::from(0));
+        assert_eq!(mined_tx.nonce, 0);
 
         let pending = provider.send_transaction(tx).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
-        assert_eq!(mined_tx.nonce, U64::from(1));
+        assert_eq!(mined_tx.nonce, 1);
     }
 }
