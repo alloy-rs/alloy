@@ -22,7 +22,10 @@ mod error;
 pub use error::*;
 
 mod event;
-pub use event::{subscription::EventSubscription, Event, EventPoller};
+pub use event::{Event, EventPoller};
+
+#[cfg(feature = "pubsub")]
+pub use event::subscription::EventSubscription;
 
 mod interface;
 pub use interface::*;
