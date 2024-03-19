@@ -328,6 +328,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     /// use alloy_primitives::keccak256;
+    /// use alloy_rpc_types::Filter;
     ///
     /// let signature = keccak256("Transfer(address,address,uint256)".as_bytes());
     ///
