@@ -34,7 +34,7 @@ pub struct TransactionRequest {
     #[serde(default, flatten)]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    #[serde(with = "u64_hex_or_decimal_opt")]
+    #[serde(default, with = "u64_hex_or_decimal_opt")]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
     pub chain_id: Option<ChainId>,
