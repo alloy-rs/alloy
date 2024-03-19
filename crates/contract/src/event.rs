@@ -256,22 +256,26 @@ mod tests {
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
 
-        let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-        let client = RpcClient::connect_pubsub(ws).await.unwrap();
-        let provider = RootProvider::<Ethereum, _>::new(client);
+        #[cfg(feature = "pubsub")] 
+        {
+            let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
+            let client = RpcClient::connect_pubsub(ws).await.unwrap();
+            let provider = RootProvider::<Ethereum, _>::new(client);
 
-        let contract = MyContract::new(*contract.address(), provider);
-        let event = contract.MyEvent_filter();
+            let contract = MyContract::new(*contract.address(), provider);
+            let event = contract.MyEvent_filter();
 
-        let sub = event.subscribe().await.unwrap();
+            let sub = event.subscribe().await.unwrap();
 
-        contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
 
-        let mut stream = sub.into_stream();
+            let mut stream = sub.into_stream();
 
-        let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
-        assert_eq!(stream_event, expected_event);
-        assert_eq!(stream_log.address, *contract.address());
-        assert_eq!(stream_log.block_number, Some(U256::from(3)));
+            let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+            assert_eq!(stream_event, expected_event);
+            assert_eq!(stream_log.address, *contract.address());
+            assert_eq!(stream_log.block_number, Some(U256::from(3)));
+        }
+        
     }
 }
