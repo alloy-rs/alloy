@@ -260,8 +260,8 @@ impl TryFrom<Transaction> for TxEnvelope {
         match tx.transaction_type.map(|t| t.to()) {
             None | Some(0) => {
                 let tx = TxLegacy {
-                    chain_id: tx.chain_id,
-                    nonce: tx.nonce.to(),
+                    chain_id: tx.chain_id.map(|c| c.to()),
+                    nonce: tx.nonce,
                     gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
                     gas_limit: tx.gas.to(),
                     to: tx.to.into(),
@@ -272,8 +272,8 @@ impl TryFrom<Transaction> for TxEnvelope {
             }
             Some(1) => {
                 let tx = TxEip2930 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
-                    nonce: tx.nonce.to(),
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+                    nonce: tx.nonce,
                     gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
                     gas_limit: tx.gas.to(),
                     to: tx.to.into(),
@@ -285,8 +285,8 @@ impl TryFrom<Transaction> for TxEnvelope {
             }
             Some(2) => {
                 let tx = TxEip1559 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
-                    nonce: tx.nonce.to(),
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+                    nonce: tx.nonce,
                     max_fee_per_gas: tx
                         .max_fee_per_gas
                         .ok_or(Eip2718Error::MissingMaxFeePerGas)?
@@ -305,8 +305,8 @@ impl TryFrom<Transaction> for TxEnvelope {
             }
             Some(3) => {
                 let tx = TxEip4844 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
-                    nonce: tx.nonce.to(),
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+                    nonce: tx.nonce,
                     max_fee_per_gas: tx
                         .max_fee_per_gas
                         .ok_or(Eip2718Error::MissingMaxFeePerGas)?
