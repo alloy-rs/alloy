@@ -120,7 +120,7 @@ mod tests {
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
         let tx = TransactionRequest {
-            nonce: Some(U64::from(0)),
+            nonce: Some(0),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
             gas_price: Some(U256::from(20e9)),
