@@ -258,7 +258,7 @@ impl TryFrom<Transaction> for TxEnvelope {
             .map_err(Eip2718Error::SignatureError)?;
 
         match tx.transaction_type.map(|t| t.to()) {
-            None | Some(0) => {
+            None => {
                 let tx = TxLegacy {
                     chain_id: tx.chain_id.map(|c| c.to()),
                     nonce: tx.nonce,
