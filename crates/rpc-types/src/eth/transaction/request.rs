@@ -2,6 +2,7 @@
 
 use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
+use alloy_serde::num::u64_hex_or_decimal_opt;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -33,7 +34,7 @@ pub struct TransactionRequest {
     #[serde(default, flatten)]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    #[serde(with = "alloy_serde::u64_hex_or_decimal_opt")]
+    #[serde(with = "u64_hex_or_decimal_opt")]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
     pub chain_id: Option<ChainId>,
