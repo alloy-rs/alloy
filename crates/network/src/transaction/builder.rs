@@ -1,6 +1,6 @@
 use super::signer::NetworkSigner;
 use crate::Network;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256, U64};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use futures_utils_wasm::impl_future;
 
 /// Error type for transaction builders.
@@ -58,13 +58,13 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the nonce for the transaction.
-    fn nonce(&self) -> Option<U64>;
+    fn nonce(&self) -> Option<u64>;
 
     /// Set the nonce for the transaction.
-    fn set_nonce(&mut self, nonce: U64);
+    fn set_nonce(&mut self, nonce: u64);
 
     /// Builder-pattern method for setting the nonce.
-    fn with_nonce(mut self, nonce: U64) -> Self {
+    fn with_nonce(mut self, nonce: u64) -> Self {
         self.set_nonce(nonce);
         self
     }
@@ -115,7 +115,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         }
         let from = self.from()?;
         let nonce = self.nonce()?;
-        Some(from.create(nonce.to()))
+        Some(from.create(nonce))
     }
 
     /// Get the value for the transaction.

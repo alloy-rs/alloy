@@ -28,7 +28,8 @@ pub struct Transaction {
     /// Hash
     pub hash: B256,
     /// Nonce
-    pub nonce: U64,
+    #[serde(with = "alloy_serde::num::u64_hex")]
+    pub nonce: u64,
     /// Block hash
     pub block_hash: Option<B256>,
     /// Block number
@@ -94,7 +95,7 @@ mod tests {
     fn serde_transaction() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
-            nonce: U64::from(2),
+            nonce: 2,
             block_hash: Some(B256::with_last_byte(3)),
             block_number: Some(U256::from(4)),
             transaction_index: Some(U256::from(5)),
@@ -132,7 +133,7 @@ mod tests {
     fn serde_transaction_with_parity_bit() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
-            nonce: U64::from(2),
+            nonce: 2,
             block_hash: Some(B256::with_last_byte(3)),
             block_number: Some(U256::from(4)),
             transaction_index: Some(U256::from(5)),

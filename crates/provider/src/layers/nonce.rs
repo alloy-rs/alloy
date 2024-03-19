@@ -1,6 +1,6 @@
 use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{Address, U64};
+use alloy_primitives::Address;
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -82,7 +82,7 @@ where
     T: Transport + Clone,
     P: Provider<N, T>,
 {
-    async fn get_next_nonce(&self, from: Address) -> TransportResult<U64> {
+    async fn get_next_nonce(&self, from: Address) -> TransportResult<u64> {
         // locks dashmap internally for a short duration to clone the `Arc`
         let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
 
@@ -91,13 +91,13 @@ where
         match *nonce {
             Some(ref mut nonce) => {
                 *nonce += 1;
-                Ok(U64::from(*nonce))
+                Ok(*nonce)
             }
             None => {
                 // initialize the nonce if we haven't seen this account before
                 let initial_nonce = self.inner.get_transaction_count(from, None).await?;
                 *nonce = Some(initial_nonce.to());
-                Ok(initial_nonce)
+                Ok(initial_nonce.to())
             }
         }
     }
@@ -193,11 +193,11 @@ mod tests {
         let pending = provider.send_transaction(tx.clone()).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
-        assert_eq!(mined_tx.nonce, U64::from(0));
+        assert_eq!(mined_tx.nonce, 0);
 
         let pending = provider.send_transaction(tx).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
         let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("tx didn't finalize");
-        assert_eq!(mined_tx.nonce, U64::from(1));
+        assert_eq!(mined_tx.nonce, 1);
     }
 }

@@ -1,7 +1,7 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U64, U8};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -33,7 +33,8 @@ pub struct TransactionRequest {
     #[serde(default, flatten)]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    pub nonce: Option<U64>,
+    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    pub nonce: Option<u64>,
     /// The chain ID for the transaction.
     pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
@@ -108,7 +109,7 @@ impl TransactionRequest {
     }
 
     /// Sets the nonce for the transaction.
-    pub const fn nonce(mut self, nonce: U64) -> Self {
+    pub const fn nonce(mut self, nonce: u64) -> Self {
         self.nonce = Some(nonce);
         self
     }
