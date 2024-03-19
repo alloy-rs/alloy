@@ -293,6 +293,26 @@ impl Decodable for TxEip2930 {
     }
 }
 
+impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip2930> {
+    type Error = alloy_rpc_types::Error;
+
+    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.try_into()?;
+
+        let tx = TxEip2930 {
+            chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+            nonce: tx.nonce,
+            gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.ok_or(Eip2718Error::MissingAccessList)?.into(),
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::TxEip2930;

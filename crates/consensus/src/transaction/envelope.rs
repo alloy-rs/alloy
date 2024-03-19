@@ -257,78 +257,14 @@ impl TryFrom<Transaction> for TxEnvelope {
             .try_into()
             .map_err(Eip2718Error::SignatureError)?;
 
-        match tx.transaction_type.map(|t| t.to()) {
-            None => {
-                let tx = TxLegacy {
-                    chain_id: tx.chain_id.map(|c| c.to()),
-                    nonce: tx.nonce,
-                    gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
-                    gas_limit: tx.gas.to(),
-                    to: tx.to.into(),
-                    value: tx.value,
-                    input: tx.input,
-                };
-                Ok(Self::Legacy(tx.into_signed(signature)))
-            }
-            Some(1) => {
-                let tx = TxEip2930 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
-                    nonce: tx.nonce,
-                    gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
-                    gas_limit: tx.gas.to(),
-                    to: tx.to.into(),
-                    value: tx.value,
-                    input: tx.input,
-                    access_list: tx.access_list.ok_or(Eip2718Error::MissingAccessList)?.into(),
-                };
-                Ok(Self::Eip2930(tx.into_signed(signature)))
-            }
-            Some(2) => {
-                let tx = TxEip1559 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
-                    nonce: tx.nonce,
-                    max_fee_per_gas: tx
-                        .max_fee_per_gas
-                        .ok_or(Eip2718Error::MissingMaxFeePerGas)?
-                        .to(),
-                    max_priority_fee_per_gas: tx
-                        .max_priority_fee_per_gas
-                        .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
-                        .to(),
-                    gas_limit: tx.gas.to(),
-                    to: tx.to.into(),
-                    value: tx.value,
-                    input: tx.input,
-                    access_list: tx.access_list.unwrap_or_default().into(),
-                };
-                Ok(Self::Eip1559(tx.into_signed(signature)))
-            }
-            Some(3) => {
-                let tx = TxEip4844 {
-                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
-                    nonce: tx.nonce,
-                    max_fee_per_gas: tx
-                        .max_fee_per_gas
-                        .ok_or(Eip2718Error::MissingMaxFeePerGas)?
-                        .to(),
-                    max_priority_fee_per_gas: tx
-                        .max_priority_fee_per_gas
-                        .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
-                        .to(),
-                    gas_limit: tx.gas.to(),
-                    to: tx.to.into(),
-                    value: tx.value,
-                    input: tx.input,
-                    access_list: tx.access_list.unwrap_or_default().into(),
-                    blob_versioned_hashes: tx.blob_versioned_hashes,
-                    max_fee_per_blob_gas: tx
-                        .max_fee_per_blob_gas
-                        .ok_or(Eip2718Error::MissingMaxFeePerBlobGas)?
-                        .to(),
-                };
-                Ok(Self::Eip4844(TxEip4844Variant::TxEip4844(tx).into_signed(signature)))
-            }
-            Some(t) => Err(Eip2718Error::UnexpectedType(t)),
+        match tx.transaction_type {
+            None => Ok(Self::Legacy(tx.try_into()?)),
+            Some(t) => match TxType::try_from(t.to())? {
+                TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
+                TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
+                TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
+                TxType::Legacy => unreachable!(),
+            },
         }
     }
 }

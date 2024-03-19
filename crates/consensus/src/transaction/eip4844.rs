@@ -281,6 +281,18 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
     }
 }
 
+impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip4844Variant> {
+    type Error = alloy_rpc_types::Error;
+
+    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
+        let tx: Signed<TxEip4844> = tx.try_into()?;
+        let (inner, signature, _) = tx.into_parts();
+        let tx = TxEip4844Variant::TxEip4844(inner);
+
+        Ok(tx.into_signed(signature))
+    }
+}
+
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
@@ -706,6 +718,35 @@ impl Decodable for TxEip4844 {
         }
 
         Self::decode_fields(data)
+    }
+}
+
+impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip4844> {
+    type Error = alloy_rpc_types::Error;
+
+    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.try_into()?;
+
+        let tx = TxEip4844 {
+            chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+            nonce: tx.nonce,
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(Eip2718Error::MissingMaxFeePerGas)?.to(),
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas
+                .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
+                .to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.unwrap_or_default().into(),
+            blob_versioned_hashes: tx.blob_versioned_hashes,
+            max_fee_per_blob_gas: tx
+                .max_fee_per_blob_gas
+                .ok_or(Eip2718Error::MissingMaxFeePerBlobGas)?
+                .to(),
+        };
+        Ok(tx.into_signed(signature))
     }
 }
 

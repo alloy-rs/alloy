@@ -275,6 +275,25 @@ impl Decodable for TxLegacy {
     }
 }
 
+impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxLegacy> {
+    type Error = alloy_rpc_types::Error;
+
+    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.try_into()?;
+
+        let tx = TxLegacy {
+            chain_id: tx.chain_id.map(|c| c.to()),
+            nonce: tx.nonce,
+            gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use crate::{SignableTransaction, TxLegacy};

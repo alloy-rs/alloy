@@ -325,6 +325,30 @@ impl Decodable for TxEip1559 {
     }
 }
 
+impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip1559> {
+    type Error = alloy_rpc_types::Error;
+
+    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.try_into()?;
+
+        let tx = TxEip1559 {
+            chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+            nonce: tx.nonce,
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(Eip2718Error::MissingMaxFeePerGas)?.to(),
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas
+                .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
+                .to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.unwrap_or_default().into(),
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip1559;
