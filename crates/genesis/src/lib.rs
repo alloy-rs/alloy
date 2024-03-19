@@ -20,7 +20,7 @@
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
     json_u256::{deserialize_json_ttd_opt, deserialize_json_u256},
-    num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
+    num::{u64_hex, u64_hex_opt, u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
 };
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub struct Genesis {
     #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "u64_hex")]
     pub nonce: u64,
     /// The genesis header timestamp.
     #[serde(with = "u64_hex_or_decimal")]
@@ -212,7 +212,7 @@ impl Genesis {
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
+    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_opt", default)]
     pub nonce: Option<u64>,
     /// The balance of the account at genesis.
     #[serde(deserialize_with = "deserialize_json_u256")]
