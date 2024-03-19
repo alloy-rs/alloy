@@ -5,7 +5,7 @@
 #[cfg(not(feature = "std"))]
 use crate::alloc::{vec, vec::Vec};
 
-use alloy_primitives::{keccak256, Sealed, B256};
+use alloy_primitives::{keccak256, Sealed, SignatureError, B256};
 use alloy_rlp::{BufMut, Header, EMPTY_STRING_CODE};
 use core::{
     fmt,
@@ -18,12 +18,28 @@ const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 /// [EIP-2718] decoding errors.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
     RlpError(alloy_rlp::Error),
     /// Got an unexpected type flag while decoding.
     UnexpectedType(u8),
+    /// Missing `gasPrice` field for Legacy transaction.
+    MissingGasPrice,
+    /// Missing signature for transaction.
+    MissingSignature,
+    /// Missing `accessList` field for EIP-2930 transaction.
+    MissingAccessList,
+    /// Missing `maxFeePerGas` field for EIP-1559 transaction.
+    MissingMaxFeePerGas,
+    /// Missing `maxPriorityFeePerGas` field for EIP-1559 transaction.
+    MissingMaxPriorityFeePerGas,
+    /// Missing `maxFeePerBlobGas` field for EIP-4844 transaction.
+    MissingMaxFeePerBlobGas,
+    /// Missing `chainId` field for EIP-155 transaction.
+    MissingChainId,
+    /// Signature error from [`alloy_primitives`].
+    SignatureError(SignatureError),
 }
 
 impl Display for Eip2718Error {
@@ -31,6 +47,22 @@ impl Display for Eip2718Error {
         match self {
             Self::RlpError(err) => write!(f, "{err}"),
             Self::UnexpectedType(t) => write!(f, "Unexpected type flag. Got {t}."),
+            Self::MissingGasPrice => write!(f, "Missing `gasPrice` field for Legacy transaction."),
+            Self::MissingSignature => write!(f, "Missing signature for transaction."),
+            Self::MissingAccessList => {
+                write!(f, "Missing `accessList` field for EIP-2930 transaction.")
+            }
+            Self::MissingMaxFeePerGas => {
+                write!(f, "Missing `maxFeePerGas` field for EIP-1559 transaction.")
+            }
+            Self::MissingMaxPriorityFeePerGas => {
+                write!(f, "Missing `maxPriorityFeePerGas` field for EIP-1559 transaction.")
+            }
+            Self::MissingMaxFeePerBlobGas => {
+                write!(f, "Missing `maxFeePerBlobGas` field for EIP-4844 transaction.")
+            }
+            Self::MissingChainId => write!(f, "Missing `chainId` field for EIP-155 transaction."),
+            Self::SignatureError(err) => write!(f, "{err}"),
         }
     }
 }

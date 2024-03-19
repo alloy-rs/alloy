@@ -1,8 +1,10 @@
 use crate::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
+    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
+    TxEip4844WithSidecar, TxLegacy,
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rpc_types::Transaction;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -241,6 +243,92 @@ impl Encodable2718 for TxEnvelope {
             TxEnvelope::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
+        }
+    }
+}
+
+impl TryFrom<Transaction> for TxEnvelope {
+    type Error = Eip2718Error;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx
+            .signature
+            .ok_or(Eip2718Error::MissingSignature)?
+            .try_into()
+            .map_err(Eip2718Error::SignatureError)?;
+
+        match tx.transaction_type.map(|t| t.to()) {
+            None | Some(0) => {
+                let tx = TxLegacy {
+                    chain_id: tx.chain_id,
+                    nonce: tx.nonce.to(),
+                    gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
+                    gas_limit: tx.gas.to(),
+                    to: tx.to.into(),
+                    value: tx.value,
+                    input: tx.input,
+                };
+                Ok(Self::Legacy(tx.into_signed(signature)))
+            }
+            Some(1) => {
+                let tx = TxEip2930 {
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
+                    nonce: tx.nonce.to(),
+                    gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
+                    gas_limit: tx.gas.to(),
+                    to: tx.to.into(),
+                    value: tx.value,
+                    input: tx.input,
+                    access_list: tx.access_list.ok_or(Eip2718Error::MissingAccessList)?.into(),
+                };
+                Ok(Self::Eip2930(tx.into_signed(signature)))
+            }
+            Some(2) => {
+                let tx = TxEip1559 {
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
+                    nonce: tx.nonce.to(),
+                    max_fee_per_gas: tx
+                        .max_fee_per_gas
+                        .ok_or(Eip2718Error::MissingMaxFeePerGas)?
+                        .to(),
+                    max_priority_fee_per_gas: tx
+                        .max_priority_fee_per_gas
+                        .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
+                        .to(),
+                    gas_limit: tx.gas.to(),
+                    to: tx.to.into(),
+                    value: tx.value,
+                    input: tx.input,
+                    access_list: tx.access_list.unwrap_or_default().into(),
+                };
+                Ok(Self::Eip1559(tx.into_signed(signature)))
+            }
+            Some(3) => {
+                let tx = TxEip4844 {
+                    chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?,
+                    nonce: tx.nonce.to(),
+                    max_fee_per_gas: tx
+                        .max_fee_per_gas
+                        .ok_or(Eip2718Error::MissingMaxFeePerGas)?
+                        .to(),
+                    max_priority_fee_per_gas: tx
+                        .max_priority_fee_per_gas
+                        .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
+                        .to(),
+                    gas_limit: tx.gas.to(),
+                    to: tx.to.into(),
+                    value: tx.value,
+                    input: tx.input,
+                    access_list: tx.access_list.unwrap_or_default().into(),
+                    blob_versioned_hashes: tx.blob_versioned_hashes,
+                    max_fee_per_blob_gas: tx
+                        .max_fee_per_blob_gas
+                        .ok_or(Eip2718Error::MissingMaxFeePerBlobGas)?
+                        .to(),
+                };
+                Ok(Self::Eip4844(TxEip4844Variant::TxEip4844(tx).into_signed(signature)))
+            }
+            Some(t) => Err(Eip2718Error::UnexpectedType(t)),
         }
     }
 }

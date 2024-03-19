@@ -96,3 +96,10 @@ impl AccessList {
             + self.0.capacity() * mem::size_of::<AccessListItem>()
     }
 }
+
+impl From<alloy_rpc_types::AccessList> for AccessList {
+    fn from(value: alloy_rpc_types::AccessList) -> Self {
+        // SAFETY: Same repr and size
+        unsafe { std::mem::transmute(value) }
+    }
+}
