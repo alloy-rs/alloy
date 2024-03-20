@@ -102,7 +102,7 @@ contribution follows the linting rules and passes clippy.
 
 Because these crates are primarily json-rpc focused, we do not intend to support
 `no_std` for most of them at this time. 
-But the following basic crates support `no_std`:
+The following crates support `no_std`:
 - alloy-eips
 - alloy-genesis
 - alloy-serde
