@@ -36,6 +36,7 @@ pub struct TransactionRequest {
     #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
+    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
     pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default)]
@@ -290,5 +291,18 @@ mod tests {
             req.other.get_deserialized::<B256>("sourceHash").unwrap().unwrap(),
             b256!("bf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
         );
+    }
+
+    #[test]
+    fn serde_tx_chain_id_field() {
+        let chain_id: u64 = 12345678;
+
+        let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
+        let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();
+        assert_eq!(req1.chain_id.unwrap(), chain_id);
+
+        let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
+        let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
+        assert_eq!(req2.chain_id.unwrap(), chain_id);
     }
 }
