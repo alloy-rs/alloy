@@ -63,7 +63,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, 
     #[doc(alias = "stream_with_meta")]
     pub async fn watch(&self) -> TransportResult<EventPoller<T, E>> {
         let poller = self.provider.watch_logs(&self.filter).await?;
-        Ok(EventPoller::new(poller))
+        Ok(poller.into())
     }
 
     /// Subscribes to the stream of events that match the filter.
@@ -72,7 +72,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, 
     #[cfg(feature = "pubsub")]
     pub async fn subscribe(&self) -> TransportResult<subscription::EventSubscription<E>> {
         let sub = self.provider.subscribe_logs(&self.filter).await?;
-        Ok(subscription::EventSubscription::new(sub))
+        Ok(sub.into())
     }
 }
 
@@ -117,14 +117,13 @@ impl<T: fmt::Debug, E> fmt::Debug for EventPoller<T, E> {
     }
 }
 
-impl<T: Transport + Clone, E: SolEvent> EventPoller<T, E> {
-    /// Creates a new event poller with the provided filter poller.
-    #[allow(clippy::missing_const_for_fn)]
-    #[inline]
-    pub fn new(poller: FilterPollerBuilder<T, Log>) -> Self {
+impl<T, E> From<FilterPollerBuilder<T, Log>> for EventPoller<T, E> {
+    fn from(poller: FilterPollerBuilder<T, Log>) -> Self {
         Self { poller, _phantom: PhantomData }
     }
+}
 
+impl<T: Transport + Clone, E: SolEvent> EventPoller<T, E> {
     /// Starts the poller and returns a stream that yields the decoded event and the raw log.
     ///
     /// Note that this stream will not return `None` until the provider is dropped.
@@ -179,14 +178,13 @@ pub(crate) mod subscription {
         }
     }
 
-    impl<E: SolEvent> EventSubscription<E> {
-        /// Creates a new event subscription with the provided subscription.
-        #[allow(clippy::missing_const_for_fn)]
-        #[inline]
-        pub fn new(sub: Subscription<Log>) -> Self {
+    impl<E> From<Subscription<Log>> for EventSubscription<E> {
+        fn from(sub: Subscription<Log>) -> Self {
             Self { sub, _phantom: PhantomData }
         }
+    }
 
+    impl<E: SolEvent> EventSubscription<E> {
         /// Converts the subscription into a stream.
         pub fn into_stream(self) -> impl Stream<Item = alloy_sol_types::Result<(E, Log)>> + Unpin {
             self.sub.into_stream().map(|log| decode_log(&log).map(|e| (e, log)))
