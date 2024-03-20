@@ -100,6 +100,6 @@ impl AccessList {
 impl From<alloy_rpc_types::AccessList> for AccessList {
     fn from(value: alloy_rpc_types::AccessList) -> Self {
         // SAFETY: Same repr and size
-        unsafe { std::mem::transmute(value) }
+        unsafe { mem::transmute(value) }
     }
 }
