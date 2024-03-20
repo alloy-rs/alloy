@@ -228,14 +228,11 @@ impl TryFrom<Transaction> for TxEnvelope {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.transaction_type {
-            None => Ok(Self::Legacy(tx.try_into()?)),
-            Some(t) => match TxType::try_from(t.to::<u8>())? {
-                TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
-                TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
-                TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
-                TxType::Legacy => unreachable!(),
-            },
+        match tx.transaction_type.unwrap_or_default().to::<u8>().try_into()? {
+            TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
+            TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
+            TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
+            TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
         }
     }
 }
