@@ -3,8 +3,6 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use std::mem;
 
-use super::ConversionError;
-
 /// Legacy transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TxLegacy {
@@ -274,25 +272,6 @@ impl Decodable for TxLegacy {
         }
 
         Ok(transaction)
-    }
-}
-
-impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxLegacy> {
-    type Error = ConversionError;
-
-    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
-        let tx = TxLegacy {
-            chain_id: tx.chain_id,
-            nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
-            gas_limit: tx.gas.to(),
-            to: tx.to.into(),
-            value: tx.value,
-            input: tx.input,
-        };
-        Ok(tx.into_signed(signature))
     }
 }
 

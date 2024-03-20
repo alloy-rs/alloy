@@ -4,8 +4,6 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use std::mem;
 
-use super::ConversionError;
-
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TxEip1559 {
@@ -324,30 +322,6 @@ impl Decodable for TxEip1559 {
         }
 
         Self::decode_fields(data)
-    }
-}
-
-impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip1559> {
-    type Error = ConversionError;
-
-    fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
-        let tx = TxEip1559 {
-            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
-            nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
-            max_priority_fee_per_gas: tx
-                .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
-                .to(),
-            gas_limit: tx.gas.to(),
-            to: tx.to.into(),
-            value: tx.value,
-            input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
-        };
-        Ok(tx.into_signed(signature))
     }
 }
 
