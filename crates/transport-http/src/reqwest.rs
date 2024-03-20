@@ -19,7 +19,16 @@ impl Http<reqwest::Client> {
                 .and_then(Response::error_for_status)
                 .map_err(TransportErrorKind::custom)?;
 
+            let status = resp.status();
             let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+
+            if !status.is_success() {
+                return Err(TransportErrorKind::custom_str(&format!(
+                    r#"HTTP error: {} with body: "{}""#,
+                    status,
+                    String::from_utf8_lossy(body.as_ref())
+                )));
+            }
 
             serde_json::from_slice(&body)
                 .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))

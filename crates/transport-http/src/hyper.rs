@@ -39,7 +39,7 @@ where
                 .await
                 .map_err(TransportErrorKind::custom)?;
 
-            if status != hyper::StatusCode::OK {
+            if !status.is_success() {
                 return Err(TransportErrorKind::custom_str(&format!(
                     r#"HTTP error: {} with body: "{}""#,
                     status,
