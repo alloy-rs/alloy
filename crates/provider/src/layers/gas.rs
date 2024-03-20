@@ -135,7 +135,7 @@ where
         let gas_price = self.get_gas_price();
 
         if tx.gas_limit().is_none() {
-            let gas_estimate = self.get_gas_estimate(&tx);
+            let gas_estimate = self.get_gas_estimate(tx);
 
             match futures::join!(gas_price, gas_estimate) {
                 (Ok(gas_price), Ok(gas_estimate)) => {
