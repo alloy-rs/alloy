@@ -93,10 +93,10 @@ where
     /// Populates the gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields if unset.
     /// Requires the chain_id to be set in the transaction request to be processed as a EIP-1559 tx.
     /// If the network does not support EIP-1559, it will process it as a legacy tx.
-    async fn handle_eip1559_tx(
-        &self,
-        mut tx: N::TransactionRequest,
-    ) -> Result<N::TransactionRequest, TransportError> {
+    async fn handle_eip1559_tx<'a>(
+        &'a self,
+        tx: &'a mut N::TransactionRequest,
+    ) -> Result<&mut N::TransactionRequest, TransportError> {
         // Check if the user has set the gas_limit, max_fee_per_gas and max_priority_fee_per_gas
         // fields.
         let gas_limit_unset = tx.gas_limit().is_none();
@@ -108,7 +108,7 @@ where
         match (gas_limit_unset, eip1559_fees_unset) {
             (true, true) => {
                 // When both gas_limit and eip1559_fees are unset by the user.
-                let gas_estimate = self.get_gas_estimate(&tx);
+                let gas_estimate = self.get_gas_estimate(tx);
                 let eip1559_fees = self.get_eip1559_fees_estimate();
 
                 match futures::join!(gas_estimate, eip1559_fees) {
@@ -140,7 +140,7 @@ where
             }
             (true, false) => {
                 // When gas_limit is unset by the user.
-                let gas_estimate = self.get_gas_estimate(&tx).await;
+                let gas_estimate = self.get_gas_estimate(tx).await;
                 match gas_estimate {
                     Ok(gas_estimate) => {
                         tx.set_gas_limit(gas_estimate);
@@ -194,10 +194,10 @@ where
 
     /// Populates the gas_price and only populates the gas_limit field if unset.
     /// This method always assumes that the gas_price is unset.
-    async fn handle_legacy_tx(
-        &self,
-        mut tx: N::TransactionRequest,
-    ) -> Result<N::TransactionRequest, TransportError> {
+    async fn handle_legacy_tx<'a>(
+        &'a self,
+        tx: &'a mut N::TransactionRequest,
+    ) -> Result<&mut N::TransactionRequest, TransportError> {
         let gas_price = self.get_gas_price();
 
         if tx.gas_limit().is_none() {
@@ -246,11 +246,11 @@ where
             // Assume its a EIP1559 tx
             // Populate the following gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields
             // if unset.
-            tx = self.handle_eip1559_tx(tx.clone()).await?;
+            self.handle_eip1559_tx(&mut tx).await?;
         } else {
             // Assume its a legacy tx
             // Populate only the gas_limit field if unset.
-            tx = self.handle_legacy_tx(tx.clone()).await?;
+            self.handle_legacy_tx(&mut tx).await?;
         }
         self.inner.send_transaction(tx).await
     }
