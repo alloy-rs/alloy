@@ -16,7 +16,7 @@ alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-eips.workspace = true
 alloy-rpc-types.workspace = true
-thiserror = { workspace = true, optional = true }
+thiserror.workspace = true
 c-kzg = { version = "1.0", features = ["serde"], optional = true }
 sha2 = { version = "0.10", optional = true }
 
@@ -32,5 +32,5 @@ tokio = { workspace = true, features = ["macros"] }
 
 [features]
 k256 = ["alloy-primitives/k256"]
-kzg = ["dep:c-kzg", "dep:sha2", "dep:thiserror"]
+kzg = ["dep:c-kzg", "dep:sha2"]
 arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]

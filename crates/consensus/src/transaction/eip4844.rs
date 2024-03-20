@@ -22,6 +22,8 @@ use sha2::Digest;
 #[cfg(feature = "kzg")]
 use std::ops::Deref;
 
+use super::ConversionError;
+
 #[cfg(feature = "kzg")]
 /// An error that can occur when validating a [TxEip4844Variant].
 #[derive(Debug, thiserror::Error)]
@@ -282,7 +284,7 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 }
 
 impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip4844Variant> {
-    type Error = alloy_rpc_types::Error;
+    type Error = ConversionError;
 
     fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
         let tx: Signed<TxEip4844> = tx.try_into()?;
@@ -722,18 +724,18 @@ impl Decodable for TxEip4844 {
 }
 
 impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip4844> {
-    type Error = alloy_rpc_types::Error;
+    type Error = ConversionError;
 
     fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
 
         let tx = TxEip4844 {
-            chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(Eip2718Error::MissingMaxFeePerGas)?.to(),
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
-                .ok_or(Eip2718Error::MissingMaxPriorityFeePerGas)?
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
                 .to(),
             gas_limit: tx.gas.to(),
             to: tx.to.into(),
@@ -743,7 +745,7 @@ impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip4844> {
             blob_versioned_hashes: tx.blob_versioned_hashes,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
-                .ok_or(Eip2718Error::MissingMaxFeePerBlobGas)?
+                .ok_or(ConversionError::MissingMaxFeePerBlobGas)?
                 .to(),
         };
         Ok(tx.into_signed(signature))

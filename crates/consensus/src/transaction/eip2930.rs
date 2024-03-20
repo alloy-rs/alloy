@@ -4,6 +4,8 @@ use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
+use super::ConversionError;
+
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct TxEip2930 {
@@ -294,20 +296,20 @@ impl Decodable for TxEip2930 {
 }
 
 impl TryFrom<alloy_rpc_types::Transaction> for Signed<TxEip2930> {
-    type Error = alloy_rpc_types::Error;
+    type Error = ConversionError;
 
     fn try_from(tx: alloy_rpc_types::Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
 
         let tx = TxEip2930 {
-            chain_id: tx.chain_id.ok_or(Eip2718Error::MissingChainId)?.to(),
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(Eip2718Error::MissingGasPrice)?.to(),
+            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
             gas_limit: tx.gas.to(),
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.ok_or(Eip2718Error::MissingAccessList)?.into(),
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?.into(),
         };
         Ok(tx.into_signed(signature))
     }

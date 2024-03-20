@@ -1,10 +1,11 @@
 use crate::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip4844WithSidecar, TxLegacy,
+    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{Decodable, Encodable, Header};
 use alloy_rpc_types::Transaction;
+
+use super::ConversionError;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -248,18 +249,12 @@ impl Encodable2718 for TxEnvelope {
 }
 
 impl TryFrom<Transaction> for TxEnvelope {
-    type Error = Eip2718Error;
+    type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx
-            .signature
-            .ok_or(Eip2718Error::MissingSignature)?
-            .try_into()
-            .map_err(Eip2718Error::SignatureError)?;
-
         match tx.transaction_type {
             None => Ok(Self::Legacy(tx.try_into()?)),
-            Some(t) => match TxType::try_from(t.to())? {
+            Some(t) => match TxType::try_from(t.to::<u8>())? {
                 TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
                 TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
                 TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
