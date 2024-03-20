@@ -12,8 +12,8 @@ use std::marker::PhantomData;
 /// The layer fetches the estimations for these via the [`Provider::get_gas_price`],
 /// [`Provider::estimate_gas`] and [`Provider::estimate_eip1559_fees`] methods.
 ///
-/// If you use layers that redirect the behavior of [`Provider::send_transaction`]
-/// (e.g. [`SignerLayer`]), you should add this layer before those.
+/// If you use layers that redirect the behavior of [`Provider::send_transaction`] (e.g.
+/// [`crate::layers::SignerLayer`]), you should add this layer before those.
 ///
 /// Note:
 ///     - If none of the gas related fields are set, the layer first assumes it's a EIP-1559 tx and
@@ -35,8 +35,6 @@ use std::marker::PhantomData;
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
-///
-/// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
 pub struct GasEstimatorLayer;
 
