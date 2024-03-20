@@ -1,6 +1,8 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar};
+use crate::{
+    eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Transaction,
+};
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -236,6 +238,12 @@ impl From<Bytes> for TransactionInput {
 impl From<Option<Bytes>> for TransactionInput {
     fn from(input: Option<Bytes>) -> Self {
         Self { input, data: None }
+    }
+}
+
+impl From<Transaction> for TransactionRequest {
+    fn from(tx: Transaction) -> TransactionRequest {
+        tx.into_request()
     }
 }
 

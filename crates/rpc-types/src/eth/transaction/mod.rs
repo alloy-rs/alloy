@@ -2,7 +2,7 @@
 
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
-use alloy_primitives::{Address, Bytes, B256, U128, U256, U64};
+use alloy_primitives::{Address, Bytes, B256, U256, U8};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
 pub use optimism::OptimismTransactionReceiptFields;
@@ -44,18 +44,18 @@ pub struct Transaction {
     pub value: U256,
     /// Gas Price
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gas_price: Option<U128>,
+    pub gas_price: Option<U256>,
     /// Gas amount
     pub gas: U256,
     /// Max BaseFeePerGas the user is willing to pay.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_gas: Option<U128>,
+    pub max_fee_per_gas: Option<U256>,
     /// The miner's tip.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_priority_fee_per_gas: Option<U128>,
+    pub max_priority_fee_per_gas: Option<U256>,
     /// Configured max fee per blob gas for eip-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_blob_gas: Option<U128>,
+    pub max_fee_per_blob_gas: Option<U256>,
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
@@ -64,7 +64,8 @@ pub struct Transaction {
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    pub chain_id: Option<U64>,
+    #[serde(with = "alloy_serde::u64_hex_opt")]
+    pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blob_versioned_hashes: Vec<B256>,
@@ -72,19 +73,46 @@ pub struct Transaction {
     ///
     /// Pre-pay to warm storage access.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_list: Option<Vec<AccessListItem>>,
+    pub access_list: Option<AccessList>,
     /// EIP2718
     ///
     /// Transaction type, Some(2) for EIP-1559 transaction,
     /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub transaction_type: Option<U64>,
+    pub transaction_type: Option<U8>,
 
     /// Arbitrary extra fields.
     ///
     /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
     #[serde(flatten)]
     pub other: OtherFields,
+}
+
+impl Transaction {
+    /// Converts [Transaction] into [TransactionRequest].
+    ///
+    /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
+    /// part of [Transaction].
+    pub fn into_request(self) -> TransactionRequest {
+        TransactionRequest {
+            from: Some(self.from),
+            to: self.to,
+            gas: Some(self.gas),
+            gas_price: self.gas_price,
+            value: Some(self.value),
+            input: self.input.into(),
+            nonce: Some(self.nonce),
+            chain_id: self.chain_id,
+            access_list: self.access_list,
+            transaction_type: self.transaction_type,
+            max_fee_per_gas: self.max_fee_per_gas,
+            max_priority_fee_per_gas: self.max_priority_fee_per_gas,
+            max_fee_per_blob_gas: self.max_fee_per_blob_gas,
+            blob_versioned_hashes: Some(self.blob_versioned_hashes),
+            sidecar: None,
+            other: OtherFields::default(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -102,7 +130,7 @@ mod tests {
             from: Address::with_last_byte(6),
             to: Some(Address::with_last_byte(7)),
             value: U256::from(8),
-            gas_price: Some(U128::from(9)),
+            gas_price: Some(U256::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
             signature: Some(Signature {
@@ -111,12 +139,12 @@ mod tests {
                 s: U256::from(14),
                 y_parity: None,
             }),
-            chain_id: Some(U64::from(17)),
+            chain_id: Some(17),
             blob_versioned_hashes: vec![],
             access_list: None,
-            transaction_type: Some(U64::from(20)),
-            max_fee_per_gas: Some(U128::from(21)),
-            max_priority_fee_per_gas: Some(U128::from(22)),
+            transaction_type: Some(U8::from(20)),
+            max_fee_per_gas: Some(U256::from(21)),
+            max_priority_fee_per_gas: Some(U256::from(22)),
             max_fee_per_blob_gas: None,
             other: Default::default(),
         };
@@ -140,7 +168,7 @@ mod tests {
             from: Address::with_last_byte(6),
             to: Some(Address::with_last_byte(7)),
             value: U256::from(8),
-            gas_price: Some(U128::from(9)),
+            gas_price: Some(U256::from(9)),
             gas: U256::from(10),
             input: Bytes::from(vec![11, 12, 13]),
             signature: Some(Signature {
@@ -149,12 +177,12 @@ mod tests {
                 s: U256::from(14),
                 y_parity: Some(Parity(true)),
             }),
-            chain_id: Some(U64::from(17)),
+            chain_id: Some(17),
             blob_versioned_hashes: vec![],
             access_list: None,
-            transaction_type: Some(U64::from(20)),
-            max_fee_per_gas: Some(U128::from(21)),
-            max_priority_fee_per_gas: Some(U128::from(22)),
+            transaction_type: Some(U8::from(20)),
+            max_fee_per_gas: Some(U256::from(21)),
+            max_priority_fee_per_gas: Some(U256::from(22)),
             max_fee_per_blob_gas: None,
             other: Default::default(),
         };
