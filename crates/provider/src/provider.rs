@@ -32,6 +32,7 @@ use std::{
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
+use crate::utils::Eip1559Estimation;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -546,9 +547,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ) -> TransportResult<()> {
         let gas = self.estimate_eip1559_fees(estimator).await;
 
-        gas.map(|(max_fee_per_gas, max_priority_fee_per_gas)| {
-            tx.set_max_fee_per_gas(max_fee_per_gas);
-            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        gas.map(|estimate| {
+            tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
+            tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
         })
     }
 
@@ -761,7 +762,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<(U256, U256)> {
+    ) -> TransportResult<Eip1559Estimation> {
         let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
         {
             Ok(Some(block)) => match block.header.base_fee_per_gas {
@@ -796,7 +797,12 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
             )
         };
 
-        Ok((max_fee_per_gas, max_priority_fee_per_gas))
+        Ok(
+            Eip1559Estimation {
+                max_fee_per_gas,
+                max_priority_fee_per_gas
+            }
+        )
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.
