@@ -97,97 +97,31 @@ where
         &'a self,
         tx: &'a mut N::TransactionRequest,
     ) -> Result<&mut N::TransactionRequest, TransportError> {
-        // Check if the user has set the gas_limit, max_fee_per_gas and max_priority_fee_per_gas
-        // fields.
-        let gas_limit_unset = tx.gas_limit().is_none();
-        // eip1559_fees_unset is true if any one of the two max_fee_per_gas or
-        // max_priority_fee_per_gas is unset.
-        let eip1559_fees_unset =
-            tx.max_fee_per_gas().is_none() || tx.max_priority_fee_per_gas().is_none();
+        let gas_estimate = self.get_gas_estimate(tx);
+        let eip1559_fees = self.get_eip1559_fees_estimate();
 
-        match (gas_limit_unset, eip1559_fees_unset) {
-            (true, true) => {
-                // When both gas_limit and eip1559_fees are unset by the user.
-                let gas_estimate = self.get_gas_estimate(tx);
-                let eip1559_fees = self.get_eip1559_fees_estimate();
+        let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate, eip1559_fees);
 
-                match futures::join!(gas_estimate, eip1559_fees) {
-                    (Ok(gas_estimate), Ok((max_fee_per_gas, max_priority_fee_per_gas))) => {
-                        tx.set_gas_limit(gas_estimate);
-                        tx.set_max_fee_per_gas(max_fee_per_gas);
-                        tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        gas_estimate.map(|gas_estimate| tx.set_gas_limit(gas_estimate))?;
 
-                        Ok(tx)
-                    }
-                    (Ok(gas_estimate), Err(err)) => {
-                        tx.set_gas_limit(gas_estimate);
-
-                        if err.is_transport_error()
-                            && err.to_string() == *"EIP-1559 not activated".to_string()
-                        {
-                            // If EIP-1559 is not activated, it will process as a legacy tx.
-                            match self.handle_legacy_tx(tx).await {
-                                Ok(tx) => Ok(tx),
-                                Err(err) => Err(err),
-                            }
-                        } else {
-                            Err(err)
-                        }
-                    }
-                    (Err(err), Ok((_max_fee_per_gas, _max_priority_fee_per_gas))) => Err(err),
-                    (Err(err1), Err(_err2)) => Err(err1),
-                }
-            }
-            (true, false) => {
-                // When gas_limit is unset by the user.
-                let gas_estimate = self.get_gas_estimate(tx).await;
-                match gas_estimate {
-                    Ok(gas_estimate) => {
-                        tx.set_gas_limit(gas_estimate);
-                        Ok(tx)
-                    }
-                    Err(err) => {
-                        if err.is_transport_error()
-                            && err.to_string() == *"EIP-1559 not activated".to_string()
-                        {
-                            // Try legacy tx if the network does not support EIP-1559.
-                            match self.handle_legacy_tx(tx).await {
-                                Ok(tx) => Ok(tx),
-                                Err(err) => Err(err),
-                            }
-                        } else {
-                            Err(err)
-                        }
-                    }
-                }
-            }
-            (false, true) => {
-                // When eip1559_fees are unset by the user.
-                let eip1559_fees = self.get_eip1559_fees_estimate().await;
-                match eip1559_fees {
-                    Ok((max_fee_per_gas, max_priority_fee_per_gas)) => {
-                        tx.set_max_fee_per_gas(max_fee_per_gas);
-                        tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
-                        Ok(tx)
-                    }
-                    Err(err) => {
-                        if err.is_transport_error()
-                            && err.to_string() == *"EIP-1559 not activated".to_string()
-                        {
-                            // Try legacy tx if the network does not support EIP-1559.
-                            match self.handle_legacy_tx(tx).await {
-                                Ok(tx) => Ok(tx),
-                                Err(err) => Err(err),
-                            }
-                        } else {
-                            Err(err)
-                        }
-                    }
-                }
-            }
-            _ => {
-                // When both gas_limit and eip1559_fees are set by the user.
+        match eip1559_fees {
+            Ok((max_fee_per_gas, max_priority_fee_per_gas)) => {
+                tx.set_max_fee_per_gas(max_fee_per_gas);
+                tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
                 Ok(tx)
+            }
+            Err(err) => {
+                if err.is_transport_error()
+                    && err.to_string() == *"EIP-1559 not activated".to_string()
+                {
+                    // If EIP-1559 is not activated, it will process as a legacy tx.
+                    match self.handle_legacy_tx(tx).await {
+                        Ok(tx) => Ok(tx),
+                        Err(err) => Err(err),
+                    }
+                } else {
+                    Err(err)
+                }
             }
         }
     }
