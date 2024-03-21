@@ -28,7 +28,7 @@ use tokio::{
 /// // Send a transaction, and configure the pending transaction.
 /// let builder = provider.send_transaction(tx)
 ///     .await?
-///     .with_reqd_confs(2)
+///     .with_required_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)));
 /// // Register the pending transaction with the provider.
 /// let pending_tx = builder.register().await?;
@@ -43,7 +43,7 @@ use tokio::{
 /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// let tx_hash = provider.send_transaction(tx)
 ///     .await?
-///     .with_reqd_confs(2)
+///     .with_required_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
 ///     .watch()
 ///     .await?;
@@ -109,20 +109,20 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
 
     /// Returns the number of confirmations to wait for.
     #[doc(alias = "confirmations")]
-    pub const fn reqd_confs(&self) -> u64 {
-        self.config.reqd_confs()
+    pub const fn required_confirmations(&self) -> u64 {
+        self.config.required_confirmations()
     }
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_reqd_confs(&mut self, confirmations: u64) {
-        self.config.set_reqd_confs(confirmations);
+    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+        self.config.set_required_confirmations(confirmations);
     }
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "with_confirmations")]
-    pub const fn with_reqd_confs(mut self, confirmations: u64) -> Self {
-        self.config.reqd_confs = confirmations;
+    pub const fn with_required_confirmations(mut self, confirmations: u64) -> Self {
+        self.config.required_confirmations = confirmations;
         self
     }
 
@@ -198,7 +198,7 @@ pub struct PendingTransactionConfig {
     tx_hash: B256,
 
     /// Require a number of confirmations.
-    reqd_confs: u64,
+    required_confirmations: u64,
 
     /// Optional timeout for the transaction.
     timeout: Option<Duration>,
@@ -207,7 +207,7 @@ pub struct PendingTransactionConfig {
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
     pub const fn new(tx_hash: B256) -> Self {
-        Self { tx_hash, reqd_confs: 0, timeout: None }
+        Self { tx_hash, required_confirmations: 0, timeout: None }
     }
 
     /// Returns the transaction hash.
@@ -228,20 +228,20 @@ impl PendingTransactionConfig {
 
     /// Returns the number of confirmations to wait for.
     #[doc(alias = "confirmations")]
-    pub const fn reqd_confs(&self) -> u64 {
-        self.reqd_confs
+    pub const fn required_confirmations(&self) -> u64 {
+        self.required_confirmations
     }
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "set_confirmations")]
-    pub fn set_reqd_confs(&mut self, confirmations: u64) {
-        self.reqd_confs = confirmations;
+    pub fn set_required_confirmations(&mut self, confirmations: u64) {
+        self.required_confirmations = confirmations;
     }
 
     /// Sets the number of confirmations to wait for.
     #[doc(alias = "with_confirmations")]
-    pub const fn with_reqd_confs(mut self, confirmations: u64) -> Self {
-        self.reqd_confs = confirmations;
+    pub const fn with_required_confirmations(mut self, confirmations: u64) -> Self {
+        self.required_confirmations = confirmations;
         self
     }
 
@@ -435,7 +435,7 @@ impl<S> Heartbeat<S> {
             block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
         for watcher in to_check {
             // If `confirmations` is 0 we can notify the watcher immediately.
-            let confirmations = watcher.config.reqd_confs;
+            let confirmations = watcher.config.required_confirmations;
             if confirmations == 0 {
                 watcher.notify();
                 continue;
