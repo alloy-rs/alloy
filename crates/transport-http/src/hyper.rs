@@ -1,43 +1,41 @@
 use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
+use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::Bytes,
-    client::{connect::Connect, Client},
+    body::{Buf, Bytes},
+    header,
 };
+use hyper_util::client::legacy::{connect::Connect, Client};
 use std::task;
 use tower::Service;
 
-impl<C> Http<Client<C>>
+impl<C, B> Http<Client<C, Full<B>>>
 where
     C: Connect + Clone + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static,
 {
     /// Make a request.
-    fn request(&self, req: RequestPacket) -> TransportFut<'static> {
+    fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             let ser = req.serialize().map_err(TransportError::ser_err)?;
 
             // convert the Box<RawValue> into a hyper request<B>
-            let body: Box<str> = ser.into();
-            let body: Box<[u8]> = body.into();
+            let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
             let req = hyper::Request::builder()
                 .method(hyper::Method::POST)
                 .uri(this.url.as_str())
-                .header("content-type", "application/json")
-                .body(hyper::Body::from(Bytes::from(body)))
+                .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"))
+                .body(body)
                 .expect("request parts are valid");
 
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
-
             let status = resp.status();
 
-            // unpack data from the response body. We do this regardless of
-            // the status code, as we want to return the error in the body if
-            // there is one.
-            let body = hyper::body::to_bytes(resp.into_body())
-                .await
-                .map_err(TransportErrorKind::custom)?;
+            // unpack json from the response body
+            let body =
+                resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 
             if status != hyper::StatusCode::OK {
                 return Err(TransportErrorKind::custom_str(&format!(
@@ -57,9 +55,10 @@ where
     }
 }
 
-impl<C> Service<RequestPacket> for &Http<Client<C>>
+impl<C, B> Service<RequestPacket> for &Http<Client<C, Full<B>>>
 where
     C: Connect + Clone + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -73,13 +72,14 @@ where
 
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request(req)
+        self.request_hyper(req)
     }
 }
 
-impl<C> Service<RequestPacket> for Http<Client<C>>
+impl<C, B> Service<RequestPacket> for Http<Client<C, Full<B>>>
 where
     C: Connect + Clone + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -93,6 +93,6 @@ where
 
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request(req)
+        self.request_hyper(req)
     }
 }

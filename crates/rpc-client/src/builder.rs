@@ -65,13 +65,22 @@ impl<L> ClientBuilder<L> {
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
-        L: Layer<alloy_transport_http::Http<hyper::client::Client<hyper::client::HttpConnector>>>,
+        L: Layer<
+            alloy_transport_http::Http<
+                hyper_util::client::legacy::Client<
+                    hyper_util::client::legacy::connect::HttpConnector,
+                    hyper::body::Bytes,
+                >,
+            >,
+        >,
         L::Service: Transport,
     {
-        let transport = alloy_transport_http::Http::new(url);
-        let is_local = transport.guess_local();
+        let _ = url;
+        todo!()
+        //     let transport = alloy_transport_http::Http::new(url);
+        //     let is_local = transport.guess_local();
 
-        self.transport(transport, is_local)
+        //     self.transport(transport, is_local)
     }
 
     /// Connect a pubsub transport, producing an [`RpcClient`] with the provided
