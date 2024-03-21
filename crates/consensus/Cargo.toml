@@ -37,4 +37,4 @@ serde_json.workspace = true
 k256 = ["alloy-primitives/k256"]
 kzg = ["dep:c-kzg", "dep:thiserror"]
 arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]
-serde = ["dep:serde", "alloy-primitives/serde", "dep:alloy-serde"]
+serde = ["dep:serde", "alloy-primitives/serde", "dep:alloy-serde", "alloy-eips/serde"]
