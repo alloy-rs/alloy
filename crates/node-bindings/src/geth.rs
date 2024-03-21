@@ -691,7 +691,6 @@ mod tests {
     fn run_with_tempdir(f: impl Fn(&Path)) {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_dir_path = temp_dir.path();
-        println!("temp dir: {:?}", temp_dir_path);
         f(temp_dir_path);
         #[cfg(not(windows))]
         temp_dir.close().unwrap();
