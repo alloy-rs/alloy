@@ -9,6 +9,17 @@ pub struct IpcConnect<T> {
     inner: T,
 }
 
+impl<T> IpcConnect<T> {
+    /// Create a new IPC connection object for any type T that can be converted into
+    /// `IpcConnect<T>`.
+    pub const fn new(inner: T) -> Self
+    where
+        Self: alloy_pubsub::PubSubConnect,
+    {
+        Self { inner }
+    }
+}
+
 macro_rules! impl_connect {
     ($target:ty) => {
         impl From<$target> for IpcConnect<$target> {

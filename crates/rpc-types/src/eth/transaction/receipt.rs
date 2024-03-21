@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TransactionReceipt {
     /// Transaction Hash.
-    pub transaction_hash: Option<B256>,
+    pub transaction_hash: B256,
     /// Index within the block.
     pub transaction_index: U64,
     /// Hash of the block this transaction was included within.
@@ -48,7 +48,9 @@ pub struct TransactionReceipt {
     /// Status: either 1 (success) or 0 (failure). Only present after activation of EIP-658
     #[serde(skip_serializing_if = "Option::is_none", rename = "status")]
     pub status_code: Option<U64>,
-    /// EIP-2718 Transaction type, Some(1) for AccessList transaction, None for Legacy
+    /// EIP-2718 Transaction type.
+    ///
+    /// For legacy transactions this returns `0`. For EIP-2718 transactions this returns the type.
     #[serde(rename = "type")]
     pub transaction_type: U8,
     /// Arbitrary extra fields.

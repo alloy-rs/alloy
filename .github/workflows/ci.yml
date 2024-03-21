@@ -132,12 +132,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@clippy
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: cargo clippy --workspace --all-targets --all-features
+      - run: cargo +stable clippy --workspace --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
 

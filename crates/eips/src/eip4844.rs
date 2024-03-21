@@ -2,13 +2,31 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
-use alloy_primitives::FixedBytes;
+use alloy_primitives::{b256, FixedBytes, U256};
+
+/// The modulus of the BLS group used in the KZG commitment scheme. All field
+/// elements contained in a blob MUST be STRICTLY LESS than this value.
+pub const BLS_MODULUS_BYTES: FixedBytes<32> =
+    b256!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
+
+/// The modulus of the BLS group used in the KZG commitment scheme. All field
+/// elements contained in a blob MUST be STRICTLY LESS than this value.
+pub const BLS_MODULUS: U256 = U256::from_be_bytes(BLS_MODULUS_BYTES.0);
 
 /// Size a single field element in bytes.
 pub const FIELD_ELEMENT_BYTES: u64 = 32;
 
 /// How many field elements are stored in a single data blob.
 pub const FIELD_ELEMENTS_PER_BLOB: u64 = 4096;
+
+/// Number of usable bits in a field element. The top two bits are always zero.
+pub const USABLE_BITS_PER_FIELD_ELEMENT: usize = 254;
+
+/// The number of usable bytes in a single data blob. This is the number of
+/// bytes you can encode in a blob without any field element being >=
+/// [`BLS_MODULUS`].
+pub const USABLE_BYTES_PER_BLOB: usize =
+    USABLE_BITS_PER_FIELD_ELEMENT * FIELD_ELEMENTS_PER_BLOB as usize / 8;
 
 /// Gas consumption of a single data blob.
 pub const DATA_GAS_PER_BLOB: u64 = 131_072u64; // 32*4096 = 131072 == 2^17 == 0x20000

@@ -2,7 +2,7 @@ use crate::{
     BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy};
-use alloy_primitives::{Address, TxKind, U256, U64};
+use alloy_primitives::{Address, TxKind, U256};
 use alloy_rpc_types::request::TransactionRequest;
 
 impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
@@ -14,11 +14,11 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.chain_id = Some(chain_id);
     }
 
-    fn nonce(&self) -> Option<U64> {
+    fn nonce(&self) -> Option<u64> {
         self.nonce
     }
 
-    fn set_nonce(&mut self, nonce: U64) {
+    fn set_nonce(&mut self, nonce: u64) {
         self.nonce = Some(nonce);
     }
 
@@ -135,7 +135,7 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
 fn build_legacy(request: TransactionRequest) -> Result<TxLegacy, TransactionBuilderError> {
     Ok(TxLegacy {
         chain_id: request.chain_id,
-        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?.to(),
+        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_price: request
             .gas_price
             .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?
@@ -154,7 +154,7 @@ fn build_legacy(request: TransactionRequest) -> Result<TxLegacy, TransactionBuil
 fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuilderError> {
     Ok(TxEip1559 {
         chain_id: request.chain_id.unwrap_or(1),
-        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?.to(),
+        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         max_priority_fee_per_gas: request
             .max_priority_fee_per_gas
             .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?
@@ -178,7 +178,7 @@ fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuild
 fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuilderError> {
     Ok(TxEip2930 {
         chain_id: request.chain_id.unwrap_or(1),
-        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?.to(),
+        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_price: request
             .gas_price
             .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?
@@ -198,7 +198,7 @@ fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuild
 fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuilderError> {
     Ok(TxEip4844 {
         chain_id: request.chain_id.unwrap_or(1),
-        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?.to(),
+        nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_limit: request
             .gas
             .ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?

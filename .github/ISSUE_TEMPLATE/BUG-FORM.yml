@@ -28,7 +28,7 @@ body:
   - type: input
     attributes:
       label: What version of Alloy are you on?
-      placeholder: "Run `carge tree | grep alloy` and paste the output here"
+      placeholder: "Run `cargo tree | grep alloy` and paste the output here"
   - type: dropdown
     attributes:
       label: Operating System

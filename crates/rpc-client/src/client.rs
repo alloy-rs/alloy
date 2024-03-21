@@ -3,6 +3,7 @@ use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
 use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
 use alloy_transport_http::Http;
 use std::{
+    borrow::Cow,
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -91,7 +92,7 @@ impl<T: Transport> RpcClient<T> {
     /// See [`PollerBuilder`] for examples and more details.
     pub fn prepare_static_poller<Params, Resp>(
         &self,
-        method: &'static str,
+        method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> PollerBuilder<T, Params, Resp>
     where
@@ -198,7 +199,7 @@ impl<T> RpcClientInner<T> {
     #[inline]
     pub fn make_request<Params: RpcParam>(
         &self,
-        method: &'static str,
+        method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> Request<Params> {
         Request::new(method, self.next_id(), params)
@@ -248,7 +249,7 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     #[doc(alias = "prepare")]
     pub fn request<Params: RpcParam, Resp: RpcReturn>(
         &self,
-        method: &'static str,
+        method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> RpcCall<T, Params, Resp> {
         let request = self.make_request(method, params);

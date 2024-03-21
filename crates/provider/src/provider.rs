@@ -3,7 +3,7 @@
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, EstimatorFunction},
+    utils::{self, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcParam, RpcReturn};
@@ -24,6 +24,7 @@ use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResu
 use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
+    borrow::Cow,
     fmt,
     marker::PhantomData,
     sync::{Arc, OnceLock},
@@ -545,9 +546,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     ) -> TransportResult<()> {
         let gas = self.estimate_eip1559_fees(estimator).await;
 
-        gas.map(|(max_fee_per_gas, max_priority_fee_per_gas)| {
-            tx.set_max_fee_per_gas(max_fee_per_gas);
-            tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        gas.map(|estimate| {
+            tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
+            tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
         })
     }
 
@@ -760,7 +761,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     async fn estimate_eip1559_fees(
         &self,
         estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<(U256, U256)> {
+    ) -> TransportResult<Eip1559Estimation> {
         let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
         {
             Ok(Some(block)) => match block.header.base_fee_per_gas {
@@ -795,7 +796,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
             )
         };
 
-        Ok((max_fee_per_gas, max_priority_fee_per_gas))
+        Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas })
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.
@@ -897,7 +898,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /* ---------------------------------------- raw calls --------------------------------------- */
 
     /// Sends a raw JSON-RPC request.
-    async fn raw_request<P, R>(&self, method: &'static str, params: P) -> TransportResult<R>
+    async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcParam,
         R: RpcReturn,
@@ -909,7 +910,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// Sends a raw JSON-RPC request with type-erased parameters and return.
     async fn raw_request_dyn(
         &self,
-        method: &'static str,
+        method: Cow<'static, str>,
         params: &RawValue,
     ) -> TransportResult<Box<RawValue>> {
         self.client().request(method, params).await
@@ -1004,7 +1005,7 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    async fn subscribe_blocks() {
+    async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
         init_tracing();
@@ -1018,13 +1019,14 @@ mod tests {
         let mut n = 1;
         while let Some(block) = stream.next().await {
             assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
     }
 
     #[cfg(feature = "ws")]
     #[tokio::test]
-    async fn subscribe_blocks_boxed() {
+    async fn subscribe_blocks_ws_boxed() {
         use futures::stream::StreamExt;
 
         init_tracing();
@@ -1039,7 +1041,26 @@ mod tests {
         let mut n = 1;
         while let Some(block) = stream.next().await {
             assert_eq!(block.header.number.unwrap(), U256::from(n));
+            assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "ws")]
+    async fn subscribe_blocks_ws_remote() {
+        use futures::stream::StreamExt;
+
+        init_tracing();
+        let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
+        let ws = alloy_rpc_client::WsConnect::new(url);
+        let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
+        let p = RootProvider::<Ethereum, _>::new(client);
+        let sub = p.subscribe_blocks().await.unwrap();
+        let mut stream = sub.into_stream().take(1);
+        while let Some(block) = stream.next().await {
+            println!("New block {:?}", block);
+            assert!(block.header.number.unwrap() > U256::ZERO);
         }
     }
 
@@ -1063,12 +1084,8 @@ mod tests {
 
         let builder = provider.send_transaction(tx).await.expect("failed to send tx");
         let hash1 = *builder.tx_hash();
-        let hash2 = builder
-            .get_receipt()
-            .await
-            .expect("failed to await pending tx")
-            .transaction_hash
-            .unwrap();
+        let hash2 =
+            builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
     }
 
@@ -1086,7 +1103,7 @@ mod tests {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
 
-        let num: U64 = provider.raw_request("eth_blockNumber", ()).await.unwrap();
+        let num: U64 = provider.raw_request("eth_blockNumber".into(), ()).await.unwrap();
         assert_eq!(0, num.to::<u64>())
     }
 
@@ -1128,7 +1145,7 @@ mod tests {
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
         let block: Block = provider
-            .raw_request::<(B256, bool), Block>("eth_getBlockByHash", (hash, true))
+            .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
             .await
             .unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
@@ -1265,7 +1282,7 @@ mod tests {
         assert!(receipt.is_some());
         let receipt = receipt.unwrap();
         assert_eq!(
-            receipt.transaction_hash.unwrap(),
+            receipt.transaction_hash,
             b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95")
         );
     }
