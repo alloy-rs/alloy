@@ -3,7 +3,7 @@
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, Eip1559Estimation, EstimatorFunction},
+    utils::{self, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -73,38 +73,29 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     }
 
     /// Creates a new root provider with a boxed transport from a string.
-    /// BoxTransport is used to allow for different transport types.
     pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
-        RootProvider::<N, _>::connect(conn_str).await
-    }
-}
-
-impl<N: Network> RootProvider<N, BoxTransport> {
-    /// Creates a new root provider with a boxed transport from a string.
-    pub async fn connect(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
-        match utils::parse_str_to_tranport_type(conn_str) {
-            "http" => {
-                let provider =
-                    RootProvider::<N, _>::new_http(reqwest::Url::parse(conn_str).unwrap());
-
-                Ok(provider.boxed())
+        let boxed_client = match utils::parse_str_to_tranport_type(conn_str) {
+            Ok(BuiltInTransportType::Http) => {
+                RpcClient::new_http(reqwest::Url::parse(conn_str).unwrap()).boxed()
             }
-            "ws" => {
+            Ok(BuiltInTransportType::Ws) => {
                 let ws = WsConnect::new(conn_str);
 
                 let ws_client = RpcClient::connect_pubsub(ws).await?;
 
-                Ok(RootProvider::<N, _>::new(ws_client).boxed())
+                ws_client.boxed()
             }
-            "ipc" => {
+            Ok(BuiltInTransportType::Ipc) => {
                 let ipc = IpcConnect::new(conn_str.to_string());
 
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
 
-                Ok(RootProvider::<N, _>::new(ipc_client).boxed())
+                ipc_client.boxed()
             }
-            _ => Err(TransportErrorKind::custom_str("unsupported transport")),
-        }
+            Err(err) => return Err(err),
+        };
+
+        Ok(RootProvider::<N, BoxTransport>::new(boxed_client))
     }
 }
 
@@ -1413,5 +1404,20 @@ mod tests {
             pending.tx_hash().to_string(),
             "0x9dae5cf33694a02e8a7d5de3fe31e9d05ca0ba6e9180efac4ab20a06c9e598a3"
         );
+    }
+
+    #[tokio::test]
+    async fn connect_boxed() {
+        init_tracing();
+        let (_provider, anvil) = spawn_anvil();
+
+        println!("Connecting to {}", anvil.endpoint());
+
+        let provider =
+            RootProvider::<Ethereum, BoxTransport>::connect_boxed(anvil.endpoint().as_str())
+                .await
+                .unwrap();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 }

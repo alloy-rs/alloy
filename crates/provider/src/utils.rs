@@ -1,6 +1,9 @@
 //! Provider-related utilities.
+use std::str::FromStr;
 
+use alloy_json_rpc::RpcError;
 use alloy_primitives::U256;
+use alloy_transport::TransportErrorKind;
 
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
@@ -53,15 +56,43 @@ pub fn eip1559_default_estimator(
 }
 
 /// Identifies the intended transport type from the given string.
-pub fn parse_str_to_tranport_type(s: &str) -> &str {
+pub fn parse_str_to_tranport_type(
+    s: &str,
+) -> Result<BuiltInTransportType, RpcError<TransportErrorKind>> {
     if s.starts_with("http://") || s.starts_with("https://") {
-        "http"
+        BuiltInTransportType::from_str("http")
     } else if s.starts_with("ws://") || s.starts_with("wss://") {
-        "ws"
+        BuiltInTransportType::from_str("ws")
     } else {
-        "ipc"
+        BuiltInTransportType::from_str("ipc")
     }
 }
+
+/// The built-in transport types.
+#[derive(Debug, Clone, Copy)]
+pub enum BuiltInTransportType {
+    /// HTTP transport.
+    Http,
+    /// WebSocket transport.
+    Ws,
+    /// IPC transport.
+    Ipc,
+}
+
+impl FromStr for BuiltInTransportType {
+    type Err = RpcError<TransportErrorKind>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "http" => Ok(BuiltInTransportType::Http),
+            "ws" => Ok(BuiltInTransportType::Ws),
+            "ipc" => Ok(BuiltInTransportType::Ipc),
+            _ => Err(TransportErrorKind::custom_str("Unable to parse transport type")),
+        }
+    }
+}
+
+// Implement an Error type called ParseBuiltInTransportTypeError
 
 #[cfg(test)]
 mod tests {
