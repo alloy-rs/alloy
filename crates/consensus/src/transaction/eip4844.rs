@@ -1041,7 +1041,7 @@ mod tests {
     use crate::{SignableTransaction, TxEnvelope};
     #[cfg(not(feature = "kzg"))]
     use alloy_eips::eip4844::{Blob, Bytes48};
-    use alloy_primitives::{Signature, TxKind, U256};
+    use alloy_primitives::{Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
     #[cfg(feature = "kzg")]
     use c_kzg::{Blob, Bytes48};
