@@ -1,8 +1,8 @@
 //! Contains types related to the Inclusion lists that will be used by in the engine API RPC
 //! definitions.
 
+use alloy_primitives::{Address, B256};
 use alloy_rpc_engine_types::PayloadStatusEnum;
-use alloy_primitives::Address;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
 
@@ -65,38 +65,54 @@ impl Serialize for InclusionListStatusV1 {
     }
 }
 
-/// This structure contains the input to the `engine_newInclusionListV1` RPC call.
+/// This is an individual entry in the inclusion list summary, representing a transaction that
+/// should be included in this block or the next block.
 ///
 /// From the spec:
 ///
-/// ### InclusionListEntryV1
+/// ### InclusionListSummaryEntryV1
 ///
-/// - `address`: `DATA`, 20 bytes
+/// This structure contains the details of each inclusion list entry.
+///
+/// - `address` : `DATA`, 20 Bytes
+/// - `nonce` : `QUANTITY`, 64 Bits
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InclusionListEntryV1 {
+pub struct InclusionListSummaryEntryV1 {
     /// The address of the inclusion list entry.
     pub address: Address,
+    /// The nonce of the inclusion list entry.
+    pub nonce: u64,
 }
 
-impl fmt::Display for InclusionListEntryV1 {
+impl fmt::Display for InclusionListSummaryEntryV1 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "InclusionListEntryV1 {{ address: {} }}", self.address)
+        write!(f, "InclusionListEntryV1 {{ address: {}, nonce: {} }}", self.address, self.nonce)
     }
 }
 
-/// This contains the configuration for the `engine_newInclusionListV1` RPC call.
+/// This structure contains the inclusion list summary input to the `engine_newInclusionListV1` RPC
+/// call.
 ///
-/// From the spec:
+/// ### InclusionListSummaryV1
 ///
-/// ### InclusionListConfiguration
+/// This structure contains the inclusion list summary.
 ///
-/// - `inclusionListMaxGas`: `QUANTITY`, 64 bits
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+/// - `slot` : `QUANTITY`, 64 Bits
+/// - `proposer_index`: `QUANTITY`, 64 Bits
+/// - `parent_hash`: `DATA`, 32 Bytes
+/// - `summary`: `Array of InclusionListSummaryEntryV1`, Array of entries that must be satisfied.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InclusionListConfiguration {
-    /// The maximum gas for the inclusion list.
-    pub inclusion_list_max_gas: u64,
+pub struct InclusionListSummaryV1 {
+    /// The slot of the inclusion list summary.
+    pub slot: u64,
+    /// The proposer index of the inclusion list summary.
+    pub proposer_index: u64,
+    /// The parent hash of the inclusion list summary.
+    pub parent_hash: B256,
+    /// The summary of the inclusion list summary.
+    pub summary: Vec<InclusionListSummaryEntryV1>,
 }
 
 #[cfg(test)]
@@ -117,21 +133,54 @@ mod tests {
 
     #[test]
     fn inclusion_list_entry_v1_serialization() {
-        let entry = InclusionListEntryV1 {
+        let entry = InclusionListSummaryEntryV1 {
             address: Address::from_hex("0x0000000000000000000000000000000000000042").unwrap(),
+            nonce: 42,
         };
         let json = json!({
             "address": "0x0000000000000000000000000000000000000042",
+            "nonce": 42,
         });
         assert_eq!(serde_json::to_value(entry).unwrap(), json);
     }
 
     #[test]
-    fn inclusion_list_configuration_serialization() {
-        let config = InclusionListConfiguration { inclusion_list_max_gas: 42 };
+    fn inclusion_list_summary_v1_serialization() {
+        let summary = InclusionListSummaryV1 {
+            slot: 42,
+            proposer_index: 42,
+            parent_hash: B256::from_hex(
+                "0x2222222222222222222222222222222222222222222222222222222222222222",
+            )
+            .unwrap(),
+            summary: vec![
+                InclusionListSummaryEntryV1 {
+                    address: Address::from_hex("0x0000000000000000000000000000000000000042")
+                        .unwrap(),
+                    nonce: 42,
+                },
+                InclusionListSummaryEntryV1 {
+                    address: Address::from_hex("0x0000000000000000000000000000000000000043")
+                        .unwrap(),
+                    nonce: 43,
+                },
+            ],
+        };
         let json = json!({
-            "inclusionListMaxGas": 42,
+            "slot": 42,
+            "proposerIndex": 42,
+            "parentHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
+            "summary": [
+                {
+                    "address": "0x0000000000000000000000000000000000000042",
+                    "nonce": 42,
+                },
+                {
+                    "address": "0x0000000000000000000000000000000000000043",
+                    "nonce": 43,
+                },
+            ],
         });
-        assert_eq!(serde_json::to_value(config).unwrap(), json);
+        assert_eq!(serde_json::to_value(summary).unwrap(), json);
     }
 }

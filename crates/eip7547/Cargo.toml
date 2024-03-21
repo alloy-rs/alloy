@@ -12,14 +12,11 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp"] }
-alloy-engine-rpc-types = { workspace = true, features = ["derive"] }
+alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-rpc-engine-types = { workspace = true }
 
 # serde
-serde = { workspace = true, optional = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-
-[features]
-serde = ["dep:serde", "alloy-primitives/serde"]
