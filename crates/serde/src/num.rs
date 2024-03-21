@@ -203,6 +203,36 @@ where
     NumberOrHexU256::deserialize(deserializer)?.try_into_u256()
 }
 
+/// serde functions for handling primitive `u64` as [U64]
+pub mod u128_hex_or_decimal {
+    use alloy_primitives::U128;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumberOrHexU128 {
+        Hex(U128),
+        Int(u128),
+    }
+
+    /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
+    /// a number
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match NumberOrHexU128::deserialize(deserializer)? {
+            NumberOrHexU128::Int(val) => Ok(val),
+            NumberOrHexU128::Hex(val) => Ok(val.to()),
+        }
+    }
+
+    /// Serializes u64 as hex string
+    pub fn serialize<S: Serializer>(value: &u128, s: S) -> Result<S::Ok, S::Error> {
+        U128::from(*value).serialize(s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +251,27 @@ mod tests {
         assert_eq!(s, "{\"inner\":\"0x3e8\"}");
 
         let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+    }
+
+    #[test]
+    fn test_u128_hex_or_decimal() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        struct Value {
+            #[serde(with = "u128_hex_or_decimal")]
+            inner: u128,
+        }
+
+        let val = Value { inner: 1000 };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, "{\"inner\":\"0x3e8\"}");
+
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+
+        let s = "{\"inner\":\"1000\"}".to_string();
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+
         assert_eq!(val, deserialized);
     }
 }

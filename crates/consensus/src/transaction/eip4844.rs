@@ -55,11 +55,15 @@ pub enum BlobTransactionValidationError {
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum TxEip4844Variant {
+    /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
+    ///
+    /// Note: kept first to ensure that we deserialize tx with sidecar if it's present.
+    TxEip4844WithSidecar(TxEip4844WithSidecar),
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
-    /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
-    TxEip4844WithSidecar(TxEip4844WithSidecar),
 }
 
 impl From<TxEip4844WithSidecar> for TxEip4844Variant {
@@ -285,16 +289,21 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub nonce: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -307,6 +316,7 @@ pub struct TxEip4844 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasFeeCap`
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_fee_per_gas: u128,
     /// Max Priority fee that transaction is paying
     ///
@@ -315,6 +325,7 @@ pub struct TxEip4844 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasTipCap`
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_priority_fee_per_gas: u128,
     /// The 160-bit address of the message call’s recipient.
     pub to: Address,
@@ -336,6 +347,7 @@ pub struct TxEip4844 {
     /// Max fee per data gas
     ///
     /// aka BlobFeeCap or blobGasFeeCap
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_fee_per_blob_gas: u128,
 
     /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
@@ -718,8 +730,11 @@ impl Decodable for TxEip4844 {
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
 /// through the network (eth_sendRawTransaction/eth_sendTransaction).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844WithSidecar {
     /// The actual transaction.
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub tx: TxEip4844,
     /// The sidecar.
     pub sidecar: BlobTransactionSidecar,
@@ -913,6 +928,7 @@ impl Transaction for TxEip4844WithSidecar {
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     pub blobs: Vec<Blob>,

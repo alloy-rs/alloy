@@ -9,14 +9,20 @@ use alloy_primitives::TxKind;
 /// 3. EIP1559 [`TxEip1559`]
 /// 4. EIP4844 [`TxEip4844Variant`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TypedTransaction {
     /// Legacy transaction
+    #[serde(rename = "0x00", alias = "0x0")]
     Legacy(TxLegacy),
     /// EIP-2930 transaction
+    #[serde(rename = "0x01", alias = "0x1")]
     Eip2930(TxEip2930),
     /// EIP-1559 transaction
+    #[serde(rename = "0x02", alias = "0x2")]
     Eip1559(TxEip1559),
     /// EIP-4844 transaction
+    #[serde(rename = "0x03", alias = "0x3")]
     Eip4844(TxEip4844Variant),
 }
 

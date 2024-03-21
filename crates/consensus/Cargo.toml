@@ -17,18 +17,24 @@ alloy-rlp.workspace = true
 alloy-eips.workspace = true
 thiserror = { workspace = true, optional = true }
 c-kzg = { version = "1.0", features = ["serde"], optional = true }
-sha2 = { version = "0.10" }
+sha2 = { version = "0.10", optional = true }
+alloy-serde = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
+
+# serde
+serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 alloy-signer.workspace = true
 arbitrary = { workspace = true, features = ["derive"] }
 k256.workspace = true
 tokio = { workspace = true, features = ["macros"] }
+serde_json.workspace = true
 
 [features]
 k256 = ["alloy-primitives/k256"]
 kzg = ["dep:c-kzg", "dep:thiserror"]
 arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]
+serde = ["dep:serde", "alloy-primitives/serde", "dep:alloy-serde"]
