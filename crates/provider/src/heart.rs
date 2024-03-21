@@ -108,16 +108,19 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     }
 
     /// Returns the number of confirmations to wait for.
+    #[doc(alias = "confirmations")]
     pub const fn reqd_confs(&self) -> u64 {
         self.config.reqd_confs()
     }
 
     /// Sets the number of confirmations to wait for.
+    #[doc(alias = "set_confirmations")]
     pub fn set_reqd_confs(&mut self, confirmations: u64) {
         self.config.set_reqd_confs(confirmations);
     }
 
     /// Sets the number of confirmations to wait for.
+    #[doc(alias = "with_confirmations")]
     pub const fn with_reqd_confs(mut self, confirmations: u64) -> Self {
         self.config.reqd_confs = confirmations;
         self
@@ -224,16 +227,19 @@ impl PendingTransactionConfig {
     }
 
     /// Returns the number of confirmations to wait for.
+    #[doc(alias = "confirmations")]
     pub const fn reqd_confs(&self) -> u64 {
         self.reqd_confs
     }
 
     /// Sets the number of confirmations to wait for.
+    #[doc(alias = "set_confirmations")]
     pub fn set_reqd_confs(&mut self, confirmations: u64) {
         self.reqd_confs = confirmations;
     }
 
     /// Sets the number of confirmations to wait for.
+    #[doc(alias = "with_confirmations")]
     pub const fn with_reqd_confs(mut self, confirmations: u64) -> Self {
         self.reqd_confs = confirmations;
         self
