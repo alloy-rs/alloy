@@ -33,7 +33,8 @@ where
             let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
             let status = resp.status();
 
-            // unpack json from the response body
+            // Unpack data from the response body. We do this regardless of the status code, as we
+            // want to return the error in the body if there is one.
             let body =
                 resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
 

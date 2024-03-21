@@ -29,7 +29,14 @@ hyper-util = { workspace = true, features = ["full"], optional = true }
 [features]
 default = ["reqwest", "reqwest-default-tls"]
 reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
-hyper = ["dep:hyper", "dep:hyper-util", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
+hyper = [
+    "dep:hyper",
+    "dep:hyper-util",
+    "dep:http-body-util",
+    "dep:alloy-json-rpc",
+    "dep:serde_json",
+    "dep:tower",
+]
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]
 reqwest-rustls-tls = ["reqwest?/rustls-tls"]

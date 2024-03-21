@@ -33,8 +33,8 @@ mod reqwest;
 /// [`Transport`]: alloy_transport::Transport
 ///
 /// Currently supported clients are:
-#[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]
-#[cfg_attr(feature = "hyper", doc = " - [`::hyper::client::Client`]")]
+#[cfg_attr(feature = "reqwest", doc = " - [`reqwest`](::reqwest::Client)")]
+#[cfg_attr(feature = "hyper", doc = " - [`hyper`](hyper_util::client::legacy::Client)")]
 #[derive(Debug, Clone)]
 pub struct Http<T> {
     client: T,
