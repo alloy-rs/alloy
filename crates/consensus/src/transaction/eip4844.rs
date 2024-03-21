@@ -1056,7 +1056,7 @@ mod tests {
             max_priority_fee_per_gas: 1,
             max_fee_per_gas: 1,
             gas_limit: 1,
-            to: TxKind::Call(Default::default()),
+            to: Default::default(),
             value: U256::from(1),
             access_list: Default::default(),
             blob_versioned_hashes: vec![Default::default()],
