@@ -101,14 +101,6 @@ pub use alloy_node_bindings as node_bindings;
 pub mod providers {
     #[doc(inline)]
     pub use alloy_provider::*;
-
-    // TODO: provider type aliases
-    // #[cfg(feature = "provider-http")]
-    // pub type HttpProvider = todo!();
-    // #[cfg(feature = "provider-ws")]
-    // pub type WsProvider = todo!();
-    // #[cfg(feature = "provider-ipc")]
-    // pub type WsProvider = todo!();
 }
 
 /// Ethereum JSON-RPC client and types.
