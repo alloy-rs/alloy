@@ -317,8 +317,7 @@ pub struct TxEip4844 {
     ///
     /// This is also known as `GasTipCap`
     pub max_priority_fee_per_gas: u128,
-    /// The 160-bit address of the message call’s recipient or, for a contract creation
-    /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
+    /// The 160-bit address of the message call’s recipient.
     pub to: Address,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
