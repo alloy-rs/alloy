@@ -1,6 +1,9 @@
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
+use alloc::{collections::BTreeMap, fmt::Write};
+
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::{collections::HashMap, fmt::Write};
 
 /// A storage key type that can be serialized to and from a hex string up to 32 bytes. Used for
 /// `eth_getStorageAt` and `eth_getProof` RPCs.
@@ -87,15 +90,15 @@ where
 /// ```
 pub fn deserialize_storage_map<'de, D>(
     deserializer: D,
-) -> Result<Option<HashMap<B256, B256>>, D::Error>
+) -> Result<Option<BTreeMap<B256, B256>>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let map = Option::<HashMap<Bytes, Bytes>>::deserialize(deserializer)?;
+    let map = Option::<BTreeMap<Bytes, Bytes>>::deserialize(deserializer)?;
     match map {
-        Some(mut map) => {
-            let mut res_map = HashMap::with_capacity(map.len());
-            for (k, v) in map.drain() {
+        Some(map) => {
+            let mut res_map = BTreeMap::new();
+            for (k, v) in map {
                 let k_deserialized = from_bytes_to_b256::<'de, D>(k)?;
                 let v_deserialized = from_bytes_to_b256::<'de, D>(v)?;
                 res_map.insert(k_deserialized, v_deserialized);
