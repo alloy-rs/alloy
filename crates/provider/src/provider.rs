@@ -20,7 +20,9 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    Authorization, BoxTransport, Transport, TransportErrorKind, TransportResult,
+};
 use alloy_transport_http::Http;
 use alloy_transport_ipc::IpcConnect;
 use alloy_transport_ws::WsConnect;
@@ -79,7 +81,17 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
                 RpcClient::new_http(reqwest::Url::parse(&conn_str).unwrap()).boxed()
             }
             Ok(BuiltInTransportType::Ws) => {
-                let ws = WsConnect::new(conn_str);
+                // Extract auth info if any
+                let url = reqwest::Url::parse(conn_str).unwrap();
+                let auth = if url.has_authority() {
+                    let username = url.username();
+                    let pass = url.password().unwrap_or_default();
+                    Some(Authorization::basic(username, pass))
+                } else {
+                    None
+                };
+
+                let ws = WsConnect::with_auth(conn_str, auth);
 
                 let ws_client = RpcClient::connect_pubsub(ws).await?;
 
