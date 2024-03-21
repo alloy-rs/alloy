@@ -92,18 +92,16 @@ pub struct EventPoller<T, E> {
     _phantom: PhantomData<E>,
 }
 
-impl<T, E> std::ops::Deref for EventPoller<T, E> {
-    type Target = FilterPollerBuilder<T, Log>;
-
+impl<T, E> AsRef<FilterPollerBuilder<T, Log>> for EventPoller<T, E> {
     #[inline]
-    fn deref(&self) -> &Self::Target {
+    fn as_ref(&self) -> &FilterPollerBuilder<T, Log> {
         &self.poller
     }
 }
 
-impl<T, E> std::ops::DerefMut for EventPoller<T, E> {
+impl<T, E> AsMut<FilterPollerBuilder<T, Log>> for EventPoller<T, E> {
     #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
+    fn as_mut(&mut self) -> &mut FilterPollerBuilder<T, Log> {
         &mut self.poller
     }
 }
@@ -153,18 +151,16 @@ pub(crate) mod subscription {
         _phantom: PhantomData<E>,
     }
 
-    impl<E> std::ops::Deref for EventSubscription<E> {
-        type Target = Subscription<Log>;
-
+    impl<E> AsRef<Subscription<Log>> for EventSubscription<E> {
         #[inline]
-        fn deref(&self) -> &Self::Target {
+        fn as_ref(&self) -> &Subscription<Log> {
             &self.sub
         }
     }
 
-    impl<E> std::ops::DerefMut for EventSubscription<E> {
+    impl<E> AsMut<Subscription<Log>> for EventSubscription<E> {
         #[inline]
-        fn deref_mut(&mut self) -> &mut Self::Target {
+        fn as_mut(&mut self) -> &mut Subscription<Log> {
             &mut self.sub
         }
     }
