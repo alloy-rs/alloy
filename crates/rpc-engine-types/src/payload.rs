@@ -2,9 +2,9 @@
 
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{
+    eip4895::Withdrawal,
     kzg::{Blob, Bytes48},
     transaction::BlobTransactionSidecar,
-    eip4895::Withdrawal,
 };
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
