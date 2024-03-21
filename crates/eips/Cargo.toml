@@ -47,5 +47,5 @@ std = [
     "serde/std",
 ]
 serde = ["dep:serde", "alloy-primitives/serde"]
-ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
+ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz", "std"]
 arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
