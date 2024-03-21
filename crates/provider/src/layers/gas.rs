@@ -96,10 +96,10 @@ where
     /// Populates the gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields if unset.
     /// Requires the chain_id to be set in the transaction request to be processed as a EIP-1559 tx.
     /// If the network does not support EIP-1559, it will process it as a legacy tx.
-    async fn handle_eip1559_tx<'a, 'b>(
-        &'a self,
-        tx: &'b mut N::TransactionRequest,
-    ) -> Result<&'b mut N::TransactionRequest, TransportError> {
+    async fn handle_eip1559_tx(
+        &self,
+        tx: &mut N::TransactionRequest,
+    ) -> Result<(), TransportError> {
         let gas_estimate_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
@@ -120,17 +120,14 @@ where
                 tx.set_gas_limit(gas_limit);
                 tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
                 tx.set_max_priority_fee_per_gas(eip1559_fees.max_priority_fee_per_gas);
-                Ok(tx)
+                Ok(())
             }
             Err(err) => {
                 if err.is_transport_error()
                     && err.to_string() == *"EIP-1559 not activated".to_string()
                 {
                     // If EIP-1559 is not activated, it will process as a legacy tx.
-                    match self.handle_legacy_tx(tx).await {
-                        Ok(tx) => Ok(tx),
-                        Err(err) => Err(err),
-                    }
+                    self.handle_legacy_tx(tx).await
                 } else {
                     Err(err)
                 }
@@ -140,10 +137,7 @@ where
 
     /// Populates the gas_price and only populates the gas_limit field if unset.
     /// This method always assumes that the gas_price is unset.
-    async fn handle_legacy_tx<'a, 'b>(
-        &'a self,
-        tx: &'b mut N::TransactionRequest,
-    ) -> Result<&'b mut N::TransactionRequest, TransportError> {
+    async fn handle_legacy_tx(&self, tx: &mut N::TransactionRequest) -> Result<(), TransportError> {
         let gas_price_fut = self.get_gas_price();
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
@@ -151,14 +145,13 @@ where
             async { self.get_gas_estimate(tx).await }.right_future()
         };
 
-        match futures::try_join!(gas_price_fut, gas_limit_fut) {
-            Ok((gas_price, gas_limit)) => {
-                tx.set_gas_price(gas_price);
-                tx.set_gas_limit(gas_limit);
-                Ok(tx)
-            }
-            Err(err) => Err(err),
-        }
+        futures::try_join!(gas_price_fut, gas_limit_fut).map(|(gas_price, gas_limit)| {
+            tx.set_gas_price(gas_price);
+            tx.set_gas_limit(gas_limit);
+            tx
+        })?;
+
+        Ok(())
     }
 }
 
