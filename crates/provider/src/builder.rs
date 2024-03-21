@@ -10,9 +10,9 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
+pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Ethereum> {
     /// The provider constructed by this layer.
-    type Provider: Provider<N, T>;
+    type Provider: Provider<T, N>;
 
     /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
@@ -22,11 +22,11 @@ pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
 #[derive(Debug, Clone, Copy)]
 pub struct Identity;
 
-impl<P, N, T> ProviderLayer<P, N, T> for Identity
+impl<P, T, N> ProviderLayer<P, T, N> for Identity
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     type Provider = P;
 
@@ -49,13 +49,13 @@ impl<Inner, Outer> Stack<Inner, Outer> {
     }
 }
 
-impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<Inner, Outer>
+impl<P, T, N, Inner, Outer> ProviderLayer<P, T, N> for Stack<Inner, Outer>
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
-    Inner: ProviderLayer<P, N, T>,
-    Outer: ProviderLayer<Inner::Provider, N, T>,
+    P: Provider<T, N>,
+    Inner: ProviderLayer<P, T, N>,
+    Outer: ProviderLayer<Inner::Provider, T, N>,
 {
     type Provider = Outer::Provider;
 
@@ -151,8 +151,8 @@ impl<L, N> ProviderBuilder<L, N> {
     /// the final [`Provider`] type with all stack components.
     pub fn provider<P, T>(self, provider: P) -> L::Provider
     where
-        L: ProviderLayer<P, N, T>,
-        P: Provider<N, T>,
+        L: ProviderLayer<P, T, N>,
+        P: Provider<T, N>,
         T: Transport + Clone,
         N: Network,
     {
@@ -166,7 +166,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// `ProviderBuilder::provider<RpcClient>`.
     pub fn on_client<T>(self, client: RpcClient<T>) -> L::Provider
     where
-        L: ProviderLayer<RootProvider<N, T>, N, T>,
+        L: ProviderLayer<RootProvider<T, N>, T, N>,
         T: Transport + Clone,
         N: Network,
     {

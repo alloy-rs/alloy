@@ -1,5 +1,5 @@
 use crate::{Provider, RootProvider};
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{PollerBuilder, WeakClient};
 use alloy_rpc_types::Block;
@@ -18,7 +18,7 @@ const MAX_RETRIES: usize = 3;
 /// Default block number for when we don't have a block yet.
 const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
-pub(crate) struct ChainStreamPoller<N, T> {
+pub(crate) struct ChainStreamPoller<T, N = Ethereum> {
     client: WeakClient<T>,
     poll_task: PollerBuilder<T, (), U64>,
     next_yield: BlockNumber,
@@ -26,8 +26,8 @@ pub(crate) struct ChainStreamPoller<N, T> {
     _phantom: PhantomData<N>,
 }
 
-impl<N: Network, T: Transport + Clone> ChainStreamPoller<N, T> {
-    pub(crate) fn from_root(p: &RootProvider<N, T>) -> Self {
+impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
+    pub(crate) fn from_root(p: &RootProvider<T, N>) -> Self {
         Self::new(p.weak_client())
     }
 

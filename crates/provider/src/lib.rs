@@ -16,10 +16,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_transport_http::Http;
+use network::Ethereum;
 use reqwest::Client as ReqwestClient;
 
 /// Type alias for a [`RootProvider`] using the [`Http`] transport.
-pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+pub type HttpProvider<N = Ethereum> = RootProvider<Http<ReqwestClient>, N>;
 
 #[macro_use]
 extern crate tracing;
