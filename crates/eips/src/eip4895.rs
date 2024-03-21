@@ -1,6 +1,6 @@
 //! [EIP-4895] Withdrawal type and serde helpers.
 //!
-//! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-4895
+//! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
