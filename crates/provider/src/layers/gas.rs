@@ -3,6 +3,7 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::U256;
 use alloy_transport::{Transport, TransportError, TransportResult};
 use async_trait::async_trait;
+use futures::FutureExt;
 use std::marker::PhantomData;
 
 /// A layer that populates gas related fields in transaction requests if unset.
@@ -97,10 +98,21 @@ where
         &'a self,
         tx: &'b mut N::TransactionRequest,
     ) -> Result<&'b mut N::TransactionRequest, TransportError> {
-        let gas_estimate = self.get_gas_estimate(tx);
-        let eip1559_fees = self.get_eip1559_fees_estimate();
+        let gas_estimate_fut = if let Some(gas_limit) = tx.gas_limit() {
+            async move { Ok(gas_limit) }.left_future()
+        } else {
+            async { self.get_gas_estimate(tx).await }.right_future()
+        };
 
-        let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate, eip1559_fees);
+        let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
+            (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
+        {
+            async move { Ok((max_fee_per_gas, max_priority_fee_per_gas)) }.left_future()
+        } else {
+            async { self.get_eip1559_fees_estimate().await }.right_future()
+        };
+
+        let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate_fut, eip1559_fees_fut);
 
         gas_estimate.map(|gas_estimate| tx.set_gas_limit(gas_estimate))?;
 
@@ -196,7 +208,7 @@ mod tests {
     use crate::{layers::ManagedNonceLayer, ProviderBuilder};
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U128, U256};
+    use alloy_primitives::{address, U128};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;
