@@ -75,8 +75,8 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     /// Creates a new root provider with a boxed transport from a string.
     pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
         let boxed_client = match utils::parse_str_to_tranport_type(conn_str) {
-            Ok(BuiltInTransportType::Http) => {
-                RpcClient::new_http(reqwest::Url::parse(conn_str).unwrap()).boxed()
+            Ok(BuiltInTransportType::Http(conn_str)) => {
+                RpcClient::new_http(reqwest::Url::parse(&conn_str).unwrap()).boxed()
             }
             Ok(BuiltInTransportType::Ws) => {
                 let ws = WsConnect::new(conn_str);
