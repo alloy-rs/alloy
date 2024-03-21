@@ -2,7 +2,7 @@ use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256, U64};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
@@ -306,7 +306,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
     }
 
     /// Sets the `nonce` field in the transaction to the provided value
-    pub fn nonce(mut self, nonce: U64) -> Self {
+    pub fn nonce(mut self, nonce: u64) -> Self {
         self.request.set_nonce(nonce);
         self
     }

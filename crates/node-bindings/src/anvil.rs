@@ -134,7 +134,9 @@ pub enum AnvilError {
 pub struct Anvil {
     program: Option<PathBuf>,
     port: Option<u16>,
-    block_time: Option<u64>,
+    // If the block_time is an integer, f64::to_string() will output without a decimal point
+    // which allows this to be backwards compatible.
+    block_time: Option<f64>,
     chain_id: Option<u64>,
     mnemonic: Option<String>,
     fork: Option<String>,
@@ -206,6 +208,13 @@ impl Anvil {
 
     /// Sets the block-time in seconds which will be used when the `anvil` instance is launched.
     pub fn block_time(mut self, block_time: u64) -> Self {
+        self.block_time = Some(block_time as f64);
+        self
+    }
+
+    /// Sets the block-time in sub-seconds which will be used when the `anvil` instance is launched.
+    /// Older versions of `anvil` do not support sub-second block times.
+    pub fn block_time_f64(mut self, block_time: f64) -> Self {
         self.block_time = Some(block_time);
         self
     }
@@ -373,6 +382,20 @@ mod tests {
     #[test]
     fn can_launch_anvil_with_more_accounts() {
         let _ = Anvil::new().arg("--accounts").arg("20").spawn();
+    }
+
+    #[test]
+    fn assert_block_time_is_natural_number() {
+        //This test is to ensure that older versions of anvil are supported
+        //even though the block time is a f64, it should be passed as a whole number
+        let anvil = Anvil::new().block_time(12);
+        assert_eq!(anvil.block_time.unwrap().to_string(), "12");
+        let _ = anvil.spawn();
+    }
+
+    #[test]
+    fn can_launch_anvil_with_sub_seconds_block_time() {
+        let _ = Anvil::new().block_time_f64(0.5).spawn();
     }
 
     #[test]
