@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 use thiserror::Error;
+use url::Url;
 
 /// How long we will wait for anvil to indicate that it is ready.
 const ANVIL_STARTUP_TIMEOUT_MILLIS: u64 = 10_000;
@@ -67,6 +68,16 @@ impl AnvilInstance {
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
         format!("ws://localhost:{}", self.port)
+    }
+
+    /// Returns the HTTP endpoint url of this instance
+    pub fn endpoint_url(&self) -> Url {
+        Url::parse(&self.endpoint()).unwrap()
+    }
+
+    /// Returns the Websocket endpoint url of this instance
+    pub fn ws_endpoint_url(&self) -> Url {
+        Url::parse(&self.ws_endpoint()).unwrap()
     }
 }
 
