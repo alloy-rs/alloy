@@ -116,11 +116,11 @@ impl Interface {
     }
 
     /// Create a [`ContractInstance`] from this ABI for a contract at the given address.
-    pub const fn connect<N, T, P>(
+    pub const fn connect<T, P, N>(
         self,
         address: Address,
         provider: P,
-    ) -> ContractInstance<N, T, P> {
+    ) -> ContractInstance<T, P, N> {
         ContractInstance::new(address, provider, self)
     }
 }
