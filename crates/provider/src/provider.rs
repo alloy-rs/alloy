@@ -1122,8 +1122,8 @@ mod tests {
         let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
         let ws = alloy_rpc_client::WsConnect::new(url);
         let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
-        let p = RootProvider::<Ethereum, _>::new(client);
-        let sub = p.subscribe_blocks().await.unwrap();
+        let provider = RootProvider::<_, Ethereum>::new(client);
+        let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);
         while let Some(block) = stream.next().await {
             println!("New block {:?}", block);
