@@ -1,4 +1,6 @@
-use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
+use crate::{
+    utils::Eip1559Estimation, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
+};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::U256;
 use alloy_transport::{Transport, TransportError, TransportResult};
@@ -87,7 +89,7 @@ where
     }
 
     /// Gets the max_fee_per_gas and max_priority_fee_per_gas to be used in EIP-1559 txs.
-    async fn get_eip1559_fees_estimate(&self) -> TransportResult<(U256, U256)> {
+    async fn get_eip1559_fees_estimate(&self) -> TransportResult<Eip1559Estimation> {
         self.inner.estimate_eip1559_fees(None).await
     }
 
@@ -107,19 +109,17 @@ where
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
             (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
         {
-            async move { Ok((max_fee_per_gas, max_priority_fee_per_gas)) }.left_future()
+            async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
+                .left_future()
         } else {
             async { self.get_eip1559_fees_estimate().await }.right_future()
         };
 
-        let (gas_estimate, eip1559_fees) = futures::join!(gas_estimate_fut, eip1559_fees_fut);
-
-        gas_estimate.map(|gas_estimate| tx.set_gas_limit(gas_estimate))?;
-
-        match eip1559_fees {
-            Ok((max_fee_per_gas, max_priority_fee_per_gas)) => {
-                tx.set_max_fee_per_gas(max_fee_per_gas);
-                tx.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        match futures::try_join!(gas_estimate_fut, eip1559_fees_fut) {
+            Ok((gas_limit, eip1559_fees)) => {
+                tx.set_gas_limit(gas_limit);
+                tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
+                tx.set_max_priority_fee_per_gas(eip1559_fees.max_priority_fee_per_gas);
                 Ok(tx)
             }
             Err(err) => {
@@ -144,30 +144,20 @@ where
         &'a self,
         tx: &'b mut N::TransactionRequest,
     ) -> Result<&'b mut N::TransactionRequest, TransportError> {
-        let gas_price = self.get_gas_price();
-
-        if tx.gas_limit().is_none() {
-            let gas_estimate = self.get_gas_estimate(tx);
-
-            match futures::join!(gas_price, gas_estimate) {
-                (Ok(gas_price), Ok(gas_estimate)) => {
-                    tx.set_gas_price(gas_price);
-                    tx.set_gas_limit(gas_estimate);
-                    Ok(tx)
-                }
-                (Ok(_gas_price), Err(err)) => Err(err),
-                (Err(err), Ok(_gas_estimate)) => Err(err),
-                (Err(err1), Err(_err2)) => Err(err1),
-            }
+        let gas_price_fut = self.get_gas_price();
+        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
+            async move { Ok(gas_limit) }.left_future()
         } else {
-            let gas_price = gas_price.await;
-            match gas_price {
-                Ok(gas_price) => {
-                    tx.set_gas_price(gas_price);
-                    Ok(tx)
-                }
-                Err(err) => Err(err),
+            async { self.get_gas_estimate(tx).await }.right_future()
+        };
+
+        match futures::try_join!(gas_price_fut, gas_limit_fut) {
+            Ok((gas_price, gas_limit)) => {
+                tx.set_gas_price(gas_price);
+                tx.set_gas_limit(gas_limit);
+                Ok(tx)
             }
+            Err(err) => Err(err),
         }
     }
 }
