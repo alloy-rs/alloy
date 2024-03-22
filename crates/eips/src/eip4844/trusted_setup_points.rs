@@ -1,8 +1,10 @@
+use alloy_primitives::hex;
 use core::fmt;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
+
+#[allow(unused_imports)]
 use std::boxed::Box;
 
-use alloy_primitives::hex;
 pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
 
 /// Number of G1 Points.
