@@ -1,5 +1,5 @@
 [package]
-name = "alloy-eip-7547"
+name = "alloy-eip7547"
 description = "EIP-7547: Inclusion Lists types"
 
 version.workspace = true
