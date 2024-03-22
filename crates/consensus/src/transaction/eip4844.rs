@@ -55,15 +55,39 @@ pub enum BlobTransactionValidationError {
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum TxEip4844Variant {
-    /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
-    ///
-    /// Note: kept first to ensure that we deserialize tx with sidecar if it's present.
-    TxEip4844WithSidecar(TxEip4844WithSidecar),
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
+    /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
+    TxEip4844WithSidecar(TxEip4844WithSidecar),
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
+    fn deserialize<D>(deserializer: D) -> Result<TxEip4844Variant, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct TxEip4844SerdeHelper {
+            #[serde(flatten)]
+            tx: TxEip4844,
+            #[serde(flatten)]
+            sidecar: Option<BlobTransactionSidecar>,
+        }
+
+        let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
+
+        if let Some(sidecar) = tx.sidecar {
+            Ok(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar::from_tx_and_sidecar(
+                tx.tx, sidecar,
+            )))
+        } else {
+            Ok(TxEip4844Variant::TxEip4844(tx.tx))
+        }
+    }
 }
 
 impl From<TxEip4844WithSidecar> for TxEip4844Variant {
@@ -737,6 +761,7 @@ pub struct TxEip4844WithSidecar {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub tx: TxEip4844,
     /// The sidecar.
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub sidecar: BlobTransactionSidecar,
 }
 

@@ -112,10 +112,10 @@ tempfile = "3.10"
 
 # TODO: Remove eventually.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/klkvr/core", rev = "0473659" }
-alloy-primitives = { git = "https://github.com/klkvr/core", rev = "0473659" }
-alloy-sol-types = { git = "https://github.com/klkvr/core", rev = "0473659" }
-alloy-json-abi = { git = "https://github.com/klkvr/core", rev = "0473659" }
-alloy-dyn-abi = { git = "https://github.com/klkvr/core", rev = "0473659" }
-syn-solidity = { git = "https://github.com/klkvr/core", rev = "0473659" }
-alloy-core = { git = "https://github.com/klkvr/core", rev = "0473659" }
+alloy-sol-macro = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+alloy-primitives = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+alloy-sol-types = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+alloy-json-abi = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+alloy-dyn-abi = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+syn-solidity = { git = "https://github.com/klkvr/core", rev = "1bac767" }
+alloy-core = { git = "https://github.com/klkvr/core", rev = "1bac767" }

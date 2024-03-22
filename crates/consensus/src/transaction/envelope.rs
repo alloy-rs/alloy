@@ -473,6 +473,8 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip_eip4844() {
+        use crate::BlobTransactionSidecar;
+
         let tx = TxEip4844Variant::TxEip4844(TxEip4844 {
             chain_id: 1,
             nonce: 100,
@@ -488,6 +490,27 @@ mod tests {
             }]),
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
+        });
+        test_serde_roundtrip(tx);
+
+        let tx = TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
+            tx: TxEip4844 {
+                chain_id: 1,
+                nonce: 100,
+                max_fee_per_gas: 50_000_000_000,
+                max_priority_fee_per_gas: 1_000_000_000_000,
+                gas_limit: 1_000_000,
+                to: TxKind::Create,
+                value: U256::from(10e18),
+                input: Bytes::new(),
+                access_list: AccessList(vec![AccessListItem {
+                    address: Address::random(),
+                    storage_keys: vec![B256::random()],
+                }]),
+                blob_versioned_hashes: vec![B256::random()],
+                max_fee_per_blob_gas: 0,
+            },
+            sidecar: BlobTransactionSidecar { ..Default::default() },
         });
         test_serde_roundtrip(tx);
     }
