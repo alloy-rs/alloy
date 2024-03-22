@@ -2,6 +2,13 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+/// Module houses the KZG settings, enabling Custom and Default
+#[cfg(feature = "kzg")]
+pub mod env_settings;
+/// This module contains functions and types used for parsing and utilizing the [Trusted Setup]( https://ceremony.ethereum.org/) for the `KzgSettings`.
+#[cfg(feature = "kzg")]
+pub mod trusted_setup_points;
+
 use alloy_primitives::{b256, FixedBytes, U256};
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
