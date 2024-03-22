@@ -1,7 +1,7 @@
 #[cfg(not(feature = "kzg"))]
 use alloy_eips::eip4844::Blob;
 #[cfg(feature = "kzg")]
-use c_kzg::{Blob, KzgCommitment, KzgProof, KzgSettings};
+use c_kzg::{Blob, KzgCommitment, KzgProof};
 
 use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
 
@@ -339,12 +339,13 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         self.coder.code(&mut self.inner, data);
     }
 
+    /// Build the sidecar from the data with the provided settings.
     #[cfg(feature = "kzg")]
-    /// Build the sidecar from the data.
-    pub fn build(
+    pub fn build_with_settings(
         self,
-        settings: &KzgSettings,
+        settings: &crate::EnvKzgSettings,
     ) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
+        let settings = settings.get();
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
@@ -355,6 +356,13 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         }
 
         Ok(crate::BlobTransactionSidecar { blobs: self.inner.blobs, commitments, proofs })
+    }
+
+    /// Build the sidecar from the data, with default (Ethereum Mainnet)
+    /// settings.
+    #[cfg(feature = "kzg")]
+    pub fn build(self) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
+        self.build_with_settings(&crate::EnvKzgSettings::Default)
     }
 
     /// Take the blobs from the builder, without committing them to a KZG proof.

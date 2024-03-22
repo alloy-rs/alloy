@@ -33,6 +33,9 @@ pub use transaction::{
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 
+#[cfg(feature = "kzg")]
+pub use alloy_eips::eip4844::env_settings::EnvKzgSettings;
+
 mod sealed;
 pub use sealed::{Sealable, Sealed};
 
