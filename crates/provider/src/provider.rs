@@ -30,9 +30,9 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
+use crate::utils::Eip1559Estimation;
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
-use crate::utils::Eip1559Estimation;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -797,12 +797,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
             )
         };
 
-        Ok(
-            Eip1559Estimation {
-                max_fee_per_gas,
-                max_priority_fee_per_gas
-            }
-        )
+        Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas })
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.

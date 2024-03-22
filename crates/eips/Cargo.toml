@@ -14,6 +14,8 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
 alloy-rlp = { workspace = true, features = ["derive"] }
+derive_more = { workspace = true, optional = true }
+c-kzg = { version = "1.0", features = ["serde"], optional = true }
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
@@ -38,3 +40,4 @@ std = [
 ]
 serde = ["dep:serde", "alloy-primitives/serde"]
 arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+kzg = ["dep:derive_more", "dep:c-kzg"]

@@ -2,6 +2,12 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
+
+#[cfg(feature = "kzg")]
+pub mod trusted_setup_points;
+#[cfg(feature = "kzg")]
+pub mod env_settings;
+
 use alloy_primitives::{b256, FixedBytes, U256};
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
