@@ -26,9 +26,7 @@ alloy-network = { version = "0.1.0", default-features = false, path = "crates/ne
 alloy-node-bindings = { version = "0.1.0", default-features = false, path = "crates/node-bindings" }
 alloy-provider = { version = "0.1.0", default-features = false, path = "crates/provider" }
 alloy-pubsub = { version = "0.1.0", default-features = false, path = "crates/pubsub" }
-alloy-rpc-client = { version = "0.1.0", features = [
-    "pubsub",
-], path = "crates/rpc-client" }
+alloy-rpc-client = { version = "0.1.0", default-features = false, path = "crates/rpc-client" }
 alloy-rpc-engine-types = { version = "0.1.0", default-features = false, path = "crates/rpc-engine-types" }
 alloy-rpc-trace-types = { version = "0.1.0", default-features = false, path = "crates/rpc-trace-types" }
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }

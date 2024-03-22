@@ -31,6 +31,7 @@ use std::{
     borrow::Cow,
     fmt,
     marker::PhantomData,
+    str::FromStr,
     sync::{Arc, OnceLock},
 };
 
@@ -76,7 +77,7 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 
     /// Creates a new root provider with a boxed transport from a string.
     pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
-        let boxed_client = match utils::parse_str_to_tranport_type(conn_str) {
+        let boxed_client = match BuiltInTransportType::from_str(conn_str) {
             Ok(BuiltInTransportType::Http(conn_str)) => {
                 RpcClient::new_http(reqwest::Url::parse(&conn_str).unwrap()).boxed()
             }

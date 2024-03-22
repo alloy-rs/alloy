@@ -1,7 +1,7 @@
 use alloy_node_bindings::Anvil;
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
-use alloy_transport::WsConnect;
+use alloy_transport_ws::WsConnect;
 
 #[tokio::test]
 async fn it_makes_a_request() {

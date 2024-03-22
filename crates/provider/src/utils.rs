@@ -58,9 +58,7 @@ pub fn eip1559_default_estimator(
 }
 
 /// Identifies the intended transport type from the given string.
-pub fn parse_str_to_tranport_type(
-    s: &str,
-) -> Result<BuiltInTransportType, RpcError<TransportErrorKind>> {
+pub fn parse_str_to_tranport_type(s: &str) -> Result<String, RpcError<TransportErrorKind>> {
     // Parse if string is a socket address e.g. "127.0.0.1:8545"
     let s = s.parse::<SocketAddr>().ok().map_or_else(|| s.to_string(), |s| format!("http://{}", s));
 
@@ -68,19 +66,17 @@ pub fn parse_str_to_tranport_type(
     let path = Path::new(&s);
     if path.exists() && path.is_file() {
         // IPC if it exists
-        return Ok(BuiltInTransportType::Ipc);
+        return Ok(s);
     }
 
     // Parse the URL or return an error
     Url::parse(&s).map_err(|e| TransportErrorKind::custom_str(e.to_string().as_str()))?;
 
-    // Return the transport type or error
-    BuiltInTransportType::from_str(&s)
-        .map_err(|_| TransportErrorKind::custom_str("Invalid transport type"))
+    Ok(s)
 }
 
 /// The built-in transport types.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltInTransportType {
     /// HTTP transport.
     Http(String),
@@ -93,23 +89,15 @@ pub enum BuiltInTransportType {
 impl FromStr for BuiltInTransportType {
     type Err = RpcError<TransportErrorKind>;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<BuiltInTransportType, Self::Err> {
+        let s = parse_str_to_tranport_type(s)?;
+
         if s.starts_with("http://") || s.starts_with("https://") {
             Ok(BuiltInTransportType::Http(s.to_string()))
         } else if s.starts_with("ws://") || s.starts_with("wss://") {
             Ok(BuiltInTransportType::Ws)
         } else {
             Ok(BuiltInTransportType::Ipc)
-        }
-    }
-}
-
-impl Clone for BuiltInTransportType {
-    fn clone(&self) -> Self {
-        match self {
-            BuiltInTransportType::Http(s) => BuiltInTransportType::Http(s.clone()),
-            BuiltInTransportType::Ws => BuiltInTransportType::Ws,
-            BuiltInTransportType::Ipc => BuiltInTransportType::Ipc,
         }
     }
 }
@@ -164,52 +152,56 @@ mod tests {
     #[test]
     fn test_parsing_urls() {
         assert_eq!(
-            super::parse_str_to_tranport_type("http://localhost:8545").unwrap(),
+            BuiltInTransportType::from_str("http://localhost:8545").unwrap(),
             BuiltInTransportType::Http("http://localhost:8545".to_string())
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("https://localhost:8545").unwrap(),
+            BuiltInTransportType::from_str("https://localhost:8545").unwrap(),
             BuiltInTransportType::Http("https://localhost:8545".to_string())
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("ws://localhost:8545").unwrap(),
+            BuiltInTransportType::from_str("ws://localhost:8545").unwrap(),
             BuiltInTransportType::Ws
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("wss://localhost:8545").unwrap(),
+            BuiltInTransportType::from_str("wss://localhost:8545").unwrap(),
             BuiltInTransportType::Ws
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("ipc:///tmp/reth.ipc").unwrap(),
+            BuiltInTransportType::from_str("ipc:///tmp/reth.ipc").unwrap(),
             BuiltInTransportType::Ipc
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("localhost:8545").unwrap(),
+            BuiltInTransportType::from_str("localhost:8545").unwrap(),
             BuiltInTransportType::Ipc
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("http://127.0.0.1:8545").unwrap(),
+            BuiltInTransportType::from_str("http://127.0.0.1:8545").unwrap(),
             BuiltInTransportType::Http("http://127.0.0.1:8545".to_string())
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("ws://127.0.0.1:8545").unwrap(),
+            BuiltInTransportType::from_str("ws://127.0.0.1:8545").unwrap(),
             BuiltInTransportType::Ws
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("http://localhost").unwrap(),
+            BuiltInTransportType::from_str("http://localhost").unwrap(),
             BuiltInTransportType::Http("http://localhost".to_string())
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("127.0.0.1:8545").unwrap(),
+            BuiltInTransportType::from_str("127.0.0.1:8545").unwrap(),
             BuiltInTransportType::Http("http://127.0.0.1:8545".to_string())
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("file:///tmp/reth.ipc").unwrap(),
+            BuiltInTransportType::from_str("file:///tmp/reth.ipc").unwrap(),
             BuiltInTransportType::Ipc
         );
         assert_eq!(
-            super::parse_str_to_tranport_type("/tmp/reth.ipc").unwrap(),
+            BuiltInTransportType::from_str("/tmp/reth.ipc").unwrap(),
             BuiltInTransportType::Ipc
+        );
+        assert_eq!(
+            BuiltInTransportType::from_str("http://user:pass@example.com").unwrap(),
+            BuiltInTransportType::Http("http://user:pass@example.com".to_string())
         );
     }
 }
