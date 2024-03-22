@@ -1,7 +1,8 @@
-#[allow(missing_docs)]
 /// Error variants when converting from [crate::Transaction] to [alloy_consensus::Signed]
 /// transaction.
 #[derive(Debug, thiserror::Error)]
+#[allow(missing_copy_implementations)]
+#[allow(missing_docs)]
 pub enum ConversionError {
     #[error("missing `gasPrice` field for Legacy transaction")]
     MissingGasPrice,
