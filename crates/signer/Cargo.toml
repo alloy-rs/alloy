@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["k256"] }
+alloy-primitives = { workspace = true, features = ["std", "k256"] }
 
 async-trait.workspace = true
 auto_impl.workspace = true
@@ -21,8 +21,8 @@ k256.workspace = true
 thiserror.workspace = true
 
 # eip712
-alloy-sol-types = { workspace = true, optional = true }
-alloy-dyn-abi = { workspace = true, optional = true, features = ["eip712"] }
+alloy-sol-types = { workspace = true, optional = true, features = ["std"] }
+alloy-dyn-abi = { workspace = true, optional = true, features = ["std", "eip712"] }
 
 [dev-dependencies]
 alloy-consensus.workspace = true

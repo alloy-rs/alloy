@@ -6,7 +6,7 @@ use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
-use alloy_json_rpc::{RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
@@ -587,7 +587,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         rlp_bytes: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
-        let rlp_hex = hex::encode(rlp_bytes);
+        let rlp_hex = hex::encode_prefixed(rlp_bytes);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
@@ -762,41 +762,25 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> TransportResult<Eip1559Estimation> {
-        let base_fee_per_gas = match self.get_block_by_number(BlockNumberOrTag::Latest, false).await
-        {
-            Ok(Some(block)) => match block.header.base_fee_per_gas {
-                Some(base_fee_per_gas) => base_fee_per_gas,
-                None => return Err(TransportErrorKind::custom_str("EIP-1559 not activated")),
-            },
-
-            Ok(None) => return Err(TransportErrorKind::custom_str("Latest block not found")),
-
-            Err(err) => return Err(err),
-        };
-
-        let fee_history = match self
-            .get_fee_history(
+        let (bf, fee_history) = futures::try_join!(
+            self.get_block_by_number(BlockNumberOrTag::Latest, false),
+            self.get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
-            .await
-        {
-            Ok(fee_history) => fee_history,
-            Err(err) => return Err(err),
-        };
+        )?;
 
-        // use the provided fee estimator function, or fallback to the default implementation.
-        let (max_fee_per_gas, max_priority_fee_per_gas) = if let Some(es) = estimator {
-            es(base_fee_per_gas, &fee_history.reward.unwrap_or_default())
-        } else {
-            utils::eip1559_default_estimator(
-                base_fee_per_gas,
-                &fee_history.reward.unwrap_or_default(),
-            )
-        };
+        let base_fee_per_gas = bf
+            .ok_or(RpcError::NullResp)?
+            .header
+            .base_fee_per_gas
+            .ok_or(RpcError::UnsupportedFeature("eip1559"))?;
 
-        Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas })
+        Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
+            base_fee_per_gas,
+            &fee_history.reward.unwrap_or_default(),
+        ))
     }
 
     /// Get the account and storage values of the specified account including the merkle proofs.

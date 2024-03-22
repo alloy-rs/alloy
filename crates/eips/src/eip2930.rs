@@ -5,7 +5,7 @@
 #![allow(unknown_lints, non_local_definitions)]
 
 #[cfg(not(feature = "std"))]
-pub(crate) use alloc::vec::Vec;
+use alloc::vec::Vec;
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
@@ -47,6 +47,8 @@ impl AccessListItem {
     all(any(test, feature = "arbitrary"), feature = "std"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccessList(
     #[cfg_attr(
         all(any(test, feature = "arbitrary"), feature = "std"),
@@ -94,5 +96,46 @@ impl AccessList {
         // take into account capacity
         self.0.iter().map(AccessListItem::size).sum::<usize>()
             + self.0.capacity() * mem::size_of::<AccessListItem>()
+    }
+}
+
+/// Access list with gas used appended.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct AccessListWithGasUsed {
+    /// List with accounts accessed during transaction.
+    pub access_list: AccessList,
+    /// Estimated gas used with access list.
+    pub gas_used: U256,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn access_list_serde() {
+        let list = AccessList(vec![
+            AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+            AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+        ]);
+        let json = serde_json::to_string(&list).unwrap();
+        let list2 = serde_json::from_str::<AccessList>(&json).unwrap();
+        assert_eq!(list, list2);
+    }
+
+    #[test]
+    fn access_list_with_gas_used() {
+        let list = AccessListWithGasUsed {
+            access_list: AccessList(vec![
+                AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+                AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
+            ]),
+            gas_used: U256::from(100),
+        };
+        let json = serde_json::to_string(&list).unwrap();
+        let list2 = serde_json::from_str::<AccessListWithGasUsed>(&json).unwrap();
+        assert_eq!(list, list2);
     }
 }

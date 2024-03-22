@@ -115,6 +115,21 @@ jobs:
       - name: build ledger
         run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
 
+  no-std:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: riscv32imac-unknown-none-elf
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: check
+        run: ./scripts/check_no_std.sh
+
   feature-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30

@@ -1,11 +1,11 @@
 //! RPC types for transactions
 
 use crate::eth::other::OtherFields;
-pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
+pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U256, U8};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
@@ -16,7 +16,6 @@ pub use request::{TransactionInput, TransactionRequest};
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 
-mod access_list;
 mod blob;
 mod common;
 mod error;
@@ -69,7 +68,7 @@ pub struct Transaction {
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    #[serde(with = "alloy_serde::u64_hex_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt")]
     pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -157,7 +156,7 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
         };
         Ok(tx.into_signed(signature))
     }
@@ -177,7 +176,7 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?.into(),
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
         };
         Ok(tx.into_signed(signature))
     }
@@ -200,7 +199,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
             blob_versioned_hashes: tx.blob_versioned_hashes,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
@@ -311,6 +310,26 @@ mod tests {
         assert_eq!(
             serialized,
             r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
+        );
+        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transaction, deserialized);
+    }
+
+    #[test]
+    fn serde_minimal_transaction() {
+        let transaction = Transaction {
+            hash: B256::with_last_byte(1),
+            nonce: 2,
+            from: Address::with_last_byte(6),
+            value: U256::from(8),
+            gas: U256::from(10),
+            input: Bytes::from(vec![11, 12, 13]),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&transaction).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);

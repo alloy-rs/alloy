@@ -24,7 +24,6 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 alloy-signer.workspace = true
-# arbitrary
 arbitrary = { workspace = true, features = ["derive"] }
 k256.workspace = true
 tokio = { workspace = true, features = ["macros"] }

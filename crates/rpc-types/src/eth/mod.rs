@@ -15,10 +15,10 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
-pub mod withdrawal;
 mod work;
 
 pub use account::*;
+pub use alloy_eips::eip4895::Withdrawal;
 pub use block::*;
 pub use call::{Bundle, EthCallResponse, StateContext};
 pub use fee::{FeeHistory, TxGasAndReward};
@@ -28,5 +28,4 @@ pub use log::*;
 pub use raw_log::{logs_bloom, Log as RawLog};
 pub use syncing::*;
 pub use transaction::*;
-pub use withdrawal::Withdrawal;
 pub use work::Work;
