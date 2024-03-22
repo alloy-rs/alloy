@@ -15,13 +15,12 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
-pub use alloy_eips::eip4895;
 mod work;
 
 pub use account::*;
+pub use alloy_eips::eip4895::Withdrawal;
 pub use block::*;
 pub use call::{Bundle, EthCallResponse, StateContext};
-pub use eip4895::Withdrawal;
 pub use fee::{FeeHistory, TxGasAndReward};
 pub use filter::*;
 pub use index::Index;
