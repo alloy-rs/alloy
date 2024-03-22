@@ -36,22 +36,12 @@ proptest-derive = { version = "0.4", optional = true }
 jsonrpsee-types = { version = "0.20", optional = true }
 
 [features]
-arbitrary = [
-    "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
-    "alloy-primitives/arbitrary",
-]
+arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = [
-    "rand",
-    "rlp",
-    "serde",
-    "arbitrary",
-] }
+alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
