@@ -109,7 +109,7 @@ The following crates support `no_std`:
 - alloy-serde
 
 If you would like to add `no_std` support to a crate, please make sure to update
-`scripts/check_no_std.sh` and run it before submitting a PR.
+`scripts/check_no_std.sh` as well.
 
 ## Credits
 
