@@ -12,9 +12,9 @@ pub struct TxLegacy {
     #[cfg_attr(
         feature = "serde",
         serde(
+            default,
             with = "alloy_serde::u64_hex_or_decimal_opt",
             skip_serializing_if = "Option::is_none",
-            default
         )
     )]
     pub chain_id: Option<ChainId>,
