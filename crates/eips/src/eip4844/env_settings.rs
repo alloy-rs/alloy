@@ -1,7 +1,7 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use c_kzg::KzgSettings;
-use std::hash::{Hash, Hasher};
 use once_cell::race::OnceBox;
+use std::hash::{Hash, Hasher};
 use std::{boxed::Box, sync::Arc};
 
 /// KZG Settings that allow us to specify a custom trusted setup.
