@@ -208,23 +208,13 @@ pub mod u128_hex_or_decimal {
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NumberOrHexU128 {
-        Hex(U128),
-        Int(u128),
-    }
-
     /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
     /// a number
     pub fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
     where
         D: Deserializer<'de>,
     {
-        match NumberOrHexU128::deserialize(deserializer)? {
-            NumberOrHexU128::Int(val) => Ok(val),
-            NumberOrHexU128::Hex(val) => Ok(val.to()),
-        }
+        U128::deserialize(deserializer).map(|val| val.to())
     }
 
     /// Serializes u64 as hex string
