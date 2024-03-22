@@ -14,6 +14,10 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
 alloy-rlp = { workspace = true, features = ["derive"] }
+alloy-serde.workspace = true
+
+ethereum_ssz_derive = { workspace = true, optional = true }
+ethereum_ssz = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
@@ -24,9 +28,15 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "serde",
+    "arbitrary",
+] }
 arbitrary = { workspace = true, features = ["derive"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+serde_json.workspace = true
 
 [features]
 default = ["std"]
@@ -39,3 +49,4 @@ arbitrary = [
     "dep:proptest",
     "alloy-primitives/arbitrary",
 ]
+ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz", "std"]

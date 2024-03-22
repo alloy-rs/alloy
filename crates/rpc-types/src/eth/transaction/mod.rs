@@ -1,11 +1,11 @@
 //! RPC types for transactions
 
 use crate::eth::other::OtherFields;
-pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
+pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U256, U8};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
@@ -16,7 +16,6 @@ pub use request::{TransactionInput, TransactionRequest};
 use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 
-mod access_list;
 mod blob;
 mod common;
 mod error;
@@ -157,7 +156,7 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
         };
         Ok(tx.into_signed(signature))
     }
@@ -177,7 +176,7 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?.into(),
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
         };
         Ok(tx.into_signed(signature))
     }
@@ -200,7 +199,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
             blob_versioned_hashes: tx.blob_versioned_hashes,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas

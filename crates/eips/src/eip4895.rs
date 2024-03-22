@@ -1,39 +1,28 @@
-//! Withdrawal type and serde helpers.
+//! [EIP-4895] Withdrawal type and serde helpers.
+//!
+//! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
-use alloy_serde::u64_hex;
-use serde::{Deserialize, Serialize};
 
 /// Multiplier for converting gwei to wei.
 pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 
 /// Withdrawal represents a validator withdrawal from the consensus layer.
-#[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    Default,
-    Hash,
-    RlpEncodable,
-    RlpDecodable,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Hash, RlpEncodable, RlpDecodable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Withdrawal {
     /// Monotonically increasing identifier issued by consensus layer.
-    #[serde(with = "u64_hex")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub index: u64,
     /// Index of validator associated with withdrawal.
-    #[serde(with = "u64_hex", rename = "validatorIndex")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex", rename = "validatorIndex"))]
     pub validator_index: u64,
     /// Target address for withdrawn ether.
     pub address: Address,
     /// Value of the withdrawal in gwei.
-    #[serde(with = "u64_hex")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub amount: u64,
 }
 
