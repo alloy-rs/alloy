@@ -2,9 +2,14 @@
 
 use crate::eth::other::OtherFields;
 pub use access_list::{AccessList, AccessListItem, AccessListWithGasUsed};
+use alloy_consensus::{
+    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
+    TxLegacy, TxType,
+};
 use alloy_primitives::{Address, Bytes, B256, U256, U8};
 pub use blob::BlobTransactionSidecar;
 pub use common::TransactionInfo;
+pub use error::ConversionError;
 pub use optimism::OptimismTransactionReceiptFields;
 pub use receipt::TransactionReceipt;
 pub use request::{TransactionInput, TransactionRequest};
@@ -12,14 +17,14 @@ use serde::{Deserialize, Serialize};
 pub use signature::{Parity, Signature};
 
 mod access_list;
+mod blob;
 mod common;
+mod error;
 pub mod kzg;
 pub mod optimism;
 mod receipt;
 pub mod request;
 mod signature;
-
-mod blob;
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,6 +116,122 @@ impl Transaction {
             blob_versioned_hashes: Some(self.blob_versioned_hashes),
             sidecar: None,
             other: OtherFields::default(),
+        }
+    }
+}
+
+impl TryFrom<Transaction> for Signed<TxLegacy> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+
+        let tx = TxLegacy {
+            chain_id: tx.chain_id,
+            nonce: tx.nonce,
+            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
+impl TryFrom<Transaction> for Signed<TxEip1559> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+
+        let tx = TxEip1559 {
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
+            nonce: tx.nonce,
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
+                .to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.unwrap_or_default().into(),
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
+impl TryFrom<Transaction> for Signed<TxEip2930> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+
+        let tx = TxEip2930 {
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
+            nonce: tx.nonce,
+            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.into(),
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?.into(),
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
+impl TryFrom<Transaction> for Signed<TxEip4844> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let tx = TxEip4844 {
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
+            nonce: tx.nonce,
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
+                .to(),
+            gas_limit: tx.gas.to(),
+            to: tx.to.ok_or(ConversionError::MissingTo)?,
+            value: tx.value,
+            input: tx.input,
+            access_list: tx.access_list.unwrap_or_default().into(),
+            blob_versioned_hashes: tx.blob_versioned_hashes,
+            max_fee_per_blob_gas: tx
+                .max_fee_per_blob_gas
+                .ok_or(ConversionError::MissingMaxFeePerBlobGas)?
+                .to(),
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
+impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let tx: Signed<TxEip4844> = tx.try_into()?;
+        let (inner, signature, _) = tx.into_parts();
+        let tx = TxEip4844Variant::TxEip4844(inner);
+
+        Ok(tx.into_signed(signature))
+    }
+}
+
+impl TryFrom<Transaction> for TxEnvelope {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        match tx.transaction_type.unwrap_or_default().to::<u8>().try_into()? {
+            TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
+            TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
+            TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
+            TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
         }
     }
 }

@@ -3,7 +3,7 @@
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, EstimatorFunction},
+    utils::{self, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcParam, RpcReturn};
@@ -30,7 +30,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use crate::utils::Eip1559Estimation;
+
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
 
@@ -566,7 +566,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
     /// let tx_hash = provider.send_transaction(tx)
     ///     .await?
-    ///     .with_confirmations(2)
+    ///     .with_required_confirmations(2)
     ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
     ///     .watch()
     ///     .await?;

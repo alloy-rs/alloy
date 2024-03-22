@@ -34,12 +34,13 @@ proptest-derive = { workspace = true }
 
 [features]
 default = ["std"]
-std = [
-    "alloy-primitives/std",
-    "alloy-rlp/std",
-
-    "serde/std",
-]
+std = ["alloy-primitives/std", "alloy-rlp/std", "serde/std"]
 serde = ["dep:serde", "alloy-primitives/serde"]
-arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+arbitrary = [
+    "std",
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+]
 kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]

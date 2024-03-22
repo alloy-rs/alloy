@@ -16,20 +16,25 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::format;
 
 use alloy_primitives::B256;
 use serde::Serializer;
 
 pub mod json_u256;
-pub use json_u256::JsonU256;
+pub use self::json_u256::JsonU256;
 
 /// Helpers for dealing with numbers.
 pub mod num;
-pub use num::*;
+pub use self::num::*;
 
 /// Storage related helpers.
 pub mod storage;
-pub use storage::JsonStorageKey;
+pub use self::storage::JsonStorageKey;
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
 ///
