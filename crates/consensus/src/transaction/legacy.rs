@@ -9,7 +9,13 @@ use std::mem;
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxLegacy {
     /// Added as EIP-155: Simple replay attack protection
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal_opt", skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            with = "alloy_serde::u64_hex_or_decimal_opt",
+            skip_serializing_if = "Option::is_none"
+        )
+    )]
     pub chain_id: Option<ChainId>,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
