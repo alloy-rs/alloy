@@ -43,4 +43,4 @@ arbitrary = [
     "dep:proptest",
     "alloy-primitives/arbitrary",
 ]
-kzg = ["dep:derive_more", "dep:c-kzg"]
+kzg = ["std", "dep:derive_more", "dep:c-kzg"]
