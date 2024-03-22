@@ -156,7 +156,7 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
         };
         Ok(tx.into_signed(signature))
     }
@@ -176,7 +176,7 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?.into(),
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
         };
         Ok(tx.into_signed(signature))
     }
@@ -199,7 +199,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             input: tx.input,
-            access_list: tx.access_list.unwrap_or_default().into(),
+            access_list: tx.access_list.unwrap_or_default(),
             blob_versioned_hashes: tx.blob_versioned_hashes,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
