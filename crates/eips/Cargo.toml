@@ -16,7 +16,7 @@ alloy-primitives = { workspace = true, features = ["rlp"], default-features = fa
 alloy-rlp = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true, optional = true }
 c-kzg = { version = "1.0", features = ["serde"], optional = true }
-once_cell = { workpace = true, optional = true }
+once_cell.workspace = true
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
@@ -43,4 +43,4 @@ arbitrary = [
     "dep:proptest",
     "alloy-primitives/arbitrary",
 ]
-kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg = ["dep:derive_more", "dep:c-kzg"]

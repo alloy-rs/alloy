@@ -1,18 +1,15 @@
 use core::fmt;
-use std::boxed::Box;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
+use std::boxed::Box;
 
-pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
 use alloy_primitives::hex;
-
-
+pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
 
 /// Number of G1 Points.
 pub const NUM_G1_POINTS: usize = 4096;
 
 /// Number of G2 Points.
 pub const NUM_G2_POINTS: usize = 65;
-
 
 /// A newtype over list of G1 point from kzg trusted setup.
 #[derive(Debug, Clone, PartialEq, AsRef, AsMut, Deref, DerefMut)]
@@ -35,7 +32,6 @@ impl Default for G2Points {
         Self([[0; BYTES_PER_G2_POINT]; NUM_G2_POINTS])
     }
 }
-
 
 /// Default G1 points.
 pub const G1_POINTS: &G1Points = {

@@ -1,9 +1,8 @@
+use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
+use c_kzg::KzgSettings;
 use core::hash::{Hash, Hasher};
 use once_cell::race::OnceBox;
 use std::{boxed::Box, sync::Arc};
-use c_kzg::KzgSettings;
-use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
-
 
 /// KZG Settings that allow us to specify a custom trusted setup.
 /// or use hardcoded default settings.
@@ -15,7 +14,6 @@ pub enum EnvKzgSettings {
     /// Custom trusted setup.
     Custom(Arc<KzgSettings>),
 }
-
 
 // Implement PartialEq and Hash manually because `c_kzg::KzgSettings` does not implement them
 impl PartialEq for EnvKzgSettings {

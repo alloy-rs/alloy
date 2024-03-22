@@ -2,13 +2,12 @@
 //!
 //! [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
 
-
-/// This module contains functions and types used for parsing and utilizing the [Trusted Setup]( https://ceremony.ethereum.org/) for the `KzgSettings`.
-#[cfg(feature = "kzg")]
-pub mod trusted_setup_points;
 /// Module houses the KZG settings, enabling Custom and Default
 #[cfg(feature = "kzg")]
 pub mod env_settings;
+/// This module contains functions and types used for parsing and utilizing the [Trusted Setup]( https://ceremony.ethereum.org/) for the `KzgSettings`.
+#[cfg(feature = "kzg")]
+pub mod trusted_setup_points;
 
 use alloy_primitives::{b256, FixedBytes, U256};
 

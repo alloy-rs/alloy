@@ -30,7 +30,6 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
 
