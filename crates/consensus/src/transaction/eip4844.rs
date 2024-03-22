@@ -9,7 +9,7 @@ use alloy_eips::{
     eip2930::AccessList,
     eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
 };
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use std::mem;
 
@@ -225,10 +225,11 @@ impl Transaction for TxEip4844Variant {
     }
 
     fn to(&self) -> TxKind {
-        match self {
+        let address = match self {
             TxEip4844Variant::TxEip4844(tx) => tx.to,
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to,
-        }
+        };
+        TxKind::Call(address)
     }
 
     fn value(&self) -> U256 {
@@ -316,9 +317,8 @@ pub struct TxEip4844 {
     ///
     /// This is also known as `GasTipCap`
     pub max_priority_fee_per_gas: u128,
-    /// The 160-bit address of the message call’s recipient or, for a contract creation
-    /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
-    pub to: TxKind,
+    /// The 160-bit address of the message call’s recipient.
+    pub to: Address,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
     /// in the case of contract creation, as an endowment
@@ -505,7 +505,7 @@ impl TxEip4844 {
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
+        mem::size_of::<Address>() + // to
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() +  // input
@@ -660,7 +660,7 @@ impl Transaction for TxEip4844 {
     }
 
     fn to(&self) -> TxKind {
-        self.to
+        TxKind::Call(self.to)
     }
 
     fn value(&self) -> U256 {
@@ -1040,7 +1040,7 @@ mod tests {
     use crate::{SignableTransaction, TxEnvelope};
     #[cfg(not(feature = "kzg"))]
     use alloy_eips::eip4844::{Blob, Bytes48};
-    use alloy_primitives::{Signature, TxKind, U256};
+    use alloy_primitives::{Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
     #[cfg(feature = "kzg")]
     use c_kzg::{Blob, Bytes48};
@@ -1055,7 +1055,7 @@ mod tests {
             max_priority_fee_per_gas: 1,
             max_fee_per_gas: 1,
             gas_limit: 1,
-            to: TxKind::Call(Default::default()),
+            to: Default::default(),
             value: U256::from(1),
             access_list: Default::default(),
             blob_versioned_hashes: vec![Default::default()],

@@ -211,7 +211,7 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .max_priority_fee_per_gas
             .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?
             .to(),
-        to: request.to.into(),
+        to: request.to.ok_or_else(|| TransactionBuilderError::MissingKey("to"))?,
         value: request.value.unwrap_or_default(),
         access_list: convert_access_list(request.access_list.unwrap_or_default()),
         blob_versioned_hashes: request

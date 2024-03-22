@@ -40,12 +40,13 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = [
-    "alloy-primitives/std",
-    "alloy-rlp/std",
-
-    "serde/std",
-]
+std = ["alloy-primitives/std", "alloy-rlp/std", "serde/std"]
 serde = ["dep:serde", "alloy-primitives/serde"]
+arbitrary = [
+    "std",
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz", "std"]
-arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
