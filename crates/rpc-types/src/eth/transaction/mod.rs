@@ -188,7 +188,6 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
-
         let tx = TxEip4844 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
@@ -198,7 +197,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
                 .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
                 .to(),
             gas_limit: tx.gas.to(),
-            to: tx.to.into(),
+            to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             input: tx.input,
             access_list: tx.access_list.unwrap_or_default().into(),

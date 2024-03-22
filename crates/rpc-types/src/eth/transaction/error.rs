@@ -17,6 +17,8 @@ pub enum ConversionError {
     MissingMaxFeePerBlobGas,
     #[error("missing `chainId` field for EIP-155 transaction")]
     MissingChainId,
+    #[error("missing `to` field for EIP-4844 transaction")]
+    MissingTo,
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
     #[error(transparent)]
