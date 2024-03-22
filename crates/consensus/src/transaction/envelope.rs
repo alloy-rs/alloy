@@ -42,9 +42,8 @@ impl TryFrom<u8> for TxType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Err(Eip2718Error::UnexpectedType(value)),
             // SAFETY: repr(u8) with explicit discriminant
-            1..=3 => Ok(unsafe { std::mem::transmute(value) }),
+            0..=3 => Ok(unsafe { std::mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }

@@ -20,3 +20,12 @@ serde.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
+
+[features]
+default = ["std"]
+std = [
+    "alloy-primitives/std",
+    "alloy-serde/std",
+    # serde
+    "serde/std",
+]

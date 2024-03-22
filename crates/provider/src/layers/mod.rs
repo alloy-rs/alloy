@@ -7,3 +7,6 @@ pub use signer::{SignerLayer, SignerProvider};
 
 mod nonce;
 pub use nonce::{ManagedNonceLayer, ManagedNonceProvider};
+
+mod gas;
+pub use gas::{GasEstimatorLayer, GasEstimatorProvider};

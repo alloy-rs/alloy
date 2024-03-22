@@ -15,6 +15,7 @@ use std::{
 };
 use tempfile::tempdir;
 use thiserror::Error;
+use url::Url;
 
 /// How long we will wait for geth to indicate that it is ready.
 const GETH_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
@@ -74,6 +75,16 @@ impl GethInstance {
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
         format!("ws://localhost:{}", self.port)
+    }
+
+    /// Returns the HTTP endpoint url of this instance
+    pub fn endpoint_url(&self) -> Url {
+        Url::parse(&self.endpoint()).unwrap()
+    }
+
+    /// Returns the Websocket endpoint url of this instance
+    pub fn ws_endpoint_url(&self) -> Url {
+        Url::parse(&self.ws_endpoint()).unwrap()
     }
 
     /// Returns the path to this instances' IPC socket

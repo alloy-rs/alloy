@@ -16,6 +16,11 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
+use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
@@ -24,7 +29,6 @@ use alloy_serde::{
     storage::deserialize_storage_map,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// The genesis block specification.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -52,7 +56,7 @@ pub struct Genesis {
     /// The genesis header coinbase address.
     pub coinbase: Address,
     /// The initial state of accounts in the genesis block.
-    pub alloc: HashMap<Address, GenesisAccount>,
+    pub alloc: BTreeMap<Address, GenesisAccount>,
     // NOTE: the following fields:
     // * base_fee_per_gas
     // * excess_blob_gas
@@ -102,7 +106,7 @@ impl Genesis {
         };
 
         // fund account
-        let mut alloc = HashMap::new();
+        let mut alloc = BTreeMap::default();
         alloc.insert(
             signer_addr,
             GenesisAccount {
@@ -226,7 +230,7 @@ pub struct GenesisAccount {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "deserialize_storage_map"
     )]
-    pub storage: Option<HashMap<B256, B256>>,
+    pub storage: Option<BTreeMap<B256, B256>>,
     /// The account's private key. Should only be used for testing.
     #[serde(rename = "secretKey", default, skip_serializing_if = "Option::is_none")]
     pub private_key: Option<B256>,
@@ -252,7 +256,7 @@ impl GenesisAccount {
     }
 
     /// Set the storage.
-    pub fn with_storage(mut self, storage: Option<HashMap<B256, B256>>) -> Self {
+    pub fn with_storage(mut self, storage: Option<BTreeMap<B256, B256>>) -> Self {
         self.storage = storage;
         self
     }
@@ -538,8 +542,9 @@ pub struct CliqueConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use alloy_primitives::hex;
-    use std::str::FromStr;
+    use core::str::FromStr;
 
     #[test]
     fn test_genesis() {
@@ -555,7 +560,7 @@ mod tests {
         let coinbase = hex!("265873b6faf3258b3ab0827805386a2a20ed040e").into();
         // create dummy account
         let first_address: Address = hex!("7618a8c597b89e01c66a1f662078992c52a30c9a").into();
-        let mut account = HashMap::default();
+        let mut account = BTreeMap::default();
         account.insert(first_address, GenesisAccount::default());
 
         // check values updated
@@ -587,10 +592,10 @@ mod tests {
             nonce: Some(1),
             balance: U256::from(1),
             code: Some(Bytes::from(b"code")),
-            storage: Some(HashMap::default()),
+            storage: Some(BTreeMap::default()),
             private_key: None,
         };
-        let mut updated_account = HashMap::default();
+        let mut updated_account = BTreeMap::default();
         updated_account.insert(same_address, new_alloc_account);
         let custom_genesis = custom_genesis.extend_accounts(updated_account.clone());
         assert_ne!(account, updated_account);
@@ -598,7 +603,7 @@ mod tests {
 
         // add second account
         let different_address = hex!("94e0681e3073dd71cec54b53afe988f39078fd1a").into();
-        let more_accounts = HashMap::from([(different_address, GenesisAccount::default())]);
+        let more_accounts = BTreeMap::from([(different_address, GenesisAccount::default())]);
         let custom_genesis = custom_genesis.extend_accounts(more_accounts);
         assert_eq!(custom_genesis.alloc.len(), 2);
 
@@ -619,7 +624,7 @@ mod tests {
         let code = Some(Bytes::from(b"code"));
         let root = hex!("9474ddfcea39c5a690d2744103e39d1ff1b03d18db10fc147d970ad24699395a").into();
         let value = hex!("58eb8294d9bb16832a9dabfcb270fff99ab8ee1d8764e4f3d9fdf59ec1dee469").into();
-        let mut map = HashMap::default();
+        let mut map = BTreeMap::default();
         map.insert(root, value);
         let storage = Some(map);
 
@@ -1054,7 +1059,7 @@ mod tests {
             .get(&Address::from_str("0000000000000000000000000000000000000314").unwrap())
             .expect("missing account for parsed genesis");
         let storage = alloc_entry.storage.as_ref().expect("missing storage for parsed genesis");
-        let expected_storage = HashMap::from_iter(vec![
+        let expected_storage = BTreeMap::from_iter(vec![
             (
                 B256::from_str(
                     "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -1162,7 +1167,7 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
-                alloc: HashMap::from_iter(vec![
+                alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
                     GenesisAccount {
@@ -1190,7 +1195,7 @@ mod tests {
                         balance: U256::from_str("0x21").unwrap(),
                         nonce: None,
                         code: None,
-                        storage: Some(HashMap::from_iter(vec![
+                        storage: Some(BTreeMap::from_iter(vec![
                             (
 
     B256::from_str("0x0000000000000000000000000000000000000000000000000000000000000001").
