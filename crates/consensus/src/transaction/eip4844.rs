@@ -11,14 +11,13 @@ use alloy_eips::{
 };
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use sha2::{Digest, Sha256};
 use std::mem;
 
 #[cfg(not(feature = "kzg"))]
 use alloy_eips::eip4844::{Blob, Bytes48};
 #[cfg(feature = "kzg")]
 use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
-#[cfg(feature = "kzg")]
-use sha2::Digest;
 #[cfg(feature = "kzg")]
 use std::ops::Deref;
 
@@ -409,7 +408,7 @@ impl TxEip4844 {
             let commitment = KzgCommitment::from(*commitment.deref());
 
             // calculate & verify versioned hash
-            let calculated_versioned_hash = kzg_to_versioned_hash(commitment);
+            let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
                 return Err(BlobTransactionValidationError::WrongVersionedHash {
                     have: *versioned_hash,
@@ -929,6 +928,17 @@ impl BlobTransactionSidecar {
         Self { blobs, commitments, proofs }
     }
 
+    /// Returns an iterator over the versioned hashes of the commitments.
+    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
+        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+
+    /// Returns the versioned hash for the blob at the given index, if it
+    /// exists.
+    pub fn versioned_hash_for_blob(&self, blob_index: usize) -> Option<B256> {
+        self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
+    }
+
     /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
     ///
     /// This encodes the fields in the following order:
@@ -959,7 +969,7 @@ impl BlobTransactionSidecar {
     #[inline]
     pub fn size(&self) -> usize {
         self.blobs.len() * BYTES_PER_BLOB + // blobs
-        self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
+        self.commitments.len() * BYTES_PER_COMMITMENT + //   commitments
         self.proofs.len() * BYTES_PER_PROOF // proofs
     }
 }
@@ -1024,12 +1034,12 @@ impl BlobTransactionSidecarRlp {
     }
 }
 
-#[cfg(feature = "kzg")]
 /// Calculates the versioned hash for a KzgCommitment
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
-pub(crate) fn kzg_to_versioned_hash(commitment: KzgCommitment) -> B256 {
-    let mut res = sha2::Sha256::digest(commitment.as_slice());
+pub(crate) fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
+    debug_assert_eq!(commitment.len(), 48, "commitment length is not 48");
+    let mut res = Sha256::digest(commitment);
     res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
     B256::new(res.into())
 }
