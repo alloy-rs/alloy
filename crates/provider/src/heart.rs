@@ -1,6 +1,7 @@
 //! Block heartbeat and pending transaction watcher.
 
 use crate::{Provider, RootProvider};
+use alloy_json_rpc::RpcError;
 use alloy_network::Network;
 use alloy_primitives::{B256, U256};
 use alloy_rpc_types::Block;
@@ -182,7 +183,8 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
         let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
         let hash = pending_tx.await?;
         let receipt = self.provider.get_transaction_receipt(hash).await?;
-        receipt.ok_or_else(TransportErrorKind::missing_receipt)
+
+        receipt.ok_or(RpcError::NullResp)
     }
 }
 
