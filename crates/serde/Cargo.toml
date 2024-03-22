@@ -15,15 +15,10 @@ exclude.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 # serde
 serde = { workspace = true }
-serde_json = { workspace = true, default-features = false, features = ["alloc"] }
+serde_json = { workspace = true, features = ["alloc"] }
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = [
-  "rand",
-  "rlp",
-  "serde",
-  "arbitrary",
-] }
+alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
 
 [features]
 default = ["std"]
