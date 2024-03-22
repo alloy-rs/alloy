@@ -762,18 +762,17 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> TransportResult<Eip1559Estimation> {
-        let (bf, fh) = futures::join!(
+        let (bf, fee_history) = futures::try_join!(
             self.get_block_by_number(BlockNumberOrTag::Latest, false),
             self.get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
-        );
+        )?;
 
         let base_fee_per_gas =
-            bf?.ok_or(RpcError::NullResp)?.header.base_fee_per_gas.ok_or(RpcError::NullResp)?;
-        let fee_history = fh?;
+            bf.ok_or(RpcError::NullResp)?.header.base_fee_per_gas.ok_or(RpcError::NullResp)?;
 
         Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
             base_fee_per_gas,
