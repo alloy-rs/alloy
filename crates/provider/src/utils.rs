@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use alloy_json_rpc::RpcError;
 use alloy_primitives::U256;
-use alloy_transport::TransportErrorKind;
+use alloy_transport::{Authorization, TransportErrorKind};
 use reqwest::Url;
 use std::{net::SocketAddr, path::Path};
 
@@ -57,22 +57,33 @@ pub fn eip1559_default_estimator(
     Eip1559Estimation { max_fee_per_gas: potential_max_fee, max_priority_fee_per_gas }
 }
 
+/// Extracts the authorization information from the given URL.
+pub fn extract_auth_info(url: Url) -> Option<Authorization> {
+    if url.has_authority() {
+        let username = url.username();
+        let pass = url.password().unwrap_or_default();
+        Some(Authorization::basic(username, pass))
+    } else {
+        None
+    }
+}
+
 /// Identifies the intended transport type from the given string.
 pub fn parse_str_to_tranport_type(s: &str) -> Result<String, RpcError<TransportErrorKind>> {
-    // Parse if string is a socket address e.g. "127.0.0.1:8545"
-    let s = s.parse::<SocketAddr>().ok().map_or_else(|| s.to_string(), |s| format!("http://{}", s));
-
+    if s.parse::<SocketAddr>().is_ok() {
+        return Ok(format!("http://{}", s));
+    }
     // Check if s is a path and it exists
     let path = Path::new(&s);
-    if path.exists() && path.is_file() {
+    if path.is_file() {
         // IPC if it exists
-        return Ok(s);
+        return Ok(s.to_string());
     }
 
     // Parse the URL or return an error
-    Url::parse(&s).map_err(|e| TransportErrorKind::custom_str(e.to_string().as_str()))?;
+    Url::parse(s).map_err(TransportErrorKind::custom)?;
 
-    Ok(s)
+    Ok(s.to_string())
 }
 
 /// The built-in transport types.

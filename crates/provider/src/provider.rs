@@ -3,7 +3,7 @@
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
+    utils::{self, extract_auth_info, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -20,9 +20,7 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{
-    Authorization, BoxTransport, Transport, TransportErrorKind, TransportResult,
-};
+use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
 use alloy_transport_ipc::IpcConnect;
 use alloy_transport_ws::WsConnect;
@@ -79,30 +77,22 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
         let boxed_client = match BuiltInTransportType::from_str(conn_str) {
             Ok(BuiltInTransportType::Http(conn_str)) => {
-                RpcClient::new_http(reqwest::Url::parse(&conn_str).unwrap()).boxed()
+                let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
+                RpcClient::new_http(url).boxed()
             }
             Ok(BuiltInTransportType::Ws(conn_str)) => {
                 // Extract auth info if any
-                let url = reqwest::Url::parse(&conn_str).unwrap();
-                let auth = if url.has_authority() {
-                    let username = url.username();
-                    let pass = url.password().unwrap_or_default();
-                    Some(Authorization::basic(username, pass))
-                } else {
-                    None
-                };
+                let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
+                let auth = extract_auth_info(url);
 
                 let ws = WsConnect::with_auth(conn_str, auth);
-
                 let ws_client = RpcClient::connect_pubsub(ws).await?;
-
                 ws_client.boxed()
             }
             Ok(BuiltInTransportType::Ipc(conn_str)) => {
                 let ipc = IpcConnect::new(conn_str);
 
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
-
                 ipc_client.boxed()
             }
             Err(err) => return Err(err),
