@@ -310,6 +310,43 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.root().get_subscription(id).await
     }
 
+    /// Subscribe to a stream of logs matching given filter.
+    ///
+    /// # Errors
+    ///
+    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
+    /// client does not support it.
+    ///
+    /// For a polling alternative available over HTTP, use
+    /// [`Provider::watch_logs`]. However, be aware that polling increases
+    /// RPC usage drastically.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider<alloy_network::Ethereum>) -> Result<(), Box<dyn std::error::Error>> {
+    /// use futures::StreamExt;
+    /// use alloy_primitives::keccak256;
+    /// use alloy_rpc_types::Filter;
+    ///
+    /// let signature = keccak256("Transfer(address,address,uint256)".as_bytes());
+    ///
+    /// let sub = provider.subscribe_logs(&Filter::new().event_signature(signature)).await?;
+    /// let mut stream = sub.into_stream().take(5);
+    /// while let Some(tx) = stream.next().await {
+    ///    println!("{tx:#?}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_logs(&self, filter: &Filter) -> TransportResult<Subscription<Log>> {
+        self.root().pubsub_frontend()?;
+        let id = self.client().request("eth_subscribe", ("logs", filter)).await?;
+        self.root().get_subscription(id).await
+    }
+
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]

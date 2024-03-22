@@ -26,10 +26,15 @@ futures-util.workspace = true
 futures.workspace = true
 thiserror.workspace = true
 
+alloy-pubsub = { workspace = true, optional = true }
+
 [dev-dependencies]
-alloy-rpc-client.workspace = true
+alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
 alloy-transport-http.workspace = true
 alloy-node-bindings.workspace = true
 test-utils.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+pubsub = ["alloy-provider/pubsub", "dep:alloy-pubsub"]
