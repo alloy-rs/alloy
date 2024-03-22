@@ -81,9 +81,9 @@ pub enum BuiltInTransportType {
     /// HTTP transport.
     Http(String),
     /// WebSocket transport.
-    Ws,
+    Ws(String),
     /// IPC transport.
-    Ipc,
+    Ipc(String),
 }
 
 impl FromStr for BuiltInTransportType {
@@ -95,9 +95,9 @@ impl FromStr for BuiltInTransportType {
         if s.starts_with("http://") || s.starts_with("https://") {
             Ok(BuiltInTransportType::Http(s.to_string()))
         } else if s.starts_with("ws://") || s.starts_with("wss://") {
-            Ok(BuiltInTransportType::Ws)
+            Ok(BuiltInTransportType::Ws(s.to_string()))
         } else {
-            Ok(BuiltInTransportType::Ipc)
+            Ok(BuiltInTransportType::Ipc(s.to_string()))
         }
     }
 }

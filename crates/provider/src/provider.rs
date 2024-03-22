@@ -81,9 +81,9 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
             Ok(BuiltInTransportType::Http(conn_str)) => {
                 RpcClient::new_http(reqwest::Url::parse(&conn_str).unwrap()).boxed()
             }
-            Ok(BuiltInTransportType::Ws) => {
+            Ok(BuiltInTransportType::Ws(conn_str)) => {
                 // Extract auth info if any
-                let url = reqwest::Url::parse(conn_str).unwrap();
+                let url = reqwest::Url::parse(&conn_str).unwrap();
                 let auth = if url.has_authority() {
                     let username = url.username();
                     let pass = url.password().unwrap_or_default();
@@ -98,8 +98,8 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 
                 ws_client.boxed()
             }
-            Ok(BuiltInTransportType::Ipc) => {
-                let ipc = IpcConnect::new(conn_str.to_string());
+            Ok(BuiltInTransportType::Ipc(conn_str)) => {
+                let ipc = IpcConnect::new(conn_str);
 
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
 
