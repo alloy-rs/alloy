@@ -1,6 +1,6 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use c_kzg::KzgSettings;
-use core::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher};
 use once_cell::race::OnceBox;
 use std::{boxed::Box, sync::Arc};
 
