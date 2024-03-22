@@ -48,13 +48,6 @@ impl AccessList {
     }
 }
 
-impl From<AccessList> for alloy_eips::eip2930::AccessList {
-    fn from(value: AccessList) -> Self {
-        // SAFETY: Same repr and size
-        unsafe { std::mem::transmute(value) }
-    }
-}
-
 /// Access list with gas used appended.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]

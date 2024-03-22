@@ -60,19 +60,6 @@ where
     }
 }
 
-impl TryFrom<Signature> for alloy_primitives::Signature {
-    type Error = alloy_primitives::SignatureError;
-
-    fn try_from(value: Signature) -> Result<Self, Self::Error> {
-        let parity = if let Some(y_parity) = value.y_parity {
-            alloy_primitives::Parity::Parity(y_parity.0)
-        } else {
-            value.v.to::<u64>().try_into()?
-        };
-        alloy_primitives::Signature::from_rs_and_parity(value.r, value.s, parity)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
