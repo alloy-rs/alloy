@@ -1038,7 +1038,7 @@ impl BlobTransactionSidecarRlp {
 ///
 /// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
 pub(crate) fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
-    debug_assert!(commitment.len() == 48, "commitment length is not 48");
+    debug_assert_eq!(commitment.len(), 48, "commitment length is not 48");
     let mut res = Sha256::digest(commitment);
     res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
     B256::new(res.into())
