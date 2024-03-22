@@ -12,6 +12,10 @@ pub enum RpcError<E, ErrResp = Box<RawValue>> {
     #[error("server returned a null response when a non-null response was expected")]
     NullResp,
 
+    /// Rpc server returned an unsupported feature.
+    #[error("unsupported feature: {0}")]
+    UnsupportedFeature(&'static str),
+
     /// JSON serialization error.
     #[error("serialization error: {0}")]
     SerError(

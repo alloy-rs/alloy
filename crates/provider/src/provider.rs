@@ -771,8 +771,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
             )
         )?;
 
-        let base_fee_per_gas =
-            bf.ok_or(RpcError::NullResp)?.header.base_fee_per_gas.ok_or(RpcError::NullResp)?;
+        let base_fee_per_gas = bf
+            .ok_or(RpcError::NullResp)?
+            .header
+            .base_fee_per_gas
+            .ok_or(RpcError::UnsupportedFeature("eip1559"))?;
 
         Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
             base_fee_per_gas,

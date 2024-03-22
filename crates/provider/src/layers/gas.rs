@@ -123,7 +123,7 @@ where
                 tx.set_max_priority_fee_per_gas(eip1559_fees.max_priority_fee_per_gas);
                 Ok(())
             }
-            Err(RpcError::NullResp) => self.handle_legacy_tx(tx).await,
+            Err(RpcError::UnsupportedFeature("eip1559")) => self.handle_legacy_tx(tx).await,
             Err(e) => Err(e),
         }
     }
