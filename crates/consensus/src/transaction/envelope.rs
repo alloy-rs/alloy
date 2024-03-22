@@ -481,7 +481,7 @@ mod tests {
             max_fee_per_gas: 50_000_000_000,
             max_priority_fee_per_gas: 1_000_000_000_000,
             gas_limit: 1_000_000,
-            to: TxKind::Create,
+            to: Address::random(),
             value: U256::from(10e18),
             input: Bytes::new(),
             access_list: AccessList(vec![AccessListItem {
@@ -500,7 +500,7 @@ mod tests {
                 max_fee_per_gas: 50_000_000_000,
                 max_priority_fee_per_gas: 1_000_000_000_000,
                 gas_limit: 1_000_000,
-                to: TxKind::Create,
+                to: Address::random(),
                 value: U256::from(10e18),
                 input: Bytes::new(),
                 access_list: AccessList(vec![AccessListItem {

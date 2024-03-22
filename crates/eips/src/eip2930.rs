@@ -48,7 +48,6 @@ impl AccessListItem {
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccessList(
     #[cfg_attr(
         all(any(test, feature = "arbitrary"), feature = "std"),
