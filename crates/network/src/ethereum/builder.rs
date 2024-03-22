@@ -170,7 +170,7 @@ fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuild
         to: request.to.into(),
         value: request.value.unwrap_or_default(),
         input: request.input.into_input().unwrap_or_default(),
-        access_list: convert_access_list(request.access_list.unwrap_or_default()),
+        access_list: request.access_list.unwrap_or_default(),
     })
 }
 
@@ -190,7 +190,7 @@ fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuild
         to: request.to.into(),
         value: request.value.unwrap_or_default(),
         input: request.input.into_input().unwrap_or_default(),
-        access_list: convert_access_list(request.access_list.unwrap_or_default()),
+        access_list: request.access_list.unwrap_or_default(),
     })
 }
 
@@ -213,7 +213,7 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .to(),
         to: request.to.ok_or_else(|| TransactionBuilderError::MissingKey("to"))?,
         value: request.value.unwrap_or_default(),
-        access_list: convert_access_list(request.access_list.unwrap_or_default()),
+        access_list: request.access_list.unwrap_or_default(),
         blob_versioned_hashes: request
             .blob_versioned_hashes
             .ok_or_else(|| TransactionBuilderError::MissingKey("blob_versioned_hashes"))?,
@@ -223,17 +223,4 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .to(),
         input: request.input.into_input().unwrap_or_default(),
     })
-}
-
-// todo: these types are almost 1:1, minus rlp decoding and ser/de, should dedupe
-fn convert_access_list(list: alloy_rpc_types::AccessList) -> alloy_eips::eip2930::AccessList {
-    alloy_eips::eip2930::AccessList(
-        list.0
-            .into_iter()
-            .map(|item| alloy_eips::eip2930::AccessListItem {
-                address: item.address,
-                storage_keys: item.storage_keys,
-            })
-            .collect(),
-    )
 }
