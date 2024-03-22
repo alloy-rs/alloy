@@ -30,7 +30,7 @@ proptest-derive = { workspace = true }
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "serde/std"]
+std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std"]
 serde = ["dep:serde", "alloy-primitives/serde"]
 arbitrary = [
     "std",
