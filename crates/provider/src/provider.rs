@@ -587,7 +587,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         rlp_bytes: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
-        let rlp_hex = hex::encode(rlp_bytes);
+        let rlp_hex = hex::encode_prefixed(rlp_bytes);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
