@@ -1,6 +1,7 @@
 use crate::{
     utils::Eip1559Estimation, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
 };
+use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::U256;
 use alloy_transport::{Transport, TransportError, TransportResult};
@@ -122,16 +123,8 @@ where
                 tx.set_max_priority_fee_per_gas(eip1559_fees.max_priority_fee_per_gas);
                 Ok(())
             }
-            Err(err) => {
-                if err.is_transport_error()
-                    && err.to_string() == *"EIP-1559 not activated".to_string()
-                {
-                    // If EIP-1559 is not activated, it will process as a legacy tx.
-                    self.handle_legacy_tx(tx).await
-                } else {
-                    Err(err)
-                }
-            }
+            Err(RpcError::NullResp) => self.handle_legacy_tx(tx).await,
+            Err(e) => Err(e),
         }
     }
 
