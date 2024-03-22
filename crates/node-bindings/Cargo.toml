@@ -12,10 +12,10 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["k256", "serde"] }
+alloy-primitives = { workspace = true, features = ["std", "k256", "serde"] }
 alloy-genesis.workspace = true
 k256.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["std"] }
 tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
