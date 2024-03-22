@@ -108,10 +108,10 @@ tempfile = "3.10"
 
 # TODO: Remove eventually.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "907d61a45a9135e979310990744080eef5f03fe5" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
