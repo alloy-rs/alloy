@@ -38,7 +38,7 @@ impl<S> SignerLayer<S> {
 
 impl<P, N, T, S> ProviderLayer<P, N, T> for SignerLayer<S>
 where
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
     N: Network,
     T: Transport + Clone,
     S: NetworkSigner<N> + Clone,
@@ -59,12 +59,12 @@ where
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`SignerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignerProvider<N, T, P, S>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     inner: P,
     signer: S,
@@ -77,7 +77,7 @@ impl<N, T, P, S> Provider<N, T> for SignerProvider<N, T, P, S>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
     S: NetworkSigner<N>,
 {
     #[inline]

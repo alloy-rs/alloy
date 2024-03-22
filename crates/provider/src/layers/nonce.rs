@@ -41,7 +41,7 @@ pub struct ManagedNonceLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for ManagedNonceLayer
 where
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
     N: Network,
     T: Transport + Clone,
 {
@@ -69,7 +69,7 @@ pub struct ManagedNonceProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     inner: P,
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
@@ -80,9 +80,15 @@ impl<N, T, P> ManagedNonceProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
-    async fn get_next_nonce(&self, from: Address) -> TransportResult<u64> {
+    /// Creates a new ManagedNonceProvider.
+    pub(crate) fn new(inner: P) -> Self {
+        Self { inner, nonces: DashMap::default(), _phantom: PhantomData }
+    }
+
+    /// Gets the next nonce for the given account.
+    pub async fn get_next_nonce(&self, from: Address) -> TransportResult<u64> {
         // locks dashmap internally for a short duration to clone the `Arc`
         let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
 
@@ -109,7 +115,7 @@ impl<N, T, P> Provider<N, T> for ManagedNonceProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     #[inline]
     fn root(&self) -> &RootProvider<N, T> {

@@ -7,9 +7,9 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
+pub trait ProviderLayer<P: Provider<N, T> + Clone, N: Network, T: Transport + Clone> {
     /// The provider constructed by this layer.
-    type Provider: Provider<N, T>;
+    type Provider: Provider<N, T> + Clone;
 
     /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
@@ -23,7 +23,7 @@ impl<P, N, T> ProviderLayer<P, N, T> for Identity
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     type Provider = P;
 
@@ -50,7 +50,7 @@ impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<Inner, Outer>
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
     Inner: ProviderLayer<P, N, T>,
     Outer: ProviderLayer<Inner::Provider, N, T>,
 {
@@ -128,7 +128,7 @@ impl<L, N> ProviderBuilder<L, N> {
     pub fn provider<P, T>(self, provider: P) -> L::Provider
     where
         L: ProviderLayer<P, N, T>,
-        P: Provider<N, T>,
+        P: Provider<N, T> + Clone,
         T: Transport + Clone,
         N: Network,
     {

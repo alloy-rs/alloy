@@ -44,7 +44,7 @@ pub struct GasEstimatorLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for GasEstimatorLayer
 where
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
     N: Network,
     T: Transport + Clone,
 {
@@ -67,7 +67,7 @@ pub struct GasEstimatorProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     inner: P,
     _phantom: PhantomData<(N, T)>,
@@ -77,8 +77,13 @@ impl<N, T, P> GasEstimatorProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
+    /// Creates a new GasEstimatorProvider.
+    pub(crate) const fn new(inner: P) -> Self {
+        Self { inner, _phantom: PhantomData }
+    }
+
     /// Gets the gas_price to be used in legacy txs.
     async fn get_gas_price(&self) -> TransportResult<U256> {
         self.inner.get_gas_price().await
@@ -97,7 +102,7 @@ where
     /// Populates the gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields if unset.
     /// Requires the chain_id to be set in the transaction request to be processed as a EIP-1559 tx.
     /// If the network does not support EIP-1559, it will process it as a legacy tx.
-    async fn handle_eip1559_tx(
+    pub async fn handle_eip1559_tx(
         &self,
         tx: &mut N::TransactionRequest,
     ) -> Result<(), TransportError> {
@@ -130,7 +135,10 @@ where
 
     /// Populates the gas_price and only populates the gas_limit field if unset.
     /// This method always assumes that the gas_price is unset.
-    async fn handle_legacy_tx(&self, tx: &mut N::TransactionRequest) -> Result<(), TransportError> {
+    pub async fn handle_legacy_tx(
+        &self,
+        tx: &mut N::TransactionRequest,
+    ) -> Result<(), TransportError> {
         let gas_price_fut = self.get_gas_price();
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
@@ -154,7 +162,7 @@ impl<N, T, P> Provider<N, T> for GasEstimatorProvider<N, T, P>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     fn root(&self) -> &RootProvider<N, T> {
         self.inner.root()
