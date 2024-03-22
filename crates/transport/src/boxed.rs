@@ -85,14 +85,11 @@ impl Service<RequestPacket> for BoxTransport {
 #[cfg(test)]
 mod test {
     use super::*;
-    /// checks trait + send + sync + 'static
+
+    // checks trait + send + sync + 'static
     fn __compile_check() {
-        fn inner<T: CloneTransport>(_: Option<T>) {
-            todo!()
-        }
-        fn inner_2<T: Transport>(_: Option<T>) {
-            todo!()
-        }
+        fn inner<T: CloneTransport>(_: Option<T>) {}
+        fn inner_2<T: Transport>(_: Option<T>) {}
         inner::<BoxTransport>(None);
         inner::<BoxTransport>(None);
     }

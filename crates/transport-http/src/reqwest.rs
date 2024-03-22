@@ -7,7 +7,7 @@ use tower::Service;
 
 impl Http<reqwest::Client> {
     /// Make a request.
-    fn request(&self, req: RequestPacket) -> TransportFut<'static> {
+    fn request_reqwest(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         Box::pin(async move {
             let resp = this
@@ -40,7 +40,7 @@ impl Service<RequestPacket> for Http<reqwest::Client> {
 
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request(req)
+        self.request_reqwest(req)
     }
 }
 
@@ -57,6 +57,6 @@ impl Service<RequestPacket> for &Http<reqwest::Client> {
 
     #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request(req)
+        self.request_reqwest(req)
     }
 }

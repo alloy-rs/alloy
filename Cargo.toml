@@ -69,7 +69,9 @@ futures-util = "0.3"
 futures-executor = "0.3"
 futures-utils-wasm = "0.1"
 
-hyper = "0.14"
+hyper = { version = "1.2", default-features = false }
+hyper-util = "0.1"
+http-body-util = "0.1"
 tokio = "1"
 tokio-util = "0.7"
 tokio-stream = "0.1"
@@ -88,7 +90,7 @@ itertools = "0.12"
 once_cell = { version = "1.19", default-features = false }
 pin-project = "1.1"
 rand = "0.8"
-reqwest = { version = "0.11", default-features = false }
+reqwest = { version = "0.12", default-features = false }
 semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"

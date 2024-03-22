@@ -21,6 +21,13 @@ use url::Url;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper;
 
+/// A [`hyper`](::hyper) HTTP client.
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+pub type HyperClient = hyper_util::client::legacy::Client<
+    hyper_util::client::legacy::connect::HttpConnector,
+    http_body_util::Full<::hyper::body::Bytes>,
+>;
+
 #[cfg(feature = "reqwest")]
 mod reqwest;
 
@@ -33,8 +40,8 @@ mod reqwest;
 /// [`Transport`]: alloy_transport::Transport
 ///
 /// Currently supported clients are:
-#[cfg_attr(feature = "reqwest", doc = " - [`::reqwest::Client`]")]
-#[cfg_attr(feature = "hyper", doc = " - [`::hyper::client::Client`]")]
+#[cfg_attr(feature = "reqwest", doc = " - [`reqwest`](::reqwest::Client)")]
+#[cfg_attr(feature = "hyper", doc = " - [`hyper`](hyper_util::client::legacy::Client)")]
 #[derive(Debug, Clone)]
 pub struct Http<T> {
     client: T,

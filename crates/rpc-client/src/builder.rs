@@ -60,15 +60,16 @@ impl<L> ClientBuilder<L> {
         self.transport(transport, is_local)
     }
 
-    /// Convenience function to create a new [`RpcClient`] with a [`hyper`]
-    /// HTTP transport.
+    /// Convenience function to create a new [`RpcClient`] with a `hyper` HTTP transport.
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
-        L: Layer<alloy_transport_http::Http<hyper::client::Client<hyper::client::HttpConnector>>>,
+        L: Layer<alloy_transport_http::Http<alloy_transport_http::HyperClient>>,
         L::Service: Transport,
     {
-        let transport = alloy_transport_http::Http::new(url);
+        let executor = hyper_util::rt::TokioExecutor::new();
+        let client = hyper_util::client::legacy::Client::builder(executor).build_http();
+        let transport = alloy_transport_http::Http::with_client(client, url);
         let is_local = transport.guess_local();
 
         self.transport(transport, is_local)
