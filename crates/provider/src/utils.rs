@@ -10,10 +10,10 @@ pub const EIP1559_BASE_FEE_MULTIPLIER: f64 = 2.0;
 pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 
 /// An estimator function for EIP1559 fees.
-pub type EstimatorFunction = fn(U256, &[Vec<U256>]) -> (U256, U256);
+pub type EstimatorFunction = fn(U256, &[Vec<U256>]) -> Eip1559Estimation;
 
 /// Return type of EIP1155 gas fee estimator.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Eip1559Estimation {
     /// The base fee per gas.
     pub max_fee_per_gas: U256,
@@ -42,10 +42,14 @@ fn estimate_priority_fee(rewards: &[Vec<U256>]) -> U256 {
 
 /// The default EIP-1559 fee estimator which is based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56)
 /// (constants for "medium" priority level are used)
-pub fn eip1559_default_estimator(base_fee_per_gas: U256, rewards: &[Vec<U256>]) -> (U256, U256) {
+pub fn eip1559_default_estimator(
+    base_fee_per_gas: U256,
+    rewards: &[Vec<U256>],
+) -> Eip1559Estimation {
     let max_priority_fee_per_gas = estimate_priority_fee(rewards);
     let potential_max_fee = base_fee_per_gas * U256::from(EIP1559_BASE_FEE_MULTIPLIER);
-    (potential_max_fee, max_priority_fee_per_gas)
+
+    Eip1559Estimation { max_fee_per_gas: potential_max_fee, max_priority_fee_per_gas }
 }
 
 #[cfg(test)]
@@ -88,7 +92,10 @@ mod tests {
         ];
         assert_eq!(
             super::eip1559_default_estimator(base_fee_per_gas, &rewards),
-            (U256::from(2_000_000_000_u64), U256::from(200_000_000_000_u64))
+            Eip1559Estimation {
+                max_fee_per_gas: U256::from(2_000_000_000_u64),
+                max_priority_fee_per_gas: U256::from(200_000_000_000_u64)
+            }
         );
     }
 }
