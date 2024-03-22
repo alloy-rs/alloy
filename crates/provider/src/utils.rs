@@ -161,19 +161,19 @@ mod tests {
         );
         assert_eq!(
             BuiltInTransportType::from_str("ws://localhost:8545").unwrap(),
-            BuiltInTransportType::Ws
+            BuiltInTransportType::Ws("ws://localhost:8545".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("wss://localhost:8545").unwrap(),
-            BuiltInTransportType::Ws
+            BuiltInTransportType::Ws("wss://localhost:8545".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("ipc:///tmp/reth.ipc").unwrap(),
-            BuiltInTransportType::Ipc
+            BuiltInTransportType::Ipc("ipc:///tmp/reth.ipc".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("localhost:8545").unwrap(),
-            BuiltInTransportType::Ipc
+            BuiltInTransportType::Ipc("localhost:8545".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("http://127.0.0.1:8545").unwrap(),
@@ -181,7 +181,7 @@ mod tests {
         );
         assert_eq!(
             BuiltInTransportType::from_str("ws://127.0.0.1:8545").unwrap(),
-            BuiltInTransportType::Ws
+            BuiltInTransportType::Ws("ws://127.0.0.1:8545".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("http://localhost").unwrap(),
@@ -193,11 +193,11 @@ mod tests {
         );
         assert_eq!(
             BuiltInTransportType::from_str("file:///tmp/reth.ipc").unwrap(),
-            BuiltInTransportType::Ipc
+            BuiltInTransportType::Ipc("file:///tmp/reth.ipc".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("/tmp/reth.ipc").unwrap(),
-            BuiltInTransportType::Ipc
+            BuiltInTransportType::Ipc("/tmp/reth.ipc".to_string())
         );
         assert_eq!(
             BuiltInTransportType::from_str("http://user:pass@example.com").unwrap(),
