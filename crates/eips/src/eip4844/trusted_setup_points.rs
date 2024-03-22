@@ -37,7 +37,7 @@ impl Default for G2Points {
 }
 
 
-// Default G1 points.
+/// Default G1 points.
 pub const G1_POINTS: &G1Points = {
     const BYTES: &[u8] = include_bytes!("./g1_points.bin");
     assert!(BYTES.len() == core::mem::size_of::<G1Points>());
@@ -101,7 +101,8 @@ pub fn parse_kzg_trusted_setup(
     Ok((g1_points, g2_points))
 }
 
-#[derive(Debug)]
+/// KZG custom Error types
+#[derive(Debug, Clone, Copy)]
 pub enum KzgErrors {
     /// Failed to get current directory.
     FailedCurrentDirectory,
