@@ -705,9 +705,19 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().request("eth_accounts", ()).await
     }
 
-    /// Gets the current gas price.
+    /// Gets the current gas price in wei.
     async fn get_gas_price(&self) -> TransportResult<U256> {
         self.client().request("eth_gasPrice", ()).await
+    }
+
+    /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
+    async fn get_max_priority_fee_per_gas(&self) -> TransportResult<U256> {
+        self.client().request("eth_maxPriorityFeePerGas", ()).await
+    }
+
+    /// Returns the base fee per blob gas (blob gas price) in wei.
+    async fn get_blob_base_fee(&self) -> TransportResult<U256> {
+        self.client().request("eth_blobBaseFee", ()).await
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -716,17 +726,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         hash: TxHash,
     ) -> TransportResult<Option<N::ReceiptResponse>> {
         self.client().request("eth_getTransactionReceipt", (hash,)).await
-    }
-
-    /// Returns a collection of historical gas information [FeeHistory] which
-    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
-    async fn get_fee_history(
-        &self,
-        block_count: U256,
-        last_block: BlockNumberOrTag,
-        reward_percentiles: &[f64],
-    ) -> TransportResult<FeeHistory> {
-        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
@@ -776,6 +775,17 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         state: StateOverride,
     ) -> TransportResult<Bytes> {
         self.client().request("eth_call", (tx, block.unwrap_or_default(), state)).await
+    }
+
+    /// Returns a collection of historical gas information [FeeHistory] which
+    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
+    async fn get_fee_history(
+        &self,
+        block_count: U256,
+        last_block: BlockNumberOrTag,
+        reward_percentiles: &[f64],
+    ) -> TransportResult<FeeHistory> {
+        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Estimate the gas needed for a transaction.
@@ -1306,6 +1316,14 @@ mod tests {
             receipt.transaction_hash,
             b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95")
         );
+    }
+
+    #[tokio::test]
+    async fn gets_max_priority_fee_per_gas() {
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil();
+
+        let _fee = provider.get_max_priority_fee_per_gas().await.unwrap();
     }
 
     #[tokio::test]
