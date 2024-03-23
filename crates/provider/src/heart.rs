@@ -209,7 +209,7 @@ pub struct PendingTransactionConfig {
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
     pub const fn new(tx_hash: B256) -> Self {
-        Self { tx_hash, required_confirmations: 0, timeout: None }
+        Self { tx_hash, required_confirmations: 1, timeout: None }
     }
 
     /// Returns the transaction hash.
@@ -445,7 +445,7 @@ impl<S> Heartbeat<S> {
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
             self.waiting_confs
-                .entry(*block_height + U256::from(confirmations) + U256::from(1))
+                .entry(*block_height + U256::from(confirmations) - U256::from(1))
                 .or_default()
                 .push(watcher);
         }
