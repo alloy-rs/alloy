@@ -438,14 +438,14 @@ impl<S> Heartbeat<S> {
         for watcher in to_check {
             // If `confirmations` is 0 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;
-            if confirmations == 0 {
+            if confirmations <= 1 {
                 watcher.notify();
                 continue;
             }
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
             self.waiting_confs
-                .entry(*block_height + U256::from(confirmations))
+                .entry(*block_height + U256::from(confirmations) + U256::from(1))
                 .or_default()
                 .push(watcher);
         }
