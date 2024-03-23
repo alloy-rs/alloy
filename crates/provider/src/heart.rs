@@ -384,7 +384,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
     fn check_confirmations(&mut self, current_height: &U256) {
-        let to_keep = self.waiting_confs.split_off(current_height);
+        let to_keep = self.waiting_confs.split_off(&(current_height + U256::from(1)));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
             watcher.notify();
