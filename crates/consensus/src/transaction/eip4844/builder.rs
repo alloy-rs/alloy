@@ -343,9 +343,8 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     #[cfg(feature = "kzg")]
     pub fn build_with_settings(
         self,
-        settings: &crate::EnvKzgSettings,
+        settings: &c_kzg::KzgSettings,
     ) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
-        let settings = settings.get();
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
@@ -362,7 +361,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     /// settings.
     #[cfg(feature = "kzg")]
     pub fn build(self) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
-        self.build_with_settings(&crate::EnvKzgSettings::Default)
+        self.build_with_settings(crate::EnvKzgSettings::Default.get())
     }
 
     /// Take the blobs from the builder, without committing them to a KZG proof.
