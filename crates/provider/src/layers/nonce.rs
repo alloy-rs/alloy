@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .layer(ManagedNonceLayer)
+///     .with_nonce_management()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///

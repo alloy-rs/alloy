@@ -32,8 +32,8 @@ use std::marker::PhantomData;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .layer(ManagedNonceLayer)
-///     .layer(GasEstimatorLayer)
+///     .with_nonce_management()
+///     .with_gas_estimation()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///
