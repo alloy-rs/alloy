@@ -30,5 +30,5 @@ tokio = { workspace = true, features = ["macros"] }
 
 [features]
 k256 = ["alloy-primitives/k256"]
-kzg = ["dep:c-kzg", "dep:thiserror"]
+kzg = ["dep:c-kzg", "dep:thiserror", "alloy-eips/kzg"]
 arbitrary = ["dep:arbitrary", "alloy-eips/arbitrary"]
