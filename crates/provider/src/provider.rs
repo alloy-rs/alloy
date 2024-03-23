@@ -26,7 +26,6 @@ use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,
 };
-use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
@@ -34,6 +33,9 @@ use std::{
     marker::PhantomData,
     sync::{Arc, OnceLock},
 };
+
+#[cfg(feature = "http")]
+use alloy_transport_http::Http;
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
@@ -62,6 +64,7 @@ impl<N, T: fmt::Debug> fmt::Debug for RootProvider<N, T> {
     }
 }
 
+#[cfg(feature = "http")]
 impl<N: Network> RootProvider<N, Http<reqwest::Client>> {
     /// Creates a new HTTP root provider from the given URL.
     pub fn new_http(url: reqwest::Url) -> Self {
