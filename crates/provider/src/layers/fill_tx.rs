@@ -76,14 +76,11 @@ where
             async { self.gas_estimation_provider.handle_legacy_tx(tx).await }.right_future()
         };
 
-        match futures::try_join!(chain_id_fut, nonce_fut, gas_estimation_fut) {
-            Ok((chain_id, nonce, _)) => {
-                tx.set_chain_id(chain_id);
-                tx.set_nonce(nonce);
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        let (chain_id, nonce, _) = futures::try_join!(chain_id_fut, nonce_fut, gas_estimation_fut)?;
+
+        tx.set_chain_id(chain_id);
+        tx.set_nonce(nonce);
+        Ok(())
     }
 }
 
