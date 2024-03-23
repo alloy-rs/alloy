@@ -436,7 +436,7 @@ impl<S> Heartbeat<S> {
         let to_check =
             block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
         for watcher in to_check {
-            // If `confirmations` is 0 we can notify the watcher immediately.
+            // If `confirmations` is not more than 1 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;
             if confirmations <= 1 {
                 watcher.notify();
