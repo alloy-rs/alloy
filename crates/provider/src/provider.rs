@@ -980,6 +980,7 @@ mod tests {
     // NOTE: We cannot import the test-utils crate here due to a circular dependency.
     include!("../../internal-test-utils/src/providers.rs");
 
+    #[cfg(feature = "http")]
     #[tokio::test]
     async fn object_safety() {
         init_tracing();

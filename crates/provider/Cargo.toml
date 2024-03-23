@@ -47,6 +47,11 @@ tracing-subscriber = { workspace = true, features = ["fmt"] }
 [features]
 default = ["http"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
-http = ["dep:alloy-transport-http", "dep:reqwest"]
+http = [
+    "dep:reqwest",
+    "dep:alloy-transport-http",
+    "alloy-transport-http/reqwest",
+    "alloy-rpc-client/reqwest",
+]
 ws = ["pubsub", "alloy-rpc-client/ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc"]
