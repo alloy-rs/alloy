@@ -96,6 +96,7 @@ where
     }
 }
 
+#[cfg(feature = "http")]
 #[cfg(test)]
 mod tests {
     use crate::{Provider, ProviderBuilder, RootProvider};

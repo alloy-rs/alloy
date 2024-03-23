@@ -15,11 +15,19 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_transport_http::Http;
-use reqwest::Client as ReqwestClient;
+#[cfg(feature = "http")]
+mod http {
+    use alloy_transport_http::Http;
+    use reqwest::Client as ReqwestClient;
 
-/// Type alias for a [`RootProvider`] using the [`Http`] transport.
-pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+    use crate::RootProvider;
+
+    /// Type alias for a [`RootProvider`] using the [`Http`] transport.
+    pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+}
+
+#[cfg(feature = "http")]
+pub use http::*;
 
 #[macro_use]
 extern crate tracing;
