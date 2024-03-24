@@ -30,16 +30,16 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.input.input = Some(input);
     }
 
-    fn to(&self) -> Option<alloy_primitives::TxKind> {
-        self.to.map(TxKind::Call).or(Some(TxKind::Create))
-    }
-
     fn from(&self) -> Option<Address> {
         self.from
     }
 
     fn set_from(&mut self, from: Address) {
         self.from = Some(from);
+    }
+
+    fn to(&self) -> Option<alloy_primitives::TxKind> {
+        self.to.map(TxKind::Call).or(Some(TxKind::Create))
     }
 
     fn set_to(&mut self, to: alloy_primitives::TxKind) {
@@ -98,29 +98,7 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
     }
 
     fn build_unsigned(self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
-        match (
-            self.gas_price.as_ref(),
-            self.max_fee_per_gas.as_ref(),
-            self.access_list.as_ref(),
-            self.max_fee_per_blob_gas.as_ref(),
-            self.blob_versioned_hashes.as_ref(),
-            self.sidecar.as_ref(),
-        ) {
-            // Legacy transaction
-            (Some(_), None, None, None, None, None) => build_legacy(self).map(Into::into),
-            // EIP-2930
-            // If only accesslist is set, and there are no EIP-1559 fees
-            (_, None, Some(_), None, None, None) => build_2930(self).map(Into::into),
-            // EIP-1559
-            // If EIP-4844 fields are missing
-            (None, _, _, None, None, None) => build_1559(self).map(Into::into),
-            // EIP-4844
-            // All blob fields required
-            (None, _, _, Some(_), Some(_), Some(_)) => {
-                build_4844(self).map(TxEip4844Variant::from).map(Into::into)
-            }
-            _ => build_legacy(self).map(Into::into),
-        }
+        build_unsigned::<Ethereum>(self)
     }
 
     async fn build<S: NetworkSigner<Ethereum>>(
@@ -128,6 +106,37 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         signer: &S,
     ) -> BuilderResult<<Ethereum as Network>::TxEnvelope> {
         Ok(signer.sign_transaction(self.build_unsigned()?).await?)
+    }
+}
+
+/// Build an unsigned transaction
+pub(crate) fn build_unsigned<N>(request: TransactionRequest) -> BuilderResult<N::UnsignedTx>
+where
+    N: Network,
+    N::UnsignedTx: From<TxLegacy> + From<TxEip1559> + From<TxEip2930> + From<TxEip4844Variant>,
+{
+    match (
+        request.gas_price.as_ref(),
+        request.max_fee_per_gas.as_ref(),
+        request.access_list.as_ref(),
+        request.max_fee_per_blob_gas.as_ref(),
+        request.blob_versioned_hashes.as_ref(),
+        request.sidecar.as_ref(),
+    ) {
+        // Legacy transaction
+        (Some(_), None, None, None, None, None) => build_legacy(request).map(Into::into),
+        // EIP-2930
+        // If only accesslist is set, and there are no EIP-1559 fees
+        (_, None, Some(_), None, None, None) => build_2930(request).map(Into::into),
+        // EIP-1559
+        // If EIP-4844 fields are missing
+        (None, _, _, None, None, None) => build_1559(request).map(Into::into),
+        // EIP-4844
+        // All blob fields required
+        (None, _, _, Some(_), Some(_), Some(_)) => {
+            build_4844(request).map(TxEip4844Variant::from).map(Into::into)
+        }
+        _ => build_legacy(request).map(Into::into),
     }
 }
 

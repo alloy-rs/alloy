@@ -1,7 +1,7 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{
-    eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Transaction,
+    eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Extra, Transaction,
 };
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
 use serde::{Deserialize, Serialize};
@@ -78,6 +78,12 @@ impl Hash for TransactionRequest {
             k.hash(state);
             v.to_string().hash(state);
         }
+    }
+}
+
+impl Default for Extra<TransactionRequest> {
+    fn default() -> Self {
+        Extra::new(TransactionRequest::default())
     }
 }
 
