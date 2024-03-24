@@ -1,4 +1,7 @@
-use crate::{layers::SignerLayer, Provider, RootProvider};
+use crate::{
+    layers::{GasEstimatorLayer, ManagedNonceLayer, SignerLayer},
+    Provider, RootProvider,
+};
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::RpcClient;
 use alloy_transport::Transport;
@@ -109,6 +112,27 @@ impl<L, N> ProviderBuilder<L, N> {
     /// See [`SignerLayer`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, N> {
         self.layer(SignerLayer::new(signer))
+    }
+
+    /// Add gas estimation to the stack being built.
+    ///
+    /// See [`GasEstimatorLayer`]
+    pub fn with_gas_estimation(self) -> ProviderBuilder<Stack<GasEstimatorLayer, L>, N> {
+        self.layer(GasEstimatorLayer)
+    }
+
+    /// Add nonce management to the stack being built.
+    ///
+    /// See [`ManagedNonceLayer`]
+    pub fn with_nonce_management(self) -> ProviderBuilder<Stack<ManagedNonceLayer, L>, N> {
+        self.layer(ManagedNonceLayer)
+    }
+
+    /// Add preconfigured set of layers handling gas estimation and nonce management
+    pub fn with_recommended_layers(
+        self,
+    ) -> ProviderBuilder<Stack<ManagedNonceLayer, Stack<GasEstimatorLayer, L>>, N> {
+        self.with_gas_estimation().with_nonce_management()
     }
 
     /// Change the network.
