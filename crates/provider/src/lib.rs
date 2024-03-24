@@ -18,12 +18,11 @@
 #[cfg(feature = "http")]
 mod http {
     use alloy_transport_http::Http;
-    use reqwest::Client as ReqwestClient;
 
     use crate::RootProvider;
 
     /// Type alias for a [`RootProvider`] using the [`Http`] transport.
-    pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+    pub type HttpProvider<N> = RootProvider<N, Http<reqwest::Client>>;
 }
 
 #[cfg(feature = "http")]
