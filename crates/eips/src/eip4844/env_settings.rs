@@ -1,9 +1,7 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
+use alloc::sync::Arc;
 use c_kzg::KzgSettings;
-use std::{
-    hash::{Hash, Hasher},
-    sync::{Arc, OnceLock},
-};
+use core::hash::{Hash, Hasher};
 
 /// KZG settings.
 #[derive(Debug, Clone, Default, Eq)]
@@ -44,11 +42,23 @@ impl EnvKzgSettings {
     pub fn get(&self) -> &KzgSettings {
         match self {
             Self::Default => {
-                static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
-                DEFAULT.get_or_init(|| {
+                let load = || {
                     KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
                         .expect("failed to load default trusted setup")
-                })
+                };
+                #[cfg(feature = "std")]
+                {
+                    use once_cell as _;
+                    use std::sync::OnceLock;
+                    static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
+                    DEFAULT.get_or_init(load)
+                }
+                #[cfg(not(feature = "std"))]
+                {
+                    use once_cell::race::OnceBox;
+                    static DEFAULT: OnceBox<KzgSettings> = OnceBox::new();
+                    DEFAULT.get_or_init(|| alloc::boxed::Box::new(load()))
+                }
             }
             Self::Custom(settings) => settings,
         }

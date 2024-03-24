@@ -21,7 +21,8 @@ serde = { workspace = true, default-features = false, optional = true }
 
 # kzg
 derive_more = { workspace = true, optional = true }
-c-kzg = { workspace = true, features = ["std"], optional = true }
+c-kzg = { workspace = true, optional = true }
+once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
 
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
@@ -41,9 +42,9 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std"]
+std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std", "c-kzg?/std", "once_cell?/std"]
 serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
-kzg = ["std", "dep:derive_more", "dep:c-kzg"]
+kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
 arbitrary = [
     "std",
