@@ -98,11 +98,20 @@ impl Transaction {
     /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
     /// part of [Transaction].
     pub fn into_request(self) -> TransactionRequest {
+        let gas_price = match (self.gas_price, self.max_fee_per_gas) {
+            (Some(gas_price), None) => Some(gas_price),
+            // EIP-1559 transactions include deprecated `gasPrice` field displaying gas used by
+            // transaction.
+            // Setting this field for resulted tx request will result in it being invalid
+            (_, Some(_)) => None,
+            // unreachable
+            (None, None) => None,
+        };
         TransactionRequest {
             from: Some(self.from),
             to: self.to,
             gas: Some(self.gas),
-            gas_price: self.gas_price,
+            gas_price,
             value: Some(self.value),
             input: self.input.into(),
             nonce: Some(self.nonce),
@@ -333,5 +342,29 @@ mod tests {
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
+    }
+
+    #[test]
+    fn into_request_legacy() {
+        // cast rpc eth_getTransactionByHash
+        // 0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e --rpc-url mainnet
+        let rpc_tx = r#"{"blockHash":"0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e","blockNumber":"0xf4240","hash":"0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e","transactionIndex":"0x1","type":"0x0","nonce":"0x43eb","input":"0x","r":"0x3b08715b4403c792b8c7567edea634088bedcd7f60d9352b1f16c69830f3afd5","s":"0x10b9afb67d2ec8b956f0e1dbc07eb79152904f3a7bf789fc869db56320adfe09","chainId":"0x0","v":"0x1c","gas":"0xc350","from":"0x32be343b94f860124dc4fee278fdcbd38c102d88","to":"0xdf190dc7190dfba737d7777a163445b7fff16133","value":"0x6113a84987be800","gasPrice":"0xdf8475800"}"#;
+
+        let tx = serde_json::from_str::<Transaction>(rpc_tx).unwrap();
+        let request = tx.into_request();
+        assert!(request.gas_price.is_some());
+        assert!(request.max_fee_per_gas.is_none());
+    }
+
+    #[test]
+    fn into_request_eip1559() {
+        // cast rpc eth_getTransactionByHash
+        // 0x0e07d8b53ed3d91314c80e53cf25bcde02084939395845cbb625b029d568135c --rpc-url mainnet
+        let rpc_tx = r#"{"blockHash":"0x883f974b17ca7b28cb970798d1c80f4d4bb427473dc6d39b2a7fe24edc02902d","blockNumber":"0xe26e6d","hash":"0x0e07d8b53ed3d91314c80e53cf25bcde02084939395845cbb625b029d568135c","accessList":[],"transactionIndex":"0xad","type":"0x2","nonce":"0x16d","input":"0x5ae401dc00000000000000000000000000000000000000000000000000000000628ced5b000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000e442712a6700000000000000000000000000000000000000000000b3ff1489674e11c40000000000000000000000000000000000000000000000000000004a6ed55bbcc18000000000000000000000000000000000000000000000000000000000000000800000000000000000000000003cf412d970474804623bb4e3a42de13f9bca54360000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000003a75941763f31c930b19c041b709742b0b31ebb600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000412210e8a00000000000000000000000000000000000000000000000000000000","r":"0x7f2153019a74025d83a73effdd91503ceecefac7e35dd933adc1901c875539aa","s":"0x334ab2f714796d13c825fddf12aad01438db3a8152b2fe3ef7827707c25ecab3","chainId":"0x1","v":"0x0","gas":"0x46a02","maxPriorityFeePerGas":"0x59682f00","from":"0x3cf412d970474804623bb4e3a42de13f9bca5436","to":"0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45","maxFeePerGas":"0x7fc1a20a8","value":"0x4a6ed55bbcc180","gasPrice":"0x50101df3a"}"#;
+
+        let tx = serde_json::from_str::<Transaction>(rpc_tx).unwrap();
+        let request = tx.into_request();
+        assert!(request.gas_price.is_none());
+        assert!(request.max_fee_per_gas.is_some());
     }
 }
