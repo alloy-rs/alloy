@@ -71,7 +71,7 @@ pub struct Transaction {
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt")]
     pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP2930
     ///
