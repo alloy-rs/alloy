@@ -1,5 +1,6 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use c_kzg::KzgSettings;
+use once_cell::sync::Lazy;
 use std::{
     hash::{Hash, Hasher},
     sync::Arc,
@@ -67,3 +68,11 @@ impl EnvKzgSettings {
         }
     }
 }
+
+/// KZG trusted setup
+pub static MAINNET_KZG_TRUSTED_SETUP: Lazy<Arc<KzgSettings>> = Lazy::new(|| {
+    Arc::new(
+        KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
+            .expect("failed to load trusted setup"),
+    )
+});
