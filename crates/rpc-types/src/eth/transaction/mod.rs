@@ -71,8 +71,8 @@ pub struct Transaction {
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt")]
     pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub blob_versioned_hashes: Vec<B256>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP2930
     ///
     /// Pre-pay to warm storage access.
@@ -121,7 +121,7 @@ impl Transaction {
             max_fee_per_gas: self.max_fee_per_gas,
             max_priority_fee_per_gas: self.max_priority_fee_per_gas,
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,
-            blob_versioned_hashes: Some(self.blob_versioned_hashes),
+            blob_versioned_hashes: self.blob_versioned_hashes,
             sidecar: None,
             other: OtherFields::default(),
         }
@@ -209,7 +209,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             value: tx.value,
             input: tx.input,
             access_list: tx.access_list.unwrap_or_default(),
-            blob_versioned_hashes: tx.blob_versioned_hashes,
+            blob_versioned_hashes: tx.blob_versioned_hashes.unwrap_or_default(),
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
                 .ok_or(ConversionError::MissingMaxFeePerBlobGas)?
