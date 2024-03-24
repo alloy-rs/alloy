@@ -51,5 +51,5 @@ arbitrary = [
     "dep:proptest",
     "alloy-primitives/arbitrary",
 ]
-kzg = ["std", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg = ["std", "dep:derive_more", "dep:c-kzg", "dep:once_cell", "once_cell/std"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz", "std"]
