@@ -57,6 +57,7 @@ ethereum_ssz_derive = "0.5"
 ethereum_ssz = "0.5"
 
 # crypto
+c-kzg = { version = "1.0", default-features = false }
 elliptic-curve = { version = "0.13", default-features = false }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 sha2 = { version = "0.10", default-features = false }
