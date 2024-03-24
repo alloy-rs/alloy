@@ -23,6 +23,3 @@ mod eth;
 
 pub use alloy_serde as serde_helpers;
 pub use eth::*;
-
-mod extra;
-pub use extra::Extra;

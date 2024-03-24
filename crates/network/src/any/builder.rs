@@ -1,13 +1,13 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_primitives::U256;
-use alloy_rpc_types::TransactionRequest;
+use alloy_rpc_types::{other::WithOtherFields, TransactionRequest};
 
 use crate::{ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder};
 
-use super::{AnyNetwork, Extra};
+use super::AnyNetwork;
 
-impl TransactionBuilder<AnyNetwork> for Extra<TransactionRequest> {
+impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
         self.deref().chain_id()
     }

@@ -114,7 +114,6 @@ impl Transaction {
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,
             blob_versioned_hashes: Some(self.blob_versioned_hashes),
             sidecar: None,
-            other: OtherFields::default(),
         }
     }
 }

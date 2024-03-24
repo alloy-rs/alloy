@@ -1,8 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{
-    eth::transaction::AccessList, other::OtherFields, BlobTransactionSidecar, Extra, Transaction,
-};
+use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -52,9 +50,6 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Support for arbitrary additional fields.
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
 impl Hash for TransactionRequest {
@@ -74,16 +69,6 @@ impl Hash for TransactionRequest {
         self.transaction_type.hash(state);
         self.blob_versioned_hashes.hash(state);
         self.sidecar.hash(state);
-        for (k, v) in self.other.iter() {
-            k.hash(state);
-            v.to_string().hash(state);
-        }
-    }
-}
-
-impl Default for Extra<TransactionRequest> {
-    fn default() -> Self {
-        Extra::new(TransactionRequest::default())
     }
 }
 
@@ -261,6 +246,8 @@ pub struct TransactionInputError;
 
 #[cfg(test)]
 mod tests {
+    use crate::other::WithOtherFields;
+
     use super::*;
     use alloy_primitives::b256;
 
@@ -300,7 +287,7 @@ mod tests {
     #[test]
     fn serde_tx_request_additional_fields() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02","sourceHash":"0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a"}"#;
-        let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
+        let req = serde_json::from_str::<WithOtherFields<TransactionRequest>>(s).unwrap();
         assert_eq!(
             req.other.get_deserialized::<B256>("sourceHash").unwrap().unwrap(),
             b256!("bf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
