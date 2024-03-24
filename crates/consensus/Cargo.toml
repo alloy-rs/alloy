@@ -15,9 +15,12 @@ exclude.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-eips.workspace = true
-thiserror = { workspace = true, optional = true }
-c-kzg = { workspace = true, features = ["serde"], optional = true }
+
 sha2 = "0.10"
+
+# kzg
+thiserror = { workspace = true, optional = true }
+c-kzg = { workspace = true, features = ["std", "serde"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
