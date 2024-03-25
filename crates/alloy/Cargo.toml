@@ -98,11 +98,11 @@ contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
 ## providers
 providers = ["dep:alloy-provider"]
 provider-http = ["providers", "transport-http"]
-provider-ws = ["providers", "transport-ws"]
-provider-ipc = ["providers", "transport-ipc"]
+provider-ws = ["providers", "alloy-provider?/pubsub", "transport-ws"]
+provider-ipc = ["providers", "alloy-provider?/pubsub", "transport-ipc"]
 
 ## pubsub
-pubsub = ["dep:alloy-pubsub"]
+pubsub = ["dep:alloy-pubsub", "alloy-provider?/pubsub"]
 
 ## rpc
 rpc = []
