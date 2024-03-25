@@ -16,14 +16,15 @@ use std::mem;
 
 #[cfg(not(feature = "kzg"))]
 use alloy_eips::eip4844::{Blob, Bytes48};
+
 #[cfg(feature = "kzg")]
 use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
 #[cfg(feature = "kzg")]
 use std::ops::Deref;
 
-#[cfg(feature = "kzg")]
 /// An error that can occur when validating a [TxEip4844Variant].
 #[derive(Debug, thiserror::Error)]
+#[cfg(feature = "kzg")]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     #[error("invalid KZG proof")]
@@ -111,10 +112,10 @@ impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
 }
 
 impl TxEip4844Variant {
-    #[cfg(feature = "kzg")]
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
+    #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
         proof_settings: &KzgSettings,
@@ -771,10 +772,10 @@ impl TxEip4844WithSidecar {
         Self { tx, sidecar }
     }
 
-    #[cfg(feature = "kzg")]
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
+    #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
         proof_settings: &KzgSettings,
@@ -1089,10 +1090,12 @@ pub(crate) fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{SignableTransaction, TxEnvelope};
-    #[cfg(not(feature = "kzg"))]
-    use alloy_eips::eip4844::{Blob, Bytes48};
     use alloy_primitives::{Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
+
+    #[cfg(not(feature = "kzg"))]
+    use alloy_eips::eip4844::{Blob, Bytes48};
+
     #[cfg(feature = "kzg")]
     use c_kzg::{Blob, Bytes48};
 

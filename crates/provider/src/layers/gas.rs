@@ -32,8 +32,8 @@ use std::marker::PhantomData;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .layer(ManagedNonceLayer)
-///     .layer(GasEstimatorLayer)
+///     .with_nonce_management()
+///     .with_gas_estimation()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///
@@ -181,7 +181,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{layers::ManagedNonceLayer, ProviderBuilder};
+    use crate::ProviderBuilder;
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, U128};
@@ -199,8 +199,8 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
-            .layer(GasEstimatorLayer)
+            .with_nonce_management()
+            .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
@@ -233,8 +233,8 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
-            .layer(GasEstimatorLayer)
+            .with_nonce_management()
+            .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
@@ -265,8 +265,8 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
-            .layer(GasEstimatorLayer)
+            .with_nonce_management()
+            .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 

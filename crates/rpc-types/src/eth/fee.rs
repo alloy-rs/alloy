@@ -62,3 +62,23 @@ pub struct FeeHistory {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reward: Option<Vec<Vec<U256>>>,
 }
+
+impl FeeHistory {
+    /// Returns the base fee of the next block.
+    pub fn next_block_base_fee(&self) -> Option<U256> {
+        self.base_fee_per_gas.last().copied()
+    }
+
+    /// Returns the blob base fee of the next block.
+    ///
+    /// If the next block is pre- EIP-4844, this will return `None`.
+    pub fn next_blob_base_fee(&self) -> Option<U256> {
+        self.base_fee_per_blob_gas
+            .last()
+            .filter(|fee| {
+                // skip zero value that is returned for pre-EIP-4844 blocks
+                !fee.is_zero()
+            })
+            .copied()
+    }
+}
