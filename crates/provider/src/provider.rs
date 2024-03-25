@@ -1,9 +1,11 @@
 //! Ethereum JSON-RPC provider.
 
+#[cfg(feature = "ws")]
+use crate::utils::extract_auth_info;
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, extract_auth_info, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
+    utils::{self, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -22,7 +24,9 @@ use alloy_rpc_types::{
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use alloy_transport_http::Http;
+#[cfg(feature = "ipc")]
 use alloy_transport_ipc::IpcConnect;
+#[cfg(feature = "ws")]
 use alloy_transport_ws::WsConnect;
 use serde_json::value::RawValue;
 use std::{
@@ -80,6 +84,7 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
                 let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
                 RpcClient::new_http(url).boxed()
             }
+            #[cfg(feature = "ws")]
             Ok(BuiltInTransportType::Ws(conn_str)) => {
                 // Extract auth info if any
                 let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
@@ -89,11 +94,19 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
                 let ws_client = RpcClient::connect_pubsub(ws).await?;
                 ws_client.boxed()
             }
+            #[cfg(not(feature = "ws"))]
+            Ok(BuiltInTransportType::Ws(_)) => {
+                return Err(TransportErrorKind::pubsub_unavailable().into());
+            }
+            #[cfg(feature = "ipc")]
             Ok(BuiltInTransportType::Ipc(conn_str)) => {
                 let ipc = IpcConnect::new(conn_str);
-
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
                 ipc_client.boxed()
+            }
+            #[cfg(not(feature = "ws"))]
+            Ok(BuiltInTransportType::Ipc(_)) => {
+                return Err(TransportErrorKind::pubsub_unavailable().into());
             }
             Err(err) => return Err(err),
         };
