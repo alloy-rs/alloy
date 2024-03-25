@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_primitives::U256;
-use alloy_rpc_types::{other::WithOtherFields, TransactionRequest};
+use alloy_rpc_types::{TransactionRequest, WithOtherFields};
 
 use crate::{ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder};
 
