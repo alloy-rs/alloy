@@ -1,8 +1,9 @@
 //! Contains types related to the Inclusion lists that will be used by in the engine API RPC
 //! definitions.
 
-use alloy_primitives::{Address, B256, U64};
+use alloy_primitives::{Address, B256};
 use alloy_rpc_engine_types::PayloadStatusEnum;
+use alloy_serde::u64_hex;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
 
@@ -82,7 +83,8 @@ pub struct InclusionListSummaryEntryV1 {
     /// The address of the inclusion list entry.
     pub address: Address,
     /// The nonce of the inclusion list entry.
-    pub nonce: U64,
+    #[serde(with = "u64_hex")]
+    pub nonce: u64,
 }
 
 impl fmt::Display for InclusionListSummaryEntryV1 {
@@ -106,9 +108,11 @@ impl fmt::Display for InclusionListSummaryEntryV1 {
 #[serde(rename_all = "camelCase")]
 pub struct InclusionListSummaryV1 {
     /// The slot of the inclusion list summary.
-    pub slot: U64,
+    #[serde(with = "u64_hex")]
+    pub slot: u64,
     /// The proposer index of the inclusion list summary.
-    pub proposer_index: U64,
+    #[serde(with = "u64_hex")]
+    pub proposer_index: u64,
     /// The parent hash of the inclusion list summary.
     pub parent_hash: B256,
     /// The summary of the inclusion list summary.
@@ -135,11 +139,11 @@ mod tests {
     fn inclusion_list_entry_v1_serialization() {
         let entry = InclusionListSummaryEntryV1 {
             address: Address::from_hex("0x0000000000000000000000000000000000000042").unwrap(),
-            nonce: U64::from(42),
+            nonce: 42,
         };
         let json = json!({
             "address": "0x0000000000000000000000000000000000000042",
-            "nonce": U64::from(42),
+            "nonce": "0x2a",
         });
         assert_eq!(serde_json::to_value(entry).unwrap(), json);
     }
@@ -147,8 +151,8 @@ mod tests {
     #[test]
     fn inclusion_list_summary_v1_serialization() {
         let summary = InclusionListSummaryV1 {
-            slot: U64::from(42),
-            proposer_index: U64::from(42),
+            slot: 42,
+            proposer_index: 42,
             parent_hash: B256::from_hex(
                 "0x2222222222222222222222222222222222222222222222222222222222222222",
             )
@@ -157,27 +161,27 @@ mod tests {
                 InclusionListSummaryEntryV1 {
                     address: Address::from_hex("0x0000000000000000000000000000000000000042")
                         .unwrap(),
-                    nonce: U64::from(42),
+                    nonce: 42,
                 },
                 InclusionListSummaryEntryV1 {
                     address: Address::from_hex("0x0000000000000000000000000000000000000043")
                         .unwrap(),
-                    nonce: U64::from(43),
+                    nonce: 43,
                 },
             ],
         };
         let json = json!({
-            "slot": U64::from(42),
-            "proposerIndex": U64::from(42),
+            "slot": "0x2a",
+            "proposerIndex": "0x2a",
             "parentHash": "0x2222222222222222222222222222222222222222222222222222222222222222",
             "summary": [
                 {
                     "address": "0x0000000000000000000000000000000000000042",
-                    "nonce": U64::from(42),
+                    "nonce": "0x2a",
                 },
                 {
                     "address": "0x0000000000000000000000000000000000000043",
-                    "nonce": U64::from(43),
+                    "nonce": "0x2b",
                 },
             ],
         });
