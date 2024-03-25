@@ -1,5 +1,5 @@
 use alloy_rpc_types::{
-    other::WithOtherFields, Header, Transaction, TransactionReceipt, TransactionRequest,
+    Header, Transaction, TransactionReceipt, TransactionRequest, WithOtherFields,
 };
 
 use crate::{Network, ReceiptResponse};
