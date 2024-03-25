@@ -18,8 +18,8 @@ alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rpc-trace-types.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
-alloy-transport-ws.workspace = true
-alloy-transport-ipc.workspace = true
+alloy-transport-ws = { workspace = true, optional = true }
+alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport.workspace = true
 alloy-primitives.workspace = true
 
