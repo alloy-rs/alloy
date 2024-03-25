@@ -58,7 +58,7 @@ pub fn eip1559_default_estimator(
 }
 
 /// Extracts the authorization information from the given URL.
-pub fn extract_auth_info(url: Url) -> Option<Authorization> {
+pub fn extract_auth_info(url: &Url) -> Option<Authorization> {
     if url.has_authority() {
         let username = url.username();
         let pass = url.password().unwrap_or_default();
@@ -68,31 +68,13 @@ pub fn extract_auth_info(url: Url) -> Option<Authorization> {
     }
 }
 
-/// Identifies the intended transport type from the given string.
-pub fn parse_str_to_tranport_type(s: &str) -> Result<String, RpcError<TransportErrorKind>> {
-    if s.parse::<SocketAddr>().is_ok() {
-        return Ok(format!("http://{}", s));
-    }
-    // Check if s is a path and it exists
-    let path = Path::new(&s);
-    if path.is_file() {
-        // IPC if it exists
-        return Ok(s.to_string());
-    }
-
-    // Parse the URL or return an error
-    Url::parse(s).map_err(TransportErrorKind::custom)?;
-
-    Ok(s.to_string())
-}
-
 /// The built-in transport types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltInTransportType {
     /// HTTP transport.
-    Http(String),
+    Http(Url),
     /// WebSocket transport.
-    Ws(String),
+    Ws(Url),
     /// IPC transport.
     Ipc(String),
 }
@@ -101,12 +83,30 @@ impl FromStr for BuiltInTransportType {
     type Err = RpcError<TransportErrorKind>;
 
     fn from_str(s: &str) -> Result<BuiltInTransportType, Self::Err> {
-        let s = parse_str_to_tranport_type(s)?;
+        if s.parse::<SocketAddr>().is_ok() {
+            let s = format!("http://{}", s);
+            let url = Url::parse(&s).map_err(TransportErrorKind::custom)?;
+            return Ok(BuiltInTransportType::Http(url));
+        }
+        // Check if s is a path and it exists
+        let path = Path::new(&s);
+        if path.is_file() {
+            // IPC if it exists
+            return Ok(BuiltInTransportType::Ipc(s.to_string()));
+        }
+
+        // Handle the case where string is "localhost:*"
+        if s.starts_with("localhost:") {
+            let url = Url::parse(&format!("http://{}", s)).map_err(TransportErrorKind::custom)?;
+            return Ok(BuiltInTransportType::Http(url));
+        }
+        // Parse the URL or return an error
+        let url = Url::parse(s).map_err(TransportErrorKind::custom)?;
 
         if s.starts_with("http://") || s.starts_with("https://") {
-            Ok(BuiltInTransportType::Http(s.to_string()))
+            Ok(BuiltInTransportType::Http(url))
         } else if s.starts_with("ws://") || s.starts_with("wss://") {
-            Ok(BuiltInTransportType::Ws(s.to_string()))
+            Ok(BuiltInTransportType::Ws(url))
         } else {
             Ok(BuiltInTransportType::Ipc(s.to_string()))
         }
@@ -164,19 +164,23 @@ mod tests {
     fn test_parsing_urls() {
         assert_eq!(
             BuiltInTransportType::from_str("http://localhost:8545").unwrap(),
-            BuiltInTransportType::Http("http://localhost:8545".to_string())
+            BuiltInTransportType::Http("http://localhost:8545".parse::<Url>().unwrap())
+        );
+        assert_eq!(
+            BuiltInTransportType::from_str("localhost:8545").unwrap(),
+            BuiltInTransportType::Http("http://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("https://localhost:8545").unwrap(),
-            BuiltInTransportType::Http("https://localhost:8545".to_string())
+            BuiltInTransportType::Http("https://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("ws://localhost:8545").unwrap(),
-            BuiltInTransportType::Ws("ws://localhost:8545".to_string())
+            BuiltInTransportType::Ws("ws://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("wss://localhost:8545").unwrap(),
-            BuiltInTransportType::Ws("wss://localhost:8545".to_string())
+            BuiltInTransportType::Ws("wss://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("ipc:///tmp/reth.ipc").unwrap(),
@@ -184,23 +188,23 @@ mod tests {
         );
         assert_eq!(
             BuiltInTransportType::from_str("localhost:8545").unwrap(),
-            BuiltInTransportType::Ipc("localhost:8545".to_string())
+            BuiltInTransportType::Http("http://localhost:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("http://127.0.0.1:8545").unwrap(),
-            BuiltInTransportType::Http("http://127.0.0.1:8545".to_string())
+            BuiltInTransportType::Http("http://127.0.0.1:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("ws://127.0.0.1:8545").unwrap(),
-            BuiltInTransportType::Ws("ws://127.0.0.1:8545".to_string())
+            BuiltInTransportType::Ws("ws://127.0.0.1:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("http://localhost").unwrap(),
-            BuiltInTransportType::Http("http://localhost".to_string())
+            BuiltInTransportType::Http("http://localhost".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("127.0.0.1:8545").unwrap(),
-            BuiltInTransportType::Http("http://127.0.0.1:8545".to_string())
+            BuiltInTransportType::Http("http://127.0.0.1:8545".parse::<Url>().unwrap())
         );
         assert_eq!(
             BuiltInTransportType::from_str("file:///tmp/reth.ipc").unwrap(),
@@ -222,7 +226,7 @@ mod tests {
         std::fs::remove_file(temp_file).unwrap();
         assert_eq!(
             BuiltInTransportType::from_str("http://user:pass@example.com").unwrap(),
-            BuiltInTransportType::Http("http://user:pass@example.com".to_string())
+            BuiltInTransportType::Http("http://user:pass@example.com".parse::<Url>().unwrap())
         );
     }
 }
