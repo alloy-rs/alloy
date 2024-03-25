@@ -138,9 +138,9 @@ impl<'a> IntoIterator for &'a OtherFields {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithOtherFields<T> {
     #[serde(flatten)]
     inner: T,
