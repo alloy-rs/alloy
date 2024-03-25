@@ -104,7 +104,7 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
                 ipc_client.boxed()
             }
-            #[cfg(not(feature = "ws"))]
+            #[cfg(not(feature = "ipc"))]
             BuiltInTransportType::Ipc(_) => {
                 return Err(TransportErrorKind::pubsub_unavailable().into());
             }
