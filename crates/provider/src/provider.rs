@@ -79,13 +79,13 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 
     /// Creates a new root provider with a boxed transport from a string.
     pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
-        let boxed_client = match BuiltInTransportType::from_str(conn_str) {
-            Ok(BuiltInTransportType::Http(conn_str)) => {
+        let boxed_client = match BuiltInTransportType::from_str(conn_str)? {
+            BuiltInTransportType::Http(conn_str) => {
                 let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
                 RpcClient::new_http(url).boxed()
             }
             #[cfg(feature = "ws")]
-            Ok(BuiltInTransportType::Ws(conn_str)) => {
+            BuiltInTransportType::Ws(conn_str) => {
                 // Extract auth info if any
                 let url = reqwest::Url::parse(&conn_str).map_err(TransportErrorKind::custom)?;
                 let auth = extract_auth_info(url);
@@ -95,20 +95,19 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
                 ws_client.boxed()
             }
             #[cfg(not(feature = "ws"))]
-            Ok(BuiltInTransportType::Ws(_)) => {
+            BuiltInTransportType::Ws(_) => {
                 return Err(TransportErrorKind::pubsub_unavailable().into());
             }
             #[cfg(feature = "ipc")]
-            Ok(BuiltInTransportType::Ipc(conn_str)) => {
+            BuiltInTransportType::Ipc(conn_str) => {
                 let ipc = IpcConnect::new(conn_str);
                 let ipc_client = RpcClient::connect_pubsub(ipc).await?;
                 ipc_client.boxed()
             }
             #[cfg(not(feature = "ws"))]
-            Ok(BuiltInTransportType::Ipc(_)) => {
+            BuiltInTransportType::Ipc(_) => {
                 return Err(TransportErrorKind::pubsub_unavailable().into());
             }
-            Err(err) => return Err(err),
         };
 
         Ok(RootProvider::<N, BoxTransport>::new(boxed_client))

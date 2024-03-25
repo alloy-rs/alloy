@@ -44,6 +44,7 @@ alloy-signer.workspace = true
 alloy-signer-wallet.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
+tempfile.workspace = true
 
 [features]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]

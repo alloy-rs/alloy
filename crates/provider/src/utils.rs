@@ -206,10 +206,20 @@ mod tests {
             BuiltInTransportType::from_str("file:///tmp/reth.ipc").unwrap(),
             BuiltInTransportType::Ipc("file:///tmp/reth.ipc".to_string())
         );
+
+        // Create a temp file and save it.
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_file = temp_dir.path().join("reth.ipc");
+
+        // Save it
+        std::fs::write(&temp_file, "reth ipc").unwrap();
+
         assert_eq!(
-            BuiltInTransportType::from_str("/tmp/reth.ipc").unwrap(),
-            BuiltInTransportType::Ipc("/tmp/reth.ipc".to_string())
+            BuiltInTransportType::from_str(temp_file.to_str().unwrap()).unwrap(),
+            BuiltInTransportType::Ipc(temp_file.to_str().unwrap().to_string())
         );
+        // Delete the written file after test
+        std::fs::remove_file(temp_file).unwrap();
         assert_eq!(
             BuiltInTransportType::from_str("http://user:pass@example.com").unwrap(),
             BuiltInTransportType::Http("http://user:pass@example.com".to_string())
