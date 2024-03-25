@@ -82,7 +82,10 @@ eip712 = [
 
 # alloy
 default-tls = ["reqwest?/default-tls"]
-jsonrpsee-types = ["alloy-rpc-types?/jsonrpsee-types", "alloy-rpc-engine-types?/jsonrpsee-types"]
+jsonrpsee-types = [
+    "alloy-rpc-types?/jsonrpsee-types",
+    "alloy-rpc-engine-types?/jsonrpsee-types",
+]
 
 consensus = ["dep:alloy-consensus"]
 eips = ["dep:alloy-eips"]
@@ -105,6 +108,10 @@ pubsub = ["dep:alloy-pubsub"]
 rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
 rpc-client = ["rpc", "dep:alloy-rpc-client"]
+rpc-client-http-reqwest = ["rpc-client", "alloy-rpc-client?/reqwest"]
+rpc-client-http-hyper = ["rpc-client", "alloy-rpc-client?/hyper"]
+rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc"]
 rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
 rpc-types-engine = ["rpc-types", "dep:alloy-rpc-engine-types"]
@@ -116,7 +123,10 @@ signers = ["dep:alloy-signer"]
 signer-wallet = ["signers", "dep:alloy-signer-wallet"]
 signer-keystore = ["signer-wallet", "alloy-signer-wallet?/keystore"]
 signer-mnemonic = ["signer-wallet", "alloy-signer-wallet?/mnemonic"]
-signer-mnemonic-all-languages = ["signer-mnemonic", "alloy-signer-wallet?/mnemonic-all-languages"]
+signer-mnemonic-all-languages = [
+    "signer-mnemonic",
+    "alloy-signer-wallet?/mnemonic-all-languages",
+]
 signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
 signer-aws = ["signers", "dep:alloy-signer-aws"]
 signer-gcp = ["signers", "dep:alloy-signer-gcp"]
