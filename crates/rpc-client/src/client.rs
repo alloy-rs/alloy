@@ -1,6 +1,6 @@
 use crate::{poller::PollerBuilder, BatchRequest, ClientBuilder, RpcCall};
 use alloy_json_rpc::{Id, Request, RpcParam, RpcReturn};
-use alloy_transport::{BoxTransport, Transport, TransportConnect, TransportError};
+use alloy_transport::{BoxTransport, Transport};
 use alloy_transport_http::Http;
 use std::{
     borrow::Cow,
@@ -20,6 +20,11 @@ pub type WeakClient<T> = Weak<RpcClientInner<T>>;
 pub type ClientRef<'a, T> = &'a RpcClientInner<T>;
 
 /// A JSON-RPC client.
+///
+/// [`RpcClient`] should never be instantiated directly. Instead, use
+/// [`ClientBuilder`].
+///
+/// [`ClientBuilder`]: crate::ClientBuilder
 #[derive(Debug)]
 pub struct RpcClient<T>(Arc<RpcClientInner<T>>);
 
@@ -79,14 +84,6 @@ impl<T> RpcClient<T> {
 }
 
 impl<T: Transport> RpcClient<T> {
-    /// Connect to a transport via a [`TransportConnect`] implementor.
-    pub async fn connect<C>(connect: C) -> Result<Self, TransportError>
-    where
-        C: TransportConnect<Transport = T>,
-    {
-        ClientBuilder::default().connect(connect).await
-    }
-
     /// Build a poller that polls a method with the given parameters.
     ///
     /// See [`PollerBuilder`] for examples and more details.

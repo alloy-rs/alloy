@@ -11,7 +11,9 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcClient, WeakClient};
+use alloy_rpc_client::{
+    BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
+};
 use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::{LocalizedTransactionTrace, TraceResults, TraceType},
@@ -20,7 +22,10 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
+    TransportResult,
+};
 use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
@@ -68,6 +73,21 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     /// Creates a new root provider from the given RPC client.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
+    }
+}
+
+impl<N: Network> RootProvider<N, BoxTransport> {
+    /// Connects to a boxed transport with the given connector.
+    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
+    }
+
+    /// Creates a new root provider from the provided connection details.
+    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
+        let conn: BuiltInConnectionString = s.parse()?;
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
     }
 }
 
@@ -1376,5 +1396,28 @@ mod tests {
             pending.tx_hash().to_string(),
             "0x9dae5cf33694a02e8a7d5de3fe31e9d05ca0ba6e9180efac4ab20a06c9e598a3"
         );
+    }
+
+    #[tokio::test]
+    async fn connect_boxed() {
+        init_tracing();
+        let (_provider, anvil) = spawn_anvil();
+
+        let provider =
+            RootProvider::<Ethereum, BoxTransport>::connect_builtin(anvil.endpoint().as_str())
+                .await;
+
+        match provider {
+            Ok(provider) => {
+                let num = provider.get_block_number().await.unwrap();
+                assert_eq!(0, num);
+            }
+            Err(e) => {
+                assert_eq!(
+                    format!("{}",e),
+                    "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
+                );
+            }
+        }
     }
 }

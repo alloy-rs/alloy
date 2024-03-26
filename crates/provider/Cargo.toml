@@ -18,8 +18,9 @@ alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rpc-trace-types.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
+alloy-transport-ws = { workspace = true, optional = true }
+alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport.workspace = true
-
 alloy-primitives.workspace = true
 
 async-stream = "0.3"
@@ -43,8 +44,9 @@ alloy-signer.workspace = true
 alloy-signer-wallet.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
+tempfile.workspace = true
 
 [features]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
-ws = ["pubsub", "alloy-rpc-client/ws"]
-ipc = ["pubsub", "alloy-rpc-client/ipc"]
+ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
+ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
