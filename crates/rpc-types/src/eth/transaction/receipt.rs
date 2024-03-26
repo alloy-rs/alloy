@@ -14,8 +14,8 @@ pub struct TransactionReceipt {
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
     pub block_number: Option<U256>,
-    /// Cumulative gas used within the block after this was executed.
-    pub cumulative_gas_used: U256,
+    // /// Cumulative gas used within the block after this was executed.
+    // pub cumulative_gas_used: U256,
     /// Gas used by this transaction alone.
     pub gas_used: Option<U256>,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both

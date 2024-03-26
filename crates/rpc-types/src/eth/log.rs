@@ -1,16 +1,14 @@
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Log {
-    /// Address
-    pub address: Address,
-    /// All topics of the log
-    pub topics: Vec<B256>,
-    /// Additional data fields of the log
-    pub data: Bytes,
+pub struct Log<T = alloy_primitives::LogData> {
+    #[serde(flatten)]
+    /// Consensus log object
+    pub inner: alloy_primitives::Log<T>,
+
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
@@ -26,33 +24,67 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl TryFrom<Log> for alloy_primitives::LogData {
-    type Error = LogError;
-
-    fn try_from(value: Log) -> Result<Self, Self::Error> {
-        alloy_primitives::LogData::new(value.topics, value.data).ok_or(LogError::TooManyTopics)
+impl<T> Log<T>
+where
+    for<'a> &'a T: Into<alloy_primitives::LogData>,
+{
+    /// Reserialize the data.
+    pub fn reserialize(&self) -> Log<alloy_primitives::LogData> {
+        Log {
+            inner: alloy_primitives::Log {
+                address: self.inner.address,
+                data: (&self.inner.data).into(),
+            },
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        }
     }
 }
 
-/// Error that can occur when converting other types to logs
-#[derive(Debug, Clone, Copy, thiserror::Error)]
-#[allow(missing_copy_implementations)]
-pub enum LogError {
-    /// There are too many topics
-    #[error("too many topics")]
-    TooManyTopics,
+impl<T> AsRef<alloy_primitives::Log<T>> for Log<T> {
+    fn as_ref(&self) -> &alloy_primitives::Log<T> {
+        &self.inner
+    }
+}
+
+impl<T> AsMut<alloy_primitives::Log<T>> for Log<T> {
+    fn as_mut(&mut self) -> &mut alloy_primitives::Log<T> {
+        &mut self.inner
+    }
+}
+
+impl<T> AsRef<T> for Log<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner.data
+    }
+}
+
+impl<T> AsMut<T> for Log<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner.data
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::{Address, Bytes};
+
     use super::*;
 
     #[test]
     fn serde_log() {
         let log = Log {
-            address: Address::with_last_byte(0x69),
-            topics: vec![B256::with_last_byte(0x69)],
-            data: Bytes::from_static(&[0x69]),
+            inner: alloy_primitives::Log {
+                address: Address::with_last_byte(0x69),
+                data: alloy_primitives::LogData::new_unchecked(
+                    vec![B256::with_last_byte(0x69)],
+                    Bytes::from_static(&[0x69]),
+                ),
+            },
             block_hash: Some(B256::with_last_byte(0x69)),
             block_number: Some(U256::from(0x69)),
             transaction_hash: Some(B256::with_last_byte(0x69)),
