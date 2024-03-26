@@ -55,9 +55,9 @@ mod tests {
                             bytes!("0100ff"),
                         ),
                     }],
-                    success: false,
+                    status: false,
                 },
-                bloom: [0; 256].into(),
+                logs_bloom: [0; 256].into(),
             });
 
         receipt.network_encode(&mut data);
@@ -87,9 +87,9 @@ mod tests {
                             bytes!("0100ff"),
                         ),
                     }],
-                    success: false,
+                    status: false,
                 },
-                bloom: [0; 256].into(),
+                logs_bloom: [0; 256].into(),
             };
 
         let receipt = ReceiptWithBloom::decode(&mut &data[..]).unwrap();
@@ -100,7 +100,7 @@ mod tests {
     fn gigantic_receipt() {
         let receipt = Receipt {
             cumulative_gas_used: 16747627,
-            success: true,
+            status: true,
             logs: vec![
                 Log {
                     address: address!("4bf56695415f725e43c3e04354b604bcfb6dfb6e"),
