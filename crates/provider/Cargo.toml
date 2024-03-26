@@ -48,5 +48,5 @@ tempfile.workspace = true
 
 [features]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
-ws = ["pubsub", "alloy-rpc-client/ws"]
-ipc = ["pubsub", "alloy-rpc-client/ipc"]
+ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
+ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
