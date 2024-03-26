@@ -84,7 +84,7 @@ impl<N: Network> RootProvider<N, BoxTransport> {
     }
 
     /// Creates a new root provider from the provided connection details.
-    pub async fn on_builtin(s: &str) -> Result<Self, TransportError> {
+    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
         let conn: BuiltInConnectionString = s.parse()?;
         let client = ClientBuilder::default().connect_boxed(conn).await?;
         Ok(Self::new(client))
@@ -1406,7 +1406,7 @@ mod tests {
         println!("Connecting to {}", anvil.endpoint());
 
         let provider =
-            RootProvider::<Ethereum, BoxTransport>::connect_boxed(anvil.endpoint().as_str())
+            RootProvider::<Ethereum, BoxTransport>::connect_builtin(anvil.endpoint().as_str())
                 .await
                 .unwrap();
         let num = provider.get_block_number().await.unwrap();
