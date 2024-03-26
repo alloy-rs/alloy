@@ -37,7 +37,6 @@ impl BoxTransportConnect for BuiltInConnectionString {
             Self::Ws(url, _) => guess_local_url(url),
             #[cfg(feature = "ipc")]
             Self::Ipc(_) => true,
-            _ => false,
         }
     }
 
@@ -91,10 +90,6 @@ impl BuiltInConnectionString {
                 .into_service()
                 .await
                 .map(Transport::boxed),
-
-            _ => Err(TransportErrorKind::custom_str(
-                "No transports enabled. Enable one of: reqwest, hyper, ws, ipc",
-            )),
         }
     }
 
