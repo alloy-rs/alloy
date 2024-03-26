@@ -1,18 +1,21 @@
 use std::str::FromStr;
 
 use alloy_json_rpc::RpcError;
-use alloy_transport::{
-    utils::guess_local_url, BoxTransport, BoxTransportConnect, Transport, TransportError,
-    TransportErrorKind,
-};
-use reqwest::Url;
+use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
+
+#[cfg(any(feature = "reqwest", feature = "hyper"))]
+use alloy_transport::utils::{guess_local_url, Transport};
+#[cfg(any(feature = "reqwest", feature = "hyper"))]
 use std::net::SocketAddr;
+#[cfg(any(feature = "reqwest", feature = "hyper", feature = "ws"))]
+use url::Url;
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::PubSubConnect;
 
 /// Connection string for built-in transports.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BuiltInConnectionString {
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
     /// HTTP transport.
@@ -34,6 +37,7 @@ impl BoxTransportConnect for BuiltInConnectionString {
             Self::Ws(url, _) => guess_local_url(url),
             #[cfg(feature = "ipc")]
             Self::Ipc(_) => true,
+            _ => false,
         }
     }
 
@@ -49,7 +53,7 @@ impl BuiltInConnectionString {
     ///
     /// # Notes
     ///
-    /// - If `hyper` feature is enabled, the HTTP transport will be `hyper`.
+    /// - If `hyper` feature is enabled
     /// - WS will extract auth, however, auth is disabled for wasm.
     pub async fn connect_boxed(&self) -> Result<BoxTransport, TransportError> {
         // NB:
@@ -87,6 +91,10 @@ impl BuiltInConnectionString {
                 .into_service()
                 .await
                 .map(Transport::boxed),
+
+            _ => Err(TransportErrorKind::custom_str(
+                "No transports enabled. Enable one of: reqwest, hyper, ws, ipc",
+            )),
         }
     }
 
@@ -151,9 +159,10 @@ impl FromStr for BuiltInConnectionString {
     type Err = RpcError<TransportErrorKind>;
 
     fn from_str(s: &str) -> Result<BuiltInConnectionString, Self::Err> {
-        let res = Err(TransportErrorKind::custom_str(
-            "No transports enabled. Enable one of: reqwest, hyper, ws, ipc",
-        ));
+        let res = Err(TransportErrorKind::custom_str(&format!(
+            "No transports enabled. Enable one of: reqwest, hyper, ws, ipc. Connection info: '{}'",
+            s
+        )));
         #[cfg(any(feature = "reqwest", feature = "hyper"))]
         let res = res.or_else(|_| Self::try_as_http(s));
         #[cfg(feature = "ws")]
