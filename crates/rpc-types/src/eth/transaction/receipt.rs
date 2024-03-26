@@ -1,6 +1,7 @@
 use crate::{other::OtherFields, ConversionError, Log};
 use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom, TxType};
-use alloy_primitives::{Address, Bloom, Log as PrimitivesLog, LogData, B256, U128, U256, U64, U8};
+use alloy_primitives::{Address, Bloom, B256, U128, U256, U64, U8};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
@@ -75,23 +76,18 @@ impl TransactionReceipt {
     /// A transaction is considered successful if the status code is `1`.
     fn success(&self) -> bool {
         match &self.status_code {
-            Some(status) => status == &U64::from(1),
+            Some(status) => status.to::<u64>() == 1,
             None => false,
         }
     }
 
-    /// Returns the logs emitted by the transaction.
-    /// Converts the logs from the RPC type to the internal type.
-    fn logs(&self) -> Vec<PrimitivesLog<LogData>> {
-        let mut logs = Vec::new();
-        for log in &self.logs {
-            let rpc_log: Log = log.clone();
-            let log_data = LogData::try_from(rpc_log).unwrap_or_default();
-            let result = PrimitivesLog { address: log.address, data: log_data };
-            logs.push(result);
-        }
-
-        logs
+    /// Returns an iterator over the logs for prmitives type conversion.
+    fn logs_iter(
+        &self,
+    ) -> impl Iterator<Item = alloy_primitives::Log<alloy_primitives::LogData>> + '_ {
+        self.logs.iter().map(|log| {
+            alloy_primitives::Log::new_unchecked(log.address, log.topics.clone(), log.data.clone())
+        })
     }
 }
 
@@ -103,7 +99,7 @@ impl TryFrom<TransactionReceipt> for ReceiptWithBloom {
             receipt: Receipt {
                 success: tx_receipt.success(),
                 cumulative_gas_used: tx_receipt.cumulative_gas_used.to::<u64>(),
-                logs: tx_receipt.logs(),
+                logs: tx_receipt.logs_iter().collect_vec(),
             },
             bloom: tx_receipt.logs_bloom,
         };
