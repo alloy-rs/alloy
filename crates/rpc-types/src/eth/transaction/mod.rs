@@ -5,25 +5,29 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
 use alloy_primitives::{Address, Bytes, B256, U256, U8};
-pub use blob::BlobTransactionSidecar;
-pub use common::TransactionInfo;
-pub use error::ConversionError;
-pub use optimism::OptimismTransactionReceiptFields;
-pub use receipt::TransactionReceipt;
-pub use request::{TransactionInput, TransactionRequest};
 use serde::{Deserialize, Serialize};
-pub use signature::{Parity, Signature};
 
-mod blob;
+pub use alloy_consensus::BlobTransactionSidecar;
+pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
+
 mod common;
+pub use common::TransactionInfo;
+
 mod error;
-pub mod kzg;
+pub use error::ConversionError;
+
 pub mod optimism;
+pub use optimism::OptimismTransactionReceiptFields;
+
 mod receipt;
+pub use receipt::TransactionReceipt;
+
 pub mod request;
+pub use request::{TransactionInput, TransactionRequest};
+
 mod signature;
+pub use signature::{Parity, Signature};
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
