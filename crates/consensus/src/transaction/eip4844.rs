@@ -9,18 +9,23 @@ use alloy_eips::{
     eip2930::AccessList,
     eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
 };
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    keccak256, Address, Bytes, ChainId, FixedBytes, Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use sha2::{Digest, Sha256};
 use std::mem;
 
 #[cfg(not(feature = "kzg"))]
-use alloy_eips::eip4844::{Blob, Bytes48};
+pub use alloy_eips::eip4844::{Blob, Bytes48};
 
 #[cfg(feature = "kzg")]
-use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
+use c_kzg::{KzgCommitment, KzgProof, KzgSettings};
 #[cfg(feature = "kzg")]
 use std::ops::Deref;
+
+#[cfg(feature = "kzg")]
+pub use c_kzg::{Blob, Bytes48};
 
 /// An error that can occur when validating a [TxEip4844Variant].
 #[derive(Debug, thiserror::Error)]
@@ -1037,9 +1042,9 @@ impl Decodable for BlobTransactionSidecar {
 // Wrapper for c-kzg rlp
 #[repr(C)]
 struct BlobTransactionSidecarRlp {
-    blobs: Vec<[u8; BYTES_PER_BLOB]>,
-    commitments: Vec<[u8; BYTES_PER_COMMITMENT]>,
-    proofs: Vec<[u8; BYTES_PER_PROOF]>,
+    blobs: Vec<FixedBytes<BYTES_PER_BLOB>>,
+    commitments: Vec<FixedBytes<BYTES_PER_COMMITMENT>>,
+    proofs: Vec<FixedBytes<BYTES_PER_PROOF>>,
 }
 
 const _: [(); std::mem::size_of::<BlobTransactionSidecar>()] =
