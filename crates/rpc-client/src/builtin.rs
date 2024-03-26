@@ -3,13 +3,6 @@ use std::str::FromStr;
 use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
 
-#[cfg(any(feature = "reqwest", feature = "hyper"))]
-use alloy_transport::{utils::guess_local_url, Transport};
-#[cfg(any(feature = "reqwest", feature = "hyper"))]
-use std::net::SocketAddr;
-#[cfg(any(feature = "reqwest", feature = "hyper", feature = "ws"))]
-use url::Url;
-
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::PubSubConnect;
 
@@ -19,10 +12,10 @@ use alloy_pubsub::PubSubConnect;
 pub enum BuiltInConnectionString {
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
     /// HTTP transport.
-    Http(Url),
+    Http(url::Url),
     #[cfg(feature = "ws")]
     /// WebSocket transport.
-    Ws(Url, Option<alloy_transport::Authorization>),
+    Ws(url::Url, Option<alloy_transport::Authorization>),
     #[cfg(feature = "ipc")]
     /// IPC transport.
     Ipc(String),
@@ -32,9 +25,9 @@ impl BoxTransportConnect for BuiltInConnectionString {
     fn is_local(&self) -> bool {
         match self {
             #[cfg(any(feature = "reqwest", feature = "hyper"))]
-            Self::Http(url) => guess_local_url(url),
+            Self::Http(url) => alloy_transport::utils::guess_local_url(url),
             #[cfg(feature = "ws")]
-            Self::Ws(url, _) => guess_local_url(url),
+            Self::Ws(url, _) => alloy_transport::utils::guess_local_url(url),
             #[cfg(feature = "ipc")]
             Self::Ipc(_) => true,
             #[cfg(not(any(
@@ -69,8 +62,12 @@ impl BuiltInConnectionString {
             // reqwest is enabled, hyper is not
             #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
             Self::Http(url) => {
-                Ok(alloy_transport_http::Http::<reqwest::Client>::new(url.clone()).boxed())
-            }
+                Ok(
+                    alloy_transport::Transport::boxed(
+                        alloy_transport_http::Http::<reqwest::Client>::new(url.clone())
+                    )
+                )
+            },
 
             // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]
@@ -83,20 +80,20 @@ impl BuiltInConnectionString {
                 alloy_transport_ws::WsConnect::with_auth(url.clone(), Some(auth.clone()))
                     .into_service()
                     .await
-                    .map(Transport::boxed)
+                    .map(alloy_transport::Transport::boxed)
             }
 
             #[cfg(feature = "ws")]
             Self::Ws(url, _) => alloy_transport_ws::WsConnect::new(url.clone())
                 .into_service()
                 .await
-                .map(Transport::boxed),
+                .map(alloy_transport::Transport::boxed),
 
             #[cfg(feature = "ipc")]
             Self::Ipc(path) => alloy_transport_ipc::IpcConnect::new(path.to_owned())
                 .into_service()
                 .await
-                .map(Transport::boxed),
+                .map(alloy_transport::Transport::boxed),
 
             #[cfg(not(any(feature = "reqwest", feature = "hyper", feature = "ws", feature = "ipc")))]
             _ => Err(TransportErrorKind::custom_str(
@@ -108,11 +105,11 @@ impl BuiltInConnectionString {
     /// Tries to parse the given string as an HTTP URL.
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
     pub fn try_as_http(s: &str) -> Result<Self, TransportError> {
-        let url = if s.starts_with("localhost:") || s.parse::<SocketAddr>().is_ok() {
+        let url = if s.starts_with("localhost:") || s.parse::<std::net::SocketAddr>().is_ok() {
             let s = format!("http://{}", s);
-            Url::parse(&s)
+            url::Url::parse(&s)
         } else {
-            Url::parse(s)
+            url::Url::parse(s)
         }
         .map_err(TransportErrorKind::custom)?;
 
@@ -126,11 +123,11 @@ impl BuiltInConnectionString {
     /// Tries to parse the given string as a WebSocket URL.
     #[cfg(feature = "ws")]
     pub fn try_as_ws(s: &str) -> Result<Self, TransportError> {
-        let url = if s.starts_with("localhost:") || s.parse::<SocketAddr>().is_ok() {
+        let url = if s.starts_with("localhost:") || s.parse::<std::net::SocketAddr>().is_ok() {
             let s = format!("ws://{}", s);
-            Url::parse(&s)
+            url::Url::parse(&s)
         } else {
-            Url::parse(s)
+            url::Url::parse(s)
         }
         .map_err(TransportErrorKind::custom)?;
 
@@ -183,6 +180,7 @@ impl FromStr for BuiltInConnectionString {
 #[cfg(test)]
 mod test {
     use super::*;
+    use url::Url;
 
     #[test]
     fn test_parsing_urls() {
