@@ -224,6 +224,26 @@ impl<L, N> ProviderBuilder<L, N> {
         let client = ClientBuilder::default().ipc(connect).await?;
         Ok(self.on_client(client))
     }
+
+    #[cfg(feature = "reqwest")]
+    pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().reqwest_http(url);
+        Ok(self.on_client(client))
+    }
+
+    #[cfg(feature = "hyper")]
+    pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().hyper_http(url);
+        Ok(self.on_client(client))
+    }
 }
 
 // Copyright (c) 2019 Tower Contributors

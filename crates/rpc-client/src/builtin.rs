@@ -14,6 +14,7 @@ use alloy_pubsub::PubSubConnect;
 /// Connection string for built-in transports.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltInConnectionString {
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
     /// HTTP transport.
     Http(Url),
     #[cfg(feature = "ws")]
@@ -27,6 +28,7 @@ pub enum BuiltInConnectionString {
 impl BoxTransportConnect for BuiltInConnectionString {
     fn is_local(&self) -> bool {
         match self {
+            #[cfg(any(feature = "reqwest", feature = "hyper"))]
             Self::Http(url) => guess_local_url(url),
             #[cfg(feature = "ws")]
             Self::Ws(url, _) => guess_local_url(url),
@@ -54,11 +56,13 @@ impl BuiltInConnectionString {
         // HTTP match will always produce hyper if the feature is enabled.
         // WS match arms are fall-through. Auth arm is disabled for wasm.
         match self {
+            // reqwest is enabled, hyper is not
             #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
             Self::Http(url) => {
                 Ok(alloy_transport_http::Http::<reqwest::Client>::new(url.clone()).boxed())
             }
 
+            // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]
             Self::Http(_) => Err(TransportErrorKind::custom_str(
                 "hyper not supported. Please instantiate a hyper client manually",
@@ -87,6 +91,7 @@ impl BuiltInConnectionString {
     }
 
     /// Tries to parse the given string as an HTTP URL.
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
     pub fn try_as_http(s: &str) -> Result<Self, TransportError> {
         let url = if s.starts_with("localhost:") || s.parse::<SocketAddr>().is_ok() {
             let s = format!("http://{}", s);
@@ -143,7 +148,11 @@ impl FromStr for BuiltInConnectionString {
     type Err = RpcError<TransportErrorKind>;
 
     fn from_str(s: &str) -> Result<BuiltInConnectionString, Self::Err> {
-        let res = Self::try_as_http(s);
+        let res = Err(TransportErrorKind::custom_str(
+            "No transports enabled. Enable one of: reqwest, hyper, ws, ipc",
+        ));
+        #[cfg(any(feature = "reqwest", feature = "hyper"))]
+        let res = res.or_else(|_| Self::try_as_http(s));
         #[cfg(feature = "ws")]
         let res = res.or_else(|_| Self::try_as_ws(s));
         #[cfg(feature = "ipc")]
