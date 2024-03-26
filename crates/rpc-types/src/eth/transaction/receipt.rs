@@ -1,5 +1,6 @@
-use crate::{other::OtherFields, Log};
-use alloy_primitives::{Address, Bloom, B256, U128, U256, U64, U8};
+use crate::{other::OtherFields, ConversionError, Log};
+use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom, TxType};
+use alloy_primitives::{Address, Bloom, Log as PrimitivesLog, LogData, B256, U128, U256, U64, U8};
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
@@ -68,5 +69,57 @@ impl TransactionReceipt {
             return None;
         }
         Some(self.from.create(nonce))
+    }
+
+    /// Returns `true` if the transaction was successful.
+    /// A transaction is considered successful if the status code is `1`.
+    fn success(&self) -> bool {
+        match &self.status_code {
+            Some(status) => status == &U64::from(1),
+            None => false,
+        }
+    }
+
+    /// Returns the logs emitted by the transaction.
+    /// Converts the logs from the RPC type to the internal type.
+    fn logs(&self) -> Vec<PrimitivesLog<LogData>> {
+        let mut logs = Vec::new();
+        for log in &self.logs {
+            let rpc_log: Log = log.clone();
+            let log_data = LogData::try_from(rpc_log).unwrap_or_default();
+            let result = PrimitivesLog { address: log.address, data: log_data };
+            logs.push(result);
+        }
+
+        logs
+    }
+}
+
+impl TryFrom<TransactionReceipt> for ReceiptWithBloom {
+    type Error = ConversionError;
+
+    fn try_from(tx_receipt: TransactionReceipt) -> Result<Self, Self::Error> {
+        let receipt_with_bloom = ReceiptWithBloom {
+            receipt: Receipt {
+                success: tx_receipt.success(),
+                cumulative_gas_used: tx_receipt.cumulative_gas_used.to::<u64>(),
+                logs: tx_receipt.logs(),
+            },
+            bloom: tx_receipt.logs_bloom,
+        };
+        Ok(receipt_with_bloom)
+    }
+}
+
+impl TryFrom<TransactionReceipt> for ReceiptEnvelope {
+    type Error = ConversionError;
+
+    fn try_from(tx_receipt: TransactionReceipt) -> Result<Self, Self::Error> {
+        match tx_receipt.transaction_type.to::<u8>().try_into()? {
+            TxType::Legacy => Ok(ReceiptEnvelope::Legacy(tx_receipt.try_into()?)),
+            TxType::Eip2930 => Ok(ReceiptEnvelope::Eip2930(tx_receipt.try_into()?)),
+            TxType::Eip1559 => Ok(ReceiptEnvelope::Eip1559(tx_receipt.try_into()?)),
+            TxType::Eip4844 => Ok(ReceiptEnvelope::Eip4844(tx_receipt.try_into()?)),
+        }
     }
 }
