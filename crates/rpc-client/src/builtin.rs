@@ -132,6 +132,9 @@ impl BuiltInConnectionString {
     /// the path does not exist.
     #[cfg(feature = "ipc")]
     pub fn try_as_ipc(s: &str) -> Result<Self, TransportError> {
+        let s = s.strip_prefix("file://").unwrap_or(s);
+        let s = s.strip_prefix("ipc://").unwrap_or(s);
+
         // Check if s is a path and it exists
         let path = std::path::Path::new(&s);
 
@@ -219,8 +222,8 @@ mod test {
         assert_eq!(
             BuiltInConnectionString::from_str("ws://alice:pass@127.0.0.1:8545").unwrap(),
             BuiltInConnectionString::Ws(
-                "ws://127.0.0.1:8545".parse::<Url>().unwrap(),
-                Some(Authorization::Basic("alice:bob".to_string()))
+                "ws://alice:pass@127.0.0.1:8545".parse::<Url>().unwrap(),
+                Some(Authorization::basic("alice", "pass"))
             )
         );
     }
@@ -228,27 +231,30 @@ mod test {
     #[test]
     #[cfg(feature = "ipc")]
     fn test_parsing_ipc() {
-        assert_eq!(
-            BuiltInConnectionString::from_str("ipc:///tmp/reth.ipc").unwrap(),
-            BuiltInConnectionString::Ipc("ipc:///tmp/reth.ipc".to_string())
-        );
-
-        assert_eq!(
-            BuiltInConnectionString::from_str("file:///tmp/reth.ipc").unwrap(),
-            BuiltInConnectionString::Ipc("file:///tmp/reth.ipc".to_string())
-        );
-
         // Create a temp file and save it.
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_file = temp_dir.path().join("reth.ipc");
 
         // Save it
         std::fs::write(&temp_file, "reth ipc").unwrap();
+        assert!(temp_file.is_file());
+        let temp_file_str = temp_file.to_str().unwrap().to_string();
+
+        assert_eq!(
+            BuiltInConnectionString::from_str(&format!("ipc://{}", temp_file_str)).unwrap(),
+            BuiltInConnectionString::Ipc(temp_file_str.clone())
+        );
+
+        assert_eq!(
+            BuiltInConnectionString::from_str(&format!("file://{}", temp_file_str)).unwrap(),
+            BuiltInConnectionString::Ipc(temp_file_str.clone())
+        );
 
         assert_eq!(
             BuiltInConnectionString::from_str(temp_file.to_str().unwrap()).unwrap(),
-            BuiltInConnectionString::Ipc(temp_file.to_str().unwrap().to_string())
+            BuiltInConnectionString::Ipc(temp_file_str.clone())
         );
+
         // Delete the written file after test
         std::fs::remove_file(temp_file).unwrap();
         assert_eq!(

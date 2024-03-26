@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine};
-use std::fmt;
+use std::{fmt, net::SocketAddr};
 
 /// Basic or bearer authentication in http or websocket transport
 ///
@@ -15,21 +15,30 @@ pub enum Authorization {
 impl Authorization {
     /// Extract the auth info from a URL.
     pub fn extract_from_url(url: &url::Url) -> Option<Self> {
-        if url.has_authority() {
-            let username = url.username();
-            let pass = url.password().unwrap_or_default();
-            Some(Authorization::basic(username, pass))
-        } else {
-            None
+        let username = url.username();
+        let password = url.password().unwrap_or_default();
+
+        // eliminates false positives on the authority
+        if username.contains("localhost") || username.parse::<SocketAddr>().is_ok() {
+            return None;
         }
+
+        dbg!(username, password);
+
+        (!username.is_empty() || !password.is_empty()).then(|| Self::basic(username, password))
     }
 
-    /// Instantiate a new basic auth.
+    /// Instantiate a new basic auth from an authority string.
+    pub fn authority(auth: impl AsRef<str>) -> Self {
+        let auth_secret = general_purpose::STANDARD.encode(auth.as_ref());
+        Self::Basic(auth_secret)
+    }
+
+    /// Instantiate a new basic auth from a username and password.
     pub fn basic(username: impl AsRef<str>, password: impl AsRef<str>) -> Self {
         let username = username.as_ref();
         let password = password.as_ref();
-        let auth_secret = general_purpose::STANDARD.encode(format!("{username}:{password}"));
-        Self::Basic(auth_secret)
+        Self::authority(format!("{username}:{password}"))
     }
 
     /// Instantiate a new bearer auth.
