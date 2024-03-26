@@ -4,7 +4,7 @@ use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
 
 #[cfg(any(feature = "reqwest", feature = "hyper"))]
-use alloy_transport::utils::{guess_local_url, Transport};
+use alloy_transport::{utils::guess_local_url, Transport};
 #[cfg(any(feature = "reqwest", feature = "hyper"))]
 use std::net::SocketAddr;
 #[cfg(any(feature = "reqwest", feature = "hyper", feature = "ws"))]
