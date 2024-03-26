@@ -23,7 +23,8 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{
-    BoxTransport, Transport, TransportError, TransportErrorKind, TransportResult,
+    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
+    TransportResult,
 };
 use alloy_transport_http::Http;
 use serde_json::value::RawValue;
@@ -76,8 +77,14 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
 }
 
 impl<N: Network> RootProvider<N, BoxTransport> {
+    /// Connects to a boxed transport with the given connector.
+    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
+    }
+
     /// Creates a new root provider from the provided connection details.
-    pub async fn connect_boxed(s: &str) -> Result<Self, TransportError> {
+    pub async fn on_builtin(s: &str) -> Result<Self, TransportError> {
         let conn: BuiltInConnectionString = s.parse()?;
         let client = ClientBuilder::default().connect_boxed(conn).await?;
         Ok(Self::new(client))
