@@ -3,8 +3,8 @@ use crate::{
     Provider, RootProvider,
 };
 use alloy_network::{Ethereum, Network};
-use alloy_rpc_client::RpcClient;
-use alloy_transport::Transport;
+use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
+use alloy_transport::{BoxTransport, Transport, TransportError};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -171,6 +171,21 @@ impl<L, N> ProviderBuilder<L, N> {
         N: Network,
     {
         self.provider(RootProvider::new(client))
+    }
+
+    /// Finish the layer stack by providing a connection string for a built-in
+    /// transport type, outputting the final [`Provider`] type with all stack
+    /// components.
+    ///
+    /// This is a convenience function for
+    pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let connect: BuiltInConnectionString = s.parse()?;
+        let client = ClientBuilder::default().connect_boxed(connect).await?;
+        Ok(self.on_client(client))
     }
 }
 

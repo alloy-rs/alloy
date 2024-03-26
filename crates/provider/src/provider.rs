@@ -1,11 +1,9 @@
 //! Ethereum JSON-RPC provider.
 
-#[cfg(feature = "ws")]
-use crate::utils::extract_auth_info;
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, BuiltInTransportType, Eip1559Estimation, EstimatorFunction},
+    utils::{self, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -13,7 +11,9 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcClient, WeakClient};
+use alloy_rpc_client::{
+    BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
+};
 use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::{LocalizedTransactionTrace, TraceResults, TraceType},
@@ -22,18 +22,15 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    BoxTransport, Transport, TransportError, TransportErrorKind, TransportResult,
+};
 use alloy_transport_http::Http;
-#[cfg(feature = "ipc")]
-use alloy_transport_ipc::IpcConnect;
-#[cfg(feature = "ws")]
-use alloy_transport_ws::WsConnect;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
     fmt,
     marker::PhantomData,
-    str::FromStr,
     sync::{Arc, OnceLock},
 };
 
@@ -76,37 +73,14 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
     }
+}
 
-    /// Creates a new root provider with a boxed transport from a string.
-    pub async fn connect_boxed(conn_str: &str) -> TransportResult<RootProvider<N, BoxTransport>> {
-        let boxed_client = match BuiltInTransportType::from_str(conn_str)? {
-            BuiltInTransportType::Http(conn_url) => RpcClient::new_http(conn_url).boxed(),
-            #[cfg(feature = "ws")]
-            BuiltInTransportType::Ws(conn_url) => {
-                // Extract auth info if any
-                let auth = extract_auth_info(&conn_url);
-
-                let ws = WsConnect::with_auth(conn_url.to_string(), auth);
-                let ws_client = RpcClient::connect_pubsub(ws).await?;
-                ws_client.boxed()
-            }
-            #[cfg(not(feature = "ws"))]
-            BuiltInTransportType::Ws(_) => {
-                return Err(TransportErrorKind::pubsub_unavailable().into());
-            }
-            #[cfg(feature = "ipc")]
-            BuiltInTransportType::Ipc(conn_str) => {
-                let ipc = IpcConnect::new(conn_str);
-                let ipc_client = RpcClient::connect_pubsub(ipc).await?;
-                ipc_client.boxed()
-            }
-            #[cfg(not(feature = "ipc"))]
-            BuiltInTransportType::Ipc(_) => {
-                return Err(TransportErrorKind::pubsub_unavailable().into());
-            }
-        };
-
-        Ok(RootProvider::<N, BoxTransport>::new(boxed_client))
+impl<N: Network> RootProvider<N, BoxTransport> {
+    /// Creates a new root provider from the provided connection details.
+    pub async fn connect_boxed(s: &str) -> Result<Self, TransportError> {
+        let conn: BuiltInConnectionString = s.parse()?;
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
     }
 }
 

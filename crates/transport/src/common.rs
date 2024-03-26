@@ -4,7 +4,7 @@ use std::fmt;
 /// Basic or bearer authentication in http or websocket transport
 ///
 /// Use to inject username and password or an auth token into requests
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Authorization {
     /// HTTP Basic Auth
     Basic(String),
@@ -13,6 +13,17 @@ pub enum Authorization {
 }
 
 impl Authorization {
+    /// Extract the auth info from a URL.
+    pub fn extract_from_url(url: &url::Url) -> Option<Self> {
+        if url.has_authority() {
+            let username = url.username();
+            let pass = url.password().unwrap_or_default();
+            Some(Authorization::basic(username, pass))
+        } else {
+            None
+        }
+    }
+
     /// Instantiate a new basic auth.
     pub fn basic(username: impl AsRef<str>, password: impl AsRef<str>) -> Self {
         let username = username.as_ref();
