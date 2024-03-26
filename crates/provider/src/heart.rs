@@ -209,7 +209,7 @@ pub struct PendingTransactionConfig {
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
     pub const fn new(tx_hash: B256) -> Self {
-        Self { tx_hash, required_confirmations: 0, timeout: None }
+        Self { tx_hash, required_confirmations: 1, timeout: None }
     }
 
     /// Returns the transaction hash.
@@ -384,7 +384,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
     fn check_confirmations(&mut self, current_height: &U256) {
-        let to_keep = self.waiting_confs.split_off(current_height);
+        let to_keep = self.waiting_confs.split_off(&(current_height + U256::from(1)));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
             watcher.notify();
@@ -436,16 +436,16 @@ impl<S> Heartbeat<S> {
         let to_check =
             block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
         for watcher in to_check {
-            // If `confirmations` is 0 we can notify the watcher immediately.
+            // If `confirmations` is not more than 1 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;
-            if confirmations == 0 {
+            if confirmations <= 1 {
                 watcher.notify();
                 continue;
             }
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
             self.waiting_confs
-                .entry(*block_height + U256::from(confirmations))
+                .entry(*block_height + U256::from(confirmations) - U256::from(1))
                 .or_default()
                 .push(watcher);
         }

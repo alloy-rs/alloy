@@ -61,12 +61,17 @@ impl TryFrom<u8> for TxType {
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
+    #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
     Legacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
+    #[cfg_attr(feature = "serde", serde(rename = "0x01", alias = "0x1"))]
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
+    #[cfg_attr(feature = "serde", serde(rename = "0x02", alias = "0x2"))]
     Eip1559(Signed<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
@@ -75,6 +80,7 @@ pub enum TxEnvelope {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
+    #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
     Eip4844(Signed<TxEip4844Variant>),
 }
 
@@ -397,5 +403,115 @@ mod tests {
         let encoded = tx.encoded_2718();
         assert_eq!(encoded, hex_data);
         assert_eq!(tx.encode_2718_len(), hex_data.len());
+    }
+
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip<T: SignableTransaction<Signature>>(tx: T)
+    where
+        Signed<T>: Into<TxEnvelope>,
+    {
+        let signature = Signature::test_signature();
+        let tx_envelope: TxEnvelope = tx.into_signed(signature).into();
+
+        let serialized = serde_json::to_string(&tx_envelope).unwrap();
+        let deserialized: TxEnvelope = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(tx_envelope, deserialized);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_legacy() {
+        let tx = TxLegacy {
+            chain_id: Some(1),
+            nonce: 100,
+            gas_price: 3_000_000_000,
+            gas_limit: 50_000,
+            to: TxKind::Call(Address::default()),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+        };
+        test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_eip1559() {
+        let tx = TxEip1559 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: TxKind::Create,
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+        };
+        test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_eip2930() {
+        let tx = TxEip2930 {
+            chain_id: u64::MAX,
+            nonce: u64::MAX,
+            gas_price: u128::MAX,
+            gas_limit: u64::MAX,
+            to: TxKind::Call(Address::random()),
+            value: U256::MAX,
+            input: Bytes::new(),
+            access_list: Default::default(),
+        };
+        test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_eip4844() {
+        use crate::BlobTransactionSidecar;
+
+        let tx = TxEip4844Variant::TxEip4844(TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        });
+        test_serde_roundtrip(tx);
+
+        let tx = TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
+            tx: TxEip4844 {
+                chain_id: 1,
+                nonce: 100,
+                max_fee_per_gas: 50_000_000_000,
+                max_priority_fee_per_gas: 1_000_000_000_000,
+                gas_limit: 1_000_000,
+                to: Address::random(),
+                value: U256::from(10e18),
+                input: Bytes::new(),
+                access_list: AccessList(vec![AccessListItem {
+                    address: Address::random(),
+                    storage_keys: vec![B256::random()],
+                }]),
+                blob_versioned_hashes: vec![B256::random()],
+                max_fee_per_blob_gas: 0,
+            },
+            sidecar: BlobTransactionSidecar { ..Default::default() },
+        });
+        test_serde_roundtrip(tx);
     }
 }

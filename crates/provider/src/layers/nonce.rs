@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .layer(ManagedNonceLayer)
+///     .with_nonce_management()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///
@@ -152,7 +152,7 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
+            .with_nonce_management()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
@@ -177,7 +177,7 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
+            .with_nonce_management()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 

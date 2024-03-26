@@ -16,7 +16,8 @@
 #![cfg_attr(feature = "arbitrary", cfg(feature = "std"))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+#[macro_use]
 extern crate alloc;
 
 pub mod eip1559;

@@ -24,6 +24,9 @@ pub use batch::BatchRequest;
 mod builder;
 pub use builder::ClientBuilder;
 
+mod builtin;
+pub use builtin::BuiltInConnectionString;
+
 mod call;
 pub use call::RpcCall;
 
