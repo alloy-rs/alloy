@@ -4,25 +4,17 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-#[cfg_attr(feautre = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipt {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity_bool"))]
     pub success: bool,
     /// Gas used
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<Log>,
-}
-
-#[cfg(feature = "serde")]
-fn deser_quantity_bool<'a, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: serde::Deserializer<'a>,
-{
-    let value = alloy_primitives::aliases::U1::deserialize(deserializer)?;
-    Ok(!value.is_zero())
 }
 
 impl Receipt {
