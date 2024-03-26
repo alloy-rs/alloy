@@ -13,20 +13,26 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum ReceiptEnvelope {
     /// Receipt envelope with no type flag.
+    #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
     Legacy(ReceiptWithBloom),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
+    #[cfg_attr(feature = "serde", serde(rename = "0x01", alias = "0x1"))]
     Eip2930(ReceiptWithBloom),
     /// Receipt envelope with type flag 2, containing a [EIP-1559] receipt.
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
+    #[cfg_attr(feature = "serde", serde(rename = "0x02", alias = "0x2"))]
     Eip1559(ReceiptWithBloom),
     /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
+    #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
     Eip4844(ReceiptWithBloom),
 }
 
