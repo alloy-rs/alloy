@@ -214,10 +214,10 @@ mod tests {
     async fn event_filters() {
         init_tracing();
 
-        #[cfg(feature = "pubsub")]
+        #[cfg(feature = "ws")]
         let (provider, anvil) = spawn_anvil();
 
-        #[cfg(not(feature = "pubsub"))]
+        #[cfg(not(feature = "ws"))]
         let (provider, _anvil) = spawn_anvil();
 
         let contract = MyContract::deploy(&provider).await.unwrap();
@@ -254,11 +254,12 @@ mod tests {
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
 
-        #[cfg(feature = "pubsub")]
+        #[cfg(feature = "ws")]
         {
-            let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-            let client = RpcClient::connect_pubsub(ws).await.unwrap();
-            let provider = RootProvider::<Ethereum, _>::new(client);
+            let provider = alloy_provider::ProviderBuilder::default()
+                .on_ws(anvil.ws_endpoint())
+                .await
+                .unwrap();
 
             let contract = MyContract::new(*contract.address(), provider);
             let event = contract.MyEvent_filter();
