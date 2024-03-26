@@ -187,6 +187,43 @@ impl<L, N> ProviderBuilder<L, N> {
         let client = ClientBuilder::default().connect_boxed(connect).await?;
         Ok(self.on_client(client))
     }
+
+    /// Build this provider with a websocket connection.
+    #[cfg(feature = "ws")]
+    pub async fn on_ws(
+        self,
+        connect: alloy_transport_ws::WsConnect,
+    ) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<
+            RootProvider<N, alloy_pubsub::PubSubFrontend>,
+            N,
+            alloy_pubsub::PubSubFrontend,
+        >,
+        N: Network,
+    {
+        let client = ClientBuilder::default().ws(connect).await?;
+        Ok(self.on_client(client))
+    }
+
+    /// Build this provider with an IPC connection.
+    #[cfg(feature = "ipc")]
+    pub async fn on_ipc<T>(
+        self,
+        connect: alloy_transport_ipc::IpcConnect<T>,
+    ) -> Result<L::Provider, TransportError>
+    where
+        alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
+        L: ProviderLayer<
+            RootProvider<N, alloy_pubsub::PubSubFrontend>,
+            N,
+            alloy_pubsub::PubSubFrontend,
+        >,
+        N: Network,
+    {
+        let client = ClientBuilder::default().ipc(connect).await?;
+        Ok(self.on_client(client))
+    }
 }
 
 // Copyright (c) 2019 Tower Contributors

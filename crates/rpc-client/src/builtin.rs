@@ -54,15 +54,15 @@ impl BuiltInConnectionString {
         // HTTP match will always produce hyper if the feature is enabled.
         // WS match arms are fall-through. Auth arm is disabled for wasm.
         match self {
-            #[cfg(not(feature = "hyper"))]
+            #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
             Self::Http(url) => {
                 Ok(alloy_transport_http::Http::<reqwest::Client>::new(url.clone()).boxed())
             }
 
             #[cfg(feature = "hyper")]
-            Self::Http(url) => {
-                Ok(alloy_transport_http::Http::<hyper::Client<_>>::new(url.clone()).boxed())
-            }
+            Self::Http(_) => Err(TransportErrorKind::custom_str(
+                "hyper not supported. Please instantiate a hyper client manually",
+            )),
 
             #[cfg(all(not(target = "wasm"), feature = "ws"))]
             Self::Ws(url, Some(auth)) => {
@@ -130,9 +130,12 @@ impl BuiltInConnectionString {
         // Check if s is a path and it exists
         let path = std::path::Path::new(&s);
 
-        path.is_file()
-            .then_some(Self::Ipc(s.to_string()))
-            .ok_or_else(|| TransportErrorKind::custom_str("Invalid IPC path. File does not exist."))
+        path.is_file().then_some(Self::Ipc(s.to_string())).ok_or_else(|| {
+            TransportErrorKind::custom_str(&format!(
+                "Invalid IPC path. File does not exist: {}",
+                path.display()
+            ))
+        })
     }
 }
 
