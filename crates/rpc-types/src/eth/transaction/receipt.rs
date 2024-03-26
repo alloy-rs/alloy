@@ -123,3 +123,37 @@ impl TryFrom<TransactionReceipt> for ReceiptEnvelope {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_from_transaction_receipt_to_receipts_envelope_4844() {
+        // cast rpc eth_getTransactionReceipt
+        // 0x9c1fbda4f649ac806ab0faefbe94e1a60282eb374ead6aa01bac042f52b28a8c --rpc-url mainnet
+        let rpc_tx_receipt = r#"{"blobGasPrice":"0x1","blobGasUsed":"0x20000","blockHash":"0xa2917e0758c98640d868182838c93bb12f0d07b6b17efe6b62d9df42c7643791","blockNumber":"0x1286d1d","contractAddress":null,"cumulativeGasUsed":"0x56b224","effectiveGasPrice":"0xd364c1438","from":"0x40c35d4faf69234986cb599890c2d2ef546074a9","gasUsed":"0x5208","logs":[],"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","status":"0x1","to":"0x0000000000000000000000000000000000000000","transactionHash":"0x9c1fbda4f649ac806ab0faefbe94e1a60282eb374ead6aa01bac042f52b28a8c","transactionIndex":"0x46","type":"0x3"}"#;
+        let transaction_receipt: TransactionReceipt = serde_json::from_str(rpc_tx_receipt).unwrap();
+
+        let receipt_with_bloom = ReceiptWithBloom {
+            receipt: Receipt { success: true, cumulative_gas_used: 0x56b224, logs: vec![] },
+            bloom: Bloom::default(),
+        };
+
+        let receipt_envelope: ReceiptEnvelope = transaction_receipt.try_into().unwrap();
+
+        assert_eq!(receipt_envelope, ReceiptEnvelope::Eip4844(receipt_with_bloom));
+    }
+
+    #[test]
+    fn try_from_transaction_receipt_to_receipts_envelope_1559() {
+        // cast rpc eth_getTransactionReceipt
+        // 0xd271efca8906538124cca4213bc61aa3def380cf5e3b068b3215c09d87219c99 --rpc-url mainnet
+        let rpc_tx_receipt = r#"{"blockHash":"0x851a0e708a669d9f9838c251b72d0b616b7f38c3ad38fa20a23c1144791bbdd6","blockNumber":"0x129cc66","contractAddress":null,"cumulativeGasUsed":"0x71a71f","effectiveGasPrice":"0x465e36461","from":"0xcb96aca8719987d15aecd066b7a1ad5d4d92fdd3","gasUsed":"0x74d8","logs":[{"address":"0x06450dee7fd2fb8e39061434babcfc05599a6fb8","topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef","0x000000000000000000000000cb96aca8719987d15aecd066b7a1ad5d4d92fdd3","0x00000000000000000000000085f7459e29d5626b5d2f16c00a97e0c48ce1654e"],"data":"0x000000000000000000000000000000000000000000198b0b16f55ce58edc0000","blockNumber":"0x129cc66","transactionHash":"0xd271efca8906538124cca4213bc61aa3def380cf5e3b068b3215c09d87219c99","transactionIndex":"0x7a","blockHash":"0x851a0e708a669d9f9838c251b72d0b616b7f38c3ad38fa20a23c1144791bbdd6","logIndex":"0xa9","removed":false}],"logsBloom":"0x0000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000a00010000c000000000008400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000","status":"0x1","to":"0x06450dee7fd2fb8e39061434babcfc05599a6fb8","transactionHash":"0xd271efca8906538124cca4213bc61aa3def380cf5e3b068b3215c09d87219c99","transactionIndex":"0x7a","type":"0x2"}"#;
+        let transaction_receipt: TransactionReceipt = serde_json::from_str(rpc_tx_receipt).unwrap();
+
+        let receipt_envelope: ReceiptEnvelope = transaction_receipt.try_into().unwrap();
+
+        assert_eq!(receipt_envelope.tx_type(), TxType::Eip1559);
+    }
+}
