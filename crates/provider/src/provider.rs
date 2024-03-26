@@ -995,6 +995,26 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
     }
 }
 
+/// Admin namespace rpc interface that gives access to several non-standard RPC methods.
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[allow(unused, unreachable_pub)]
+pub trait AdminApi<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
+    /// Adds the given node record to the peerset.
+    async fn add_peer(&self, record: String) -> TransportResult<bool> {
+        self.client().request("admin_addPeer", (record,)).await
+    }
+
+    /// Returns the ENR of the node.
+    async fn node_info(&self) -> TransportResult<String> {
+        self.client().request("admin_nodeInfo", ()).await
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl<N: Network, T: Transport + Clone> AdminApi<N, T> for RootProvider<N, T> {}
+
 #[cfg(test)]
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
@@ -1419,5 +1439,15 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn adds_peer() {
+        use super::AdminApi;
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil();
+
+        let added = provider.add_peer("enr:-".to_string()).await.unwrap();
+        println!("{added:?}");
     }
 }
