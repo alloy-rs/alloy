@@ -1403,13 +1403,21 @@ mod tests {
         init_tracing();
         let (_provider, anvil) = spawn_anvil();
 
-        println!("Connecting to {}", anvil.endpoint());
-
         let provider =
             RootProvider::<Ethereum, BoxTransport>::connect_builtin(anvil.endpoint().as_str())
-                .await
-                .unwrap();
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(0, num);
+                .await;
+
+        match provider {
+            Ok(provider) => {
+                let num = provider.get_block_number().await.unwrap();
+                assert_eq!(0, num);
+            }
+            Err(e) => {
+                assert_eq!(
+                    format!("{}",e),
+                    "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
+                );
+            }
+        }
     }
 }

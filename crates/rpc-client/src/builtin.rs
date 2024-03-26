@@ -65,7 +65,7 @@ impl BuiltInConnectionString {
             // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]
             Self::Http(_) => Err(TransportErrorKind::custom_str(
-                "hyper not supported. Please instantiate a hyper client manually",
+                "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually",
             )),
 
             #[cfg(all(not(target = "wasm"), feature = "ws"))]
