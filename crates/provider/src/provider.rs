@@ -999,21 +999,29 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[allow(unused, unreachable_pub)]
-pub trait AdminApi<N: Network, T: Transport + Clone = BoxTransport>: Provider<N, T> {
+pub trait AdminApi {
     /// Adds the given node record to the peerset.
-    async fn add_peer(&self, record: String) -> TransportResult<bool> {
-        self.client().request("admin_addPeer", (record,)).await
-    }
+    async fn add_peer(&self, record: String) -> TransportResult<bool>;
+    // async fn add_peer(&self, record: String) -> TransportResult<bool> {
+    // }
 
     /// Returns the ENR of the node.
-    async fn node_info(&self) -> TransportResult<String> {
-        self.client().request("admin_nodeInfo", ()).await
-    }
+    async fn node_info(&self) -> TransportResult<String>;
+    // async fn node_info(&self) -> TransportResult<String> {
+    // }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N: Network, T: Transport + Clone> AdminApi<N, T> for RootProvider<N, T> {}
+impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
+    async fn add_peer(&self, record: String) -> TransportResult<bool> {
+        self.inner.client_ref().request("admin_addPeer", (record,)).await
+    }
+
+    async fn node_info(&self) -> TransportResult<String> {
+        self.inner.client_ref().request("admin_nodeInfo", ()).await
+    }
+}
 
 #[cfg(test)]
 #[allow(clippy::missing_const_for_fn)]
