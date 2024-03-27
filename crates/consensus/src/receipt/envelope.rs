@@ -1,5 +1,6 @@
 use crate::{Receipt, ReceiptWithBloom, TxType};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+use alloy_primitives::Log;
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
@@ -15,28 +16,28 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
-pub enum ReceiptEnvelope {
+pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
-    Legacy(ReceiptWithBloom),
+    Legacy(ReceiptWithBloom<T>),
     /// Receipt envelope with type flag 1, containing a [EIP-2930] receipt.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
     #[cfg_attr(feature = "serde", serde(rename = "0x01", alias = "0x1"))]
-    Eip2930(ReceiptWithBloom),
+    Eip2930(ReceiptWithBloom<T>),
     /// Receipt envelope with type flag 2, containing a [EIP-1559] receipt.
     ///
     /// [EIP-1559]: https://eips.ethereum.org/EIPS/eip-1559
     #[cfg_attr(feature = "serde", serde(rename = "0x02", alias = "0x2"))]
-    Eip1559(ReceiptWithBloom),
+    Eip1559(ReceiptWithBloom<T>),
     /// Receipt envelope with type flag 2, containing a [EIP-4844] receipt.
     ///
     /// [EIP-4844]: https://eips.ethereum.org/EIPS/eip-4844
     #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
-    Eip4844(ReceiptWithBloom),
+    Eip4844(ReceiptWithBloom<T>),
 }
 
-impl ReceiptEnvelope {
+impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
     pub const fn tx_type(&self) -> TxType {
         match self {
@@ -49,7 +50,7 @@ impl ReceiptEnvelope {
 
     /// Return the inner receipt with bloom. Currently this is infallible,
     /// however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom> {
+    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<T>> {
         match self {
             Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => Some(t),
         }
@@ -57,14 +58,16 @@ impl ReceiptEnvelope {
 
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
-    pub const fn as_receipt(&self) -> Option<&Receipt> {
+    pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
         match self {
             Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => {
                 Some(&t.receipt)
             }
         }
     }
+}
 
+impl ReceiptEnvelope {
     /// Get the length of the inner receipt in the 2718 encoding.
     pub fn inner_length(&self) -> usize {
         self.as_receipt_with_bloom().unwrap().length()

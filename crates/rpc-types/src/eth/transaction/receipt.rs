@@ -1,3 +1,4 @@
+use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256, U64, U8};
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct TransactionReceipt {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
-    pub inner: ReceiptEnvelope,
+    pub inner: ReceiptEnvelope<Log>,
 
     /// Transaction Hash.
     pub transaction_hash: B256,
@@ -58,8 +59,8 @@ pub struct TransactionReceipt {
     pub transaction_type: U8,
 }
 
-impl AsRef<ReceiptEnvelope> for TransactionReceipt {
-    fn as_ref(&self) -> &ReceiptEnvelope {
+impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
+    fn as_ref(&self) -> &ReceiptEnvelope<Log> {
         &self.inner
     }
 }
@@ -96,7 +97,7 @@ impl TransactionReceipt {
 mod test {
 
     use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
-    use alloy_primitives::{b256, bloom, Bloom};
+    use alloy_primitives::{address, b256, bloom, Bloom};
 
     use super::*;
 
@@ -120,5 +121,17 @@ mod test {
                 logs_bloom: EXPECTED_BLOOM
             })
         ));
+
+        let log = receipt.inner.as_receipt().unwrap().logs.first().unwrap();
+        assert_eq!(log.address(), address!("dac17f958d2ee523a2206206994597c13d831ec7"));
+        assert_eq!(log.log_index, Some(0x118));
+        assert_eq!(
+            log.topics(),
+            vec![
+                b256!("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"),
+                b256!("0000000000000000000000009a53bfba35269414f3b2d20b52ca01b15932c7b2"),
+                b256!("00000000000000000000000039e5dbb9d2fead31234d7c647d6ce77d85826f76")
+            ],
+        )
     }
 }

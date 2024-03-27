@@ -6,7 +6,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Receipt {
+pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
@@ -16,7 +16,7 @@ pub struct Receipt {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
-    pub logs: Vec<Log>,
+    pub logs: Vec<T>,
 }
 
 impl Receipt {
@@ -60,10 +60,10 @@ impl TxReceipt for Receipt {
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ReceiptWithBloom {
+pub struct ReceiptWithBloom<T = Log> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     /// The receipt.
-    pub receipt: Receipt,
+    pub receipt: Receipt<T>,
     /// The bloom filter.
     pub logs_bloom: Bloom,
 }
