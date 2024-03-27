@@ -1479,7 +1479,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn adds_peer() {
+    async fn node_info() {
         use super::AdminApi;
         init_tracing();
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
@@ -1487,5 +1487,28 @@ mod tests {
         let provider = http_provider(&geth.endpoint());
         let node_info = provider.node_info().await.unwrap();
         assert!(node_info.enode.starts_with("enode://"));
+    }
+
+    #[tokio::test]
+    async fn peers() {
+        use super::AdminApi;
+        init_tracing();
+        let temp_dir = tempfile::TempDir::with_prefix("reth-test-1").unwrap();
+        let temp_dir_2 = tempfile::TempDir::with_prefix("reth-test-2").unwrap();
+        let geth1 = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let mut geth2 =
+            Geth::new().disable_discovery().port(0u16).data_dir(temp_dir_2.path()).spawn();
+
+        let provider1 = http_provider(&geth1.endpoint());
+        let provider2 = http_provider(&geth2.endpoint());
+        let node1_info = provider1.node_info().await.unwrap();
+        let node1_id = node1_info.id;
+        let node1_enode = node1_info.enode;
+
+        let added = provider2.add_peer(node1_enode.clone()).await.unwrap();
+        assert!(added);
+        let _ = geth2.wait_to_add_peer(node1_id).unwrap();
+        let peers = provider2.peers().await.unwrap();
+        assert_eq!(peers[0].enode, node1_enode);
     }
 }
