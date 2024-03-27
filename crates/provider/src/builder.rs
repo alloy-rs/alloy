@@ -181,7 +181,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// `ProviderBuilder::provider<RpcClient>`.
     pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        L: ProviderLayer<RootProvider<BoxTransport, N>, BoxTransport, N>,
         N: Network,
     {
         let connect: BuiltInConnectionString = s.parse()?;
@@ -197,9 +197,9 @@ impl<L, N> ProviderBuilder<L, N> {
     ) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<
-            RootProvider<N, alloy_pubsub::PubSubFrontend>,
-            N,
+            RootProvider<alloy_pubsub::PubSubFrontend, N>,
             alloy_pubsub::PubSubFrontend,
+            N,
         >,
         N: Network,
     {
@@ -216,9 +216,9 @@ impl<L, N> ProviderBuilder<L, N> {
     where
         alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
         L: ProviderLayer<
-            RootProvider<N, alloy_pubsub::PubSubFrontend>,
-            N,
+            RootProvider<alloy_pubsub::PubSubFrontend, N>,
             alloy_pubsub::PubSubFrontend,
+            N,
         >,
         N: Network,
     {

@@ -1420,7 +1420,7 @@ mod tests {
         let (_provider, anvil) = spawn_anvil();
 
         let provider =
-            RootProvider::<Ethereum, BoxTransport>::connect_builtin(anvil.endpoint().as_str())
+            RootProvider::<BoxTransport, Ethereum>::connect_builtin(anvil.endpoint().as_str())
                 .await;
 
         match provider {

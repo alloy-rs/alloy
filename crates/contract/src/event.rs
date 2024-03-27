@@ -223,7 +223,7 @@ mod tests {
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<_, _, _, MyContract::MyEvent> = Event::new(&provider, Filter::new());
+        let event: Event<_, _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 

@@ -100,7 +100,10 @@ url = "2.5"
 derive_more = "0.99.17"
 
 ## serde
-serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "1.0", default-features = false, features = [
+  "derive",
+  "alloc",
+] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 ## misc-testing
@@ -114,10 +117,10 @@ tempfile = "3.10"
 
 # TODO: Remove eventually.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-sol-macro = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+alloy-primitives = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+alloy-sol-types = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+alloy-json-abi = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+alloy-dyn-abi = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+syn-solidity = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
+alloy-core = { git = "https://github.com/moricho/alloy-core", rev = "5f1dcbf" }
