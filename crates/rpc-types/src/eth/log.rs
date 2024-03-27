@@ -26,12 +26,12 @@ pub struct Log<T = LogData> {
 
 impl<T> Log<T> {
     /// Getter for the address field. Shortcut for `log.inner.address`.
-    pub fn address(&self) -> &alloy_primitives::Address {
+    pub const fn address(&self) -> &alloy_primitives::Address {
         &self.inner.address
     }
 
     /// Getter for the data field. Shortcut for `log.inner.data`.
-    pub fn data(&self) -> &T {
+    pub const fn data(&self) -> &T {
         &self.inner.data
     }
 }
@@ -39,7 +39,7 @@ impl<T> Log<T> {
 impl Log<LogData> {
     /// Getter for the topics field. Shortcut for `log.inner.topics()`.
     pub fn topics(&self) -> &[B256] {
-        &self.inner.topics()
+        self.inner.topics()
     }
 
     /// Get the topic list, mutably. This gives access to the internal
