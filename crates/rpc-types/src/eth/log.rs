@@ -1,4 +1,4 @@
-use alloy_primitives::{LogData, B256, U256};
+use alloy_primitives::{LogData, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
@@ -12,13 +12,16 @@ pub struct Log<T = LogData> {
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
-    pub block_number: Option<U256>,
+    #[serde(with = "alloy_serde::u64_hex_opt")]
+    pub block_number: Option<u64>,
     /// Transaction Hash
     pub transaction_hash: Option<B256>,
     /// Index of the Transaction in the block
-    pub transaction_index: Option<U256>,
+    #[serde(with = "alloy_serde::u64_hex_opt")]
+    pub transaction_index: Option<u64>,
     /// Log Index in Block
-    pub log_index: Option<U256>,
+    #[serde(with = "alloy_serde::u64_hex_opt")]
+    pub log_index: Option<u64>,
     /// Geth Compatibility Field: whether this log was removed
     #[serde(default)]
     pub removed: bool,
@@ -26,8 +29,8 @@ pub struct Log<T = LogData> {
 
 impl<T> Log<T> {
     /// Getter for the address field. Shortcut for `log.inner.address`.
-    pub const fn address(&self) -> &alloy_primitives::Address {
-        &self.inner.address
+    pub const fn address(&self) -> alloy_primitives::Address {
+        self.inner.address
     }
 
     /// Getter for the data field. Shortcut for `log.inner.data`.
@@ -126,10 +129,10 @@ mod tests {
                 ),
             },
             block_hash: Some(B256::with_last_byte(0x69)),
-            block_number: Some(U256::from(0x69)),
+            block_number: Some(0x69),
             transaction_hash: Some(B256::with_last_byte(0x69)),
-            transaction_index: Some(U256::from(0x69)),
-            log_index: Some(U256::from(0x69)),
+            transaction_index: Some(0x69),
+            log_index: Some(0x69),
             removed: false,
         };
         let serialized = serde_json::to_string(&log).unwrap();

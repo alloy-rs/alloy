@@ -244,7 +244,7 @@ mod tests {
         let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
         assert_eq!(stream_event, expected_event);
         assert_eq!(stream_log.inner.address, *contract.address());
-        assert_eq!(stream_log.block_number, Some(U256::from(2)));
+        assert_eq!(stream_log.block_number, Some(2));
 
         // This is not going to return `None`
         // assert!(stream.next().await.is_none());
