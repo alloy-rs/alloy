@@ -17,8 +17,10 @@ pub struct Bundle {
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {
     /// Block Number
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub block_number: Option<BlockId>,
     /// Inclusive number of tx to replay in block. -1 means replay all
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub transaction_index: Option<TransactionIndex>,
 }
 
@@ -100,6 +102,7 @@ impl<'de> Deserialize<'de> for TransactionIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BlockNumberOrTag;
 
     #[test]
     fn transaction_index() {
@@ -114,5 +117,14 @@ mod tests {
         let s = "-2";
         let res = serde_json::from_str::<TransactionIndex>(s);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn serde_state_context() {
+        let s = r#"{"blockNumber":"pending"}"#;
+        let state_context = serde_json::from_str::<StateContext>(s).unwrap();
+        assert_eq!(state_context.block_number, Some(BlockId::Number(BlockNumberOrTag::Pending)));
+        let state_context = serde_json::from_str::<Option<StateContext>>(s).unwrap().unwrap();
+        assert_eq!(state_context.block_number, Some(BlockId::Number(BlockNumberOrTag::Pending)));
     }
 }
