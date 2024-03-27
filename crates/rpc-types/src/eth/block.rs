@@ -600,6 +600,30 @@ impl BlockId {
         matches!(self, BlockId::Number(BlockNumberOrTag::Pending))
     }
 
+    /// Returns true if this is [BlockNumberOrTag::Safe]
+    pub const fn is_safe(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Safe))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Finalized]
+    pub const fn is_finalized(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Finalized))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Earliest]
+    pub const fn is_earliest(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Earliest))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Number]
+    pub const fn is_number(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Number(_)))
+    }
+    /// Returns true if this is [BlockId::Hash]
+    pub const fn is_hash(&self) -> bool {
+        matches!(self, BlockId::Hash(_))
+    }
+
     /// Creates a new "pending" tag instance.
     pub const fn pending() -> Self {
         BlockId::Number(BlockNumberOrTag::Pending)
