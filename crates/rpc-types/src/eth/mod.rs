@@ -15,6 +15,7 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
+pub mod admin;
 mod work;
 
 pub use account::*;

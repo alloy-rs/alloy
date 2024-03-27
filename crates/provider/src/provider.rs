@@ -37,6 +37,7 @@ use std::{
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
+use alloy_rpc_types::admin::NodeInfo;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -1002,13 +1003,9 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 pub trait AdminApi {
     /// Adds the given node record to the peerset.
     async fn add_peer(&self, record: String) -> TransportResult<bool>;
-    // async fn add_peer(&self, record: String) -> TransportResult<bool> {
-    // }
 
     /// Returns the ENR of the node.
-    async fn node_info(&self) -> TransportResult<String>;
-    // async fn node_info(&self) -> TransportResult<String> {
-    // }
+    async fn node_info(&self) -> TransportResult<NodeInfo>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -1018,7 +1015,7 @@ impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
         self.inner.client_ref().request("admin_addPeer", (record,)).await
     }
 
-    async fn node_info(&self) -> TransportResult<String> {
+    async fn node_info(&self) -> TransportResult<NodeInfo> {
         self.inner.client_ref().request("admin_nodeInfo", ()).await
     }
 }
@@ -1027,6 +1024,7 @@ impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
+    use alloy_node_bindings::Geth;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
 
@@ -1453,9 +1451,10 @@ mod tests {
     async fn adds_peer() {
         use super::AdminApi;
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
-        let added = provider.add_peer("enr:-".to_string()).await.unwrap();
-        println!("{added:?}");
+        let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = http_provider(&geth.endpoint());
+        let node_info = provider.node_info().await.unwrap();
+        assert!(node_info.enode.starts_with("enode://"));
     }
 }
