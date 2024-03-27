@@ -23,7 +23,7 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{
-    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
+    impl_future, BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,
 };
 use alloy_transport_http::Http;
@@ -997,19 +997,15 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 }
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[allow(unused, unreachable_pub)]
 pub trait AdminApi {
     /// Adds the given node record to the peerset.
-    async fn add_peer(&self, record: String) -> TransportResult<bool>;
+    fn add_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
 
     /// Returns the ENR of the node.
-    async fn node_info(&self) -> TransportResult<NodeInfo>;
+    fn node_info(&self) -> impl_future!(<Output= TransportResult<NodeInfo>>);
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
     async fn add_peer(&self, record: String) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_addPeer", (record,)).await
