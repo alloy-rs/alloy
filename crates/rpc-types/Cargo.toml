@@ -34,6 +34,7 @@ proptest-derive = { version = "0.4", optional = true }
 
 # jsonrpsee
 jsonrpsee-types = { version = "0.20", optional = true }
+alloy-sol-types.workspace = true
 
 [features]
 arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
