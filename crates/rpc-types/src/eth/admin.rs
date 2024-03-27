@@ -2,7 +2,6 @@
 use alloy_genesis::ChainConfig;
 use alloy_primitives::{B256, U256};
 use alloy_serde::json_u256::deserialize_json_u256;
-use enr::{k256::ecdsa::SigningKey, Enr};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
 
@@ -20,7 +19,7 @@ pub struct NodeInfo {
     pub enode: String,
 
     /// The [ENR](https://eips.ethereum.org/EIPS/eip-778) of the running client.
-    pub enr: Enr<SigningKey>,
+    pub enr: String,
 
     /// The IP address of the connected node.
     pub ip: IpAddr,
@@ -171,7 +170,7 @@ pub struct SnapInfo {
 pub struct PeerInfo {
     /// The peer's ENR.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enr: Option<Enr<SigningKey>>,
+    pub enr: Option<String>,
 
     /// The peer's enode URL.
     pub enode: String,

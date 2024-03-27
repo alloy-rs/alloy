@@ -1001,21 +1001,20 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 pub trait AdminApi {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
-    fn add_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
+    fn add_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
 
     /// Requests adding the given peer as a trusted peer, which the node will
     /// always connect to even when its peer slots are full.
-    fn add_trusted_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
+    fn add_trusted_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
 
     /// Requests to remove the given peer, returning true if the enode was successfully parsed and
     /// the peer was removed.
-    fn remove_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
+    fn remove_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
 
     /// Requests to remove the given peer, returning a boolean representing whether or not the
     /// enode url passed was validated. A return value of `true` does not necessarily mean that the
     /// peer was disconnected.
-    fn remove_trusted_peer(&self, record: String)
-        -> impl_future!(<Output = TransportResult<bool>>);
+    fn remove_trusted_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
 
     /// Returns the list of peers currently connected to the node.
     fn peers(&self) -> impl_future!(<Output = TransportResult<Vec<PeerInfo>>>);
@@ -1026,19 +1025,19 @@ pub trait AdminApi {
 }
 
 impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
-    async fn add_peer(&self, record: String) -> TransportResult<bool> {
+    async fn add_peer(&self, record: &str) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_addPeer", (record,)).await
     }
 
-    async fn add_trusted_peer(&self, record: String) -> TransportResult<bool> {
+    async fn add_trusted_peer(&self, record: &str) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_addTrustedPeer", (record,)).await
     }
 
-    async fn remove_peer(&self, record: String) -> TransportResult<bool> {
+    async fn remove_peer(&self, record: &str) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_removePeer", (record,)).await
     }
 
-    async fn remove_trusted_peer(&self, record: String) -> TransportResult<bool> {
+    async fn remove_trusted_peer(&self, record: &str) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_removeTrustedPeer", (record,)).await
     }
 
@@ -1505,7 +1504,7 @@ mod tests {
         let node1_id = node1_info.id;
         let node1_enode = node1_info.enode;
 
-        let added = provider2.add_peer(node1_enode.clone()).await.unwrap();
+        let added = provider2.add_peer(&node1_enode).await.unwrap();
         assert!(added);
         let _ = geth2.wait_to_add_peer(node1_id).unwrap();
         let peers = provider2.peers().await.unwrap();
