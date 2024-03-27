@@ -224,7 +224,7 @@ mod tests {
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<_, _, _, MyContract::MyEvent> = Event::new(&provider, Filter::new());
+        let event: Event<_, _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 
@@ -260,7 +260,7 @@ mod tests {
         {
             let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
             let client = RpcClient::connect_pubsub(ws).await.unwrap();
-            let provider = RootProvider::<Ethereum, _>::new(client);
+            let provider = RootProvider::<_, Ethereum>::new(client);
 
             let contract = MyContract::new(*contract.address(), provider);
             let event = contract.MyEvent_filter();
