@@ -1,7 +1,6 @@
 use crate::{other::OtherFields, ConversionError, Log};
 use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom, TxType};
 use alloy_primitives::{Address, Bloom, B256, U128, U256, U64, U8};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
@@ -81,13 +80,31 @@ impl TransactionReceipt {
         }
     }
 
-    /// Returns an iterator over the logs for prmitives type conversion.
-    fn logs_iter(
-        &self,
-    ) -> impl Iterator<Item = alloy_primitives::Log<alloy_primitives::LogData>> + '_ {
-        self.logs.iter().map(|log| {
-            alloy_primitives::Log::new_unchecked(log.address, log.topics.clone(), log.data.clone())
-        })
+    /// Consumes the type and returns a vector of logs.
+    fn into_logs(self) -> Vec<alloy_primitives::Log<alloy_primitives::LogData>> {
+        self.logs
+            .into_iter()
+            .map(|log| {
+                alloy_primitives::Log::new_unchecked(
+                    log.address,
+                    log.topics.clone(),
+                    log.data.clone(),
+                )
+            })
+            .collect()
+    }
+
+    /// Consumes the type and converts the transaction receipt into a receipt with bloom.
+    fn into_receipt_with_bloom(self) -> ReceiptWithBloom {
+        let logs_bloom = self.logs_bloom;
+        ReceiptWithBloom::new(
+            Receipt {
+                success: self.success(),
+                cumulative_gas_used: self.cumulative_gas_used.to::<u64>(),
+                logs: self.into_logs(),
+            },
+            logs_bloom,
+        )
     }
 }
 
@@ -95,15 +112,7 @@ impl TryFrom<TransactionReceipt> for ReceiptWithBloom {
     type Error = ConversionError;
 
     fn try_from(tx_receipt: TransactionReceipt) -> Result<Self, Self::Error> {
-        let receipt_with_bloom = ReceiptWithBloom {
-            receipt: Receipt {
-                success: tx_receipt.success(),
-                cumulative_gas_used: tx_receipt.cumulative_gas_used.to::<u64>(),
-                logs: tx_receipt.logs_iter().collect_vec(),
-            },
-            bloom: tx_receipt.logs_bloom,
-        };
-        Ok(receipt_with_bloom)
+        Ok(tx_receipt.into_receipt_with_bloom())
     }
 }
 
@@ -112,10 +121,10 @@ impl TryFrom<TransactionReceipt> for ReceiptEnvelope {
 
     fn try_from(tx_receipt: TransactionReceipt) -> Result<Self, Self::Error> {
         match tx_receipt.transaction_type.to::<u8>().try_into()? {
-            TxType::Legacy => Ok(ReceiptEnvelope::Legacy(tx_receipt.try_into()?)),
-            TxType::Eip2930 => Ok(ReceiptEnvelope::Eip2930(tx_receipt.try_into()?)),
-            TxType::Eip1559 => Ok(ReceiptEnvelope::Eip1559(tx_receipt.try_into()?)),
-            TxType::Eip4844 => Ok(ReceiptEnvelope::Eip4844(tx_receipt.try_into()?)),
+            TxType::Legacy => Ok(ReceiptEnvelope::Legacy(tx_receipt.into_receipt_with_bloom())),
+            TxType::Eip2930 => Ok(ReceiptEnvelope::Eip2930(tx_receipt.into_receipt_with_bloom())),
+            TxType::Eip1559 => Ok(ReceiptEnvelope::Eip1559(tx_receipt.into_receipt_with_bloom())),
+            TxType::Eip4844 => Ok(ReceiptEnvelope::Eip4844(tx_receipt.into_receipt_with_bloom())),
         }
     }
 }
