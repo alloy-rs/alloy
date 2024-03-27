@@ -146,6 +146,19 @@ where
 
         Ok(())
     }
+
+    /// There are a few ways to obtain the blob base fee for an EIP-4844 transaction:
+    ///
+    /// * `eth_blobBaseFee`: Returns the fee for the next block directly.
+    /// * `eth_feeHistory`: Returns the same info as for the EIP-1559 fees.
+    /// * retrieving it from the "pending" block directly.
+    ///
+    /// At the time of this writing support for EIP-4844 fees is lacking, hence we're defaulting to requesting the fee from the "pending" block.
+    async fn handle_eip4844_tx(&self, tx: &mut N::TransactionRequest) -> Result<(), TransportError> {
+        // TODO fetch block and set blob fee
+
+        todo!()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
