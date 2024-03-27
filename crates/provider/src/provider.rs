@@ -37,7 +37,7 @@ use std::{
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
-use alloy_rpc_types::admin::NodeInfo;
+use alloy_rpc_types::admin::{NodeInfo, PeerInfo};
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -999,16 +999,51 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
 #[allow(unused, unreachable_pub)]
 pub trait AdminApi {
-    /// Adds the given node record to the peerset.
+    /// Requests adding the given peer, returning a boolean representing
+    /// whether or not the peer was accepted for tracking.
     fn add_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
 
-    /// Returns the ENR of the node.
+    /// Requests adding the given peer as a trusted peer, which the node will
+    /// always connect to even when its peer slots are full.
+    fn add_trusted_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
+
+    /// Requests to remove the given peer, returning true if the enode was successfully parsed and
+    /// the peer was removed.
+    fn remove_peer(&self, record: String) -> impl_future!(<Output = TransportResult<bool>>);
+
+    /// Requests to remove the given peer, returning a boolean representing whether or not the
+    /// enode url passed was validated. A return value of `true` does not necessarily mean that the
+    /// peer was disconnected.
+    fn remove_trusted_peer(&self, record: String)
+        -> impl_future!(<Output = TransportResult<bool>>);
+
+    /// Returns the list of peers currently connected to the node.
+    fn peers(&self) -> impl_future!(<Output = TransportResult<Vec<PeerInfo>>>);
+
+    /// Returns general information about the node as well as information about the running p2p
+    /// protocols (e.g. `eth`, `snap`).
     fn node_info(&self) -> impl_future!(<Output= TransportResult<NodeInfo>>);
 }
 
 impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
     async fn add_peer(&self, record: String) -> TransportResult<bool> {
         self.inner.client_ref().request("admin_addPeer", (record,)).await
+    }
+
+    async fn add_trusted_peer(&self, record: String) -> TransportResult<bool> {
+        self.inner.client_ref().request("admin_addTrustedPeer", (record,)).await
+    }
+
+    async fn remove_peer(&self, record: String) -> TransportResult<bool> {
+        self.inner.client_ref().request("admin_removePeer", (record,)).await
+    }
+
+    async fn remove_trusted_peer(&self, record: String) -> TransportResult<bool> {
+        self.inner.client_ref().request("admin_removeTrustedPeer", (record,)).await
+    }
+
+    async fn peers(&self) -> TransportResult<Vec<PeerInfo>> {
+        self.inner.client_ref().request("admin_peers", ()).await
     }
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
