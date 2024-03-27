@@ -39,7 +39,7 @@ use std::marker::PhantomData;
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct GasEstimatorLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for GasEstimatorLayer
