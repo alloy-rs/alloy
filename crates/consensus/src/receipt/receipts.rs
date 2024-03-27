@@ -13,7 +13,7 @@ pub struct Receipt {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity_bool"))]
     pub status: bool,
     /// Gas used
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     pub logs: Vec<Log>,

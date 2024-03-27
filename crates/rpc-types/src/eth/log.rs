@@ -1,10 +1,10 @@
-use alloy_primitives::{B256, U256};
+use alloy_primitives::{LogData, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Log<T = alloy_primitives::LogData> {
+pub struct Log<T = LogData> {
     #[serde(flatten)]
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
@@ -24,12 +24,52 @@ pub struct Log<T = alloy_primitives::LogData> {
     pub removed: bool,
 }
 
+impl<T> Log<T> {
+    /// Getter for the address field. Shortcut for `log.inner.address`.
+    pub fn address(&self) -> &alloy_primitives::Address {
+        &self.inner.address
+    }
+
+    /// Getter for the data field. Shortcut for `log.inner.data`.
+    pub fn data(&self) -> &T {
+        &self.inner.data
+    }
+}
+
+impl Log<LogData> {
+    /// Getter for the topics field. Shortcut for `log.inner.topics()`.
+    pub fn topics(&self) -> &[B256] {
+        &self.inner.topics()
+    }
+
+    /// Get the topic list, mutably. This gives access to the internal
+    /// array, without allowing extension of that array. Shortcut for
+    /// [`LogData::topics_mut`]
+    pub fn topics_mut(&mut self) -> &mut [B256] {
+        self.inner.data.topics_mut()
+    }
+
+    /// Decode the log data into a typed log.
+    pub fn log_decode<T: alloy_sol_types::SolEvent>(&self) -> alloy_sol_types::Result<Log<T>> {
+        let decoded = T::decode_log(&self.inner, false)?;
+        Ok(Log {
+            inner: decoded,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            log_index: self.log_index,
+            removed: self.removed,
+        })
+    }
+}
+
 impl<T> Log<T>
 where
-    for<'a> &'a T: Into<alloy_primitives::LogData>,
+    for<'a> &'a T: Into<LogData>,
 {
     /// Reserialize the data.
-    pub fn reserialize(&self) -> Log<alloy_primitives::LogData> {
+    pub fn reserialize(&self) -> Log<LogData> {
         Log {
             inner: alloy_primitives::Log {
                 address: self.inner.address,
