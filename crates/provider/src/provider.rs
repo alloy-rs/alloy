@@ -1506,7 +1506,7 @@ mod tests {
 
         let added = provider2.add_peer(&node1_enode).await.unwrap();
         assert!(added);
-        let _ = geth2.wait_to_add_peer(node1_id).unwrap();
+        geth2.wait_to_add_peer(node1_id).unwrap();
         let peers = provider2.peers().await.unwrap();
         assert_eq!(peers[0].enode, node1_enode);
     }
