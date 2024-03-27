@@ -1,6 +1,7 @@
 //! Ethereum related types
 
 mod account;
+pub mod admin;
 mod block;
 mod call;
 pub mod error;
@@ -15,7 +16,6 @@ pub mod state;
 mod syncing;
 pub mod transaction;
 pub mod txpool;
-pub mod admin;
 mod work;
 
 pub use account::*;
