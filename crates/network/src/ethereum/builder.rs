@@ -97,7 +97,7 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.gas = Some(gas_limit);
     }
 
-    fn build_unsigned(self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
+    fn build_unsigned(mut self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
         match (
             self.gas_price.as_ref(),
             self.max_fee_per_gas.as_ref(),
@@ -116,7 +116,11 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
             (None, _, _, None, None, None) => build_1559(self).map(Into::into),
             // EIP-4844
             // All blob fields required
-            (None, _, _, Some(_), Some(_), Some(_)) => {
+            (None, _, _, Some(_), _, Some(sidecar)) => {
+                if self.blob_versioned_hashes.is_none() {
+                    //if not configured already, set the blob hashes from the sidecar
+                    self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+                }
                 build_4844(self).map(TxEip4844Variant::from).map(Into::into)
             }
             _ => build_legacy(self).map(Into::into),
