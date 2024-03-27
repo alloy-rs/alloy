@@ -3,6 +3,7 @@
 #![allow(unknown_lints, non_local_definitions)]
 
 use crate::{other::OtherFields, Transaction, Withdrawal};
+use alloy_eips::{calc_blob_gasprice, calc_excess_blob_gas};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
@@ -115,6 +116,32 @@ pub struct Header {
     /// Parent beacon block root
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+}
+
+impl Header {
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    pub fn blob_fee(&self) -> Option<u128> {
+        self.excess_blob_gas.map(|gas| calc_blob_gasprice(gas.to()))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    pub fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+    }
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
+        Some(calc_excess_blob_gas(self.excess_blob_gas?.to(), self.blob_gas_used?.to()))
+    }
 }
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
