@@ -837,9 +837,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
             )
             .await?;
 
+        // if the base fee of the Latest block is 0 then we need check if the latest block even has
+        // a base fee/supports EIP1559
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
-            Some(base_fee) => base_fee,
-            None => {
+            Some(base_fee) if !base_fee.is_zero() => base_fee,
+            _ => {
                 // empty response, fetch basefee from latest block directly
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
                     .await?
