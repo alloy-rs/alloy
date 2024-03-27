@@ -72,7 +72,7 @@ impl TransactionReceipt {
     }
 
     /// Returns the transaction type.
-    pub fn transaction_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         self.inner.tx_type()
     }
 
