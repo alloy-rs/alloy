@@ -64,6 +64,13 @@ pub struct FeeHistory {
 }
 
 impl FeeHistory {
+    /// Returns the base fee of the requested block in the `eth_feeHistory` request.
+    pub fn latest_block_base_fee(&self) -> Option<U256> {
+        // the base fee of what is considered the "latest" block is the second last element in the
+        // list
+        self.base_fee_per_gas.iter().rev().skip(1).next().copied()
+    }
+
     /// Returns the base fee of the next block.
     pub fn next_block_base_fee(&self) -> Option<U256> {
         self.base_fee_per_gas.last().copied()
@@ -72,9 +79,25 @@ impl FeeHistory {
     /// Returns the blob base fee of the next block.
     ///
     /// If the next block is pre- EIP-4844, this will return `None`.
-    pub fn next_blob_base_fee(&self) -> Option<U256> {
+    pub fn next_block_blob_base_fee(&self) -> Option<U256> {
         self.base_fee_per_blob_gas
             .last()
+            .filter(|fee| {
+                // skip zero value that is returned for pre-EIP-4844 blocks
+                !fee.is_zero()
+            })
+            .copied()
+    }
+
+    /// Returns the blob fee of the requested block in the `eth_feeHistory` request.
+    pub fn latest_block_blob_base_fee(&self) -> Option<U256> {
+        // the base fee of what is considered the "latest" block is the second last element in the
+        // list
+        self.base_fee_per_blob_gas
+            .iter()
+            .rev()
+            .skip(1)
+            .next()
             .filter(|fee| {
                 // skip zero value that is returned for pre-EIP-4844 blocks
                 !fee.is_zero()
