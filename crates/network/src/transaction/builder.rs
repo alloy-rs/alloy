@@ -1,5 +1,6 @@
 use super::signer::NetworkSigner;
 use crate::Network;
+use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use futures_utils_wasm::impl_future;
 
@@ -187,6 +188,21 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Builder-pattern method for setting the gas limit.
     fn with_gas_limit(mut self, gas_limit: U256) -> Self {
         self.set_gas_limit(gas_limit);
+        self
+    }
+
+    /// Gets the EIP-4844 blob sidecar of the transaction.
+    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
+
+    /// Sets the EIP-4844 blob sidecar of the transaction.
+    ///
+    /// Note: This will also set the versioned blob hashes accordingly:
+    /// [BlobTransactionSidecar::versioned_hashes]
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar);
+
+    /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
+    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecar) -> Self {
+        self.set_blob_sidecar(sidecar);
         self
     }
 

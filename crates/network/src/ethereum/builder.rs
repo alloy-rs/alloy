@@ -1,7 +1,9 @@
 use crate::{
     BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
-use alloy_consensus::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy};
+use alloy_consensus::{
+    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
+};
 use alloy_primitives::{Address, TxKind, U256};
 use alloy_rpc_types::request::TransactionRequest;
 
@@ -30,16 +32,16 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.input.input = Some(input);
     }
 
-    fn to(&self) -> Option<alloy_primitives::TxKind> {
-        self.to.map(TxKind::Call).or(Some(TxKind::Create))
-    }
-
     fn from(&self) -> Option<Address> {
         self.from
     }
 
     fn set_from(&mut self, from: Address) {
         self.from = Some(from);
+    }
+
+    fn to(&self) -> Option<alloy_primitives::TxKind> {
+        self.to.map(TxKind::Call).or(Some(TxKind::Create))
     }
 
     fn set_to(&mut self, to: alloy_primitives::TxKind) {
@@ -95,6 +97,15 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
 
     fn set_gas_limit(&mut self, gas_limit: U256) {
         self.gas = Some(gas_limit);
+    }
+
+    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+        self.sidecar = Some(sidecar);
     }
 
     fn build_unsigned(mut self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
