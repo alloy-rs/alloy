@@ -599,6 +599,46 @@ impl BlockId {
     pub const fn is_pending(&self) -> bool {
         matches!(self, BlockId::Number(BlockNumberOrTag::Pending))
     }
+
+    /// Creates a new "pending" tag instance.
+    pub const fn pending() -> Self {
+        BlockId::Number(BlockNumberOrTag::Pending)
+    }
+
+    /// Creates a new "latest" tag instance.
+    pub const fn latest() -> Self {
+        BlockId::Number(BlockNumberOrTag::Latest)
+    }
+
+    /// Creates a new "earliest" tag instance.
+    pub const fn earliest() -> Self {
+        BlockId::Number(BlockNumberOrTag::Earliest)
+    }
+
+    /// Creates a new "finalized" tag instance.
+    pub const fn finalized() -> Self {
+        BlockId::Number(BlockNumberOrTag::Finalized)
+    }
+
+    /// Creates a new "safe" tag instance.
+    pub const fn safe() -> Self {
+        BlockId::Number(BlockNumberOrTag::Safe)
+    }
+
+    /// Creates a new block number instance.
+    pub const fn number(num: u64) -> Self {
+        BlockId::Number(BlockNumberOrTag::Number(num))
+    }
+
+    /// Create a new block hash instance.
+    pub const fn hash(block_hash: B256) -> Self {
+        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
+    }
+
+    /// Create a new block hash instance that requires the block to be canonical.
+    pub const fn hash_canonical(block_hash: B256) -> Self {
+        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
+    }
 }
 
 impl Default for BlockId {
