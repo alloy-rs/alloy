@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ConversionError"],"mod":["optimism","request"],"struct":["AccessList","AccessListItem","AccessListWithGasUsed","BlobTransactionSidecar","OptimismTransactionReceiptFields","Parity","Signature","Transaction","TransactionInfo","TransactionInput","TransactionReceipt","TransactionRequest"]};

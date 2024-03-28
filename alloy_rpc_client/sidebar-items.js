@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BuiltInConnectionString"],"mod":["batch","builder","builtin","call","client","poller"],"struct":["BatchRequest","ClientBuilder","IpcConnect","PollChannel","PollerBuilder","RpcCall","RpcClient","WsConnect"],"type":["ClientRef","WeakClient"]};

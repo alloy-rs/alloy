@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FilterBlockOption","FilterChanges","FilterId","PendingTransactionFilterKind","ValueOrArray"],"mod":["empty_array"],"struct":["BloomFilter","Filter","FilterSet","FilteredParams"],"type":["RawAddressFilter","RawTopicsFilter","Topic"]};

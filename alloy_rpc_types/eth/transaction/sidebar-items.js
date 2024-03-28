@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["common","error","optimism","receipt","request","signature"],"struct":["AccessList","AccessListItem","AccessListWithGasUsed","BlobTransactionSidecar","Transaction"]};

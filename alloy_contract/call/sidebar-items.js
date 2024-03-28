@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["private"],"struct":["CallBuilder"],"trait":["CallDecoder"],"type":["DynCallBuilder","RawCallBuilder","SolCallBuilder"]};

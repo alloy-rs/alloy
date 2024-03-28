@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ErrorKind"],"fn":["erase_device_and_init_with_profile","init_with_profile"],"mod":["report"],"struct":["Profile","Report","Role"],"type":["Error"]};

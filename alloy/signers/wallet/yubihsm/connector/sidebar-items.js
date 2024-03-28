@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ErrorKind"],"mod":["http","usb"],"struct":["Connector","HttpConfig","UsbConfig"],"trait":["Connection"],"type":["Error"]};

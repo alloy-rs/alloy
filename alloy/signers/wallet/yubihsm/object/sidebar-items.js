@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["LABEL_SIZE"],"enum":["ErrorKind","Filter","Origin","Type"],"mod":["put"],"struct":["Entry","Handle","Info","Label"],"type":["Error","Id","SequenceId"]};

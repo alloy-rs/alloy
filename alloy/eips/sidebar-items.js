@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["calc_blob_gasprice","calc_excess_blob_gas","calc_next_block_base_fee"],"mod":["eip1559","eip2718","eip2930","eip4788","eip4844","eip4895","merge"]};

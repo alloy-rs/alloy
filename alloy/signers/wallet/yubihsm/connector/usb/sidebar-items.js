@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["YUBICO_VENDOR_ID","YUBIHSM2_BULK_IN_ENDPOINT","YUBIHSM2_BULK_OUT_ENDPOINT","YUBIHSM2_INTERFACE_NUM","YUBIHSM2_PRODUCT_ID"],"struct":["Device","Devices","UsbConfig","UsbConnection","UsbConnector","UsbTimeout"]};

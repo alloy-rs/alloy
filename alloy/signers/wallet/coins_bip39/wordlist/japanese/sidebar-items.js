@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RAW_JAPANESE"],"static":["PARSED"],"struct":["Japanese"]};

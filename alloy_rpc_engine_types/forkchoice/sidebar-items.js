@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["INVALID_FORK_CHOICE_STATE_ERROR","INVALID_FORK_CHOICE_STATE_ERROR_MSG","INVALID_PAYLOAD_ATTRIBUTES_ERROR","INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG"],"enum":["ForkchoiceUpdateError"],"struct":["ForkchoiceState","ForkchoiceUpdated"],"type":["ForkChoiceUpdateResult"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["NumberOrHexU256"],"fn":["from_int_or_hex","from_int_or_hex_opt"],"mod":["u128_hex_or_decimal","u64_hex","u64_hex_opt","u64_hex_or_decimal","u64_hex_or_decimal_opt"],"struct":["U64HexOrNumber"]};

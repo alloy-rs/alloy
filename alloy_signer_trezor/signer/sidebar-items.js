@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FIRMWARE_1_MIN_VERSION","FIRMWARE_2_MIN_VERSION"],"fn":["address_to_trezor","signature_from_trezor","u128_to_trezor","u256_to_trezor","u64_to_trezor"],"struct":["TrezorSigner"]};

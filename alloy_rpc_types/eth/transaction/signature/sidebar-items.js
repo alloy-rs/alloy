@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["deserialize_parity","serialize_parity"],"struct":["Parity","Signature"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["calc_next_block_base_fee"]};

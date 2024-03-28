@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["TX_TYPE_BYTE_MAX"],"enum":["Eip2718Error"],"trait":["Decodable2718","Eip2718Envelope","Encodable2718"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["mainnet_id"],"struct":["ChainConfig","CliqueConfig","EthashConfig","Genesis","GenesisAccount"]};

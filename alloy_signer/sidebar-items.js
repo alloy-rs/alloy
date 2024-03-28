@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Error","UnsupportedSignerOperation"],"macro":["sign_transaction_with_chain_id"],"mod":["error","signer","utils"],"trait":["Signer","SignerSync"],"type":["Result","Signature"]};

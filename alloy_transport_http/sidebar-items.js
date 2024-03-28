@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["hyper","reqwest"],"struct":["Http"],"type":["HyperClient"]};
