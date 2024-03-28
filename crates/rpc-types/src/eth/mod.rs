@@ -1,6 +1,7 @@
 //! Ethereum related types
 
 mod account;
+pub mod admin;
 mod block;
 mod call;
 pub mod error;

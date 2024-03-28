@@ -38,6 +38,7 @@ mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
 pub mod utils;
+mod admin;
 
 #[doc(no_inline)]
 pub use alloy_network::{self as network, Network};
