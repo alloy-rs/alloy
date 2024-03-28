@@ -998,7 +998,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
 #[allow(unused, unreachable_pub)]
-pub trait AdminApi {
+pub trait AdminApi<N, T> {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
     fn add_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
@@ -1024,29 +1024,35 @@ pub trait AdminApi {
     fn node_info(&self) -> impl_future!(<Output= TransportResult<NodeInfo>>);
 }
 
-impl<N: Network, T: Transport + Clone> AdminApi for RootProvider<N, T> {
+impl<N, T, P> AdminApi<N, T> for P
+where
+    N: Network,
+    T: Transport + Clone,
+    P: Provider<N, T>,
+{
     async fn add_peer(&self, record: &str) -> TransportResult<bool> {
-        self.inner.client_ref().request("admin_addPeer", (record,)).await
+        // self.client().
+        self.client().request("admin_addPeer", (record,)).await
     }
 
     async fn add_trusted_peer(&self, record: &str) -> TransportResult<bool> {
-        self.inner.client_ref().request("admin_addTrustedPeer", (record,)).await
+        self.client().request("admin_addTrustedPeer", (record,)).await
     }
 
     async fn remove_peer(&self, record: &str) -> TransportResult<bool> {
-        self.inner.client_ref().request("admin_removePeer", (record,)).await
+        self.client().request("admin_removePeer", (record,)).await
     }
 
     async fn remove_trusted_peer(&self, record: &str) -> TransportResult<bool> {
-        self.inner.client_ref().request("admin_removeTrustedPeer", (record,)).await
+        self.client().request("admin_removeTrustedPeer", (record,)).await
     }
 
     async fn peers(&self) -> TransportResult<Vec<PeerInfo>> {
-        self.inner.client_ref().request("admin_peers", ()).await
+        self.client().request("admin_peers", ()).await
     }
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
-        self.inner.client_ref().request("admin_nodeInfo", ()).await
+        self.client().request("admin_nodeInfo", ()).await
     }
 }
 
@@ -1489,7 +1495,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn peers() {
+    async fn admin_peers() {
         use super::AdminApi;
         init_tracing();
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-1").unwrap();
