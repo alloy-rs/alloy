@@ -43,7 +43,9 @@ pub use self::core::json;
 #[cfg(feature = "sol-types")]
 #[doc(inline)]
 pub use self::core::sol_types;
-#[cfg(all(doc, feature = "sol-types"))] // Show this re-export in docs instead of the wrapper below.
+
+// Show this re-export in docs instead of the wrapper below.
+#[cfg(all(doc, feature = "sol-types"))]
 #[doc(no_inline)]
 pub use sol_types::sol;
 
@@ -158,7 +160,6 @@ pub mod rpc {
     #[doc(inline)]
     pub use alloy_json_rpc as json_rpc;
 
-    /// Ethereum JSON-RPC type definitions.
     #[cfg(feature = "rpc-types")]
     pub mod types {
         #[cfg(feature = "rpc-types-eth")]
@@ -187,15 +188,19 @@ pub mod signers {
     #[cfg(feature = "signer-aws")]
     #[doc(inline)]
     pub use alloy_signer_aws as aws;
+
     #[cfg(feature = "signer-gcp")]
     #[doc(inline)]
     pub use alloy_signer_gcp as gcp;
+
     #[cfg(feature = "signer-ledger")]
     #[doc(inline)]
     pub use alloy_signer_ledger as ledger;
+
     #[cfg(feature = "signer-trezor")]
     #[doc(inline)]
     pub use alloy_signer_trezor as trezor;
+
     #[cfg(feature = "signer-wallet")]
     #[doc(inline)]
     pub use alloy_signer_wallet as wallet;
@@ -209,13 +214,18 @@ pub mod transports {
     #[cfg(feature = "transport-http")]
     #[doc(inline)]
     pub use alloy_transport_http as http;
-    #[cfg(feature = "transport-ipc")]
-    #[doc(inline)]
-    pub use alloy_transport_ipc as ipc;
-    #[cfg(feature = "transport-ws")]
-    #[doc(inline)]
-    pub use alloy_transport_ws as ws;
 
     #[cfg(feature = "transport-http-reqwest")]
     use reqwest as _;
+
+    #[cfg(feature = "transport-http-hyper")]
+    use hyper as _;
+
+    #[cfg(feature = "transport-ipc")]
+    #[doc(inline)]
+    pub use alloy_transport_ipc as ipc;
+
+    #[cfg(feature = "transport-ws")]
+    #[doc(inline)]
+    pub use alloy_transport_ws as ws;
 }
