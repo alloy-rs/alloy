@@ -35,6 +35,7 @@ tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 
 alloy-pubsub = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-consensus.workspace = true
@@ -47,6 +48,8 @@ tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
 
 [features]
+reqwest = ["dep:url"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
+hyper = ["dep:url"]

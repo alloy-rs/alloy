@@ -225,23 +225,25 @@ impl<L, N> ProviderBuilder<L, N> {
         Ok(self.on_client(client))
     }
 
+    /// Build this provider with reqwest HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
         N: Network,
     {
-        let client = ClientBuilder::default().reqwest_http(url);
+        let client = ClientBuilder::default().reqwest_http(url).boxed();
         Ok(self.on_client(client))
     }
 
+    /// Build this provider with hyper HTTP transport.
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
         N: Network,
     {
-        let client = ClientBuilder::default().hyper_http(url);
+        let client = ClientBuilder::default().hyper_http(url).boxed();
         Ok(self.on_client(client))
     }
 }
