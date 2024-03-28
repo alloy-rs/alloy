@@ -192,7 +192,6 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::Ethereum;
     use alloy_primitives::U256;
     use alloy_provider::RootProvider;
     use alloy_rpc_client::RpcClient;
