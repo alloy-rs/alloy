@@ -37,9 +37,9 @@ use tokio::sync::Mutex;
 ///
 /// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
-pub struct ManagedNonceLayer;
+pub struct NonceManagerLayer;
 
-impl<P, N, T> ProviderLayer<P, N, T> for ManagedNonceLayer
+impl<P, N, T> ProviderLayer<P, N, T> for NonceManagerLayer
 where
     P: Provider<N, T>,
     N: Network,
@@ -61,7 +61,7 @@ where
 /// If the transaction requests do not have a sender set, this provider will not set nonces.
 ///
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a
-/// [`ManagedNonceLayer`].
+/// [`NonceManagerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]

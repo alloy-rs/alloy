@@ -1,11 +1,7 @@
 //! Payload types.
-
+use alloy_consensus::{Blob, Bytes48};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
-use alloy_rpc_types::{
-    kzg::{Blob, Bytes48},
-    transaction::BlobTransactionSidecar,
-    Withdrawal,
-};
+use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -405,14 +401,75 @@ impl ssz::Encode for ExecutionPayloadV3 {
 
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct BlobsBundleV1 {
     /// All commitments in the bundle.
-    pub commitments: Vec<Bytes48>,
+    pub commitments: Vec<alloy_consensus::Bytes48>,
     /// All proofs in the bundle.
-    pub proofs: Vec<Bytes48>,
+    pub proofs: Vec<alloy_consensus::Bytes48>,
     /// All blobs in the bundle.
-    pub blobs: Vec<Blob>,
+    pub blobs: Vec<alloy_consensus::Blob>,
+}
+
+#[cfg(feature = "ssz")]
+#[derive(ssz_derive::Encode, ssz_derive::Decode)]
+struct BlobsBundleV1Ssz {
+    commitments: Vec<alloy_primitives::FixedBytes<48>>,
+    proofs: Vec<alloy_primitives::FixedBytes<48>>,
+    blobs: Vec<alloy_primitives::FixedBytes<{ alloy_eips::eip4844::BYTES_PER_BLOB }>>,
+}
+
+#[cfg(feature = "ssz")]
+impl BlobsBundleV1Ssz {
+    const _ASSERT: [(); std::mem::size_of::<BlobsBundleV1>()] =
+        [(); std::mem::size_of::<BlobsBundleV1Ssz>()];
+
+    const fn wrap_ref(other: &BlobsBundleV1) -> &Self {
+        // SAFETY: Same repr and size
+        unsafe { &*(other as *const BlobsBundleV1 as *const Self) }
+    }
+
+    fn unwrap(self) -> BlobsBundleV1 {
+        // SAFETY: Same repr and size
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for BlobsBundleV1 {
+    fn is_ssz_fixed_len() -> bool {
+        <BlobsBundleV1Ssz as ssz::Encode>::is_ssz_fixed_len()
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        BlobsBundleV1Ssz::wrap_ref(self).ssz_append(buf)
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        BlobsBundleV1Ssz::wrap_ref(self).ssz_bytes_len()
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <BlobsBundleV1Ssz as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn as_ssz_bytes(&self) -> Vec<u8> {
+        BlobsBundleV1Ssz::wrap_ref(self).as_ssz_bytes()
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for BlobsBundleV1 {
+    fn is_ssz_fixed_len() -> bool {
+        <BlobsBundleV1Ssz as ssz::Decode>::is_ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        BlobsBundleV1Ssz::from_ssz_bytes(bytes).map(BlobsBundleV1Ssz::unwrap)
+    }
+
+    fn ssz_fixed_len() -> usize {
+        <BlobsBundleV1Ssz as ssz::Decode>::ssz_fixed_len()
+    }
 }
 
 impl BlobsBundleV1 {
@@ -459,6 +516,12 @@ impl BlobsBundleV1 {
 impl From<Vec<BlobTransactionSidecar>> for BlobsBundleV1 {
     fn from(sidecars: Vec<BlobTransactionSidecar>) -> Self {
         Self::new(sidecars)
+    }
+}
+
+impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
+    fn from_iter<T: IntoIterator<Item = BlobTransactionSidecar>>(iter: T) -> Self {
+        Self::new(iter)
     }
 }
 

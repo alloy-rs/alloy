@@ -4,6 +4,7 @@ use crate::{
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::U256;
+use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportError, TransportResult};
 use async_trait::async_trait;
 use futures::FutureExt;
@@ -39,7 +40,7 @@ use std::marker::PhantomData;
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct GasEstimatorLayer;
 
 impl<P, N, T> ProviderLayer<P, N, T> for GasEstimatorLayer
@@ -146,6 +147,35 @@ where
 
         Ok(())
     }
+
+    /// There are a few ways to obtain the blob base fee for an EIP-4844 transaction:
+    ///
+    /// * `eth_blobBaseFee`: Returns the fee for the next block directly.
+    /// * `eth_feeHistory`: Returns the same info as for the EIP-1559 fees.
+    /// * retrieving it from the "pending" block directly.
+    ///
+    /// At the time of this writing support for EIP-4844 fees is lacking, hence we're defaulting to
+    /// requesting the fee from the "pending" block.
+    async fn handle_eip4844_tx(
+        &self,
+        tx: &mut N::TransactionRequest,
+    ) -> Result<(), TransportError> {
+        // TODO this can be optimized together with 1559 dynamic fees once blob fee support on
+        // eth_feeHistory is more widely supported
+        if tx.get_blob_sidecar().is_some() && tx.max_fee_per_blob_gas().is_none() {
+            let next_blob_fee = self
+                .inner
+                .get_block_by_number(BlockNumberOrTag::Latest, false)
+                .await?
+                .ok_or(RpcError::NullResp)?
+                .header
+                .next_block_blob_fee()
+                .ok_or(RpcError::UnsupportedFeature("eip4844"))?;
+            tx.set_max_fee_per_blob_gas(U256::from(next_blob_fee));
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -169,6 +199,9 @@ where
             // Populate the following gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields
             // if unset.
             self.handle_eip1559_tx(&mut tx).await?;
+            // TODO: this can be done more elegantly once we can set EIP-1559 and EIP-4844 fields
+            // with a single eth_feeHistory request
+            self.handle_eip4844_tx(&mut tx).await?;
         } else {
             // Assume its a legacy tx
             // Populate only the gas_limit field if unset.

@@ -3,6 +3,7 @@
 #![allow(unknown_lints, non_local_definitions)]
 
 use crate::{other::OtherFields, Transaction, Withdrawal};
+use alloy_eips::{calc_blob_gasprice, calc_excess_blob_gas};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
@@ -115,6 +116,32 @@ pub struct Header {
     /// Parent beacon block root
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+}
+
+impl Header {
+    /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None
+    pub fn blob_fee(&self) -> Option<u128> {
+        self.excess_blob_gas.map(|gas| calc_blob_gasprice(gas.to()))
+    }
+
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    ///
+    /// See also [Self::next_block_excess_blob_gas]
+    pub fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_excess_blob_gas().map(calc_blob_gasprice)
+    }
+
+    /// Calculate excess blob gas for the next block according to the EIP-4844
+    /// spec.
+    ///
+    /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
+    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
+        Some(calc_excess_blob_gas(self.excess_blob_gas?.to(), self.blob_gas_used?.to()))
+    }
 }
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
@@ -598,6 +625,70 @@ impl BlockId {
     /// Returns true if this is [BlockNumberOrTag::Pending]
     pub const fn is_pending(&self) -> bool {
         matches!(self, BlockId::Number(BlockNumberOrTag::Pending))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Safe]
+    pub const fn is_safe(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Safe))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Finalized]
+    pub const fn is_finalized(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Finalized))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Earliest]
+    pub const fn is_earliest(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Earliest))
+    }
+
+    /// Returns true if this is [BlockNumberOrTag::Number]
+    pub const fn is_number(&self) -> bool {
+        matches!(self, BlockId::Number(BlockNumberOrTag::Number(_)))
+    }
+    /// Returns true if this is [BlockId::Hash]
+    pub const fn is_hash(&self) -> bool {
+        matches!(self, BlockId::Hash(_))
+    }
+
+    /// Creates a new "pending" tag instance.
+    pub const fn pending() -> Self {
+        BlockId::Number(BlockNumberOrTag::Pending)
+    }
+
+    /// Creates a new "latest" tag instance.
+    pub const fn latest() -> Self {
+        BlockId::Number(BlockNumberOrTag::Latest)
+    }
+
+    /// Creates a new "earliest" tag instance.
+    pub const fn earliest() -> Self {
+        BlockId::Number(BlockNumberOrTag::Earliest)
+    }
+
+    /// Creates a new "finalized" tag instance.
+    pub const fn finalized() -> Self {
+        BlockId::Number(BlockNumberOrTag::Finalized)
+    }
+
+    /// Creates a new "safe" tag instance.
+    pub const fn safe() -> Self {
+        BlockId::Number(BlockNumberOrTag::Safe)
+    }
+
+    /// Creates a new block number instance.
+    pub const fn number(num: u64) -> Self {
+        BlockId::Number(BlockNumberOrTag::Number(num))
+    }
+
+    /// Create a new block hash instance.
+    pub const fn hash(block_hash: B256) -> Self {
+        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
+    }
+
+    /// Create a new block hash instance that requires the block to be canonical.
+    pub const fn hash_canonical(block_hash: B256) -> Self {
+        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
     }
 }
 

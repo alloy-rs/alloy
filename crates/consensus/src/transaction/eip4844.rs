@@ -9,18 +9,23 @@ use alloy_eips::{
     eip2930::AccessList,
     eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
 };
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    keccak256, Address, Bytes, ChainId, FixedBytes, Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use sha2::{Digest, Sha256};
 use std::mem;
 
 #[cfg(not(feature = "kzg"))]
-use alloy_eips::eip4844::{Blob, Bytes48};
+pub use alloy_eips::eip4844::{Blob, Bytes48};
 
 #[cfg(feature = "kzg")]
-use c_kzg::{Blob, Bytes48, KzgCommitment, KzgProof, KzgSettings};
+use c_kzg::{KzgCommitment, KzgProof, KzgSettings};
 #[cfg(feature = "kzg")]
 use std::ops::Deref;
+
+#[cfg(feature = "kzg")]
+pub use c_kzg::{Blob, Bytes48};
 
 /// An error that can occur when validating a [TxEip4844Variant].
 #[derive(Debug, thiserror::Error)]
@@ -56,11 +61,39 @@ pub enum BlobTransactionValidationError {
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum TxEip4844Variant {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
     /// A transaction with a sidecar, which contains the blob data, commitments, and proofs.
     TxEip4844WithSidecar(TxEip4844WithSidecar),
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
+    fn deserialize<D>(deserializer: D) -> Result<TxEip4844Variant, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct TxEip4844SerdeHelper {
+            #[serde(flatten)]
+            tx: TxEip4844,
+            #[serde(flatten)]
+            sidecar: Option<BlobTransactionSidecar>,
+        }
+
+        let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
+
+        if let Some(sidecar) = tx.sidecar {
+            Ok(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar::from_tx_and_sidecar(
+                tx.tx, sidecar,
+            )))
+        } else {
+            Ok(TxEip4844Variant::TxEip4844(tx.tx))
+        }
+    }
 }
 
 impl From<TxEip4844WithSidecar> for TxEip4844Variant {
@@ -286,16 +319,21 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub nonce: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -308,6 +346,7 @@ pub struct TxEip4844 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasFeeCap`
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_fee_per_gas: u128,
     /// Max Priority fee that transaction is paying
     ///
@@ -316,6 +355,7 @@ pub struct TxEip4844 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasTipCap`
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_priority_fee_per_gas: u128,
     /// The 160-bit address of the message call’s recipient.
     pub to: Address,
@@ -337,6 +377,7 @@ pub struct TxEip4844 {
     /// Max fee per data gas
     ///
     /// aka BlobFeeCap or blobGasFeeCap
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
     pub max_fee_per_blob_gas: u128,
 
     /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
@@ -719,10 +760,14 @@ impl Decodable for TxEip4844 {
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
 /// through the network (eth_sendRawTransaction/eth_sendTransaction).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844WithSidecar {
     /// The actual transaction.
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub tx: TxEip4844,
     /// The sidecar.
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub sidecar: BlobTransactionSidecar,
 }
 
@@ -914,6 +959,7 @@ impl Transaction for TxEip4844WithSidecar {
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     pub blobs: Vec<Blob>,
@@ -996,9 +1042,9 @@ impl Decodable for BlobTransactionSidecar {
 // Wrapper for c-kzg rlp
 #[repr(C)]
 struct BlobTransactionSidecarRlp {
-    blobs: Vec<[u8; BYTES_PER_BLOB]>,
-    commitments: Vec<[u8; BYTES_PER_COMMITMENT]>,
-    proofs: Vec<[u8; BYTES_PER_PROOF]>,
+    blobs: Vec<FixedBytes<BYTES_PER_BLOB>>,
+    commitments: Vec<FixedBytes<BYTES_PER_COMMITMENT>>,
+    proofs: Vec<FixedBytes<BYTES_PER_PROOF>>,
 }
 
 const _: [(); std::mem::size_of::<BlobTransactionSidecar>()] =

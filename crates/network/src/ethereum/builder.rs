@@ -1,7 +1,9 @@
 use crate::{
     BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
-use alloy_consensus::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy};
+use alloy_consensus::{
+    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
+};
 use alloy_primitives::{Address, TxKind, U256};
 use alloy_rpc_types::request::TransactionRequest;
 
@@ -30,16 +32,16 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.input.input = Some(input);
     }
 
-    fn to(&self) -> Option<alloy_primitives::TxKind> {
-        self.to.map(TxKind::Call).or(Some(TxKind::Create))
-    }
-
     fn from(&self) -> Option<Address> {
         self.from
     }
 
     fn set_from(&mut self, from: Address) {
         self.from = Some(from);
+    }
+
+    fn to(&self) -> Option<alloy_primitives::TxKind> {
+        self.to.map(TxKind::Call).or(Some(TxKind::Create))
     }
 
     fn set_to(&mut self, to: alloy_primitives::TxKind) {
@@ -97,7 +99,16 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.gas = Some(gas_limit);
     }
 
-    fn build_unsigned(self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
+    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+        self.sidecar = Some(sidecar);
+    }
+
+    fn build_unsigned(mut self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
         match (
             self.gas_price.as_ref(),
             self.max_fee_per_gas.as_ref(),
@@ -116,7 +127,11 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
             (None, _, _, None, None, None) => build_1559(self).map(Into::into),
             // EIP-4844
             // All blob fields required
-            (None, _, _, Some(_), Some(_), Some(_)) => {
+            (None, _, _, Some(_), _, Some(sidecar)) => {
+                if self.blob_versioned_hashes.is_none() {
+                    //if not configured already, set the blob hashes from the sidecar
+                    self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+                }
                 build_4844(self).map(TxEip4844Variant::from).map(Into::into)
             }
             _ => build_legacy(self).map(Into::into),
