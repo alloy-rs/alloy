@@ -1,6 +1,6 @@
 //! Types for the admin api
 use alloy_genesis::ChainConfig;
-use alloy_primitives::{B256, B512, U256};
+use alloy_primitives::{B256, U256};
 use alloy_serde::json_u256::deserialize_json_u256;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
@@ -10,7 +10,7 @@ use std::net::{IpAddr, SocketAddr};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
     /// The node's private key.
-    pub id: B512,
+    pub id: B256,
     /// The node's user agent, containing a client name, version, OS, and other metadata.
     pub name: String,
     /// The enode URL of the connected node.
@@ -214,7 +214,7 @@ mod tests {
     fn deserialize_peer_info() {
         let response = r#"{
             "enode":"enode://bb37b7302f79e47c1226d6e3ccf0ef6d51146019efdcc1f6e861fd1c1a78d5e84e486225a6a8a503b93d5c50125ee980835c92bde7f7d12f074c16f4e439a578@127.0.0.1:60872",
-            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
+            "id":"ca23c04b7e796da5d6a5f04a62b81c88d41b1341537db85a2b6443e838d8339b",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "caps":["eth/66","eth/67","snap/1"],
             "network":{
@@ -242,7 +242,7 @@ mod tests {
     fn deserialize_node_info() {
         // this response also has an enr
         let response = r#"{
-            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
+            "id":"6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "enode":"enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0",
             "enr":"enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA",
@@ -274,7 +274,7 @@ mod tests {
     fn deserialize_node_info_post_merge() {
         // this response also has an enr
         let response = r#"{
-            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
+            "id":"6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "enode":"enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0",
             "enr":"enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA",
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn deserialize_node_info_mainnet_full() {
         let actual_response = r#"{
-            "id": "e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
+            "id": "74477ca052fcf55ee9eafb369fafdb3e91ad7b64fbd7ae15a4985bfdc43696f2",
             "name": "Geth/v1.10.26-stable/darwin-arm64/go1.19.3",
             "enode": "enode://962184c6f2a19e064e2ddf0d5c5a788c8c5ed3a4909b7f75fb4dad967392ff542772bcc498cd7f15e13eecbde830265f379779c6da1f71fb8fe1a4734dfc0a1e@127.0.0.1:13337?discport=0",
             "enr": "enr:-J-4QFttJyL3f2-B2TQmBZNFxex99TSBv1YtB_8jqUbXWkf6LOREKQAPW2bIn8kJ8QvHbWxCQNFzTX6sehjbrz1ZkSuGAYSyQ0_rg2V0aMrJhPxk7ASDEYwwgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQKWIYTG8qGeBk4t3w1cWniMjF7TpJCbf3X7Ta2Wc5L_VIRzbmFwwIN0Y3CCNBk",
@@ -358,7 +358,7 @@ mod tests {
     fn deserialize_peer_info_handshake() {
         let response = r#"{
             "enode": "enode://a997fde0023537ad01e536ebf2eeeb4b4b3d5286707586727b704f32e8e2b4959e08b6db5b27eb6b7e9f6efcbb53657f4e2bd16900aa77a89426dc3382c29ce0@[::1]:60948",
-            "id": "e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
+            "id": "df6f8bc331005962c2ef1f5236486a753bc6b2ddb5ef04370757999d1ca832d4",
             "name": "Geth/v1.10.26-stable-e5eb32ac/linux-amd64/go1.18.5",
             "caps": ["eth/66","eth/67","snap/1"],
             "network":{
