@@ -1,7 +1,10 @@
-use crate::{layers::SignerLayer, Provider, RootProvider};
+use crate::{
+    layers::{GasEstimatorLayer, NonceManagerLayer, SignerLayer},
+    Provider, RootProvider,
+};
 use alloy_network::{Ethereum, Network};
-use alloy_rpc_client::RpcClient;
-use alloy_transport::Transport;
+use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
+use alloy_transport::{BoxTransport, Transport, TransportError};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -111,6 +114,27 @@ impl<L, N> ProviderBuilder<L, N> {
         self.layer(SignerLayer::new(signer))
     }
 
+    /// Add gas estimation to the stack being built.
+    ///
+    /// See [`GasEstimatorLayer`]
+    pub fn with_gas_estimation(self) -> ProviderBuilder<Stack<GasEstimatorLayer, L>, N> {
+        self.layer(GasEstimatorLayer)
+    }
+
+    /// Add nonce management to the stack being built.
+    ///
+    /// See [`NonceManagerLayer`]
+    pub fn with_nonce_management(self) -> ProviderBuilder<Stack<NonceManagerLayer, L>, N> {
+        self.layer(NonceManagerLayer)
+    }
+
+    /// Add preconfigured set of layers handling gas estimation and nonce management
+    pub fn with_recommended_layers(
+        self,
+    ) -> ProviderBuilder<Stack<NonceManagerLayer, Stack<GasEstimatorLayer, L>>, N> {
+        self.with_gas_estimation().with_nonce_management()
+    }
+
     /// Change the network.
     ///
     /// By default, the network is `Ethereum`. This method must be called to configure a different
@@ -147,6 +171,78 @@ impl<L, N> ProviderBuilder<L, N> {
         N: Network,
     {
         self.provider(RootProvider::new(client))
+    }
+
+    /// Finish the layer stack by providing a connection string for a built-in
+    /// transport type, outputting the final [`Provider`] type with all stack
+    /// components.
+    ///
+    /// This is a convenience function for
+    pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let connect: BuiltInConnectionString = s.parse()?;
+        let client = ClientBuilder::default().connect_boxed(connect).await?;
+        Ok(self.on_client(client))
+    }
+
+    /// Build this provider with a websocket connection.
+    #[cfg(feature = "ws")]
+    pub async fn on_ws(
+        self,
+        connect: alloy_transport_ws::WsConnect,
+    ) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<
+            RootProvider<N, alloy_pubsub::PubSubFrontend>,
+            N,
+            alloy_pubsub::PubSubFrontend,
+        >,
+        N: Network,
+    {
+        let client = ClientBuilder::default().ws(connect).await?;
+        Ok(self.on_client(client))
+    }
+
+    /// Build this provider with an IPC connection.
+    #[cfg(feature = "ipc")]
+    pub async fn on_ipc<T>(
+        self,
+        connect: alloy_transport_ipc::IpcConnect<T>,
+    ) -> Result<L::Provider, TransportError>
+    where
+        alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
+        L: ProviderLayer<
+            RootProvider<N, alloy_pubsub::PubSubFrontend>,
+            N,
+            alloy_pubsub::PubSubFrontend,
+        >,
+        N: Network,
+    {
+        let client = ClientBuilder::default().ipc(connect).await?;
+        Ok(self.on_client(client))
+    }
+
+    #[cfg(feature = "reqwest")]
+    pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().reqwest_http(url);
+        Ok(self.on_client(client))
+    }
+
+    #[cfg(feature = "hyper")]
+    pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    where
+        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        N: Network,
+    {
+        let client = ClientBuilder::default().hyper_http(url);
+        Ok(self.on_client(client))
     }
 }
 

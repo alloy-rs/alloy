@@ -11,7 +11,9 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcClient, WeakClient};
+use alloy_rpc_client::{
+    BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
+};
 use alloy_rpc_trace_types::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::{LocalizedTransactionTrace, TraceResults, TraceType},
@@ -20,7 +22,10 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{
+    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
+    TransportResult,
+};
 use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
@@ -68,6 +73,21 @@ impl<N: Network, T: Transport> RootProvider<N, T> {
     /// Creates a new root provider from the given RPC client.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
+    }
+}
+
+impl<N: Network> RootProvider<N, BoxTransport> {
+    /// Connects to a boxed transport with the given connector.
+    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
+    }
+
+    /// Creates a new root provider from the provided connection details.
+    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
+        let conn: BuiltInConnectionString = s.parse()?;
+        let client = ClientBuilder::default().connect_boxed(conn).await?;
+        Ok(Self::new(client))
     }
 }
 
@@ -705,9 +725,19 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().request("eth_accounts", ()).await
     }
 
-    /// Gets the current gas price.
+    /// Gets the current gas price in wei.
     async fn get_gas_price(&self) -> TransportResult<U256> {
         self.client().request("eth_gasPrice", ()).await
+    }
+
+    /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
+    async fn get_max_priority_fee_per_gas(&self) -> TransportResult<U256> {
+        self.client().request("eth_maxPriorityFeePerGas", ()).await
+    }
+
+    /// Returns the base fee per blob gas (blob gas price) in wei.
+    async fn get_blob_base_fee(&self) -> TransportResult<U256> {
+        self.client().request("eth_blobBaseFee", ()).await
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -716,17 +746,6 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         hash: TxHash,
     ) -> TransportResult<Option<N::ReceiptResponse>> {
         self.client().request("eth_getTransactionReceipt", (hash,)).await
-    }
-
-    /// Returns a collection of historical gas information [FeeHistory] which
-    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
-    async fn get_fee_history(
-        &self,
-        block_count: U256,
-        last_block: BlockNumberOrTag,
-        reward_percentiles: &[f64],
-    ) -> TransportResult<FeeHistory> {
-        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Gets the selected block [BlockNumberOrTag] receipts.
@@ -776,6 +795,17 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         state: StateOverride,
     ) -> TransportResult<Bytes> {
         self.client().request("eth_call", (tx, block.unwrap_or_default(), state)).await
+    }
+
+    /// Returns a collection of historical gas information [FeeHistory] which
+    /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
+    async fn get_fee_history(
+        &self,
+        block_count: U256,
+        last_block: BlockNumberOrTag,
+        reward_percentiles: &[f64],
+    ) -> TransportResult<FeeHistory> {
+        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
     /// Estimate the gas needed for a transaction.
@@ -1309,6 +1339,14 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn gets_max_priority_fee_per_gas() {
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil();
+
+        let _fee = provider.get_max_priority_fee_per_gas().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn gets_fee_history() {
         init_tracing();
         let (provider, _anvil) = spawn_anvil();
@@ -1358,5 +1396,28 @@ mod tests {
             pending.tx_hash().to_string(),
             "0x9dae5cf33694a02e8a7d5de3fe31e9d05ca0ba6e9180efac4ab20a06c9e598a3"
         );
+    }
+
+    #[tokio::test]
+    async fn connect_boxed() {
+        init_tracing();
+        let (_provider, anvil) = spawn_anvil();
+
+        let provider =
+            RootProvider::<Ethereum, BoxTransport>::connect_builtin(anvil.endpoint().as_str())
+                .await;
+
+        match provider {
+            Ok(provider) => {
+                let num = provider.get_block_number().await.unwrap();
+                assert_eq!(0, num);
+            }
+            Err(e) => {
+                assert_eq!(
+                    format!("{}",e),
+                    "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually"
+                );
+            }
+        }
     }
 }

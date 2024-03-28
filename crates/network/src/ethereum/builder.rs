@@ -1,7 +1,9 @@
 use crate::{
     BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
-use alloy_consensus::{TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy};
+use alloy_consensus::{
+    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
+};
 use alloy_primitives::{Address, TxKind, U256};
 use alloy_rpc_types::request::TransactionRequest;
 
@@ -99,6 +101,15 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
 
     fn build_unsigned(self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
         build_unsigned::<Ethereum>(self)
+    }
+
+    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+        self.sidecar = Some(sidecar);
     }
 
     async fn build<S: NetworkSigner<Ethereum>>(

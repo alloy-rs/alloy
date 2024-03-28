@@ -57,6 +57,7 @@ ethereum_ssz_derive = "0.5"
 ethereum_ssz = "0.5"
 
 # crypto
+c-kzg = { version = "1.0", default-features = false }
 elliptic-curve = { version = "0.13", default-features = false }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 sha2 = { version = "0.10", default-features = false }
@@ -112,10 +113,10 @@ tempfile = "3.10"
 
 # TODO: Remove eventually.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "1bac7678797fcd1bee2f2580825724b4165b12c1" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }

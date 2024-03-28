@@ -27,7 +27,7 @@ use tokio::sync::Mutex;
 /// ```rs
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .layer(ManagedNonceLayer)
+///     .with_nonce_management()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///
@@ -37,9 +37,9 @@ use tokio::sync::Mutex;
 ///
 /// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
-pub struct ManagedNonceLayer;
+pub struct NonceManagerLayer;
 
-impl<P, N, T> ProviderLayer<P, N, T> for ManagedNonceLayer
+impl<P, N, T> ProviderLayer<P, N, T> for NonceManagerLayer
 where
     P: Provider<N, T>,
     N: Network,
@@ -61,7 +61,7 @@ where
 /// If the transaction requests do not have a sender set, this provider will not set nonces.
 ///
 /// You cannot construct this provider directly. Use [`ProviderBuilder`] with a
-/// [`ManagedNonceLayer`].
+/// [`NonceManagerLayer`].
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
@@ -151,7 +151,7 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
+            .with_nonce_management()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 
@@ -176,7 +176,7 @@ mod tests {
         let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
 
         let provider = ProviderBuilder::new()
-            .layer(ManagedNonceLayer)
+            .with_nonce_management()
             .signer(EthereumSigner::from(wallet))
             .provider(RootProvider::new(RpcClient::new(http, true)));
 

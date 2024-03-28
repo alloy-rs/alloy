@@ -16,7 +16,7 @@ exclude.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = {workspace = true, features = ["std", "serde"]}
 
 itertools.workspace = true
