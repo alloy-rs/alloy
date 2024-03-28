@@ -34,7 +34,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-#[cfg(feature = "http")]
+#[cfg(feature = "reqwest")]
 use alloy_transport_http::Http;
 
 #[cfg(feature = "pubsub")]
@@ -64,7 +64,7 @@ impl<N, T: fmt::Debug> fmt::Debug for RootProvider<N, T> {
     }
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "reqwest")]
 impl<N: Network> RootProvider<N, Http<reqwest::Client>> {
     /// Creates a new HTTP root provider from the given URL.
     pub fn new_http(url: reqwest::Url) -> Self {
@@ -1020,7 +1020,7 @@ mod tests {
     // NOTE: We cannot import the test-utils crate here due to a circular dependency.
     include!("../../internal-test-utils/src/providers.rs");
 
-    #[cfg(feature = "http")]
+    #[cfg(feature = "reqwest")]
     #[tokio::test]
     async fn object_safety() {
         init_tracing();

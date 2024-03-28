@@ -178,6 +178,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// components.
     ///
     /// This is a convenience function for
+    /// `ProviderBuilder::provider<RpcClient>`.
     pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
@@ -225,23 +226,25 @@ impl<L, N> ProviderBuilder<L, N> {
         Ok(self.on_client(client))
     }
 
+    /// Build this provider with an Reqwest HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
         N: Network,
     {
-        let client = ClientBuilder::default().reqwest_http(url);
+        let client = ClientBuilder::default().reqwest_http(url).boxed();
         Ok(self.on_client(client))
     }
 
+    /// Build this provider with an Hyper HTTP transport.
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
         N: Network,
     {
-        let client = ClientBuilder::default().hyper_http(url);
+        let client = ClientBuilder::default().hyper_http(url).boxed();
         Ok(self.on_client(client))
     }
 }

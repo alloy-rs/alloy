@@ -15,7 +15,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-#[cfg(feature = "http")]
+#[cfg(feature = "reqwest")]
 mod http {
     use alloy_transport_http::Http;
 
@@ -25,7 +25,7 @@ mod http {
     pub type HttpProvider<N> = RootProvider<N, Http<reqwest::Client>>;
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "reqwest")]
 pub use http::*;
 
 #[macro_use]

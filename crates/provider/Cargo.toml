@@ -20,6 +20,7 @@ alloy-rpc-types.workspace = true
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
+alloy-pubsub = { workspace = true, optional = true }
 alloy-transport.workspace = true
 alloy-primitives.workspace = true
 
@@ -33,8 +34,7 @@ reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
-
-alloy-pubsub = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-consensus.workspace = true
@@ -47,13 +47,14 @@ tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
 
 [features]
-default = ["http"]
+default = ["reqwest"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
-http = [
+reqwest = [
     "dep:reqwest",
+    "dep:url",
     "dep:alloy-transport-http",
-    "alloy-transport-http/reqwest",
     "alloy-rpc-client/reqwest",
 ]
+hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]

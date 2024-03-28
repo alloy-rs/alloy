@@ -130,7 +130,7 @@ where
     }
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
     use super::*;
