@@ -28,6 +28,10 @@ use serde::Serializer;
 pub mod json_u256;
 pub use self::json_u256::JsonU256;
 
+/// Helpers for dealing with booleans.
+mod bool;
+pub use self::bool::*;
+
 /// Helpers for dealing with numbers.
 pub mod num;
 pub use self::num::*;

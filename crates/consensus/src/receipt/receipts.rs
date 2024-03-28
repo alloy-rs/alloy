@@ -4,15 +4,19 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct Receipt {
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
-    pub success: bool,
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity_bool"))]
+    pub status: bool,
     /// Gas used
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
-    pub logs: Vec<Log>,
+    pub logs: Vec<T>,
 }
 
 impl Receipt {
@@ -31,7 +35,7 @@ impl Receipt {
 
 impl TxReceipt for Receipt {
     fn success(&self) -> bool {
-        self.success
+        self.status
     }
 
     fn bloom(&self) -> Bloom {
@@ -54,24 +58,27 @@ impl TxReceipt for Receipt {
 ///
 /// [`Sealed`]: crate::sealed::Sealed
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct ReceiptWithBloom {
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct ReceiptWithBloom<T = Log> {
+    #[cfg_attr(feature = "serde", serde(flatten))]
     /// The receipt.
-    pub receipt: Receipt,
+    pub receipt: Receipt<T>,
     /// The bloom filter.
-    pub bloom: Bloom,
+    pub logs_bloom: Bloom,
 }
 
 impl TxReceipt for ReceiptWithBloom {
     fn success(&self) -> bool {
-        self.receipt.success
+        self.receipt.status
     }
 
     fn bloom(&self) -> Bloom {
-        self.bloom
+        self.logs_bloom
     }
 
     fn bloom_cheap(&self) -> Option<Bloom> {
-        Some(self.bloom)
+        Some(self.logs_bloom)
     }
 
     fn cumulative_gas_used(&self) -> u64 {
@@ -86,14 +93,14 @@ impl TxReceipt for ReceiptWithBloom {
 impl From<Receipt> for ReceiptWithBloom {
     fn from(receipt: Receipt) -> Self {
         let bloom = receipt.bloom_slow();
-        ReceiptWithBloom { receipt, bloom }
+        ReceiptWithBloom { receipt, logs_bloom: bloom }
     }
 }
 
 impl ReceiptWithBloom {
     /// Create new [ReceiptWithBloom]
     pub const fn new(receipt: Receipt, bloom: Bloom) -> Self {
-        Self { receipt, bloom }
+        Self { receipt, logs_bloom: bloom }
     }
 
     /// Consume the structure, returning only the receipt
@@ -105,13 +112,13 @@ impl ReceiptWithBloom {
     /// Consume the structure, returning the receipt and the bloom filter
     #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_components(self) -> (Receipt, Bloom) {
-        (self.receipt, self.bloom)
+        (self.receipt, self.logs_bloom)
     }
 
     fn payload_len(&self) -> usize {
-        self.receipt.success.length()
+        self.receipt.status.length()
             + self.receipt.cumulative_gas_used.length()
-            + self.bloom.length()
+            + self.logs_bloom.length()
             + self.receipt.logs.length()
     }
 
@@ -123,9 +130,9 @@ impl ReceiptWithBloom {
     /// Encodes the receipt data.
     fn encode_fields(&self, out: &mut dyn BufMut) {
         self.receipt_rlp_header().encode(out);
-        self.receipt.success.encode(out);
+        self.receipt.status.encode(out);
         self.receipt.cumulative_gas_used.encode(out);
-        self.bloom.encode(out);
+        self.logs_bloom.encode(out);
         self.receipt.logs.encode(out);
     }
 
@@ -143,9 +150,9 @@ impl ReceiptWithBloom {
         let bloom = Decodable::decode(b)?;
         let logs = Decodable::decode(b)?;
 
-        let receipt = Receipt { success, cumulative_gas_used, logs };
+        let receipt = Receipt { status: success, cumulative_gas_used, logs };
 
-        let this = Self { receipt, bloom };
+        let this = Self { receipt, logs_bloom: bloom };
         let consumed = started_len - b.len();
         if consumed != rlp_head.payload_length {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -164,9 +171,9 @@ impl alloy_rlp::Encodable for ReceiptWithBloom {
     }
 
     fn length(&self) -> usize {
-        let payload_length = self.receipt.success.length()
+        let payload_length = self.receipt.status.length()
             + self.receipt.cumulative_gas_used.length()
-            + self.bloom.length()
+            + self.logs_bloom.length()
             + self.receipt.logs.length();
         payload_length + length_of_length(payload_length)
     }
@@ -184,6 +191,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Receipt {
         let success = bool::arbitrary(u)?;
         let cumulative_gas_used = u64::arbitrary(u)?;
         let logs = u.arbitrary_iter()?.take(4).collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { success, cumulative_gas_used, logs })
+        Ok(Self { status: success, cumulative_gas_used, logs })
     }
 }
