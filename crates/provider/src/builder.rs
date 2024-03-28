@@ -78,7 +78,7 @@ pub struct ProviderBuilder<L, N = Ethereum> {
     network: PhantomData<N>,
 }
 
-impl<N> ProviderBuilder<Identity, N> {
+impl ProviderBuilder<Identity, Ethereum> {
     /// Create a new [`ProviderBuilder`].
     pub const fn new() -> Self {
         ProviderBuilder { layer: Identity, network: PhantomData }
@@ -87,7 +87,7 @@ impl<N> ProviderBuilder<Identity, N> {
 
 impl<N> Default for ProviderBuilder<Identity, N> {
     fn default() -> Self {
-        Self::new()
+        ProviderBuilder { layer: Identity, network: PhantomData }
     }
 }
 
@@ -140,7 +140,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// By default, the network is `Ethereum`. This method must be called to configure a different
     /// network.
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
     pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net> {
@@ -176,9 +176,6 @@ impl<L, N> ProviderBuilder<L, N> {
     /// Finish the layer stack by providing a connection string for a built-in
     /// transport type, outputting the final [`Provider`] type with all stack
     /// components.
-    ///
-    /// This is a convenience function for
-    /// `ProviderBuilder::provider<RpcClient>`.
     pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<BoxTransport, N>, BoxTransport, N>,
