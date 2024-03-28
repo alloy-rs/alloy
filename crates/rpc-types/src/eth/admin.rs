@@ -1,6 +1,6 @@
 //! Types for the admin api
 use alloy_genesis::ChainConfig;
-use alloy_primitives::{B256, U256};
+use alloy_primitives::{B256, B512, U256};
 use alloy_serde::json_u256::deserialize_json_u256;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
@@ -10,27 +10,20 @@ use std::net::{IpAddr, SocketAddr};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NodeInfo {
     /// The node's private key.
-    pub id: B256,
-
+    pub id: B512,
     /// The node's user agent, containing a client name, version, OS, and other metadata.
     pub name: String,
-
     /// The enode URL of the connected node.
     pub enode: String,
-
     /// The [ENR](https://eips.ethereum.org/EIPS/eip-778) of the running client.
     pub enr: String,
-
     /// The IP address of the connected node.
     pub ip: IpAddr,
-
     /// The node's listening ports.
     pub ports: Ports,
-
     /// The node's listening address.
     #[serde(rename = "listenAddr")]
     pub listen_addr: String,
-
     /// The protocols that the node supports, with protocol metadata.
     pub protocols: ProtocolInfo,
 }
@@ -40,7 +33,6 @@ pub struct NodeInfo {
 pub struct Ports {
     /// The node's discovery port.
     pub discovery: u16,
-
     /// The node's listener port.
     pub listener: u16,
 }
@@ -53,7 +45,6 @@ pub struct ProtocolInfo {
     /// Details about the node's supported eth protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eth: Option<EthProtocolInfo>,
-
     /// Details about the node's supported snap protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snap: Option<SnapProtocolInfo>,
@@ -68,17 +59,13 @@ pub struct ProtocolInfo {
 pub struct EthProtocolInfo {
     /// The eth network version.
     pub network: u64,
-
     /// The total difficulty of the host's blockchain.
     #[serde(deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
-
     /// The Keccak hash of the host's genesis block.
     pub genesis: B256,
-
     /// The chain configuration for the host's fork rules.
     pub config: ChainConfig,
-
     /// The hash of the host's best known block.
     pub head: B256,
 }
@@ -100,7 +87,6 @@ pub struct PeerProtocolInfo {
     /// Details about the peer's supported eth protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eth: Option<EthPeerInfo>,
-
     /// Details about the peer's supported snap protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snap: Option<SnapPeerInfo>,
@@ -113,7 +99,6 @@ pub struct PeerProtocolInfo {
 pub enum EthPeerInfo {
     /// The `eth` sub-protocol metadata known about the host peer.
     Info(Box<EthInfo>),
-
     /// The string "handshake" if the peer is still completing the handshake for the protocol.
     #[serde(deserialize_with = "deser_handshake", serialize_with = "ser_handshake")]
     Handshake,
@@ -129,11 +114,9 @@ pub struct EthInfo {
     /// The negotiated eth version.
     #[serde(default)]
     pub version: u64,
-
     /// The total difficulty of the peer's blockchain.
     #[serde(default, deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
-
     /// The hash of the peer's best known block.
     #[serde(default)]
     pub head: B256,
@@ -146,7 +129,6 @@ pub struct EthInfo {
 pub enum SnapPeerInfo {
     /// The `snap` sub-protocol metadata known about the host peer.
     Info(SnapInfo),
-
     /// The string "handshake" if the peer is still completing the handshake for the protocol.
     #[serde(deserialize_with = "deser_handshake", serialize_with = "ser_handshake")]
     Handshake,
@@ -171,22 +153,16 @@ pub struct PeerInfo {
     /// The peer's ENR.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enr: Option<String>,
-
     /// The peer's enode URL.
     pub enode: String,
-
     /// The peer's enode ID.
     pub id: String,
-
     /// The peer's name.
     pub name: String,
-
     /// The peer's capabilities.
     pub caps: Vec<String>,
-
     /// Networking information about the peer.
     pub network: PeerNetworkInfo,
-
     /// The protocols that the peer supports, with protocol metadata.
     pub protocols: PeerProtocolInfo,
 }
@@ -198,16 +174,12 @@ pub struct PeerInfo {
 pub struct PeerNetworkInfo {
     /// The local endpoint of the TCP connection.
     pub local_address: SocketAddr,
-
     /// The remote endpoint of the TCP connection.
     pub remote_address: SocketAddr,
-
     /// Whether or not the peer is inbound.
     pub inbound: bool,
-
     /// Whether or not the peer is trusted.
     pub trusted: bool,
-
     /// Whether or not the peer is a static peer.
     #[serde(rename = "static")]
     pub static_node: bool,
@@ -242,7 +214,7 @@ mod tests {
     fn deserialize_peer_info() {
         let response = r#"{
             "enode":"enode://bb37b7302f79e47c1226d6e3ccf0ef6d51146019efdcc1f6e861fd1c1a78d5e84e486225a6a8a503b93d5c50125ee980835c92bde7f7d12f074c16f4e439a578@127.0.0.1:60872",
-            "id":"ca23c04b7e796da5d6a5f04a62b81c88d41b1341537db85a2b6443e838d8339b",
+            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "caps":["eth/66","eth/67","snap/1"],
             "network":{
@@ -270,7 +242,7 @@ mod tests {
     fn deserialize_node_info() {
         // this response also has an enr
         let response = r#"{
-            "id":"6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6",
+            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "enode":"enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0",
             "enr":"enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA",
@@ -302,7 +274,7 @@ mod tests {
     fn deserialize_node_info_post_merge() {
         // this response also has an enr
         let response = r#"{
-            "id":"6e2fe698f3064cd99410926ce16734e35e3cc947d4354461d2594f2d2dd9f7b6",
+            "id":"e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
             "name":"Geth/v1.10.19-stable/darwin-arm64/go1.18.3",
             "enode":"enode://d7dfaea49c7ef37701e668652bcf1bc63d3abb2ae97593374a949e175e4ff128730a2f35199f3462a56298b981dfc395a5abebd2d6f0284ffe5bdc3d8e258b86@127.0.0.1:30304?discport=0",
             "enr":"enr:-Jy4QIvS0dKBLjTTV_RojS8hjriwWsJNHRVyOh4Pk4aUXc5SZjKRVIOeYc7BqzEmbCjLdIY4Ln7x5ZPf-2SsBAc2_zqGAYSwY1zog2V0aMfGhNegsXuAgmlkgnY0gmlwhBiT_DiJc2VjcDI1NmsxoQLX366knH7zdwHmaGUrzxvGPTq7Kul1kzdKlJ4XXk_xKIRzbmFwwIN0Y3CCdmA",
@@ -336,7 +308,7 @@ mod tests {
     #[test]
     fn deserialize_node_info_mainnet_full() {
         let actual_response = r#"{
-            "id": "74477ca052fcf55ee9eafb369fafdb3e91ad7b64fbd7ae15a4985bfdc43696f2",
+            "id": "e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
             "name": "Geth/v1.10.26-stable/darwin-arm64/go1.19.3",
             "enode": "enode://962184c6f2a19e064e2ddf0d5c5a788c8c5ed3a4909b7f75fb4dad967392ff542772bcc498cd7f15e13eecbde830265f379779c6da1f71fb8fe1a4734dfc0a1e@127.0.0.1:13337?discport=0",
             "enr": "enr:-J-4QFttJyL3f2-B2TQmBZNFxex99TSBv1YtB_8jqUbXWkf6LOREKQAPW2bIn8kJ8QvHbWxCQNFzTX6sehjbrz1ZkSuGAYSyQ0_rg2V0aMrJhPxk7ASDEYwwgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQKWIYTG8qGeBk4t3w1cWniMjF7TpJCbf3X7Ta2Wc5L_VIRzbmFwwIN0Y3CCNBk",
@@ -386,7 +358,7 @@ mod tests {
     fn deserialize_peer_info_handshake() {
         let response = r#"{
             "enode": "enode://a997fde0023537ad01e536ebf2eeeb4b4b3d5286707586727b704f32e8e2b4959e08b6db5b27eb6b7e9f6efcbb53657f4e2bd16900aa77a89426dc3382c29ce0@[::1]:60948",
-            "id": "df6f8bc331005962c2ef1f5236486a753bc6b2ddb5ef04370757999d1ca832d4",
+            "id": "e54eebad24dce1f6d246bea455ffa756d97801582420b9ed681a2ea84bf376d0bd87ae8dd6dc06cdb862a2ca89ecabe1be1050be35b4e70d62bc1a092cb7e2d3",
             "name": "Geth/v1.10.26-stable-e5eb32ac/linux-amd64/go1.18.5",
             "caps": ["eth/66","eth/67","snap/1"],
             "network":{
