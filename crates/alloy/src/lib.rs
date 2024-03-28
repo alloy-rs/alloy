@@ -15,17 +15,11 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-// Just for features.
-#[cfg(feature = "transport-http-reqwest")]
-use reqwest as _;
-
 /* --------------------------------------- Core re-exports -------------------------------------- */
 
-// Re-export the core crate.
 // This should generally not be used by downstream crates as we re-export everything else
-// individually.
-// It is acceptable to use this if an item has been added to `alloy-core` and it has not been added
-// to the re-exports below.
+// individually. It is acceptable to use this if an item has been added to `alloy-core`
+// and it has not been added to the re-exports below.
 #[doc(hidden)]
 pub use alloy_core as core;
 
@@ -42,16 +36,16 @@ pub use self::core::dyn_abi;
 #[doc(inline)]
 pub use self::core::json_abi;
 
+#[cfg(feature = "json")]
+#[doc(inline)]
+pub use self::core::json;
+
 #[cfg(feature = "sol-types")]
 #[doc(inline)]
 pub use self::core::sol_types;
 #[cfg(all(doc, feature = "sol-types"))] // Show this re-export in docs instead of the wrapper below.
 #[doc(no_inline)]
 pub use sol_types::sol;
-
-#[cfg(feature = "rlp")]
-#[doc(inline)]
-pub use self::core::rlp;
 
 /// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
 ///
@@ -67,6 +61,54 @@ macro_rules! sol {
         }
     };
 }
+
+#[cfg(feature = "tiny-keccak")]
+#[doc(inline)]
+pub use self::core::tiny_keccak;
+
+#[cfg(feature = "native-keccak")]
+#[doc(inline)]
+pub use self::core::native_keccak;
+
+#[cfg(feature = "asm-keccak")]
+#[doc(inline)]
+pub use self::core::asm_keccak;
+
+#[cfg(feature = "postgres")]
+#[doc(inline)]
+pub use self::core::postgres;
+
+#[cfg(feature = "getrandom")]
+#[doc(inline)]
+pub use self::core::getrandom;
+
+#[cfg(feature = "rand")]
+#[doc(inline)]
+pub use self::core::rand;
+
+#[cfg(feature = "rlp")]
+#[doc(inline)]
+pub use self::core::rlp;
+
+#[cfg(feature = "serde")]
+#[doc(inline)]
+pub use self::core::serde;
+
+#[cfg(feature = "ssz")]
+#[doc(inline)]
+pub use self::core::ssz;
+
+#[cfg(feature = "arbitrary")]
+#[doc(inline)]
+pub use self::core::arbitrary;
+
+#[cfg(feature = "k256")]
+#[doc(inline)]
+pub use self::core::k256;
+
+#[cfg(feature = "eip712")]
+#[doc(inline)]
+pub use self::core::eip712;
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
@@ -94,16 +136,18 @@ pub use alloy_genesis as genesis;
 #[doc(inline)]
 pub use alloy_node_bindings as node_bindings;
 
-/// Interface with an Ethereum blockchain.
-///
-/// See [`alloy_provider`] for more details.
 #[cfg(feature = "providers")]
 pub mod providers {
     #[doc(inline)]
     pub use alloy_provider::*;
 }
 
-/// Ethereum JSON-RPC client and types.
+#[cfg(feature = "pubsub")]
+pub mod pubsub {
+    #[doc(inline)]
+    pub use alloy_pubsub::*;
+}
+
 #[cfg(feature = "rpc")]
 pub mod rpc {
     #[cfg(feature = "rpc-client")]
@@ -131,9 +175,10 @@ pub mod rpc {
     }
 }
 
-/// Ethereum signer abstraction and implementations.
-///
-/// See [`alloy_signer`] for more details.
+#[cfg(feature = "serde")]
+#[doc(inline)]
+pub use alloy_serde as serde;
+
 #[cfg(feature = "signers")]
 pub mod signers {
     #[doc(inline)]
@@ -156,18 +201,6 @@ pub mod signers {
     pub use alloy_signer_wallet as wallet;
 }
 
-/// Low-level Ethereum JSON-RPC transport abstraction and implementations.
-///
-/// You will likely not need to use this module;
-/// see the [`providers`] module for high-level usage of transports.
-///
-/// See [`alloy_transport`] for more details.
-#[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
-#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
-#[cfg_attr(
-    not(feature = "providers"),
-    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
-)]
 #[cfg(feature = "transports")]
 pub mod transports {
     #[doc(inline)]
@@ -182,22 +215,7 @@ pub mod transports {
     #[cfg(feature = "transport-ws")]
     #[doc(inline)]
     pub use alloy_transport_ws as ws;
-}
 
-/// Ethereum JSON-RPC publish-subscribe tower service and type definitions.
-///
-/// You will likely not need to use this module;
-/// see the [`providers`] module for high-level usage of pubsub.
-///
-/// See [`alloy_pubsub`] for more details.
-#[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
-#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
-#[cfg_attr(
-    not(feature = "providers"),
-    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
-)]
-#[cfg(feature = "pubsub")]
-pub mod pubsub {
-    #[doc(inline)]
-    pub use alloy_pubsub::*;
+    #[cfg(feature = "transport-http-reqwest")]
+    use reqwest as _;
 }
