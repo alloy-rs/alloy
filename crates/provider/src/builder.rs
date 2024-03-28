@@ -1,5 +1,5 @@
 use crate::{
-    layers::{GasEstimatorLayer, ManagedNonceLayer, SignerLayer},
+    layers::{GasEstimatorLayer, NonceManagerLayer, SignerLayer},
     Provider, RootProvider,
 };
 use alloy_network::{Ethereum, Network};
@@ -123,15 +123,15 @@ impl<L, N> ProviderBuilder<L, N> {
 
     /// Add nonce management to the stack being built.
     ///
-    /// See [`ManagedNonceLayer`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<Stack<ManagedNonceLayer, L>, N> {
-        self.layer(ManagedNonceLayer)
+    /// See [`NonceManagerLayer`]
+    pub fn with_nonce_management(self) -> ProviderBuilder<Stack<NonceManagerLayer, L>, N> {
+        self.layer(NonceManagerLayer)
     }
 
     /// Add preconfigured set of layers handling gas estimation and nonce management
     pub fn with_recommended_layers(
         self,
-    ) -> ProviderBuilder<Stack<ManagedNonceLayer, Stack<GasEstimatorLayer, L>>, N> {
+    ) -> ProviderBuilder<Stack<NonceManagerLayer, Stack<GasEstimatorLayer, L>>, N> {
         self.with_gas_estimation().with_nonce_management()
     }
 
