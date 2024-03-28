@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::U256;
 use alloy_rpc_types::{TransactionRequest, WithOtherFields};
 
@@ -98,6 +99,14 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
 
     fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
         build_unsigned::<AnyNetwork>(self.unwrap())
+    }
+
+    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.deref().get_blob_sidecar()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.deref_mut().set_blob_sidecar(sidecar)
     }
 
     async fn build<S: crate::NetworkSigner<AnyNetwork>>(
