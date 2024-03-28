@@ -1,4 +1,5 @@
 use crate::Error;
+use alloy_network::Ethereum;
 use alloy_primitives::Address;
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types::{Filter, Log};
@@ -10,15 +11,15 @@ use std::{fmt, marker::PhantomData};
 
 /// Helper for managing the event filter before querying or streaming its logs
 #[must_use = "event filters do nothing unless you `query`, `watch`, or `stream` them"]
-pub struct Event<N, T, P, E> {
+pub struct Event<T, P, E, N = Ethereum> {
     /// The provider to use for querying or streaming logs.
     pub provider: P,
     /// The filter to use for querying or streaming logs.
     pub filter: Filter,
-    _phantom: PhantomData<(T, N, E)>,
+    _phantom: PhantomData<(T, E, N)>,
 }
 
-impl<N, T, P: fmt::Debug, E> fmt::Debug for Event<N, T, P, E> {
+impl<T, P: fmt::Debug, E, N> fmt::Debug for Event<T, P, E, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Event")
             .field("provider", &self.provider)
@@ -29,7 +30,7 @@ impl<N, T, P: fmt::Debug, E> fmt::Debug for Event<N, T, P, E> {
 }
 
 #[doc(hidden)]
-impl<'a, N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, T, &'a P, E> {
+impl<'a, T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, &'a P, E, N> {
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address) -> Self {
@@ -37,7 +38,7 @@ impl<'a, N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event
     }
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, T, P, E> {
+impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, P, E, N> {
     /// Creates a new event with the provided provider and filter.
     #[allow(clippy::missing_const_for_fn)]
     pub fn new(provider: P, filter: Filter) -> Self {
@@ -76,9 +77,9 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, E: SolEvent> Event<N, 
     }
 }
 
-impl<N, T, P: Clone, E> Event<N, T, &P, E> {
+impl<T, P: Clone, E, N> Event<T, &P, E, N> {
     /// Clones the provider and returns a new event with the cloned provider.
-    pub fn with_cloned_provider(self) -> Event<N, T, P, E> {
+    pub fn with_cloned_provider(self) -> Event<T, P, E, N> {
         Event { provider: self.provider.clone(), filter: self.filter, _phantom: PhantomData }
     }
 }
@@ -191,7 +192,6 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::Ethereum;
     use alloy_primitives::U256;
     use alloy_provider::RootProvider;
     use alloy_rpc_client::RpcClient;
@@ -223,7 +223,7 @@ mod tests {
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
-        let event: Event<_, _, _, MyContract::MyEvent> = Event::new(&provider, Filter::new());
+        let event: Event<_, _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new());
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 
@@ -259,7 +259,7 @@ mod tests {
         {
             let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
             let client = RpcClient::connect_pubsub(ws).await.unwrap();
-            let provider = RootProvider::<Ethereum, _>::new(client);
+            let provider = RootProvider::<_, Ethereum>::new(client);
 
             let contract = MyContract::new(*contract.address(), provider);
             let event = contract.MyEvent_filter();

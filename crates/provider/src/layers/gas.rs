@@ -43,13 +43,13 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GasEstimatorLayer;
 
-impl<P, N, T> ProviderLayer<P, N, T> for GasEstimatorLayer
+impl<P, T, N> ProviderLayer<P, T, N> for GasEstimatorLayer
 where
-    P: Provider<N, T>,
+    P: Provider<T, N>,
     N: Network,
     T: Transport + Clone,
 {
-    type Provider = GasEstimatorProvider<N, T, P>;
+    type Provider = GasEstimatorProvider<T, P, N>;
     fn layer(&self, inner: P) -> Self::Provider {
         GasEstimatorProvider { inner, _phantom: PhantomData }
     }
@@ -64,21 +64,21 @@ where
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
-pub struct GasEstimatorProvider<N, T, P>
+pub struct GasEstimatorProvider<T, P, N>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     inner: P,
     _phantom: PhantomData<(N, T)>,
 }
 
-impl<N, T, P> GasEstimatorProvider<N, T, P>
+impl<T, P, N> GasEstimatorProvider<T, P, N>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     /// Gets the gas_price to be used in legacy txs.
     async fn get_gas_price(&self) -> TransportResult<U256> {
@@ -180,20 +180,20 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N, T, P> Provider<N, T> for GasEstimatorProvider<N, T, P>
+impl<T, P, N> Provider<T, N> for GasEstimatorProvider<T, P, N>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
-    fn root(&self) -> &RootProvider<N, T> {
+    fn root(&self) -> &RootProvider<T, N> {
         self.inner.root()
     }
 
     async fn send_transaction(
         &self,
         mut tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         if tx.gas_price().is_none() {
             // Assume its a EIP1559 tx
             // Populate the following gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields
