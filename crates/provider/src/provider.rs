@@ -23,7 +23,7 @@ use alloy_rpc_types::{
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{
-    impl_future, BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
+    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,
 };
 use alloy_transport_http::Http;
@@ -998,32 +998,36 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
 #[allow(unused, unreachable_pub)]
-pub trait AdminApi<N, T> {
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+pub trait AdminApi<N, T>: Send + Sync {
     /// Requests adding the given peer, returning a boolean representing
     /// whether or not the peer was accepted for tracking.
-    fn add_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
+    async fn add_peer(&self, record: &str) -> TransportResult<bool>;
 
     /// Requests adding the given peer as a trusted peer, which the node will
     /// always connect to even when its peer slots are full.
-    fn add_trusted_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
+    async fn add_trusted_peer(&self, record: &str) -> TransportResult<bool>;
 
     /// Requests to remove the given peer, returning true if the enode was successfully parsed and
     /// the peer was removed.
-    fn remove_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
+    async fn remove_peer(&self, record: &str) -> TransportResult<bool>;
 
     /// Requests to remove the given peer, returning a boolean representing whether or not the
     /// enode url passed was validated. A return value of `true` does not necessarily mean that the
     /// peer was disconnected.
-    fn remove_trusted_peer(&self, record: &str) -> impl_future!(<Output = TransportResult<bool>>);
+    async fn remove_trusted_peer(&self, record: &str) -> TransportResult<bool>;
 
     /// Returns the list of peers currently connected to the node.
-    fn peers(&self) -> impl_future!(<Output = TransportResult<Vec<PeerInfo>>>);
+    async fn peers(&self) -> TransportResult<Vec<PeerInfo>>;
 
     /// Returns general information about the node as well as information about the running p2p
     /// protocols (e.g. `eth`, `snap`).
-    fn node_info(&self) -> impl_future!(<Output= TransportResult<NodeInfo>>);
+    async fn node_info(&self) -> TransportResult<NodeInfo>;
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<N, T, P> AdminApi<N, T> for P
 where
     N: Network,
