@@ -96,18 +96,34 @@ pub use alloy_genesis as genesis;
 #[doc(inline)]
 pub use alloy_node_bindings as node_bindings;
 
+/// Interface with an Ethereum blockchain.
+///
+/// See [`alloy_provider`] for more details.
 #[cfg(feature = "providers")]
 pub mod providers {
     #[doc(inline)]
     pub use alloy_provider::*;
 }
 
+/// Ethereum JSON-RPC publish-subscribe tower service and type definitions.
+///
+/// You will likely not need to use this module;
+/// see the [`providers`] module for high-level usage of pubsub.
+///
+/// See [`alloy_pubsub`] for more details.
+#[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
+#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
+#[cfg_attr(
+    not(feature = "providers"),
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
+)]
 #[cfg(feature = "pubsub")]
 pub mod pubsub {
     #[doc(inline)]
     pub use alloy_pubsub::*;
 }
 
+/// Ethereum JSON-RPC client and types.
 #[cfg(feature = "rpc")]
 pub mod rpc {
     #[cfg(feature = "rpc-client")]
@@ -118,6 +134,7 @@ pub mod rpc {
     #[doc(inline)]
     pub use alloy_json_rpc as json_rpc;
 
+    /// Ethereum JSON-RPC type definitions.
     #[cfg(feature = "rpc-types")]
     pub mod types {
         #[cfg(feature = "rpc-types-eth")]
@@ -138,6 +155,9 @@ pub mod rpc {
 #[doc(inline)]
 pub use alloy_serde as serde;
 
+/// Ethereum signer abstraction and implementations.
+///
+/// See [`alloy_signer`] for more details.
 #[cfg(feature = "signers")]
 pub mod signers {
     #[doc(inline)]
@@ -164,6 +184,18 @@ pub mod signers {
     pub use alloy_signer_wallet as wallet;
 }
 
+/// Low-level Ethereum JSON-RPC transport abstraction and implementations.
+///
+/// You will likely not need to use this module;
+/// see the [`providers`] module for high-level usage of transports.
+///
+/// See [`alloy_transport`] for more details.
+#[doc = "\n"] // Empty doc line `///` gets deleted by rustfmt.
+#[cfg_attr(feature = "providers", doc = "[`providers`]: crate::providers")]
+#[cfg_attr(
+    not(feature = "providers"),
+    doc = "[`providers`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider"
+)]
 #[cfg(feature = "transports")]
 pub mod transports {
     #[doc(inline)]
