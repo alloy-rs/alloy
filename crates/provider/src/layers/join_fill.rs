@@ -5,6 +5,66 @@ use async_trait::async_trait;
 use futures::try_join;
 use std::{future::Future, marker::PhantomData};
 
+/// The control flow for a filler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FillerControlFlow {
+    /// The filler is missing a required property.
+    Missing(Vec<&'static str>),
+    /// The filler is ready to fill in the transaction request.
+    Ready,
+    /// The filler has filled in all properties that it can fill.
+    Finished,
+}
+
+impl FillerControlFlow {
+    /// Absorb the control flow of another filler.
+    ///
+    /// # Behavior:
+    /// - If either is finished, return the unfinished one
+    /// - If either is ready, return ready.
+    /// - If both are missing, return missing.
+    pub fn absorb(self, other: Self) -> Self {
+        if other.is_finished() {
+            return self;
+        }
+        if other.is_ready() || self.is_ready() {
+            return Self::Ready;
+        }
+
+        if let (Self::Missing(mut a), Self::Missing(b)) = (self, other) {
+            a.extend(b);
+            return Self::Missing(a);
+        }
+        unreachable!()
+    }
+
+    /// Returns true if the filler is missing a required property.
+    pub fn as_missing(&self) -> Option<&[&'static str]> {
+        match self {
+            Self::Missing(missing) => Some(missing),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` if the filler is missing information required to fill in
+    /// the transaction request.
+    pub fn is_missing(&self) -> bool {
+        matches!(self, Self::Missing(_))
+    }
+
+    /// Returns `true` if the filler is ready to fill in the transaction
+    /// request.
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    /// Returns `true` if the filler is finished filling in the transaction
+    /// request.
+    pub fn is_finished(&self) -> bool {
+        matches!(self, Self::Finished)
+    }
+}
+
 /// A layer that can fill in a `TransactionRequest` with additional information.
 ///
 /// ## Lifecycle Notes
@@ -26,14 +86,20 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
         JoinFill::new(self, other)
     }
 
-    /// Returns true if the filler is ready to fill in the transaction request.
+    /// Return a control-flow enum indicating whether the filler is ready to
+    /// fill in the transaction request, or if it is missing required
+    /// properties.
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
-    // CONSIDER: should this return Result<(), String> to allow for error
-    // messages to specify why it's not ready?
-    fn ready(&self, tx: &N::TransactionRequest) -> bool;
+    /// Returns `true` if the filler is ready to fill in the transaction request.
+    fn ready(&self, tx: &N::TransactionRequest) -> bool {
+        self.status(tx).is_ready()
+    }
 
-    /// Returns true if all fillable properties have been filled.
-    fn finished(&self, tx: &N::TransactionRequest) -> bool;
+    /// Returns `true` if the filler is finished filling in the transaction request.
+    fn finished(&self, tx: &N::TransactionRequest) -> bool {
+        self.status(tx).is_finished()
+    }
 
     /// Requests the fillable properties from the RPC.
     fn request<P, T>(
@@ -112,12 +178,8 @@ where
 {
     type Fillable = (Option<L::Fillable>, Option<R::Fillable>);
 
-    fn ready(&self, tx: &N::TransactionRequest) -> bool {
-        self.left.ready(tx) || self.right.ready(tx)
-    }
-
-    fn finished(&self, tx: &N::TransactionRequest) -> bool {
-        self.left.finished(tx) && self.right.finished(tx)
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
+        self.left.status(tx).absorb(self.right.status(tx))
     }
 
     async fn request<P, T>(
@@ -212,7 +274,7 @@ where
         &self,
         mut tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        while self.filler.ready(&tx) && !self.filler.finished(&tx) {
+        while self.filler.status(&tx).is_ready() {
             let fillable = self.filler.request(self.root(), &tx).await?;
 
             // CONSIDER: should we have some sort of break condition or max loops here to account

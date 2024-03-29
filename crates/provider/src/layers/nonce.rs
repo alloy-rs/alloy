@@ -1,5 +1,5 @@
 use crate::{
-    layers::{FillProvider, TxFiller},
+    layers::{FillProvider, FillerControlFlow, TxFiller},
     Provider, ProviderLayer,
 };
 use alloy_network::{Network, TransactionBuilder};
@@ -61,12 +61,14 @@ pub struct NonceFiller {
 impl<N: Network> TxFiller<N> for NonceFiller {
     type Fillable = u64;
 
-    fn ready(&self, tx: &N::TransactionRequest) -> bool {
-        tx.from().is_some()
-    }
-
-    fn finished(&self, tx: &N::TransactionRequest) -> bool {
-        tx.nonce().is_some()
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        if tx.nonce().is_some() {
+            return FillerControlFlow::Finished;
+        }
+        if tx.from().is_none() {
+            return FillerControlFlow::Missing(vec!["from"]);
+        }
+        FillerControlFlow::Ready
     }
 
     async fn request<P, T>(

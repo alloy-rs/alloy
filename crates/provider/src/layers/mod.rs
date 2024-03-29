@@ -12,4 +12,4 @@ mod gas;
 pub use gas::{GasEstimatorLayer, GasEstimatorProvider};
 
 mod join_fill;
-pub use join_fill::{FillProvider, JoinFill, TxFiller};
+pub use join_fill::{FillProvider, FillerControlFlow, JoinFill, TxFiller};
