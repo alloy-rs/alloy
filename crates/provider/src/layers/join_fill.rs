@@ -114,16 +114,16 @@ where
         self.left.finished(tx) && self.right.finished(tx)
     }
 
-    fn request<P, T>(
+    async fn request<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
-    ) -> impl Future<Output = TransportResult<Self::Fillable>> + Send
+    ) -> TransportResult<Self::Fillable>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        async { try_join!(self.left_req(provider, tx), self.right_req(provider, tx)) }
+        try_join!(self.left_req(provider, tx), self.right_req(provider, tx))
     }
 
     fn fill(&self, to_fill: Self::Fillable, tx: &mut N::TransactionRequest) {
@@ -178,6 +178,14 @@ where
     /// Creates a new `FillProvider` with the given filler and inner provider.
     pub fn new(inner: P, filler: F) -> Self {
         Self { inner, filler, _pd: PhantomData }
+    }
+
+    /// Joins a filler to this provider
+    pub fn join<Other: TxFiller<N>>(
+        self,
+        other: Other,
+    ) -> FillProvider<JoinFill<F, Other, N>, P, N, T> {
+        JoinFill::new(self.filler, other).layer(self.inner)
     }
 }
 

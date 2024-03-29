@@ -82,19 +82,17 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         tx.nonce().is_some()
     }
 
-    fn request<P, T>(
+    async fn request<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
-    ) -> impl std::future::Future<Output = TransportResult<Self::Fillable>> + Send
+    ) -> TransportResult<Self::Fillable>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        async {
-            let from = tx.from().expect("checked by 'ready()'");
-            self.get_next_nonce(provider, from).await
-        }
+        let from = tx.from().expect("checked by 'ready()'");
+        self.get_next_nonce(provider, from).await
     }
 
     fn fill(&self, nonce: Self::Fillable, tx: &mut N::TransactionRequest) {
@@ -133,7 +131,7 @@ impl NonceFiller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, RootProvider};
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, U256};
