@@ -110,6 +110,12 @@ pub use self::core::eip712;
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
+#[cfg(feature = "reqwest")]
+use reqwest as _;
+
+#[cfg(feature = "hyper")]
+use hyper as _;
+
 #[cfg(feature = "contract")]
 #[doc(inline)]
 pub use alloy_contract as contract;
@@ -210,12 +216,6 @@ pub mod transports {
     #[cfg(feature = "transport-http")]
     #[doc(inline)]
     pub use alloy_transport_http as http;
-
-    #[cfg(feature = "transport-http-reqwest")]
-    use reqwest as _;
-
-    #[cfg(feature = "transport-http-hyper")]
-    use hyper as _;
 
     #[cfg(feature = "transport-ipc")]
     #[doc(inline)]
