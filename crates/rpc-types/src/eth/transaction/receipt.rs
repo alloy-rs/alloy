@@ -1,15 +1,18 @@
 use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxType};
-use alloy_primitives::{Address, B256, U64, U8};
+use alloy_primitives::{Address, B256, U64};
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
+///
+/// This type is generic over an inner [`ReceiptEnvelope`] which contains
+/// consensus data and metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TransactionReceipt {
+pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
-    pub inner: ReceiptEnvelope<Log>,
+    pub inner: T,
 
     /// Transaction Hash.
     pub transaction_hash: B256,
@@ -49,14 +52,6 @@ pub struct TransactionReceipt {
     /// EIP98 makes this optional field, if it's missing then skip serializing it
     #[serde(skip_serializing_if = "Option::is_none", rename = "root")]
     pub state_root: Option<B256>,
-    /// Status: either 1 (success) or 0 (failure). Only present after activation of EIP-658
-    #[serde(skip_serializing_if = "Option::is_none", rename = "status")]
-    pub status_code: Option<U64>,
-    /// EIP-2718 Transaction type.
-    ///
-    /// For legacy transactions this returns `0`. For EIP-2718 transactions this returns the type.
-    #[serde(rename = "type")]
-    pub transaction_type: U8,
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -132,6 +127,11 @@ mod test {
                 b256!("0000000000000000000000009a53bfba35269414f3b2d20b52ca01b15932c7b2"),
                 b256!("00000000000000000000000039e5dbb9d2fead31234d7c647d6ce77d85826f76")
             ],
-        )
+        );
+
+        assert_eq!(
+            serde_json::to_value(&receipt).unwrap(),
+            serde_json::from_str::<serde_json::Value>(json_str).unwrap()
+        );
     }
 }
