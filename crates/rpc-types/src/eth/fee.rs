@@ -89,7 +89,7 @@ impl FeeHistory {
             .copied()
     }
 
-    /// Returns the blob fee of the requested block in the `eth_feeHistory` request.
+    /// Returns the blob fee of the latest block in the `eth_feeHistory` request.
     pub fn latest_block_blob_base_fee(&self) -> Option<U256> {
         // the blob fee requested block is the second last element in the list
         self.base_fee_per_blob_gas
