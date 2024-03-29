@@ -1,8 +1,6 @@
-use std::ops::{Deref, DerefMut};
-
-use serde::{Deserialize, Serialize};
-
 use crate::other::OtherFields;
+use serde::{Deserialize, Serialize};
+use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.

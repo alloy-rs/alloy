@@ -4,9 +4,9 @@ use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::U256;
 use alloy_rpc_types::{TransactionRequest, WithOtherFields};
 
-use crate::{ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder};
-
-use super::AnyNetwork;
+use crate::{
+    any::AnyNetwork, ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder,
+};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {

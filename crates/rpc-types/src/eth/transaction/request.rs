@@ -246,9 +246,8 @@ pub struct TransactionInputError;
 
 #[cfg(test)]
 mod tests {
-    use crate::WithOtherFields;
-
     use super::*;
+    use crate::WithOtherFields;
     use alloy_primitives::b256;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>

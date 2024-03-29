@@ -1,8 +1,7 @@
+use crate::{Network, ReceiptResponse};
 use alloy_rpc_types::{
     Header, Transaction, TransactionReceipt, TransactionRequest, WithOtherFields,
 };
-
-use crate::{Network, ReceiptResponse};
 
 mod builder;
 
