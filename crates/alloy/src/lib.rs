@@ -36,10 +36,6 @@ pub use self::core::dyn_abi;
 #[doc(inline)]
 pub use self::core::json_abi;
 
-#[cfg(feature = "json")]
-#[doc(inline)]
-pub use self::core::json;
-
 #[cfg(feature = "sol-types")]
 #[doc(inline)]
 pub use self::core::sol_types;
