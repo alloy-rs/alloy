@@ -37,8 +37,8 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
-pub mod utils;
 pub mod admin;
+pub mod utils;
 
 #[doc(no_inline)]
 pub use alloy_network::{self as network, Network};
