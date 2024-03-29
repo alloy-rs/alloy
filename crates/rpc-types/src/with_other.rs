@@ -6,8 +6,9 @@ use std::ops::{Deref, DerefMut};
 /// deserialize.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WithOtherFields<T> {
+    /// The inner struct.
     #[serde(flatten)]
-    inner: T,
+    pub inner: T,
     /// All fields not present in the inner struct.
     #[serde(flatten)]
     pub other: OtherFields,
@@ -17,11 +18,6 @@ impl<T> WithOtherFields<T> {
     /// Create a new `Extra`.
     pub fn new(inner: T) -> Self {
         Self { inner, other: OtherFields::default() }
-    }
-
-    /// Unwrap the inner struct.
-    pub fn unwrap(self) -> T {
-        self.inner
     }
 }
 

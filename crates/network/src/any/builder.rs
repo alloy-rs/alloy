@@ -98,7 +98,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     }
 
     fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
-        build_unsigned::<AnyNetwork>(self.unwrap())
+        build_unsigned::<AnyNetwork>(self.inner)
     }
 
     fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
