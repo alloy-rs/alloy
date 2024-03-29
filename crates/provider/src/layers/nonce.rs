@@ -41,19 +41,6 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone, Copy)]
 pub struct NonceManagerLayer;
 
-// impl<P, N, T> ProviderLayer<P, N, T> for NonceManagerLayer
-// where
-//     P: Provider<T, N>,
-//     N: Network,
-//     T: Transport + Clone,
-// {
-//     type Provider = FillProvider<NonceFiller, N, T, P>;
-
-//     fn layer(&self, inner: P) -> Self::Provider {
-//         NonceFiller::default()
-//     }
-// }
-
 impl<P, T, N> ProviderLayer<P, T, N> for NonceManagerLayer
 where
     P: Provider<T, N>,
@@ -102,7 +89,7 @@ impl<N: Network> TxFiller<N> for NonceFiller {
 
 impl NonceFiller {
     /// Get the next nonce for the given account.
-    async fn get_next_nonce<P, N, T>(&self, provider: &P, from: Address) -> TransportResult<u64>
+    async fn get_next_nonce<P, T, N>(&self, provider: &P, from: Address) -> TransportResult<u64>
     where
         P: Provider<T, N>,
         N: Network,
