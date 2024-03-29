@@ -475,13 +475,13 @@ mod tests {
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex};
-    use alloy_provider::{HttpProvider, Provider, RootProvider};
+    use alloy_provider::{Provider, ReqwestProvider, RootProvider};
     use alloy_rpc_client::RpcClient;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
 
-    fn spawn_anvil() -> (HttpProvider<Ethereum>, AnvilInstance) {
+    fn spawn_anvil() -> (ReqwestProvider<Ethereum>, AnvilInstance) {
         let anvil = Anvil::new().spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
