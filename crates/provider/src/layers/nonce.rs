@@ -1,10 +1,12 @@
-use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
-use alloy_network::{Ethereum, Network, TransactionBuilder};
+use crate::{
+    layers::{FillProvider, TxFiller},
+    Provider, ProviderLayer,
+};
+use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;
 use alloy_transport::{Transport, TransportResult};
-use async_trait::async_trait;
 use dashmap::DashMap;
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// A layer that fills nonces on transactions.
@@ -39,50 +41,75 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone, Copy)]
 pub struct NonceManagerLayer;
 
+// impl<P, N, T> ProviderLayer<P, N, T> for NonceManagerLayer
+// where
+//     P: Provider<T, N>,
+//     N: Network,
+//     T: Transport + Clone,
+// {
+//     type Provider = FillProvider<NonceFiller, N, T, P>;
+
+//     fn layer(&self, inner: P) -> Self::Provider {
+//         NonceFiller::default()
+//     }
+// }
+
 impl<P, T, N> ProviderLayer<P, T, N> for NonceManagerLayer
 where
     P: Provider<T, N>,
-    T: Transport + Clone,
+    T: alloy_transport::Transport + Clone,
     N: Network,
 {
-    type Provider = ManagedNonceProvider<T, P, N>;
-
+    type Provider = FillProvider<NonceFiller, P, T, N>;
     fn layer(&self, inner: P) -> Self::Provider {
-        ManagedNonceProvider { inner, nonces: DashMap::default(), _phantom: PhantomData }
+        FillProvider::new(inner, NonceFiller::default())
     }
 }
 
-/// A provider that manages account nonces.
-///
-/// Fills nonces for transaction requests if unset.
-///
-/// # Note
-///
-/// If the transaction requests do not have a sender set, this provider will not set nonces.
-///
-/// You cannot construct this provider directly. Use [`ProviderBuilder`] with a
-/// [`NonceManagerLayer`].
-///
-/// [`ProviderBuilder`]: crate::ProviderBuilder
-#[derive(Debug, Clone)]
-pub struct ManagedNonceProvider<T, P, N = Ethereum>
-where
-    T: Transport + Clone,
-    P: Provider<T, N>,
-    N: Network,
-{
-    inner: P,
+#[derive(Debug, Clone, Default)]
+pub struct NonceFiller {
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
-    _phantom: PhantomData<(T, N)>,
 }
 
-impl<T, P, N> ManagedNonceProvider<T, P, N>
-where
-    N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
-{
-    async fn get_next_nonce(&self, from: Address) -> TransportResult<u64> {
+impl<N: Network> TxFiller<N> for NonceFiller {
+    type Fillable = u64;
+
+    fn ready(&self, tx: &N::TransactionRequest) -> bool {
+        tx.from().is_some()
+    }
+
+    fn finished(&self, tx: &N::TransactionRequest) -> bool {
+        tx.nonce().is_some()
+    }
+
+    fn request<P, T>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> impl std::future::Future<Output = TransportResult<Self::Fillable>> + Send
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        async {
+            let from = tx.from().expect("checked by 'ready()'");
+            self.get_next_nonce(provider, from).await
+        }
+    }
+
+    fn fill(&self, nonce: Self::Fillable, tx: &mut N::TransactionRequest) {
+        tx.set_nonce(nonce);
+    }
+}
+
+impl NonceFiller {
+    /// Get the next nonce for the given account.
+    async fn get_next_nonce<P, N, T>(&self, provider: &P, from: Address) -> TransportResult<u64>
+    where
+        P: Provider<T, N>,
+        N: Network,
+        T: Transport + Clone,
+    {
         // locks dashmap internally for a short duration to clone the `Arc`
         let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
 
@@ -95,7 +122,7 @@ where
             }
             None => {
                 // initialize the nonce if we haven't seen this account before
-                let initial_nonce = self.inner.get_transaction_count(from, None).await?;
+                let initial_nonce = provider.get_transaction_count(from, None).await?;
                 *nonce = Some(initial_nonce);
                 Ok(initial_nonce)
             }
@@ -103,34 +130,6 @@ where
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<T, P, N> Provider<T, N> for ManagedNonceProvider<T, P, N>
-where
-    T: Transport + Clone,
-    P: Provider<T, N>,
-    N: Network,
-{
-    #[inline]
-    fn root(&self) -> &RootProvider<T, N> {
-        self.inner.root()
-    }
-
-    async fn send_transaction(
-        &self,
-        mut tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        if tx.nonce().is_none() {
-            if let Some(from) = tx.from() {
-                tx.set_nonce(self.get_next_nonce(from).await?);
-            }
-        }
-
-        self.inner.send_transaction(tx).await
-    }
-}
-
-#[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
     use super::*;

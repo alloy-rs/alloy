@@ -6,7 +6,10 @@ mod signer;
 pub use signer::{SignerLayer, SignerProvider};
 
 mod nonce;
-pub use nonce::{ManagedNonceProvider, NonceManagerLayer};
+pub use nonce::NonceManagerLayer;
 
 mod gas;
 pub use gas::{GasEstimatorLayer, GasEstimatorProvider};
+
+mod join_fill;
+pub use join_fill::{FillProvider, JoinFill, TxFiller};
