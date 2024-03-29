@@ -71,39 +71,35 @@ where
     }
 
     /// Get a request for the left layer, if the left layer is ready.
-    fn left_req<'a: 'd, 'b: 'd, 'c: 'd, 'd, P, T>(
-        &'a self,
-        provider: &'b P,
-        tx: &'c N::TransactionRequest,
-    ) -> impl Future<Output = TransportResult<Option<L::Fillable>>> + Send + 'd
+    async fn left_req<P, T>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<Option<L::Fillable>>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        async {
-            if self.left.ready(tx) {
-                self.left.request(provider, tx).await.map(Some)
-            } else {
-                Ok(None)
-            }
+        if self.left.ready(tx) {
+            self.left.request(provider, tx).await.map(Some)
+        } else {
+            Ok(None)
         }
     }
 
-    fn right_req<'a: 'd, 'b: 'd, 'c: 'd, 'd, P, T>(
-        &'a self,
-        provider: &'b P,
-        tx: &'c N::TransactionRequest,
-    ) -> impl Future<Output = TransportResult<Option<R::Fillable>>> + Send + 'd
+    async fn right_req<P, T>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<Option<R::Fillable>>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        async {
-            if self.right.ready(tx) {
-                self.right.request(provider, tx).await.map(Some)
-            } else {
-                Ok(None)
-            }
+        if self.right.ready(tx) {
+            self.right.request(provider, tx).await.map(Some)
+        } else {
+            Ok(None)
         }
     }
 }
