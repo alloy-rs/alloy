@@ -107,8 +107,8 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
         self.status(tx).is_finished()
     }
 
-    /// Requests the fillable properties from the RPC.
-    fn request<P, T>(
+    /// Prepares fillable properties, potentially by making an RPC request.
+    fn prepare<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -142,8 +142,8 @@ where
         Self { left, right, _network: PhantomData }
     }
 
-    /// Get a request for the left layer, if the left layer is ready.
-    async fn left_req<P, T>(
+    /// Get a request for the left filler, if the left filler is ready.
+    async fn prepare_left<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -153,13 +153,14 @@ where
         T: Transport + Clone,
     {
         if self.left.ready(tx) {
-            self.left.request(provider, tx).await.map(Some)
+            self.left.prepare(provider, tx).await.map(Some)
         } else {
             Ok(None)
         }
     }
 
-    async fn right_req<P, T>(
+    /// Get a prepare for the right filler, if the right filler is ready.
+    async fn prepare_right<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -169,7 +170,7 @@ where
         T: Transport + Clone,
     {
         if self.right.ready(tx) {
-            self.right.request(provider, tx).await.map(Some)
+            self.right.prepare(provider, tx).await.map(Some)
         } else {
             Ok(None)
         }
@@ -188,7 +189,7 @@ where
         self.left.status(tx).absorb(self.right.status(tx))
     }
 
-    async fn request<P, T>(
+    async fn prepare<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -197,7 +198,7 @@ where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        try_join!(self.left_req(provider, tx), self.right_req(provider, tx))
+        try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
 
     fn fill(&self, to_fill: Self::Fillable, tx: &mut N::TransactionRequest) {
@@ -281,7 +282,7 @@ where
         mut tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         while self.filler.status(&tx).is_ready() {
-            let fillable = self.filler.request(self.root(), &tx).await?;
+            let fillable = self.filler.prepare(self.root(), &tx).await?;
 
             // CONSIDER: should we have some sort of break condition or max loops here to account
             // for misimplemented fillers that are always ready and never finished?

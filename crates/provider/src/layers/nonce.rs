@@ -71,7 +71,7 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         FillerControlFlow::Ready
     }
 
-    async fn request<P, T>(
+    async fn prepare<P, T>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
