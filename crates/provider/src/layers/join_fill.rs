@@ -171,7 +171,7 @@ where
 {
     inner: P,
     filler: F,
-    _pd: PhantomData<fn() -> (N, T)>,
+    _pd: PhantomData<fn() -> (T, N)>,
 }
 
 impl<F, P, T, N> FillProvider<F, P, T, N>
@@ -190,7 +190,7 @@ where
     pub fn join_with<Other: TxFiller<N>>(
         self,
         other: Other,
-    ) -> FillProvider<JoinFill<F, Other, N>, P, N, T> {
+    ) -> FillProvider<JoinFill<F, Other, N>, P, T, N> {
         self.filler.join_with(other).layer(self.inner)
     }
 }

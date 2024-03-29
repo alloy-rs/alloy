@@ -7,7 +7,7 @@ use crate::{
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -593,31 +593,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
         self.client().request("eth_getBlockByNumber", (number, hydrate)).await
-    }
-
-    /// Populates the legacy gas price field of the given transaction request.
-    async fn populate_gas(
-        &self,
-        tx: &mut N::TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<()> {
-        let gas = self.estimate_gas(&*tx, block).await;
-
-        gas.map(|gas| tx.set_gas_limit(gas))
-    }
-
-    /// Populates the EIP-1559 gas price fields of the given transaction request.
-    async fn populate_gas_eip1559(
-        &self,
-        tx: &mut N::TransactionRequest,
-        estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<()> {
-        let gas = self.estimate_eip1559_fees(estimator).await;
-
-        gas.map(|estimate| {
-            tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
-            tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
-        })
     }
 
     /// Broadcasts a transaction to the network.
