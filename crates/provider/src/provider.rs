@@ -565,7 +565,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().request("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
 
-    /// Gets the transaction count of the corresponding address.
+    /// Gets the transaction count (AKA "nonce") of the corresponding address.
+    #[doc(alias = "get_nonce")]
+    #[doc(alias = "get_account_nonce")]
     async fn get_transaction_count(
         &self,
         address: Address,
