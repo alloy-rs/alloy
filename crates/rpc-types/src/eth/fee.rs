@@ -64,7 +64,7 @@ pub struct FeeHistory {
 }
 
 impl FeeHistory {
-    /// Returns the base fee of the requested block in the `eth_feeHistory` request.
+    /// Returns the base fee of the latest block in the `eth_feeHistory` request.
     pub fn latest_block_base_fee(&self) -> Option<U256> {
         // the base fee of requested block is the second last element in the
         // list
