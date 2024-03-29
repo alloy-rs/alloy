@@ -9,7 +9,7 @@ use std::{future::Future, marker::PhantomData};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FillerControlFlow {
     /// The filler is missing a required property.
-    Missing(Vec<&'static str>),
+    Missing(Vec<&'static [&'static str]>),
     /// The filler is ready to fill in the transaction request.
     Ready,
     /// The filler has filled in all properties that it can fill.
@@ -45,7 +45,7 @@ impl FillerControlFlow {
     }
 
     /// Returns true if the filler is missing a required property.
-    pub fn as_missing(&self) -> Option<&[&'static str]> {
+    pub fn as_missing(&self) -> Option<&[&'static [&'static str]]> {
         match self {
             Self::Missing(missing) => Some(missing),
             _ => None,
