@@ -16,6 +16,8 @@ exclude.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
+alloy-genesis.workspace=true
+
 alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = {workspace = true, features = ["std", "serde"]}
 
@@ -23,6 +25,7 @@ itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
+
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }

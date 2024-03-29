@@ -37,6 +37,7 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
+pub mod admin;
 pub mod utils;
 
 #[doc(no_inline)]
