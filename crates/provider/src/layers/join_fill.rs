@@ -48,19 +48,19 @@ impl FillerControlFlow {
 
     /// Returns `true` if the filler is missing information required to fill in
     /// the transaction request.
-    pub fn is_missing(&self) -> bool {
+    pub const fn is_missing(&self) -> bool {
         matches!(self, Self::Missing(_))
     }
 
     /// Returns `true` if the filler is ready to fill in the transaction
     /// request.
-    pub fn is_ready(&self) -> bool {
+    pub const fn is_ready(&self) -> bool {
         matches!(self, Self::Ready)
     }
 
     /// Returns `true` if the filler is finished filling in the transaction
     /// request.
-    pub fn is_finished(&self) -> bool {
+    pub const fn is_finished(&self) -> bool {
         matches!(self, Self::Finished)
     }
 }
