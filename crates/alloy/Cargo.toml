@@ -72,8 +72,12 @@ std = [
 ]
 
 # configuration
-reqwest = ["dep:reqwest"]
-hyper = ["dep:hyper"]
+reqwest = [
+    "dep:reqwest",
+    "alloy-rpc-client?/reqwest",
+    "alloy-transport-http?/reqwest",
+]
+hyper = ["dep:hyper", "alloy-rpc-client?/hyper", "alloy-transport-http?/hyper"]
 
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
@@ -92,7 +96,11 @@ provider-ws = ["providers", "alloy-provider?/pubsub", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/pubsub", "transport-ipc"]
 
 # pubsub
-pubsub = ["dep:alloy-pubsub", "alloy-provider?/pubsub"]
+pubsub = [
+    "dep:alloy-pubsub",
+    "alloy-provider?/pubsub",
+    "alloy-rpc-client?/pubsub",
+]
 
 # rpc
 rpc = []
