@@ -69,10 +69,16 @@ impl FillerControlFlow {
 ///
 /// ## Lifecycle Notes
 ///
-/// - `ready` MUST be called before `request` and `fill`. It is acceptable to panic in `request` and
-///   `fill` if `ready` has not been called.
-/// - the output of `request` MUST be passed to `fill` before `finished()`
-/// is called again.
+/// The [`FillerControlFlow`] determines the lifecycle of a filler. Fillers
+/// may be in one of three states:
+/// - **Missing**: The filler is missing a required property to fill in the
+///  transaction request. [`TxFiller::status`] should return
+/// [`FillerControlFlow::Missing`].
+/// with a list of the missing properties.
+/// - **Ready**: The filler is ready to fill in the transaction request.
+/// [`TxFiller::status`] should return [`FillerControlFlow::Ready`].
+/// - **Finished**: The filler has filled in all properties that it can fill.
+/// [`TxFiller::status`] should return [`FillerControlFlow::Finished`].
 pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
