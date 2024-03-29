@@ -227,7 +227,7 @@ impl<L, N> ProviderBuilder<L, N> {
     #[cfg(feature = "reqwest")]
     pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<crate::ReqwestProvider<N>, N, alloy_transport_http::Http<reqwest::Client>>,
+        L: ProviderLayer<crate::ReqwestProvider<N>, alloy_transport_http::Http<reqwest::Client>, N>,
         N: Network,
     {
         let client = ClientBuilder::default().reqwest_http(url);
@@ -240,8 +240,8 @@ impl<L, N> ProviderBuilder<L, N> {
     where
         L: ProviderLayer<
             crate::HyperProvider<N>,
-            N,
             alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+            N,
         >,
         N: Network,
     {
