@@ -1,3 +1,4 @@
+//! This module extends the Ethereum JSON-RPC provider with the Admin namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
 use alloy_rpc_types::admin::{NodeInfo, PeerInfo};
