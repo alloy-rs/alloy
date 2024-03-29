@@ -6,6 +6,13 @@ use futures::try_join;
 use std::{future::Future, marker::PhantomData};
 
 /// A layer that can fill in a `TransactionRequest` with additional information.
+///
+/// ## Lifecycle Notes
+///
+/// - `ready` MUST be called before `request` and `fill`. It is acceptable to panic in `request` and
+///   `fill` if `ready` has not been called.
+/// - the output of `request` MUST be passed to `fill` before `finished()`
+/// is called again.
 pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
@@ -211,6 +218,10 @@ where
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         while self.filler.ready(&tx) && !self.filler.finished(&tx) {
             let fillable = self.filler.request(self.root(), &tx).await?;
+
+            // CONSIDER: should we have some sort of break condition or max loops here to account
+            // for misimplemented fillers that are always ready and never finished?
+
             self.filler.fill(fillable, &mut tx);
         }
         // CONSIDER: should we error if the filler is not finished and also not ready?
