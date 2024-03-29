@@ -1,5 +1,5 @@
 use crate::Error;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, LogData};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
 use alloy_rpc_types::{Filter, Log};
 use alloy_sol_types::SolEvent;
@@ -134,7 +134,9 @@ impl<T: Transport + Clone, E: SolEvent> EventPoller<T, E> {
 }
 
 fn decode_log<E: SolEvent>(log: &Log) -> alloy_sol_types::Result<E> {
-    E::decode_raw_log(log.topics.iter().copied(), &log.data, false)
+    let log_data: &LogData = log.as_ref();
+
+    E::decode_raw_log(log_data.topics().iter().copied(), &log_data.data, false)
 }
 
 #[cfg(feature = "pubsub")]
@@ -191,10 +193,7 @@ pub(crate) mod subscription {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::Ethereum;
     use alloy_primitives::U256;
-    use alloy_provider::RootProvider;
-    use alloy_rpc_client::RpcClient;
     use alloy_sol_types::sol;
     use test_utils::{init_tracing, spawn_anvil};
 
@@ -215,10 +214,10 @@ mod tests {
     async fn event_filters() {
         init_tracing();
 
-        #[cfg(feature = "pubsub")]
+        #[cfg(feature = "ws")]
         let (provider, anvil) = spawn_anvil();
 
-        #[cfg(not(feature = "pubsub"))]
+        #[cfg(not(feature = "ws"))]
         let (provider, _anvil) = spawn_anvil();
 
         let contract = MyContract::deploy(&provider).await.unwrap();
@@ -244,8 +243,8 @@ mod tests {
         let mut stream = poller.into_stream();
         let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
         assert_eq!(stream_event, expected_event);
-        assert_eq!(stream_log.address, *contract.address());
-        assert_eq!(stream_log.block_number, Some(U256::from(2)));
+        assert_eq!(stream_log.inner.address, *contract.address());
+        assert_eq!(stream_log.block_number, Some(2));
 
         // This is not going to return `None`
         // assert!(stream.next().await.is_none());
@@ -255,11 +254,12 @@ mod tests {
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
 
-        #[cfg(feature = "pubsub")]
+        #[cfg(feature = "ws")]
         {
-            let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-            let client = RpcClient::connect_pubsub(ws).await.unwrap();
-            let provider = RootProvider::<Ethereum, _>::new(client);
+            let provider = alloy_provider::ProviderBuilder::default()
+                .on_ws(anvil.ws_endpoint())
+                .await
+                .unwrap();
 
             let contract = MyContract::new(*contract.address(), provider);
             let event = contract.MyEvent_filter();
