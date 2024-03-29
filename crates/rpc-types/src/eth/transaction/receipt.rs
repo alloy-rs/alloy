@@ -1,6 +1,6 @@
 use crate::Log;
 use alloy_consensus::{ReceiptEnvelope, TxType};
-use alloy_primitives::{Address, B256, U64};
+use alloy_primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
