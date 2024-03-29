@@ -44,3 +44,6 @@ pub mod private {
     pub use alloy_provider::Provider;
     pub use alloy_transport::Transport;
 }
+
+mod multicall;
+pub use multicall::*;

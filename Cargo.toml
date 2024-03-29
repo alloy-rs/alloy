@@ -49,6 +49,7 @@ alloy-dyn-abi = { version = "0.6.4", default-features = false }
 alloy-json-abi = { version = "0.6.4", default-features = false }
 alloy-primitives = { version = "0.6.4", default-features = false }
 alloy-sol-types = { version = "0.6.4", default-features = false }
+alloy-chains = {version = "0.1.15", default-features = false}
 
 alloy-rlp = { version = "0.3", default-features = false }
 

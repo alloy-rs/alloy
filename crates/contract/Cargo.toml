@@ -28,6 +28,8 @@ thiserror.workspace = true
 
 alloy-pubsub = { workspace = true, optional = true }
 
+alloy-chains.workspace = true
+
 [dev-dependencies]
 alloy-rpc-client = { workspace = true, features = ["pubsub", "ws"] }
 alloy-transport-http.workspace = true
