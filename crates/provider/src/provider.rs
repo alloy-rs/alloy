@@ -831,20 +831,28 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> TransportResult<Eip1559Estimation> {
-        let (bf, fee_history) = futures::try_join!(
-            self.get_block_by_number(BlockNumberOrTag::Latest, false),
-            self.get_fee_history(
+        let fee_history = self
+            .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
-        )?;
+            .await?;
 
-        let base_fee_per_gas = bf
-            .ok_or(RpcError::NullResp)?
-            .header
-            .base_fee_per_gas
-            .ok_or(RpcError::UnsupportedFeature("eip1559"))?;
+        // if the base fee of the Latest block is 0 then we need check if the latest block even has
+        // a base fee/supports EIP1559
+        let base_fee_per_gas = match fee_history.latest_block_base_fee() {
+            Some(base_fee) if !base_fee.is_zero() => base_fee,
+            _ => {
+                // empty response, fetch basefee from latest block directly
+                self.get_block_by_number(BlockNumberOrTag::Latest, false)
+                    .await?
+                    .ok_or(RpcError::NullResp)?
+                    .header
+                    .base_fee_per_gas
+                    .ok_or(RpcError::UnsupportedFeature("eip1559"))?
+            }
+        };
 
         Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
             base_fee_per_gas,
