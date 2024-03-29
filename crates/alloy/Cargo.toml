@@ -31,7 +31,7 @@ alloy-pubsub = { workspace = true, default-features = false, optional = true }
 
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
-alloy-rpc-client = { workspace = true, optional = true }                                 # features: `reqwest`
+alloy-rpc-client = { workspace = true, default-features = false, optional = true }
 alloy-rpc-engine-types = { workspace = true, default-features = false, optional = true }
 alloy-rpc-trace-types = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types = { workspace = true, default-features = false, optional = true }
@@ -49,14 +49,13 @@ alloy-signer-wallet = { workspace = true, default-features = false, optional = t
 
 # transport
 alloy-transport = { workspace = true, default-features = false, optional = true }
-alloy-transport-http = { workspace = true, optional = true }                          # features: `reqwest`, `reqwest-default-tls`
+alloy-transport-http = { workspace = true, default-features = false, optional = true }
 alloy-transport-ipc = { workspace = true, default-features = false, optional = true }
 alloy-transport-ws = { workspace = true, default-features = false, optional = true }
 
 # optional
 reqwest = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true }
-
 
 # ----------------------------------------- Configuration ---------------------------------------- #
 
@@ -76,6 +75,7 @@ reqwest = [
     "dep:reqwest",
     "alloy-rpc-client?/reqwest",
     "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-default-tls",
 ]
 hyper = ["dep:hyper", "alloy-rpc-client?/hyper", "alloy-transport-http?/hyper"]
 
