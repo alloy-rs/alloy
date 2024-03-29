@@ -66,7 +66,7 @@ impl<N: Network> TxFiller<N> for NonceFiller {
             return FillerControlFlow::Finished;
         }
         if tx.from().is_none() {
-            return FillerControlFlow::Missing(vec![&["from"]]);
+            return FillerControlFlow::missing("NonceManager", &["from"]);
         }
         FillerControlFlow::Ready
     }

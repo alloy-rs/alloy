@@ -9,7 +9,12 @@ use std::{future::Future, marker::PhantomData};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FillerControlFlow {
     /// The filler is missing a required property.
-    Missing(Vec<&'static [&'static str]>),
+    ///
+    /// To allow joining fillers while preserving their associated missing
+    /// lists, this variant contains a list of `(name, missing)` tuples. When
+    /// absorbing another control flow, if both are missing, the missing lists
+    /// are combined.
+    Missing(Vec<(&'static str, &'static [&'static str])>),
     /// The filler is ready to fill in the transaction request.
     Ready,
     /// The filler has filled in all properties that it can fill.
@@ -44,8 +49,13 @@ impl FillerControlFlow {
         unreachable!()
     }
 
+    /// Creates a new `Missing` control flow.
+    pub fn missing(name: &'static str, missing: &'static [&'static str]) -> Self {
+        Self::Missing(vec![(name, missing)])
+    }
+
     /// Returns true if the filler is missing a required property.
-    pub fn as_missing(&self) -> Option<&[&'static [&'static str]]> {
+    pub fn as_missing(&self) -> Option<&[(&'static str, &'static [&'static str])]> {
         match self {
             Self::Missing(missing) => Some(missing),
             _ => None,
