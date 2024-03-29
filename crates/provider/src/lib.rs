@@ -16,11 +16,17 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(feature = "reqwest")]
-/// Type alias for a [`RootProvider`] using the [`Http`] transport.
+/// Type alias for a [`RootProvider`] using the [`Http`] transport and a
+/// reqwest client.
+///
+/// [`Http`]: alloy_transport_http::Http
 pub type ReqwestProvider<N> = crate::RootProvider<N, alloy_transport_http::Http<reqwest::Client>>;
 
 #[cfg(feature = "hyper")]
-/// Type alias for a [`RootProvider`] using the [`Hyper`] transport.
+/// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
+/// client.
+///
+/// [`Http`]: alloy_transport_http::Http
 pub type HyperProvider<N> =
     crate::RootProvider<N, alloy_transport_http::Http<alloy_transport_http::HyperClient>>;
 
