@@ -45,6 +45,10 @@ pub use self::core::sol_types;
 #[doc(no_inline)]
 pub use sol_types::sol;
 
+#[cfg(feature = "rlp")]
+#[doc(inline)]
+pub use self::core::rlp;
+
 /// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
 ///
 /// See [`sol!`](sol_types::sol!) for the actual macro documentation.
@@ -59,54 +63,6 @@ macro_rules! sol {
         }
     };
 }
-
-#[cfg(feature = "tiny-keccak")]
-#[doc(inline)]
-pub use self::core::tiny_keccak;
-
-#[cfg(feature = "native-keccak")]
-#[doc(inline)]
-pub use self::core::native_keccak;
-
-#[cfg(feature = "asm-keccak")]
-#[doc(inline)]
-pub use self::core::asm_keccak;
-
-#[cfg(feature = "postgres")]
-#[doc(inline)]
-pub use self::core::postgres;
-
-#[cfg(feature = "getrandom")]
-#[doc(inline)]
-pub use self::core::getrandom;
-
-#[cfg(feature = "rand")]
-#[doc(inline)]
-pub use self::core::rand;
-
-#[cfg(feature = "rlp")]
-#[doc(inline)]
-pub use self::core::rlp;
-
-#[cfg(feature = "serde")]
-#[doc(inline)]
-pub use self::core::serde;
-
-#[cfg(feature = "ssz")]
-#[doc(inline)]
-pub use self::core::ssz;
-
-#[cfg(feature = "arbitrary")]
-#[doc(inline)]
-pub use self::core::arbitrary;
-
-#[cfg(feature = "k256")]
-#[doc(inline)]
-pub use self::core::k256;
-
-#[cfg(feature = "eip712")]
-#[doc(inline)]
-pub use self::core::eip712;
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
