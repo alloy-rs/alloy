@@ -27,6 +27,11 @@ impl FillerControlFlow {
         if other.is_finished() {
             return self;
         }
+
+        if self.is_finished() {
+            return other;
+        }
+
         if other.is_ready() || self.is_ready() {
             return Self::Ready;
         }
@@ -35,6 +40,7 @@ impl FillerControlFlow {
             a.extend(b);
             return Self::Missing(a);
         }
+
         unreachable!()
     }
 
