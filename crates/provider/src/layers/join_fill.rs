@@ -20,6 +20,9 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     }
 
     /// Returns true if the filler is ready to fill in the transaction request.
+
+    // CONSIDER: should this return Result<(), String> to allow for error
+    // messages to specify why it's not ready?
     fn ready(&self, tx: &N::TransactionRequest) -> bool;
 
     /// Returns true if all fillable properties have been filled.
@@ -181,11 +184,11 @@ where
     }
 
     /// Joins a filler to this provider
-    pub fn join<Other: TxFiller<N>>(
+    pub fn join_with<Other: TxFiller<N>>(
         self,
         other: Other,
     ) -> FillProvider<JoinFill<F, Other, N>, P, N, T> {
-        JoinFill::new(self.filler, other).layer(self.inner)
+        self.filler.join_with(other).layer(self.inner)
     }
 }
 
@@ -210,6 +213,7 @@ where
             let fillable = self.filler.request(self.root(), &tx).await?;
             self.filler.fill(fillable, &mut tx);
         }
+        // CONSIDER: should we error if the filler is not finished and also not ready?
 
         self.inner.send_transaction(tx).await
     }
