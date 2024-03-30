@@ -159,28 +159,32 @@ where
     N::UnsignedTx: From<TxLegacy> + From<TxEip1559> + From<TxEip2930> + From<TxEip4844Variant>,
 {
     match (
-        request.gas_price.as_ref(),
-        request.max_fee_per_gas.as_ref(),
         request.access_list.as_ref(),
         request.max_fee_per_blob_gas.as_ref(),
         request.blob_versioned_hashes.as_ref(),
         request.sidecar.as_ref(),
     ) {
-        // Legacy transaction
-        (Some(_), None, None, None, None, None) => build_legacy(request).map(Into::into),
-        // EIP-2930
-        // If only accesslist is set, and there are no EIP-1559 fees
-        (_, None, Some(_), None, None, None) => build_2930(request).map(Into::into),
-        // EIP-1559
-        // If EIP-4844 fields are missing
-        (None, _, _, None, None, None) => build_1559(request).map(Into::into),
-        // EIP-4844
-        // All blob fields required
-        (None, _, _, Some(_), Some(_), Some(_)) => {
-            build_4844(request).map(TxEip4844Variant::from).map(Into::into)
+        (_, Some(_), None, _) => Err(TransactionBuilderError::MissingKey("blob_versioned_hashes")),
+        (_, Some(_), _, None) => Err(TransactionBuilderError::MissingKey("sidecar")),
+        (Some(_), _, _, Some(_)) => {
+            Err(TransactionBuilderError::SidecarAndAccessListMutuallyExclusive)
         }
-        _ => build_legacy(request).map(Into::into),
+        _ => {
+            if will_build_4844(&request) {
+                build_4844(request).map(TxEip4844Variant::from).map(Into::into)
+            } else if will_build_2930(&request) {
+                build_2930(request).map(Into::into)
+            } else if will_build_legacy(&request) {
+                build_legacy(request).map(Into::into)
+            } else {
+                build_1559(request).map(Into::into)
+            }
+        }
     }
+}
+
+const fn will_build_legacy(request: &TransactionRequest) -> bool {
+    request.gas_price.is_some()
 }
 
 /// Build a legacy transaction.
@@ -217,6 +221,10 @@ fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuild
     })
 }
 
+const fn will_build_2930(request: &TransactionRequest) -> bool {
+    request.access_list.is_some()
+}
+
 /// Build an EIP-2930 transaction.
 fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuilderError> {
     Ok(TxEip2930 {
@@ -231,6 +239,10 @@ fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuild
         input: request.input.into_input().unwrap_or_default(),
         access_list: request.access_list.unwrap_or_default(),
     })
+}
+
+const fn will_build_4844(request: &TransactionRequest) -> bool {
+    request.sidecar.is_some()
 }
 
 /// Build an EIP-4844 transaction.
@@ -256,4 +268,78 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_blob_gas"))?,
         input: request.input.into_input().unwrap_or_default(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy_consensus::{BlobTransactionSidecar, TypedTransaction};
+    use alloy_primitives::{Address, U256};
+    use alloy_rpc_types::{AccessList, TransactionRequest};
+
+    use crate::{TransactionBuilder, TransactionBuilderError};
+
+    #[test]
+    fn test_4844_when_sidecar() {
+        let request = TransactionRequest::default()
+            .with_nonce(1)
+            .with_gas_limit(U256::default())
+            .with_max_fee_per_gas(U256::default())
+            .with_max_priority_fee_per_gas(U256::default())
+            .with_to(Address::ZERO.into())
+            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .with_max_fee_per_blob_gas(U256::default());
+
+        let tx = request.clone().build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Eip4844(_)));
+
+        let tx = request.with_gas_price(U256::default()).build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Eip4844(_)));
+    }
+
+    #[test]
+    fn test_2930_when_acces_list() {
+        let request = TransactionRequest::default()
+            .with_nonce(1)
+            .with_gas_limit(U256::default())
+            .with_max_fee_per_gas(U256::default())
+            .with_max_priority_fee_per_gas(U256::default())
+            .with_to(Address::ZERO.into())
+            .with_gas_price(U256::default())
+            .access_list(AccessList::default());
+
+        let tx = request.build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Eip2930(_)));
+    }
+
+    #[test]
+    fn test_default_to_1559() {
+        let request = TransactionRequest::default()
+            .with_nonce(1)
+            .with_gas_limit(U256::default())
+            .with_max_fee_per_gas(U256::default())
+            .with_max_priority_fee_per_gas(U256::default())
+            .with_to(Address::ZERO.into());
+
+        let tx = request.clone().build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Eip1559(_)));
+
+        let tx = request.with_gas_price(U256::default()).build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Legacy(_)));
+    }
+
+    #[test]
+    fn test_fail_when_sidecar_and_access_list() {
+        let request = TransactionRequest::default()
+            .with_blob_sidecar(BlobTransactionSidecar::default())
+            .access_list(AccessList::default());
+
+        let error = request.clone().build_unsigned().unwrap_err();
+
+        assert!(matches!(error, TransactionBuilderError::SidecarAndAccessListMutuallyExclusive));
+    }
 }

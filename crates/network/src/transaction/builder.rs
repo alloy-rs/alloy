@@ -20,6 +20,10 @@ pub enum TransactionBuilderError {
     #[error(transparent)]
     Signer(#[from] alloy_signer::Error),
 
+    /// Sidecar and access list are mutually exclusive.
+    #[error("Sidecar and access list are mutually exclusive")]
+    SidecarAndAccessListMutuallyExclusive,
+
     /// A custom error.
     #[error("{0}")]
     Custom(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
