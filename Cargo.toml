@@ -114,10 +114,10 @@ tempfile = "3.10"
 
 # TODO: Remove eventually.
 [patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
+alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }
+alloy-core = { git = "https://github.com/alloy-rs/core", rev = "2fcea76" }

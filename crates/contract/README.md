@@ -17,7 +17,7 @@ that returns a `CallBuilder` for that function. See its documentation for more d
 use alloy_contract::SolCallBuilder;
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, U256};
-use alloy_provider::RootProvider;
+use alloy_provider::ProviderBuilder;
 use alloy_sol_types::sol;
 
 sol! {
@@ -32,7 +32,7 @@ sol! {
 }
 
 // Build a provider.
-let provider = RootProvider::<Ethereum, _>::new_http("http://localhost:8545".parse()?);
+let provider = ProviderBuilder::new().with_recommended_layers().on_builtin("http://localhost:8545").await?;
 
 // If `#[sol(bytecode = "0x...")]` is provided, the contract can be deployed with `MyContract::deploy`,
 // and a new instance will be created.

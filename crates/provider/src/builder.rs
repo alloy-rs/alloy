@@ -10,9 +10,9 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
+pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Ethereum> {
     /// The provider constructed by this layer.
-    type Provider: Provider<N, T>;
+    type Provider: Provider<T, N>;
 
     /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
@@ -22,11 +22,11 @@ pub trait ProviderLayer<P: Provider<N, T>, N: Network, T: Transport + Clone> {
 #[derive(Debug, Clone, Copy)]
 pub struct Identity;
 
-impl<P, N, T> ProviderLayer<P, N, T> for Identity
+impl<P, T, N> ProviderLayer<P, T, N> for Identity
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     type Provider = P;
 
@@ -49,13 +49,13 @@ impl<Inner, Outer> Stack<Inner, Outer> {
     }
 }
 
-impl<P, N, T, Inner, Outer> ProviderLayer<P, N, T> for Stack<Inner, Outer>
+impl<P, T, N, Inner, Outer> ProviderLayer<P, T, N> for Stack<Inner, Outer>
 where
     T: Transport + Clone,
     N: Network,
-    P: Provider<N, T>,
-    Inner: ProviderLayer<P, N, T>,
-    Outer: ProviderLayer<Inner::Provider, N, T>,
+    P: Provider<T, N>,
+    Inner: ProviderLayer<P, T, N>,
+    Outer: ProviderLayer<Inner::Provider, T, N>,
 {
     type Provider = Outer::Provider;
 
@@ -78,7 +78,7 @@ pub struct ProviderBuilder<L, N = Ethereum> {
     network: PhantomData<N>,
 }
 
-impl<N> ProviderBuilder<Identity, N> {
+impl ProviderBuilder<Identity, Ethereum> {
     /// Create a new [`ProviderBuilder`].
     pub const fn new() -> Self {
         ProviderBuilder { layer: Identity, network: PhantomData }
@@ -87,7 +87,7 @@ impl<N> ProviderBuilder<Identity, N> {
 
 impl<N> Default for ProviderBuilder<Identity, N> {
     fn default() -> Self {
-        Self::new()
+        ProviderBuilder { layer: Identity, network: PhantomData }
     }
 }
 
@@ -140,7 +140,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// By default, the network is `Ethereum`. This method must be called to configure a different
     /// network.
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
     pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net> {
@@ -151,8 +151,8 @@ impl<L, N> ProviderBuilder<L, N> {
     /// the final [`Provider`] type with all stack components.
     pub fn provider<P, T>(self, provider: P) -> L::Provider
     where
-        L: ProviderLayer<P, N, T>,
-        P: Provider<N, T>,
+        L: ProviderLayer<P, T, N>,
+        P: Provider<T, N>,
         T: Transport + Clone,
         N: Network,
     {
@@ -166,7 +166,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// `ProviderBuilder::provider<RpcClient>`.
     pub fn on_client<T>(self, client: RpcClient<T>) -> L::Provider
     where
-        L: ProviderLayer<RootProvider<N, T>, N, T>,
+        L: ProviderLayer<RootProvider<T, N>, T, N>,
         T: Transport + Clone,
         N: Network,
     {
@@ -176,12 +176,9 @@ impl<L, N> ProviderBuilder<L, N> {
     /// Finish the layer stack by providing a connection string for a built-in
     /// transport type, outputting the final [`Provider`] type with all stack
     /// components.
-    ///
-    /// This is a convenience function for
-    /// `ProviderBuilder::provider<RpcClient>`.
     pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        L: ProviderLayer<RootProvider<BoxTransport, N>, BoxTransport, N>,
         N: Network,
     {
         let connect: BuiltInConnectionString = s.parse()?;
@@ -197,9 +194,9 @@ impl<L, N> ProviderBuilder<L, N> {
     ) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<
-            RootProvider<N, alloy_pubsub::PubSubFrontend>,
-            N,
+            RootProvider<alloy_pubsub::PubSubFrontend, N>,
             alloy_pubsub::PubSubFrontend,
+            N,
         >,
         N: Network,
     {
@@ -216,9 +213,9 @@ impl<L, N> ProviderBuilder<L, N> {
     where
         alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
         L: ProviderLayer<
-            RootProvider<N, alloy_pubsub::PubSubFrontend>,
-            N,
+            RootProvider<alloy_pubsub::PubSubFrontend, N>,
             alloy_pubsub::PubSubFrontend,
+            N,
         >,
         N: Network,
     {
@@ -230,7 +227,7 @@ impl<L, N> ProviderBuilder<L, N> {
     #[cfg(feature = "reqwest")]
     pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<crate::ReqwestProvider<N>, N, alloy_transport_http::Http<reqwest::Client>>,
+        L: ProviderLayer<crate::ReqwestProvider<N>, alloy_transport_http::Http<reqwest::Client>, N>,
         N: Network,
     {
         let client = ClientBuilder::default().reqwest_http(url);
@@ -243,8 +240,8 @@ impl<L, N> ProviderBuilder<L, N> {
     where
         L: ProviderLayer<
             crate::HyperProvider<N>,
-            N,
             alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+            N,
         >,
         N: Network,
     {
