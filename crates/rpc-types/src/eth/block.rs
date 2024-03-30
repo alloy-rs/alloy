@@ -26,7 +26,7 @@ pub struct Block<T = Transaction> {
     #[serde(default)]
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
-    /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
+    /// responses, and when deserialized, it will be set to [TransactionList::Uncle].
     #[serde(default = "TransactionList::uncle", skip_serializing_if = "TransactionList::is_uncle")]
     pub transactions: TransactionList<T>,
     /// Integer the size of this block in bytes.
@@ -188,7 +188,7 @@ impl TransactionList<Transaction> {
 
 /// An iterator over the transaction hashes of a block.
 ///
-/// See [`BlockTransactions::hashes`].
+/// See [`TransactionList::hashes`].
 #[derive(Clone, Debug)]
 pub struct BlockTransactionHashes<'a>(BlockTransactionHashesInner<'a>);
 
@@ -258,7 +258,7 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a> {}
 
 /// An Iterator over the transaction hashes of a block.
 ///
-/// See [`BlockTransactions::hashes_mut`].
+/// See [`TransactionList::hashes_mut`].
 #[derive(Debug)]
 pub struct BlockTransactionHashesMut<'a>(BlockTransactionHashesInnerMut<'a>);
 
@@ -332,9 +332,9 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
 /// response should include full transaction objects or just the hashes.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum BlockTransactionsKind {
-    /// Only include hashes: [BlockTransactions::Hashes]
+    /// Only include hashes: [TransactionList::Hashes]
     Hashes,
-    /// Include full transaction objects: [BlockTransactions::Full]
+    /// Include full transaction objects: [TransactionList::Full]
     Full,
 }
 
