@@ -14,6 +14,9 @@ pub struct Log<T = LogData> {
     /// Number of the block the transaction that emitted this log was mined in
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
+    /// The timestamp of the block.
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
+    pub block_timestamp: Option<u64>,
     /// Transaction Hash
     pub transaction_hash: Option<B256>,
     /// Index of the Transaction in the block
@@ -59,6 +62,7 @@ impl Log<LogData> {
             inner: decoded,
             block_hash: self.block_hash,
             block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
             transaction_hash: self.transaction_hash,
             transaction_index: self.transaction_index,
             log_index: self.log_index,
@@ -80,6 +84,7 @@ where
             },
             block_hash: self.block_hash,
             block_number: self.block_number,
+            block_timestamp: self.block_timestamp,
             transaction_hash: self.transaction_hash,
             transaction_index: self.transaction_index,
             log_index: self.log_index,
@@ -130,6 +135,7 @@ mod tests {
             },
             block_hash: Some(B256::with_last_byte(0x69)),
             block_number: Some(0x69),
+            block_timestamp: Some(0x69),
             transaction_hash: Some(B256::with_last_byte(0x69)),
             transaction_index: Some(0x69),
             log_index: Some(0x69),
@@ -138,7 +144,7 @@ mod tests {
         let serialized = serde_json::to_string(&log).unwrap();
         assert_eq!(
             serialized,
-            r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000069","blockNumber":"0x69","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000069","transactionIndex":"0x69","logIndex":"0x69","removed":false}"#
+            r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000069","blockNumber":"0x69","blockTimestamp":"0x69","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000069","transactionIndex":"0x69","logIndex":"0x69","removed":false}"#
         );
 
         let deserialized: Log = serde_json::from_str(&serialized).unwrap();
