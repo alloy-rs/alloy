@@ -14,7 +14,9 @@ pub struct Log<T = LogData> {
     /// Number of the block the transaction that emitted this log was mined in
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
-    /// The timestamp of the block.
+    /// The timestamp of the block as proposed in:
+    /// https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests
+    /// https://github.com/ethereum/execution-apis/issues/295
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
