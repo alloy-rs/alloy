@@ -26,7 +26,6 @@ use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,
 };
-use alloy_transport_http::Http;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
@@ -34,6 +33,9 @@ use std::{
     marker::PhantomData,
     sync::{Arc, OnceLock},
 };
+
+#[cfg(feature = "reqwest")]
+use alloy_transport_http::Http;
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::{PubSubFrontend, Subscription};
@@ -62,6 +64,7 @@ impl<N, T: fmt::Debug> fmt::Debug for RootProvider<N, T> {
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl<N: Network> RootProvider<N, Http<reqwest::Client>> {
     /// Creates a new HTTP root provider from the given URL.
     pub fn new_http(url: reqwest::Url) -> Self {
@@ -565,7 +568,9 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         self.client().request("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
     }
 
-    /// Gets the transaction count of the corresponding address.
+    /// Gets the transaction count (AKA "nonce") of the corresponding address.
+    #[doc(alias = "get_nonce")]
+    #[doc(alias = "get_account_nonce")]
     async fn get_transaction_count(
         &self,
         address: Address,
@@ -829,20 +834,28 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         estimator: Option<EstimatorFunction>,
     ) -> TransportResult<Eip1559Estimation> {
-        let (bf, fee_history) = futures::try_join!(
-            self.get_block_by_number(BlockNumberOrTag::Latest, false),
-            self.get_fee_history(
+        let fee_history = self
+            .get_fee_history(
                 U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
-        )?;
+            .await?;
 
-        let base_fee_per_gas = bf
-            .ok_or(RpcError::NullResp)?
-            .header
-            .base_fee_per_gas
-            .ok_or(RpcError::UnsupportedFeature("eip1559"))?;
+        // if the base fee of the Latest block is 0 then we need check if the latest block even has
+        // a base fee/supports EIP1559
+        let base_fee_per_gas = match fee_history.latest_block_base_fee() {
+            Some(base_fee) if !base_fee.is_zero() => base_fee,
+            _ => {
+                // empty response, fetch basefee from latest block directly
+                self.get_block_by_number(BlockNumberOrTag::Latest, false)
+                    .await?
+                    .ok_or(RpcError::NullResp)?
+                    .header
+                    .base_fee_per_gas
+                    .ok_or(RpcError::UnsupportedFeature("eip1559"))?
+            }
+        };
 
         Ok(estimator.unwrap_or(utils::eip1559_default_estimator)(
             base_fee_per_gas,
@@ -1007,6 +1020,7 @@ mod tests {
     // NOTE: We cannot import the test-utils crate here due to a circular dependency.
     include!("../../internal-test-utils/src/providers.rs");
 
+    #[cfg(feature = "reqwest")]
     #[tokio::test]
     async fn object_safety() {
         init_tracing();

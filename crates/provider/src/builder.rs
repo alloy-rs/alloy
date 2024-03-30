@@ -178,6 +178,7 @@ impl<L, N> ProviderBuilder<L, N> {
     /// components.
     ///
     /// This is a convenience function for
+    /// `ProviderBuilder::provider<RpcClient>`.
     pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
@@ -225,25 +226,29 @@ impl<L, N> ProviderBuilder<L, N> {
         Ok(self.on_client(client))
     }
 
-    /// Build this provider with reqwest HTTP transport.
+    /// Build this provider with an Reqwest HTTP transport.
     #[cfg(feature = "reqwest")]
     pub fn on_reqwest_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        L: ProviderLayer<crate::ReqwestProvider<N>, N, alloy_transport_http::Http<reqwest::Client>>,
         N: Network,
     {
-        let client = ClientBuilder::default().reqwest_http(url).boxed();
+        let client = ClientBuilder::default().reqwest_http(url);
         Ok(self.on_client(client))
     }
 
-    /// Build this provider with hyper HTTP transport.
+    /// Build this provider with an Hyper HTTP transport.
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
     where
-        L: ProviderLayer<RootProvider<N, BoxTransport>, N, BoxTransport>,
+        L: ProviderLayer<
+            crate::HyperProvider<N>,
+            N,
+            alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+        >,
         N: Network,
     {
-        let client = ClientBuilder::default().hyper_http(url).boxed();
+        let client = ClientBuilder::default().hyper_http(url);
         Ok(self.on_client(client))
     }
 }

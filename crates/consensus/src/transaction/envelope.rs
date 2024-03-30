@@ -65,13 +65,13 @@ impl TryFrom<u8> for TxType {
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
-    #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
     Legacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
-    #[cfg_attr(feature = "serde", serde(rename = "0x01", alias = "0x1"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x1", alias = "0x01"))]
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
-    #[cfg_attr(feature = "serde", serde(rename = "0x02", alias = "0x2"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
     Eip1559(Signed<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
@@ -80,7 +80,7 @@ pub enum TxEnvelope {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
-    #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
     Eip4844(Signed<TxEip4844Variant>),
 }
 

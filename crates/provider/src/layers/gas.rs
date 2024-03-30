@@ -211,13 +211,14 @@ where
     }
 }
 
+#[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U128};
+    use alloy_primitives::address;
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;
@@ -250,11 +251,8 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        let set_gas_price = U128::from(0x3b9aca00);
-        let set_gas_limit = U256::from(0x5208);
-
-        assert_eq!(tx.effective_gas_price, set_gas_price);
-        assert_eq!(tx.gas_used, Some(set_gas_limit));
+        assert_eq!(tx.effective_gas_price, 0x3b9aca00);
+        assert_eq!(tx.gas_used, Some(0x5208));
     }
 
     #[tokio::test]
@@ -284,9 +282,7 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        let set_gas_limit = U256::from(0x5208);
-
-        assert_eq!(tx.gas_used, Some(set_gas_limit));
+        assert_eq!(tx.gas_used, Some(0x5208));
     }
 
     #[tokio::test]
@@ -315,8 +311,6 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        let set_gas_price = U128::from(0x6fc23ac0);
-
-        assert_eq!(tx.effective_gas_price, set_gas_price);
+        assert_eq!(tx.effective_gas_price, 0x6fc23ac0);
     }
 }
