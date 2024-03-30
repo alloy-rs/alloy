@@ -1,6 +1,5 @@
 //! RPC types for transactions
 
-use crate::eth::other::OtherFields;
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
@@ -88,12 +87,6 @@ pub struct Transaction {
     /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type: Option<U8>,
-
-    /// Arbitrary extra fields.
-    ///
-    /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
 impl Transaction {
@@ -278,7 +271,6 @@ mod tests {
             max_fee_per_gas: Some(U256::from(21)),
             max_priority_fee_per_gas: Some(U256::from(22)),
             max_fee_per_blob_gas: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
@@ -316,7 +308,6 @@ mod tests {
             max_fee_per_gas: Some(U256::from(21)),
             max_priority_fee_per_gas: Some(U256::from(22)),
             max_fee_per_blob_gas: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(

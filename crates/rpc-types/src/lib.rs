@@ -24,5 +24,8 @@ mod eth;
 pub use alloy_serde as serde_helpers;
 pub use eth::*;
 
+mod transaction_list;
+pub use transaction_list::TransactionList;
+
 mod with_other;
 pub use with_other::WithOtherFields;

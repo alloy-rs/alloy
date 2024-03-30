@@ -7,7 +7,7 @@ use crate::{
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{BlockResponse, HeaderResponse, Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
@@ -19,7 +19,7 @@ use alloy_rpc_trace_types::{
     parity::{LocalizedTransactionTrace, TraceResults, TraceType},
 };
 use alloy_rpc_types::{
-    state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
+    state::StateOverride, AccessListWithGasUsed, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{
@@ -256,7 +256,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
+    async fn subscribe_blocks(&self) -> TransportResult<Subscription<N::BlockResponse>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -585,7 +585,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         number: BlockNumberOrTag,
         hydrate: bool,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         self.client().request("eth_getBlockByNumber", (number, hydrate)).await
     }
 
@@ -665,7 +665,11 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
-    async fn get_block(&self, id: BlockId, full: bool) -> TransportResult<Option<Block>> {
+    async fn get_block(
+        &self,
+        id: BlockId,
+        full: bool,
+    ) -> TransportResult<Option<N::BlockResponse>> {
         match id {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
             BlockId::Number(number) => self.get_block_by_number(number, full).await,
@@ -677,7 +681,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
         &self,
         hash: BlockHash,
         full: bool,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         self.client().request("eth_getBlockByHash", (hash, full)).await
     }
 
@@ -762,7 +766,7 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
+    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<N::BlockResponse>> {
         match tag {
             BlockId::Hash(hash) => {
                 self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
@@ -851,8 +855,8 @@ pub trait Provider<N: Network, T: Transport + Clone = BoxTransport>: Send + Sync
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
                     .await?
                     .ok_or(RpcError::NullResp)?
-                    .header
-                    .base_fee_per_gas
+                    .header()
+                    .base_fee_per_gas()
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
             }
         };
@@ -1013,7 +1017,7 @@ impl<N: Network, T: Transport + Clone> Provider<N, T> for RootProvider<N, T> {
 mod tests {
     use super::*;
     use alloy_primitives::{address, b256, bytes};
-    use alloy_rpc_types::request::TransactionRequest;
+    use alloy_rpc_types::{request::TransactionRequest, Block};
 
     extern crate self as alloy_provider;
 

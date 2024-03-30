@@ -2,7 +2,7 @@
 
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::{
-    serde_helpers::u64_hex, Block, BlockTransactions, Rich, Transaction, TransactionReceipt,
+    serde_helpers::u64_hex, Block, Rich, Transaction, TransactionList, TransactionReceipt,
 };
 use serde::{Deserialize, Serialize};
 
@@ -106,9 +106,9 @@ pub struct ContractCreator {
 impl From<Block> for OtsBlock {
     fn from(block: Block) -> Self {
         let transaction_count = match &block.transactions {
-            BlockTransactions::Full(t) => t.len(),
-            BlockTransactions::Hashes(t) => t.len(),
-            BlockTransactions::Uncle => 0,
+            TransactionList::Full(t) => t.len(),
+            TransactionList::Hashes(t) => t.len(),
+            TransactionList::Uncle => 0,
         };
 
         Self { block, transaction_count }
