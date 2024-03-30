@@ -53,4 +53,8 @@ impl HeaderResponse for alloy_rpc_types::Header {
     fn base_fee_per_gas(&self) -> &Option<U256> {
         &self.base_fee_per_gas
     }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_blob_fee()
+    }
 }

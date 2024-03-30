@@ -46,6 +46,10 @@ pub trait BlockResponse<N: Network> {
 pub trait HeaderResponse {
     /// Base fee per unit of gas (if past London)
     fn base_fee_per_gas(&self) -> &Option<U256>;
+    /// Returns the blob fee for the next block according to the EIP-4844 spec.
+    ///
+    /// Returns `None` if `excess_blob_gas` is None.
+    fn next_block_blob_fee(&self) -> Option<u128>;
 }
 
 /// A receipt response.

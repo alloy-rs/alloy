@@ -2,7 +2,7 @@ use crate::{
     utils::Eip1559Estimation, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
 };
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{BlockResponse, HeaderResponse, Network, TransactionBuilder};
 use alloy_primitives::U256;
 use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportError, TransportResult};
@@ -168,7 +168,7 @@ where
                 .get_block_by_number(BlockNumberOrTag::Latest, false)
                 .await?
                 .ok_or(RpcError::NullResp)?
-                .header
+                .header()
                 .next_block_blob_fee()
                 .ok_or(RpcError::UnsupportedFeature("eip4844"))?;
             tx.set_max_fee_per_blob_gas(U256::from(next_blob_fee));
