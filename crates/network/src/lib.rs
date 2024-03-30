@@ -45,7 +45,7 @@ pub trait BlockResponse<N: Network> {
 /// A header response.
 pub trait HeaderResponse {
     /// Base fee per unit of gas (if past London)
-    fn base_fee_per_gas(&self) -> &Option<U256>;
+    fn base_fee_per_gas(&self) -> Option<U256>;
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None.
@@ -59,7 +59,7 @@ pub trait HeaderResponse {
 /// [`TxReceipt`]: alloy_consensus::TxReceipt
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
-    fn contract_address(&self) -> &Option<Address>;
+    fn contract_address(&self) -> Option<Address>;
 }
 
 /// Captures type info for network-specific RPC requests/responses.

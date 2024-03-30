@@ -37,8 +37,8 @@ impl Network for AnyNetwork {
 }
 
 impl ReceiptResponse for WithOtherFields<TransactionReceipt> {
-    fn contract_address(&self) -> &Option<alloy_primitives::Address> {
-        &self.contract_address
+    fn contract_address(&self) -> Option<alloy_primitives::Address> {
+        self.contract_address
     }
 }
 

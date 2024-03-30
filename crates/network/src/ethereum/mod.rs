@@ -34,8 +34,8 @@ impl Network for Ethereum {
 }
 
 impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
-    fn contract_address(&self) -> &Option<alloy_primitives::Address> {
-        &self.contract_address
+    fn contract_address(&self) -> Option<alloy_primitives::Address> {
+        self.contract_address
     }
 }
 
@@ -50,8 +50,8 @@ impl BlockResponse<Ethereum> for alloy_rpc_types::Block {
 }
 
 impl HeaderResponse for alloy_rpc_types::Header {
-    fn base_fee_per_gas(&self) -> &Option<U256> {
-        &self.base_fee_per_gas
+    fn base_fee_per_gas(&self) -> Option<U256> {
+        self.base_fee_per_gas
     }
 
     fn next_block_blob_fee(&self) -> Option<u128> {
