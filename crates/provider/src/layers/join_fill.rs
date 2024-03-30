@@ -3,7 +3,8 @@ use alloy_network::{Ethereum, Network};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use futures::try_join;
-use std::{future::Future, marker::PhantomData};
+use futures_utils_wasm::impl_future;
+use std::marker::PhantomData;
 
 /// The control flow for a filler.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,7 +129,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
-    ) -> impl Future<Output = TransportResult<Self::Fillable>> + Send
+    ) -> impl_future!(<Output = TransportResult<Self::Fillable>>)
     where
         P: Provider<T, N>,
         T: Transport + Clone;
