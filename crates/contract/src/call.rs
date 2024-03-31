@@ -2,7 +2,7 @@ use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
@@ -34,7 +34,7 @@ mod private {
 ///
 /// This trait is sealed and cannot be implemented manually.
 /// It is an implementation detail of [`CallBuilder`].
-pub trait CallDecoder: private::Sealed {
+pub trait CallDecoder: private::Sealed + Clone {
     // Not public API.
 
     /// The output type of the contract function.
@@ -201,8 +201,14 @@ pub struct CallBuilder<N: Network, T, P, D> {
 
 // See [`ContractInstance`].
 impl<N: Network, T: Transport + Clone, P: Provider<N, T>> DynCallBuilder<N, T, P> {
-    pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
-        Ok(Self::new_inner(provider, function.abi_encode_input(args)?.into(), function.clone()))
+    pub(crate) fn new_dyn(
+        provider: P,
+        function: &Function,
+        args: &[DynSolValue],
+        address: &Address,
+    ) -> Result<Self> {
+        Ok(Self::new_inner(provider, function.abi_encode_input(args)?.into(), function.clone())
+            .to(Some(*address)))
     }
 
     /// Clears the decoder, returning a raw call builder.
@@ -278,6 +284,20 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
     pub fn to(mut self, to: Option<Address>) -> Self {
         self.request.set_to(to.into());
         self
+    }
+
+    /// Returns the `to` field of the transactions request
+    pub fn get_to(&self) -> Address {
+        let to = self.request.to();
+
+        if let Some(to) = to {
+            match to {
+                TxKind::Call(address) => address,
+                TxKind::Create => Address::ZERO,
+            }
+        } else {
+            Address::ZERO
+        }
     }
 
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
@@ -367,6 +387,11 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>, D: CallDecoder> CallBu
             self.provider.call(&self.request, self.block).await
         }
         .map_err(Into::into)
+    }
+
+    /// Returns a cloned instance of this CallBuilder's decoder
+    pub fn get_decoder(&self) -> D {
+        self.decoder.clone()
     }
 
     /// Decodes the output of a contract function using the provided decoder.

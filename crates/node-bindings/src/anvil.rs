@@ -289,12 +289,7 @@ impl Anvil {
             Command::new("anvil")
         };
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
-        let mut port = if let Some(port) = self.port {
-            port
-        } else {
-            // let the OS choose a port for us
-            0
-        };
+        let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());
 
         if let Some(mnemonic) = self.mnemonic {

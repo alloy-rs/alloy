@@ -2,6 +2,8 @@
 use alloy_sol_types::sol;
 
 sol! {
+  #[derive(Debug)]
+  #[sol(rpc=true, alloy_contract=alloy_contract, abi, extra_methods)]
   interface IMulticall3 {
     struct Call {
       address target;

@@ -87,7 +87,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T,
         args: &[DynSolValue],
     ) -> Result<CallBuilder<N, T, &P, Function>> {
         let function = self.interface.get_from_name(name)?;
-        CallBuilder::new_dyn(&self.provider, function, args)
+        CallBuilder::new_dyn(&self.provider, function, args, &self.address)
     }
 
     /// Returns a transaction builder for the provided function selector.
@@ -97,7 +97,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T,
         args: &[DynSolValue],
     ) -> Result<CallBuilder<N, T, &P, Function>> {
         let function = self.interface.get_from_selector(selector)?;
-        CallBuilder::new_dyn(&self.provider, function, args)
+        CallBuilder::new_dyn(&self.provider, function, args, &self.address)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
