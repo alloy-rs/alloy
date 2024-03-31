@@ -6,7 +6,7 @@
 use crate::alloc::{vec, vec::Vec};
 
 use alloy_primitives::{keccak256, Sealed, B256};
-use alloy_rlp::{BufMut, Header, EMPTY_STRING_CODE};
+use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use core::{
     fmt,
     fmt::{Display, Formatter},
@@ -102,7 +102,7 @@ pub trait Decodable2718: Sized {
         }
 
         let ty = buf[0];
-        let buf = &mut &buf[1..];
+        buf.advance(1);
         let tx = Self::typed_decode(ty, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
