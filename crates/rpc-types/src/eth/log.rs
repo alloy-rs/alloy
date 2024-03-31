@@ -15,8 +15,8 @@ pub struct Log<T = LogData> {
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// The timestamp of the block as proposed in:
-    /// https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests
-    /// https://github.com/ethereum/execution-apis/issues/295
+    /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
+    /// <https://github.com/ethereum/execution-apis/issues/295>
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn serde_log() {
-        let log = Log {
+        let mut log = Log {
             inner: alloy_primitives::Log {
                 address: Address::with_last_byte(0x69),
                 data: alloy_primitives::LogData::new_unchecked(
@@ -137,12 +137,22 @@ mod tests {
             },
             block_hash: Some(B256::with_last_byte(0x69)),
             block_number: Some(0x69),
-            block_timestamp: Some(0x69),
+            block_timestamp: None,
             transaction_hash: Some(B256::with_last_byte(0x69)),
             transaction_index: Some(0x69),
             log_index: Some(0x69),
             removed: false,
         };
+        let serialized = serde_json::to_string(&log).unwrap();
+        assert_eq!(
+            serialized,
+            r#"{"address":"0x0000000000000000000000000000000000000069","topics":["0x0000000000000000000000000000000000000000000000000000000000000069"],"data":"0x69","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000069","blockNumber":"0x69","transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000069","transactionIndex":"0x69","logIndex":"0x69","removed":false}"#
+        );
+
+        let deserialized: Log = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(log, deserialized);
+
+        log.block_timestamp = Some(0x69);
         let serialized = serde_json::to_string(&log).unwrap();
         assert_eq!(
             serialized,
