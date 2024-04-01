@@ -1,21 +1,18 @@
+use super::error::MulticallError;
 use crate::{
-    contract::IMulticall3::{self, Call3, IMulticall3Instance},
-    CallDecoder, DynCallBuilder,
+    constants,
+    contract::IMulticall3::{self, IMulticall3Instance},
+    CallBuilder, CallDecoder, DynCallBuilder,
 };
 use alloy_dyn_abi::DynSolValue;
 use alloy_json_abi::Function;
 use alloy_primitives::{Address, Bytes};
 use alloy_provider::Provider;
-
-use std::result::Result as StdResult;
+use std::{marker::PhantomData, result::Result as StdResult};
+use IMulticall3::Result as MulticallResult;
 
 /// Alias for [std::result::Result]<T, [MulticallError]>
 pub type Result<T> = std::result::Result<T, MulticallError>;
-
-use crate::constants;
-
-use super::error::MulticallError;
-use IMulticall3::Result as MulticallResult;
 
 /// An individual call within a multicall
 #[derive(Debug, Clone)]
@@ -24,11 +21,66 @@ pub struct Call {
     target: Address,
     /// The calldata
     calldata: Bytes,
-
     /// Whether the call is allowed to fail
     allow_failure: bool,
     /// The decoder
     decoder: Function,
+}
+
+/// The [Multicall] version - used to determine which methods of the Multicall contract to use:
+/// - [`Multicall`] : `aggregate((address,bytes)[])`
+/// - [`Multicall2`] : `try_aggregate(bool, (address,bytes)[])`
+/// - [`Multicall3`] : `aggregate3((address,bool,bytes)[])` or
+///   `aggregate3Value((address,bool,uint256,bytes)[])`
+///
+/// [`Multicall`]: #variant.Multicall
+/// [`Multicall2`]: #variant.Multicall2
+/// [`Multicall3`]: #variant.Multicall3
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MulticallVersion {
+    /// Multicall V1
+    Multicall = 1,
+    /// Multicall V2
+    Multicall2 = 2,
+    /// Multicall V3
+    #[default]
+    Multicall3 = 3,
+}
+
+impl From<MulticallVersion> for u8 {
+    fn from(v: MulticallVersion) -> Self {
+        v as u8
+    }
+}
+
+impl TryFrom<u8> for MulticallVersion {
+    type Error = String;
+    fn try_from(v: u8) -> StdResult<Self, Self::Error> {
+        match v {
+            1 => Ok(MulticallVersion::Multicall),
+            2 => Ok(MulticallVersion::Multicall2),
+            3 => Ok(MulticallVersion::Multicall3),
+            _ => Err(format!("Invalid Multicall version: {v}. Accepted values: 1, 2, 3.")),
+        }
+    }
+}
+
+impl MulticallVersion {
+    /// Returns true if the version is v1
+    pub const fn is_v1(&self) -> bool {
+        matches!(self, Self::Multicall)
+    }
+
+    /// Returns true if the version is v2     
+    pub const fn is_v2(&self) -> bool {
+        matches!(self, Self::Multicall2)
+    }
+
+    /// Returns true if the version is v2
+    pub const fn is_v3(&self) -> bool {
+        matches!(self, Self::Multicall3)
+    }
 }
 
 /// An abstraction for sending batched calls.
@@ -43,6 +95,8 @@ where
     calls: Vec<Call>,
     /// The Multicall3 contract
     contract: IMulticall3Instance<N, T, P>,
+    /// The Multicall version to use. The default is 3.
+    version: MulticallVersion,
 }
 
 impl<N, T, P> Multicall<N, T, P>
@@ -74,7 +128,48 @@ where
         // Create the multicall contract
         let contract = IMulticall3::new(address, provider);
 
-        Ok(Self { calls: vec![], contract })
+        Ok(Self { calls: vec![], contract, version: MulticallVersion::Multicall3 })
+    }
+
+    /// Sets the [MulticallVersion] which is used to determine which functions to use when making
+    /// the contract call. The default is 3, and the default will be used if an invalid version
+    /// is provided.
+    ///
+    /// Version differences (adapted from [here](https://github.com/mds1/multicall#multicall---)):
+    ///
+    /// - Multicall (v1): This is the recommended version for simple calls. The original contract
+    /// containing an aggregate method to batch calls. Each call returns only the return data and
+    /// none are allowed to fail.
+    ///
+    /// - Multicall2 (v2): The same as Multicall, but provides additional methods that allow either
+    /// all or no calls within the batch to fail. Included for backward compatibility. Use v3 to
+    /// allow failure on a per-call basis.
+    ///
+    /// - Multicall3 (v3): This is the recommended version for allowing failing calls. It's cheaper
+    /// to use (so you can fit more calls into a single request), and it adds an aggregate3 method
+    /// so you can specify whether calls are allowed to fail on a per-call basis.
+    ///
+    /// Note: all these versions are available in the same contract address
+    /// ([`constants::MULTICALL_ADDRESS`]) so changing version just changes the methods used,
+    /// not the contract address.
+    pub fn set_version(&mut self, version: impl TryInto<MulticallVersion>) {
+        match version.try_into() {
+            Ok(v) => self.version = v,
+            Err(_) => self.version = MulticallVersion::Multicall3,
+        }
+    }
+
+    /// Same functionality as [set_version], but uses a builder pattern to return the updated
+    /// [Multicall] instance.
+    ///
+    /// [set_version]: #method.set_version
+    pub fn with_version(mut self, version: impl TryInto<MulticallVersion>) -> Self {
+        match version.try_into() {
+            Ok(v) => self.version = v,
+            Err(_) => self.version = MulticallVersion::Multicall3,
+        };
+
+        self
     }
 
     /// Adds a [Call] to the internal calls vector
@@ -89,8 +184,51 @@ where
         self.calls.push(call)
     }
 
+    /// Adds multiple [Call] instances to the internal calls vector.
+    ///
+    /// All added calls will use the same `allow_failure` setting.
+    pub fn add_calls(
+        &mut self,
+        calls: impl IntoIterator<Item = DynCallBuilder<N, T, P>>,
+        allow_failure: bool,
+    ) {
+        for call in calls {
+            let call = Call {
+                allow_failure,
+                target: call.get_to(),
+                calldata: call.calldata().clone(),
+                decoder: call.get_decoder(),
+            };
+
+            self.calls.push(call)
+        }
+    }
+
+    /// Adds multiple [Call] instances to the internal calls vector and returns the updated
+    /// [Multicall] instance.
+    ///
+    ///  All added calls will use the same `allow_failure` setting.
+    pub fn with_calls(
+        mut self,
+        calls: impl IntoIterator<Item = DynCallBuilder<N, T, P>>,
+        allow_failure: bool,
+    ) -> Self {
+        for call in calls {
+            let call = Call {
+                allow_failure,
+                target: call.get_to(),
+                calldata: call.calldata().clone(),
+                decoder: call.get_decoder(),
+            };
+
+            self.calls.push(call)
+        }
+
+        self
+    }
+
     /// Builder pattern to add a [Call] to the internal calls vector and return the [Multicall]
-    pub fn with_call(&mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) -> &Self {
+    pub fn with_call(mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) -> Self {
         let call = Call {
             allow_failure,
             target: call.get_to(),
@@ -114,26 +252,104 @@ where
     ///
     /// Returns a [MulticallError] if the Multicall call failed.
     pub async fn call(&self) -> Result<Vec<StdResult<DynSolValue, Bytes>>> {
+        match self.version {
+            MulticallVersion::Multicall => {
+                let call = self.as_aggregate();
+
+                let multicall_result = call.call().await?;
+
+                self.parse_multicall_result(
+                    multicall_result.returnData.into_iter().map(|return_data| MulticallResult {
+                        success: true,
+                        returnData: return_data,
+                    }),
+                )
+            }
+
+            MulticallVersion::Multicall2 => {
+                let call = self.as_try_aggregate();
+
+                let multicall_result = call.call().await?;
+
+                self.parse_multicall_result(multicall_result.returnData)
+            }
+
+            MulticallVersion::Multicall3 => {
+                let call = self.as_aggregate_3();
+
+                let multicall_result = call.call().await?;
+
+                self.parse_multicall_result(multicall_result.returnData)
+            }
+        }
+    }
+
+    /// Uses the Multicall `aggregate(Call[] calldata calls)` method which returns a tuple of
+    /// (uint256 blockNumber, bytes[] returnData). The call reverts if any individual call fails.
+    /// This is used when using [MulticallVersion] V1.
+    pub fn as_aggregate(&self) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::aggregateCall>> {
         let calls = self
             .calls
             .clone()
             .into_iter()
-            .map(|call| Call3 {
+            .map(|call| IMulticall3::Call { target: call.target, callData: call.calldata })
+            .collect::<Vec<IMulticall3::Call>>();
+
+        self.contract.aggregate(calls)
+    }
+
+    /// Uses the Multicall `tryAggregate(bool requireSuccess, Call[] calldata calls)` method which
+    /// returns a tuple of (bool success, bytes[] returnData)[]. The call reverts if any
+    /// individual call fails. This is used when using [MulticallVersion] V2.
+    pub fn as_try_aggregate(
+        &self,
+    ) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::tryAggregateCall>> {
+        let mut allow_failure = true;
+
+        let calls = self
+            .calls
+            .clone()
+            .into_iter()
+            .map(|call| {
+                // If any call has `allow_failure = false`, then set allow_failure to false. The
+                // `tryAggregate` contract call reverts if any of the individual calls revert.
+                allow_failure &= call.allow_failure;
+
+                IMulticall3::Call { target: call.target, callData: call.calldata }
+            })
+            .collect::<Vec<IMulticall3::Call>>();
+
+        self.contract.tryAggregate(!allow_failure, calls)
+    }
+
+    /// Uses the Multicall `aggregate3(Call3[] calldata calls)` method which returns `Results[]
+    /// returnData`.
+    ///
+    /// If any of the individual calls has `allow_failure = false` then the entire multicall will
+    /// fail.
+    ///
+    /// This is used when using [MulticallVersion] V3.
+    pub fn as_aggregate_3(
+        &self,
+    ) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::aggregate3Call>> {
+        let calls = self
+            .calls
+            .clone()
+            .into_iter()
+            .map(|call| IMulticall3::Call3 {
                 target: call.target,
                 callData: call.calldata,
                 allowFailure: call.allow_failure,
             })
-            .collect();
+            .collect::<Vec<IMulticall3::Call3>>();
 
-        let multicall_result = self.contract.aggregate3(calls).call().await?;
-
-        self.parse_multicall_result(multicall_result.returnData)
+        self.contract.aggregate3(calls)
     }
 
     /// Decodes the return data for each individual call result within a multicall.
     fn parse_multicall_result(
         &self,
-        return_data: Vec<MulticallResult>,
+        return_data: impl IntoIterator<Item = MulticallResult>,
     ) -> Result<Vec<StdResult<DynSolValue, Bytes>>> {
         let iter = return_data.into_iter();
 
@@ -243,8 +459,24 @@ mod tests {
         multicall.add_call(symbol_call, true);
 
         // Send and await the multicall results
-        let results = multicall.call().await.unwrap();
 
+        // MulticallV1
+        multicall.set_version(1);
+        let results = multicall.call().await.unwrap();
+        assert_results(results);
+
+        // MulticallV2
+        multicall.set_version(2);
+        let results = multicall.call().await.unwrap();
+        assert_results(results);
+
+        // MulticallV3
+        multicall.set_version(3);
+        let results = multicall.call().await.unwrap();
+        assert_results(results);
+    }
+
+    fn assert_results(results: Vec<StdResult<DynSolValue, Bytes>>) {
         // Get the expected individual results.
         let name_result = results.get(1).unwrap().as_ref();
         let decimals_result = results.get(2).unwrap().as_ref();
