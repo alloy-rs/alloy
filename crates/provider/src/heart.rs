@@ -25,7 +25,7 @@ use tokio::{
 /// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
 ///
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// // Send a transaction, and configure the pending transaction.
 /// let builder = provider.send_transaction(tx)
 ///     .await?
@@ -41,7 +41,7 @@ use tokio::{
 ///
 /// This can also be more concisely written using `watch`:
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider<N>, tx: N::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// let tx_hash = provider.send_transaction(tx)
 ///     .await?
 ///     .with_required_confirmations(2)
@@ -53,20 +53,20 @@ use tokio::{
 /// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
-pub struct PendingTransactionBuilder<'a, N, T> {
+pub struct PendingTransactionBuilder<'a, T, N> {
     config: PendingTransactionConfig,
-    provider: &'a RootProvider<N, T>,
+    provider: &'a RootProvider<T, N>,
 }
 
-impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
+impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: &'a RootProvider<N, T>, tx_hash: B256) -> Self {
+    pub const fn new(provider: &'a RootProvider<T, N>, tx_hash: B256) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
     pub const fn from_config(
-        provider: &'a RootProvider<N, T>,
+        provider: &'a RootProvider<T, N>,
         config: PendingTransactionConfig,
     ) -> Self {
         Self { config, provider }
@@ -83,12 +83,12 @@ impl<'a, N: Network, T: Transport + Clone> PendingTransactionBuilder<'a, N, T> {
     }
 
     /// Returns the provider.
-    pub const fn provider(&self) -> &'a RootProvider<N, T> {
+    pub const fn provider(&self) -> &'a RootProvider<T, N> {
         self.provider
     }
 
     /// Consumes this builder, returning the provider and the configuration.
-    pub const fn split(self) -> (&'a RootProvider<N, T>, PendingTransactionConfig) {
+    pub const fn split(self) -> (&'a RootProvider<T, N>, PendingTransactionConfig) {
         (self.provider, self.config)
     }
 
@@ -264,10 +264,10 @@ impl PendingTransactionConfig {
     }
 
     /// Wraps this configuration with a provider to expose watching methods.
-    pub const fn with_provider<N: Network, T: Transport + Clone>(
+    pub const fn with_provider<T: Transport + Clone, N: Network>(
         self,
-        provider: &RootProvider<N, T>,
-    ) -> PendingTransactionBuilder<'_, N, T> {
+        provider: &RootProvider<T, N>,
+    ) -> PendingTransactionBuilder<'_, T, N> {
         PendingTransactionBuilder::from_config(provider, self)
     }
 }

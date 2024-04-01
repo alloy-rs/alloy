@@ -1,7 +1,7 @@
 use crate::{CallBuilder, Event, Interface, Result};
 use alloy_dyn_abi::DynSolValue;
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{Address, Selector};
 use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 /// A contract is an abstraction of an executable program on Ethereum. Every deployed contract has
 /// an address, which is used to connect to it so that it may receive messages (transactions).
 #[derive(Clone)]
-pub struct ContractInstance<N, T, P> {
+pub struct ContractInstance<T, P, N = Ethereum> {
     address: Address,
     provider: P,
     interface: Interface,
@@ -22,7 +22,7 @@ pub struct ContractInstance<N, T, P> {
     network: PhantomData<N>,
 }
 
-impl<N, T, P> ContractInstance<N, T, P> {
+impl<T, P, N> ContractInstance<T, P, N> {
     /// Creates a new contract from the provided address, provider, and interface.
     #[inline]
     pub const fn new(address: Address, provider: P, interface: Interface) -> Self {
@@ -43,7 +43,7 @@ impl<N, T, P> ContractInstance<N, T, P> {
 
     /// Returns a new contract instance at `address`.
     #[inline]
-    pub fn at(mut self, address: Address) -> ContractInstance<N, T, P> {
+    pub fn at(mut self, address: Address) -> ContractInstance<T, P, N> {
         self.set_address(address);
         self
     }
@@ -61,10 +61,10 @@ impl<N, T, P> ContractInstance<N, T, P> {
     }
 }
 
-impl<N, T, P: Clone> ContractInstance<N, T, &P> {
+impl<T, P: Clone, N> ContractInstance<T, &P, N> {
     /// Clones the provider and returns a new contract instance with the cloned provider.
     #[inline]
-    pub fn with_cloned_provider(self) -> ContractInstance<N, T, P> {
+    pub fn with_cloned_provider(self) -> ContractInstance<T, P, N> {
         ContractInstance {
             address: self.address,
             provider: self.provider.clone(),
@@ -75,7 +75,7 @@ impl<N, T, P: Clone> ContractInstance<N, T, &P> {
     }
 }
 
-impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T, P> {
+impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P, N> {
     /// Returns a transaction builder for the provided function name.
     ///
     /// If there are multiple functions with the same name due to overloading, consider using
@@ -85,7 +85,7 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T,
         &self,
         name: &str,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<N, T, &P, Function>> {
+    ) -> Result<CallBuilder<T, &P, Function, N>> {
         let function = self.interface.get_from_name(name)?;
         CallBuilder::new_dyn(&self.provider, function, args)
     }
@@ -95,18 +95,18 @@ impl<N: Network, T: Transport + Clone, P: Provider<N, T>> ContractInstance<N, T,
         &self,
         selector: &Selector,
         args: &[DynSolValue],
-    ) -> Result<CallBuilder<N, T, &P, Function>> {
+    ) -> Result<CallBuilder<T, &P, Function, N>> {
         let function = self.interface.get_from_selector(selector)?;
         CallBuilder::new_dyn(&self.provider, function, args)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
-    pub fn event<E: SolEvent>(&self, filter: Filter) -> Event<N, T, &P, E> {
+    pub fn event<E: SolEvent>(&self, filter: Filter) -> Event<T, &P, E, N> {
         Event::new(&self.provider, filter)
     }
 }
 
-impl<N, T, P> std::ops::Deref for ContractInstance<N, T, P> {
+impl<T, P, N> std::ops::Deref for ContractInstance<T, P, N> {
     type Target = Interface;
 
     fn deref(&self) -> &Self::Target {
@@ -114,7 +114,7 @@ impl<N, T, P> std::ops::Deref for ContractInstance<N, T, P> {
     }
 }
 
-impl<N, T, P> std::fmt::Debug for ContractInstance<N, T, P> {
+impl<T, P, N> std::fmt::Debug for ContractInstance<T, P, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractInstance").field("address", &self.address).finish()
     }

@@ -75,7 +75,7 @@ impl BuiltInConnectionString {
                 "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually",
             )),
 
-            #[cfg(all(not(target = "wasm"), feature = "ws"))]
+            #[cfg(all(not(target_arch = "wasm32"), feature = "ws"))]
             Self::Ws(url, Some(auth)) => {
                 alloy_transport_ws::WsConnect::with_auth(url.clone(), Some(auth.clone()))
                     .into_service()

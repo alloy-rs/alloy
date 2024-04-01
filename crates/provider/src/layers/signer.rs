@@ -1,5 +1,5 @@
 use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
-use alloy_network::{eip2718::Encodable2718, Network, NetworkSigner, TransactionBuilder};
+use alloy_network::{eip2718::Encodable2718, Ethereum, Network, NetworkSigner, TransactionBuilder};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
 use std::marker::PhantomData;
@@ -36,14 +36,14 @@ impl<S> SignerLayer<S> {
     }
 }
 
-impl<P, N, T, S> ProviderLayer<P, N, T> for SignerLayer<S>
+impl<P, T, S, N> ProviderLayer<P, T, N> for SignerLayer<S>
 where
-    P: Provider<N, T>,
-    N: Network,
+    P: Provider<T, N>,
     T: Transport + Clone,
     S: NetworkSigner<N> + Clone,
+    N: Network,
 {
-    type Provider = SignerProvider<N, T, P, S>;
+    type Provider = SignerProvider<T, P, S, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         SignerProvider { inner, signer: self.signer.clone(), _phantom: PhantomData }
@@ -60,35 +60,35 @@ where
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug)]
-pub struct SignerProvider<N, T, P, S>
+pub struct SignerProvider<T, P, S, N = Ethereum>
 where
-    N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
+    N: Network,
 {
     inner: P,
     signer: S,
-    _phantom: PhantomData<(N, T)>,
+    _phantom: PhantomData<(T, N)>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N, T, P, S> Provider<N, T> for SignerProvider<N, T, P, S>
+impl<T, P, S, N> Provider<T, N> for SignerProvider<T, P, S, N>
 where
-    N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
     S: NetworkSigner<N>,
+    N: Network,
 {
     #[inline]
-    fn root(&self) -> &RootProvider<N, T> {
+    fn root(&self) -> &RootProvider<T, N> {
         self.inner.root()
     }
 
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         let envelope = tx.build(&self.signer).await.map_err(TransportErrorKind::custom)?;
         let rlp = envelope.encoded_2718();
 
@@ -96,6 +96,7 @@ where
     }
 }
 
+#[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
     use crate::{Provider, ProviderBuilder, RootProvider};
