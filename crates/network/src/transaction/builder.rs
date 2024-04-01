@@ -1,6 +1,11 @@
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
+
 use super::signer::NetworkSigner;
 use crate::Network;
-use alloy_consensus::BlobTransactionSidecar;
+use alloy_consensus::{BlobTransactionSidecar, TxType};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::AccessList;
 use futures_utils_wasm::impl_future;
@@ -8,9 +13,9 @@ use futures_utils_wasm::impl_future;
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
 pub enum TransactionBuilderError {
-    /// A required key is missing.
-    #[error("A required key is missing: {0}")]
-    MissingKey(&'static str),
+    /// Invalid transaction request
+    #[error("{0:?} transaction can't be built: {1}")]
+    InvalidTransactionRequest(TxType, InvalidTransactionRequestErrors),
 
     /// Signer cannot produce signature type required for transaction.
     #[error("Signer cannot produce signature type required for transaction")]
@@ -19,10 +24,6 @@ pub enum TransactionBuilderError {
     /// Signer error.
     #[error(transparent)]
     Signer(#[from] alloy_signer::Error),
-
-    /// Sidecar and access list are mutually exclusive.
-    #[error("Sidecar and access list are mutually exclusive")]
-    SidecarAndAccessListMutuallyExclusive,
 
     /// A custom error.
     #[error("{0}")]
@@ -37,6 +38,44 @@ impl TransactionBuilderError {
     {
         Self::Custom(Box::new(e))
     }
+}
+
+/// Wrapper for [`InvalidTransactionRequestError`]s.
+#[derive(Debug)]
+pub struct InvalidTransactionRequestErrors(pub Vec<InvalidTransactionRequestError>);
+
+impl Deref for InvalidTransactionRequestErrors {
+    type Target = Vec<InvalidTransactionRequestError>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for InvalidTransactionRequestErrors {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Display for InvalidTransactionRequestErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let to_display = self.0.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+
+        write!(f, "{to_display}")
+    }
+}
+
+/// Error type for invalid transaction requests.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
+pub enum InvalidTransactionRequestError {
+    /// A required key is missing.
+    #[error("Missing {0}")]
+    MissingKey(&'static str),
+
+    /// Mutually exclusive fields have been set.
+    #[error("{0} and {1} are mutually exclusive")]
+    MutuallyExclusive(&'static str, &'static str),
 }
 
 /// [`TransactionBuilder`] result type.
