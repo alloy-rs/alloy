@@ -199,78 +199,77 @@ fn get_invalid_1559_fields(request: &TransactionRequest) -> Vec<InvalidTransacti
 }
 
 fn will_build_legacy(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.gas_price.is_some() {
-        let errors = get_invalid_common_fields(request);
+    if request.gas_price.is_none() {
+        return Ok(false);
+    }
 
-        if errors.is_empty() {
-            Ok(true)
-        } else {
-            Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Legacy, errors))
-        }
+    let errors = get_invalid_common_fields(request);
+
+    if errors.is_empty() {
+        Ok(true)
     } else {
-        Ok(false)
+        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Legacy, errors))
     }
 }
 
 fn will_build_2930(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.access_list.is_some() {
-        let mut errors = get_invalid_common_fields(request);
+    if request.access_list.is_none() {
+        return Ok(false);
+    }
 
-        if request.gas_price.is_none() {
-            errors.push(InvalidTransactionRequestError::MissingKey("gas_price"));
-        }
+    let mut errors = get_invalid_common_fields(request);
 
-        if request.sidecar.is_some() {
-            errors
-                .push(InvalidTransactionRequestError::MutuallyExclusive("access_list", "sidecar"));
-        }
+    if request.gas_price.is_none() {
+        errors.push(InvalidTransactionRequestError::MissingKey("gas_price"));
+    }
 
-        if errors.is_empty() {
-            Ok(true)
-        } else {
-            Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip2930, errors))
-        }
+    if request.sidecar.is_some() {
+        errors.push(InvalidTransactionRequestError::MutuallyExclusive("access_list", "sidecar"));
+    }
+
+    if errors.is_empty() {
+        Ok(true)
     } else {
-        Ok(false)
+        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip2930, errors))
     }
 }
 
 fn will_build_4844(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.sidecar.is_some()
-        || request.blob_versioned_hashes.is_some()
-        || request.max_fee_per_blob_gas.is_some()
+    if request.sidecar.is_none()
+        && request.blob_versioned_hashes.is_none()
+        && request.max_fee_per_blob_gas.is_none()
     {
-        let mut errors = get_invalid_common_fields(request);
+        return Ok(false);
+    }
 
-        errors.append(&mut get_invalid_1559_fields(request));
+    let mut errors = get_invalid_common_fields(request);
 
-        if request.access_list.is_some() {
-            errors.push(InvalidTransactionRequestError::MutuallyExclusive("sidecar", "access_list"))
-        }
+    errors.append(&mut get_invalid_1559_fields(request));
 
-        if request.sidecar.is_none() {
-            errors.push(InvalidTransactionRequestError::MissingKey("sidecar"));
-        }
+    if request.access_list.is_some() {
+        errors.push(InvalidTransactionRequestError::MutuallyExclusive("sidecar", "access_list"))
+    }
 
-        if request.blob_versioned_hashes.is_none() {
-            errors.push(InvalidTransactionRequestError::MissingKey("blob_versioned_hashes"));
-        }
+    if request.sidecar.is_none() {
+        errors.push(InvalidTransactionRequestError::MissingKey("sidecar"));
+    }
 
-        if request.blob_versioned_hashes.is_none() {
-            errors.push(InvalidTransactionRequestError::MissingKey("max_fee_per_blob_gas"));
-        }
+    if request.blob_versioned_hashes.is_none() {
+        errors.push(InvalidTransactionRequestError::MissingKey("blob_versioned_hashes"));
+    }
 
-        if request.to.is_none() {
-            errors.push(InvalidTransactionRequestError::MissingKey("to"));
-        }
+    if request.blob_versioned_hashes.is_none() {
+        errors.push(InvalidTransactionRequestError::MissingKey("max_fee_per_blob_gas"));
+    }
 
-        if errors.is_empty() {
-            Ok(true)
-        } else {
-            Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip4844, errors))
-        }
+    if request.to.is_none() {
+        errors.push(InvalidTransactionRequestError::MissingKey("to"));
+    }
+
+    if errors.is_empty() {
+        Ok(true)
     } else {
-        Ok(false)
+        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip4844, errors))
     }
 }
 
