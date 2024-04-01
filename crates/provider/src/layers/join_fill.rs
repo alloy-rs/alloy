@@ -298,16 +298,20 @@ where
         &self,
         mut tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        let mut count = 0;
         while self.filler.status(&tx).is_ready() {
             let fillable = self.filler.prepare(self.root(), &tx).await?;
-
-            // CONSIDER: should we have some sort of break condition or max loops here to account
-            // for misimplemented fillers that are always ready and never finished?
-
             self.filler.fill(fillable, &mut tx);
-        }
-        // CONSIDER: should we error if the filler is not finished and also not ready?
 
+            count += 1;
+            if count >= 20 {
+                panic!(
+                    "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
+                );
+            }
+        }
+
+        // Errors in tx building happen further down the stack.
         self.inner.send_transaction(tx).await
     }
 }
