@@ -74,10 +74,16 @@ std = [
 reqwest = [
     "dep:reqwest",
     "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
 ]
-hyper = ["dep:hyper", "alloy-rpc-client?/hyper", "alloy-transport-http?/hyper"]
+hyper = [
+    "dep:hyper",
+    "alloy-rpc-client?/hyper",
+    "alloy-provider?/hyper",
+    "alloy-transport-http?/hyper",
+]
 
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
