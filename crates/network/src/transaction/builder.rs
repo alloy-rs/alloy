@@ -66,6 +66,14 @@ impl Display for InvalidTransactionRequestErrors {
     }
 }
 
+impl From<Vec<&'static str>> for InvalidTransactionRequestErrors {
+    fn from(value: Vec<&'static str>) -> Self {
+        InvalidTransactionRequestErrors(
+            value.into_iter().map(InvalidTransactionRequestError::MissingKey).collect(),
+        )
+    }
+}
+
 /// Error type for invalid transaction requests.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
 pub enum InvalidTransactionRequestError {

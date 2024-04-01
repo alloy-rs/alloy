@@ -170,45 +170,17 @@ where
     }
 }
 
-fn get_invalid_common_fields(request: &TransactionRequest) -> InvalidTransactionRequestErrors {
-    let mut errors = vec![];
-
-    if request.nonce.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("nonce"));
-    }
-
-    if request.gas.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("gas_limit"));
-    }
-
-    InvalidTransactionRequestErrors(errors)
-}
-
-fn get_invalid_1559_fields(request: &TransactionRequest) -> Vec<InvalidTransactionRequestError> {
-    let mut errors = vec![];
-
-    if request.max_priority_fee_per_gas.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("max_priority_fee_per_gas"));
-    }
-
-    if request.max_fee_per_gas.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("max_fee_per_gas"));
-    }
-
-    errors
-}
-
 fn will_build_legacy(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
     if request.gas_price.is_none() {
         return Ok(false);
     }
 
-    let errors = get_invalid_common_fields(request);
+    let errors = request.get_invalid_common_fields();
 
     if errors.is_empty() {
         Ok(true)
     } else {
-        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Legacy, errors))
+        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Legacy, errors.into()))
     }
 }
 
@@ -217,7 +189,7 @@ fn will_build_2930(request: &TransactionRequest) -> Result<bool, TransactionBuil
         return Ok(false);
     }
 
-    let mut errors = get_invalid_common_fields(request);
+    let mut errors = InvalidTransactionRequestErrors::from(request.get_invalid_common_fields());
 
     if request.gas_price.is_none() {
         errors.push(InvalidTransactionRequestError::MissingKey("gas_price"));
@@ -242,9 +214,11 @@ fn will_build_4844(request: &TransactionRequest) -> Result<bool, TransactionBuil
         return Ok(false);
     }
 
-    let mut errors = get_invalid_common_fields(request);
+    let mut errors = request.get_invalid_common_fields();
 
-    errors.append(&mut get_invalid_1559_fields(request));
+    errors.append(&mut request.get_invalid_1559_fields());
+
+    let mut errors = InvalidTransactionRequestErrors::from(errors);
 
     if request.access_list.is_some() {
         errors.push(InvalidTransactionRequestError::MutuallyExclusive("sidecar", "access_list"))
@@ -288,9 +262,11 @@ fn build_legacy(request: TransactionRequest) -> Result<TxLegacy, TransactionBuil
 
 /// Build an EIP-1559 transaction.
 fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuilderError> {
-    let mut errors = get_invalid_common_fields(&request);
+    let mut errors = request.get_invalid_common_fields();
 
-    errors.append(&mut get_invalid_1559_fields(&request));
+    errors.append(&mut request.get_invalid_1559_fields());
+
+    let errors = InvalidTransactionRequestErrors::from(errors);
 
     if errors.is_empty() {
         Ok(TxEip1559 {

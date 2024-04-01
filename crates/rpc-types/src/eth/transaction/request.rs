@@ -171,6 +171,36 @@ impl TransactionRequest {
         self.transaction_type = Some(transaction_type);
         self
     }
+
+    /// Gets invalid fields for all transaction types
+    pub fn get_invalid_common_fields(&self) -> Vec<&'static str> {
+        let mut errors = vec![];
+
+        if self.nonce.is_none() {
+            errors.push("nonce");
+        }
+
+        if self.gas.is_none() {
+            errors.push("gas_limit");
+        }
+
+        errors
+    }
+
+    /// Gets invalid fields for EIP-1559 transaction type
+    pub fn get_invalid_1559_fields(&self) -> Vec<&'static str> {
+        let mut errors = vec![];
+
+        if self.max_priority_fee_per_gas.is_none() {
+            errors.push("max_priority_fee_per_gas");
+        }
+
+        if self.max_fee_per_gas.is_none() {
+            errors.push("max_fee_per_gas");
+        }
+
+        errors
+    }
 }
 
 /// Helper type that supports both `data` and `input` fields that map to transaction input data.
