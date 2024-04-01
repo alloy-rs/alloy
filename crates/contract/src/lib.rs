@@ -47,4 +47,5 @@ pub mod private {
 
 #[cfg(feature = "multicall")]
 mod multicall;
+#[cfg(feature = "multicall")]
 pub use multicall::*;

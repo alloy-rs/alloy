@@ -14,4 +14,7 @@ pub enum MulticallError {
 
     #[error("Multicall call reverted but `allowFailure` is false")]
     FailedCall,
+
+    #[error("Invalid params. Must provide at least one of: address or chain_id.")]
+    InvalidInitializationParams,
 }
