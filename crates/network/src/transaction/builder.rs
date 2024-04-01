@@ -14,7 +14,7 @@ use futures_utils_wasm::impl_future;
 #[derive(Debug, thiserror::Error)]
 pub enum TransactionBuilderError {
     /// Invalid transaction request
-    #[error("{0:?} transaction can't be built: {1}")]
+    #[error("{0} transaction can't be built: {1}")]
     InvalidTransactionRequest(TxType, InvalidTransactionRequestErrors),
 
     /// Signer cannot produce signature type required for transaction.
