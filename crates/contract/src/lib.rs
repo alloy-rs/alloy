@@ -15,6 +15,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(any(test, feature = "multicall"))]
 extern crate self as alloy_contract;
 
 mod error;
@@ -44,5 +45,6 @@ pub mod private {
     pub use alloy_transport::Transport;
 }
 
+#[cfg(feature = "multicall")]
 mod multicall;
 pub use multicall::*;

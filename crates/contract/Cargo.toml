@@ -40,3 +40,4 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [features]
 pubsub = ["alloy-provider/pubsub", "dep:alloy-pubsub"]
+multicall = ["alloy-sol-types/json"]

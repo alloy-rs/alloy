@@ -9,7 +9,8 @@ use alloy_provider::Provider;
 
 use std::result::Result as StdResult;
 
-pub type Result<T> = std::result::Result<T, super::error::MulticallError>;
+/// Alias for [std::result::Result]<T, [MulticallError]>
+pub type Result<T> = std::result::Result<T, MulticallError>;
 
 use crate::constants;
 
