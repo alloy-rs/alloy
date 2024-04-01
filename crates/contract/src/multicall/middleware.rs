@@ -163,7 +163,7 @@ where
     /// [Multicall] instance.
     ///
     /// [set_version]: #method.set_version
-    pub fn with_version(mut self, version: impl TryInto<MulticallVersion>) -> Self {
+    pub fn with_version(&mut self, version: impl TryInto<MulticallVersion>) -> &mut Self {
         match version.try_into() {
             Ok(v) => self.version = v,
             Err(_) => self.version = MulticallVersion::Multicall3,
@@ -182,6 +182,20 @@ where
         };
 
         self.calls.push(call)
+    }
+
+    /// Builder pattern to add a [Call] to the internal calls vector and return the [Multicall]
+    pub fn with_call(&mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) -> &mut Self {
+        let call = Call {
+            allow_failure,
+            target: call.get_to(),
+            calldata: call.calldata().clone(),
+            decoder: call.get_decoder(),
+        };
+
+        self.calls.push(call);
+
+        self
     }
 
     /// Adds multiple [Call] instances to the internal calls vector.
@@ -209,10 +223,10 @@ where
     ///
     ///  All added calls will use the same `allow_failure` setting.
     pub fn with_calls(
-        mut self,
+        &mut self,
         calls: impl IntoIterator<Item = DynCallBuilder<N, T, P>>,
         allow_failure: bool,
-    ) -> Self {
+    ) -> &mut Self {
         for call in calls {
             let call = Call {
                 allow_failure,
@@ -227,30 +241,17 @@ where
         self
     }
 
-    /// Builder pattern to add a [Call] to the internal calls vector and return the [Multicall]
-    pub fn with_call(mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) -> Self {
-        let call = Call {
-            allow_failure,
-            target: call.get_to(),
-            calldata: call.calldata().clone(),
-            decoder: call.get_decoder(),
-        };
-
-        self.calls.push(call);
-
-        self
-    }
-
     /// Queries the multicall contract via `eth_call` and returns the decoded result
     ///
-    /// Returns a vector of Result<DynSolValue, Bytes> for each internal call:
-    /// `Err(Bytes)` if the individual call failed whilst `allowFailure` was true, or if the return
-    /// data was empty.
-    /// `Ok(DynSolValue)` if the call was successful.
+    /// Returns a vector of [StdResult]<[DynSolValue], [Bytes]> for each internal call:
+    /// - Ok([DynSolValue]) if the call was successful.
+    /// - Err([Bytes]) if the individual call failed whilst `allowFailure` was true, or if the
+    ///   return data was empty.
     ///
     /// # Errors
     ///
-    /// Returns a [MulticallError] if the Multicall call failed.
+    /// Returns a [MulticallError] if the Multicall call failed. This can occur due to RPC errors,
+    /// or if an individual call failed whilst `allowFailure` was false.
     pub async fn call(&self) -> Result<Vec<StdResult<DynSolValue, Bytes>>> {
         match self.version {
             MulticallVersion::Multicall => {
@@ -453,10 +454,17 @@ mod tests {
         let symbol_call = weth_contract.function("symbol", &[]).unwrap();
 
         // Add the calls
-        multicall.add_call(total_supply_call, true);
-        multicall.add_call(name_call, true);
-        multicall.add_call(decimals_call, true);
-        multicall.add_call(symbol_call, true);
+        multicall.add_call(total_supply_call.clone(), true);
+        multicall.add_call(name_call.clone(), true);
+        multicall.add_call(decimals_call.clone(), true);
+        multicall.add_call(symbol_call.clone(), true);
+
+        // Add the same calls via the builder pattern
+        multicall
+            .with_call(total_supply_call, true)
+            .with_call(name_call, true)
+            .with_call(decimals_call, true)
+            .with_call(symbol_call, true);
 
         // Send and await the multicall results
 
@@ -487,6 +495,19 @@ mod tests {
         let decimals = decimals_result.unwrap().as_uint().unwrap().0.to::<u8>();
 
         // Assert the returned results are as expected
+        assert_eq!(name, "Wrapped Ether");
+        assert_eq!(symbol, "WETH");
+        assert_eq!(decimals, 18);
+
+        // Also check the calls that were added via the builder pattern
+        let name_result = results.get(5).unwrap().as_ref();
+        let decimals_result = results.get(6).unwrap().as_ref();
+        let symbol_result = results.get(7).unwrap().as_ref();
+
+        let name = name_result.unwrap().as_str().unwrap();
+        let symbol = symbol_result.unwrap().as_str().unwrap();
+        let decimals = decimals_result.unwrap().as_uint().unwrap().0.to::<u8>();
+
         assert_eq!(name, "Wrapped Ether");
         assert_eq!(symbol, "WETH");
         assert_eq!(decimals, 18);
