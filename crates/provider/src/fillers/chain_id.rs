@@ -1,0 +1,89 @@
+use std::sync::{Arc, OnceLock};
+
+use alloy_network::TransactionBuilder;
+use alloy_transport::TransportResult;
+
+use crate::fillers::{FillerControlFlow, TxFiller};
+
+/// A [`TxFiller`] that populates the chain ID of a transaction.
+///
+/// If a chain ID is provided, it will be used for filling. If a chain ID
+/// is not provided, the filler will attempt to fetch the chain ID from the
+/// provider the first time a transaction is prepared, and will cache it for
+/// future transactions.
+///
+/// Transactions that already have a chain_id set by the user will not be
+/// modified.
+///
+/// # Example
+///
+/// ```
+/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
+/// let provider = ProviderBuilder::new()
+///     .with_chain_id(1)
+///     .signer(EthereumSigner::from(signer)) // note the order!
+///     .provider(RootProvider::new(transport));
+///
+/// provider.send_transaction(TransactionRequest::default()).await;
+/// # }
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChainIdFiller(Arc<OnceLock<u64>>);
+
+impl ChainIdFiller {
+    /// Create a new [`ChainIdFiller`] with an optional chain ID.
+    ///
+    /// If a chain ID is provided, it will be used for filling. If a chain ID
+    /// is not provided, the filler will attempt to fetch the chain ID from the
+    /// provider the first time a transaction is prepared.
+    pub fn new(chain_id: Option<u64>) -> Self {
+        let lock = OnceLock::new();
+        if let Some(chain_id) = chain_id {
+            lock.set(chain_id).expect("brand new");
+        }
+        Self(Arc::new(lock))
+    }
+}
+
+impl TxFiller for ChainIdFiller {
+    type Fillable = u64;
+
+    fn status(
+        &self,
+        tx: &<alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
+    ) -> FillerControlFlow {
+        if tx.chain_id.is_some() {
+            FillerControlFlow::Finished
+        } else {
+            FillerControlFlow::Ready
+        }
+    }
+
+    async fn prepare<P, T>(
+        &self,
+        provider: &P,
+        _tx: &<alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
+    ) -> TransportResult<Self::Fillable>
+    where
+        P: crate::Provider<T, alloy_network::Ethereum>,
+        T: alloy_transport::Transport + Clone,
+    {
+        match self.0.get().copied() {
+            Some(chain_id) => Ok(chain_id),
+            None => {
+                let chain_id = provider.get_chain_id().await?.as_limbs()[0];
+                let chain_id = *self.0.get_or_init(|| chain_id);
+                Ok(chain_id)
+            }
+        }
+    }
+
+    fn fill(
+        &self,
+        fillable: Self::Fillable,
+        tx: &mut <alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
+    ) {
+        if tx.chain_id().is_none() {
+            tx.set_chain_id(fillable);
+        }
+    }
+}

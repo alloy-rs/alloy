@@ -1,5 +1,7 @@
 use crate::{
-    fillers::{FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller},
+    fillers::{
+        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller,
+    },
     Provider, RootProvider,
 };
 use alloy_network::{Ethereum, Network};
@@ -8,7 +10,8 @@ use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
 /// The recommended filler.
-type RecommendFiller = JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>;
+type RecommendFiller =
+    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
@@ -121,7 +124,7 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation and nonce management
     pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendFiller, N> {
-        self.filler(GasFiller).filler(NonceFiller::default())
+        self.filler(GasFiller).filler(NonceFiller::default()).filler(ChainIdFiller::default())
     }
 
     /// Add gas estimation to the stack being built.
@@ -136,6 +139,24 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// See [`NonceFiller`]
     pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
         self.filler(NonceFiller::default())
+    }
+
+    /// Add a chain ID filler to the stack being built. The filler will attempt
+    /// to fetch the chain ID from the provider using
+    /// [`Provider::get_chain_id`]. the first time a transaction is prepared,
+    /// and will cache it for future transactions.
+    pub fn fetch_chain_id(self) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
+        self.filler(ChainIdFiller::default())
+    }
+
+    /// Add a specific chain ID to the stack being built. The filler will
+    /// fill transactions with the provided chain ID, regardless of the chain ID
+    /// that the provider reports via [`Provider::get_chain_id`].
+    pub fn with_chain_id(
+        self,
+        chain_id: u64,
+    ) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
+        self.filler(ChainIdFiller::new(Some(chain_id)))
     }
 }
 
