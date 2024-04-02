@@ -20,14 +20,6 @@
 
 extern crate alloc;
 
-use alloc::format;
-
-use alloy_primitives::B256;
-use serde::Serializer;
-
-pub mod json_u256;
-pub use self::json_u256::JsonU256;
-
 /// Helpers for dealing with booleans.
 mod bool;
 pub use self::bool::*;
@@ -39,6 +31,14 @@ pub use self::num::*;
 /// Storage related helpers.
 pub mod storage;
 pub use self::storage::JsonStorageKey;
+
+pub mod ttd;
+pub use self::ttd::*;
+
+use alloc::format;
+use serde::Serializer;
+
+use alloy_primitives::B256;
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
 ///

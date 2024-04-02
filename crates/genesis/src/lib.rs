@@ -24,9 +24,9 @@ use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
-    json_u256::{deserialize_json_ttd_opt, deserialize_json_u256},
     num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
+    ttd::deserialize_json_ttd_opt,
 };
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +49,6 @@ pub struct Genesis {
     #[serde(with = "u64_hex_or_decimal")]
     pub gas_limit: u64,
     /// The genesis header difficulty.
-    #[serde(deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
     /// The genesis header mix hash.
     pub mix_hash: B256,
@@ -219,7 +218,6 @@ pub struct GenesisAccount {
     #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
     pub nonce: Option<u64>,
     /// The balance of the account at genesis.
-    #[serde(deserialize_with = "deserialize_json_u256")]
     pub balance: U256,
     /// The account's bytecode at genesis.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -1,7 +1,6 @@
 //! Types for the admin api
 use alloy_genesis::ChainConfig;
 use alloy_primitives::{B256, U256};
-use alloy_serde::json_u256::deserialize_json_u256;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr};
 
@@ -60,7 +59,6 @@ pub struct EthProtocolInfo {
     /// The eth network version.
     pub network: u64,
     /// The total difficulty of the host's blockchain.
-    #[serde(deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
     /// The Keccak hash of the host's genesis block.
     pub genesis: B256,
@@ -115,7 +113,6 @@ pub struct EthInfo {
     #[serde(default)]
     pub version: u64,
     /// The total difficulty of the peer's blockchain.
-    #[serde(default, deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
     /// The hash of the peer's best known block.
     #[serde(default)]
