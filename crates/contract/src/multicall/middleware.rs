@@ -114,12 +114,11 @@ impl MulticallVersion {
 ///
 /// # Example
 /// ```no_run
+/// use alloy_contract::{ContractInstance, Interface, Multicall};
 /// use alloy_network::Ethereum;
 /// use alloy_primitives::address;
 /// use alloy_provider::{ProviderBuilder, ReqwestProvider};
 /// use alloy_sol_types::sol;
-///
-/// use crate::{ContractInstance, Interface, Multicall};
 ///
 /// sol! {
 /// #[sol(rpc, abi)]
