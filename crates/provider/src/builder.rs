@@ -138,7 +138,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add a transaction filler to the stack being built. Transaction fillers
     /// are used to fill in missing fields on transactions before they are sent,
     /// and are all joined to form the outermost layer of the stack.
-    pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2, N>, N> {
+    pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2>, N> {
         ProviderBuilder {
             layer: self.layer,
             filler: JoinFill::new(self.filler, filler),
@@ -156,23 +156,23 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add gas estimation to the stack being built.
     ///
     /// See [`GasFiller`]
-    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller, N>, N> {
+    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
         self.filler(GasFiller)
     }
 
     /// Add nonce management to the stack being built.
     ///
     /// See [`NonceManager`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<F, NonceFiller, N>, N> {
+    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<F, NonceFiller>, N> {
         self.filler(NonceFiller::default())
     }
 
-    // /// Add preconfigured set of layers handling gas estimation and nonce management
-    // pub fn with_recommended_layers(
-    //     self,
-    // ) -> ProviderBuilder<Stack<NonceManagerLayer, Stack<GasEstimatorLayer, L>>, N> {
-    //     self.with_gas_estimation().with_nonce_management()
-    // }
+    /// Add preconfigured set of layers handling gas estimation and nonce management
+    pub fn with_recommended_layers(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<JoinFill<F, GasFiller>, NonceFiller>, N> {
+        self.with_gas_estimation().with_nonce_management()
+    }
 
     /// Change the network.
     ///
@@ -188,14 +188,17 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
     /// the final [`Provider`] type with all stack components.
-    pub fn on_provider<P, T>(self, provider: P) -> L::Provider
+    pub fn on_provider<P, T>(self, provider: P) -> F::Provider
     where
         L: ProviderLayer<P, T, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, T, N>,
         P: Provider<T, N>,
         T: Transport + Clone,
         N: Network,
     {
-        self.layer.layer(provider)
+        let Self { layer, filler, .. } = self;
+        let stack = Stack::new(layer, filler);
+        stack.layer(provider)
     }
 
     /// Finish the layer stack by providing a root [`RpcClient`], outputting
@@ -203,9 +206,10 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     ///
     /// This is a convenience function for
     /// `ProviderBuilder::provider<RpcClient>`.
-    pub fn on_client<T>(self, client: RpcClient<T>) -> L::Provider
+    pub fn on_client<T>(self, client: RpcClient<T>) -> F::Provider
     where
         L: ProviderLayer<RootProvider<T, N>, T, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, T, N>,
         T: Transport + Clone,
         N: Network,
     {
@@ -215,9 +219,10 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Finish the layer stack by providing a connection string for a built-in
     /// transport type, outputting the final [`Provider`] type with all stack
     /// components.
-    pub async fn on_builtin(self, s: &str) -> Result<L::Provider, TransportError>
+    pub async fn on_builtin(self, s: &str) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<RootProvider<BoxTransport, N>, BoxTransport, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, BoxTransport, N>,
         N: Network,
     {
         let connect: BuiltInConnectionString = s.parse()?;
@@ -230,13 +235,14 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     pub async fn on_ws(
         self,
         connect: alloy_transport_ws::WsConnect,
-    ) -> Result<L::Provider, TransportError>
+    ) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<
             RootProvider<alloy_pubsub::PubSubFrontend, N>,
             alloy_pubsub::PubSubFrontend,
             N,
         >,
+        F: TxFiller<N> + ProviderLayer<L::Provider, alloy_pubsub::PubSubFrontend, N>,
         N: Network,
     {
         let client = ClientBuilder::default().ws(connect).await?;
@@ -248,7 +254,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     pub async fn on_ipc<T>(
         self,
         connect: alloy_transport_ipc::IpcConnect<T>,
-    ) -> Result<L::Provider, TransportError>
+    ) -> Result<F::Provider, TransportError>
     where
         alloy_transport_ipc::IpcConnect<T>: alloy_pubsub::PubSubConnect,
         L: ProviderLayer<
@@ -256,6 +262,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
             alloy_pubsub::PubSubFrontend,
             N,
         >,
+        F: TxFiller<N> + ProviderLayer<L::Provider, alloy_pubsub::PubSubFrontend, N>,
         N: Network,
     {
         let client = ClientBuilder::default().ipc(connect).await?;
@@ -264,24 +271,31 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Build this provider with an Reqwest HTTP transport.
     #[cfg(feature = "reqwest")]
-    pub fn on_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    pub fn on_http(self, url: url::Url) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<crate::ReqwestProvider<N>, alloy_transport_http::Http<reqwest::Client>, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, N>,
         N: Network,
     {
         let client = ClientBuilder::default().http(url);
         Ok(self.on_client(client))
     }
 
-    /// Build this provider with an Hyper HTTP transport.
+    /// Build this provider with an Hyper HTTP qransport.
     #[cfg(feature = "hyper")]
-    pub fn on_hyper_http(self, url: url::Url) -> Result<L::Provider, TransportError>
+    pub fn on_hyper_http(self, url: url::Url) -> Result<F::Provider, TransportError>
     where
         L: ProviderLayer<
             crate::HyperProvider<N>,
             alloy_transport_http::Http<alloy_transport_http::HyperClient>,
             N,
         >,
+        F: TxFiller<N>
+            + ProviderLayer<
+                L::Provider,
+                alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+                N,
+            >,
         N: Network,
     {
         let client = ClientBuilder::default().hyper_http(url);

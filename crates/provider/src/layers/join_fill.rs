@@ -102,7 +102,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     type Fillable: Send + Sync + 'static;
 
     /// Joins this filler with another filler to compose multiple fillers.
-    fn join_with<T>(self, other: T) -> JoinFill<Self, T, N>
+    fn join_with<T>(self, other: T) -> JoinFill<Self, T>
     where
         T: TxFiller<N>,
     {
@@ -142,27 +142,21 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
 /// by joining two [`TxFiller`]s. This  struct is itself a [`TxFiller`],
 /// and can be nested to compose any number of fill layers.
 #[derive(Debug, Clone)]
-pub struct JoinFill<L, R, N> {
+pub struct JoinFill<L, R> {
     left: L,
     right: R,
-    _network: PhantomData<fn() -> N>,
 }
 
-impl<L, R, N> JoinFill<L, R, N> {
+impl<L, R> JoinFill<L, R> {
     /// Creates a new `JoinFill` with the given layers.
     pub fn new(left: L, right: R) -> Self {
-        Self { left, right, _network: PhantomData }
+        Self { left, right }
     }
 }
 
-impl<L, R, N> JoinFill<L, R, N>
-where
-    L: TxFiller<N>,
-    R: TxFiller<N>,
-    N: Network,
-{
+impl<L, R> JoinFill<L, R> {
     /// Get a request for the left filler, if the left filler is ready.
-    async fn prepare_left<P, T>(
+    async fn prepare_left<P, T, N>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -170,6 +164,8 @@ where
     where
         P: Provider<T, N>,
         T: Transport + Clone,
+        L: TxFiller<N>,
+        N: Network,
     {
         if self.left.ready(tx) {
             self.left.prepare(provider, tx).await.map(Some)
@@ -179,7 +175,7 @@ where
     }
 
     /// Get a prepare for the right filler, if the right filler is ready.
-    async fn prepare_right<P, T>(
+    async fn prepare_right<P, T, N>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
@@ -187,6 +183,8 @@ where
     where
         P: Provider<T, N>,
         T: Transport + Clone,
+        R: TxFiller<N>,
+        N: Network,
     {
         if self.right.ready(tx) {
             self.right.prepare(provider, tx).await.map(Some)
@@ -196,7 +194,7 @@ where
     }
 }
 
-impl<L, R, N> TxFiller<N> for JoinFill<L, R, N>
+impl<L, R, N> TxFiller<N> for JoinFill<L, R>
 where
     L: TxFiller<N>,
     R: TxFiller<N>,
@@ -230,7 +228,7 @@ where
     }
 }
 
-impl<L, R, P, T, N> ProviderLayer<P, T, N> for JoinFill<L, R, N>
+impl<L, R, P, T, N> ProviderLayer<P, T, N> for JoinFill<L, R>
 where
     L: TxFiller<N>,
     R: TxFiller<N>,
@@ -238,7 +236,7 @@ where
     T: alloy_transport::Transport + Clone,
     N: Network,
 {
-    type Provider = FillProvider<JoinFill<L, R, N>, P, T, N>;
+    type Provider = FillProvider<JoinFill<L, R>, P, T, N>;
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
     }
@@ -278,7 +276,7 @@ where
     pub fn join_with<Other: TxFiller<N>>(
         self,
         other: Other,
-    ) -> FillProvider<JoinFill<F, Other, N>, P, T, N> {
+    ) -> FillProvider<JoinFill<F, Other>, P, T, N> {
         self.filler.join_with(other).layer(self.inner)
     }
 }
