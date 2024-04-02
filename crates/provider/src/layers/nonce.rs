@@ -9,24 +9,24 @@ use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// A layer that fills nonces on transactions.
+/// A [`TxFiller`] that fills nonces on transactions.
 ///
-/// The layer will fetch the transaction count for any new account it sees, store it locally and
-/// increment the locally stored nonce as transactions are sent via [`Provider::send_transaction`].
-///
-/// If you use layers that redirect the behavior of [`Provider::send_transaction`] (e.g.
-/// [`SignerLayer`]), you should add this layer before those.
+/// The filler will fetch the transaction count via
+/// [`Provider::get_transaction_count`] for any new account it sees, store it
+/// locally and increment the locally stored nonce as transactions are sent via
+/// [`Provider::send_transaction`].
 ///
 /// # Note
 ///
-/// - If the transaction request does not have a sender set, this layer will not fill nonces.
-/// - Using two providers with their own nonce layer can potentially fill invalid nonces if
-///   transactions are sent from the same address, as the next nonce to be used is cached internally
-///   in the layer.
+/// - If the transaction request does not have a sender set, this layer will
+///  not fill nonces.
+/// - Using two providers with their own nonce layer can potentially fill
+///  invalid nonces if transactions are sent from the same address, as the next
+///  nonce to be used is cached internally in the layer.
 ///
 /// # Example
 ///
-/// ```rs
+/// ```
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
 ///     .with_nonce_management()
@@ -36,13 +36,35 @@ use tokio::sync::Mutex;
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 /// ```
-///
-/// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
 pub struct NonceFillerConfig;
 
-/// A [`TxFiller`] that fills the nonce on transactions by keeping a local
-/// mapping of account addresses to their next nonce.
+/// A [`TxFiller`] that fills nonces on transactions.
+///
+/// The filler will fetch the transaction count for any new account it sees,
+/// store it locally and increment the locally stored nonce as transactions are
+/// sent via [`Provider::send_transaction`].
+///
+/// # Note
+///
+/// - If the transaction request does not have a sender set, this layer will
+///  not fill nonces.
+/// - Using two providers with their own nonce layer can potentially fill
+///  invalid nonces if transactions are sent from the same address, as the next
+///  nonce to be used is cached internally in the layer.
+///
+/// # Example
+///
+/// ```
+/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
+/// let provider = ProviderBuilder::new()
+///     .with_nonce_management()
+///     .signer(EthereumSigner::from(signer)) // note the order!
+///     .provider(RootProvider::new(transport));
+///
+/// provider.send_transaction(TransactionRequest::default()).await;
+/// # }
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct NonceFiller {
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,

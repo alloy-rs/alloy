@@ -133,7 +133,7 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
 
     /// Add nonce management to the stack being built.
     ///
-    /// See [`NonceManager`]
+    /// See [`NonceFiller`]
     pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
         self.filler(NonceFiller::default())
     }

@@ -9,31 +9,37 @@ use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
-/// A layer that populates gas related fields in transaction requests if unset.
+/// A [`TxFiller`] that populates gas related fields in transaction requests if
+/// unset.
 ///
-/// Gas related fields are gas_price, gas_limit, max_fee_per_gas and max_priority_fee_per_gas.
+/// Gas related fields are gas_price, gas_limit, max_fee_per_gas
+/// max_priority_fee_per_gas and max_fee_per_blob_gas.
 ///
-/// The layer fetches the estimations for these via the [`Provider::get_gas_price`],
-/// [`Provider::estimate_gas`] and [`Provider::estimate_eip1559_fees`] methods.
+/// The layer fetches the estimations for these via the
+/// [`Provider::get_gas_price`], [`Provider::estimate_gas`] and
+/// [`Provider::estimate_eip1559_fees`] methods.
 ///
-/// If you use layers that redirect the behavior of [`Provider::send_transaction`] (e.g.
-/// [`crate::layers::SignerLayer`]), you should add this layer before those.
+/// ## Note:
 ///
-/// Note:
-///     - If none of the gas related fields are set, the layer first assumes it's a EIP-1559 tx and
-///       populates the gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields.
-///     - If the network does not support EIP-1559, it will process as a legacy tx and populate the
-///       gas_limit and gas_price fields.
-///     - If the gas_price is already set by the user, it will process as a legacy tx and populate
-///       the gas_limit field if unset.
+/// The layer will populate gas fields based on the following logic:
+/// - if `gas_price` is set, it will process as a legacy tx and populate the
+///  `gas_limit` field if unset.
+/// - if `access_list` is set, it will process as a 2930 tx and populate the
+///  `gas_limit` and `gas_price` field if unset.
+/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the
+///  `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas` and
+///  `max_fee_per_blob_gas` fields if unset.
+/// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`,
+///  `max_fee_per_gas` and `max_priority_fee_per_gas` fields if unset.
+/// - If the network does not support EIP-1559, it will fallback to the legacy
+///  tx and populate the `gas_limit` and `gas_price` fields if unset.
 ///
 /// # Example
 ///
-/// ```rs
+/// ```
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
-///     .with_nonce_management()
-///     .with_gas_estimation()
+///     .with_recommended_fillers()
 ///     .signer(EthereumSigner::from(signer)) // note the order!
 ///     .provider(RootProvider::new(transport));
 ///
@@ -54,6 +60,40 @@ pub enum GasFillable {
 
 /// A [`TxFiller`] that populates gas related fields in transaction requests if
 /// unset.
+///
+/// Gas related fields are gas_price, gas_limit, max_fee_per_gas
+/// max_priority_fee_per_gas and max_fee_per_blob_gas.
+///
+/// The layer fetches the estimations for these via the
+/// [`Provider::get_gas_price`], [`Provider::estimate_gas`] and
+/// [`Provider::estimate_eip1559_fees`] methods.
+///
+/// ## Note:
+///
+/// The layer will populate gas fields based on the following logic:
+/// - if `gas_price` is set, it will process as a legacy tx and populate the
+///  `gas_limit` field if unset.
+/// - if `access_list` is set, it will process as a 2930 tx and populate the
+///  `gas_limit` and `gas_price` field if unset.
+/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the
+///  `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas` and
+///  `max_fee_per_blob_gas` fields if unset.
+/// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`,
+///  `max_fee_per_gas` and `max_priority_fee_per_gas` fields if unset.
+/// - If the network does not support EIP-1559, it will fallback to the legacy
+///  tx and populate the `gas_limit` and `gas_price` fields if unset.
+///
+/// # Example
+///
+/// ```
+/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
+/// let provider = ProviderBuilder::new()
+///     .with_recommended_fillers()
+///     .signer(EthereumSigner::from(signer)) // note the order!
+///     .provider(RootProvider::new(transport));
+///
+/// provider.send_transaction(TransactionRequest::default()).await;
+/// # }
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GasFiller;
 
@@ -202,7 +242,12 @@ impl<N: Network> TxFiller<N> for GasFiller {
         } else if tx.blob_sidecar().is_some() {
             self.prepare_4844(provider, tx).await
         } else {
-            self.prepare_1559(provider, tx).await
+            match self.prepare_1559(provider, tx).await {
+                // fallback to legacy
+                Ok(estimate) => Ok(estimate),
+                Err(RpcError::UnsupportedFeature(_)) => self.prepare_legacy(provider, tx).await,
+                Err(e) => Err(e),
+            }
         }
     }
 
