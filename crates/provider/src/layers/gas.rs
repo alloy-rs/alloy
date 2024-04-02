@@ -1,13 +1,13 @@
 use crate::{
-    utils::Eip1559Estimation, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
+    layers::{FillProvider, FillerControlFlow, TxFiller},
+    utils::Eip1559Estimation,
+    Provider, ProviderLayer,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_rpc_types::BlockNumberOrTag;
-use alloy_transport::{Transport, TransportError, TransportResult};
-use async_trait::async_trait;
+use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
-use std::marker::PhantomData;
 
 /// A layer that populates gas related fields in transaction requests if unset.
 ///
@@ -40,71 +40,77 @@ use std::marker::PhantomData;
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 #[derive(Debug, Clone, Copy, Default)]
-pub struct GasEstimatorLayer;
+pub struct GasFillerConfig;
 
-impl<P, T, N> ProviderLayer<P, T, N> for GasEstimatorLayer
+impl<P, T, N> ProviderLayer<P, T, N> for GasFillerConfig
 where
     P: Provider<T, N>,
+    T: alloy_transport::Transport + Clone,
     N: Network,
-    T: Transport + Clone,
 {
-    type Provider = GasEstimatorProvider<T, P, N>;
+    type Provider = FillProvider<GasFiller, P, T, N>;
     fn layer(&self, inner: P) -> Self::Provider {
-        GasEstimatorProvider { inner, _phantom: PhantomData }
+        FillProvider::new(inner, GasFiller)
     }
 }
 
-/// A provider that estimates gas for transactions.
-///
-/// Note: This provider requires the chain_id to be set in the transaction request if it's a
-/// EIP1559.
-///
-/// You cannot construct this directly, use [`ProviderBuilder`] with a [`GasEstimatorLayer`].
-///
-/// [`ProviderBuilder`]: crate::ProviderBuilder
-#[derive(Debug, Clone)]
-pub struct GasEstimatorProvider<T, P, N>
-where
-    N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
-{
-    inner: P,
-    _phantom: PhantomData<(N, T)>,
+/// An enum over the different types of gas fillable.
+#[allow(unreachable_pub)]
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GasFillable {
+    Legacy { gas_limit: u128, gas_price: u128 },
+    Eip1559 { gas_limit: u128, estimate: Eip1559Estimation },
+    Eip4844 { gas_limit: u128, estimate: Eip1559Estimation, max_fee_per_blob_gas: u128 },
 }
 
-impl<T, P, N> GasEstimatorProvider<T, P, N>
-where
-    N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
-{
-    /// Gets the gas_price to be used in legacy txs.
-    async fn get_gas_price(&self) -> TransportResult<u128> {
-        self.inner.get_gas_price().await
-    }
+/// A [`TxFiller`] that populates gas related fields in transaction requests if
+/// unset.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GasFiller;
 
-    /// Gets the gas_limit to be used in txs.
-    async fn get_gas_estimate(&self, tx: &N::TransactionRequest) -> TransportResult<u128> {
-        self.inner.estimate_gas(tx, None).await
-    }
-
-    /// Gets the max_fee_per_gas and max_priority_fee_per_gas to be used in EIP-1559 txs.
-    async fn get_eip1559_fees_estimate(&self) -> TransportResult<Eip1559Estimation> {
-        self.inner.estimate_eip1559_fees(None).await
-    }
-
-    /// Populates the gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields if unset.
-    /// Requires the chain_id to be set in the transaction request to be processed as a EIP-1559 tx.
-    /// If the network does not support EIP-1559, it will process it as a legacy tx.
-    async fn handle_eip1559_tx(
+impl GasFiller {
+    async fn prepare_legacy<P, T, N>(
         &self,
-        tx: &mut N::TransactionRequest,
-    ) -> Result<(), TransportError> {
-        let gas_estimate_fut = if let Some(gas_limit) = tx.gas_limit() {
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<GasFillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+        N: Network,
+    {
+        let gas_price_fut = if let Some(gas_price) = tx.gas_price() {
+            async move { Ok(gas_price) }.left_future()
+        } else {
+            async { provider.get_gas_price().await }.right_future()
+        };
+
+        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { self.get_gas_estimate(tx).await }.right_future()
+            async { provider.estimate_gas(tx, None).await }.right_future()
+        };
+
+        let (gas_price, gas_limit) = futures::try_join!(gas_price_fut, gas_limit_fut)?;
+
+        Ok(GasFillable::Legacy { gas_limit, gas_price })
+    }
+
+    async fn prepare_1559<P, T, N>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<GasFillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+        N: Network,
+    {
+        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
+            async move { Ok(gas_limit) }.left_future()
+        } else {
+            async { provider.estimate_gas(tx, None).await }.right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
@@ -113,100 +119,123 @@ where
             async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
                 .left_future()
         } else {
-            async { self.get_eip1559_fees_estimate().await }.right_future()
+            async { provider.estimate_eip1559_fees(None).await }.right_future()
         };
 
-        match futures::try_join!(gas_estimate_fut, eip1559_fees_fut) {
-            Ok((gas_limit, eip1559_fees)) => {
-                tx.set_gas_limit(gas_limit);
-                tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
-                tx.set_max_priority_fee_per_gas(eip1559_fees.max_priority_fee_per_gas);
-                Ok(())
-            }
-            Err(RpcError::UnsupportedFeature("eip1559")) => self.handle_legacy_tx(tx).await,
-            Err(e) => Err(e),
-        }
+        let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;
+
+        Ok(GasFillable::Eip1559 { gas_limit, estimate })
     }
 
-    /// Populates the gas_price and only populates the gas_limit field if unset.
-    /// This method always assumes that the gas_price is unset.
-    async fn handle_legacy_tx(&self, tx: &mut N::TransactionRequest) -> Result<(), TransportError> {
-        let gas_price_fut = self.get_gas_price();
+    async fn prepare_4844<P, T, N>(
+        &self,
+        provider: &P,
+        tx: &N::TransactionRequest,
+    ) -> TransportResult<GasFillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+        N: Network,
+    {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { self.get_gas_estimate(tx).await }.right_future()
+            async { provider.estimate_gas(tx, None).await }.right_future()
         };
 
-        futures::try_join!(gas_price_fut, gas_limit_fut).map(|(gas_price, gas_limit)| {
-            tx.set_gas_price(gas_price);
-            tx.set_gas_limit(gas_limit);
-            tx
-        })?;
+        let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
+            (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
+        {
+            async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
+                .left_future()
+        } else {
+            async { provider.estimate_eip1559_fees(None).await }.right_future()
+        };
 
-        Ok(())
-    }
+        let max_fee_per_blob_gas_fut = if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas()
+        {
+            async move { Ok(max_fee_per_blob_gas) }.left_future()
+        } else {
+            async {
+                provider
+                    .get_block_by_number(BlockNumberOrTag::Latest, false)
+                    .await?
+                    .ok_or(RpcError::NullResp)?
+                    .header
+                    .next_block_blob_fee()
+                    .ok_or(RpcError::UnsupportedFeature("eip4844"))
+            }
+            .right_future()
+        };
 
-    /// There are a few ways to obtain the blob base fee for an EIP-4844 transaction:
-    ///
-    /// * `eth_blobBaseFee`: Returns the fee for the next block directly.
-    /// * `eth_feeHistory`: Returns the same info as for the EIP-1559 fees.
-    /// * retrieving it from the "pending" block directly.
-    ///
-    /// At the time of this writing support for EIP-4844 fees is lacking, hence we're defaulting to
-    /// requesting the fee from the "pending" block.
-    async fn handle_eip4844_tx(
-        &self,
-        tx: &mut N::TransactionRequest,
-    ) -> Result<(), TransportError> {
-        // TODO this can be optimized together with 1559 dynamic fees once blob fee support on
-        // eth_feeHistory is more widely supported
-        if tx.get_blob_sidecar().is_some() && tx.max_fee_per_blob_gas().is_none() {
-            let next_blob_fee = self
-                .inner
-                .get_block_by_number(BlockNumberOrTag::Latest, false)
-                .await?
-                .ok_or(RpcError::NullResp)?
-                .header
-                .next_block_blob_fee()
-                .ok_or(RpcError::UnsupportedFeature("eip4844"))?;
-            tx.set_max_fee_per_blob_gas(next_blob_fee);
-        }
+        let (gas_limit, estimate, max_fee_per_blob_gas) =
+            futures::try_join!(gas_limit_fut, eip1559_fees_fut, max_fee_per_blob_gas_fut)?;
 
-        Ok(())
+        Ok(GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas })
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<T, P, N> Provider<T, N> for GasEstimatorProvider<T, P, N>
-where
-    N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
-{
-    fn root(&self) -> &RootProvider<T, N> {
-        self.inner.root()
+impl<N: Network> TxFiller<N> for GasFiller {
+    type Fillable = GasFillable;
+
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        // legacy and eip2930 tx
+        if tx.gas_price().is_some() && tx.gas_limit().is_some() {
+            return FillerControlFlow::Finished;
+        }
+        // 4844
+        if tx.max_fee_per_blob_gas().is_some()
+            && tx.max_fee_per_gas().is_some()
+            && tx.max_priority_fee_per_gas().is_some()
+        {
+            return FillerControlFlow::Finished;
+        }
+        // eip1559
+        if tx.blob_sidecar().is_none()
+            && tx.max_fee_per_gas().is_some()
+            && tx.max_priority_fee_per_gas().is_some()
+        {
+            return FillerControlFlow::Finished;
+        }
+        FillerControlFlow::Ready
     }
 
-    async fn send_transaction(
+    async fn prepare<P, T>(
         &self,
-        mut tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        if tx.gas_price().is_none() {
-            // Assume its a EIP1559 tx
-            // Populate the following gas_limit, max_fee_per_gas and max_priority_fee_per_gas fields
-            // if unset.
-            self.handle_eip1559_tx(&mut tx).await?;
-            // TODO: this can be done more elegantly once we can set EIP-1559 and EIP-4844 fields
-            // with a single eth_feeHistory request
-            self.handle_eip4844_tx(&mut tx).await?;
+        provider: &P,
+        tx: &<N as Network>::TransactionRequest,
+    ) -> TransportResult<Self::Fillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        if tx.gas_price().is_some() || tx.access_list().is_some() {
+            self.prepare_legacy(provider, tx).await
+        } else if tx.blob_sidecar().is_some() {
+            self.prepare_4844(provider, tx).await
         } else {
-            // Assume its a legacy tx
-            // Populate only the gas_limit field if unset.
-            self.handle_legacy_tx(&mut tx).await?;
+            self.prepare_1559(provider, tx).await
         }
-        self.inner.send_transaction(tx).await
+    }
+
+    fn fill(&self, fillable: Self::Fillable, tx: &mut <N as Network>::TransactionRequest) {
+        match fillable {
+            GasFillable::Legacy { gas_limit, gas_price } => {
+                tx.set_gas_limit(gas_limit);
+                tx.set_gas_price(gas_price);
+            }
+            GasFillable::Eip1559 { gas_limit, estimate } => {
+                tx.set_gas_limit(gas_limit);
+                tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+            }
+            GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas } => {
+                tx.set_gas_limit(gas_limit);
+                tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                tx.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
+            }
+        }
     }
 }
 

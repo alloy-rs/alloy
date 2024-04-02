@@ -4,15 +4,15 @@ use crate::{
 use alloy_consensus::{
     BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
 };
-use alloy_primitives::{Address, TxKind};
-use alloy_rpc_types::request::TransactionRequest;
+use alloy_primitives::{Address, TxKind, U256, Bytes, ChainId};
+use alloy_rpc_types::{request::TransactionRequest, AccessList};
 
-impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+impl TransactionBuilder<Ethereum> for TransactionRequest {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
-    fn set_chain_id(&mut self, chain_id: alloy_primitives::ChainId) {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = Some(chain_id);
     }
 
@@ -24,11 +24,11 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.nonce = Some(nonce);
     }
 
-    fn input(&self) -> Option<&alloy_primitives::Bytes> {
+    fn input(&self) -> Option<&Bytes> {
         self.input.input()
     }
 
-    fn set_input(&mut self, input: alloy_primitives::Bytes) {
+    fn set_input(&mut self, input: Bytes) {
         self.input.input = Some(input);
     }
 
@@ -40,22 +40,22 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.from = Some(from);
     }
 
-    fn to(&self) -> Option<alloy_primitives::TxKind> {
+    fn to(&self) -> Option<TxKind> {
         self.to.map(TxKind::Call).or(Some(TxKind::Create))
     }
 
-    fn set_to(&mut self, to: alloy_primitives::TxKind) {
+    fn set_to(&mut self, to: TxKind) {
         match to {
             TxKind::Create => self.to = None,
             TxKind::Call(to) => self.to = Some(to),
         }
     }
 
-    fn value(&self) -> Option<alloy_primitives::U256> {
+    fn value(&self) -> Option<U256> {
         self.value
     }
 
-    fn set_value(&mut self, value: alloy_primitives::U256) {
+    fn set_value(&mut self, value: U256) {
         self.value = Some(value)
     }
 
@@ -103,7 +103,15 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         build_unsigned::<Ethereum>(self)
     }
 
-    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+    fn access_list(&self) -> Option<&AccessList> {
+        self.access_list.as_ref()
+    }
+
+    fn set_access_list(&mut self, access_list: AccessList) {
+        self.access_list = Some(access_list);
+    }
+
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
         self.sidecar.as_ref()
     }
 

@@ -1,7 +1,4 @@
-use crate::{
-    layers::{GasEstimatorLayer, NonceManagerLayer, SignerLayer},
-    Provider, RootProvider,
-};
+use crate::{layers::SignerLayer, Provider, RootProvider};
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError};
@@ -114,26 +111,26 @@ impl<L, N> ProviderBuilder<L, N> {
         self.layer(SignerLayer::new(signer))
     }
 
-    /// Add gas estimation to the stack being built.
-    ///
-    /// See [`GasEstimatorLayer`]
-    pub fn with_gas_estimation(self) -> ProviderBuilder<Stack<GasEstimatorLayer, L>, N> {
-        self.layer(GasEstimatorLayer)
-    }
+    // /// Add gas estimation to the stack being built.
+    // ///
+    // /// See [`GasEstimatorLayer`]
+    // pub fn with_gas_estimation(self) -> ProviderBuilder<Stack<GasEstimatorLayer, L>, N> {
+    //     self.layer(GasEstimatorLayer)
+    // }
 
-    /// Add nonce management to the stack being built.
-    ///
-    /// See [`NonceManagerLayer`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<Stack<NonceManagerLayer, L>, N> {
-        self.layer(NonceManagerLayer)
-    }
+    // /// Add nonce management to the stack being built.
+    // ///
+    // /// See [`NonceManagerLayer`]
+    // pub fn with_nonce_management(self) -> ProviderBuilder<Stack<NonceManagerLayer, L>, N> {
+    //     self.layer(NonceManagerLayer)
+    // }
 
-    /// Add preconfigured set of layers handling gas estimation and nonce management
-    pub fn with_recommended_layers(
-        self,
-    ) -> ProviderBuilder<Stack<NonceManagerLayer, Stack<GasEstimatorLayer, L>>, N> {
-        self.with_gas_estimation().with_nonce_management()
-    }
+    // /// Add preconfigured set of layers handling gas estimation and nonce management
+    // pub fn with_recommended_layers(
+    //     self,
+    // ) -> ProviderBuilder<Stack<NonceManagerLayer, Stack<GasEstimatorLayer, L>>, N> {
+    //     self.with_gas_estimation().with_nonce_management()
+    // }
 
     /// Change the network.
     ///

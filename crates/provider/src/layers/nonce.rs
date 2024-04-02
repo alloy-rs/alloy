@@ -39,9 +39,9 @@ use tokio::sync::Mutex;
 ///
 /// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
-pub struct NonceManagerLayer;
+pub struct NonceFillerConfig;
 
-impl<P, T, N> ProviderLayer<P, T, N> for NonceManagerLayer
+impl<P, T, N> ProviderLayer<P, T, N> for NonceFillerConfig
 where
     P: Provider<T, N>,
     T: alloy_transport::Transport + Clone,
@@ -53,6 +53,8 @@ where
     }
 }
 
+/// A [`TxFiller`] that fills the nonce on transactions by keeping a local
+/// mapping of account addresses to their next nonce.
 #[derive(Debug, Clone, Default)]
 pub struct NonceFiller {
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,

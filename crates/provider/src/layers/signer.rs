@@ -1,4 +1,4 @@
-use crate::{layers::TxFiller, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
+use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
 use alloy_network::{eip2718::Encodable2718, Ethereum, Network, NetworkSigner, TransactionBuilder};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
