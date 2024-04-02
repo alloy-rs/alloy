@@ -9,45 +9,6 @@ use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
-/// A [`TxFiller`] that populates gas related fields in transaction requests if
-/// unset.
-///
-/// Gas related fields are gas_price, gas_limit, max_fee_per_gas
-/// max_priority_fee_per_gas and max_fee_per_blob_gas.
-///
-/// The layer fetches the estimations for these via the
-/// [`Provider::get_gas_price`], [`Provider::estimate_gas`] and
-/// [`Provider::estimate_eip1559_fees`] methods.
-///
-/// ## Note:
-///
-/// The layer will populate gas fields based on the following logic:
-/// - if `gas_price` is set, it will process as a legacy tx and populate the
-///  `gas_limit` field if unset.
-/// - if `access_list` is set, it will process as a 2930 tx and populate the
-///  `gas_limit` and `gas_price` field if unset.
-/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the
-///  `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas` and
-///  `max_fee_per_blob_gas` fields if unset.
-/// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`,
-///  `max_fee_per_gas` and `max_priority_fee_per_gas` fields if unset.
-/// - If the network does not support EIP-1559, it will fallback to the legacy
-///  tx and populate the `gas_limit` and `gas_price` fields if unset.
-///
-/// # Example
-///
-/// ```
-/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
-/// let provider = ProviderBuilder::new()
-///     .with_recommended_fillers()
-///     .signer(EthereumSigner::from(signer)) // note the order!
-///     .provider(RootProvider::new(transport));
-///
-/// provider.send_transaction(TransactionRequest::default()).await;
-/// # }
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GasFillerConfig;
-
 /// An enum over the different types of gas fillable.
 #[allow(unreachable_pub)]
 #[doc(hidden)]
