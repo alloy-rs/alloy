@@ -81,6 +81,23 @@ impl<T> RpcClient<T> {
     pub fn get_ref(&self) -> ClientRef<'_, T> {
         &self.0
     }
+
+    /// Sets the poll interval for the client.
+    ///
+    /// Note: This will only set the poll interval for the client if it is the only reference to the
+    /// inner client. If the reference is held by many, then it will not update the poll interval.
+    pub fn set_poll_interval(self, poll_interval: Duration) -> Self {
+        let mut client = self.clone();
+
+        let inner = Arc::get_mut(&mut client.0);
+
+        if let Some(inner) = inner {
+            inner.set_poll_interval(poll_interval);
+        } else {
+            todo!("TBD: Value is already shared. Cannot be mutated");
+        }
+        client
+    }
 }
 
 impl<T: Transport> RpcClient<T> {
@@ -152,22 +169,37 @@ pub struct RpcClientInner<T> {
     pub(crate) is_local: bool,
     /// The next request ID to use.
     pub(crate) id: AtomicU64,
+    /// The poll interval for the client.
+    pub(crate) poll_interval: Duration,
 }
 
 impl<T> RpcClientInner<T> {
     /// Create a new [`RpcClient`] with the given transport.
+    ///
+    /// Note: Sets the poll interval to 250ms for local transports and 7s for remote transports by
+    /// default.
     #[inline]
     pub const fn new(t: T, is_local: bool) -> Self {
-        Self { transport: t, is_local, id: AtomicU64::new(0) }
+        Self {
+            transport: t,
+            is_local,
+            id: AtomicU64::new(0),
+            poll_interval: if is_local {
+                Duration::from_millis(250)
+            } else {
+                Duration::from_secs(7)
+            },
+        }
     }
 
     /// Returns the default poll interval for the client.
-    pub const fn default_poll_interval(&self) -> Duration {
-        if self.is_local {
-            Duration::from_millis(250)
-        } else {
-            Duration::from_secs(7)
-        }
+    pub const fn poll_interval(&self) -> Duration {
+        self.poll_interval
+    }
+
+    /// Set the poll interval for the client.
+    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
+        self.poll_interval = poll_interval;
     }
 
     /// Returns a reference to the underlying transport.
@@ -262,7 +294,12 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     /// erasing each type. E.g. if you have `RpcClient<Http>` and
     /// `RpcClient<Ws>` you can put both into a `Vec<RpcClient<BoxTransport>>`.
     pub fn boxed(self) -> RpcClientInner<BoxTransport> {
-        RpcClientInner { transport: self.transport.boxed(), is_local: self.is_local, id: self.id }
+        RpcClientInner {
+            transport: self.transport.boxed(),
+            is_local: self.is_local,
+            id: self.id,
+            poll_interval: self.poll_interval,
+        }
     }
 }
 

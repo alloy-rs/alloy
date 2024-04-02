@@ -86,7 +86,7 @@ where
         params: Params,
     ) -> Self {
         let poll_interval =
-            client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.default_poll_interval());
+            client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.poll_interval());
         Self {
             client,
             method: method.into(),
