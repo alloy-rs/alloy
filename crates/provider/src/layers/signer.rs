@@ -99,26 +99,13 @@ where
 #[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
-    use crate::{Provider, ProviderBuilder, RootProvider};
-    use alloy_network::EthereumSigner;
-    use alloy_node_bindings::Anvil;
+    use crate::{Provider, ProviderBuilder};
     use alloy_primitives::{address, b256, U256};
-    use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
     #[tokio::test]
     async fn poc() {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .signer(EthereumSigner::from(wallet))
-            .on_provider(RootProvider::new(RpcClient::new(http, true)));
+        let (provider, _anvil) = ProviderBuilder::new().on_anvil_with_signer();
 
         let tx = TransactionRequest {
             nonce: Some(0),

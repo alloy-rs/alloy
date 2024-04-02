@@ -7,6 +7,9 @@ use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
+/// The recommended filler.
+type RecommendFiller = JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>;
+
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
@@ -115,6 +118,27 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     }
 }
 
+impl<L, N> ProviderBuilder<L, Identity, N> {
+    /// Add preconfigured set of layers handling gas estimation and nonce management
+    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendFiller, N> {
+        self.filler(GasFiller).filler(NonceFiller::default())
+    }
+
+    /// Add gas estimation to the stack being built.
+    ///
+    /// See [`GasFiller`]
+    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<Identity, GasFiller>, N> {
+        self.filler(GasFiller)
+    }
+
+    /// Add nonce management to the stack being built.
+    ///
+    /// See [`NonceManager`]
+    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
+        self.filler(NonceFiller::default())
+    }
+}
+
 impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
@@ -151,27 +175,6 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// See [`SignerLayer`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, F, N> {
         self.layer(SignerLayer::new(signer))
-    }
-
-    /// Add gas estimation to the stack being built.
-    ///
-    /// See [`GasFiller`]
-    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller>, N> {
-        self.filler(GasFiller)
-    }
-
-    /// Add nonce management to the stack being built.
-    ///
-    /// See [`NonceManager`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<F, NonceFiller>, N> {
-        self.filler(NonceFiller::default())
-    }
-
-    /// Add preconfigured set of layers handling gas estimation and nonce management
-    pub fn with_recommended_layers(
-        self,
-    ) -> ProviderBuilder<L, JoinFill<JoinFill<F, GasFiller>, NonceFiller>, N> {
-        self.with_gas_estimation().with_nonce_management()
     }
 
     /// Change the network.
@@ -300,6 +303,37 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     {
         let client = ClientBuilder::default().hyper_http(url);
         Ok(self.on_client(client))
+    }
+}
+
+#[cfg(all(test, feature = "reqwest"))]
+impl<L, F> ProviderBuilder<L, F, Ethereum> {
+    /// Build this provider with anvil, using an Reqwest HTTP transport. This
+    /// function configures a signer backed by anvil keys, and is intended for
+    /// use in tests.
+    pub fn on_anvil_with_signer(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
+    where
+        L: ProviderLayer<
+            crate::layers::SignerProvider<
+                alloy_transport_http::Http<reqwest::Client>,
+                crate::ReqwestProvider,
+                crate::network::EthereumSigner,
+                Ethereum,
+            >,
+            alloy_transport_http::Http<reqwest::Client>,
+            Ethereum,
+        >,
+        F: TxFiller<Ethereum>
+            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+    {
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+        let url = anvil.endpoint().parse().unwrap();
+
+        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
+
+        let this = self.signer(crate::network::EthereumSigner::from(wallet));
+
+        (this.on_reqwest_http(url).unwrap(), anvil)
     }
 }
 

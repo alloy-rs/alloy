@@ -1,7 +1,7 @@
 use crate::{
-    layers::{FillProvider, FillerControlFlow, TxFiller},
+    layers::{FillerControlFlow, TxFiller},
     utils::Eip1559Estimation,
-    Provider, ProviderLayer,
+    Provider,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
@@ -41,18 +41,6 @@ use futures::FutureExt;
 /// # }
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GasFillerConfig;
-
-impl<P, T, N> ProviderLayer<P, T, N> for GasFillerConfig
-where
-    P: Provider<T, N>,
-    T: alloy_transport::Transport + Clone,
-    N: Network,
-{
-    type Provider = FillProvider<GasFiller, P, T, N>;
-    fn layer(&self, inner: P) -> Self::Provider {
-        FillProvider::new(inner, GasFiller)
-    }
-}
 
 /// An enum over the different types of gas fillable.
 #[allow(unreachable_pub)]
@@ -244,27 +232,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
 mod tests {
     use super::*;
     use crate::ProviderBuilder;
-    use alloy_network::EthereumSigner;
-    use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, U256};
-    use alloy_rpc_client::RpcClient;
+    use alloy_primitives::address;
     use alloy_rpc_types::TransactionRequest;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .with_nonce_management()
-            .with_gas_estimation()
-            .signer(EthereumSigner::from(wallet))
-            .on_http(url);
+        let (provider, anvil) =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -285,17 +259,8 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .with_nonce_management()
-            .with_gas_estimation()
-            .signer(EthereumSigner::from(wallet))
-            .on_http(url);
+        let (provider, anvil) =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
@@ -315,17 +280,8 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let anvil = Anvil::new().arg("--hardfork").arg("frontier").spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .with_nonce_management()
-            .with_gas_estimation()
-            .signer(EthereumSigner::from(wallet))
-            .on_http(url);
+        let (provider, anvil) =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
         let tx = TransactionRequest {
             from: Some(anvil.addresses()[0]),

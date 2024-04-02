@@ -141,7 +141,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
 /// A layer that can fill in a `TransactionRequest` with additional information
 /// by joining two [`TxFiller`]s. This  struct is itself a [`TxFiller`],
 /// and can be nested to compose any number of fill layers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct JoinFill<L, R> {
     left: L,
     right: R,
@@ -149,7 +149,7 @@ pub struct JoinFill<L, R> {
 
 impl<L, R> JoinFill<L, R> {
     /// Creates a new `JoinFill` with the given layers.
-    pub fn new(left: L, right: R) -> Self {
+    pub const fn new(left: L, right: R) -> Self {
         Self { left, right }
     }
 }

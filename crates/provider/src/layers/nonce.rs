@@ -1,6 +1,6 @@
 use crate::{
-    layers::{FillProvider, FillerControlFlow, TxFiller},
-    Provider, ProviderLayer,
+    layers::{FillerControlFlow, TxFiller},
+    Provider,
 };
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;
@@ -40,18 +40,6 @@ use tokio::sync::Mutex;
 /// [`SignerLayer`]: crate::layers::SignerLayer
 #[derive(Debug, Clone, Copy)]
 pub struct NonceFillerConfig;
-
-impl<P, T, N> ProviderLayer<P, T, N> for NonceFillerConfig
-where
-    P: Provider<T, N>,
-    T: alloy_transport::Transport + Clone,
-    N: Network,
-{
-    type Provider = FillProvider<NonceFiller, P, T, N>;
-    fn layer(&self, inner: P) -> Self::Provider {
-        FillProvider::new(inner, NonceFiller::default())
-    }
-}
 
 /// A [`TxFiller`] that fills the nonce on transactions by keeping a local
 /// mapping of account addresses to their next nonce.
@@ -122,27 +110,14 @@ impl NonceFiller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, RootProvider};
-    use alloy_network::EthereumSigner;
-    use alloy_node_bindings::Anvil;
+    use crate::ProviderBuilder;
     use alloy_primitives::{address, U256};
-    use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
-    use alloy_transport_http::Http;
-    use reqwest::Client;
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .with_nonce_management()
-            .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+        let (provider, _anvil) =
+            ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -158,16 +133,8 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
-
-        let provider = ProviderBuilder::new()
-            .with_nonce_management()
-            .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+        let (provider, anvil) =
+            ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
 
         let from = anvil.addresses()[0];
         let tx = TransactionRequest {
