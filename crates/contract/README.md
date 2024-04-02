@@ -6,7 +6,7 @@ The main type is `CallBuilder`, which is a builder for constructing calls to on-
 It provides a way to encode and decode data for on-chain calls, and to send those calls to the chain.
 See its documentation for more details.
 
-Additional methods for interacting with the Multicall3 contract are availably by enabling the
+Additional methods for interacting with the Multicall3 contract are available by enabling the
 `multicall` feature flag.
 
 ## Usage
