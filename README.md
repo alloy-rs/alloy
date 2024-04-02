@@ -30,8 +30,8 @@ This repository contains the following crates:
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Ethereum JSON-RPC types
-  - [`alloy-rpc-engine-types`] - Ethereum execution-consensus layer (engine) API RPC types
-  - [`alloy-rpc-trace-types`] - Ethereum RPC trace types
+  - [`alloy-rpc-types-engine`] - Ethereum execution-consensus layer (engine) API RPC types
+  - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
@@ -53,8 +53,8 @@ This repository contains the following crates:
 [`alloy-provider`]: crates/provider
 [`alloy-pubsub`]: crates/pubsub
 [`alloy-rpc-client`]: crates/rpc-client
-[`alloy-rpc-engine-types`]: crates/rpc-engine-types
-[`alloy-rpc-trace-types`]: crates/rpc-trace-types
+[`alloy-rpc-types-engine`]: crates/rpc-types-engine
+[`alloy-rpc-types-trace`]: crates/rpc-types-trace
 [`alloy-rpc-types`]: crates/rpc-types
 [`alloy-signer`]: crates/signer
 [`alloy-signer-aws`]: crates/signer-aws

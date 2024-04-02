@@ -14,7 +14,7 @@ use alloy_primitives::{
 use alloy_rpc_client::{
     BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
 };
-use alloy_rpc_trace_types::{
+use alloy_rpc_types_trace::{
     geth::{GethDebugTracingOptions, GethTrace},
     parity::{LocalizedTransactionTrace, TraceResults, TraceType},
 };
