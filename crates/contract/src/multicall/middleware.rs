@@ -110,7 +110,55 @@ impl MulticallVersion {
 /// [`with_call`]: #method.with_call
 /// [`call`]: #method.call
 ///
-/// TODO examples
+/// # Example
+/// ```no_run
+/// use alloy_network::Ethereum;
+/// use alloy_primitives::address;
+/// use alloy_provider::{HttpProvider, ProviderBuilder};
+/// use alloy_sol_types::sol;
+///
+/// use crate::{multicall, ContractInstance, Interface};
+///
+/// sol! {
+/// #[sol(rpc, abi)]
+/// interface ERC20 {
+/// function totalSupply() external view returns (uint256 totalSupply);
+/// function balanceOf(address owner) external view returns (uint256 balance);
+/// function name() external view returns (string memory);
+/// function symbol() external view returns (string memory);
+/// function decimals() external view returns (uint8);
+/// }
+/// }
+///
+/// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
+/// let client: HttpProvider<Ethereum> =
+///     HttpProvider::new_http("https://rpc.ankr.com/eth".parse()?);
+///
+/// let provider = ProviderBuilder::new().provider(client);
+///
+/// let mut multicall =
+///     multicall::middleware::Multicall::new(provider.clone(), None).await.unwrap();
+///
+/// let weth_address = address!("3bfc20f0b9afcace800d73d2191166ff16540258");
+/// let erc20_abi = ERC20::abi::contract();
+/// let erc20_interface = Interface::new(erc20_abi);
+/// let erc20_instance = ContractInstance::new(weth_address, provider.clone(), erc20_interface);
+///
+/// let first_call = erc20_instance.function_with_cloned_provider("symbol", &[]).unwrap();
+/// let second_call = erc20_instance.function_with_cloned_provider("decimals", &[]).unwrap();
+///
+/// // Add the calls to the multicall instance
+/// multicall.with_call(first_call, false).with_call(second_call, false);
+///
+/// // Query the blockchain
+/// let results = multicall.call().await?;
+///
+/// let symbol = results.get(0).unwrap().as_ref().unwrap().as_str().unwrap();
+/// let decimals = results.get(1).unwrap().as_ref().unwrap().as_uint().unwrap();
+///
+/// #    Ok(())
+/// # }
+/// ```
 #[derive(Debug, Clone)]
 #[must_use = "Multicall does nothing unless you use `call`"]
 pub struct Multicall<N, T, P>
@@ -759,8 +807,7 @@ mod tests {
         let weth_address = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
         // Create the multicall instance
-        let mut multicall = Multicall::new(provider, None).await.unwrap();
-        let provider = multicall.contract.provider().clone();
+        let mut multicall = Multicall::new(provider.clone(), None).await.unwrap();
 
         // Generate the WETH ERC20 instance we'll be using to create the individual calls
         let abi = ERC20::abi::contract();

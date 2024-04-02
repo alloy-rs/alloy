@@ -76,7 +76,7 @@ impl<N, T, P: Clone> ContractInstance<N, T, &P> {
 }
 
 impl<N: Network, T: Transport + Clone, P: Provider<N, T> + Clone> ContractInstance<N, T, P> {
-    /// Returns a transaction builder for the provided function name.
+    /// Returns a transaction builder for the provided function name, using a cloned provider.
     ///
     /// If there are multiple functions with the same name due to overloading, consider using
     /// the [`ContractInstance::function_from_selector`] method instead, since this will use the
