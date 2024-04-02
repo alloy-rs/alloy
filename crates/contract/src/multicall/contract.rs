@@ -4,7 +4,7 @@ use alloy_sol_types::sol;
 
 sol! {
   #[derive(Debug)]
-  #[sol(rpc=true, abi, extra_methods)]
+  #[sol(rpc, abi)]
   interface IMulticall3 {
     struct Call {
       address target;
