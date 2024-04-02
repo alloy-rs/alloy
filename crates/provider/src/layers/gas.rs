@@ -264,7 +264,7 @@ mod tests {
             .with_nonce_management()
             .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+            .on_http(url);
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -295,7 +295,7 @@ mod tests {
             .with_nonce_management()
             .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+            .on_http(url);
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
@@ -325,7 +325,7 @@ mod tests {
             .with_nonce_management()
             .with_gas_estimation()
             .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+            .on_http(url);
 
         let tx = TransactionRequest {
             from: Some(anvil.addresses()[0]),

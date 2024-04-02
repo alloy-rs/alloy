@@ -1,7 +1,10 @@
-use crate::{layers::SignerLayer, Provider, RootProvider};
+use crate::{
+    layers::{FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller},
+    Provider, RootProvider,
+};
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
-use alloy_transport::{BoxTransport, Transport, TransportError};
+use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
@@ -18,6 +21,29 @@ pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Et
 /// An identity layer that does nothing.
 #[derive(Debug, Clone, Copy)]
 pub struct Identity;
+
+impl<N> TxFiller<N> for Identity
+where
+    N: Network,
+{
+    type Fillable = ();
+
+    fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        FillerControlFlow::Finished
+    }
+
+    async fn prepare<P, T>(
+        &self,
+        _provider: &P,
+        _tx: &N::TransactionRequest,
+    ) -> TransportResult<Self::Fillable> {
+        Ok(())
+    }
+
+    fn fill(&self, _to_fill: Self::Fillable, _tx: &mut N::TransactionRequest) {
+        // Do nothing
+    }
+}
 
 impl<P, T, N> ProviderLayer<P, T, N> for Identity
 where
@@ -70,25 +96,26 @@ where
 ///
 /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
 #[derive(Debug)]
-pub struct ProviderBuilder<L, N = Ethereum> {
+pub struct ProviderBuilder<L, F, N = Ethereum> {
     layer: L,
-    network: PhantomData<N>,
+    filler: F,
+    network: PhantomData<fn() -> N>,
 }
 
-impl ProviderBuilder<Identity, Ethereum> {
+impl ProviderBuilder<Identity, Identity, Ethereum> {
     /// Create a new [`ProviderBuilder`].
     pub const fn new() -> Self {
-        ProviderBuilder { layer: Identity, network: PhantomData }
+        ProviderBuilder { layer: Identity, filler: Identity, network: PhantomData }
     }
 }
 
-impl<N> Default for ProviderBuilder<Identity, N> {
+impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     fn default() -> Self {
-        ProviderBuilder { layer: Identity, network: PhantomData }
+        ProviderBuilder { layer: Identity, filler: Identity, network: PhantomData }
     }
 }
 
-impl<L, N> ProviderBuilder<L, N> {
+impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add a layer to the stack being built. This is similar to
     /// [`tower::ServiceBuilder::layer`].
     ///
@@ -100,30 +127,45 @@ impl<L, N> ProviderBuilder<L, N> {
     ///
     /// [`tower::ServiceBuilder::layer`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html#method.layer
     /// [`tower::ServiceBuilder`]: https://docs.rs/tower/latest/tower/struct.ServiceBuilder.html
-    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>, N> {
-        ProviderBuilder { layer: Stack::new(layer, self.layer), network: PhantomData }
+    pub fn layer<Inner>(self, layer: Inner) -> ProviderBuilder<Stack<Inner, L>, F, N> {
+        ProviderBuilder {
+            layer: Stack::new(layer, self.layer),
+            filler: self.filler,
+            network: PhantomData,
+        }
+    }
+
+    /// Add a transaction filler to the stack being built. Transaction fillers
+    /// are used to fill in missing fields on transactions before they are sent,
+    /// and are all joined to form the outermost layer of the stack.
+    pub fn filler<F2>(self, filler: F2) -> ProviderBuilder<L, JoinFill<F, F2, N>, N> {
+        ProviderBuilder {
+            layer: self.layer,
+            filler: JoinFill::new(self.filler, filler),
+            network: PhantomData,
+        }
     }
 
     /// Add a signer layer to the stack being built.
     ///
     /// See [`SignerLayer`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, N> {
+    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, F, N> {
         self.layer(SignerLayer::new(signer))
     }
 
-    // /// Add gas estimation to the stack being built.
-    // ///
-    // /// See [`GasEstimatorLayer`]
-    // pub fn with_gas_estimation(self) -> ProviderBuilder<Stack<GasEstimatorLayer, L>, N> {
-    //     self.layer(GasEstimatorLayer)
-    // }
+    /// Add gas estimation to the stack being built.
+    ///
+    /// See [`GasFiller`]
+    pub fn with_gas_estimation(self) -> ProviderBuilder<L, JoinFill<F, GasFiller, N>, N> {
+        self.filler(GasFiller)
+    }
 
-    // /// Add nonce management to the stack being built.
-    // ///
-    // /// See [`NonceManagerLayer`]
-    // pub fn with_nonce_management(self) -> ProviderBuilder<Stack<NonceManagerLayer, L>, N> {
-    //     self.layer(NonceManagerLayer)
-    // }
+    /// Add nonce management to the stack being built.
+    ///
+    /// See [`NonceManager`]
+    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<F, NonceFiller, N>, N> {
+        self.filler(NonceFiller::default())
+    }
 
     // /// Add preconfigured set of layers handling gas estimation and nonce management
     // pub fn with_recommended_layers(
@@ -140,13 +182,13 @@ impl<L, N> ProviderBuilder<L, N> {
     /// ```ignore
     /// builder.network::<Arbitrum>()
     /// ```
-    pub fn network<Net: Network>(self) -> ProviderBuilder<L, Net> {
-        ProviderBuilder { layer: self.layer, network: PhantomData }
+    pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
+        ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
     }
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
     /// the final [`Provider`] type with all stack components.
-    pub fn provider<P, T>(self, provider: P) -> L::Provider
+    pub fn on_provider<P, T>(self, provider: P) -> L::Provider
     where
         L: ProviderLayer<P, T, N>,
         P: Provider<T, N>,
@@ -167,7 +209,7 @@ impl<L, N> ProviderBuilder<L, N> {
         T: Transport + Clone,
         N: Network,
     {
-        self.provider(RootProvider::new(client))
+        self.on_provider(RootProvider::new(client))
     }
 
     /// Finish the layer stack by providing a connection string for a built-in

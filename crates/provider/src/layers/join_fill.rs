@@ -148,17 +148,19 @@ pub struct JoinFill<L, R, N> {
     _network: PhantomData<fn() -> N>,
 }
 
+impl<L, R, N> JoinFill<L, R, N> {
+    /// Creates a new `JoinFill` with the given layers.
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right, _network: PhantomData }
+    }
+}
+
 impl<L, R, N> JoinFill<L, R, N>
 where
     L: TxFiller<N>,
     R: TxFiller<N>,
     N: Network,
 {
-    /// Creates a new `JoinFill` with the given layers.
-    pub fn new(left: L, right: R) -> Self {
-        Self { left, right, _network: PhantomData }
-    }
-
     /// Get a request for the left filler, if the left filler is ready.
     async fn prepare_left<P, T>(
         &self,

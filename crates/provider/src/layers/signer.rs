@@ -118,7 +118,7 @@ mod tests {
 
         let provider = ProviderBuilder::new()
             .signer(EthereumSigner::from(wallet))
-            .provider(RootProvider::new(RpcClient::new(http, true)));
+            .on_provider(RootProvider::new(RpcClient::new(http, true)));
 
         let tx = TransactionRequest {
             nonce: Some(0),
