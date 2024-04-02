@@ -114,7 +114,7 @@ impl MulticallVersion {
 /// ```no_run
 /// use alloy_network::Ethereum;
 /// use alloy_primitives::address;
-/// use alloy_provider::{HttpProvider, ProviderBuilder};
+/// use alloy_provider::{ProviderBuilder, ReqwestProvider};
 /// use alloy_sol_types::sol;
 ///
 /// use crate::{multicall, ContractInstance, Interface};
@@ -131,8 +131,8 @@ impl MulticallVersion {
 /// }
 ///
 /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-/// let client: HttpProvider<Ethereum> =
-///     HttpProvider::new_http("https://rpc.ankr.com/eth".parse()?);
+/// let client: ReqwestProvider<Ethereum> =
+///     ReqwestProvider::new_http("https://rpc.ankr.com/eth".parse()?);
 ///
 /// let provider = ProviderBuilder::new().provider(client);
 ///
@@ -161,25 +161,25 @@ impl MulticallVersion {
 /// ```
 #[derive(Debug, Clone)]
 #[must_use = "Multicall does nothing unless you use `call`"]
-pub struct Multicall<N, T, P>
+pub struct Multicall<T, P, N>
 where
     N: crate::private::Network,
     T: crate::private::Transport + Clone,
-    P: Provider<N, T> + Clone,
+    P: Provider<T, N> + Clone,
 {
     /// The internal calls vector
     calls: Vec<Call>,
     /// The Multicall3 contract
-    contract: IMulticall3Instance<N, T, P>,
+    contract: IMulticall3Instance<T, P, N>,
     /// The Multicall version to use. The default is 3.
     version: MulticallVersion,
 }
 
-impl<N, T, P> Multicall<N, T, P>
+impl<T, P, N> Multicall<T, P, N>
 where
     N: crate::private::Network,
     T: crate::private::Transport + Clone,
-    P: Provider<N, T> + Clone,
+    P: Provider<T, N> + Clone,
 {
     /// Asynchronously creates a new [Multicall] instance from the given provider.
     ///
@@ -307,7 +307,7 @@ where
     /// - `3`: `allow_failure` specifies whether or not this call is allowed to revert in the
     ///   multicall. This is on a per-call basis, however if this is `false` for an individual call
     ///   and the call reverts, then this will cause the entire multicall to revert.
-    pub fn add_call(&mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) {
+    pub fn add_call(&mut self, call: DynCallBuilder<T, P, N>, allow_failure: bool) {
         let call = Call {
             allow_failure,
             target: call.get_to(),
@@ -322,7 +322,7 @@ where
     /// [`add_call`] for more details.
     ///
     /// [`add_call`]: #method.add_call
-    pub fn with_call(&mut self, call: DynCallBuilder<N, T, P>, allow_failure: bool) -> &mut Self {
+    pub fn with_call(&mut self, call: DynCallBuilder<T, P, N>, allow_failure: bool) -> &mut Self {
         let call = Call {
             allow_failure,
             target: call.get_to(),
@@ -345,7 +345,7 @@ where
     /// [`add_call`]: #method.add_call
     pub fn add_calls(
         &mut self,
-        calls: impl IntoIterator<Item = DynCallBuilder<N, T, P>>,
+        calls: impl IntoIterator<Item = DynCallBuilder<T, P, N>>,
         allow_failure: bool,
     ) {
         for call in calls {
@@ -370,7 +370,7 @@ where
     /// [`add_call`]: #method.add_call
     pub fn with_calls(
         &mut self,
-        calls: impl IntoIterator<Item = DynCallBuilder<N, T, P>>,
+        calls: impl IntoIterator<Item = DynCallBuilder<T, P, N>>,
         allow_failure: bool,
     ) -> &mut Self {
         for call in calls {
@@ -638,7 +638,7 @@ where
     ///
     /// # Returns
     /// Returns a [CallBuilder], which uses [IMulticall3::aggregateCall] for decoding.
-    pub fn as_aggregate(&self) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::aggregateCall>> {
+    pub fn as_aggregate(&self) -> CallBuilder<T, &P, PhantomData<IMulticall3::aggregateCall>, N> {
         let calls = self
             .calls
             .clone()
@@ -657,7 +657,7 @@ where
     /// Returns a [CallBuilder], which uses [IMulticall3::tryAggregateCall] for decoding.
     pub fn as_try_aggregate(
         &self,
-    ) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::tryAggregateCall>> {
+    ) -> CallBuilder<T, &P, PhantomData<IMulticall3::tryAggregateCall>, N> {
         let mut allow_failure = true;
 
         let calls = self
@@ -688,7 +688,7 @@ where
     /// Returns a [CallBuilder], which uses [IMulticall3::aggregate3Call] for decoding.
     pub fn as_aggregate_3(
         &self,
-    ) -> CallBuilder<N, T, &P, PhantomData<IMulticall3::aggregate3Call>> {
+    ) -> CallBuilder<T, &P, PhantomData<IMulticall3::aggregate3Call>, N> {
         let calls = self
             .calls
             .clone()
