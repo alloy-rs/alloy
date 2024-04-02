@@ -49,14 +49,6 @@ pub struct Http<T> {
 }
 
 impl<T> Http<T> {
-    /// Create a new [`Http`] transport.
-    pub fn new(url: Url) -> Self
-    where
-        T: Default,
-    {
-        Self { client: Default::default(), url }
-    }
-
     /// Create a new [`Http`] transport with a custom client.
     pub const fn with_client(client: T, url: Url) -> Self {
         Self { client, url }
