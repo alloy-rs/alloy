@@ -6,7 +6,7 @@ use crate::{
 };
 use alloy_dyn_abi::DynSolValue;
 use alloy_json_abi::Function;
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::Provider;
 use std::{marker::PhantomData, result::Result as StdResult};
 use IMulticall3::Result as MulticallResult;
@@ -97,6 +97,9 @@ impl MulticallVersion {
 /// Calls can be added to the `Multicall` instance by using [`add_call`], or the builder
 /// pattern [`with_call`].
 ///
+/// Note - The Multicall instance, and any calls added to the instance MUST be instantiated using a
+/// provider that implements [Clone].
+///
 /// The Multicall transaction can be sent by using [`call`].
 ///
 /// [`new`]: #method.new
@@ -114,7 +117,7 @@ pub struct Multicall<N, T, P>
 where
     N: crate::private::Network,
     T: crate::private::Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     /// The internal calls vector
     calls: Vec<Call>,
@@ -128,7 +131,7 @@ impl<N, T, P> Multicall<N, T, P>
 where
     N: crate::private::Network,
     T: crate::private::Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<N, T> + Clone,
 {
     /// Asynchronously creates a new [Multicall] instance from the given provider.
     ///
@@ -336,7 +339,14 @@ where
         self
     }
 
-    /// Queries the multicall contract via `eth_call` and returns the decoded result
+    /// Returns the current instantiated [Multicall] instance with an empty `calls` vector.
+    /// This allows the user to reuse the instance to perform another aggregate query.
+    pub fn clear_calls(&mut self) -> &mut Self {
+        self.calls.clear();
+        self
+    }
+
+    /// Queries the multicall contract via `eth_call` and returns the decoded result.
     ///
     /// Returns a vector of [StdResult]<[DynSolValue], [Bytes]> for each internal call:
     /// - Ok([DynSolValue]) if the call was successful.
@@ -378,6 +388,200 @@ where
                 self.parse_multicall_result(multicall_result.returnData)
             }
         }
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the block hash
+    /// of a given block number.
+    ///
+    /// Note: this call will return 0 if `block_number` is not one of the most recent 256 blocks.
+    /// ([Reference](https://docs.soliditylang.org/en/latest/units-and-global-variables.html?highlight=blockhash#block-and-transaction-properties))
+    pub fn add_get_block_hash(&mut self, block_number: impl Into<U256>) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getBlockHash").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[DynSolValue::from(block_number.into())],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block number.
+    pub fn add_get_block_number(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getBlockNumber").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block coinbase address.
+    pub fn add_get_current_block_coinbase(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function =
+            functions.get("getCurrentBlockCoinbase").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block difficulty.
+    ///
+    /// Note: in a post-merge environment, the return value of this call will be the output of the
+    /// randomness beacon provided by the beacon chain.
+    /// ([Reference](https://eips.ethereum.org/EIPS/eip-4399#abstract))
+    pub fn add_get_current_block_difficulty(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function =
+            functions.get("getCurrentBlockDifficulty").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block gas limit.
+    pub fn add_get_current_block_gas_limit(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function =
+            functions.get("getCurrentBlockGasLimit").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block timestamp.
+    pub fn add_get_current_block_timestamp(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function =
+            functions.get("getCurrentBlockTimestamp").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the ETH
+    /// balance of an address.
+    pub fn add_get_eth_balance(&mut self, address: impl Into<Address>) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getEthBalance").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[DynSolValue::from(address.into())],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the last
+    /// block hash.
+    pub fn add_get_last_block_hash(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getLastBlockHash").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the current
+    /// block base fee.
+    ///
+    /// Note: this call will fail if the chain that it is called on does not implement the
+    /// [BASEFEE opcode](https://eips.ethereum.org/EIPS/eip-3198).
+    pub fn add_get_basefee(&mut self, allow_failure: bool) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getBasefee").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, allow_failure)
+    }
+
+    /// Appends a `call` to the list of calls of the Multicall instance for querying the last
+    /// block hash.
+    pub fn add_get_chain_id(&mut self) -> &mut Self {
+        let functions = IMulticall3::abi::functions();
+
+        let get_block_hash_function = functions.get("getChainId").unwrap().first().unwrap();
+
+        let call = CallBuilder::new_dyn(
+            self.contract.provider().clone(),
+            get_block_hash_function,
+            &[],
+            self.contract.address(),
+        )
+        .unwrap();
+
+        self.with_call(call, false)
     }
 
     /// Uses the Multicall `aggregate(Call[] calldata calls)` method which returns a tuple of
@@ -517,13 +721,11 @@ where
 #[cfg(test)]
 mod tests {
 
-    use alloy_primitives::address;
+    use super::*;
+    use crate::{ContractInstance, Interface};
+    use alloy_primitives::{address, utils::format_ether};
     use alloy_sol_types::sol;
     use test_utils::{spawn_anvil, spawn_anvil_fork};
-
-    use crate::{ContractInstance, Interface};
-
-    use super::*;
 
     sol! {
         #[derive(Debug, PartialEq)]
@@ -557,7 +759,8 @@ mod tests {
         let weth_address = address!("C02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 
         // Create the multicall instance
-        let mut multicall = Multicall::new(&provider, None).await.unwrap();
+        let mut multicall = Multicall::new(provider, None).await.unwrap();
+        let provider = multicall.contract.provider().clone();
 
         // Generate the WETH ERC20 instance we'll be using to create the individual calls
         let abi = ERC20::abi::contract();
@@ -565,10 +768,11 @@ mod tests {
             ContractInstance::new(weth_address, provider.clone(), Interface::new(abi));
 
         // Create the individual calls
-        let total_supply_call = weth_contract.function("totalSupply", &[]).unwrap();
-        let name_call = weth_contract.function("name", &[]).unwrap();
-        let decimals_call = weth_contract.function("decimals", &[]).unwrap();
-        let symbol_call = weth_contract.function("symbol", &[]).unwrap();
+        let total_supply_call =
+            weth_contract.function_with_cloned_provider("totalSupply", &[]).unwrap();
+        let name_call = weth_contract.function_with_cloned_provider("name", &[]).unwrap();
+        let decimals_call = weth_contract.function_with_cloned_provider("decimals", &[]).unwrap();
+        let symbol_call = weth_contract.function_with_cloned_provider("symbol", &[]).unwrap();
 
         // Add the calls
         multicall.add_call(total_supply_call.clone(), true);
@@ -581,7 +785,8 @@ mod tests {
             .with_call(total_supply_call, true)
             .with_call(name_call, true)
             .with_call(decimals_call, true)
-            .with_call(symbol_call, true);
+            .with_call(symbol_call, true)
+            .add_get_chain_id();
 
         // Send and await the multicall results
 
@@ -601,15 +806,48 @@ mod tests {
         assert_results(results);
     }
 
+    #[tokio::test]
+    async fn test_multicall_specific_methods() {
+        let (provider, _anvil) = spawn_anvil_fork("https://rpc.ankr.com/eth");
+        let mut multicall = Multicall::new(provider, None).await.unwrap();
+
+        multicall
+            .add_get_basefee(false)
+            .add_get_block_hash(U256::from(19568342))
+            .add_get_block_number()
+            .add_get_chain_id()
+            .add_get_current_block_coinbase()
+            .add_get_current_block_difficulty()
+            .add_get_current_block_gas_limit()
+            .add_get_current_block_timestamp()
+            .add_get_last_block_hash()
+            .add_get_eth_balance(address!("3bfc20f0b9afcace800d73d2191166ff16540258"));
+
+        let results = multicall.call().await.unwrap();
+
+        let chain_id = results.get(3).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
+        let gas_limit = results.get(6).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
+        let eth_balance =
+            format_ether(results.get(9).unwrap().as_ref().unwrap().as_uint().unwrap().0)
+                .split('.')
+                .collect::<Vec<&str>>()
+                .first()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap();
+
+        assert_eq!(chain_id, 1); // Provider forked from Mainnet should always have chain ID 1
+        assert_eq!(gas_limit, 30_000_000); // Mainnet gas limit is 30m
+        assert!((306_276..=306_277).contains(&eth_balance)); // Parity multisig bug affected wallet
+                                                             // - balance isn't expected to change
+                                                             // significantly
+    }
+
     fn assert_results(results: Vec<StdResult<DynSolValue, Bytes>>) {
         // Get the expected individual results.
-        let name_result = results.get(1).unwrap().as_ref();
-        let decimals_result = results.get(2).unwrap().as_ref();
-        let symbol_result = results.get(3).unwrap().as_ref();
-
-        let name = name_result.unwrap().as_str().unwrap();
-        let symbol = symbol_result.unwrap().as_str().unwrap();
-        let decimals = decimals_result.unwrap().as_uint().unwrap().0.to::<u8>();
+        let name = results.get(1).unwrap().as_ref().unwrap().as_str().unwrap();
+        let decimals = results.get(2).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u8>();
+        let symbol = results.get(3).unwrap().as_ref().unwrap().as_str().unwrap();
 
         // Assert the returned results are as expected
         assert_eq!(name, "Wrapped Ether");
@@ -617,16 +855,14 @@ mod tests {
         assert_eq!(decimals, 18);
 
         // Also check the calls that were added via the builder pattern
-        let name_result = results.get(5).unwrap().as_ref();
-        let decimals_result = results.get(6).unwrap().as_ref();
-        let symbol_result = results.get(7).unwrap().as_ref();
-
-        let name = name_result.unwrap().as_str().unwrap();
-        let symbol = symbol_result.unwrap().as_str().unwrap();
-        let decimals = decimals_result.unwrap().as_uint().unwrap().0.to::<u8>();
+        let name = results.get(5).unwrap().as_ref().unwrap().as_str().unwrap();
+        let decimals = results.get(6).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u8>();
+        let symbol = results.get(7).unwrap().as_ref().unwrap().as_str().unwrap();
+        let chain_id = results.get(8).unwrap().as_ref().unwrap().as_uint().unwrap().0.to::<u64>();
 
         assert_eq!(name, "Wrapped Ether");
         assert_eq!(symbol, "WETH");
         assert_eq!(decimals, 18);
+        assert_eq!(chain_id, 1);
     }
 }
