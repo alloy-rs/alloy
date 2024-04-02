@@ -1,5 +1,5 @@
 use crate::{
-    layers::{FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller},
+    fillers::{FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller},
     Provider, RootProvider,
 };
 use alloy_network::{Ethereum, Network};
@@ -314,7 +314,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil_with_signer(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
     where
         L: ProviderLayer<
-            crate::layers::SignerProvider<
+            crate::fillers::SignerProvider<
                 alloy_transport_http::Http<reqwest::Client>,
                 crate::ReqwestProvider,
                 crate::network::EthereumSigner,
