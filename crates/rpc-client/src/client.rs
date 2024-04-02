@@ -86,17 +86,15 @@ impl<T> RpcClient<T> {
     ///
     /// Note: This will only set the poll interval for the client if it is the only reference to the
     /// inner client. If the reference is held by many, then it will not update the poll interval.
-    pub fn set_poll_interval(self, poll_interval: Duration) -> Self {
-        let mut client = self.clone();
-
-        let inner = Arc::get_mut(&mut client.0);
+    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
+        let inner = Arc::get_mut(&mut self.0);
 
         if let Some(inner) = inner {
             inner.set_poll_interval(poll_interval);
+            self
         } else {
             todo!("TBD: Value is already shared. Cannot be mutated");
         }
-        client
     }
 }
 
@@ -342,5 +340,18 @@ mod pubsub_impl {
         pub fn channel_size(&self) -> usize {
             self.transport.channel_size()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_client_with_poll_interval() {
+        let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
+            .with_poll_interval(Duration::from_secs(5));
+        // let client = client;
+        assert_eq!(client.poll_interval(), Duration::from_secs(5));
     }
 }
