@@ -5,6 +5,7 @@ use alloy_sol_types::sol;
 sol! {
   #[derive(Debug)]
   #[sol(rpc, abi)]
+  /// Module containing types and functions of the Multicall3 contract.
   interface IMulticall3 {
     struct Call {
       address target;

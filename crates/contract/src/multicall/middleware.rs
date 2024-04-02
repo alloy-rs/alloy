@@ -1,7 +1,9 @@
 use super::error::MulticallError;
 use crate::{
-    constants,
-    contract::IMulticall3::{self, IMulticall3Instance},
+    multicall::{
+        constants,
+        contract::IMulticall3::{self, IMulticall3Instance},
+    },
     CallBuilder, CallDecoder, DynCallBuilder,
 };
 use alloy_dyn_abi::DynSolValue;
@@ -117,7 +119,7 @@ impl MulticallVersion {
 /// use alloy_provider::{ProviderBuilder, ReqwestProvider};
 /// use alloy_sol_types::sol;
 ///
-/// use crate::{multicall, ContractInstance, Interface};
+/// use crate::{ContractInstance, Interface, Multicall};
 ///
 /// sol! {
 /// #[sol(rpc, abi)]
@@ -136,8 +138,7 @@ impl MulticallVersion {
 ///
 /// let provider = ProviderBuilder::new().provider(client);
 ///
-/// let mut multicall =
-///     multicall::middleware::Multicall::new(provider.clone(), None).await.unwrap();
+/// let mut multicall = Multicall::new(provider.clone(), None).await.unwrap();
 ///
 /// let weth_address = address!("3bfc20f0b9afcace800d73d2191166ff16540258");
 /// let erc20_abi = ERC20::abi::contract();
