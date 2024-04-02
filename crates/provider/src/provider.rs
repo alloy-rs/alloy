@@ -14,13 +14,13 @@ use alloy_primitives::{
 use alloy_rpc_client::{
     BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
 };
-use alloy_rpc_trace_types::{
-    geth::{GethDebugTracingOptions, GethTrace},
-    parity::{LocalizedTransactionTrace, TraceResults, TraceType},
-};
 use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+};
+use alloy_rpc_types_trace::{
+    geth::{GethDebugTracingOptions, GethTrace},
+    parity::{LocalizedTransactionTrace, TraceResults, TraceType},
 };
 use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,

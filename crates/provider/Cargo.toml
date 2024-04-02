@@ -15,7 +15,7 @@ exclude.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-rpc-client.workspace = true
-alloy-rpc-trace-types.workspace = true
+alloy-rpc-types-trace.workspace = true
 alloy-rpc-types.workspace = true
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }

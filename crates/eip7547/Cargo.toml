@@ -13,7 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-rpc-engine-types = { workspace = true }
+alloy-rpc-types-engine = { workspace = true }
 alloy-serde = { workspace = true }
 
 # serde

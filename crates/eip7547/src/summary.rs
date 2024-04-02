@@ -2,7 +2,7 @@
 //! definitions.
 
 use alloy_primitives::{Address, B256};
-use alloy_rpc_engine_types::PayloadStatusEnum;
+use alloy_rpc_types_engine::PayloadStatusEnum;
 use alloy_serde::u64_hex;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
