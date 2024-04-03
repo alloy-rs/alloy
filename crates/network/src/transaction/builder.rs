@@ -278,6 +278,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// a valid transaction.
     fn can_build(&self) -> bool;
 
+    /// Returns the transaction type that this builder will attempt to build. This does not imply
+    /// that the builder is ready to build.
+    fn output_tx_type(&self) -> TxType;
+
+    /// Returns the transaction type that this builder will build. `Err` if the builder
+    /// is not ready to build, containing the attempt type and missing/conflicted information
+    fn output_tx_type_checked(&self) -> BuilderResult<TxType>;
+
     /// Build an unsigned, but typed, transaction.
     fn build_unsigned(self) -> BuilderResult<N::UnsignedTx>;
 

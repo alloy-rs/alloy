@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use alloy_consensus::BlobTransactionSidecar;
+use alloy_consensus::{BlobTransactionSidecar, TxType};
 use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{
@@ -120,6 +120,14 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
 
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
+    }
+
+    fn output_tx_type(&self) -> TxType {
+        self.deref().output_tx_type()
+    }
+
+    fn output_tx_type_checked(&self) -> BuilderResult<TxType> {
+        self.deref().output_tx_type_checked()
     }
 
     fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {

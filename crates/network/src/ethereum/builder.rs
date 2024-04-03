@@ -141,6 +141,22 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         common && (legacy || eip2930 || eip1559 || eip4844)
     }
 
+    fn output_tx_type(&self) -> TxType {
+        todo!()
+    }
+
+    fn output_tx_type_checked(&self) -> BuilderResult<TxType> {
+        if will_build_4844(self)? {
+            Ok(TxType::Eip4844)
+        } else if will_build_2930(self)? {
+            Ok(TxType::Eip2930)
+        } else if will_build_legacy(self)? {
+            Ok(TxType::Legacy)
+        } else {
+            Ok(TxType::Eip1559)
+        }
+    }
+
     fn build_unsigned(self) -> BuilderResult<TypedTransaction> {
         build_unsigned::<Ethereum>(self)
     }
@@ -159,14 +175,11 @@ where
     N: Network,
     N::UnsignedTx: From<TxLegacy> + From<TxEip1559> + From<TxEip2930> + From<TxEip4844Variant>,
 {
-    if will_build_4844(&request)? {
-        build_4844(request).map(TxEip4844Variant::from).map(Into::into)
-    } else if will_build_2930(&request)? {
-        build_2930(request).map(Into::into)
-    } else if will_build_legacy(&request)? {
-        build_legacy(request).map(Into::into)
-    } else {
-        build_1559(request).map(Into::into)
+    match request.output_tx_type_checked()? {
+        TxType::Legacy => build_legacy(request).map(Into::into),
+        TxType::Eip2930 => build_2930(request).map(Into::into),
+        TxType::Eip1559 => build_1559(request).map(Into::into),
+        TxType::Eip4844 => build_4844(request).map(TxEip4844Variant::from).map(Into::into),
     }
 }
 
