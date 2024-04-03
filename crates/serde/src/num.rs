@@ -282,7 +282,7 @@ pub mod u128_hex_or_decimal_opt {
         }
     }
 
-    /// Serializes Option<u128> as hex string
+    /// Serializes `Option<u128>` as hex string
     pub fn serialize<S: Serializer>(value: &Option<u128>, s: S) -> Result<S::Ok, S::Error> {
         match value {
             Some(val) => U128::from(*val).serialize(s),
