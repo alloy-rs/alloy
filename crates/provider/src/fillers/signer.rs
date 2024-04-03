@@ -42,7 +42,7 @@ where
     type Fillable = ();
 
     fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        todo!("check on ")
+        todo!("check on if tx is buildable")
     }
 
     async fn prepare<P, T>(
