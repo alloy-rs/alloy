@@ -21,7 +21,6 @@ alloy-signer.workspace = true
 
 async-trait.workspace = true
 futures-utils-wasm.workspace = true
-serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 
 [dev-dependencies]
