@@ -70,3 +70,44 @@ impl TransactionReceipt {
         Some(self.from.create(nonce))
     }
 }
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for TransactionReceipt {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            transaction_hash: B256::arbitrary(u)?,
+            transaction_index: U64::arbitrary(u)?,
+            block_hash: Option::<B256>::arbitrary(u)?,
+            block_number: Option::<U256>::arbitrary(u)?,
+            cumulative_gas_used: U256::arbitrary(u)?,
+            gas_used: Option::<U256>::arbitrary(u)?,
+            effective_gas_price: U128::arbitrary(u)?,
+            blob_gas_used: Option::<U128>::arbitrary(u)?,
+            blob_gas_price: Option::<U128>::arbitrary(u)?,
+            from: Address::arbitrary(u)?,
+            to: Option::<Address>::arbitrary(u)?,
+            contract_address: Option::<Address>::arbitrary(u)?,
+            logs: Vec::<Log>::arbitrary(u)?,
+            logs_bloom: Bloom::arbitrary(u)?,
+            state_root: Option::<B256>::arbitrary(u)?,
+            status_code: Option::<U64>::arbitrary(u)?,
+            transaction_type: U8::arbitrary(u)?,
+            other: OtherFields::arbitrary(u)?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn transaction_receipt_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _ = TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
+}

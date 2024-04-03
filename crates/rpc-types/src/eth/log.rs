@@ -26,6 +26,23 @@ pub struct Log {
     pub removed: bool,
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for Log {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            address: Address::arbitrary(u)?,
+            topics: Vec::<B256>::arbitrary(u)?,
+            data: Bytes::arbitrary(u)?,
+            block_hash: Option::<B256>::arbitrary(u)?,
+            block_number: Option::<U256>::arbitrary(u)?,
+            transaction_hash: Option::<B256>::arbitrary(u)?,
+            transaction_index: Option::<U256>::arbitrary(u)?,
+            log_index: Option::<U256>::arbitrary(u)?,
+            removed: bool::arbitrary(u)?,
+        })
+    }
+}
+
 impl TryFrom<Log> for alloy_primitives::LogData {
     type Error = LogError;
 
@@ -46,6 +63,16 @@ pub enum LogError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn log_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _ = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn serde_log() {
