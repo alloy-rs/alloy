@@ -73,7 +73,7 @@ impl<N: Network> SendableTx<N> {
     }
 
     /// Fallible cast to an unbuilt transaction request.
-    pub fn as_builder(&self) -> Option<&N::TransactionRequest> {
+    pub const fn as_builder(&self) -> Option<&N::TransactionRequest> {
         match self {
             Self::Builder(tx) => Some(tx),
             _ => None,
@@ -81,17 +81,17 @@ impl<N: Network> SendableTx<N> {
     }
 
     /// Checks if the transaction is a builder.
-    pub fn is_builder(&self) -> bool {
+    pub const fn is_builder(&self) -> bool {
         matches!(self, Self::Builder(_))
     }
 
     /// Check if the transaction is an envelope.
-    pub fn is_envelope(&self) -> bool {
+    pub const fn is_envelope(&self) -> bool {
         matches!(self, Self::Envelope(_))
     }
 
     /// Fallible cast to a built transaction envelope.
-    pub fn as_envelope(&self) -> Option<&N::TxEnvelope> {
+    pub const fn as_envelope(&self) -> Option<&N::TxEnvelope> {
         match self {
             Self::Envelope(tx) => Some(tx),
             _ => None,
@@ -650,8 +650,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Broadcasts a transaction to the network.
     ///
-    /// Returns a type that can be used to configure how and when to await the transaction's
-    /// confirmation.
+    /// Returns a type that can be used to configure how and when to await the
+    /// transaction's confirmation.
     ///
     /// # Examples
     ///

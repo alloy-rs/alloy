@@ -10,7 +10,7 @@ mod chain_id;
 pub use chain_id::ChainIdFiller;
 
 mod signer;
-pub use signer::{SignerLayer, SignerProvider};
+pub use signer::SignerFiller;
 
 mod nonce;
 pub use nonce::NonceFiller;

@@ -1,6 +1,6 @@
 use crate::{
     fillers::{
-        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller,
+        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerFiller, TxFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -195,8 +195,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// Add a signer layer to the stack being built.
     ///
     /// See [`SignerLayer`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<Stack<SignerLayer<S>, L>, F, N> {
-        self.layer(SignerLayer::new(signer))
+    pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, SignerFiller<S>>, N> {
+        self.filler(SignerFiller::new(signer))
     }
 
     /// Change the network.
@@ -333,15 +333,19 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
     /// function configures a signer backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_signer(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
+    #[allow(clippy::type_complexity)]
+    pub fn on_anvil_with_signer(
+        self,
+    ) -> (
+        <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+            L::Provider,
+            alloy_transport_http::Http<reqwest::Client>,
+        >>::Provider,
+        alloy_node_bindings::AnvilInstance,
+    )
     where
         L: ProviderLayer<
-            crate::fillers::SignerProvider<
-                alloy_transport_http::Http<reqwest::Client>,
-                crate::ReqwestProvider,
-                crate::network::EthereumSigner,
-                Ethereum,
-            >,
+            crate::ReqwestProvider<Ethereum>,
             alloy_transport_http::Http<reqwest::Client>,
             Ethereum,
         >,

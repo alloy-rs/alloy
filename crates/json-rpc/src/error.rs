@@ -57,6 +57,16 @@ where
         Self::ErrorResp(err)
     }
 
+    /// Instantiate a new `RpcError` from a custom error string.
+    pub const fn make_err_resp(code: i64, message: String) -> Self {
+        Self::ErrorResp(ErrorPayload { code, message, data: None })
+    }
+
+    /// Instantiate a new `RpcError` from a custom error with data.
+    pub const fn make_err_resp_with_data(code: i64, message: String, data: ErrResp) -> Self {
+        Self::ErrorResp(ErrorPayload { code, message, data: Some(data) })
+    }
+
     /// Instantiate a new `TransportError` from a [`serde_json::Error`] and the
     /// text. This should be called when the error occurs during
     /// deserialization.
@@ -76,7 +86,7 @@ where
 }
 
 impl<E, ErrResp> RpcError<E, ErrResp> {
-    /// Instantiate a new `TransportError` from a [`serde_json::Error`]. This
+    /// Instantiate a new `RpcError` from a [`serde_json::Error`]. This
     /// should be called when the error occurs during serialization.
     pub const fn ser_err(err: serde_json::Error) -> Self {
         Self::SerError(err)

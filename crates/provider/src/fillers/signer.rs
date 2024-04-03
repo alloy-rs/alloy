@@ -1,8 +1,7 @@
-use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
-use alloy_network::{eip2718::Encodable2718, Ethereum, Network, NetworkSigner, TransactionBuilder};
+use crate::{provider::SendableTx, Provider};
+use alloy_json_rpc::RpcError;
+use alloy_network::{Network, NetworkSigner, TransactionBuilder};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
-use async_trait::async_trait;
-use std::marker::PhantomData;
 
 use super::{FillerControlFlow, TxFiller};
 
@@ -27,32 +26,18 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Debug, Clone)]
-pub struct SignerLayer<S> {
+pub struct SignerFiller<S> {
     signer: S,
 }
 
-impl<S> SignerLayer<S> {
+impl<S> SignerFiller<S> {
     /// Creates a new signing layer with the given signer.
     pub const fn new(signer: S) -> Self {
         Self { signer }
     }
 }
 
-impl<P, T, S, N> ProviderLayer<P, T, N> for SignerLayer<S>
-where
-    P: Provider<T, N>,
-    T: Transport + Clone,
-    S: NetworkSigner<N> + Clone,
-    N: Network,
-{
-    type Provider = SignerProvider<T, P, S, N>;
-
-    fn layer(&self, inner: P) -> Self::Provider {
-        SignerProvider { inner, signer: self.signer.clone(), _phantom: PhantomData }
-    }
-}
-
-impl<S, N> TxFiller<N> for SignerLayer<S>
+impl<S, N> TxFiller<N> for SignerFiller<S>
 where
     N: Network,
     S: NetworkSigner<N> + Clone,
@@ -60,69 +45,48 @@ where
     type Fillable = ();
 
     fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        FillerControlFlow::Ready
+        todo!("check on ")
     }
 
     async fn prepare<P, T>(
         &self,
-        provider: &P,
-        tx: &<N as Network>::TransactionRequest,
+        _provider: &P,
+        _tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        todo!()
+        panic!("This function should not be called. This is a bug. If you have not manually called SignerLayer::prepare, please file an issue.")
     }
 
-    fn fill(&self, fillable: Self::Fillable, tx: &mut crate::provider::SendableTx<N>) {
-        todo!()
-    }
-}
-
-/// A locally-signing provider.
-///
-/// Signs transactions locally using a [`NetworkSigner`].
-///
-/// # Note
-///
-/// You cannot construct this provider directly. Use [`ProviderBuilder`] with a [`SignerLayer`].
-///
-/// [`ProviderBuilder`]: crate::ProviderBuilder
-#[derive(Debug)]
-pub struct SignerProvider<T, P, S, N = Ethereum>
-where
-    T: Transport + Clone,
-    P: Provider<T, N>,
-    N: Network,
-{
-    inner: P,
-    signer: S,
-    _phantom: PhantomData<(T, N)>,
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<T, P, S, N> Provider<T, N> for SignerProvider<T, P, S, N>
-where
-    T: Transport + Clone,
-    P: Provider<T, N>,
-    S: NetworkSigner<N>,
-    N: Network,
-{
-    #[inline]
-    fn root(&self) -> &RootProvider<T, N> {
-        self.inner.root()
+    fn fill(&self, _fillable: Self::Fillable, _tx: &mut SendableTx<N>) {
+        panic!("This function should not be called. This is a bug. If you have not manually called SignerLayer::prepare, please file an issue.")
     }
 
-    async fn send_transaction(
+    async fn prepare_and_fill<P, T>(
         &self,
-        tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        let envelope = tx.build(&self.signer).await.map_err(TransportErrorKind::custom)?;
-        let rlp = envelope.encoded_2718();
+        _provider: &P,
+        tx: &mut SendableTx<N>,
+    ) -> TransportResult<()>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        let builder = match tx {
+            SendableTx::Builder(builder) => builder.clone(),
+            _ => return Ok(()),
+        };
 
-        self.inner.send_raw_transaction(&rlp).await
+        let envelope = builder.build(&self.signer).await.map_err(|e| {
+            RpcError::<TransportErrorKind>::make_err_resp(
+                -42069,
+                format!("failed to build transaction: {e}"),
+            )
+        })?;
+        *tx = SendableTx::Envelope(envelope);
+
+        Ok(())
     }
 }
 
