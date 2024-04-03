@@ -738,7 +738,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the current gas price in wei.
     async fn get_gas_price(&self) -> TransportResult<u128> {
-        self.client().request("eth_gasPrice", ()).await
+        self.client().request("eth_gasPrice", ()).await.map(|price: U128| price.to::<u128>())
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
