@@ -149,11 +149,11 @@ impl Header {
 /// or if used by `eth_getUncle*`
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BlockTransactions {
+pub enum BlockTransactions<T = Transaction> {
     /// Only hashes
     Hashes(Vec<B256>),
     /// Full transactions
-    Full(Vec<Transaction>),
+    Full(Vec<T>),
     /// Special case for uncle response.
     Uncle,
 }
