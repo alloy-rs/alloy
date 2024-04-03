@@ -4,6 +4,8 @@ use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use async_trait::async_trait;
 use std::marker::PhantomData;
 
+use super::{FillerControlFlow, TxFiller};
+
 /// A layer that signs transactions locally.
 ///
 /// The layer uses a [`NetworkSigner`] to sign transactions sent using
@@ -24,7 +26,7 @@ use std::marker::PhantomData;
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SignerLayer<S> {
     signer: S,
 }
@@ -47,6 +49,34 @@ where
 
     fn layer(&self, inner: P) -> Self::Provider {
         SignerProvider { inner, signer: self.signer.clone(), _phantom: PhantomData }
+    }
+}
+
+impl<S, N> TxFiller<N> for SignerLayer<S>
+where
+    N: Network,
+    S: NetworkSigner<N> + Clone,
+{
+    type Fillable = ();
+
+    fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        FillerControlFlow::Ready
+    }
+
+    async fn prepare<P, T>(
+        &self,
+        provider: &P,
+        tx: &<N as Network>::TransactionRequest,
+    ) -> TransportResult<Self::Fillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        todo!()
+    }
+
+    fn fill(&self, fillable: Self::Fillable, tx: &mut crate::provider::SendableTx<N>) {
+        todo!()
     }
 }
 

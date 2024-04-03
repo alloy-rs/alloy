@@ -47,7 +47,14 @@ use alloy_pubsub::{PubSubFrontend, Subscription};
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 
-/// A transaction that will be
+/// A transaction that can be sent. This is either a builder or an envelope.
+///
+/// This type is used to allow for fillers to convert a builder into an envelope
+/// without changing the user-facing API.
+///
+/// Users should NOT use this type directly. It should only be used as an
+/// implementation detail of [`Provider::send_transaction_internal`].
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendableTx<N: Network> {
     /// A transaction that is not yet signed.
