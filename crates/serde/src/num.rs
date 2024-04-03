@@ -72,6 +72,47 @@ impl<'de> Deserialize<'de> for U64HexOrNumber {
     }
 }
 
+/// serde functions for handling `u8` as [U8](alloy_primitives::U8)
+pub mod u8_hex {
+    use alloy_primitives::U8;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Deserializes an `u8` from [U8] accepting a hex quantity string with optional 0x prefix
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u8, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        U8::deserialize(deserializer).map(|val| val.to())
+    }
+
+    /// Serializes u64 as hex string
+    pub fn serialize<S: Serializer>(value: &u8, s: S) -> Result<S::Ok, S::Error> {
+        U8::from(*value).serialize(s)
+    }
+}
+
+/// serde functions for handling `Option<u8>` as [U8](alloy_primitives::U8)
+pub mod u8_hex_opt {
+    use alloy_primitives::U8;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Serializes u64 as hex string
+    pub fn serialize<S: Serializer>(value: &Option<u8>, s: S) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(val) => U8::from(*val).serialize(s),
+            None => s.serialize_none(),
+        }
+    }
+
+    /// Deserializes an `Option` from [U8] accepting a hex quantity string with optional 0x prefix
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(U8::deserialize(deserializer).map_or(None, |v| Some(u8::from_be_bytes(v.to_be_bytes()))))
+    }
+}
+
 /// serde functions for handling `u64` as [U64]
 pub mod u64_hex {
     use alloy_primitives::U64;
@@ -203,12 +244,12 @@ where
     NumberOrHexU256::deserialize(deserializer)?.try_into_u256()
 }
 
-/// serde functions for handling primitive `u64` as [U64]
+/// serde functions for handling primitive `u128` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal {
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
+    /// Deserializes an `u128` accepting a hex quantity string with optional 0x prefix or
     /// a number
     pub fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
     where
@@ -217,7 +258,7 @@ pub mod u128_hex_or_decimal {
         U128::deserialize(deserializer).map(|val| val.to())
     }
 
-    /// Serializes u64 as hex string
+    /// Serializes u128 as hex string
     pub fn serialize<S: Serializer>(value: &u128, s: S) -> Result<S::Ok, S::Error> {
         U128::from(*value).serialize(s)
     }

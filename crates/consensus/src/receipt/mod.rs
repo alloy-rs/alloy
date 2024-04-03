@@ -1,5 +1,8 @@
 use alloy_primitives::{Bloom, Log};
 
+mod any;
+pub use any::AnyReceiptEnvelope;
+
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
