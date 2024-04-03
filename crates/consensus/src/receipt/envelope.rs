@@ -50,18 +50,18 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Return the inner receipt with bloom. Currently this is infallible,
     /// however, future receipt types may be added.
-    pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<T>> {
+    pub const fn as_receipt_with_bloom(&self) -> &ReceiptWithBloom<T> {
         match self {
-            Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => Some(t),
+            Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => t,
         }
     }
 
     /// Return the inner receipt. Currently this is infallible, however, future
     /// receipt types may be added.
-    pub const fn as_receipt(&self) -> Option<&Receipt<T>> {
+    pub const fn as_receipt(&self) -> &Receipt<T> {
         match self {
             Self::Legacy(t) | Self::Eip2930(t) | Self::Eip1559(t) | Self::Eip4844(t) => {
-                Some(&t.receipt)
+                &t.receipt
             }
         }
     }
@@ -70,12 +70,12 @@ impl<T> ReceiptEnvelope<T> {
 impl ReceiptEnvelope {
     /// Get the length of the inner receipt in the 2718 encoding.
     pub fn inner_length(&self) -> usize {
-        self.as_receipt_with_bloom().unwrap().length()
+        self.as_receipt_with_bloom().length()
     }
 
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
-        let length = self.as_receipt_with_bloom().unwrap().length();
+        let length = self.as_receipt_with_bloom().length();
         match self {
             Self::Legacy(_) => length,
             _ => length + 1,
@@ -125,7 +125,7 @@ impl Encodable2718 for ReceiptEnvelope {
             None => {}
             Some(ty) => out.put_u8(ty),
         }
-        self.as_receipt_with_bloom().unwrap().encode(out);
+        self.as_receipt_with_bloom().encode(out);
     }
 }
 
