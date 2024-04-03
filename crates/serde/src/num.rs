@@ -266,6 +266,7 @@ pub mod u128_hex_or_decimal {
 
 /// serde functions for handling primitive optional `u128` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal_opt {
+    // TODO: Add unit tests for this module
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

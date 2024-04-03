@@ -9,7 +9,8 @@ use crate::{
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::{
-    hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
+    hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
+    U256, U64,
 };
 use alloy_rpc_client::{
     BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
@@ -578,7 +579,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         address: Address,
         tag: Option<BlockId>,
     ) -> TransportResult<u64> {
-        self.client().request("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
+        self.client()
+            .request("eth_getTransactionCount", (address, tag.unwrap_or_default()))
+            .await
+            .map(|count: U64| count.to::<u64>())
     }
 
     /// Get a block by its number.
@@ -690,12 +694,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the chain ID.
     async fn get_chain_id(&self) -> TransportResult<u64> {
-        self.client().request("eth_chainId", ()).await
+        self.client().request("eth_chainId", ()).await.map(|id: U64| id.to::<u64>())
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
     async fn get_net_version(&self) -> TransportResult<u64> {
-        self.client().request("net_version", ()).await
+        self.client().request("net_version", ()).await.map(|id: U64| id.to::<u64>())
     }
 
     /// Gets the specified storage value from [Address].
@@ -739,7 +743,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
     async fn get_max_priority_fee_per_gas(&self) -> TransportResult<u128> {
-        self.client().request("eth_maxPriorityFeePerGas", ()).await
+        self.client()
+            .request("eth_maxPriorityFeePerGas", ())
+            .await
+            .map(|fee: U128| fee.to::<u128>())
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
