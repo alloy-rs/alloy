@@ -264,6 +264,32 @@ pub mod u128_hex_or_decimal {
     }
 }
 
+/// serde functions for handling primitive optional `u128` as [U128](alloy_primitives::U128)
+pub mod u128_hex_or_decimal_opt {
+    use alloy_primitives::U128;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Deserializes an `Option<u128>` accepting a hex quantity string with optional 0x prefix or
+    /// a number
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<u128>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<U128>::deserialize(deserializer)? {
+            Some(val) => Ok(Some(val.to())),
+            None => Ok(None),
+        }
+    }
+
+    /// Serializes Option<u128> as hex string
+    pub fn serialize<S: Serializer>(value: &Option<u128>, s: S) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(val) => U128::from(*val).serialize(s),
+            None => s.serialize_none(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -42,8 +42,10 @@ pub struct Transaction {
     /// Block hash
     pub block_hash: Option<B256>,
     /// Block number
+    #[serde(with = "alloy_serde::num::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// Transaction Index
+    #[serde(with = "alloy_serde::num::u64_hex_opt")]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
@@ -52,18 +54,35 @@ pub struct Transaction {
     /// Transferred value
     pub value: U256,
     /// Gas Price
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub gas_price: Option<u128>,
     /// Gas amount
+    #[serde(with = "alloy_serde::num::u128_hex_or_decimal")]
     pub gas: u128,
     /// Max BaseFeePerGas the user is willing to pay.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// Data
     pub input: Bytes,
@@ -87,7 +106,12 @@ pub struct Transaction {
     ///
     /// Transaction type, Some(2) for EIP-1559 transaction,
     /// Some(1) for AccessList transaction, None for Legacy
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "type",
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u8_hex_opt"
+    )]
     pub transaction_type: Option<u8>,
 
     /// Arbitrary extra fields.
