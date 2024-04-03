@@ -12,6 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-eips.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-rpc-client.workspace = true

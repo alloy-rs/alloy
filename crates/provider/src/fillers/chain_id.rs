@@ -1,9 +1,12 @@
 use std::sync::{Arc, OnceLock};
 
-use alloy_network::TransactionBuilder;
+use alloy_network::{Network, TransactionBuilder};
 use alloy_transport::TransportResult;
 
-use crate::fillers::{FillerControlFlow, TxFiller};
+use crate::{
+    fillers::{FillerControlFlow, TxFiller},
+    provider::SendableTx,
+};
 
 /// A [`TxFiller`] that populates the chain ID of a transaction.
 ///
@@ -44,14 +47,11 @@ impl ChainIdFiller {
     }
 }
 
-impl TxFiller for ChainIdFiller {
+impl<N: Network> TxFiller<N> for ChainIdFiller {
     type Fillable = u64;
 
-    fn status(
-        &self,
-        tx: &<alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
-    ) -> FillerControlFlow {
-        if tx.chain_id.is_some() {
+    fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
+        if tx.chain_id().is_some() {
             FillerControlFlow::Finished
         } else {
             FillerControlFlow::Ready
@@ -61,10 +61,10 @@ impl TxFiller for ChainIdFiller {
     async fn prepare<P, T>(
         &self,
         provider: &P,
-        _tx: &<alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
+        _tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: crate::Provider<T, alloy_network::Ethereum>,
+        P: crate::Provider<T, N>,
         T: alloy_transport::Transport + Clone,
     {
         match self.0.get().copied() {
@@ -77,11 +77,12 @@ impl TxFiller for ChainIdFiller {
         }
     }
 
-    fn fill(
-        &self,
-        fillable: Self::Fillable,
-        tx: &mut <alloy_network::Ethereum as alloy_network::Network>::TransactionRequest,
-    ) {
+    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>) {
+        let tx = match tx {
+            SendableTx::Builder(tx) => tx,
+            _ => return,
+        };
+
         if tx.chain_id().is_none() {
             tx.set_chain_id(fillable);
         }

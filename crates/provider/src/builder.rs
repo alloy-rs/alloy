@@ -2,6 +2,7 @@ use crate::{
     fillers::{
         ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerLayer, TxFiller,
     },
+    provider::SendableTx,
     Provider, RootProvider,
 };
 use alloy_network::{Ethereum, Network};
@@ -46,7 +47,7 @@ where
         Ok(())
     }
 
-    fn fill(&self, _to_fill: Self::Fillable, _tx: &mut N::TransactionRequest) {
+    fn fill(&self, _to_fill: Self::Fillable, _tx: &mut SendableTx<N>) {
         // Do nothing
     }
 }

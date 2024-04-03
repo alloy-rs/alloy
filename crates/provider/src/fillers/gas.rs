@@ -1,5 +1,6 @@
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
+    provider::SendableTx,
     utils::Eip1559Estimation,
     Provider,
 };
@@ -212,7 +213,12 @@ impl<N: Network> TxFiller<N> for GasFiller {
         }
     }
 
-    fn fill(&self, fillable: Self::Fillable, tx: &mut <N as Network>::TransactionRequest) {
+    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>) {
+        let tx = match tx {
+            SendableTx::Builder(tx) => tx,
+            _ => return,
+        };
+
         match fillable {
             GasFillable::Legacy { gas_limit, gas_price } => {
                 tx.set_gas_limit(gas_limit);

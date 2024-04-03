@@ -1,5 +1,6 @@
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
+    provider::SendableTx,
     Provider,
 };
 use alloy_network::{Network, TransactionBuilder};
@@ -66,7 +67,11 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         self.get_next_nonce(provider, from).await
     }
 
-    fn fill(&self, nonce: Self::Fillable, tx: &mut N::TransactionRequest) {
+    fn fill(&self, nonce: Self::Fillable, tx: &mut SendableTx<N>) {
+        let tx = match tx {
+            SendableTx::Builder(tx) => tx,
+            _ => return,
+        };
         tx.set_nonce(nonce);
     }
 }

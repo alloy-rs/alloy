@@ -1,4 +1,6 @@
-use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
+use crate::{
+    provider::SendableTx, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
+};
 use alloy_network::{Ethereum, Network};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
@@ -114,6 +116,11 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     /// properties.
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
+    /// Returns `true` if the filler is should continnue filling.
+    fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
+        tx.as_builder().map(|tx| self.status(tx).is_ready()).unwrap_or_default()
+    }
+
     /// Returns `true` if the filler is ready to fill in the transaction request.
     fn ready(&self, tx: &N::TransactionRequest) -> bool {
         self.status(tx).is_ready()
@@ -135,12 +142,37 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
         T: Transport + Clone;
 
     /// Fills in the transaction request with the fillable properties.
-    fn fill(&self, fillable: Self::Fillable, tx: &mut N::TransactionRequest);
+    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>);
+
+    /// Prepares and fills the transaction request with the fillable properties.
+    fn prepare_and_fill<P, T>(
+        &self,
+        provider: &P,
+        tx: &mut SendableTx<N>,
+    ) -> impl_future!(<Output = TransportResult<()>>)
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        async move {
+            if !tx.is_builder() {
+                return Ok(());
+            }
+
+            let fillable = self.prepare(provider, tx.as_builder().unwrap()).await?;
+
+            self.fill(fillable, tx);
+
+            Ok(())
+        }
+    }
 }
 
-/// A layer that can fill in a `TransactionRequest` with additional information
-/// by joining two [`TxFiller`]s. This  struct is itself a [`TxFiller`],
-/// and can be nested to compose any number of fill layers.
+/// A layer that can fill in a [`TransactionRequest`] with additional
+/// information by joining two [`TxFiller`]s. This  struct is itself a
+/// [`TxFiller`], and can be nested to compose any number of fill layers.
+///
+/// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
 #[derive(Debug, Clone, Copy)]
 pub struct JoinFill<L, R> {
     left: L,
@@ -218,7 +250,7 @@ where
         try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
 
-    fn fill(&self, to_fill: Self::Fillable, tx: &mut N::TransactionRequest) {
+    fn fill(&self, to_fill: Self::Fillable, tx: &mut SendableTx<N>) {
         if let Some(to_fill) = to_fill.0 {
             self.left.fill(to_fill, tx);
         };
@@ -245,7 +277,14 @@ where
 /// A [`Provider`] that applies one or more [`TxFiller`]s.
 ///
 /// Fills arbitrary properties in a transaction request by composing multiple
-/// fill layers.
+/// fill layers. This struct should always be the outermost layer in a provider
+/// stack, and this is enforced when using [`ProviderBuilder::filler`] to
+/// construct this layer.
+///
+/// Users should NOT use this struct directly. Instead, use
+/// [`ProviderBuilder::filler`] to construct and apply it to a stack.
+///
+/// [`ProviderBuilder::filler`]: crate::ProviderBuilder::filler
 
 #[derive(Debug, Clone)]
 pub struct FillProvider<F, P, T, N>
@@ -294,14 +333,14 @@ where
         self.inner.root()
     }
 
-    async fn send_transaction(
+    async fn send_transaction_internal(
         &self,
-        mut tx: N::TransactionRequest,
+        mut tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         let mut count = 0;
-        while self.filler.status(&tx).is_ready() {
-            let fillable = self.filler.prepare(self.root(), &tx).await?;
-            self.filler.fill(fillable, &mut tx);
+
+        while self.filler.continue_filling(&tx) {
+            self.filler.prepare_and_fill(&self.inner, &mut tx).await?;
 
             count += 1;
             if count >= 20 {
@@ -312,6 +351,6 @@ where
         }
 
         // Errors in tx building happen further down the stack.
-        self.inner.send_transaction(tx).await
+        self.inner.send_transaction_internal(tx).await
     }
 }
