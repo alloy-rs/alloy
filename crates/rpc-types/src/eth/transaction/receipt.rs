@@ -91,7 +91,7 @@ impl TransactionReceipt {
 #[cfg(test)]
 mod test {
 
-    use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
+    use alloy_consensus::{Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
 
     use super::*;

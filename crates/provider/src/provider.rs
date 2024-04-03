@@ -577,7 +577,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         tag: Option<BlockId>,
-    ) -> TransportResult<U64> {
+    ) -> TransportResult<u64> {
         self.client().request("eth_getTransactionCount", (address, tag.unwrap_or_default())).await
     }
 
@@ -599,7 +599,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<()> {
         let gas = self.estimate_gas(&*tx, block).await;
 
-        gas.map(|gas| tx.set_gas_limit(gas))
+        gas.map(|gas| tx.set_gas_limit(gas.to::<u128>()))
     }
 
     /// Populates the EIP-1559 gas price fields of the given transaction request.
@@ -689,12 +689,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the chain ID.
-    async fn get_chain_id(&self) -> TransportResult<U64> {
+    async fn get_chain_id(&self) -> TransportResult<u64> {
         self.client().request("eth_chainId", ()).await
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    async fn get_net_version(&self) -> TransportResult<U64> {
+    async fn get_net_version(&self) -> TransportResult<u64> {
         self.client().request("net_version", ()).await
     }
 
@@ -733,17 +733,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    async fn get_gas_price(&self) -> TransportResult<U256> {
+    async fn get_gas_price(&self) -> TransportResult<u128> {
         self.client().request("eth_gasPrice", ()).await
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
-    async fn get_max_priority_fee_per_gas(&self) -> TransportResult<U256> {
+    async fn get_max_priority_fee_per_gas(&self) -> TransportResult<u128> {
         self.client().request("eth_maxPriorityFeePerGas", ()).await
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
-    async fn get_blob_base_fee(&self) -> TransportResult<U256> {
+    async fn get_blob_base_fee(&self) -> TransportResult<u128> {
         self.client().request("eth_blobBaseFee", ()).await
     }
 
@@ -806,15 +806,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Returns a collection of historical gas information [FeeHistory] which
     /// can be used to calculate the EIP1559 fields `maxFeePerGas` and `maxPriorityFeePerGas`.
+    /// `block_count` can range from 1 to 1024 blocks in a single request.
     async fn get_fee_history(
         &self,
-        block_count: U256,
+        block_count: u64,
         last_block: BlockNumberOrTag,
         reward_percentiles: &[f64],
     ) -> TransportResult<FeeHistory> {
         self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
+    // TODO: Return TransportResult<u128> instead of U256
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(
         &self,
@@ -838,7 +840,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<Eip1559Estimation> {
         let fee_history = self
             .get_fee_history(
-                U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
+                utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
                 BlockNumberOrTag::Latest,
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
@@ -1139,8 +1141,8 @@ mod tests {
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
-            gas_price: Some(U256::from(20e9)),
-            gas: Some(U256::from(21000)),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
             ..Default::default()
         };
 
@@ -1186,7 +1188,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(count, U64::from(0));
+        assert_eq!(count, 0);
     }
 
     #[tokio::test]
@@ -1251,26 +1253,26 @@ mod tests {
 
     #[tokio::test]
     async fn gets_chain_id() {
-        let chain_id: u64 = 13371337;
-        let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
+        let dev_chain_id: u64 = 13371337;
+        let anvil = Anvil::new().args(["--chain-id", dev_chain_id.to_string().as_str()]).spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
         let provider = RootProvider::<_, Ethereum>::new(RpcClient::new(http, true));
 
         let chain_id = provider.get_chain_id().await.unwrap();
-        assert_eq!(chain_id, U64::from(chain_id));
+        assert_eq!(chain_id, dev_chain_id);
     }
 
     #[tokio::test]
     async fn gets_network_id() {
-        let chain_id: u64 = 13371337;
-        let anvil = Anvil::new().args(["--chain-id", chain_id.to_string().as_str()]).spawn();
+        let dev_chain_id: u64 = 13371337;
+        let anvil = Anvil::new().args(["--chain-id", dev_chain_id.to_string().as_str()]).spawn();
         let url = anvil.endpoint().parse().unwrap();
         let http = Http::<Client>::new(url);
         let provider = RootProvider::<_, Ethereum>::new(RpcClient::new(http, true));
 
         let chain_id = provider.get_net_version().await.unwrap();
-        assert_eq!(chain_id, U64::from(chain_id));
+        assert_eq!(chain_id, dev_chain_id);
     }
 
     #[tokio::test]
@@ -1314,7 +1316,7 @@ mod tests {
             tx.block_hash.unwrap(),
             b256!("b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3")
         );
-        assert_eq!(tx.block_number.unwrap(), U256::from(4571819));
+        assert_eq!(tx.block_number.unwrap(), 4571819);
     }
 
     #[tokio::test]
@@ -1370,7 +1372,7 @@ mod tests {
         let block_number = provider.get_block_number().await.unwrap();
         let fee_history = provider
             .get_fee_history(
-                U256::from(utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS),
+                utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
                 BlockNumberOrTag::Number(block_number),
                 &[utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )

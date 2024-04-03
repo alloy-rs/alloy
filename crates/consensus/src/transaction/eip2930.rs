@@ -29,8 +29,8 @@ pub struct TxEip2930 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
-    pub gas_limit: u64,
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    pub gas_limit: u128,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
@@ -237,12 +237,12 @@ impl Transaction for TxEip2930 {
         self.nonce
     }
 
-    fn gas_limit(&self) -> u64 {
+    fn gas_limit(&self) -> u128 {
         self.gas_limit
     }
 
-    fn gas_price(&self) -> Option<U256> {
-        Some(U256::from(self.gas_price))
+    fn gas_price(&self) -> Option<u128> {
+        Some(self.gas_price)
     }
 }
 

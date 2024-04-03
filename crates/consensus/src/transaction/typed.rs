@@ -96,7 +96,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn gas_limit(&self) -> u64 {
+    fn gas_limit(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
             Self::Eip2930(tx) => tx.gas_limit(),
@@ -105,7 +105,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn gas_price(&self) -> Option<alloy_primitives::U256> {
+    fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.gas_price(),
             Self::Eip2930(tx) => tx.gas_price(),

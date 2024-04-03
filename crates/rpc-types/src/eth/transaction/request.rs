@@ -1,7 +1,7 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256, U8};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -15,18 +15,18 @@ pub struct TransactionRequest {
     pub to: Option<Address>,
     /// The legacy gas price.
     #[serde(default)]
-    pub gas_price: Option<U256>,
+    pub gas_price: Option<u128>,
     /// The max base fee per gas the sender is willing to pay.
     #[serde(default)]
-    pub max_fee_per_gas: Option<U256>,
+    pub max_fee_per_gas: Option<u128>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
     #[serde(default)]
-    pub max_priority_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_blob_gas: Option<U256>,
+    pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
-    pub gas: Option<U256>,
+    pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
     pub value: Option<U256>,
     /// Transaction data.
@@ -43,7 +43,7 @@ pub struct TransactionRequest {
     pub access_list: Option<AccessList>,
     /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
     #[serde(rename = "type")]
-    pub transaction_type: Option<U8>,
+    pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
@@ -79,7 +79,7 @@ impl TransactionRequest {
     ///
     /// The returns `gas_price` (legacy) if set or `max_fee_per_gas` (EIP1559)
     #[inline]
-    pub fn fee_cap(&self) -> Option<U256> {
+    pub fn fee_cap(&self) -> Option<u128> {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
@@ -97,7 +97,7 @@ impl TransactionRequest {
     }
 
     /// Sets the gas limit for the transaction.
-    pub const fn gas_limit(mut self, gas_limit: U256) -> Self {
+    pub const fn gas_limit(mut self, gas_limit: u128) -> Self {
         self.gas = Some(gas_limit);
         self
     }
@@ -109,13 +109,13 @@ impl TransactionRequest {
     }
 
     /// Sets the maximum fee per gas for the transaction.
-    pub const fn max_fee_per_gas(mut self, max_fee_per_gas: U256) -> Self {
+    pub const fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
         self.max_fee_per_gas = Some(max_fee_per_gas);
         self
     }
 
     /// Sets the maximum priority fee per gas for the transaction.
-    pub const fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: U256) -> Self {
+    pub const fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
         self
     }
@@ -146,8 +146,8 @@ impl TransactionRequest {
     }
 
     /// Sets the transactions type for the transactions.
-    pub fn transaction_type(mut self, transaction_type: u8) -> Self {
-        self.transaction_type = Some(U8::from(transaction_type));
+    pub const fn transaction_type(mut self, transaction_type: u8) -> Self {
+        self.transaction_type = Some(transaction_type);
         self
     }
 }

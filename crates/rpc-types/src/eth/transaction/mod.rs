@@ -5,7 +5,7 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-use alloy_primitives::{Address, Bytes, B256, U256, U8};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -42,9 +42,9 @@ pub struct Transaction {
     /// Block hash
     pub block_hash: Option<B256>,
     /// Block number
-    pub block_number: Option<U256>,
+    pub block_number: Option<u64>,
     /// Transaction Index
-    pub transaction_index: Option<U256>,
+    pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
     /// Recipient
@@ -53,18 +53,18 @@ pub struct Transaction {
     pub value: U256,
     /// Gas Price
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gas_price: Option<U256>,
+    pub gas_price: Option<u128>,
     /// Gas amount
-    pub gas: U256,
+    pub gas: u128,
     /// Max BaseFeePerGas the user is willing to pay.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_gas: Option<U256>,
+    pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_priority_fee_per_gas: Option<U256>,
+    pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_blob_gas: Option<U256>,
+    pub max_fee_per_blob_gas: Option<u128>,
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
@@ -88,7 +88,7 @@ pub struct Transaction {
     /// Transaction type, Some(2) for EIP-1559 transaction,
     /// Some(1) for AccessList transaction, None for Legacy
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub transaction_type: Option<U8>,
+    pub transaction_type: Option<u8>,
 
     /// Arbitrary extra fields.
     ///
@@ -141,8 +141,8 @@ impl TryFrom<Transaction> for Signed<TxLegacy> {
         let tx = TxLegacy {
             chain_id: tx.chain_id,
             nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
-            gas_limit: tx.gas.to(),
+            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?,
+            gas_limit: tx.gas,
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
@@ -160,12 +160,11 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
         let tx = TxEip1559 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
-                .to(),
-            gas_limit: tx.gas.to(),
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
+            gas_limit: tx.gas,
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
@@ -184,8 +183,8 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
         let tx = TxEip2930 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
-            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?.to(),
-            gas_limit: tx.gas.to(),
+            gas_price: tx.gas_price.ok_or(ConversionError::MissingGasPrice)?,
+            gas_limit: tx.gas,
             to: tx.to.into(),
             value: tx.value,
             input: tx.input,
@@ -203,12 +202,11 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
         let tx = TxEip4844 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
-            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?.to(),
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
-                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?
-                .to(),
-            gas_limit: tx.gas.to(),
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
+            gas_limit: tx.gas,
             to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             input: tx.input,
@@ -216,8 +214,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             blob_versioned_hashes: tx.blob_versioned_hashes.unwrap_or_default(),
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
-                .ok_or(ConversionError::MissingMaxFeePerBlobGas)?
-                .to(),
+                .ok_or(ConversionError::MissingMaxFeePerBlobGas)?,
         };
         Ok(tx.into_signed(signature))
     }
@@ -239,7 +236,7 @@ impl TryFrom<Transaction> for TxEnvelope {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.transaction_type.unwrap_or_default().to::<u8>().try_into()? {
+        match tx.transaction_type.unwrap_or_default().try_into()? {
             TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
             TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
             TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
@@ -258,13 +255,13 @@ mod tests {
             hash: B256::with_last_byte(1),
             nonce: 2,
             block_hash: Some(B256::with_last_byte(3)),
-            block_number: Some(U256::from(4)),
-            transaction_index: Some(U256::from(5)),
+            block_number: Some(4),
+            transaction_index: Some(5),
             from: Address::with_last_byte(6),
             to: Some(Address::with_last_byte(7)),
             value: U256::from(8),
-            gas_price: Some(U256::from(9)),
-            gas: U256::from(10),
+            gas_price: Some(9),
+            gas: 10,
             input: Bytes::from(vec![11, 12, 13]),
             signature: Some(Signature {
                 v: U256::from(14),
@@ -275,9 +272,9 @@ mod tests {
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
-            transaction_type: Some(U8::from(20)),
-            max_fee_per_gas: Some(U256::from(21)),
-            max_priority_fee_per_gas: Some(U256::from(22)),
+            transaction_type: Some(20),
+            max_fee_per_gas: Some(21),
+            max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             other: Default::default(),
         };
@@ -296,13 +293,13 @@ mod tests {
             hash: B256::with_last_byte(1),
             nonce: 2,
             block_hash: Some(B256::with_last_byte(3)),
-            block_number: Some(U256::from(4)),
-            transaction_index: Some(U256::from(5)),
+            block_number: Some(4),
+            transaction_index: Some(5),
             from: Address::with_last_byte(6),
             to: Some(Address::with_last_byte(7)),
             value: U256::from(8),
-            gas_price: Some(U256::from(9)),
-            gas: U256::from(10),
+            gas_price: Some(9),
+            gas: 10,
             input: Bytes::from(vec![11, 12, 13]),
             signature: Some(Signature {
                 v: U256::from(14),
@@ -313,9 +310,9 @@ mod tests {
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
-            transaction_type: Some(U8::from(20)),
-            max_fee_per_gas: Some(U256::from(21)),
-            max_priority_fee_per_gas: Some(U256::from(22)),
+            transaction_type: Some(20),
+            max_fee_per_gas: Some(21),
+            max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             other: Default::default(),
         };
@@ -335,7 +332,7 @@ mod tests {
             nonce: 2,
             from: Address::with_last_byte(6),
             value: U256::from(8),
-            gas: U256::from(10),
+            gas: 10,
             input: Bytes::from(vec![11, 12, 13]),
             ..Default::default()
         };
