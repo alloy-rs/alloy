@@ -328,7 +328,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
-#[cfg(all(test, feature = "reqwest"))]
+// Enabled when the `anvil` feature is enabled, or when both in test and the
+// `reqwest` feature is enabled.
+#[cfg(any(all(test, feature = "reqwest"), feature = "anvil"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
     /// function configures a signer backed by anvil keys, and is intended for

@@ -15,6 +15,8 @@ exclude.workspace = true
 alloy-eips.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
+alloy-node-bindings = { workspace = true, optional = true }
+alloy-signer-wallet = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-trace.workspace = true
 alloy-rpc-types.workspace = true
@@ -61,3 +63,4 @@ reqwest = [
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
+anvil = ["dep:alloy-node-bindings", "dep:alloy-signer-wallet"]
