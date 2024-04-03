@@ -67,15 +67,15 @@ where
     async fn prepare_and_fill<P, T>(
         &self,
         _provider: &P,
-        tx: &mut SendableTx<N>,
-    ) -> TransportResult<()>
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>>
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
         let builder = match tx {
-            SendableTx::Builder(builder) => builder.clone(),
-            _ => return Ok(()),
+            SendableTx::Builder(builder) => builder,
+            _ => return Ok(tx),
         };
 
         let envelope = builder.build(&self.signer).await.map_err(|e| {
@@ -84,9 +84,9 @@ where
                 format!("failed to build transaction: {e}"),
             )
         })?;
-        *tx = SendableTx::Envelope(envelope);
+        tx = SendableTx::Envelope(envelope);
 
-        Ok(())
+        Ok(tx)
     }
 }
 

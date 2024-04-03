@@ -148,22 +148,22 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
     fn prepare_and_fill<P, T>(
         &self,
         provider: &P,
-        tx: &mut SendableTx<N>,
-    ) -> impl_future!(<Output = TransportResult<()>>)
+        mut tx: SendableTx<N>,
+    ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>)
     where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
         async move {
-            if !tx.is_builder() {
-                return Ok(());
+            if tx.is_envelope() {
+                return Ok(tx);
             }
 
             let fillable = self.prepare(provider, tx.as_builder().unwrap()).await?;
 
-            self.fill(fillable, tx);
+            self.fill(fillable, &mut tx);
 
-            Ok(())
+            Ok(tx)
         }
     }
 }
@@ -340,7 +340,7 @@ where
         let mut count = 0;
 
         while self.filler.continue_filling(&tx) {
-            self.filler.prepare_and_fill(&self.inner, &mut tx).await?;
+            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
 
             count += 1;
             if count >= 20 {
