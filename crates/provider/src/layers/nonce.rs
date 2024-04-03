@@ -1,5 +1,5 @@
 use crate::{PendingTransactionBuilder, Provider, ProviderLayer, RootProvider};
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{Ethereum, Network, TransactionBuilder};
 use alloy_primitives::Address;
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
@@ -39,13 +39,13 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone, Copy)]
 pub struct NonceManagerLayer;
 
-impl<P, N, T> ProviderLayer<P, N, T> for NonceManagerLayer
+impl<P, T, N> ProviderLayer<P, T, N> for NonceManagerLayer
 where
-    P: Provider<N, T>,
-    N: Network,
+    P: Provider<T, N>,
     T: Transport + Clone,
+    N: Network,
 {
-    type Provider = ManagedNonceProvider<N, T, P>;
+    type Provider = ManagedNonceProvider<T, P, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         ManagedNonceProvider { inner, nonces: DashMap::default(), _phantom: PhantomData }
@@ -65,22 +65,22 @@ where
 ///
 /// [`ProviderBuilder`]: crate::ProviderBuilder
 #[derive(Debug, Clone)]
-pub struct ManagedNonceProvider<N, T, P>
+pub struct ManagedNonceProvider<T, P, N = Ethereum>
 where
-    N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
+    N: Network,
 {
     inner: P,
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
-    _phantom: PhantomData<(N, T)>,
+    _phantom: PhantomData<(T, N)>,
 }
 
-impl<N, T, P> ManagedNonceProvider<N, T, P>
+impl<T, P, N> ManagedNonceProvider<T, P, N>
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     async fn get_next_nonce(&self, from: Address) -> TransportResult<u64> {
         // locks dashmap internally for a short duration to clone the `Arc`
@@ -105,21 +105,21 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N, T, P> Provider<N, T> for ManagedNonceProvider<N, T, P>
+impl<T, P, N> Provider<T, N> for ManagedNonceProvider<T, P, N>
 where
-    N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
+    N: Network,
 {
     #[inline]
-    fn root(&self) -> &RootProvider<N, T> {
+    fn root(&self) -> &RootProvider<T, N> {
         self.inner.root()
     }
 
     async fn send_transaction(
         &self,
         mut tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, N, T>> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         if tx.nonce().is_none() {
             if let Some(from) = tx.from() {
                 tx.set_nonce(self.get_next_nonce(from).await?);
@@ -130,6 +130,7 @@ where
     }
 }
 
+#[cfg(feature = "reqwest")]
 #[cfg(test)]
 mod tests {
     use super::*;

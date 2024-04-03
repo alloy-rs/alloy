@@ -65,13 +65,13 @@ impl TryFrom<u8> for TxType {
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
-    #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
     Legacy(Signed<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
-    #[cfg_attr(feature = "serde", serde(rename = "0x01", alias = "0x1"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x1", alias = "0x01"))]
     Eip2930(Signed<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
-    #[cfg_attr(feature = "serde", serde(rename = "0x02", alias = "0x2"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x2", alias = "0x02"))]
     Eip1559(Signed<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
@@ -80,7 +80,7 @@ pub enum TxEnvelope {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
-    #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
+    #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
     Eip4844(Signed<TxEip4844Variant>),
 }
 
@@ -389,6 +389,29 @@ mod tests {
             }]),
         };
         test_encode_decode_roundtrip(tx);
+    }
+
+    #[test]
+    fn test_encode_decode_transaction_list() {
+        let signature = Signature::test_signature();
+        let tx = TxEnvelope::Eip1559(
+            TxEip1559 {
+                chain_id: 1u64,
+                nonce: 2,
+                max_fee_per_gas: 3,
+                max_priority_fee_per_gas: 4,
+                gas_limit: 5,
+                to: TxKind::Call(Address::left_padding_from(&[6])),
+                value: U256::from(7_u64),
+                input: Bytes::from(vec![8]),
+                access_list: Default::default(),
+            }
+            .into_signed(signature),
+        );
+        let transactions = vec![tx.clone(), tx];
+        let encoded = alloy_rlp::encode(&transactions);
+        let decoded = Vec::<TxEnvelope>::decode(&mut &encoded[..]).unwrap();
+        assert_eq!(transactions, decoded);
     }
 
     #[test]

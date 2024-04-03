@@ -1,0 +1,23 @@
+[package]
+name = "alloy-eip7547"
+description = "EIP-7547: Inclusion Lists types"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-rpc-types-engine = { workspace = true }
+alloy-serde = { workspace = true }
+
+# serde
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

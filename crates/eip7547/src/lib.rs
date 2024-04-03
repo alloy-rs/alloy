@@ -1,7 +1,3 @@
-//! Alloy RPC type definitions.
-//!
-//! Provides all relevant types for the various RPC endpoints, grouped by namespace.
-
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
@@ -19,10 +15,6 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod eth;
+pub mod constants;
 
-pub use alloy_serde as serde_helpers;
-pub use eth::*;
-
-mod with_other;
-pub use with_other::WithOtherFields;
+pub mod summary;

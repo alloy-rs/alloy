@@ -15,11 +15,23 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_transport_http::Http;
-use reqwest::Client as ReqwestClient;
+use network::Ethereum;
 
-/// Type alias for a [`RootProvider`] using the [`Http`] transport.
-pub type HttpProvider<N> = RootProvider<N, Http<ReqwestClient>>;
+#[cfg(feature = "reqwest")]
+/// Type alias for a [`RootProvider`] using the [`Http`] transport and a
+/// reqwest client.
+///
+/// [`Http`]: alloy_transport_http::Http
+pub type ReqwestProvider<N = Ethereum> =
+    crate::RootProvider<alloy_transport_http::Http<reqwest::Client>, N>;
+
+#[cfg(feature = "hyper")]
+/// Type alias for a [`RootProvider`] using the [`Http`] transport and a hyper
+/// client.
+///
+/// [`Http`]: alloy_transport_http::Http
+pub type HyperProvider<N = Ethereum> =
+    crate::RootProvider<alloy_transport_http::Http<alloy_transport_http::HyperClient>, N>;
 
 #[macro_use]
 extern crate tracing;
@@ -37,6 +49,7 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
+pub mod admin;
 pub mod utils;
 
 #[doc(no_inline)]
