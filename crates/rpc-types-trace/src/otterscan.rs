@@ -6,7 +6,7 @@
 #![allow(missing_docs)]
 
 use alloy_primitives::{Address, Bloom, Bytes, U256};
-use alloy_rpc_types::{Block, BlockTransactions, Rich, Transaction, TransactionReceipt};
+use alloy_rpc_types::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct
@@ -64,13 +64,7 @@ pub struct OtsBlock {
 
 impl From<Block> for OtsBlock {
     fn from(block: Block) -> Self {
-        let transaction_count = match &block.transactions {
-            BlockTransactions::Full(t) => t.len(),
-            BlockTransactions::Hashes(t) => t.len(),
-            BlockTransactions::Uncle => 0,
-        };
-
-        Self { block, transaction_count }
+        Self { transaction_count: block.transactions.len(), block }
     }
 }
 
