@@ -45,6 +45,7 @@ impl From<TxType> for u8 {
     }
 }
 
+// TODO(Numeric-Audit): Remove this conversion
 impl From<TxType> for U8 {
     fn from(value: TxType) -> Self {
         U8::from(u8::from(value))

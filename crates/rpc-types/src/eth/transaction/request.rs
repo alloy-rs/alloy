@@ -42,7 +42,7 @@ pub struct TransactionRequest {
     #[serde(default)]
     pub access_list: Option<AccessList>,
     /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
-    #[serde(rename = "type")]
+    #[serde(default, rename = "type", with = "alloy_serde::num::u8_hex_opt")]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
