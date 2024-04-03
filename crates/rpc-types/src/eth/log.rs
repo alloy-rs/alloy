@@ -8,7 +8,6 @@ pub struct Log<T = LogData> {
     #[serde(flatten)]
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
-
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
@@ -120,17 +119,16 @@ impl<T> AsMut<T> for Log<T> {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for Log {
+impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for Log<T> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            address: Address::arbitrary(u)?,
-            topics: Vec::<B256>::arbitrary(u)?,
-            data: Bytes::arbitrary(u)?,
+            inner: alloy_primitives::Log::<T>::arbitrary(u)?,
             block_hash: Option::<B256>::arbitrary(u)?,
-            block_number: Option::<U256>::arbitrary(u)?,
+            block_number: Option::<u64>::arbitrary(u)?,
+            block_timestamp: Option::<u64>::arbitrary(u)?,
             transaction_hash: Option::<B256>::arbitrary(u)?,
-            transaction_index: Option::<U256>::arbitrary(u)?,
-            log_index: Option::<U256>::arbitrary(u)?,
+            transaction_index: Option::<u64>::arbitrary(u)?,
+            log_index: Option::<u64>::arbitrary(u)?,
             removed: bool::arbitrary(u)?,
         })
     }
@@ -149,7 +147,7 @@ mod tests {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
 
-        let _ = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 
     #[test]

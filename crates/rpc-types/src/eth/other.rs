@@ -1,6 +1,6 @@
 //! Support for capturing other fields
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Map;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -138,6 +138,7 @@ impl<'a> IntoIterator for &'a OtherFields {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
 impl arbitrary::Arbitrary<'_> for OtherFields {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
         // Generate a random number of entries for the BTreeMap
@@ -149,10 +150,10 @@ impl arbitrary::Arbitrary<'_> for OtherFields {
             inner.insert(
                 String::arbitrary(u)?,
                 match u.int_in_range(0..=3)? {
-                    0 => Value::Null,
-                    1 => Value::Bool(u.arbitrary()?),
-                    2 => Value::Number(serde_json::Number::from(u.arbitrary::<u64>()?)),
-                    3 => Value::String(u.arbitrary()?),
+                    0 => serde_json::Value::Null,
+                    1 => serde_json::Value::Bool(u.arbitrary()?),
+                    2 => serde_json::Value::Number(serde_json::Number::from(u.arbitrary::<u64>()?)),
+                    3 => serde_json::Value::String(u.arbitrary()?),
                     _ => unreachable!(),
                 },
             );

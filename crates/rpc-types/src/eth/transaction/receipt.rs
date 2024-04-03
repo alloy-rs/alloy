@@ -13,7 +13,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
     pub inner: T,
-
     /// Transaction Hash.
     pub transaction_hash: B256,
     /// Index within the block.
@@ -22,7 +21,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Hash of the block this transaction was included within.
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
-
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
@@ -89,27 +87,25 @@ impl TransactionReceipt {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for TransactionReceipt {
+impl<'a, T> arbitrary::Arbitrary<'a> for TransactionReceipt<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
+            inner: T::arbitrary(u)?,
             transaction_hash: B256::arbitrary(u)?,
-            transaction_index: U64::arbitrary(u)?,
+            transaction_index: u64::arbitrary(u)?,
             block_hash: Option::<B256>::arbitrary(u)?,
-            block_number: Option::<U256>::arbitrary(u)?,
-            cumulative_gas_used: U256::arbitrary(u)?,
-            gas_used: Option::<U256>::arbitrary(u)?,
-            effective_gas_price: U128::arbitrary(u)?,
-            blob_gas_used: Option::<U128>::arbitrary(u)?,
-            blob_gas_price: Option::<U128>::arbitrary(u)?,
+            block_number: Option::<u64>::arbitrary(u)?,
+            gas_used: Option::<u64>::arbitrary(u)?,
+            effective_gas_price: u64::arbitrary(u)?,
+            blob_gas_used: Option::<u64>::arbitrary(u)?,
+            blob_gas_price: Option::<u64>::arbitrary(u)?,
             from: Address::arbitrary(u)?,
             to: Option::<Address>::arbitrary(u)?,
             contract_address: Option::<Address>::arbitrary(u)?,
-            logs: Vec::<Log>::arbitrary(u)?,
-            logs_bloom: Bloom::arbitrary(u)?,
             state_root: Option::<B256>::arbitrary(u)?,
-            status_code: Option::<U64>::arbitrary(u)?,
-            transaction_type: U8::arbitrary(u)?,
-            other: OtherFields::arbitrary(u)?,
         })
     }
 }
@@ -117,19 +113,19 @@ impl<'a> arbitrary::Arbitrary<'a> for TransactionReceipt {
 #[cfg(test)]
 mod test {
 
-    use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
+    use super::*;
+    use alloy_consensus::{Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;
     use rand::Rng;
-
-    use super::*;
 
     #[test]
     fn transaction_receipt_arbitrary() {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
 
-        let _ = TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+        let _: TransactionReceipt =
+            TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 
     #[test]

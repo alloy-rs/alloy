@@ -51,6 +51,20 @@ impl TxReceipt for Receipt {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T> arbitrary::Arbitrary<'a> for Receipt<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            status: bool::arbitrary(u)?,
+            cumulative_gas_used: u64::arbitrary(u)?,
+            logs: Vec::<T>::arbitrary(u)?,
+        })
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -186,11 +200,11 @@ impl alloy_rlp::Decodable for ReceiptWithBloom {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for Receipt {
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let success = bool::arbitrary(u)?;
-        let cumulative_gas_used = u64::arbitrary(u)?;
-        let logs = u.arbitrary_iter()?.take(4).collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { status: success, cumulative_gas_used, logs })
+        Ok(Self { receipt: Receipt::<T>::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
     }
 }
