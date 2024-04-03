@@ -194,7 +194,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Add a signer layer to the stack being built.
     ///
-    /// See [`SignerLayer`].
+    /// See [`SignerFiller`].
     pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, SignerFiller<S>>, N> {
         self.filler(SignerFiller::new(signer))
     }

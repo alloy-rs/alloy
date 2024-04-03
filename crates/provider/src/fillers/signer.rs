@@ -11,12 +11,9 @@ use super::{FillerControlFlow, TxFiller};
 /// [`Provider::send_transaction`] locally before passing them to the node with
 /// [`Provider::send_raw_transaction`].
 ///
-/// If you have other layers that depend on [`Provider::send_transaction`] being invoked, add those
-/// first.
-///
 /// # Example
 ///
-/// ```rs
+/// ```
 /// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
 /// let provider = ProviderBuilder::new()
 ///     .signer(EthereumSigner::from(signer))
