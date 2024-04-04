@@ -16,8 +16,9 @@ use core::mem;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodable, RlpEncodable)]
 #[cfg_attr(
     all(any(test, feature = "arbitrary"), feature = "std"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(proptest_derive::Arbitrary)
 )]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccessListItem {
@@ -45,8 +46,9 @@ impl AccessListItem {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodableWrapper, RlpEncodableWrapper)]
 #[cfg_attr(
     all(any(test, feature = "arbitrary"), feature = "std"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(proptest_derive::Arbitrary)
 )]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccessList(
     #[cfg_attr(
