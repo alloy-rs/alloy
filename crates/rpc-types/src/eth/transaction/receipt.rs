@@ -90,6 +90,30 @@ impl TransactionReceipt {
     }
 }
 
+impl<T> TransactionReceipt<T> {
+    /// Maps the inner receipt value of this receipt.
+    pub fn map_inner<U, F>(self, f: F) -> TransactionReceipt<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        TransactionReceipt {
+            inner: f(self.inner),
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            gas_used: self.gas_used,
+            effective_gas_price: self.effective_gas_price,
+            blob_gas_used: self.blob_gas_used,
+            blob_gas_price: self.blob_gas_price,
+            from: self.from,
+            to: self.to,
+            contract_address: self.contract_address,
+            state_root: self.state_root,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
