@@ -91,7 +91,6 @@ impl TransactionReceipt {
 }
 
 impl<T> TransactionReceipt<T> {
-
     /// Maps the inner receipt value of this receipt.
     pub fn map_inner<U, F>(self, f: F) -> TransactionReceipt<U>
     where
