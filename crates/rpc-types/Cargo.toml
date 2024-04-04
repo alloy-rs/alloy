@@ -19,7 +19,7 @@ alloy-serde.workspace = true
 alloy-genesis.workspace=true
 
 alloy-consensus = { workspace = true, features = ["serde"] }
-alloy-eips = {workspace = true, features = ["std", "serde", "arbitrary"]}
+alloy-eips = {workspace = true, features = ["std", "serde"]}
 
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }

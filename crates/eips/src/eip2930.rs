@@ -15,10 +15,9 @@ use core::mem;
 /// Accesses outside the list are possible, but become more expensive.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodable, RlpEncodable)]
 #[cfg_attr(
-    all(any(test, feature = "arbitrary"), feature = "std"),
-    derive(proptest_derive::Arbitrary)
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccessListItem {
@@ -26,7 +25,7 @@ pub struct AccessListItem {
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
     #[cfg_attr(
-        all(any(test, feature = "arbitrary"), feature = "std"),
+        any(test, feature = "arbitrary"),
         proptest(
             strategy = "proptest::collection::vec(proptest::arbitrary::any::<B256>(), 0..=20)"
         )
@@ -45,14 +44,13 @@ impl AccessListItem {
 /// AccessList as defined in EIP-2930
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodableWrapper, RlpEncodableWrapper)]
 #[cfg_attr(
-    all(any(test, feature = "arbitrary"), feature = "std"),
-    derive(proptest_derive::Arbitrary)
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccessList(
     #[cfg_attr(
-        all(any(test, feature = "arbitrary"), feature = "std"),
+        any(test, feature = "arbitrary"),
         proptest(
             strategy = "proptest::collection::vec(proptest::arbitrary::any::<AccessListItem>(), 0..=20)"
         )
