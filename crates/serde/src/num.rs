@@ -353,6 +353,7 @@ pub mod u128_hex_or_decimal_vec_vec_opt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::{vec, vec::Vec};
     use serde::{Deserialize, Serialize};
 
     #[test]
