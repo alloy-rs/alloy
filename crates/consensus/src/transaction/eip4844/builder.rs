@@ -5,15 +5,10 @@ use c_kzg::{Blob, KzgCommitment, KzgProof};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
-use core::cmp;
-
-#[cfg(feature = "std")]
-use std::cmp;
-
-use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
 
 use super::utils::WholeFe;
+use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
+use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///

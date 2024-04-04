@@ -107,6 +107,7 @@ The following crates support `no_std`:
 - alloy-eips
 - alloy-genesis
 - alloy-serde
+- alloy-consensus
 
 If you would like to add `no_std` support to a crate, please make sure to update
 `scripts/check_no_std.sh` as well.

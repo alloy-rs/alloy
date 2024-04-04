@@ -1,13 +1,9 @@
 use crate::Signed;
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use core::any;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
-use core::any;
-
-#[cfg(feature = "std")]
-use std::any;
 
 mod eip1559;
 pub use eip1559::TxEip1559;

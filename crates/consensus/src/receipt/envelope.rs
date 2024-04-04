@@ -184,6 +184,7 @@ where
             0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),
+            3 => Ok(Self::Eip4844(receipt)),
             _ => unreachable!(),
         }
     }

@@ -2,14 +2,10 @@ use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use core::mem;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
-use core::mem;
-
-#[cfg(feature = "std")]
-use std::mem;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

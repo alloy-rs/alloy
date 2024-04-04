@@ -13,15 +13,11 @@ use alloy_primitives::{
     keccak256, Address, Bytes, ChainId, FixedBytes, Signature, TxKind, B256, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use core::mem;
 use sha2::{Digest, Sha256};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
-use core::mem;
-
-#[cfg(feature = "std")]
-use std::mem;
 
 #[cfg(not(feature = "kzg"))]
 pub use alloy_eips::eip4844::{Blob, Bytes48};
