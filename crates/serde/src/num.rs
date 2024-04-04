@@ -266,7 +266,6 @@ pub mod u128_hex_or_decimal {
 
 /// serde functions for handling primitive optional `u128` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal_opt {
-    // TODO: Add unit tests for this module
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -330,6 +329,34 @@ mod tests {
         let s = "{\"inner\":\"1000\"}".to_string();
         let deserialized: Value = serde_json::from_str(&s).unwrap();
 
+        assert_eq!(val, deserialized);
+    }
+
+    #[test]
+    fn test_u128_hex_or_decimal_opt() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        struct Value {
+            #[serde(with = "u128_hex_or_decimal_opt")]
+            inner: Option<u128>,
+        }
+
+        let val = Value { inner: Some(1000) };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, "{\"inner\":\"0x3e8\"}");
+
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(val, deserialized);
+
+        let s = "{\"inner\":\"1000\"}".to_string();
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
+
+        assert_eq!(val, deserialized);
+
+        let val = Value { inner: None };
+        let s = serde_json::to_string(&val).unwrap();
+        assert_eq!(s, "{\"inner\":null}");
+
+        let deserialized: Value = serde_json::from_str(&s).unwrap();
         assert_eq!(val, deserialized);
     }
 }

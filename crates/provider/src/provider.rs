@@ -823,7 +823,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
     }
 
-    // TODO: Return TransportResult<u128> instead of U256
     /// Estimate the gas needed for a transaction.
     async fn estimate_gas(
         &self,
