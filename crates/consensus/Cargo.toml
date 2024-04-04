@@ -38,8 +38,8 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-eips/std", "c-kzg/std", "sha2/std"]
+std = ["alloy-eips/std", "sha2/std", "c-kzg?/std"]
 k256 = ["alloy-primitives/k256"]
-kzg = ["std", "dep:c-kzg", "dep:thiserror", "alloy-eips/kzg"]
+kzg = ["dep:c-kzg", "dep:thiserror", "alloy-eips/kzg", "std"]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
 serde = ["dep:serde", "alloy-primitives/serde", "dep:alloy-serde", "alloy-eips/serde"]
