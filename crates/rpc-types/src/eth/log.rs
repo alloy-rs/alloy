@@ -3,12 +3,15 @@ use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Log<T = LogData> {
     #[serde(flatten)]
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
-
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
@@ -124,6 +127,16 @@ mod tests {
     use alloy_primitives::{Address, Bytes};
 
     use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn log_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn serde_log() {

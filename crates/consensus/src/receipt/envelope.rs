@@ -148,12 +148,14 @@ impl Decodable2718 for ReceiptEnvelope {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for ReceiptEnvelope {
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptEnvelope<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tx_type = u.int_in_range(0..=2)?;
-        let receipt = Receipt::arbitrary(u)?.with_bloom();
+        let receipt = ReceiptWithBloom::<T>::arbitrary(u)?;
 
-        match tx_type {
+        match u.int_in_range(0..=3)? {
             0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),

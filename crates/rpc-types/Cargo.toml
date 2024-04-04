@@ -43,6 +43,7 @@ ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+alloy-consensus = { workspace = true, features = ["arbitrary"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
