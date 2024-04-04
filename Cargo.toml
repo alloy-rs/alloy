@@ -28,8 +28,8 @@ alloy-node-bindings = { version = "0.1.0", default-features = false, path = "cra
 alloy-provider = { version = "0.1.0", default-features = false, path = "crates/provider" }
 alloy-pubsub = { version = "0.1.0", default-features = false, path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", default-features = false, path = "crates/rpc-client" }
-alloy-rpc-engine-types = { version = "0.1.0", default-features = false, path = "crates/rpc-engine-types" }
-alloy-rpc-trace-types = { version = "0.1.0", default-features = false, path = "crates/rpc-trace-types" }
+alloy-rpc-types-engine = { version = "0.1.0", default-features = false, path = "crates/rpc-types-engine" }
+alloy-rpc-types-trace = { version = "0.1.0", default-features = false, path = "crates/rpc-types-trace" }
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }
 alloy-serde = { version = "0.1.0", default-features = false, path = "crates/serde" }
 alloy-signer = { version = "0.1.0", default-features = false, path = "crates/signer" }
@@ -45,11 +45,11 @@ alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crat
 
 test-utils = { version = "0.1.0", default-features = false, path = "crates/internal-test-utils", package = "alloy-internal-test-utils" }
 
-alloy-core = { version = "0.6.4", default-features = false }
-alloy-dyn-abi = { version = "0.6.4", default-features = false }
-alloy-json-abi = { version = "0.6.4", default-features = false }
-alloy-primitives = { version = "0.6.4", default-features = false }
-alloy-sol-types = { version = "0.6.4", default-features = false }
+alloy-core = { version = "0.7.0", default-features = false }
+alloy-dyn-abi = { version = "0.7.0", default-features = false }
+alloy-json-abi = { version = "0.7.0", default-features = false }
+alloy-primitives = { version = "0.7.0", default-features = false }
+alloy-sol-types = { version = "0.7.0", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 
@@ -111,13 +111,3 @@ proptest-derive = "0.4"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
-
-# TODO: Remove eventually.
-[patch.crates-io]
-alloy-sol-macro = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-primitives = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-sol-types = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-json-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-dyn-abi = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-syn-solidity = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }
-alloy-core = { git = "https://github.com/alloy-rs/core", rev = "ff33969" }

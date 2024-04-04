@@ -8,12 +8,15 @@ use serde::{Deserialize, Serialize};
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
     pub inner: T,
-
     /// Transaction Hash.
     pub transaction_hash: B256,
     /// Index within the block.
@@ -22,7 +25,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Hash of the block this transaction was included within.
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
-
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
@@ -88,13 +90,47 @@ impl TransactionReceipt {
     }
 }
 
+impl<T> TransactionReceipt<T> {
+    /// Maps the inner receipt value of this receipt.
+    pub fn map_inner<U, F>(self, f: F) -> TransactionReceipt<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        TransactionReceipt {
+            inner: f(self.inner),
+            transaction_hash: self.transaction_hash,
+            transaction_index: self.transaction_index,
+            block_hash: self.block_hash,
+            block_number: self.block_number,
+            gas_used: self.gas_used,
+            effective_gas_price: self.effective_gas_price,
+            blob_gas_used: self.blob_gas_used,
+            blob_gas_price: self.blob_gas_price,
+            from: self.from,
+            to: self.to,
+            contract_address: self.contract_address,
+            state_root: self.state_root,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
 
-    use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
-    use alloy_primitives::{address, b256, bloom, Bloom};
-
     use super::*;
+    use alloy_consensus::{Receipt, ReceiptWithBloom};
+    use alloy_primitives::{address, b256, bloom, Bloom};
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn transaction_receipt_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _: TransactionReceipt =
+            TransactionReceipt::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn test_sanity() {

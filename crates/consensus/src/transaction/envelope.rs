@@ -392,6 +392,29 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_decode_transaction_list() {
+        let signature = Signature::test_signature();
+        let tx = TxEnvelope::Eip1559(
+            TxEip1559 {
+                chain_id: 1u64,
+                nonce: 2,
+                max_fee_per_gas: 3,
+                max_priority_fee_per_gas: 4,
+                gas_limit: 5,
+                to: TxKind::Call(Address::left_padding_from(&[6])),
+                value: U256::from(7_u64),
+                input: Bytes::from(vec![8]),
+                access_list: Default::default(),
+            }
+            .into_signed(signature),
+        );
+        let transactions = vec![tx.clone(), tx];
+        let encoded = alloy_rlp::encode(&transactions);
+        let decoded = Vec::<TxEnvelope>::decode(&mut &encoded[..]).unwrap();
+        assert_eq!(transactions, decoded);
+    }
+
+    #[test]
     fn decode_encode_known_rpc_transaction() {
         // test data pulled from hive test that sends blob transactions
         let network_data_path =

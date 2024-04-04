@@ -40,7 +40,7 @@ impl<N, T, P> AdminApi<N, T> for P
 where
     N: Network,
     T: Transport + Clone,
-    P: Provider<N, T>,
+    P: Provider<T, N>,
 {
     async fn add_peer(&self, record: &str) -> TransportResult<bool> {
         // self.client().

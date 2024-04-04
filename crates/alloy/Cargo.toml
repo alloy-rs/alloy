@@ -12,23 +12,32 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-core = { workspace = true, default-features = false, features = ["std"] }
+# core
+alloy-core = { workspace = true, default-features = false }
 
+# alloy
 alloy-consensus = { workspace = true, default-features = false, optional = true }
 alloy-contract = { workspace = true, default-features = false, optional = true }
 alloy-eips = { workspace = true, default-features = false, optional = true }
 alloy-genesis = { workspace = true, default-features = false, optional = true }
 alloy-network = { workspace = true, default-features = false, optional = true }
 alloy-node-bindings = { workspace = true, default-features = false, optional = true }
+
+# providers
 alloy-provider = { workspace = true, default-features = false, optional = true }
-alloy-pubsub = { workspace = true, optional = true }
+
+# pubsub
+alloy-pubsub = { workspace = true, default-features = false, optional = true }
 
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
-alloy-rpc-client = { workspace = true, optional = true }
-alloy-rpc-engine-types = { workspace = true, default-features = false, optional = true }
-alloy-rpc-trace-types = { workspace = true, default-features = false, optional = true }
+alloy-rpc-client = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types-engine = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types-trace = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types = { workspace = true, default-features = false, optional = true }
+
+# serde
+alloy-serde = { workspace = true, default-features = false, optional = true }
 
 # signer
 alloy-signer = { workspace = true, default-features = false, optional = true }
@@ -41,28 +50,120 @@ alloy-signer-wallet = { workspace = true, default-features = false, optional = t
 # transport
 alloy-transport = { workspace = true, default-features = false, optional = true }
 alloy-transport-http = { workspace = true, default-features = false, optional = true }
-reqwest = { workspace = true, default-features = false, optional = true }
 alloy-transport-ipc = { workspace = true, default-features = false, optional = true }
 alloy-transport-ws = { workspace = true, default-features = false, optional = true }
 
-[features]
-default = ["transport-http-reqwest", "default-tls"]
+# optional
+reqwest = { workspace = true, optional = true }
+hyper = { workspace = true, optional = true }
 
-# alloy-core
+# ----------------------------------------- Configuration ---------------------------------------- #
+
+[features]
+default = ["std", "reqwest"]
+
+# std
+std = [
+    "alloy-core/std",
+    "alloy-eips?/std",
+    "alloy-genesis?/std",
+    "alloy-serde?/std",
+]
+
+# configuration
+reqwest = [
+    "dep:reqwest",
+    "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
+    "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-default-tls",
+]
+hyper = [
+    "dep:hyper",
+    "alloy-rpc-client?/hyper",
+    "alloy-provider?/hyper",
+    "alloy-transport-http?/hyper",
+]
+
+# ---------------------------------------- Main re-exports --------------------------------------- #
+
+# general
+consensus = ["dep:alloy-consensus"]
+contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
+eips = ["dep:alloy-eips"]
+genesis = ["dep:alloy-genesis"]
+network = ["dep:alloy-network"]
+node-bindings = ["dep:alloy-node-bindings"]
+
+# providers
+providers = ["dep:alloy-provider"]
+provider-http = ["providers", "transport-http"]
+provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
+provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
+
+# pubsub
+pubsub = [
+    "dep:alloy-pubsub",
+    "alloy-provider?/pubsub",
+    "alloy-rpc-client?/pubsub",
+]
+
+# rpc
+rpc = []
+json-rpc = ["rpc", "dep:alloy-json-rpc"]
+rpc-client = ["rpc", "dep:alloy-rpc-client"]
+rpc-client-ws = ["rpc", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc", "alloy-rpc-client?/ipc"]
+rpc-types = ["rpc"]
+rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
+rpc-types-engine = ["rpc-types", "dep:alloy-rpc-types-engine"]
+rpc-types-json = [
+    "alloy-rpc-types?/jsonrpsee-types",
+    "alloy-rpc-types-engine?/jsonrpsee-types",
+]
+rpc-types-trace = ["rpc-types", "dep:alloy-rpc-types-trace"]
+
+# signers
+signers = ["dep:alloy-signer"]
+signer-aws = ["signers", "dep:alloy-signer-aws"]
+signer-gcp = ["signers", "dep:alloy-signer-gcp"]
+signer-ledger = ["signers", "dep:alloy-signer-ledger"]
+signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
+signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
+signer-trezor = ["signers", "dep:alloy-signer-trezor"]
+signer-wallet = ["signers", "dep:alloy-signer-wallet"]
+signer-keystore = ["signer-wallet", "alloy-signer-wallet?/keystore"]
+signer-mnemonic = ["signer-wallet", "alloy-signer-wallet?/mnemonic"]
+signer-mnemonic-all-languages = [
+    "signer-mnemonic",
+    "alloy-signer-wallet?/mnemonic-all-languages",
+]
+signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
+
+# transports
+transports = ["dep:alloy-transport"]
+transport-http = ["transports", "dep:alloy-transport-http"]
+transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
+transport-ipc-mock = ["alloy-transport-ipc?/mock"]
+transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
+
+# ---------------------------------------- Core re-exports --------------------------------------- #
+
 dyn-abi = ["alloy-core/dyn-abi"]
 json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
 sol-types = ["alloy-core/sol-types"]
 
 tiny-keccak = ["alloy-core/tiny-keccak"]
+native-keccak = ["alloy-core/native-keccak"]
 asm-keccak = ["alloy-core/asm-keccak"]
 
 postgres = ["alloy-core/postgres"]
 getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
-serde = ["alloy-core/serde", "alloy-eips?/serde"]
-ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz", "alloy-rpc-engine-types?/ssz"]
+serde = ["alloy-core/serde", "alloy-eips?/serde", "alloy-serde"]
+ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz", "alloy-rpc-types-engine?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
     "alloy-consensus?/arbitrary",
@@ -79,57 +180,3 @@ eip712 = [
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
-
-# alloy
-default-tls = ["reqwest?/default-tls"]
-jsonrpsee-types = ["alloy-rpc-types?/jsonrpsee-types", "alloy-rpc-engine-types?/jsonrpsee-types"]
-
-consensus = ["dep:alloy-consensus"]
-eips = ["dep:alloy-eips"]
-network = ["dep:alloy-network"]
-genesis = ["dep:alloy-genesis"]
-node-bindings = ["dep:alloy-node-bindings"]
-
-contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
-
-## providers
-providers = ["dep:alloy-provider"]
-provider-http = ["providers", "transport-http"]
-provider-ws = ["providers", "transport-ws"]
-provider-ipc = ["providers", "transport-ipc"]
-
-## pubsub
-pubsub = ["dep:alloy-pubsub"]
-
-## rpc
-rpc = []
-json-rpc = ["rpc", "dep:alloy-json-rpc"]
-rpc-client = ["rpc", "dep:alloy-rpc-client"]
-rpc-types = ["rpc"]
-rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
-rpc-types-engine = ["rpc-types", "dep:alloy-rpc-engine-types"]
-rpc-types-trace = ["rpc-types", "dep:alloy-rpc-trace-types"]
-
-## signers
-signers = ["dep:alloy-signer"]
-### Signer implementations
-signer-wallet = ["signers", "dep:alloy-signer-wallet"]
-signer-keystore = ["signer-wallet", "alloy-signer-wallet?/keystore"]
-signer-mnemonic = ["signer-wallet", "alloy-signer-wallet?/mnemonic"]
-signer-mnemonic-all-languages = ["signer-mnemonic", "alloy-signer-wallet?/mnemonic-all-languages"]
-signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
-signer-aws = ["signers", "dep:alloy-signer-aws"]
-signer-gcp = ["signers", "dep:alloy-signer-gcp"]
-signer-ledger = ["signers", "dep:alloy-signer-ledger"]
-signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
-signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
-signer-trezor = ["signers", "dep:alloy-signer-trezor"]
-
-## transports
-transports = ["dep:alloy-transport"]
-transport-http = ["transports", "dep:alloy-transport-http"]
-transport-http-reqwest = ["dep:reqwest", "alloy-transport-http?/reqwest"]
-transport-http-hyper = ["alloy-transport-http?/hyper"]
-transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
-transport-ipc-mock = ["alloy-transport-ipc?/mock"]
-transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]

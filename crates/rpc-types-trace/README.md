@@ -1,3 +1,3 @@
-# alloy-rpc-trace-types
+# alloy-rpc-types-trace
 
 Ethereum RPC trace types.

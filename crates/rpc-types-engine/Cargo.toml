@@ -1,5 +1,5 @@
 [package]
-name = "alloy-rpc-engine-types"
+name = "alloy-rpc-types-engine"
 description = "Ethereum execution-consensus layer (engine) API RPC types"
 
 version.workspace = true

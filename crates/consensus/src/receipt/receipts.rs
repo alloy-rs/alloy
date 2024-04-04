@@ -5,6 +5,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
@@ -186,11 +187,11 @@ impl alloy_rlp::Decodable for ReceiptWithBloom {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for Receipt {
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptWithBloom<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let success = bool::arbitrary(u)?;
-        let cumulative_gas_used = u64::arbitrary(u)?;
-        let logs = u.arbitrary_iter()?.take(4).collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { status: success, cumulative_gas_used, logs })
+        Ok(Self { receipt: Receipt::<T>::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
     }
 }
