@@ -32,7 +32,7 @@ pub use signature::{Parity, Signature};
 
 /// Transaction object used in RPC
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(all(any(test, feature = "arbitrary"), feature = "std"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {
     /// Hash
@@ -252,6 +252,16 @@ impl TryFrom<Transaction> for TxEnvelope {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn arbitrary_transaction() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let _: Transaction =
+            Transaction::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn serde_transaction() {
