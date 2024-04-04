@@ -18,10 +18,10 @@ use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromS
 /// Block representation
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<H = Header, T = Transaction> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,

@@ -1,4 +1,4 @@
-use crate::{BlockResponse, Network, ReceiptResponse};
+use crate::{BlockResponse, HeaderResponse, Network, ReceiptResponse};
 use alloy_consensus::AnyReceiptEnvelope;
 use alloy_rpc_types::{
     Block, Header, Log, Transaction, TransactionList, TransactionReceipt, TransactionRequest,
@@ -34,7 +34,7 @@ impl Network for AnyNetwork {
 
     type HeaderResponse = WithOtherFields<Header>;
 
-    type BlockResponse = WithOtherFields<Block<Self::TransactionResponse>>;
+    type BlockResponse = WithOtherFields<Block<Self::HeaderResponse, Self::TransactionResponse>>;
 }
 
 impl ReceiptResponse for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>> {
@@ -43,12 +43,24 @@ impl ReceiptResponse for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<L
     }
 }
 
-impl BlockResponse<AnyNetwork> for WithOtherFields<Block<WithOtherFields<Transaction>>> {
-    fn header(&self) -> &Header {
+impl BlockResponse<AnyNetwork>
+    for WithOtherFields<Block<WithOtherFields<Header>, WithOtherFields<Transaction>>>
+{
+    fn header(&self) -> &WithOtherFields<Header> {
         &self.header
     }
 
     fn transactions(&self) -> &TransactionList<WithOtherFields<Transaction>> {
         &self.transactions
+    }
+}
+
+impl HeaderResponse for WithOtherFields<Header> {
+    fn base_fee_per_gas(&self) -> Option<alloy_primitives::U256> {
+        todo!()
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        todo!()
     }
 }
