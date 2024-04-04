@@ -44,7 +44,6 @@ pub fn eip1559_default_estimator(
     base_fee_per_gas: u128,
     rewards: &[Vec<u128>],
 ) -> Eip1559Estimation {
-    // TODO: Num type audit - return u128 here
     let max_priority_fee_per_gas = estimate_priority_fee(rewards);
     let potential_max_fee = base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
 
