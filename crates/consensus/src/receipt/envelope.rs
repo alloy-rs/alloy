@@ -1,6 +1,6 @@
 use crate::{Receipt, ReceiptWithBloom, TxType};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
-use alloy_primitives::Log;
+use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
@@ -46,6 +46,31 @@ impl<T> ReceiptEnvelope<T> {
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
         }
+    }
+
+    /// Return true if the transaction was successful.
+    pub fn is_success(&self) -> bool {
+        self.status()
+    }
+
+    /// Returns the success status of the receipt's transaction.
+    pub fn status(&self) -> bool {
+        self.as_receipt().unwrap().status
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    pub fn cumulative_gas_used(&self) -> u64 {
+        self.as_receipt().unwrap().cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    pub fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
+    }
+
+    /// Return the receipt's bloom.
+    pub fn logs_bloom(&self) -> &Bloom {
+        &self.as_receipt_with_bloom().unwrap().logs_bloom
     }
 
     /// Return the inner receipt with bloom. Currently this is infallible,
