@@ -1,8 +1,7 @@
-use crate::{BlockResponse, HeaderResponse, Network, ReceiptResponse};
+use crate::{Block, Header, Network, ReceiptResponse, Transaction};
 use alloy_consensus::AnyReceiptEnvelope;
 use alloy_rpc_types::{
-    Block, Header, Log, Transaction, TransactionList, TransactionReceipt, TransactionRequest,
-    WithOtherFields,
+    Log, TransactionList, TransactionReceipt, TransactionRequest, WithOtherFields,
 };
 
 mod builder;
@@ -28,13 +27,14 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction>;
+    type TransactionResponse = WithOtherFields<alloy_rpc_types::Transaction>;
 
     type ReceiptResponse = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
-    type HeaderResponse = WithOtherFields<Header>;
+    type HeaderResponse = WithOtherFields<alloy_rpc_types::Header>;
 
-    type BlockResponse = WithOtherFields<Block<Self::HeaderResponse, Self::TransactionResponse>>;
+    type BlockResponse =
+        WithOtherFields<alloy_rpc_types::Block<Self::HeaderResponse, Self::TransactionResponse>>;
 }
 
 impl ReceiptResponse for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>> {
@@ -43,19 +43,24 @@ impl ReceiptResponse for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<L
     }
 }
 
-impl BlockResponse<AnyNetwork>
-    for WithOtherFields<Block<WithOtherFields<Header>, WithOtherFields<Transaction>>>
+impl Block<AnyNetwork>
+    for WithOtherFields<
+        alloy_rpc_types::Block<
+            WithOtherFields<alloy_rpc_types::Header>,
+            WithOtherFields<alloy_rpc_types::Transaction>,
+        >,
+    >
 {
-    fn header(&self) -> &WithOtherFields<Header> {
+    fn header(&self) -> &WithOtherFields<alloy_rpc_types::Header> {
         &self.header
     }
 
-    fn transactions(&self) -> &TransactionList<WithOtherFields<Transaction>> {
+    fn transactions(&self) -> &TransactionList<WithOtherFields<alloy_rpc_types::Transaction>> {
         &self.transactions
     }
 }
 
-impl HeaderResponse for WithOtherFields<Header> {
+impl Header for WithOtherFields<alloy_rpc_types::Header> {
     fn base_fee_per_gas(&self) -> Option<alloy_primitives::U256> {
         todo!()
     }
@@ -64,3 +69,5 @@ impl HeaderResponse for WithOtherFields<Header> {
         todo!()
     }
 }
+
+impl Transaction for WithOtherFields<alloy_rpc_types::Transaction> {}

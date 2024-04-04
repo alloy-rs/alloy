@@ -7,7 +7,7 @@ use crate::{
     PendingTransactionBuilder,
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{BlockResponse, Ethereum, HeaderResponse, Network, TransactionBuilder};
+use alloy_network::{Block, Ethereum, Header, Network, TransactionBuilder};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };

@@ -34,22 +34,25 @@ pub use any::AnyNetwork;
 
 pub use alloy_eips::eip2718;
 
-/// A block response.
-pub trait BlockResponse<N: Network> {
-    /// Header of the block.
-    fn header(&self) -> &N::HeaderResponse;
-    /// Block transactions.
-    fn transactions(&self) -> &TransactionList<N::TransactionResponse>;
-}
+/// A transaction.
+pub trait Transaction {}
 
-/// A header response.
-pub trait HeaderResponse {
+/// A header.
+pub trait Header {
     /// Base fee per unit of gas (if past London)
     fn base_fee_per_gas(&self) -> Option<U256>;
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None.
     fn next_block_blob_fee(&self) -> Option<u128>;
+}
+
+/// A block.
+pub trait Block<N: Network> {
+    /// Header of the block.
+    fn header(&self) -> &N::HeaderResponse;
+    /// Block transactions.
+    fn transactions(&self) -> &TransactionList<N::TransactionResponse>;
 }
 
 /// A receipt response.
@@ -86,12 +89,12 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     /// The JSON body of a transaction request.
     type TransactionRequest: RpcObject + TransactionBuilder<Self> + std::fmt::Debug;
     /// The JSON body of a transaction response.
-    type TransactionResponse: RpcObject;
+    type TransactionResponse: RpcObject + Transaction;
     /// The JSON body of a transaction receipt.
     type ReceiptResponse: RpcObject + ReceiptResponse;
     /// The JSON body of a header response, as flattened into
     /// [`BlockResponse`].
-    type HeaderResponse: RpcObject + HeaderResponse;
+    type HeaderResponse: RpcObject + Header;
     /// The JSON body of a block response
-    type BlockResponse: RpcObject + BlockResponse<Self>;
+    type BlockResponse: RpcObject + Block<Self>;
 }

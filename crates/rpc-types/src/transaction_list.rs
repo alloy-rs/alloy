@@ -1,10 +1,11 @@
+use crate::Transaction;
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
 /// A list of transactions, either full, hashes or uncle for uncle blocks pre-merge.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum TransactionList<T> {
+pub enum TransactionList<T = Transaction> {
     /// Hashes only.
     Hashes(Vec<B256>),
     /// Full transactions

@@ -2,7 +2,7 @@ use crate::{
     utils::Eip1559Estimation, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
 };
 use alloy_json_rpc::RpcError;
-use alloy_network::{BlockResponse, HeaderResponse, Network, TransactionBuilder};
+use alloy_network::{Block, Header, Network, TransactionBuilder};
 use alloy_primitives::U256;
 use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportError, TransportResult};
