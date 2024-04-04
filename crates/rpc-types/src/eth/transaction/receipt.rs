@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
@@ -83,30 +87,6 @@ impl TransactionReceipt {
             return None;
         }
         Some(self.from.create(nonce))
-    }
-}
-
-#[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T> arbitrary::Arbitrary<'a> for TransactionReceipt<T>
-where
-    T: arbitrary::Arbitrary<'a>,
-{
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            inner: T::arbitrary(u)?,
-            transaction_hash: B256::arbitrary(u)?,
-            transaction_index: u64::arbitrary(u)?,
-            block_hash: Option::<B256>::arbitrary(u)?,
-            block_number: Option::<u64>::arbitrary(u)?,
-            gas_used: Option::<u64>::arbitrary(u)?,
-            effective_gas_price: u64::arbitrary(u)?,
-            blob_gas_used: Option::<u64>::arbitrary(u)?,
-            blob_gas_price: Option::<u64>::arbitrary(u)?,
-            from: Address::arbitrary(u)?,
-            to: Option::<Address>::arbitrary(u)?,
-            contract_address: Option::<Address>::arbitrary(u)?,
-            state_root: Option::<B256>::arbitrary(u)?,
-        })
     }
 }
 

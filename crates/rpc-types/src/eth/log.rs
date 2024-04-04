@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Log<T = LogData> {
     #[serde(flatten)]
@@ -115,22 +119,6 @@ impl<T> AsRef<T> for Log<T> {
 impl<T> AsMut<T> for Log<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.inner.data
-    }
-}
-
-#[cfg(any(test, feature = "arbitrary"))]
-impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for Log<T> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            inner: alloy_primitives::Log::<T>::arbitrary(u)?,
-            block_hash: Option::<B256>::arbitrary(u)?,
-            block_number: Option::<u64>::arbitrary(u)?,
-            block_timestamp: Option::<u64>::arbitrary(u)?,
-            transaction_hash: Option::<B256>::arbitrary(u)?,
-            transaction_index: Option::<u64>::arbitrary(u)?,
-            log_index: Option::<u64>::arbitrary(u)?,
-            removed: bool::arbitrary(u)?,
-        })
     }
 }
 
