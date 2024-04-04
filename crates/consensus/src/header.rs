@@ -7,6 +7,13 @@ use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::mem;
+
+#[cfg(feature = "std")]
 use std::mem;
 
 /// Ommer root of empty list.

@@ -1,6 +1,13 @@
 use crate::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::mem;
+
+#[cfg(feature = "std")]
 use std::mem;
 
 /// Legacy transaction.

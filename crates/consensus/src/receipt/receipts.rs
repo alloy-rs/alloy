@@ -2,6 +2,9 @@ use super::TxReceipt;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

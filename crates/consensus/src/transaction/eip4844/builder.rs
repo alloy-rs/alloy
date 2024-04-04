@@ -3,6 +3,14 @@ use alloy_eips::eip4844::Blob;
 #[cfg(feature = "kzg")]
 use c_kzg::{Blob, KzgCommitment, KzgProof};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::cmp;
+
+#[cfg(feature = "std")]
+use std::cmp;
+
 use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
 
 use super::utils::WholeFe;
@@ -196,7 +204,7 @@ impl SimpleCoder {
 
         let mut res = Vec::with_capacity(num_bytes);
         while num_bytes > 0 {
-            let to_copy = std::cmp::min(31, num_bytes);
+            let to_copy = cmp::min(31, num_bytes);
             let fe = fes.next().ok_or(())?;
             res.extend_from_slice(&fe.as_ref()[1..1 + to_copy]);
             num_bytes -= to_copy;
@@ -220,7 +228,7 @@ impl SidecarCoder for SimpleCoder {
 
         // ingest the rest of the data
         while !data.is_empty() {
-            let (left, right) = data.split_at(std::cmp::min(31, data.len()));
+            let (left, right) = data.split_at(cmp::min(31, data.len()));
             builder.ingest_partial_fe(left);
             data = right
         }
@@ -386,9 +394,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
-
     use super::*;
+    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
 
     #[test]
     fn ingestion_strategy() {

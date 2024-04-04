@@ -2,6 +2,13 @@ use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::mem;
+
+#[cfg(feature = "std")]
 use std::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).

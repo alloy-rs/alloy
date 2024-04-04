@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true

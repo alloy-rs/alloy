@@ -37,7 +37,7 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 alloy-node-bindings.workspace = true
 alloy-rlp.workspace = true
 alloy-signer.workspace = true
