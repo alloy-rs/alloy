@@ -1,10 +1,7 @@
 //! Ethereum JSON-RPC provider.
 
 use crate::{
-    chain::ChainStreamPoller,
-    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
-    utils::{self, Eip1559Estimation, EstimatorFunction},
-    PendingTransactionBuilder,
+    chain::ChainStreamPoller, heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig}, utils::{self, Eip1559Estimation, EstimatorFunction}, Identity, PendingTransactionBuilder, ProviderBuilder
 };
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network, TransactionBuilder};
@@ -201,6 +198,11 @@ impl<T: Transport + Clone, N> RootProviderInner<T, N> {
 pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     Send + Sync
 {
+    /// Returns a builder Struct for the provider.
+    fn builder() -> ProviderBuilder<Identity, N> {
+        ProviderBuilder::default()
+    }
+    
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<T, N>;
 
@@ -1014,6 +1016,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
+    use alloy_network::EthereumSigner;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
 
