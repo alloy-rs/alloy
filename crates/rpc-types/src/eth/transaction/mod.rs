@@ -21,7 +21,7 @@ pub mod optimism;
 pub use optimism::OptimismTransactionReceiptFields;
 
 mod receipt;
-pub use alloy_consensus::{Receipt, ReceiptEnvelope, ReceiptWithBloom};
+pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 pub use receipt::TransactionReceipt;
 
 pub mod request;
