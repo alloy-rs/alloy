@@ -34,10 +34,10 @@ pub trait TxReceipt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::vec;
     use alloy_eips::eip2718::Encodable2718;
     use alloy_primitives::{address, b256, bytes, hex, Bytes, LogData};
     use alloy_rlp::{Decodable, Encodable};
+    use std::vec;
 
     // Test vector from: https://eips.ethereum.org/EIPS/eip-2481
     #[test]
