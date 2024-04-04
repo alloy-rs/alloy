@@ -37,7 +37,13 @@ jsonrpsee-types = { version = "0.20", optional = true }
 alloy-sol-types.workspace = true
 
 [features]
-arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+arbitrary = [
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+    "alloy-eips/arbitrary"
+]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 
