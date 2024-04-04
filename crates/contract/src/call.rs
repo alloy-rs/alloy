@@ -342,7 +342,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
-    pub async fn estimate_gas(&self) -> Result<U256> {
+    pub async fn estimate_gas(&self) -> Result<u128> {
         self.provider.estimate_gas(&self.request, self.block).await.map_err(Into::into)
     }
 

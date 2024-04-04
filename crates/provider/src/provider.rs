@@ -603,7 +603,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<()> {
         let gas = self.estimate_gas(&*tx, block).await;
 
-        gas.map(|gas| tx.set_gas_limit(gas.to::<u128>()))
+        gas.map(|gas| tx.set_gas_limit(gas))
     }
 
     /// Populates the EIP-1559 gas price fields of the given transaction request.
@@ -829,11 +829,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &N::TransactionRequest,
         block: Option<BlockId>,
-    ) -> TransportResult<U256> {
+    ) -> TransportResult<u128> {
         if let Some(block_id) = block {
-            self.client().request("eth_estimateGas", (tx, block_id)).await
+            self.client()
+                .request("eth_estimateGas", (tx, block_id))
+                .await
+                .map(|gas: U128| gas.to::<u128>())
         } else {
-            self.client().request("eth_estimateGas", (tx,)).await
+            self.client().request("eth_estimateGas", (tx,)).await.map(|gas: U128| gas.to::<u128>())
         }
     }
 

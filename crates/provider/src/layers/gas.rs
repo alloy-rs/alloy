@@ -86,9 +86,7 @@ where
 
     /// Gets the gas_limit to be used in txs.
     async fn get_gas_estimate(&self, tx: &N::TransactionRequest) -> TransportResult<u128> {
-        self.inner.estimate_gas(tx, None).await.map(|gas| gas.to::<u128>()) // Temp Fix until
-                                                                            // estimate_gas returns
-                                                                            // u128
+        self.inner.estimate_gas(tx, None).await
     }
 
     /// Gets the max_fee_per_gas and max_priority_fee_per_gas to be used in EIP-1559 txs.
