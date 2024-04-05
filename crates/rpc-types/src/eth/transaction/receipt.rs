@@ -116,7 +116,6 @@ impl<T> TransactionReceipt<T> {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
     use alloy_consensus::{Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};

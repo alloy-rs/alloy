@@ -286,7 +286,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub fn gas(mut self, gas: U256) -> Self {
+    pub fn gas(mut self, gas: u128) -> Self {
         self.request.set_gas_limit(gas);
         self
     }
@@ -294,7 +294,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Sets the `gas_price` field in the transaction to the provided value
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
-    pub fn gas_price(mut self, gas_price: U256) -> Self {
+    pub fn gas_price(mut self, gas_price: u128) -> Self {
         self.request.set_gas_price(gas_price);
         self
     }
@@ -342,7 +342,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
-    pub async fn estimate_gas(&self) -> Result<U256> {
+    pub async fn estimate_gas(&self) -> Result<u128> {
         self.provider.estimate_gas(&self.request, self.block).await.map_err(Into::into)
     }
 

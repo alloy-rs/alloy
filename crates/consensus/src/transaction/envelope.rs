@@ -484,7 +484,7 @@ mod tests {
             chain_id: u64::MAX,
             nonce: u64::MAX,
             gas_price: u128::MAX,
-            gas_limit: u64::MAX,
+            gas_limit: u128::MAX,
             to: TxKind::Call(Address::random()),
             value: U256::MAX,
             input: Bytes::new(),

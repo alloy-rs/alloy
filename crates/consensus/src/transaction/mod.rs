@@ -42,10 +42,10 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
-    fn gas_limit(&self) -> u64;
+    fn gas_limit(&self) -> u128;
 
     /// Get `gas_price`.
-    fn gas_price(&self) -> Option<U256>;
+    fn gas_price(&self) -> Option<u128>;
 }
 
 /// A signable transaction.

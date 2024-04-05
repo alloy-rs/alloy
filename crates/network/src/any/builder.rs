@@ -1,7 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::U256;
 use alloy_rpc_types::{TransactionRequest, WithOtherFields};
 
 use crate::{
@@ -57,43 +56,43 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_value(value)
     }
 
-    fn gas_price(&self) -> Option<U256> {
+    fn gas_price(&self) -> Option<u128> {
         self.deref().gas_price()
     }
 
-    fn set_gas_price(&mut self, gas_price: U256) {
+    fn set_gas_price(&mut self, gas_price: u128) {
         self.deref_mut().set_gas_price(gas_price);
     }
 
-    fn max_fee_per_gas(&self) -> Option<U256> {
+    fn max_fee_per_gas(&self) -> Option<u128> {
         self.deref().max_fee_per_gas()
     }
 
-    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256) {
+    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: u128) {
         self.deref_mut().set_max_fee_per_gas(max_fee_per_gas);
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<U256> {
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.deref().max_priority_fee_per_gas()
     }
 
-    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256) {
+    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: u128) {
         self.deref_mut().set_max_priority_fee_per_gas(max_priority_fee_per_gas);
     }
 
-    fn max_fee_per_blob_gas(&self) -> Option<U256> {
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.deref().max_fee_per_blob_gas()
     }
 
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: U256) {
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
         self.deref_mut().set_max_fee_per_blob_gas(max_fee_per_blob_gas)
     }
 
-    fn gas_limit(&self) -> Option<U256> {
+    fn gas_limit(&self) -> Option<u128> {
         self.deref().gas_limit()
     }
 
-    fn set_gas_limit(&mut self, gas_limit: U256) {
+    fn set_gas_limit(&mut self, gas_limit: u128) {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 
