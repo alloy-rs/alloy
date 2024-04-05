@@ -16,7 +16,7 @@ use serde::{
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
 /// Block representation
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     /// Header of the block.
@@ -51,7 +51,7 @@ impl Block {
 }
 
 /// Block header representation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
@@ -155,6 +155,12 @@ pub enum BlockTransactions {
     Full(Vec<Transaction>),
     /// Special case for uncle response.
     Uncle,
+}
+
+impl Default for BlockTransactions {
+    fn default() -> Self {
+        BlockTransactions::Hashes(Vec::default())
+    }
 }
 
 impl BlockTransactions {
