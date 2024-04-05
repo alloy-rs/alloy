@@ -54,11 +54,8 @@ where
     type Output = TransportResult<Resp>;
 
     fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        let resp = ready!(Pin::new(&mut self.rx).poll(cx));
-
-        Poll::Ready(match resp {
+        Pin::new(&mut self.rx).poll(cx).map(|resp| match resp {
             Ok(resp) => try_deserialize_ok(resp),
-
             Err(e) => Err(TransportErrorKind::custom(e)),
         })
     }
@@ -227,7 +224,7 @@ where
         _cx: &mut task::Context<'_>,
     ) -> Poll<<Self as Future>::Output> {
         let e = if let CallStateProj::SerError(e) = self.as_mut().project() {
-            e.take().expect("No error. This is a bug.")
+            e.take().expect("no error")
         } else {
             unreachable!("Called poll_ser_error in incorrect state")
         };
