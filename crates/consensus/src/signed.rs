@@ -32,6 +32,11 @@ impl<T, Sig> Signed<T, Sig> {
     pub fn into_parts(self) -> (T, Sig, B256) {
         (self.tx, self.signature, self.hash)
     }
+
+    /// Returns the transaction.
+    pub fn owned_tx(self) -> T {
+        self.tx
+    }
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {

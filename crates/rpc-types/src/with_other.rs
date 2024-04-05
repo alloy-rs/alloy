@@ -1,4 +1,5 @@
-use crate::other::OtherFields;
+use crate::{other::OtherFields, TransactionRequest};
+use alloy_consensus::{TxEnvelope, TypedTransaction};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -18,6 +19,18 @@ impl<T> WithOtherFields<T> {
     /// Create a new `Extra`.
     pub fn new(inner: T) -> Self {
         Self { inner, other: OtherFields::default() }
+    }
+}
+
+impl From<TypedTransaction> for WithOtherFields<TransactionRequest> {
+    fn from(tx: TypedTransaction) -> Self {
+        Self::new(tx.into())
+    }
+}
+
+impl From<TxEnvelope> for WithOtherFields<TransactionRequest> {
+    fn from(envelope: TxEnvelope) -> Self {
+        Self::new(envelope.into())
     }
 }
 
