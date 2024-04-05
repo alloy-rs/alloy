@@ -1,7 +1,7 @@
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, NetworkSigner, TransactionBuilder};
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{Transport, TransportResult};
 
 use super::{FillerControlFlow, TxFiller};
 
@@ -77,12 +77,7 @@ where
             _ => return Ok(tx),
         };
 
-        let envelope = builder.build(&self.signer).await.map_err(|e| {
-            RpcError::<TransportErrorKind>::make_err_resp(
-                -42069,
-                format!("failed to build transaction: {e}"),
-            )
-        })?;
+        let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))
     }

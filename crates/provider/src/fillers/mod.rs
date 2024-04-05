@@ -272,8 +272,9 @@ where
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
                 // TODO: improve this.
+                // blocked by #431
                 let message = format!("missing properties: {:?}", missing);
-                return Err(RpcError::make_err_resp(-42069, message));
+                return Err(RpcError::local_usage_str(&message));
             }
         }
 
