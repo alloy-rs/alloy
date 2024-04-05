@@ -27,7 +27,7 @@ serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.20", optional = true }
+jsonrpsee-types = { version = "0.22", optional = true }
 alloy-eips = { workspace= true, optional = true }
 
 [features]
