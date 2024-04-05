@@ -14,12 +14,16 @@ use super::{FillerControlFlow, TxFiller};
 /// # Example
 ///
 /// ```
-/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
+/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
+/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
+/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
-///     .signer(EthereumSigner::from(signer))
-///     .provider(RootProvider::new(transport));
+///     .signer(signer)
+///     .on_http(url)?;
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
+/// # Ok(())
 /// # }
 /// ```
 #[derive(Debug, Clone)]

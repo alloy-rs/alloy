@@ -48,14 +48,19 @@ pub enum GasFillable {
 /// # Example
 ///
 /// ```
-/// # async fn test<T: Transport + Clone, S: NetworkSigner<Ethereum>>(transport: T, signer: S) {
+/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
+/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
+/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
-///     .with_recommended_fillers()
-///     .signer(EthereumSigner::from(signer)) // note the order!
-///     .provider(RootProvider::new(transport));
+///     .with_gas_estimation()
+///     .signer(signer)
+///     .on_http(url)?;
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
+/// # Ok(())
 /// # }
+/// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GasFiller;
 
