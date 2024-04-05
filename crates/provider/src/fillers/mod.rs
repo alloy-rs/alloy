@@ -186,7 +186,8 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
                 return Ok(tx);
             }
 
-            let fillable = self.prepare(provider, tx.as_builder().unwrap()).await?;
+            let fillable =
+                self.prepare(provider, tx.as_builder().expect("checked by is_envelope")).await?;
 
             self.fill(fillable, tx).await
         }

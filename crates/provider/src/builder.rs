@@ -127,7 +127,8 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 }
 
 impl<L, N> ProviderBuilder<L, Identity, N> {
-    /// Add preconfigured set of layers handling gas estimation and nonce management
+    /// Add preconfigured set of layers handling gas estimation, nonce
+    /// management, and chain-id fetching.
     pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendFiller, N> {
         self.filler(GasFiller).filler(NonceFiller::default()).filler(ChainIdFiller::default())
     }
@@ -310,7 +311,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         Ok(self.on_client(client))
     }
 
-    /// Build this provider with an Hyper HTTP qransport.
+    /// Build this provider with an Hyper HTTP transport.
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> Result<F::Provider, TransportError>
     where
