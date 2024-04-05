@@ -7,7 +7,7 @@ use alloy_consensus::{
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
-use std::{hash::Hash, ops::Add};
+use std::hash::Hash;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
