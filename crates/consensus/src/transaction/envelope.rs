@@ -95,7 +95,7 @@ pub enum TxEnvelope {
     /// A [`TxDeposit`] tagged with type 0x7E.
     #[cfg_attr(feature = "optimism", serde(rename = "0x7E"))]
     #[cfg(feature = "optimism")]
-    Deposit(Signed<TxDeposit>),
+    Deposit(TxDeposit),
 }
 
 impl From<Signed<TxLegacy>> for TxEnvelope {
@@ -119,6 +119,13 @@ impl From<Signed<TxEip1559>> for TxEnvelope {
 impl From<Signed<TxEip4844Variant>> for TxEnvelope {
     fn from(v: Signed<TxEip4844Variant>) -> Self {
         Self::Eip4844(v)
+    }
+}
+
+#[cfg(feature = "optimism")]
+impl From<TxDeposit> for TxEnvelope {
+    fn from(v: TxDeposit) -> Self {
+        Self::Deposit(v)
     }
 }
 
@@ -182,7 +189,7 @@ impl TxEnvelope {
                 }
             },
             #[cfg(feature = "optimism")]
-            Self::Deposit(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Deposit(t) => t.fields_len(),
         }
     }
 
@@ -227,7 +234,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Eip1559 => Ok(Self::Eip1559(TxEip1559::decode_signed_fields(buf)?)),
             TxType::Eip4844 => Ok(Self::Eip4844(TxEip4844Variant::decode_signed_fields(buf)?)),
             #[cfg(feature = "optimism")]
-            TxType::Deposit => Ok(Self::Deposit(TxDeposit::decode_signed_fields(buf)?)),
+            TxType::Deposit => Ok(Self::Deposit(TxDeposit::decode(buf)?)),
             TxType::Legacy => {
                 Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
             }
@@ -269,9 +276,7 @@ impl Encodable2718 for TxEnvelope {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
             #[cfg(feature = "optimism")]
-            TxEnvelope::Deposit(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
-            }
+            TxEnvelope::Deposit(tx) => tx.encode(out),
         }
     }
 }

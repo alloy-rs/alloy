@@ -199,6 +199,25 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
     }
 }
 
+#[cfg(feature = "optimism")]
+impl TryFrom<Transaction> for alloy_consensus::TxDeposit {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let tx = alloy_consensus::TxDeposit {
+            source_hash: tx.hash,
+            from: tx.from,
+            to: tx.to.into(),
+            mint: None,
+            value: tx.value,
+            gas_limit: tx.gas as u64,
+            is_system_transaction: false,
+            input: tx.input,
+        };
+        Ok(tx)
+    }
+}
+
 impl TryFrom<Transaction> for Signed<TxEip2930> {
     type Error = ConversionError;
 
@@ -266,6 +285,8 @@ impl TryFrom<Transaction> for TxEnvelope {
             TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
             TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
             TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
+            #[cfg(feature = "optimism")]
+            TxType::Deposit => Ok(Self::Deposit(tx.try_into()?)),
         }
     }
 }

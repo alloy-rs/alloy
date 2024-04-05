@@ -34,6 +34,9 @@ pub use transaction::{
     TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
+#[cfg(feature = "optimism")]
+pub use transaction::TxDeposit;
+
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;
 

@@ -44,6 +44,7 @@ arbitrary = [
     "alloy-primitives/arbitrary",
     "alloy-eips/arbitrary"
 ]
+optimism = ["alloy-consensus/optimism"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 

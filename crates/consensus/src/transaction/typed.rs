@@ -1,6 +1,9 @@
 use crate::{Transaction, TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy, TxType};
 use alloy_primitives::TxKind;
 
+#[cfg(feature = "optimism")]
+use crate::TxDeposit;
+
 /// The TypedTransaction enum represents all Ethereum transaction request types.
 ///
 /// Its variants correspond to specific allowed transactions:
@@ -24,6 +27,10 @@ pub enum TypedTransaction {
     /// EIP-4844 transaction
     #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
     Eip4844(TxEip4844Variant),
+    /// Optimism deposit transaction
+    #[cfg_attr(feature = "serde", serde(rename = "0x7e", alias = "0x7e"))]
+    #[cfg(feature = "optimism")]
+    Deposit(TxDeposit),
 }
 
 impl From<TxLegacy> for TypedTransaction {
@@ -50,6 +57,13 @@ impl From<TxEip4844Variant> for TypedTransaction {
     }
 }
 
+#[cfg(feature = "optimism")]
+impl From<TxDeposit> for TypedTransaction {
+    fn from(tx: TxDeposit) -> Self {
+        Self::Deposit(tx)
+    }
+}
+
 impl TypedTransaction {
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
@@ -58,6 +72,8 @@ impl TypedTransaction {
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
+            #[cfg(feature = "optimism")]
+            Self::Deposit(_) => TxType::Deposit,
         }
     }
 
@@ -93,6 +109,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.chain_id(),
             Self::Eip1559(tx) => tx.chain_id(),
             Self::Eip4844(tx) => tx.chain_id(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.chain_id(),
         }
     }
 
@@ -102,6 +120,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.gas_limit(),
             Self::Eip1559(tx) => tx.gas_limit(),
             Self::Eip4844(tx) => tx.gas_limit(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.gas_limit(),
         }
     }
 
@@ -111,6 +131,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.gas_price(),
             Self::Eip1559(tx) => tx.gas_price(),
             Self::Eip4844(tx) => tx.gas_price(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.gas_price(),
         }
     }
 
@@ -120,6 +142,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.input(),
             Self::Eip1559(tx) => tx.input(),
             Self::Eip4844(tx) => tx.input(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.input(),
         }
     }
 
@@ -129,6 +153,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.nonce(),
             Self::Eip1559(tx) => tx.nonce(),
             Self::Eip4844(tx) => tx.nonce(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.nonce(),
         }
     }
 
@@ -138,6 +164,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.to(),
             Self::Eip1559(tx) => tx.to(),
             Self::Eip4844(tx) => tx.to(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.to(),
         }
     }
 
@@ -147,6 +175,8 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.value(),
             Self::Eip1559(tx) => tx.value(),
             Self::Eip4844(tx) => tx.value(),
+            #[cfg(feature = "optimism")]
+            Self::Deposit(tx) => tx.value(),
         }
     }
 }

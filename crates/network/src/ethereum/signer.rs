@@ -62,6 +62,10 @@ impl NetworkSigner<Ethereum> for EthereumSigner {
                 let sig = self.sign_transaction(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
+            #[cfg(feature = "optimism")]
+            TypedTransaction::Deposit(_) => Err(alloy_signer::Error::Other(
+                "Optimism transactions are not supported by the Ethereum signer".into(),
+            )),
         }
     }
 }
