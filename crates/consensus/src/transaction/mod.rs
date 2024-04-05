@@ -11,6 +11,11 @@ pub use eip1559::TxEip1559;
 mod eip2930;
 pub use eip2930::TxEip2930;
 
+#[cfg(feature = "optimism")]
+mod optimism;
+#[cfg(feature = "optimism")]
+pub use optimism::TxDeposit;
+
 mod eip4844;
 #[cfg(feature = "kzg")]
 pub use eip4844::BlobTransactionValidationError;
