@@ -3,6 +3,7 @@ use crate::{
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{Decodable, Encodable, Header};
+use core::mem;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -43,7 +44,7 @@ impl TryFrom<u8> for TxType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: repr(u8) with explicit discriminant
-            0..=3 => Ok(unsafe { std::mem::transmute(value) }),
+            0..=3 => Ok(unsafe { mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }
@@ -256,7 +257,7 @@ mod tests {
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
     use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
-    use std::{fs, path::PathBuf};
+    use std::{fs, path::PathBuf, vec, vec::Vec};
 
     #[test]
     #[cfg(feature = "k256")]

@@ -1,7 +1,10 @@
 use crate::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
-use std::mem;
+use core::mem;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// Legacy transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

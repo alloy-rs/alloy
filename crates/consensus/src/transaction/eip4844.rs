@@ -13,8 +13,11 @@ use alloy_primitives::{
     keccak256, Address, Bytes, ChainId, FixedBytes, Signature, TxKind, B256, U256,
 };
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use core::mem;
 use sha2::{Digest, Sha256};
-use std::mem;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 #[cfg(not(feature = "kzg"))]
 pub use alloy_eips::eip4844::{Blob, Bytes48};
@@ -1047,8 +1050,8 @@ struct BlobTransactionSidecarRlp {
     proofs: Vec<FixedBytes<BYTES_PER_PROOF>>,
 }
 
-const _: [(); std::mem::size_of::<BlobTransactionSidecar>()] =
-    [(); std::mem::size_of::<BlobTransactionSidecarRlp>()];
+const _: [(); mem::size_of::<BlobTransactionSidecar>()] =
+    [(); mem::size_of::<BlobTransactionSidecarRlp>()];
 
 impl BlobTransactionSidecarRlp {
     const fn wrap_ref(other: &BlobTransactionSidecar) -> &Self {
@@ -1058,7 +1061,7 @@ impl BlobTransactionSidecarRlp {
 
     fn unwrap(self) -> BlobTransactionSidecar {
         // SAFETY: Same repr and size
-        unsafe { std::mem::transmute(self) }
+        unsafe { mem::transmute(self) }
     }
 
     fn encode(&self, out: &mut dyn BufMut) {

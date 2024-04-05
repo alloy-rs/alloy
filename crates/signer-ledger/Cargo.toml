@@ -12,7 +12,7 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
@@ -28,7 +28,7 @@ alloy-sol-types = { workspace = true, optional = true }
 alloy-network.workspace = true
 
 [dev-dependencies]
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 alloy-rlp.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 serial_test.workspace = true

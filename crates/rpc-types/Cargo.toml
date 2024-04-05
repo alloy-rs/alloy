@@ -18,7 +18,7 @@ alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
 alloy-genesis.workspace=true
 
-alloy-consensus = { workspace = true, features = ["serde"] }
+alloy-consensus = { workspace = true, features = ["std", "serde"] }
 alloy-eips = {workspace = true, features = ["std", "serde"]}
 
 itertools.workspace = true
@@ -49,7 +49,7 @@ ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
-alloy-consensus = { workspace = true, features = ["arbitrary"] }
+alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
