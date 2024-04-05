@@ -365,7 +365,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let this = self.signer(crate::network::EthereumSigner::from(wallet));
 
-        (this.on_reqwest_http(url).unwrap(), anvil)
+        (this.on_http(url).unwrap(), anvil)
     }
 }
 

@@ -70,7 +70,7 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         match self.0.get().copied() {
             Some(chain_id) => Ok(chain_id),
             None => {
-                let chain_id = provider.get_chain_id().await?.as_limbs()[0];
+                let chain_id = provider.get_chain_id().await?;
                 let chain_id = *self.0.get_or_init(|| chain_id);
                 Ok(chain_id)
             }
@@ -82,11 +82,11 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         fillable: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        tx.as_mut_builder().map(|tx| {
-            if tx.chain_id().is_none() {
-                tx.set_chain_id(fillable)
+        if let Some(builder) = tx.as_mut_builder() {
+            if builder.chain_id().is_none() {
+                builder.set_chain_id(fillable)
             }
-        });
+        };
         Ok(tx)
     }
 }
