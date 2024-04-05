@@ -3,6 +3,7 @@ use crate::{
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{Decodable, Encodable, Header};
+use core::mem;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -43,7 +44,7 @@ impl TryFrom<u8> for TxType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: repr(u8) with explicit discriminant
-            0..=3 => Ok(unsafe { std::mem::transmute(value) }),
+            0..=3 => Ok(unsafe { mem::transmute(value) }),
             _ => Err(Eip2718Error::UnexpectedType(value)),
         }
     }
@@ -63,6 +64,7 @@ impl TryFrom<u8> for TxType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
@@ -256,7 +258,10 @@ mod tests {
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
     use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
-    use std::{fs, path::PathBuf};
+    use std::{fs, path::PathBuf, vec};
+
+    #[cfg(not(feature = "std"))]
+    use std::vec::Vec;
 
     #[test]
     #[cfg(feature = "k256")]
@@ -484,7 +489,7 @@ mod tests {
             chain_id: u64::MAX,
             nonce: u64::MAX,
             gas_price: u128::MAX,
-            gas_limit: u64::MAX,
+            gas_limit: u128::MAX,
             to: TxKind::Call(Address::random()),
             value: U256::MAX,
             input: Bytes::new(),

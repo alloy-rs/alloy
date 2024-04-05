@@ -4,7 +4,7 @@ use crate::{
 use alloy_consensus::{
     BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
 };
-use alloy_primitives::{Address, TxKind, U256};
+use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::request::TransactionRequest;
 
 impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
@@ -59,43 +59,43 @@ impl TransactionBuilder<Ethereum> for alloy_rpc_types::TransactionRequest {
         self.value = Some(value)
     }
 
-    fn gas_price(&self) -> Option<U256> {
+    fn gas_price(&self) -> Option<u128> {
         self.gas_price
     }
 
-    fn set_gas_price(&mut self, gas_price: U256) {
+    fn set_gas_price(&mut self, gas_price: u128) {
         self.gas_price = Some(gas_price);
     }
 
-    fn max_fee_per_gas(&self) -> Option<U256> {
+    fn max_fee_per_gas(&self) -> Option<u128> {
         self.max_fee_per_gas
     }
 
-    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: U256) {
+    fn set_max_fee_per_gas(&mut self, max_fee_per_gas: u128) {
         self.max_fee_per_gas = Some(max_fee_per_gas);
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<U256> {
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.max_priority_fee_per_gas
     }
 
-    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: U256) {
+    fn set_max_priority_fee_per_gas(&mut self, max_priority_fee_per_gas: u128) {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
-    fn max_fee_per_blob_gas(&self) -> Option<U256> {
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.max_fee_per_blob_gas
     }
 
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: U256) {
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
         self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
     }
 
-    fn gas_limit(&self) -> Option<U256> {
+    fn gas_limit(&self) -> Option<u128> {
         self.gas
     }
 
-    fn set_gas_limit(&mut self, gas_limit: U256) {
+    fn set_gas_limit(&mut self, gas_limit: u128) {
         self.gas = Some(gas_limit);
     }
 
@@ -158,12 +158,8 @@ fn build_legacy(request: TransactionRequest) -> Result<TxLegacy, TransactionBuil
         nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_price: request
             .gas_price
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?
-            .to(),
-        gas_limit: request
-            .gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?,
+        gas_limit: request.gas.ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?,
         to: request.to.into(),
         value: request.value.unwrap_or_default(),
         input: request.input.into_input().unwrap_or_default(),
@@ -177,16 +173,11 @@ fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuild
         nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         max_priority_fee_per_gas: request
             .max_priority_fee_per_gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?,
         max_fee_per_gas: request
             .max_fee_per_gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_gas"))?
-            .to(),
-        gas_limit: request
-            .gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_gas"))?,
+        gas_limit: request.gas.ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?,
         to: request.to.into(),
         value: request.value.unwrap_or_default(),
         input: request.input.into_input().unwrap_or_default(),
@@ -201,12 +192,8 @@ fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuild
         nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_price: request
             .gas_price
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?
-            .to(),
-        gas_limit: request
-            .gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_price"))?,
+        gas_limit: request.gas.ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?,
         to: request.to.into(),
         value: request.value.unwrap_or_default(),
         input: request.input.into_input().unwrap_or_default(),
@@ -219,18 +206,13 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
     Ok(TxEip4844 {
         chain_id: request.chain_id.unwrap_or(1),
         nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
-        gas_limit: request
-            .gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?
-            .to(),
+        gas_limit: request.gas.ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?,
         max_fee_per_gas: request
             .max_fee_per_gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_gas"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_gas"))?,
         max_priority_fee_per_gas: request
             .max_priority_fee_per_gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("max_priority_fee_per_gas"))?,
         to: request.to.ok_or_else(|| TransactionBuilderError::MissingKey("to"))?,
         value: request.value.unwrap_or_default(),
         access_list: request.access_list.unwrap_or_default(),
@@ -239,8 +221,7 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .ok_or_else(|| TransactionBuilderError::MissingKey("blob_versioned_hashes"))?,
         max_fee_per_blob_gas: request
             .max_fee_per_blob_gas
-            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_blob_gas"))?
-            .to(),
+            .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_blob_gas"))?,
         input: request.input.into_input().unwrap_or_default(),
     })
 }

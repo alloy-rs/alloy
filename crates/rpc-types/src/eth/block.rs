@@ -51,6 +51,7 @@ impl Block {
 }
 
 /// Block header representation.
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct Header {
@@ -148,11 +149,11 @@ impl Header {
 /// or if used by `eth_getUncle*`
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BlockTransactions {
+pub enum BlockTransactions<T = Transaction> {
     /// Only hashes
     Hashes(Vec<B256>),
     /// Full transactions
-    Full(Vec<Transaction>),
+    Full(Vec<T>),
     /// Special case for uncle response.
     Uncle,
 }
@@ -1129,6 +1130,15 @@ pub struct BlockOverrides {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn arbitrary_header() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn test_full_conversion() {

@@ -25,7 +25,7 @@ alloy-sol-types = { workspace = true, optional = true, features = ["std"] }
 alloy-dyn-abi = { workspace = true, optional = true, features = ["std", "eip712"] }
 
 [dev-dependencies]
-alloy-consensus.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true
 alloy-signer-wallet.workspace = true
 assert_matches.workspace = true

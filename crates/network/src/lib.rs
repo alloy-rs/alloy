@@ -17,7 +17,7 @@
 
 use alloy_eips::eip2718::Eip2718Envelope;
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, B256};
+use alloy_primitives::Address;
 
 mod transaction;
 pub use transaction::{
@@ -32,26 +32,6 @@ mod any;
 pub use any::AnyNetwork;
 
 pub use alloy_eips::eip2718;
-
-/// A list of transactions, either hydrated or hashes.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum TransactionList<T> {
-    /// Hashes only.
-    Hashes(Vec<B256>),
-    /// Hydrated tx objects.
-    Hydrated(Vec<T>),
-    /// Special case for uncle response
-    Uncled,
-}
-
-/// A block response
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct BlockResponse<N: Network> {
-    #[serde(flatten)]
-    header: N::HeaderResponse,
-    transactions: TransactionList<N::TransactionResponse>,
-}
 
 /// A receipt response.
 ///
@@ -90,7 +70,6 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.
     type ReceiptResponse: RpcObject + ReceiptResponse;
-    /// The JSON body of a header response, as flattened into
-    /// [`BlockResponse`].
+    /// The JSON body of a header response.
     type HeaderResponse: RpcObject;
 }

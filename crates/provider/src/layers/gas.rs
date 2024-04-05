@@ -3,7 +3,6 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::U256;
 use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportError, TransportResult};
 use async_trait::async_trait;
@@ -81,12 +80,12 @@ where
     P: Provider<T, N>,
 {
     /// Gets the gas_price to be used in legacy txs.
-    async fn get_gas_price(&self) -> TransportResult<U256> {
+    async fn get_gas_price(&self) -> TransportResult<u128> {
         self.inner.get_gas_price().await
     }
 
     /// Gets the gas_limit to be used in txs.
-    async fn get_gas_estimate(&self, tx: &N::TransactionRequest) -> TransportResult<U256> {
+    async fn get_gas_estimate(&self, tx: &N::TransactionRequest) -> TransportResult<u128> {
         self.inner.estimate_gas(tx, None).await
     }
 
@@ -171,7 +170,7 @@ where
                 .header
                 .next_block_blob_fee()
                 .ok_or(RpcError::UnsupportedFeature("eip4844"))?;
-            tx.set_max_fee_per_blob_gas(U256::from(next_blob_fee));
+            tx.set_max_fee_per_blob_gas(next_blob_fee);
         }
 
         Ok(())
@@ -218,7 +217,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_network::EthereumSigner;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::address;
+    use alloy_primitives::{address, U256};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::TransactionRequest;
     use alloy_transport_http::Http;

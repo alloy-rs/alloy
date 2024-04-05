@@ -124,8 +124,8 @@ mod tests {
             nonce: Some(0),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
-            gas_price: Some(U256::from(20e9)),
-            gas: Some(U256::from(21000)),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
             ..Default::default()
         };
 

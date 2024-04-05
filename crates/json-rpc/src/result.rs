@@ -63,8 +63,5 @@ where
 {
     let json = result?;
     let text = json.borrow().get();
-
-    let val = serde_json::from_str::<T>(text).map_err(|err| RpcError::deser_err(err, text))?;
-
-    Ok(val)
+    serde_json::from_str(text).map_err(|err| RpcError::deser_err(err, text))
 }

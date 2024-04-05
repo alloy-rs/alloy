@@ -1,5 +1,9 @@
 use crate::Signed;
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use core::any;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -25,7 +29,7 @@ mod typed;
 pub use typed::TypedTransaction;
 
 /// Represents a minimal EVM transaction.
-pub trait Transaction: std::any::Any + Send + Sync + 'static {
+pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `data`.
     fn input(&self) -> &[u8];
 
@@ -42,10 +46,10 @@ pub trait Transaction: std::any::Any + Send + Sync + 'static {
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
-    fn gas_limit(&self) -> u64;
+    fn gas_limit(&self) -> u128;
 
     /// Get `gas_price`.
-    fn gas_price(&self) -> Option<U256>;
+    fn gas_price(&self) -> Option<u128>;
 }
 
 /// A signable transaction.
@@ -107,8 +111,8 @@ pub trait SignableTransaction<Signature>: Transaction {
 // TODO: Remove in favor of dyn trait upcasting (TBD, see https://github.com/rust-lang/rust/issues/65991#issuecomment-1903120162)
 #[doc(hidden)]
 impl<S: 'static> dyn SignableTransaction<S> {
-    pub fn __downcast_ref<T: std::any::Any>(&self) -> Option<&T> {
-        if std::any::Any::type_id(self) == std::any::TypeId::of::<T>() {
+    pub fn __downcast_ref<T: any::Any>(&self) -> Option<&T> {
+        if any::Any::type_id(self) == any::TypeId::of::<T>() {
             unsafe { Some(&*(self as *const _ as *const T)) }
         } else {
             None
