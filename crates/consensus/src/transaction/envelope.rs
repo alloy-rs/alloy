@@ -64,6 +64,7 @@ impl TryFrom<u8> for TxType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]

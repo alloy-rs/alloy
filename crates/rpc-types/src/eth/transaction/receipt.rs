@@ -70,6 +70,7 @@ impl TransactionReceipt {
             | ReceiptEnvelope::Eip2930(receipt)
             | ReceiptEnvelope::Eip4844(receipt)
             | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status,
+            _ => false,
         }
     }
 
