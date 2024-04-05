@@ -221,23 +221,24 @@ impl<N: Network> TxFiller<N> for GasFiller {
         fillable: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        if let Some(builder) = tx.as_mut_builder(){
+        if let Some(builder) = tx.as_mut_builder() {
             match fillable {
-            GasFillable::Legacy { gas_limit, gas_price } => {
-                builder.set_gas_limit(gas_limit);
-                builder.set_gas_price(gas_price);
+                GasFillable::Legacy { gas_limit, gas_price } => {
+                    builder.set_gas_limit(gas_limit);
+                    builder.set_gas_price(gas_price);
+                }
+                GasFillable::Eip1559 { gas_limit, estimate } => {
+                    builder.set_gas_limit(gas_limit);
+                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                }
+                GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas } => {
+                    builder.set_gas_limit(gas_limit);
+                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                    builder.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
+                }
             }
-            GasFillable::Eip1559 { gas_limit, estimate } => {
-                builder.set_gas_limit(gas_limit);
-                builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
-            }
-            GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas } => {
-                builder.set_gas_limit(gas_limit);
-                builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
-                builder.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
-            }}
         };
         Ok(tx)
     }
@@ -249,7 +250,7 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types::{TransactionRequest};
+    use alloy_rpc_types::TransactionRequest;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {

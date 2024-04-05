@@ -5,7 +5,7 @@ use alloy_consensus::{
     BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
     TypedTransaction,
 };
-use alloy_primitives::{Address, TxKind, U256, Bytes, ChainId};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {

@@ -72,7 +72,7 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         nonce: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        if let Some(builder) = tx.as_mut_builder(){
+        if let Some(builder) = tx.as_mut_builder() {
             builder.set_nonce(nonce);
         }
         Ok(tx)
