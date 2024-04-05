@@ -290,34 +290,34 @@ mod tests {
 
         let tx = provider.send_transaction(tx).await.unwrap();
 
-        let tx = tx.get_receipt().await.unwrap();
+        let tx_hash = tx.tx_hash();
 
-        assert_eq!(tx.gas_used, Some(0x5208));
+        let receipt = provider.get_transaction_receipt(*tx_hash).await.unwrap().unwrap();
+
+        assert_eq!(receipt.gas_used, Some(0x5208));
     }
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let (provider, anvil) = ProviderBuilder::new()
+        let (provider, _anvil) = ProviderBuilder::new()
             .filler(crate::fillers::GasFiller)
             .filler(crate::fillers::NonceFiller::default())
             .filler(crate::fillers::ChainIdFiller::default())
-            .on_anvil_with_signer();
+            .on_anvil();
 
         let tx = TransactionRequest {
-            from: Some(anvil.addresses()[0]),
+            from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
+            // access list forces legacy gassing
             access_list: Some(vec![Default::default()].into()),
             ..Default::default()
         };
 
         let tx = provider.send_transaction(tx).await.unwrap();
 
-        let _: () =
-            provider.raw_request(std::borrow::Cow::Borrowed("anvil_mine"), &["0x5"]).await.unwrap();
+        let receipt = tx.get_receipt().await.unwrap();
 
-        let tx = tx.get_receipt().await.unwrap();
-
-        assert_eq!(tx.effective_gas_price, 0x6fc23ac0);
+        assert_eq!(receipt.effective_gas_price, 2000000000);
     }
 }

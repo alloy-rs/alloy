@@ -340,7 +340,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
     where
         F: TxFiller<Ethereum>
-            + ProviderLayer<L::PRovider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
         L: ProviderLayer<
             crate::ReqwestProvider<Ethereum>,
             alloy_transport_http::Http<reqwest::Client>,

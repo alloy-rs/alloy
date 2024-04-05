@@ -220,6 +220,12 @@ impl TransactionInput {
     }
 }
 
+impl From<Vec<u8>> for TransactionInput {
+    fn from(input: Vec<u8>) -> Self {
+        Self { input: Some(input.into()), data: None }
+    }
+}
+
 impl From<Bytes> for TransactionInput {
     fn from(input: Bytes) -> Self {
         Self { input: Some(input), data: None }
