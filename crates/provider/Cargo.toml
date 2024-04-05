@@ -63,4 +63,4 @@ reqwest = [
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
-anvil = ["dep:alloy-node-bindings", "dep:alloy-signer-wallet"]
+anvil = ["reqwest", "dep:alloy-node-bindings", "dep:alloy-signer-wallet"]
