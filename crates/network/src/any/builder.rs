@@ -114,6 +114,14 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_blob_sidecar(sidecar)
     }
 
+    fn can_build(&self) -> bool {
+        self.deref().can_build()
+    }
+
+    fn can_submit(&self) -> bool {
+        self.deref().can_submit()
+    }
+
     fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
         build_unsigned::<AnyNetwork>(self.inner)
     }

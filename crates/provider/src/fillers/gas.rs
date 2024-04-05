@@ -173,6 +173,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         if tx.gas_price().is_some() && tx.gas_limit().is_some() {
             return FillerControlFlow::Finished;
         }
+
         // 4844
         if tx.max_fee_per_blob_gas().is_some()
             && tx.max_fee_per_gas().is_some()
@@ -180,6 +181,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         {
             return FillerControlFlow::Finished;
         }
+
         // eip1559
         if tx.blob_sidecar().is_none()
             && tx.max_fee_per_gas().is_some()
@@ -187,6 +189,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         {
             return FillerControlFlow::Finished;
         }
+
         FillerControlFlow::Ready
     }
 
@@ -213,13 +216,12 @@ impl<N: Network> TxFiller<N> for GasFiller {
         }
     }
 
-    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>) {
-        let tx = match tx {
-            SendableTx::Builder(tx) => tx,
-            _ => return,
-        };
-
-        match fillable {
+    async fn fill(
+        &self,
+        fillable: Self::Fillable,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        tx.as_mut_builder().map(|tx| match fillable {
             GasFillable::Legacy { gas_limit, gas_price } => {
                 tx.set_gas_limit(gas_limit);
                 tx.set_gas_price(gas_price);
@@ -235,7 +237,8 @@ impl<N: Network> TxFiller<N> for GasFiller {
                 tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
                 tx.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
             }
-        }
+        });
+        Ok(tx)
     }
 }
 
@@ -245,7 +248,7 @@ mod tests {
     use super::*;
     use crate::ProviderBuilder;
     use alloy_primitives::address;
-    use alloy_rpc_types::TransactionRequest;
+    use alloy_rpc_types::{AccessListItem, TransactionRequest};
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -299,7 +302,8 @@ mod tests {
             from: Some(anvil.addresses()[0]),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
-            // chain_id: Some(31337), Not required as this will fallback to legacy_tx
+            access_list: Some(vec![Default::default()].into()),
+            // chain_id: Some(31337), Not required as access list causes legacy gassing
             ..Default::default()
         };
 

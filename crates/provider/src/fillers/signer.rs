@@ -41,8 +41,12 @@ where
 {
     type Fillable = ();
 
-    fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        todo!("check on if tx is buildable")
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        if tx.can_build() {
+            FillerControlFlow::Ready
+        } else {
+            FillerControlFlow::Missing(vec![("Signer", &["TODO"])])
+        }
     }
 
     async fn prepare<P, T>(
@@ -54,22 +58,14 @@ where
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        panic!("This function should not be called. This is a bug. If you have not manually called SignerLayer::prepare, please file an issue.")
+        Ok(())
     }
 
-    fn fill(&self, _fillable: Self::Fillable, _tx: &mut SendableTx<N>) {
-        panic!("This function should not be called. This is a bug. If you have not manually called SignerLayer::prepare, please file an issue.")
-    }
-
-    async fn prepare_and_fill<P, T>(
+    async fn fill(
         &self,
-        _provider: &P,
-        mut tx: SendableTx<N>,
-    ) -> TransportResult<SendableTx<N>>
-    where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-    {
+        _fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
         let builder = match tx {
             SendableTx::Builder(builder) => builder,
             _ => return Ok(tx),
@@ -81,9 +77,7 @@ where
                 format!("failed to build transaction: {e}"),
             )
         })?;
-        tx = SendableTx::Envelope(envelope);
-
-        Ok(tx)
+        Ok(SendableTx::Envelope(envelope))
     }
 }
 

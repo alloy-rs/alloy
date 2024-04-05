@@ -675,7 +675,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
-    /// Backing logic for [`send_transaction`].
     ///
     /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
     /// transaction and send it to the network without changing user-facing

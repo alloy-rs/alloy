@@ -48,11 +48,11 @@ pub trait ReceiptResponse {
 /// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
-pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
+pub trait Network: std::fmt::Debug + Clone + Copy + Sized + Send + Sync + 'static {
     // -- Consensus types --
 
     /// The network transaction envelope type.
-    type TxEnvelope: Eip2718Envelope;
+    type TxEnvelope: Eip2718Envelope + std::fmt::Debug;
 
     /// An enum over the various transaction types.
     type UnsignedTx;

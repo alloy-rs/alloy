@@ -1,6 +1,7 @@
 use crate::{
     provider::SendableTx, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
 };
+use alloy_json_rpc::RpcError;
 use alloy_network::{Ethereum, Network};
 use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
@@ -98,7 +99,7 @@ impl FillerControlFlow {
 /// [`TxFiller::status`] should return [`FillerControlFlow::Ready`].
 /// - **Finished**: The filler has filled in all properties that it can fill.
 /// [`TxFiller::status`] should return [`FillerControlFlow::Finished`].
-pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
+pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug {
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
     type Fillable: Send + Sync + 'static;
@@ -142,13 +143,17 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
         T: Transport + Clone;
 
     /// Fills in the transaction request with the fillable properties.
-    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>);
+    fn fill(
+        &self,
+        fillable: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
     /// Prepares and fills the transaction request with the fillable properties.
     fn prepare_and_fill<P, T>(
         &self,
         provider: &P,
-        mut tx: SendableTx<N>,
+        tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>)
     where
         P: Provider<T, N>,
@@ -161,9 +166,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync {
 
             let fillable = self.prepare(provider, tx.as_builder().unwrap()).await?;
 
-            self.fill(fillable, &mut tx);
-
-            Ok(tx)
+            self.fill(fillable, tx).await
         }
     }
 }
@@ -250,13 +253,18 @@ where
         try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
 
-    fn fill(&self, to_fill: Self::Fillable, tx: &mut SendableTx<N>) {
+    async fn fill(
+        &self,
+        to_fill: Self::Fillable,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
         if let Some(to_fill) = to_fill.0 {
-            self.left.fill(to_fill, tx);
+            tx = self.left.fill(to_fill, tx).await?;
         };
         if let Some(to_fill) = to_fill.1 {
-            self.right.fill(to_fill, tx);
+            tx = self.right.fill(to_fill, tx).await?;
         };
+        Ok(tx)
     }
 }
 
@@ -347,6 +355,14 @@ where
                 panic!(
                     "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
                 );
+            }
+        }
+
+        if let Some(builder) = tx.as_builder() {
+            if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
+                // TODO: improve this.
+                let message = format!("missing properties: {:?}", missing);
+                return Err(RpcError::make_err_resp(-42069, message));
             }
         }
 

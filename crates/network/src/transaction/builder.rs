@@ -219,6 +219,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// True if the builder contains all necessary information to be submitted
+    /// to the `eth_sendTransaction` endpoint.
+    fn can_submit(&self) -> bool;
+
+    /// True if the builder contains all necessary information to be built into
+    /// a valid transaction.
+    fn can_build(&self) -> bool;
+
     /// Build an unsigned, but typed, transaction.
     fn build_unsigned(self) -> BuilderResult<N::UnsignedTx>;
 

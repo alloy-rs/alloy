@@ -47,8 +47,12 @@ where
         Ok(())
     }
 
-    fn fill(&self, _to_fill: Self::Fillable, _tx: &mut SendableTx<N>) {
-        // Do nothing
+    async fn fill(
+        &self,
+        _to_fill: Self::Fillable,
+        tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        Ok(tx)
     }
 }
 

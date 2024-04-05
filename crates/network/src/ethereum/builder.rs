@@ -3,6 +3,7 @@ use crate::{
 };
 use alloy_consensus::{
     BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy,
+    TypedTransaction,
 };
 use alloy_primitives::{Address, TxKind, U256, Bytes, ChainId};
 use alloy_rpc_types::{request::TransactionRequest, AccessList};
@@ -99,10 +100,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.gas = Some(gas_limit);
     }
 
-    fn build_unsigned(self) -> BuilderResult<<Ethereum as Network>::UnsignedTx> {
-        build_unsigned::<Ethereum>(self)
-    }
-
     fn access_list(&self) -> Option<&AccessList> {
         self.access_list.as_ref()
     }
@@ -118,6 +115,33 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
         self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
         self.sidecar = Some(sidecar);
+    }
+
+    fn can_submit(&self) -> bool {
+        // value and data may be None. If they are, they will be set to default.
+        // gas fields and nonce may be None, if they are, they will be populated
+        // with default values by the RPC server
+        self.to.is_some() && self.from.is_some()
+    }
+
+    fn can_build(&self) -> bool {
+        // value and data may be none. If they are, they will be set to default
+        // values.
+
+        // chain_id and from may be none.
+        let common = self.to.is_some() && self.gas.is_some() && self.nonce.is_some();
+
+        let legacy = self.gas_price.is_some();
+        let eip2930 = legacy && self.access_list().is_some();
+
+        let eip1559 = self.max_fee_per_gas.is_some() && self.max_priority_fee_per_gas.is_some();
+
+        let eip4844 = eip1559 && self.sidecar.is_some();
+        common && (legacy || eip2930 || eip1559 || eip4844)
+    }
+
+    fn build_unsigned(self) -> BuilderResult<TypedTransaction> {
+        build_unsigned::<Ethereum>(self)
     }
 
     async fn build<S: NetworkSigner<Ethereum>>(

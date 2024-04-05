@@ -67,12 +67,15 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         self.get_next_nonce(provider, from).await
     }
 
-    fn fill(&self, nonce: Self::Fillable, tx: &mut SendableTx<N>) {
-        let tx = match tx {
-            SendableTx::Builder(tx) => tx,
-            _ => return,
-        };
-        tx.set_nonce(nonce);
+    async fn fill(
+        &self,
+        nonce: Self::Fillable,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        tx.as_mut_builder().map(|tx| {
+            tx.set_nonce(nonce);
+        });
+        Ok(tx)
     }
 }
 
@@ -125,7 +128,7 @@ mod tests {
         };
 
         // errors because signer layer expects nonce to be set, which it is not
-        assert!(provider.send_transaction(tx.clone()).await.is_err());
+        assert!(provider.send_transaction(tx).await.is_err());
     }
 
     #[tokio::test]

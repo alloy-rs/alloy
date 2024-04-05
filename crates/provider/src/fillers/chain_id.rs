@@ -77,14 +77,16 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         }
     }
 
-    fn fill(&self, fillable: Self::Fillable, tx: &mut SendableTx<N>) {
-        let tx = match tx {
-            SendableTx::Builder(tx) => tx,
-            _ => return,
-        };
-
-        if tx.chain_id().is_none() {
-            tx.set_chain_id(fillable);
-        }
+    async fn fill(
+        &self,
+        fillable: Self::Fillable,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        tx.as_mut_builder().map(|tx| {
+            if tx.chain_id().is_none() {
+                tx.set_chain_id(fillable)
+            }
+        });
+        Ok(tx)
     }
 }
