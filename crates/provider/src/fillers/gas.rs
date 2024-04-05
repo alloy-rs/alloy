@@ -297,19 +297,24 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let (provider, anvil) =
-            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let (provider, anvil) = ProviderBuilder::new()
+            .filler(crate::fillers::GasFiller)
+            .filler(crate::fillers::NonceFiller::default())
+            .filler(crate::fillers::ChainIdFiller::default())
+            .on_anvil_with_signer();
 
         let tx = TransactionRequest {
             from: Some(anvil.addresses()[0]),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
             access_list: Some(vec![Default::default()].into()),
-            // chain_id: Some(31337), Not required as access list causes legacy gassing
             ..Default::default()
         };
 
         let tx = provider.send_transaction(tx).await.unwrap();
+
+        let _: () =
+            provider.raw_request(std::borrow::Cow::Borrowed("anvil_mine"), &["0x5"]).await.unwrap();
 
         let tx = tx.get_receipt().await.unwrap();
 

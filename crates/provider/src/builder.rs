@@ -336,6 +336,23 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 // `reqwest` feature is enabled.
 #[cfg(any(all(test, feature = "reqwest"), feature = "anvil"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
+    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    pub fn on_anvil(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
+    where
+        F: TxFiller<Ethereum>
+            + ProviderLayer<L::PRovider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        L: ProviderLayer<
+            crate::ReqwestProvider<Ethereum>,
+            alloy_transport_http::Http<reqwest::Client>,
+            Ethereum,
+        >,
+    {
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+        let url = anvil.endpoint().parse().unwrap();
+
+        (self.on_http(url).unwrap(), anvil)
+    }
+
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
     /// function configures a signer backed by anvil keys, and is intended for
     /// use in tests.

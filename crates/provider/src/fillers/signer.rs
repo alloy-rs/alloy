@@ -77,6 +77,7 @@ where
                 format!("failed to build transaction: {e}"),
             )
         })?;
+
         Ok(SendableTx::Envelope(envelope))
     }
 }
