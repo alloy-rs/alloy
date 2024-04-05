@@ -295,9 +295,7 @@ mod tests {
 
         let tx = provider.send_transaction(tx).await.unwrap();
 
-        let tx_hash = tx.tx_hash();
-
-        let receipt = provider.get_transaction_receipt(*tx_hash).await.unwrap().unwrap();
+        let receipt = tx.get_receipt().await.unwrap();
 
         assert_eq!(receipt.gas_used, Some(0x5208));
     }
