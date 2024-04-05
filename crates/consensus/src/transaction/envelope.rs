@@ -258,7 +258,10 @@ mod tests {
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
     use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
-    use std::{fs, path::PathBuf, vec, vec::Vec};
+    use std::{fs, path::PathBuf, vec};
+
+    #[cfg(not(feature = "std"))]
+    use std::vec::Vec;
 
     #[test]
     #[cfg(feature = "k256")]

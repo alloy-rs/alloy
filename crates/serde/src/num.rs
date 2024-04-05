@@ -292,9 +292,11 @@ pub mod u128_hex_or_decimal_opt {
 
 /// serde functions for handling `Vec<u128>` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal_vec {
+    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
     /// Deserializes an `u128` accepting a hex quantity string with optional 0x prefix or
     /// a number
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u128>, D::Error>
@@ -314,9 +316,11 @@ pub mod u128_hex_or_decimal_vec {
 
 /// serde functions for handling `Vec<Vec<u128>>` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal_vec_vec_opt {
-    use alloc::vec::Vec;
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     /// Deserializes an `u128` accepting a hex quantity string with optional 0x prefix or
     /// a number
@@ -353,8 +357,10 @@ pub mod u128_hex_or_decimal_vec_vec_opt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::{vec, vec::Vec};
     use serde::{Deserialize, Serialize};
+
+    #[cfg(not(feature = "std"))]
+    use alloc::{vec, vec::Vec};
 
     #[test]
     fn test_hex_u64() {
