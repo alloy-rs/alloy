@@ -24,6 +24,7 @@ pub struct TransactionRequest {
     pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u128_hex_or_decimal_opt"
     )]
