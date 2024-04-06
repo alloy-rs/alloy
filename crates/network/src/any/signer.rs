@@ -1,7 +1,7 @@
 use crate::{AnyNetwork, NetworkSigner, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
-use async_trait::async_trait;
 use alloy_signer::Signature;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 /// A signer capable of signing any transaction for the [AnyNetwork] network.
