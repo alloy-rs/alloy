@@ -31,11 +31,6 @@ pub trait TxReceipt {
     fn logs(&self) -> &[Log];
 }
 
-/// A trait for receipts that can be used to determine the success status of a transaction.
-pub trait ReceiptTr<T> {
-    /// Returns the success status of the receipt's transaction.
-    fn status(&self) -> bool;
-}
 
 #[cfg(test)]
 mod tests {

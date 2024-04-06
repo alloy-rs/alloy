@@ -26,7 +26,7 @@ pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptTr, ReceiptWithBloom, TxReceipt,
+    AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
 };
 
 mod transaction;

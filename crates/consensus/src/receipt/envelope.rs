@@ -1,9 +1,8 @@
-use crate::{Receipt, ReceiptWithBloom, TxType};
+use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
-use super::ReceiptTr;
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -51,26 +50,6 @@ impl<T> ReceiptEnvelope<T> {
         }
     }
 
-    /// Return true if the transaction was successful.
-    pub fn is_success(&self) -> bool {
-        self.status()
-    }
-
-    /// Returns the cumulative gas used at this receipt.
-    pub fn cumulative_gas_used(&self) -> u64 {
-        self.as_receipt().unwrap().cumulative_gas_used
-    }
-
-    /// Return the receipt logs.
-    pub fn logs(&self) -> &[T] {
-        &self.as_receipt().unwrap().logs
-    }
-
-    /// Return the receipt's bloom.
-    pub fn logs_bloom(&self) -> &Bloom {
-        &self.as_receipt_with_bloom().unwrap().logs_bloom
-    }
-
     /// Return the inner receipt with bloom. Currently this is infallible,
     /// however, future receipt types may be added.
     pub const fn as_receipt_with_bloom(&self) -> Option<&ReceiptWithBloom<T>> {
@@ -90,9 +69,28 @@ impl<T> ReceiptEnvelope<T> {
     }
 }
 
-impl<T> ReceiptTr<T> for ReceiptEnvelope<T> {
-    fn status(&self) -> bool {
+impl TxReceipt for ReceiptEnvelope {
+    fn success(&self) -> bool {
         self.as_receipt().unwrap().status
+    }
+
+    /// Return the receipt's bloom.
+    fn bloom(&self) -> Bloom {
+        self.as_receipt_with_bloom().unwrap().logs_bloom
+    }
+
+    fn bloom_cheap(&self) -> Option<Bloom> {
+        Some(self.bloom())
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    fn cumulative_gas_used(&self) -> u64 {
+        self.as_receipt().unwrap().cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    fn logs(&self) -> &[Log] {
+        &self.as_receipt().unwrap().logs
     }
 }
 
