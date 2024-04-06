@@ -3,7 +3,6 @@ use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
-
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the

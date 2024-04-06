@@ -31,7 +31,6 @@ pub trait TxReceipt {
     fn logs(&self) -> &[Log];
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
