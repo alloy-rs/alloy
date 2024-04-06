@@ -64,7 +64,6 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     /// The network header type.
     type Header;
 
-
     // -- JSON RPC types --
 
     /// The JSON body of a transaction request.

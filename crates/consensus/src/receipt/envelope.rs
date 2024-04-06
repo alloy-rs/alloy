@@ -40,9 +40,6 @@ pub enum ReceiptEnvelope<T = Log> {
     Eip4844(ReceiptWithBloom<T>),
 }
 
-
-
-
 impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
     pub const fn tx_type(&self) -> TxType {
@@ -93,13 +90,11 @@ impl<T> ReceiptEnvelope<T> {
     }
 }
 
-
 impl<T> ReceiptTr<T> for ReceiptEnvelope<T> {
     fn status(&self) -> bool {
         self.as_receipt().unwrap().status
     }
 }
-
 
 impl ReceiptEnvelope {
     /// Get the length of the inner receipt in the 2718 encoding.

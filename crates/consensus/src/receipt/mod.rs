@@ -6,7 +6,6 @@ pub use any::AnyReceiptEnvelope;
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
-
 mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom};
 
