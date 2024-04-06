@@ -31,6 +31,7 @@ pub struct OptimismTransactionReceiptFields {
     pub deposit_receipt_version: Option<U64>,
     /// L1 fee for the transaction
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u128_hex_or_decimal_opt"
     )]
@@ -40,12 +41,14 @@ pub struct OptimismTransactionReceiptFields {
     pub l1_fee_scalar: Option<f64>,
     /// L1 gas price for the transaction
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u128_hex_or_decimal_opt"
     )]
     pub l1_gas_price: Option<u128>,
     /// L1 gas used for the transaction
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u128_hex_or_decimal_opt"
     )]
