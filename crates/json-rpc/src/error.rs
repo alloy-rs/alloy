@@ -5,7 +5,7 @@ use serde_json::value::RawValue;
 #[derive(Debug, thiserror::Error)]
 pub enum RpcError<E, ErrResp = Box<RawValue>> {
     /// Server returned an error response.
-    #[error("Server returned an error response: {0}")]
+    #[error("server returned an error response: {0}")]
     ErrorResp(ErrorPayload<ErrResp>),
 
     /// Server returned a null response when a non-null response was expected.
