@@ -3,6 +3,8 @@ use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
+use super::ReceiptTr;
+
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the
@@ -38,6 +40,9 @@ pub enum ReceiptEnvelope<T = Log> {
     Eip4844(ReceiptWithBloom<T>),
 }
 
+
+
+
 impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
     pub const fn tx_type(&self) -> TxType {
@@ -52,11 +57,6 @@ impl<T> ReceiptEnvelope<T> {
     /// Return true if the transaction was successful.
     pub fn is_success(&self) -> bool {
         self.status()
-    }
-
-    /// Returns the success status of the receipt's transaction.
-    pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
     }
 
     /// Returns the cumulative gas used at this receipt.
@@ -92,6 +92,14 @@ impl<T> ReceiptEnvelope<T> {
         }
     }
 }
+
+
+impl<T> ReceiptTr<T> for ReceiptEnvelope<T> {
+    fn status(&self) -> bool {
+        self.as_receipt().unwrap().status
+    }
+}
+
 
 impl ReceiptEnvelope {
     /// Get the length of the inner receipt in the 2718 encoding.

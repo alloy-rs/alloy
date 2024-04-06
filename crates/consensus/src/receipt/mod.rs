@@ -6,6 +6,7 @@ pub use any::AnyReceiptEnvelope;
 mod envelope;
 pub use envelope::ReceiptEnvelope;
 
+
 mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom};
 
@@ -29,6 +30,12 @@ pub trait TxReceipt {
 
     /// Returns the logs emitted by this transaction.
     fn logs(&self) -> &[Log];
+}
+
+/// A trait for receipts that can be used to determine the success status of a transaction.
+pub trait ReceiptTr<T> {
+    /// Returns the success status of the receipt's transaction.
+    fn status(&self) -> bool;
 }
 
 #[cfg(test)]

@@ -33,6 +33,8 @@ pub use any::AnyNetwork;
 
 pub use alloy_eips::eip2718;
 
+pub use alloy_consensus::ReceiptTr;
+
 /// A receipt response.
 ///
 /// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
@@ -61,6 +63,7 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptEnvelope: Eip2718Envelope;
     /// The network header type.
     type Header;
+
 
     // -- JSON RPC types --
 
