@@ -24,7 +24,9 @@ use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
-    num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
+    num::{
+        u128_hex_or_decimal, u128_hex_or_decimal_opt, u64_hex_or_decimal, u64_hex_or_decimal_opt,
+    },
     storage::deserialize_storage_map,
     ttd::deserialize_json_ttd_opt,
 };
@@ -46,8 +48,8 @@ pub struct Genesis {
     /// The genesis header extra data.
     pub extra_data: Bytes,
     /// The genesis header gas limit.
-    #[serde(with = "u64_hex_or_decimal")]
-    pub gas_limit: u64,
+    #[serde(with = "u128_hex_or_decimal")]
+    pub gas_limit: u128,
     /// The genesis header difficulty.
     pub difficulty: U256,
     /// The genesis header mix hash.
@@ -64,14 +66,14 @@ pub struct Genesis {
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub base_fee_per_gas: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub excess_blob_gas: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub excess_blob_gas: Option<u128>,
     /// The genesis header blob gas used
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub blob_gas_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub blob_gas_used: Option<u128>,
     /// The genesis block number
     #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
     pub number: Option<u64>,
@@ -158,7 +160,7 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u128) -> Self {
         self.gas_limit = gas_limit;
         self
     }
@@ -182,19 +184,19 @@ impl Genesis {
     }
 
     /// Set the base fee.
-    pub const fn with_base_fee(mut self, base_fee: Option<u64>) -> Self {
+    pub const fn with_base_fee(mut self, base_fee: Option<u128>) -> Self {
         self.base_fee_per_gas = base_fee;
         self
     }
 
     /// Set the excess blob gas.
-    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u128>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u128>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
