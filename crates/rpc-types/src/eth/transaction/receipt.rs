@@ -28,21 +28,29 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
-    #[serde(with = "alloy_serde::u64_hex_opt")]
-    pub gas_used: Option<u64>,
+    #[serde(with = "alloy_serde::u128_hex_or_decimal_opt")]
+    pub gas_used: Option<u128>,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
-    #[serde(with = "alloy_serde::u64_hex")]
-    pub effective_gas_price: u64,
+    #[serde(with = "alloy_serde::u128_hex_or_decimal")]
+    pub effective_gas_price: u128,
     /// Blob gas used by the eip-4844 transaction
     ///
     /// This is None for non eip-4844 transactions
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
-    pub blob_gas_used: Option<u64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u128_hex_or_decimal_opt",
+        default
+    )]
+    pub blob_gas_used: Option<u128>,
     /// The price paid by the eip-4844 transaction per blob gas.
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
-    pub blob_gas_price: Option<u64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u128_hex_or_decimal_opt",
+        default
+    )]
+    pub blob_gas_price: Option<u128>,
     /// Address of the sender
     pub from: Address,
     /// Address of the receiver. None when its a contract creation transaction.

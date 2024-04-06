@@ -14,18 +14,22 @@ pub struct TransactionRequest {
     /// The destination address of the transaction.
     pub to: Option<Address>,
     /// The legacy gas price.
-    #[serde(default)]
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
     pub gas_price: Option<u128>,
     /// The max base fee per gas the sender is willing to pay.
-    #[serde(default)]
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
     pub max_fee_per_gas: Option<u128>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
-    #[serde(default)]
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
     pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
     pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
     pub value: Option<U256>,

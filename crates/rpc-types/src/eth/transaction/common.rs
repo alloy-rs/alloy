@@ -15,5 +15,5 @@ pub struct TransactionInfo {
     /// Number of the block.
     pub block_number: Option<u64>,
     /// Base fee of the block.
-    pub base_fee: Option<u64>,
+    pub base_fee: Option<u128>,
 }

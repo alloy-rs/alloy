@@ -3,7 +3,7 @@
 use crate::{Provider, RootProvider};
 use alloy_json_rpc::RpcError;
 use alloy_network::Network;
-use alloy_primitives::{B256, U256};
+use alloy_primitives::B256;
 use alloy_rpc_types::Block;
 use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
@@ -363,7 +363,7 @@ pub(crate) struct Heartbeat<S> {
     unconfirmed: HashMap<B256, TxWatcher>,
 
     /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<U256, Vec<TxWatcher>>,
+    waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
 
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
@@ -384,7 +384,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
     fn check_confirmations(&mut self, current_height: u64) {
-        let to_keep = self.waiting_confs.split_off(&U256::from(current_height + 1));
+        let to_keep = self.waiting_confs.split_off(&(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
             watcher.notify();
@@ -444,10 +444,7 @@ impl<S> Heartbeat<S> {
             }
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-            self.waiting_confs
-                .entry(U256::from(*block_height + confirmations - 1))
-                .or_default()
-                .push(watcher);
+            self.waiting_confs.entry(*block_height + confirmations - 1).or_default().push(watcher);
         }
 
         self.check_confirmations(*block_height);
