@@ -69,7 +69,7 @@ impl<T> ReceiptEnvelope<T> {
 }
 
 impl TxReceipt for ReceiptEnvelope {
-    fn success(&self) -> bool {
+    fn status(&self) -> bool {
         self.as_receipt().unwrap().status
     }
 

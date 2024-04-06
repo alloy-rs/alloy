@@ -1,4 +1,4 @@
-use crate::ReceiptWithBloom;
+use crate::{ReceiptWithBloom, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -39,30 +39,27 @@ impl AnyReceiptEnvelope {
             length + 1
         }
     }
+}
 
-    /// Return true if the transaction was successful.
-    pub const fn is_success(&self) -> bool {
-        self.status()
-    }
-
+impl TxReceipt for AnyReceiptEnvelope {
     /// Returns the success status of the receipt's transaction.
-    pub const fn status(&self) -> bool {
+    fn status(&self) -> bool {
         self.inner.receipt.status
     }
 
+    /// Return the receipt's bloom.
+    fn bloom(&self) -> Bloom {
+        self.inner.logs_bloom
+    }
+
     /// Returns the cumulative gas used at this receipt.
-    pub const fn cumulative_gas_used(&self) -> u64 {
+    fn cumulative_gas_used(&self) -> u64 {
         self.inner.receipt.cumulative_gas_used
     }
 
     /// Return the receipt logs.
-    pub fn logs(&self) -> &[Log] {
+    fn logs(&self) -> &[Log] {
         &self.inner.receipt.logs
-    }
-
-    /// Return the receipt's bloom.
-    pub const fn logs_bloom(&self) -> &Bloom {
-        &self.inner.logs_bloom
     }
 }
 

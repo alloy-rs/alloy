@@ -12,7 +12,7 @@ pub use receipts::{Receipt, ReceiptWithBloom};
 /// Receipt is the result of a transaction execution.
 pub trait TxReceipt {
     /// Returns true if the transaction was successful.
-    fn success(&self) -> bool;
+    fn status(&self) -> bool;
 
     /// Returns the bloom filter for the logs in the receipt. This operation
     /// may be expensive.
