@@ -5,6 +5,11 @@ use alloy_rpc_types::{
 };
 
 mod builder;
+mod signer;
+pub use signer::AnyNetworkSigner;
+
+/// Alias for a catch-all receipt type.
+pub type AnyReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 /// Types for a catch-all network.
 ///
@@ -29,12 +34,12 @@ impl Network for AnyNetwork {
 
     type TransactionResponse = WithOtherFields<Transaction>;
 
-    type ReceiptResponse = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+    type ReceiptResponse = AnyReceipt;
 
     type HeaderResponse = WithOtherFields<Header>;
 }
 
-impl ReceiptResponse for WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>> {
+impl ReceiptResponse for AnyReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
     }
