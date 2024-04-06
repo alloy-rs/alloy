@@ -17,8 +17,8 @@ pub struct Receipt<T = Log> {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity_bool"))]
     pub status: bool,
     /// Gas used
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
-    pub cumulative_gas_used: u64,
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    pub cumulative_gas_used: u128,
     /// Log send from contracts.
     pub logs: Vec<T>,
 }
@@ -46,7 +46,7 @@ impl TxReceipt for Receipt {
         self.bloom_slow()
     }
 
-    fn cumulative_gas_used(&self) -> u64 {
+    fn cumulative_gas_used(&self) -> u128 {
         self.cumulative_gas_used
     }
 
@@ -85,7 +85,7 @@ impl TxReceipt for ReceiptWithBloom {
         Some(self.logs_bloom)
     }
 
-    fn cumulative_gas_used(&self) -> u64 {
+    fn cumulative_gas_used(&self) -> u128 {
         self.receipt.cumulative_gas_used
     }
 

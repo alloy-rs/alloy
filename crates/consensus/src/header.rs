@@ -54,9 +54,9 @@ pub struct Header {
     /// zero; formally Hi.
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
-    pub gas_limit: u64,
+    pub gas_limit: u128,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
-    pub gas_used: u64,
+    pub gas_used: u128,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
     /// formally Hs.
     pub timestamp: u64,
@@ -73,14 +73,14 @@ pub struct Header {
     /// The algorithm results in the base fee per gas increasing when blocks are
     /// above the gas target, and decreasing when blocks are below the gas target. The base fee per
     /// gas is burned.
-    pub base_fee_per_gas: Option<u64>,
+    pub base_fee_per_gas: Option<u128>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
-    pub blob_gas_used: Option<u64>,
+    pub blob_gas_used: Option<u128>,
     /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
     /// with above-target blob gas consumption increase this value, blocks with below-target blob
     /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
-    pub excess_blob_gas: Option<u64>,
+    pub excess_blob_gas: Option<u128>,
     /// The hash of the parent beacon block's root is included in execution blocks, as proposed by
     /// EIP-4788.
     ///
@@ -194,7 +194,7 @@ impl Header {
     /// Calculate base fee for next block according to the EIP-1559 spec.
     ///
     /// Returns a `None` if no base fee is set, no EIP-1559 support
-    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u128> {
         Some(calc_next_block_base_fee(
             self.gas_used,
             self.gas_limit,
@@ -207,7 +207,7 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
+    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 
@@ -397,8 +397,8 @@ impl Decodable for Header {
             logs_bloom: Decodable::decode(buf)?,
             difficulty: Decodable::decode(buf)?,
             number: U256::decode(buf)?.to::<u64>(),
-            gas_limit: U256::decode(buf)?.to::<u64>(),
-            gas_used: U256::decode(buf)?.to::<u64>(),
+            gas_limit: U256::decode(buf)?.to::<u128>(),
+            gas_used: U256::decode(buf)?.to::<u128>(),
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
@@ -414,7 +414,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
+                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 
@@ -432,7 +432,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
+                this.blob_gas_used = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 
@@ -440,7 +440,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());
+                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 

@@ -383,8 +383,8 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
 
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
-    fn check_confirmations(&mut self, current_height: &U256) {
-        let to_keep = self.waiting_confs.split_off(&(current_height + U256::from(1)));
+    fn check_confirmations(&mut self, current_height: u64) {
+        let to_keep = self.waiting_confs.split_off(&U256::from(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
             watcher.notify();
@@ -445,12 +445,12 @@ impl<S> Heartbeat<S> {
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
             self.waiting_confs
-                .entry(*block_height + U256::from(confirmations) - U256::from(1))
+                .entry(U256::from(*block_height + confirmations - 1))
                 .or_default()
                 .push(watcher);
         }
 
-        self.check_confirmations(block_height);
+        self.check_confirmations(*block_height);
 
         // Update the latest block. We use `send_replace` here to ensure the
         // latest block is always up to date, even if no receivers exist.
