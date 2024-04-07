@@ -28,6 +28,11 @@ impl U64HexOrNumber {
     pub fn to(self) -> u64 {
         self.0.to()
     }
+
+    /// Checks if the wrapped value is zero.
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
 }
 
 impl From<u64> for U64HexOrNumber {
