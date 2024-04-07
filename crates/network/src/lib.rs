@@ -29,7 +29,7 @@ mod ethereum;
 pub use ethereum::{Ethereum, EthereumSigner};
 
 mod any;
-pub use any::{AnyNetwork, AnyNetworkSigner};
+pub use any::AnyNetwork;
 
 pub use alloy_eips::eip2718;
 
