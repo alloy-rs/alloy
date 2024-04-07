@@ -1,5 +1,4 @@
-use super::Ethereum;
-use crate::{NetworkSigner, TxSigner};
+use crate::{Network, NetworkSigner, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_signer::Signature;
 use async_trait::async_trait;
@@ -43,7 +42,8 @@ impl EthereumSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl NetworkSigner<Ethereum> for EthereumSigner {
+impl<N> NetworkSigner<N> for EthereumSigner
+    where N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope> {
     async fn sign_transaction(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
         match tx {
             TypedTransaction::Legacy(mut t) => {

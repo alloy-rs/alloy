@@ -1,15 +1,9 @@
 use crate::{Network, ReceiptResponse};
-use alloy_consensus::AnyReceiptEnvelope;
 use alloy_rpc_types::{
-    Header, Log, Transaction, TransactionReceipt, TransactionRequest, WithOtherFields,
+    AnyTransactionReceipt, Header, Transaction, TransactionRequest, WithOtherFields
 };
 
 mod builder;
-mod signer;
-pub use signer::AnyNetworkSigner;
-
-/// Alias for a catch-all receipt type.
-pub type AnyReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 /// Types for a catch-all network.
 ///
@@ -34,12 +28,12 @@ impl Network for AnyNetwork {
 
     type TransactionResponse = WithOtherFields<Transaction>;
 
-    type ReceiptResponse = AnyReceipt;
+    type ReceiptResponse = AnyTransactionReceipt;
 
     type HeaderResponse = WithOtherFields<Header>;
 }
 
-impl ReceiptResponse for AnyReceipt {
+impl ReceiptResponse for AnyTransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
     }
