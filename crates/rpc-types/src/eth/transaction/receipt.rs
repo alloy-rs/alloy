@@ -28,8 +28,8 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     #[serde(with = "alloy_serde::u64_hex_opt")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
-    #[serde(with = "alloy_serde::u128_hex_or_decimal_opt")]
-    pub gas_used: Option<u128>,
+    #[serde(with = "alloy_serde::u128_hex_or_decimal")]
+    pub gas_used: u128,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
