@@ -24,9 +24,7 @@ use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
-    num::{
-        u128_hex_or_decimal, u128_hex_or_decimal_opt, u64_hex_or_decimal, u64_hex_or_decimal_opt,
-    },
+    num::{u128_hex_or_decimal, u128_hex_or_decimal_opt, u64_hex, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
     ttd::deserialize_json_ttd_opt,
 };
@@ -40,10 +38,10 @@ pub struct Genesis {
     #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "u64_hex")]
     pub nonce: u64,
     /// The genesis header timestamp.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "u64_hex")]
     pub timestamp: u64,
     /// The genesis header extra data.
     pub extra_data: Bytes,
@@ -66,16 +64,16 @@ pub struct Genesis {
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
-    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
     pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
-    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
     pub excess_blob_gas: Option<u128>,
     /// The genesis header blob gas used
-    #[serde(skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
     pub blob_gas_used: Option<u128>,
     /// The genesis block number
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
     pub number: Option<u64>,
 }
 
