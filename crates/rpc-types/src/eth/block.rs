@@ -84,7 +84,8 @@ pub struct Header {
     #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal")]
     pub gas_used: u128,
     /// Timestamp
-    pub timestamp: U256,
+    #[serde(default, with = "alloy_serde::num::u64_hex")]
+    pub timestamp: u64,
     /// Total difficulty
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,
@@ -1193,7 +1194,7 @@ mod tests {
                 gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
@@ -1235,7 +1236,7 @@ mod tests {
                 gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
@@ -1277,7 +1278,7 @@ mod tests {
                 gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
