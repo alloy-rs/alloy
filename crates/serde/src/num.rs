@@ -243,6 +243,7 @@ where
 {
     NumberOrHexU256::deserialize(deserializer)?.try_into_u256()
 }
+
 /// serde functions for handling primitive `u128` as [U128](alloy_primitives::U128)
 pub mod u128_hex_or_decimal {
     use alloy_primitives::U128;
