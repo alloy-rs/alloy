@@ -224,14 +224,14 @@ impl Header {
         mem::size_of::<Bloom>() + // logs bloom
         mem::size_of::<U256>() + // difficulty
         mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u64>() + // gas limit
-        mem::size_of::<u64>() + // gas used
+        mem::size_of::<u128>() + // gas limit
+        mem::size_of::<u128>() + // gas used
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u64>>() + // base fee per gas
-        mem::size_of::<Option<u64>>() + // blob gas used
-        mem::size_of::<Option<u64>>() + // excess blob gas
+        mem::size_of::<Option<u128>>() + // base fee per gas
+        mem::size_of::<Option<u128>>() + // blob gas used
+        mem::size_of::<Option<u128>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         self.extra_data.len() // extra data
     }
@@ -396,9 +396,9 @@ impl Decodable for Header {
             receipts_root: Decodable::decode(buf)?,
             logs_bloom: Decodable::decode(buf)?,
             difficulty: Decodable::decode(buf)?,
-            number: U256::decode(buf)?.to::<u64>(),
-            gas_limit: U256::decode(buf)?.to::<u128>(),
-            gas_used: U256::decode(buf)?.to::<u128>(),
+            number: u64::decode(buf)?,
+            gas_limit: u128::decode(buf)?,
+            gas_used: u128::decode(buf)?,
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
