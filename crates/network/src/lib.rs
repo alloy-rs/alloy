@@ -55,7 +55,7 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     type TxEnvelope: Eip2718Envelope;
 
     /// An enum over the various transaction types.
-    type UnsignedTx;
+    type UnsignedTx: From<Self::TxEnvelope>;
 
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
@@ -65,7 +65,11 @@ pub trait Network: Clone + Copy + Sized + Send + Sync + 'static {
     // -- JSON RPC types --
 
     /// The JSON body of a transaction request.
-    type TransactionRequest: RpcObject + TransactionBuilder<Self> + std::fmt::Debug;
+    type TransactionRequest: RpcObject
+        + TransactionBuilder<Self>
+        + std::fmt::Debug
+        + From<Self::TxEnvelope>
+        + From<Self::UnsignedTx>;
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
     /// The JSON body of a transaction receipt.
