@@ -6,8 +6,9 @@ use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     PendingTransactionBuilder,
 };
+use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -45,6 +46,58 @@ use alloy_pubsub::{PubSubFrontend, Subscription};
 ///
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
+
+/// A transaction that can be sent. This is either a builder or an envelope.
+///
+/// This type is used to allow for fillers to convert a builder into an envelope
+/// without changing the user-facing API.
+///
+/// Users should NOT use this type directly. It should only be used as an
+/// implementation detail of [`Provider::send_transaction_internal`].
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SendableTx<N: Network> {
+    /// A transaction that is not yet signed.
+    Builder(N::TransactionRequest),
+    /// A transaction that is signed and fully constructed.
+    Envelope(N::TxEnvelope),
+}
+
+impl<N: Network> SendableTx<N> {
+    /// Fallible cast to an unbuilt transaction request.
+    pub fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
+        match self {
+            Self::Builder(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Fallible cast to an unbuilt transaction request.
+    pub const fn as_builder(&self) -> Option<&N::TransactionRequest> {
+        match self {
+            Self::Builder(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Checks if the transaction is a builder.
+    pub const fn is_builder(&self) -> bool {
+        matches!(self, Self::Builder(_))
+    }
+
+    /// Check if the transaction is an envelope.
+    pub const fn is_envelope(&self) -> bool {
+        matches!(self, Self::Envelope(_))
+    }
+
+    /// Fallible cast to a built transaction envelope.
+    pub const fn as_envelope(&self) -> Option<&N::TxEnvelope> {
+        match self {
+            Self::Envelope(tx) => Some(tx),
+            _ => None,
+        }
+    }
+}
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
@@ -595,35 +648,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getBlockByNumber", (number, hydrate)).await
     }
 
-    /// Populates the legacy gas price field of the given transaction request.
-    async fn populate_gas(
-        &self,
-        tx: &mut N::TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<()> {
-        let gas = self.estimate_gas(&*tx, block).await;
-
-        gas.map(|gas| tx.set_gas_limit(gas))
-    }
-
-    /// Populates the EIP-1559 gas price fields of the given transaction request.
-    async fn populate_gas_eip1559(
-        &self,
-        tx: &mut N::TransactionRequest,
-        estimator: Option<EstimatorFunction>,
-    ) -> TransportResult<()> {
-        let gas = self.estimate_eip1559_fees(estimator).await;
-
-        gas.map(|estimate| {
-            tx.set_max_fee_per_gas(estimate.max_fee_per_gas);
-            tx.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
-        })
-    }
-
     /// Broadcasts a transaction to the network.
     ///
-    /// Returns a type that can be used to configure how and when to await the transaction's
-    /// confirmation.
+    /// Returns a type that can be used to configure how and when to await the
+    /// transaction's confirmation.
     ///
     /// # Examples
     ///
@@ -644,8 +672,33 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
-        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+        self.send_transaction_internal(SendableTx::Builder(tx)).await
+    }
+
+    ///
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// transaction and send it to the network without changing user-facing
+    /// APIs. Generally implementors should NOT override this method.
+    ///
+    /// [`send_transaction`]: Self::send_transaction
+    /// [`ProviderLayer`]: crate::ProviderLayer
+    /// [`TxFiller`]: crate::TxFiller
+    #[doc(hidden)]
+    async fn send_transaction_internal(
+        &self,
+        tx: SendableTx<N>,
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        match tx {
+            SendableTx::Builder(tx) => {
+                let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
+                Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+            }
+            SendableTx::Envelope(tx) => {
+                let mut encoded_tx = vec![];
+                tx.encode_2718(&mut encoded_tx);
+                self.send_raw_transaction(&encoded_tx).await
+            }
+        }
     }
 
     /// Broadcasts a raw transaction RLP bytes to the network.
@@ -653,9 +706,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// See [`send_transaction`](Self::send_transaction) for more details.
     async fn send_raw_transaction(
         &self,
-        rlp_bytes: &[u8],
+        encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        let rlp_hex = hex::encode_prefixed(rlp_bytes);
+        let rlp_hex = hex::encode_prefixed(encoded_tx);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }

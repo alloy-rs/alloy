@@ -58,6 +58,18 @@ pub struct AccessList(
     pub Vec<AccessListItem>,
 );
 
+impl From<Vec<AccessListItem>> for AccessList {
+    fn from(list: Vec<AccessListItem>) -> Self {
+        Self(list)
+    }
+}
+
+impl From<AccessList> for Vec<AccessListItem> {
+    fn from(this: AccessList) -> Self {
+        this.0
+    }
+}
+
 impl AccessList {
     /// Converts the list into a vec, expected by revm
     pub fn flattened(&self) -> Vec<(Address, Vec<U256>)> {

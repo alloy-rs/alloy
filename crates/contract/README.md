@@ -32,7 +32,7 @@ sol! {
 }
 
 // Build a provider.
-let provider = ProviderBuilder::new().with_recommended_layers().on_builtin("http://localhost:8545").await?;
+let provider = ProviderBuilder::new().with_recommended_fillers().on_builtin("http://localhost:8545").await?;
 
 // If `#[sol(bytecode = "0x...")]` is provided, the contract can be deployed with `MyContract::deploy`,
 // and a new instance will be created.

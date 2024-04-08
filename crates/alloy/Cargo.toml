@@ -94,7 +94,7 @@ contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
 eips = ["dep:alloy-eips"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
-node-bindings = ["dep:alloy-node-bindings"]
+node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil"]
 
 # providers
 providers = ["dep:alloy-provider"]

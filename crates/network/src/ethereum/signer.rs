@@ -1,5 +1,4 @@
-use super::Ethereum;
-use crate::{NetworkSigner, TxSigner};
+use crate::{Network, NetworkSigner, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_signer::Signature;
 use async_trait::async_trait;
@@ -33,7 +32,7 @@ impl EthereumSigner {
         Self(Arc::new(signer))
     }
 
-    async fn sign_transaction(
+    async fn sign_transaction_inner(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
@@ -43,23 +42,26 @@ impl EthereumSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl NetworkSigner<Ethereum> for EthereumSigner {
+impl<N> NetworkSigner<N> for EthereumSigner
+where
+    N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
+{
     async fn sign_transaction(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
         match tx {
             TypedTransaction::Legacy(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip2930(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip1559(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip4844(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
         }

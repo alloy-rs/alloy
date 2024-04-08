@@ -22,7 +22,7 @@ pub use optimism::OptimismTransactionReceiptFields;
 
 mod receipt;
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
-pub use receipt::TransactionReceipt;
+pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
