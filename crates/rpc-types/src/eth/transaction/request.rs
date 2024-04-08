@@ -367,11 +367,12 @@ impl From<TxEnvelope> for TransactionRequest {
             TxEnvelope::Legacy(tx) => {
                 #[cfg(feature = "k256")]
                 {
-                    if let Ok(signer) = tx.recover_signer() {
-                        let tx: TransactionRequest = tx.strip_signature().into();
-                        tx.from(signer)
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
                     } else {
-                        tx.strip_signature().into()
+                        tx
                     }
                 }
 
@@ -383,11 +384,12 @@ impl From<TxEnvelope> for TransactionRequest {
             TxEnvelope::Eip2930(tx) => {
                 #[cfg(feature = "k256")]
                 {
-                    if let Ok(signer) = tx.recover_signer() {
-                        let tx: TransactionRequest = tx.strip_signature().into();
-                        tx.from(signer)
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
                     } else {
-                        tx.strip_signature().into()
+                        tx
                     }
                 }
 
@@ -399,11 +401,12 @@ impl From<TxEnvelope> for TransactionRequest {
             TxEnvelope::Eip1559(tx) => {
                 #[cfg(feature = "k256")]
                 {
-                    if let Ok(signer) = tx.recover_signer() {
-                        let tx: TransactionRequest = tx.strip_signature().into();
-                        tx.from(signer)
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
                     } else {
-                        tx.strip_signature().into()
+                        tx
                     }
                 }
 
@@ -415,11 +418,12 @@ impl From<TxEnvelope> for TransactionRequest {
             TxEnvelope::Eip4844(tx) => {
                 #[cfg(feature = "k256")]
                 {
-                    if let Ok(signer) = tx.recover_signer() {
-                        let tx: TransactionRequest = tx.strip_signature().into();
-                        tx.from(signer)
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
                     } else {
-                        tx.strip_signature().into()
+                        tx
                     }
                 }
 
