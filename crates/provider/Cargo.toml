@@ -55,6 +55,7 @@ reqwest = [
     "dep:url",
     "dep:alloy-transport-http",
     "alloy-rpc-client/reqwest",
+    "alloy-transport-http/reqwest-default-tls",
 ]
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
