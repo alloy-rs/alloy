@@ -19,6 +19,7 @@ pub mod txpool;
 mod work;
 
 pub use account::*;
+pub use admin::NodeInfo;
 pub use alloy_eips::eip4895::Withdrawal;
 pub use block::*;
 pub use call::{Bundle, EthCallResponse, StateContext};
