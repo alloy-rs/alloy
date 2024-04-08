@@ -55,7 +55,7 @@ pub const MAX_BLOBS_PER_BLOCK: usize = (MAX_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BL
 pub const TARGET_BLOBS_PER_BLOCK: u64 = TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB; // 393216 / 131072 = 3
 
 /// Determines the maximum rate of change for blob fee
-pub const BLOB_GASPRICE_UPDATE_FRACTION: u64 = 3_338_477u64; // 3338477
+pub const BLOB_GASPRICE_UPDATE_FRACTION: u128 = 3_338_477u128; // 3338477
 
 /// Minimum gas price for a data blob
 pub const BLOB_TX_MIN_BLOB_GASPRICE: u128 = 1u128;
@@ -80,8 +80,12 @@ pub type Bytes48 = FixedBytes<48>;
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    (parent_excess_blob_gas + parent_blob_gas_used).saturating_sub(TARGET_DATA_GAS_PER_BLOCK)
+pub const fn calc_excess_blob_gas(
+    parent_excess_blob_gas: u128,
+    parent_blob_gas_used: u128,
+) -> u128 {
+    (parent_excess_blob_gas + parent_blob_gas_used)
+        .saturating_sub(TARGET_DATA_GAS_PER_BLOCK as u128)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -89,12 +93,8 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
-    fake_exponential(
-        BLOB_TX_MIN_BLOB_GASPRICE as u64,
-        excess_blob_gas,
-        BLOB_GASPRICE_UPDATE_FRACTION,
-    )
+pub fn calc_blob_gasprice(excess_blob_gas: u128) -> u128 {
+    fake_exponential(BLOB_TX_MIN_BLOB_GASPRICE, excess_blob_gas, BLOB_GASPRICE_UPDATE_FRACTION)
 }
 
 /// Approximates `factor * e ** (numerator / denominator)` using Taylor expansion.
@@ -108,11 +108,8 @@ pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
 ///
 /// This function panics if `denominator` is zero.
 #[inline]
-fn fake_exponential(factor: u64, numerator: u64, denominator: u64) -> u128 {
+fn fake_exponential(factor: u128, numerator: u128, denominator: u128) -> u128 {
     assert_ne!(denominator, 0, "attempt to divide by zero");
-    let factor = factor as u128;
-    let numerator = numerator as u128;
-    let denominator = denominator as u128;
 
     let mut i = 1;
     let mut output = 0;
@@ -164,8 +161,8 @@ mod tests {
             ),
             (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1, 0),
         ] {
-            let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
-            assert_eq!(actual, expected, "test: {t:?}");
+            let actual = calc_excess_blob_gas(excess as u128, (blobs * DATA_GAS_PER_BLOB) as u128);
+            assert_eq!(actual, expected as u128, "test: {t:?}");
         }
     }
 
@@ -213,9 +210,9 @@ mod tests {
             (1, 5, 2, 11),   // approximate 12.18
             (2, 5, 2, 23),   // approximate 24.36
             (1, 50000000, 2225652, 5709098764),
-            (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION, 1),
+            (1, 380928, BLOB_GASPRICE_UPDATE_FRACTION.try_into().unwrap(), 1),
         ] {
-            let actual = fake_exponential(factor, numerator, denominator);
+            let actual = fake_exponential(factor as u128, numerator as u128, denominator as u128);
             assert_eq!(actual, expected, "test: {t:?}");
         }
     }
