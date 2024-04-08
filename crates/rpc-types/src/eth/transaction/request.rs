@@ -364,10 +364,10 @@ impl From<TypedTransaction> for TransactionRequest {
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> TransactionRequest {
         match envelope {
-            TxEnvelope::Legacy(tx) => tx.owned_tx().into(),
-            TxEnvelope::Eip2930(tx) => tx.owned_tx().into(),
-            TxEnvelope::Eip1559(tx) => tx.owned_tx().into(),
-            TxEnvelope::Eip4844(tx) => tx.owned_tx().into(),
+            TxEnvelope::Legacy(tx) => tx.strip_signature().into(),
+            TxEnvelope::Eip2930(tx) => tx.strip_signature().into(),
+            TxEnvelope::Eip1559(tx) => tx.strip_signature().into(),
+            TxEnvelope::Eip4844(tx) => tx.strip_signature().into(),
             _ => Default::default(),
         }
     }

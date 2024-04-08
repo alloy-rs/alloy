@@ -33,8 +33,8 @@ impl<T, Sig> Signed<T, Sig> {
         (self.tx, self.signature, self.hash)
     }
 
-    /// Returns the transaction.
-    pub fn owned_tx(self) -> T {
+    /// Returns the transaction without signature.
+    pub fn strip_signature(self) -> T {
         self.tx
     }
 }
