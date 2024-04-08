@@ -105,7 +105,11 @@ pub struct Header {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mix_hash: Option<B256>,
     /// Nonce
-    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u64_hex_opt"
+    )]
     pub nonce: Option<u64>,
     /// Base fee per unit of gas (if past London)
     #[serde(
