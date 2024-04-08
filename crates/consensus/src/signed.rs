@@ -1,8 +1,10 @@
+use std::sync::OnceLock;
+
 use crate::transaction::SignableTransaction;
-use alloy_primitives::{Signature, B256};
+use alloy_primitives::{Address, Signature, B256};
 
 /// A transaction with a signature and hash seal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -10,6 +12,8 @@ pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
     hash: B256,
+    #[cfg_attr(feature = "serde", serde(skip))] // TODO: Write serde for OnceLock<Address>
+    signer: OnceLock<Address>,
 }
 
 impl<T, Sig> Signed<T, Sig> {
@@ -37,12 +41,22 @@ impl<T, Sig> Signed<T, Sig> {
     pub fn strip_signature(self) -> T {
         self.tx
     }
+
+    /// Returns the signer of the transaction.
+    pub fn signer(&self) -> Option<&Address> {
+        self.signer.get()
+    }
+
+    /// Sets the signer of the transaction.
+    fn set_signer(&self, signer: Address) -> Result<(), Address> {
+        self.signer.set(signer)
+    }
 }
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
     pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
+        Self { tx, signature, hash, signer: OnceLock::new() }
     }
 
     /// Calculate the signing hash for the transaction.
@@ -58,6 +72,8 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
         &self,
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         let sighash = self.tx.signature_hash();
-        self.signature.recover_address_from_prehash(&sighash)
+        let signer = self.signature.recover_address_from_prehash(&sighash)?;
+        let _ = self.set_signer(signer);
+        Ok(signer)
     }
 }
