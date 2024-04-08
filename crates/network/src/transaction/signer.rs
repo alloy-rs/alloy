@@ -1,4 +1,4 @@
-use crate::Network;
+use crate::{Network, TransactionBuilder};
 use alloy_consensus::SignableTransaction;
 use async_trait::async_trait;
 
@@ -9,9 +9,18 @@ use async_trait::async_trait;
 /// [`TxSigner`] to signify signing capability for specific signature types.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait NetworkSigner<N: Network>: Send + Sync {
+pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     /// Asynchronously sign an unsigned transaction.
     async fn sign_transaction(&self, tx: N::UnsignedTx) -> alloy_signer::Result<N::TxEnvelope>;
+
+    /// Asynchronously sign a transaction request.
+    async fn sign_request(
+        &self,
+        request: N::TransactionRequest,
+    ) -> alloy_signer::Result<N::TxEnvelope> {
+        let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
+        self.sign_transaction(tx).await
+    }
 }
 
 /// Asynchronous transaction signer, capable of signing any [`SignableTransaction`] for the given

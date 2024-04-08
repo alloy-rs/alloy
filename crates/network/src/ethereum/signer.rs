@@ -32,7 +32,7 @@ impl EthereumSigner {
         Self(Arc::new(signer))
     }
 
-    async fn sign_transaction(
+    async fn sign_transaction_inner(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
@@ -49,19 +49,19 @@ where
     async fn sign_transaction(&self, tx: TypedTransaction) -> alloy_signer::Result<TxEnvelope> {
         match tx {
             TypedTransaction::Legacy(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip2930(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip1559(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip4844(mut t) => {
-                let sig = self.sign_transaction(&mut t).await?;
+                let sig = self.sign_transaction_inner(&mut t).await?;
                 Ok(t.into_signed(sig).into())
             }
         }

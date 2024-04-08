@@ -23,8 +23,6 @@ impl Authorization {
             return None;
         }
 
-        dbg!(username, password);
-
         (!username.is_empty() || !password.is_empty()).then(|| Self::basic(username, password))
     }
 
