@@ -364,10 +364,70 @@ impl From<TypedTransaction> for TransactionRequest {
 impl From<TxEnvelope> for TransactionRequest {
     fn from(envelope: TxEnvelope) -> TransactionRequest {
         match envelope {
-            TxEnvelope::Legacy(tx) => tx.strip_signature().into(),
-            TxEnvelope::Eip2930(tx) => tx.strip_signature().into(),
-            TxEnvelope::Eip1559(tx) => tx.strip_signature().into(),
-            TxEnvelope::Eip4844(tx) => tx.strip_signature().into(),
+            TxEnvelope::Legacy(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    if let Ok(signer) = tx.recover_signer() {
+                        let tx: TransactionRequest = tx.strip_signature().into();
+                        tx.from(signer)
+                    } else {
+                        tx.strip_signature().into()
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip2930(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    if let Ok(signer) = tx.recover_signer() {
+                        let tx: TransactionRequest = tx.strip_signature().into();
+                        tx.from(signer)
+                    } else {
+                        tx.strip_signature().into()
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip1559(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    if let Ok(signer) = tx.recover_signer() {
+                        let tx: TransactionRequest = tx.strip_signature().into();
+                        tx.from(signer)
+                    } else {
+                        tx.strip_signature().into()
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip4844(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    if let Ok(signer) = tx.recover_signer() {
+                        let tx: TransactionRequest = tx.strip_signature().into();
+                        tx.from(signer)
+                    } else {
+                        tx.strip_signature().into()
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
             _ => Default::default(),
         }
     }
