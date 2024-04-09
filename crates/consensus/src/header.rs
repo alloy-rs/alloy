@@ -66,7 +66,7 @@ pub struct Header {
     pub mix_hash: B256,
     /// A 64-bit value which, combined with the mixhash, proves that a sufficient amount of
     /// computation has been carried out on this block; formally Hn.
-    pub nonce: u64,
+    pub nonce: B64,
     /// A scalar representing EIP1559 base fee which can move up or down each block according
     /// to a formula which is a function of gas used in parent block and gas target
     /// (block gas limit divided by elasticity multiplier) of parent block.
@@ -111,7 +111,7 @@ impl Default for Header {
             timestamp: 0,
             extra_data: Default::default(),
             mix_hash: Default::default(),
-            nonce: 0,
+            nonce: B64::ZERO,
             base_fee_per_gas: None,
             withdrawals_root: None,
             blob_gas_used: None,
@@ -252,7 +252,7 @@ impl Header {
         length += self.timestamp.length();
         length += self.extra_data.length();
         length += self.mix_hash.length();
-        length += B64::new(self.nonce.to_be_bytes()).length();
+        length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
             length += U256::from(base_fee).length();
@@ -319,7 +319,7 @@ impl Encodable for Header {
         self.timestamp.encode(out);
         self.extra_data.encode(out);
         self.mix_hash.encode(out);
-        B64::new(self.nonce.to_be_bytes()).encode(out);
+        self.nonce.encode(out);
 
         // Encode base fee. Put empty list if base fee is missing,
         // but withdrawals root is present.
@@ -402,7 +402,7 @@ impl Decodable for Header {
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
-            nonce: u64::from_be_bytes(B64::decode(buf)?.0),
+            nonce: B64::decode(buf)?,
             base_fee_per_gas: None,
             withdrawals_root: None,
             blob_gas_used: None,
