@@ -728,14 +728,14 @@ mod tests {
         assert_eq!(
             transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
             max_fee_per_gas.to(),
-            "max_fee_per_gas of the transaction should be set to the value that we gave it"
+            "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
             transaction
                 .max_priority_fee_per_gas
                 .expect("max_priority_fee_per_gas of the transaction should be set"),
             max_priority_fee_per_gas.to(),
-            "Sent transaction should have the max priority_fee_per_gas that we set"
+            "max_priority_fee_per_gas of the transaction should be set to the right value"
         )
     }
 }
