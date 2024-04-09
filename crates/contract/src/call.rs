@@ -530,7 +530,7 @@ mod tests {
     use super::*;
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
-    use alloy_primitives::{address, b256, bytes, hex, B256};
+    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{Provider, ReqwestProvider, RootProvider};
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::AccessListItem;
@@ -576,7 +576,20 @@ mod tests {
         }
     }
 
-    /// Creates a new call_builder to test field modifications, copied from [call_encoding]
+    sol! {
+        // Solc: 0.8.24+commit.e11b9ed9.Linux.g++
+        // Command: solc counter.sol --bin --via-ir --optimize --optimize-runs 1
+        #[sol(rpc, bytecode = "608080604052346100155760d4908161001a8239f35b5f80fdfe60808060405260043610156011575f80fd5b5f3560e01c90816361bc221a14607e575063d09de08a14602f575f80fd5b34607a575f366003190112607a575f546001600160801b038082166001018181116066576001600160801b03199092169116175f55005b634e487b7160e01b5f52601160045260245ffd5b5f80fd5b34607a575f366003190112607a575f546001600160801b03168152602090f3fea26469706673582212208b360e442c4bb2a4bbdec007ee24588c7a88e0aa52ac39efac748e5e23eff69064736f6c63430008180033")]
+        contract Counter {
+            uint128 public counter;
+
+            function increment() external {
+                counter += 1;
+            }
+        }
+    }
+
+    /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     fn build_call_builder(
     ) -> CallBuilder<Http<Client>, RootProvider<Http<Client>>, PhantomData<MyContract::doStuffCall>>
     {
@@ -689,5 +702,40 @@ mod tests {
             result.d,
             b256!("0000000000000000000000000000000000000000000000000000000000000001"),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deploy_and_call_with_priority() {
+        let (provider, _anvil) = spawn_anvil();
+        let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
+        let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
+        let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
+        let receipt = counter_contract
+            .increment()
+            .max_fee_per_gas(max_fee_per_gas.to())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
+            .send()
+            .await
+            .expect("Could not send transaction")
+            .get_receipt()
+            .await
+            .expect("Could not get the receipt");
+        let transaction_hash = receipt.transaction_hash;
+        let transaction = provider
+            .get_transaction_by_hash(transaction_hash)
+            .await
+            .expect("Could not get transaction");
+        assert_eq!(
+            transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
+            max_fee_per_gas.to(),
+            "max_fee_per_gas of the transaction should be set to the value that we gave it"
+        );
+        assert_eq!(
+            transaction
+                .max_priority_fee_per_gas
+                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            max_priority_fee_per_gas.to(),
+            "Sent transaction should have the max priority_fee_per_gas that we set"
+        )
     }
 }
