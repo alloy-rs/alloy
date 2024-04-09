@@ -5,7 +5,7 @@
 use crate::{other::OtherFields, Transaction, Withdrawal};
 use alloy_eips::{calc_blob_gasprice, calc_excess_blob_gas};
 use alloy_primitives::{
-    ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, U256, U64,
+    ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use serde::{
@@ -105,12 +105,8 @@ pub struct Header {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mix_hash: Option<B256>,
     /// Nonce
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_hex_opt"
-    )]
-    pub nonce: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
     #[serde(
         default,
