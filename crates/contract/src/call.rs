@@ -577,8 +577,7 @@ mod tests {
             address: Address::ZERO,
             storage_keys: vec![B256::ZERO],
         }]);
-        let call_builder =
-            build_call_builder().access_list(access_list.clone());
+        let call_builder = build_call_builder().access_list(access_list.clone());
         assert_eq!(
             call_builder.request.access_list.expect("access_list should be set"),
             access_list,
