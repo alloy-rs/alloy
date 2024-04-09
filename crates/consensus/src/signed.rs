@@ -1,3 +1,4 @@
+#[cfg(not(feature = "no_std"))]
 use std::sync::OnceLock;
 
 use crate::transaction::SignableTransaction;
@@ -13,6 +14,7 @@ pub struct Signed<T, Sig = Signature> {
     signature: Sig,
     hash: B256,
     #[cfg_attr(feature = "serde", serde(skip))] // TODO: Write serde for OnceLock<Address>
+    #[cfg(not(feature = "no_std"))]
     signer: OnceLock<Address>,
 }
 
@@ -43,11 +45,13 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns the signer of the transaction.
+    #[cfg(not(feature = "no_std"))]
     pub fn signer(&self) -> Option<&Address> {
         self.signer.get()
     }
 
     /// Sets the signer of the transaction.
+    #[cfg(not(feature = "no_std"))]
     fn set_signer(&self, signer: Address) -> Result<(), Address> {
         self.signer.set(signer)
     }
@@ -71,9 +75,16 @@ impl<T: SignableTransaction<Signature>> Signed<T, Signature> {
     pub fn recover_signer(
         &self,
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
+        #[cfg(not(feature = "no_std"))]
+        if let Some(signer) = self.signer() {
+            return Ok(*signer);
+        }
         let sighash = self.tx.signature_hash();
         let signer = self.signature.recover_address_from_prehash(&sighash)?;
+
+        #[cfg(not(feature = "no_std"))]
         let _ = self.set_signer(signer);
+
         Ok(signer)
     }
 }
