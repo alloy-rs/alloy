@@ -1028,6 +1028,24 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /* ---------------------------------------- raw calls --------------------------------------- */
 
     /// Sends a raw JSON-RPC request.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_rpc_types::BlockNumberOrTag;
+    ///
+    /// // No parameters: `()`
+    /// let block_number = provider.raw_request("eth_blockNumber".into(), ()).await?;
+    ///
+    /// // One parameter: `(param,)` or `[param]`
+    /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
+    ///
+    /// // Two or more parameters: `(param1, param2, ...)` or `[param1, param2, ...]`
+    /// let full_block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest, true)).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcParam,
@@ -1038,6 +1056,27 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Sends a raw JSON-RPC request with type-erased parameters and return.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
+    /// use alloy_rpc_types::BlockNumberOrTag;
+    ///
+    /// // No parameters: `()`
+    /// let params = serde_json::value::to_raw_value(&())?;
+    /// let block_number = provider.raw_request_dyn("eth_blockNumber".into(), &params).await?;
+    ///
+    /// // One parameter: `(param,)` or `[param]`
+    /// let params = serde_json::value::to_raw_value(&(BlockNumberOrTag::Latest,))?;
+    /// let block = provider.raw_request_dyn("eth_getBlockByNumber".into(), &params).await?;
+    ///
+    /// // Two or more parameters: `(param1, param2, ...)` or `[param1, param2, ...]`
+    /// let params = serde_json::value::to_raw_value(&(BlockNumberOrTag::Latest, true))?;
+    /// let full_block = provider.raw_request_dyn("eth_getBlockByNumber".into(), &params).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn raw_request_dyn(
         &self,
         method: Cow<'static, str>,

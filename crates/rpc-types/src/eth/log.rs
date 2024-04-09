@@ -1,3 +1,5 @@
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{LogData, B256};
 use serde::{Deserialize, Serialize};
 
