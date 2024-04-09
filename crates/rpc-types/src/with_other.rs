@@ -1,11 +1,12 @@
 use crate::{other::OtherFields, TransactionRequest};
 use alloy_consensus::{TxEnvelope, TypedTransaction};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct WithOtherFields<T> {
     /// The inner struct.
     #[serde(flatten)]
@@ -51,5 +52,38 @@ impl<T> DerefMut for WithOtherFields<T> {
 impl<T: Default> Default for WithOtherFields<T> {
     fn default() -> Self {
         WithOtherFields::new(T::default())
+    }
+}
+
+impl<'de, T> Deserialize<'de> for WithOtherFields<T>
+where
+    T: Deserialize<'de> + Serialize,
+{
+    fn deserialize<D>(deserializer: D) -> Result<WithOtherFields<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        #[derive(Deserialize)]
+        struct WithOtherFieldsHelper<T> {
+            #[serde(flatten)]
+            inner: T,
+            #[serde(flatten)]
+            other: OtherFields,
+        }
+
+        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
+        let inner_serialzed = serde_json::to_value(&helper.inner).map_err(D::Error::custom)?;
+        let inner_keys = match &inner_serialzed {
+            Value::Object(map) => map.keys().collect::<Vec<_>>(),
+            _ => Vec::new(),
+        };
+
+        for key in inner_keys {
+            helper.other.remove(key);
+        }
+
+        Ok(WithOtherFields { inner: helper.inner, other: helper.other })
     }
 }
