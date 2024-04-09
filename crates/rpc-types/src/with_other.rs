@@ -74,14 +74,13 @@ where
         }
 
         let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
-        let inner_serialzed = serde_json::to_value(&helper.inner).map_err(D::Error::custom)?;
-        match &inner_serialzed {
-            Value::Object(map) => {
-                for key in map.keys() {
-                    helper.other.remove(key);
-                }
+        // remove all fields present in the inner struct from the other fields, this is to avoid
+        // duplicate fields in the catch all other fields because serde flatten does not exclude
+        // already deserialized fields when deserializing the other fields.
+        if let Value::Object(map) = serde_json::to_value(&helper.inner).map_err(D::Error::custom)? {
+            for key in map.keys() {
+                helper.other.remove(key);
             }
-            _ => {}
         }
 
         Ok(WithOtherFields { inner: helper.inner, other: helper.other })
