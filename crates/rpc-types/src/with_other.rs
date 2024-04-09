@@ -75,13 +75,11 @@ where
 
         let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
         let inner_serialzed = serde_json::to_value(&helper.inner).map_err(D::Error::custom)?;
-        let inner_keys = match &inner_serialzed {
-            Value::Object(map) => map.keys().collect::<Vec<_>>(),
-            _ => Vec::new(),
-        };
-
-        for key in inner_keys {
-            helper.other.remove(key);
+        match &inner_serialzed {
+            Value::Object(map) => for key in map.keys() {
+                helper.other.remove(key);
+            },
+            _ => {},
         }
 
         Ok(WithOtherFields { inner: helper.inner, other: helper.other })
