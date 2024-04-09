@@ -48,15 +48,17 @@ tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
 
 [features]
-default = ["reqwest"]
+default = ["reqwest", "reqwest-default-tls"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
     "dep:url",
     "dep:alloy-transport-http",
     "alloy-rpc-client/reqwest",
-    "alloy-transport-http/reqwest-default-tls",
 ]
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
+reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
+reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
+reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
