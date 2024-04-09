@@ -1,7 +1,11 @@
 //! Alloy basic Transaction Request type.
 
 use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
+use alloy_consensus::{
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
+    TypedTransaction,
+};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -14,18 +18,35 @@ pub struct TransactionRequest {
     /// The destination address of the transaction.
     pub to: Option<Address>,
     /// The legacy gas price.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub gas_price: Option<u128>,
     /// The max base fee per gas the sender is willing to pay.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_fee_per_gas: Option<u128>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
     pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
     pub value: Option<U256>,
@@ -220,6 +241,12 @@ impl TransactionInput {
     }
 }
 
+impl From<Vec<u8>> for TransactionInput {
+    fn from(input: Vec<u8>) -> Self {
+        Self { input: Some(input.into()), data: None }
+    }
+}
+
 impl From<Bytes> for TransactionInput {
     fn from(input: Bytes) -> Self {
         Self { input: Some(input), data: None }
@@ -235,6 +262,201 @@ impl From<Option<Bytes>> for TransactionInput {
 impl From<Transaction> for TransactionRequest {
     fn from(tx: Transaction) -> TransactionRequest {
         tx.into_request()
+    }
+}
+
+impl From<TxLegacy> for TransactionRequest {
+    fn from(tx: TxLegacy) -> TransactionRequest {
+        TransactionRequest {
+            from: None,
+            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            gas_price: Some(tx.gas_price),
+            gas: Some(tx.gas_limit),
+            value: Some(tx.value),
+            input: TransactionInput::from(tx.input),
+            nonce: Some(tx.nonce),
+            chain_id: tx.chain_id,
+            transaction_type: Some(0),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<TxEip2930> for TransactionRequest {
+    fn from(tx: TxEip2930) -> TransactionRequest {
+        TransactionRequest {
+            from: None,
+            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            gas_price: Some(tx.gas_price),
+            gas: Some(tx.gas_limit),
+            value: Some(tx.value),
+            input: TransactionInput::from(tx.input),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id),
+            transaction_type: Some(1),
+            access_list: Some(tx.access_list),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<TxEip1559> for TransactionRequest {
+    fn from(tx: TxEip1559) -> TransactionRequest {
+        TransactionRequest {
+            from: None,
+            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            max_fee_per_gas: Some(tx.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
+            gas: Some(tx.gas_limit),
+            value: Some(tx.value),
+            input: TransactionInput::from(tx.input),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id),
+            transaction_type: Some(2),
+            access_list: Some(tx.access_list),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<TxEip4844> for TransactionRequest {
+    fn from(tx: TxEip4844) -> TransactionRequest {
+        TransactionRequest {
+            from: None,
+            to: Some(tx.to),
+            max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
+            gas: Some(tx.gas_limit),
+            max_fee_per_gas: Some(tx.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
+            value: Some(tx.value),
+            input: TransactionInput::from(tx.input),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id),
+            transaction_type: Some(3),
+            access_list: Some(tx.access_list),
+            blob_versioned_hashes: Some(tx.blob_versioned_hashes),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<TxEip4844WithSidecar> for TransactionRequest {
+    fn from(tx: TxEip4844WithSidecar) -> TransactionRequest {
+        let sidecar = tx.sidecar;
+        let tx = tx.tx;
+        TransactionRequest {
+            from: None,
+            to: Some(tx.to),
+            max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
+            gas: Some(tx.gas_limit),
+            max_fee_per_gas: Some(tx.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
+            value: Some(tx.value),
+            input: TransactionInput::from(tx.input),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id),
+            transaction_type: Some(3),
+            access_list: Some(tx.access_list),
+            blob_versioned_hashes: Some(tx.blob_versioned_hashes),
+            sidecar: Some(sidecar),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<TxEip4844Variant> for TransactionRequest {
+    fn from(tx: TxEip4844Variant) -> TransactionRequest {
+        match tx {
+            TxEip4844Variant::TxEip4844(tx) => tx.into(),
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
+        }
+    }
+}
+
+impl From<TypedTransaction> for TransactionRequest {
+    fn from(tx: TypedTransaction) -> TransactionRequest {
+        match tx {
+            TypedTransaction::Legacy(tx) => tx.into(),
+            TypedTransaction::Eip2930(tx) => tx.into(),
+            TypedTransaction::Eip1559(tx) => tx.into(),
+            TypedTransaction::Eip4844(tx) => tx.into(),
+        }
+    }
+}
+
+impl From<TxEnvelope> for TransactionRequest {
+    fn from(envelope: TxEnvelope) -> TransactionRequest {
+        match envelope {
+            TxEnvelope::Legacy(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
+                    } else {
+                        tx
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip2930(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
+                    } else {
+                        tx
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip1559(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
+                    } else {
+                        tx
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip4844(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    let from = tx.recover_signer().ok();
+                    let tx: TransactionRequest = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
+                    } else {
+                        tx
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            _ => Default::default(),
+        }
     }
 }
 

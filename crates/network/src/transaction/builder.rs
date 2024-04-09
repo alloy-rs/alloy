@@ -2,6 +2,7 @@ use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_rpc_types::AccessList;
 use futures_utils_wasm::impl_future;
 
 /// Error type for transaction builders.
@@ -191,8 +192,20 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Get the EIP-2930 access list for the transaction.
+    fn access_list(&self) -> Option<&AccessList>;
+
+    /// Sets the EIP-2930 access list.
+    fn set_access_list(&mut self, access_list: AccessList);
+
+    /// Builder-pattern method for setting the access list.
+    fn with_access_list(mut self, access_list: AccessList) -> Self {
+        self.set_access_list(access_list);
+        self
+    }
+
     /// Gets the EIP-4844 blob sidecar of the transaction.
-    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
 
     /// Sets the EIP-4844 blob sidecar of the transaction.
     ///
@@ -205,6 +218,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self.set_blob_sidecar(sidecar);
         self
     }
+
+    /// True if the builder contains all necessary information to be submitted
+    /// to the `eth_sendTransaction` endpoint.
+    fn can_submit(&self) -> bool;
+
+    /// True if the builder contains all necessary information to be built into
+    /// a valid transaction.
+    fn can_build(&self) -> bool;
 
     /// Build an unsigned, but typed, transaction.
     fn build_unsigned(self) -> BuilderResult<N::UnsignedTx>;

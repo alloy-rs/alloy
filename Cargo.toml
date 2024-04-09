@@ -8,8 +8,8 @@ edition = "2021"
 rust-version = "1.76"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
-homepage = "https://github.com/alloy-rs/next"
-repository = "https://github.com/alloy-rs/next"
+homepage = "https://github.com/alloy-rs/alloy"
+repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/"]
 
 [workspace.metadata.docs.rs]

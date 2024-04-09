@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_rpc_types::{TransactionRequest, WithOtherFields};
+use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{
     any::AnyNetwork, ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder,
@@ -96,16 +96,34 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_gas_limit(gas_limit);
     }
 
-    fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
-        build_unsigned::<AnyNetwork>(self.inner)
+    /// Get the EIP-2930 access list for the transaction.
+    fn access_list(&self) -> Option<&AccessList> {
+        self.deref().access_list()
     }
 
-    fn get_blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.deref().get_blob_sidecar()
+    /// Sets the EIP-2930 access list.
+    fn set_access_list(&mut self, access_list: AccessList) {
+        self.deref_mut().set_access_list(access_list)
+    }
+
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.deref().blob_sidecar()
     }
 
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
         self.deref_mut().set_blob_sidecar(sidecar)
+    }
+
+    fn can_build(&self) -> bool {
+        self.deref().can_build()
+    }
+
+    fn can_submit(&self) -> bool {
+        self.deref().can_submit()
+    }
+
+    fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
+        build_unsigned::<AnyNetwork>(self.inner)
     }
 
     async fn build<S: crate::NetworkSigner<AnyNetwork>>(
