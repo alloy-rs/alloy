@@ -530,9 +530,10 @@ mod tests {
     use super::*;
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
-    use alloy_primitives::{address, b256, bytes, hex};
+    use alloy_primitives::{address, b256, bytes, hex, B256};
     use alloy_provider::{Provider, ReqwestProvider, RootProvider};
     use alloy_rpc_client::RpcClient;
+    use alloy_rpc_types::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
@@ -573,6 +574,54 @@ mod tests {
                 return (address(uint160(a)), bytes32(uint256(b ? 1 : 0)));
             }
         }
+    }
+
+    /// Creates a new call_builder to test field modifications, copied from [call_encoding]
+    fn build_call_builder(
+    ) -> CallBuilder<Http<Client>, RootProvider<Http<Client>>, PhantomData<MyContract::doStuffCall>>
+    {
+        let (provider, _anvil) = spawn_anvil();
+        let contract = MyContract::new(Address::ZERO, provider);
+        let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
+        call_builder
+    }
+
+    #[test]
+    fn change_max_fee_per_gas() {
+        let call_builder = build_call_builder().max_fee_per_gas(42);
+        assert_eq!(
+            call_builder.request.max_fee_per_gas.expect("max_fee_per_gas should be set"),
+            42,
+            "max_fee_per_gas of request should be '42'"
+        );
+    }
+
+    #[test]
+    fn change_max_priority_fee_per_gas() {
+        let call_builder = build_call_builder().max_priority_fee_per_gas(45);
+        assert_eq!(
+            call_builder
+                .request
+                .max_priority_fee_per_gas
+                .expect("max_priority_fee_per_gas should be set"),
+            45,
+            "max_priority_fee_per_gas of request should be '45'"
+        );
+    }
+
+    #[test]
+    fn change_access_list() {
+        let access_list = AccessList::from(vec![AccessListItem {
+            address: Address::ZERO,
+            storage_keys: vec![B256::ZERO],
+        }]);
+        let call_builder =
+            build_call_builder().access_list(access_list.clone());
+        assert_eq!(
+            call_builder.request.access_list.expect("access_list should be set"),
+            access_list,
+            "Access list of the transaction should have been set to our access list"
+        )
     }
 
     #[test]
