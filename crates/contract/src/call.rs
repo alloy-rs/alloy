@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlobTransactionSidecar, BlockId};
+use alloy_rpc_types::{state::StateOverride, AccessList, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -332,6 +332,24 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
     pub fn gas_price(mut self, gas_price: u128) -> Self {
         self.request.set_gas_price(gas_price);
+        self
+    }
+
+    /// Sets the `max_fee_per_gas` in the transaction to the provide value
+    pub fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
+        self.request.set_max_fee_per_gas(max_fee_per_gas);
+        self
+    }
+
+    /// Sets the `max_priority_fee_per_gas` in the transaction to the provide value
+    pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
+        self.request.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        self
+    }
+
+    /// Sets the `access_list` in the transaction to the provided value
+    pub fn access_list(mut self, access_list: AccessList) -> Self {
+        self.request.set_access_list(access_list);
         self
     }
 
