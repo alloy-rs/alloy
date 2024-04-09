@@ -121,7 +121,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         // value and data may be None. If they are, they will be set to default.
         // gas fields and nonce may be None, if they are, they will be populated
         // with default values by the RPC server
-        self.to.is_some() && self.from.is_some()
+        self.from.is_some()
     }
 
     fn can_build(&self) -> bool {
@@ -129,7 +129,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         // values.
 
         // chain_id and from may be none.
-        let common = self.to.is_some() && self.gas.is_some() && self.nonce.is_some();
+        let common = self.gas.is_some() && self.nonce.is_some();
 
         let legacy = self.gas_price.is_some();
         let eip2930 = legacy && self.access_list().is_some();
