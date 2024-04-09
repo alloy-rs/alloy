@@ -87,3 +87,33 @@ where
         Ok(WithOtherFields { inner: helper.inner, other: helper.other })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use serde_json::json;
+
+    #[derive(Serialize, Deserialize)]
+    struct Inner {
+        a: u64,
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct InnerWrapper {
+        #[serde(flatten)]
+        inner: Inner,
+    }
+
+    #[test]
+    fn test_correct_other() {
+        let with_other: WithOtherFields<InnerWrapper> =
+            serde_json::from_str("{\"a\": 1, \"b\": 2}").unwrap();
+        assert_eq!(with_other.inner.inner.a, 1);
+        assert_eq!(
+            with_other.other,
+            OtherFields::new(BTreeMap::from_iter(vec![("b".to_string(), json!(2))]))
+        );
+    }
+}
