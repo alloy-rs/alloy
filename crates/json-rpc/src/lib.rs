@@ -82,6 +82,12 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[macro_use]
+extern crate tracing;
+
+use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
+
 mod common;
 pub use common::Id;
 
@@ -108,15 +114,13 @@ pub use result::{
     transform_response, transform_result, try_deserialize_ok, BorrowedRpcResult, RpcResult,
 };
 
-use serde::{de::DeserializeOwned, Serialize};
-
 /// An object that can be used as a JSON-RPC parameter.
 ///
 /// This marker trait is blanket-implemented for every qualifying type. It is
 /// used to indicate that a type can be used as a JSON-RPC parameter.
-pub trait RpcParam: Serialize + Clone + Send + Sync + Unpin {}
+pub trait RpcParam: Serialize + Clone + Debug + Send + Sync + Unpin {}
 
-impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
+impl<T> RpcParam for T where T: Serialize + Clone + Debug + Send + Sync + Unpin {}
 
 /// An object that can be used as a JSON-RPC return value.
 ///
@@ -128,9 +132,9 @@ impl<T> RpcParam for T where T: Serialize + Clone + Send + Sync + Unpin {}
 /// We add the `'static` lifetime bound to indicate that the type can't borrow.
 /// This is a simplification that makes it easier to use the types in client
 /// code. It is not suitable for use in server code.
-pub trait RpcReturn: DeserializeOwned + Send + Sync + Unpin + 'static {}
+pub trait RpcReturn: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
-impl<T> RpcReturn for T where T: DeserializeOwned + Send + Sync + Unpin + 'static {}
+impl<T> RpcReturn for T where T: DeserializeOwned + Debug + Send + Sync + Unpin + 'static {}
 
 /// An object that can be used as a JSON-RPC parameter and return value.
 ///
