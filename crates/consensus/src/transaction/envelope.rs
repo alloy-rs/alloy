@@ -3,7 +3,6 @@ use crate::{
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_rlp::{Decodable, Encodable, Header};
-use core::mem;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
@@ -28,13 +27,7 @@ pub enum TxType {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(match u.int_in_range(0..=3)? {
-            0 => TxType::Legacy,
-            1 => TxType::Eip2930,
-            2 => TxType::Eip1559,
-            3 => TxType::Eip4844,
-            _ => unreachable!(),
-        })
+        Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
     }
 }
 
@@ -42,11 +35,13 @@ impl TryFrom<u8> for TxType {
     type Error = Eip2718Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            // SAFETY: repr(u8) with explicit discriminant
-            0..=3 => Ok(unsafe { mem::transmute(value) }),
-            _ => Err(Eip2718Error::UnexpectedType(value)),
-        }
+        Ok(match value {
+            0 => TxType::Legacy,
+            1 => TxType::Eip2930,
+            2 => TxType::Eip1559,
+            3 => TxType::Eip4844,
+            _ => return Err(Eip2718Error::UnexpectedType(value)),
+        })
     }
 }
 

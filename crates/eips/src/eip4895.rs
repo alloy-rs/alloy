@@ -2,6 +2,8 @@
 //!
 //! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -11,7 +13,7 @@ pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 /// Withdrawal represents a validator withdrawal from the consensus layer.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(
-    all(any(test, feature = "arbitrary"), feature = "std"),
+    any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
