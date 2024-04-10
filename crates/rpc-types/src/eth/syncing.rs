@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 
 /// Syncing info
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
     /// Starting block
@@ -19,7 +19,7 @@ pub struct SyncInfo {
 }
 
 /// Peers info
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize)]
 pub struct Peers {
     /// Number of active peers
     pub active: usize,
@@ -32,7 +32,7 @@ pub struct Peers {
 }
 
 /// Number of peers connected to.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PeerCount {
     /// Peer count as integer
@@ -42,7 +42,7 @@ pub enum PeerCount {
 }
 
 /// Peer connection information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// Public node id
     pub id: Option<String>,
@@ -57,7 +57,7 @@ pub struct PeerInfo {
 }
 
 /// Peer network information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerNetworkInfo {
     /// Remote endpoint address
@@ -67,7 +67,7 @@ pub struct PeerNetworkInfo {
 }
 
 /// Peer protocols information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerProtocolsInfo {
     /// Ethereum protocol information
     pub eth: Option<PeerEthProtocolInfo>,
@@ -77,7 +77,7 @@ pub struct PeerProtocolsInfo {
 }
 
 /// Peer Ethereum protocol information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerEthProtocolInfo {
     /// Negotiated ethereum protocol version
     pub version: u32,
@@ -88,7 +88,7 @@ pub struct PeerEthProtocolInfo {
 }
 
 /// Peer PIP protocol information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PipProtocolInfo {
     /// Negotiated PIP protocol version
     pub version: u32,
