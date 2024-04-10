@@ -95,5 +95,20 @@ mod tests {
                 max_priority_fee_per_gas: 200_000_000_000_u128
             }
         );
+
+        let base_fee_per_gas = 0u128;
+        let rewards = vec![
+            vec![200_000_000_000_u128],
+            vec![200_000_000_000_u128],
+            vec![300_000_000_000_u128],
+        ];
+
+        assert_eq!(
+            super::eip1559_default_estimator(base_fee_per_gas, &rewards),
+            Eip1559Estimation {
+                max_fee_per_gas: 200_000_000_000_u128,
+                max_priority_fee_per_gas: 200_000_000_000_u128
+            }
+        );
     }
 }
