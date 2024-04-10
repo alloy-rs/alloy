@@ -114,11 +114,11 @@ mod tests {
         let local_hash = *pending.tx_hash();
         assert_eq!(local_hash, node_hash);
 
-        let local_hash2 = pending.await.unwrap();
-        assert_eq!(local_hash2, node_hash);
+        let receipt = pending.await.unwrap();
+        assert_eq!(receipt.transaction_hash, node_hash);
 
         let receipt =
-            provider.get_transaction_receipt(local_hash2).await.unwrap().expect("no receipt");
+            provider.get_transaction_receipt(local_hash).await.unwrap().expect("no receipt");
         let receipt_hash = receipt.transaction_hash;
         assert_eq!(receipt_hash, node_hash);
     }

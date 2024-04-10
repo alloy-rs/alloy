@@ -98,18 +98,18 @@ impl<N: Network> SendableTx<N> {
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
-pub struct RootProvider<T, N = Ethereum> {
+pub struct RootProvider<T, N: Network = Ethereum> {
     /// The inner state of the root provider.
     pub(crate) inner: Arc<RootProviderInner<T, N>>,
 }
 
-impl<T, N> Clone for RootProvider<T, N> {
+impl<T, N: Network> Clone for RootProvider<T, N> {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone() }
     }
 }
 
-impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
+impl<T: fmt::Debug, N: Network> fmt::Debug for RootProvider<T, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
     }
@@ -185,32 +185,34 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     fn transport(&self) -> &T {
         self.inner.client.transport()
     }
+}
 
+impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     #[inline]
-    fn get_heart(&self) -> &HeartbeatHandle {
+    fn get_heart(&self) -> &HeartbeatHandle<N> {
         self.inner.heart.get_or_init(|| {
             let poller = ChainStreamPoller::from_root(self);
             // TODO: Can we avoid `Box::pin` here?
-            Heartbeat::new(Box::pin(poller.into_stream())).spawn()
+            Heartbeat::<_, N>::new(Box::pin(poller.into_stream())).spawn(self.weak_client())
         })
     }
 }
 
 /// The root provider manages the RPC client and the heartbeat. It is at the
 /// base of every provider stack.
-pub(crate) struct RootProviderInner<T, N = Ethereum> {
+pub(crate) struct RootProviderInner<T, N: Network = Ethereum> {
     client: RpcClient<T>,
-    heart: OnceLock<HeartbeatHandle>,
+    heart: OnceLock<HeartbeatHandle<N>>,
     _network: PhantomData<N>,
 }
 
-impl<T, N> Clone for RootProviderInner<T, N> {
+impl<T, N: Network> Clone for RootProviderInner<T, N> {
     fn clone(&self) -> Self {
         Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
     }
 }
 
-impl<T, N> RootProviderInner<T, N> {
+impl<T, N: Network> RootProviderInner<T, N> {
     pub(crate) fn new(client: RpcClient<T>) -> Self {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
     }
@@ -224,7 +226,7 @@ impl<T, N> RootProviderInner<T, N> {
     }
 }
 
-impl<T: Transport + Clone, N> RootProviderInner<T, N> {
+impl<T: Transport + Clone, N: Network> RootProviderInner<T, N> {
     fn boxed(self) -> RootProviderInner<BoxTransport, N> {
         RootProviderInner { client: self.client.boxed(), heart: self.heart, _network: PhantomData }
     }
@@ -276,11 +278,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Note that this is handled internally rather than calling any specific RPC method, and as
     /// such should not be overridden.
     #[inline]
-    async fn watch_pending_transaction(
+    async fn register_tx_watcher(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
-        self.root().watch_pending_transaction(config).await
+    ) -> TransportResult<PendingTransaction<N>> {
+        self.root().register_tx_watcher(config).await
     }
 
     /// Subscribe to a stream of new block headers.
@@ -1088,10 +1090,10 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
     }
 
     #[inline]
-    async fn watch_pending_transaction(
+    async fn register_tx_watcher(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> TransportResult<PendingTransaction<N>> {
         self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
     }
 }

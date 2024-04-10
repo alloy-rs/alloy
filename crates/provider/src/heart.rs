@@ -1,9 +1,9 @@
 //! Block heartbeat and pending transaction watcher.
 
 use crate::{Provider, RootProvider};
-use alloy_json_rpc::RpcError;
-use alloy_network::Network;
+use alloy_network::{Network, ReceiptResponse};
 use alloy_primitives::B256;
+use alloy_rpc_client::WeakClient;
 use alloy_rpc_types::Block;
 use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
@@ -11,6 +11,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     future::Future,
+    marker::PhantomData,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -53,7 +54,7 @@ use tokio::{
 /// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
-pub struct PendingTransactionBuilder<'a, T, N> {
+pub struct PendingTransactionBuilder<'a, T, N: Network> {
     config: PendingTransactionConfig,
     provider: &'a RootProvider<T, N>,
 }
@@ -153,8 +154,8 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
     #[doc(alias = "build")]
-    pub async fn register(self) -> TransportResult<PendingTransaction> {
-        self.provider.watch_pending_transaction(self.config).await
+    pub async fn register(self) -> TransportResult<PendingTransaction<N>> {
+        self.provider.register_tx_watcher(self.config).await
     }
 
     /// Waits for the transaction to confirm with the given number of confirmations.
@@ -165,7 +166,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
     pub async fn watch(self) -> TransportResult<B256> {
-        self.register().await?.await
+        Ok(self.register().await?.await?.transaction_hash())
     }
 
     /// Waits for the transaction to confirm with the given number of confirmations, and
@@ -180,11 +181,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
-        let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
-        let hash = pending_tx.await?;
-        let receipt = self.provider.get_transaction_receipt(hash).await?;
-
-        receipt.ok_or(RpcError::NullResp)
+        self.provider.register_tx_watcher(self.config).await?.await
     }
 }
 
@@ -272,16 +269,16 @@ impl PendingTransactionConfig {
     }
 }
 
-struct TxWatcher {
+struct TxWatcher<T> {
     config: PendingTransactionConfig,
-    tx: oneshot::Sender<()>,
+    tx: oneshot::Sender<T>,
 }
 
-impl TxWatcher {
+impl<T> TxWatcher<T> {
     /// Notify the waiter.
-    fn notify(self) {
+    fn notify(self, receipt: T) {
         debug!(tx=%self.config.tx_hash, "notifying");
-        let _ = self.tx.send(());
+        let _ = self.tx.send(receipt);
     }
 }
 
@@ -290,54 +287,51 @@ impl TxWatcher {
 /// This struct is a future created by [`PendingTransactionBuilder`] that resolves to the
 /// transaction hash once the underlying transaction has been confirmed the specified number of
 /// times in the network.
-pub struct PendingTransaction {
+pub struct PendingTransaction<N: Network> {
     /// The transaction hash.
     pub(crate) tx_hash: B256,
     /// The receiver for the notification.
-    // TODO: send a receipt?
-    pub(crate) rx: oneshot::Receiver<()>,
+    pub(crate) rx: oneshot::Receiver<N::ReceiptResponse>,
 }
 
-impl fmt::Debug for PendingTransaction {
+impl<N: Network> fmt::Debug for PendingTransaction<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PendingTransaction").field("tx_hash", &self.tx_hash).finish()
     }
 }
 
-impl PendingTransaction {
+impl<N: Network> PendingTransaction<N> {
     /// Returns this transaction's hash.
     pub const fn tx_hash(&self) -> &B256 {
         &self.tx_hash
     }
 }
 
-impl Future for PendingTransaction {
-    type Output = TransportResult<B256>;
+impl<N: Network> Future for PendingTransaction<N> {
+    type Output = TransportResult<N::ReceiptResponse>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.rx
-            .poll_unpin(cx)
-            .map(|res| res.map(|()| self.tx_hash).map_err(|_| TransportErrorKind::backend_gone()))
+        self.rx.poll_unpin(cx).map_err(|_| TransportErrorKind::backend_gone())
     }
 }
 
 /// A handle to the heartbeat task.
 #[derive(Clone, Debug)]
-pub(crate) struct HeartbeatHandle {
-    tx: mpsc::Sender<TxWatcher>,
+pub(crate) struct HeartbeatHandle<N: Network> {
+    tx: mpsc::Sender<TxWatcher<N::ReceiptResponse>>,
     #[allow(dead_code)]
     latest: watch::Receiver<Option<Block>>,
 }
 
-impl HeartbeatHandle {
+impl<N: Network> HeartbeatHandle<N> {
     /// Watch for a transaction to be confirmed with the given config.
     pub(crate) async fn watch_tx(
         &self,
         config: PendingTransactionConfig,
-    ) -> Result<PendingTransaction, PendingTransactionConfig> {
+    ) -> Result<PendingTransaction<N>, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
         let tx_hash = config.tx_hash;
         match self.tx.send(TxWatcher { config, tx }).await {
@@ -353,23 +347,26 @@ impl HeartbeatHandle {
     }
 }
 
-// TODO: Parameterize with `Network`
+type WatcherWithReceipt<T> = (TxWatcher<T>, T);
+
 /// A heartbeat task that receives blocks and watches for transactions.
-pub(crate) struct Heartbeat<S> {
+pub(crate) struct Heartbeat<S, N: Network> {
     /// The stream of incoming blocks to watch.
     stream: futures::stream::Fuse<S>,
 
     /// Transactions to watch for.
-    unconfirmed: HashMap<B256, TxWatcher>,
+    unconfirmed: HashMap<B256, TxWatcher<N::ReceiptResponse>>,
 
     /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
+    waiting_confs: BTreeMap<u64, Vec<WatcherWithReceipt<N::ReceiptResponse>>>,
 
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
+
+    network: PhantomData<N>,
 }
 
-impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
+impl<S: Stream<Item = Block> + Unpin + 'static, N: Network> Heartbeat<S, N> {
     /// Create a new heartbeat task.
     pub(crate) fn new(stream: S) -> Self {
         Self {
@@ -377,17 +374,18 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
+            network: PhantomData,
         }
     }
 }
 
-impl<S> Heartbeat<S> {
+impl<S, N: Network> Heartbeat<S, N> {
     /// Check if any transactions have enough confirmations to notify.
     fn check_confirmations(&mut self, current_height: u64) {
         let to_keep = self.waiting_confs.split_off(&(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
-        for watcher in to_notify.into_values().flatten() {
-            watcher.notify();
+        for (watcher, receipt) in to_notify.into_values().flatten() {
+            watcher.notify(receipt);
         }
     }
 
@@ -415,14 +413,61 @@ impl<S> Heartbeat<S> {
 
     /// Handle a watch instruction by adding it to the watch list, and
     /// potentially adding it to our `reap_at` list.
-    fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
+    async fn handle_watch_ix(
+        &mut self,
+        to_watch: TxWatcher<N::ReceiptResponse>,
+        hash_tx: &mpsc::Sender<B256>,
+    ) {
         // Start watching for the transaction.
         debug!(tx=%to_watch.config.tx_hash, "watching");
         trace!(?to_watch.config);
+
         if let Some(timeout) = to_watch.config.timeout {
             self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
         }
+
+        // Start polling for the receipt.
+        let _ = hash_tx.send(to_watch.config.tx_hash).await;
         self.unconfirmed.insert(to_watch.config.tx_hash, to_watch);
+    }
+
+    /// Processes a receipt response. If the receipt is not yet available, sends new request.
+    /// Otherwise, either notifies the watcher or adds transaction to the waiting list.
+    async fn handle_receipt_response(
+        &mut self,
+        tx_hash: B256,
+        receipt: TransportResult<Option<N::ReceiptResponse>>,
+        hash_tx: &mpsc::Sender<B256>,
+    ) {
+        if !self.unconfirmed.contains_key(&tx_hash) {
+            // This likely means the transaction was reaped.
+            return;
+        }
+        if let Ok(Some(receipt)) = receipt {
+            let watcher = self.unconfirmed.remove(&tx_hash).unwrap();
+
+            // If `confirmations` is not more than 1 we can notify the watcher immediately.
+            let confirmations = watcher.config.required_confirmations;
+            if confirmations <= 1 {
+                return watcher.notify(receipt);
+            }
+
+            if let Some(block) = receipt.block_number() {
+                // Otherwise add it to the waiting list.
+                debug!(tx=%watcher.config.tx_hash, %block, confirmations, "adding to waiting list");
+                self.waiting_confs
+                    .entry(block + confirmations - 1)
+                    .or_default()
+                    .push((watcher, receipt));
+            } else {
+                // Edge case: receipt does not include block number, we can't count confirmations,
+                // so notify immediately.
+                watcher.notify(receipt);
+            }
+        } else {
+            // Keep polling
+            let _ = hash_tx.send(tx_hash).await;
+        }
     }
 
     /// Handle a new block by checking if any of the transactions we're
@@ -431,21 +476,6 @@ impl<S> Heartbeat<S> {
     fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Option<Block>>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
         let Some(block_height) = &block.header.number else { return };
-
-        // Check if we are watching for any of the transactions in this block.
-        let to_check =
-            block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
-        for watcher in to_check {
-            // If `confirmations` is not more than 1 we can notify the watcher immediately.
-            let confirmations = watcher.config.required_confirmations;
-            if confirmations <= 1 {
-                watcher.notify();
-                continue;
-            }
-            // Otherwise add it to the waiting list.
-            debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-            self.waiting_confs.entry(*block_height + confirmations - 1).or_default().push(watcher);
-        }
 
         self.check_confirmations(*block_height);
 
@@ -458,37 +488,74 @@ impl<S> Heartbeat<S> {
 }
 
 #[cfg(target_arch = "wasm32")]
-impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
+impl<S: Stream<Item = Block> + Unpin + 'static, N: Network> Heartbeat<S, N> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle {
+    pub(crate) fn spawn<T: Transport + Clone>(self, client: WeakClient<T>) -> HeartbeatHandle<N> {
         let (latest, latest_rx) = watch::channel(None::<Block>);
         let (ix_tx, ixns) = mpsc::channel(16);
 
-        self.into_future(latest, ixns).spawn_task();
+        self.into_future(latest, ixns, client).spawn_task();
 
         HeartbeatHandle { tx: ix_tx, latest: latest_rx }
     }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-impl<S: Stream<Item = Block> + Unpin + Send + 'static> Heartbeat<S> {
+impl<S: Stream<Item = Block> + Unpin + Send + 'static, N: Network> Heartbeat<S, N> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle {
+    pub(crate) fn spawn<T: Transport + Clone>(self, client: WeakClient<T>) -> HeartbeatHandle<N> {
         let (latest, latest_rx) = watch::channel(None::<Block>);
         let (ix_tx, ixns) = mpsc::channel(16);
 
-        self.into_future(latest, ixns).spawn_task();
+        self.into_future(latest, ixns, client).spawn_task();
 
         HeartbeatHandle { tx: ix_tx, latest: latest_rx }
     }
 }
 
-impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
-    async fn into_future(
+type TransportReceipt<R> = TransportResult<Option<R>>;
+
+/// Spawns a receipt fetching task. This task receives transaction hashes and fetches receipts for
+/// requested transactions, sending the results back.
+fn spawn_receipt_fetcher<T: Transport + Clone, N: Network>(
+    client: WeakClient<T>,
+) -> ReceiptFetcherHandle<N> {
+    let (receipt_tx, receipt_rx) = mpsc::channel(16);
+    let (hash_tx, mut hash_rx) = mpsc::channel(16);
+
+    async move {
+        while let Some(tx_hash) = hash_rx.recv().await {
+            let Some(client) = client.upgrade() else {
+                break;
+            };
+            let receipt_tx = receipt_tx.clone();
+
+            async move {
+                let result = client.request("eth_getTransactionReceipt", (tx_hash,)).await;
+                let _ = receipt_tx.send((tx_hash, result)).await;
+            }
+            .spawn_task();
+        }
+    }
+    .spawn_task();
+
+    ReceiptFetcherHandle { tx: hash_tx, rx: receipt_rx }
+}
+
+struct ReceiptFetcherHandle<N: Network> {
+    tx: mpsc::Sender<B256>,
+    rx: mpsc::Receiver<(B256, TransportReceipt<N::ReceiptResponse>)>,
+}
+
+impl<S: Stream<Item = Block> + Unpin + 'static, N: Network> Heartbeat<S, N> {
+    async fn into_future<T: Transport + Clone>(
         mut self,
         latest: watch::Sender<Option<Block>>,
-        mut ixns: mpsc::Receiver<TxWatcher>,
+        mut ixns: mpsc::Receiver<TxWatcher<N::ReceiptResponse>>,
+        client: WeakClient<T>,
     ) {
+        let ReceiptFetcherHandle { tx: hash_tx, rx: mut receipt_rx } =
+            spawn_receipt_fetcher::<_, N>(client);
         'shutdown: loop {
             {
                 let next_reap = self.next_reap();
@@ -499,10 +566,18 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
                 select! {
                     biased;
 
-                    // Watch for new transactions.
+                    // Watch for new tx watching requests.
                     ix_opt = ixns.recv() => match ix_opt {
-                        Some(to_watch) => self.handle_watch_ix(to_watch),
+                        Some(to_watch) => self.handle_watch_ix(to_watch, &hash_tx).await,
                         None => break 'shutdown, // ix channel is closed
+                    },
+
+                    // Handle receipt responses.
+                    ix_opt = receipt_rx.recv() => match ix_opt {
+                        Some((tx_hash, receipt)) => {
+                            self.handle_receipt_response(tx_hash, receipt, &hash_tx).await;
+                        },
+                        None => break 'shutdown, // receipt channel is closed
                     },
 
                     // Wake up to handle new blocks.

@@ -1,6 +1,7 @@
 use crate::{Network, ReceiptResponse};
 
 mod builder;
+use alloy_primitives::B256;
 
 mod signer;
 pub use signer::EthereumSigner;
@@ -34,5 +35,13 @@ impl Network for Ethereum {
 impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.block_number
+    }
+
+    fn transaction_hash(&self) -> B256 {
+        self.transaction_hash
     }
 }

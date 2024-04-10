@@ -17,7 +17,7 @@
 
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -42,6 +42,12 @@ pub use alloy_eips::eip2718;
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
     fn contract_address(&self) -> Option<Address>;
+
+    /// Number of block in which transaction was included.
+    fn block_number(&self) -> Option<u64>;
+
+    /// Hash of the transaction.
+    fn transaction_hash(&self) -> B256;
 }
 
 /// Captures type info for network-specific RPC requests/responses.
