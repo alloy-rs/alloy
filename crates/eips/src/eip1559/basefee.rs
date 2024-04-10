@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// BaseFeeParams contains the config parameters that control block base fee computation
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BaseFeeParams {
     /// The base_fee_max_change_denominator from EIP-1559

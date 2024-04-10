@@ -9,7 +9,7 @@ use std::{
 
 /// This includes general information about a running node, spanning networking and protocol
 /// details.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInfo {
     /// Unique node identifier.
     pub id: B256,
@@ -31,7 +31,7 @@ pub struct NodeInfo {
 }
 
 /// Represents a node's discovery and listener ports.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ports {
     /// The node's discovery port.
     pub discovery: u16,
@@ -42,7 +42,7 @@ pub struct Ports {
 /// Represents protocols that the connected RPC node supports.
 ///
 /// This contains protocol information reported by the connected RPC node.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProtocolInfo {
     /// Details about the node's supported eth protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -57,7 +57,7 @@ pub struct ProtocolInfo {
 /// See [geth's `NodeInfo`
 /// struct](https://github.com/ethereum/go-ethereum/blob/c2e0abce2eedc1ba2a1b32c46fd07ef18a25354a/eth/protocols/eth/handler.go#L129)
 /// for how these fields are determined.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthProtocolInfo {
     /// The eth network version.
     pub network: u64,
@@ -75,7 +75,7 @@ pub struct EthProtocolInfo {
 ///
 /// This is just an empty struct, because [geth's internal representation is
 /// empty](https://github.com/ethereum/go-ethereum/blob/c2e0abce2eedc1ba2a1b32c46fd07ef18a25354a/eth/protocols/snap/handler.go#L571-L576).
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnapProtocolInfo {}
 
 /// Represents the protocols that a peer supports.
@@ -83,7 +83,7 @@ pub struct SnapProtocolInfo {}
 /// This differs from [`ProtocolInfo`] in that [`PeerProtocolInfo`] contains protocol information
 /// gathered from the protocol handshake, and [`ProtocolInfo`] contains information reported by the
 /// connected RPC node.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerProtocolInfo {
     /// Details about the peer's supported eth protocol. `None` if unsupported
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -98,7 +98,7 @@ pub struct PeerProtocolInfo {
 
 /// Can contain either eth protocol info or a string "handshake", which geth uses if the peer is
 /// still completing the handshake for the protocol.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EthPeerInfo {
     /// The `eth` sub-protocol metadata known about the host peer.
@@ -113,7 +113,7 @@ pub enum EthPeerInfo {
 /// See [geth's `ethPeerInfo`
 /// struct](https://github.com/ethereum/go-ethereum/blob/53d1ae096ac0515173e17f0f81a553e5f39027f7/eth/peer.go#L28)
 /// for how these fields are determined.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthInfo {
     /// The negotiated eth version.
     #[serde(default)]
@@ -127,7 +127,7 @@ pub struct EthInfo {
 
 /// Can contain either snap protocol info or a string "handshake", which geth uses if the peer is
 /// still completing the handshake for the protocol.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapPeerInfo {
     /// The `snap` sub-protocol metadata known about the host peer.
@@ -142,7 +142,7 @@ pub enum SnapPeerInfo {
 /// See [geth's `snapPeerInfo`
 /// struct](https://github.com/ethereum/go-ethereum/blob/53d1ae096ac0515173e17f0f81a553e5f39027f7/eth/peer.go#L53)
 /// for how these fields are determined.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnapInfo {
     /// The negotiated snap version.
     pub version: u64,
@@ -151,7 +151,7 @@ pub struct SnapInfo {
 /// Represents a short summary of information known about a connected peer.
 ///
 /// See [geth's `PeerInfo` struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/p2p/peer.go#L484) for the source of each field.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// The peer's ENR.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -172,7 +172,7 @@ pub struct PeerInfo {
 
 /// Represents networking related information about the peer, including details about whether or
 /// not it is inbound, trusted, or static.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerNetworkInfo {
     /// The local endpoint of the TCP connection.

@@ -13,7 +13,7 @@ use futures::FutureExt;
 /// An enum over the different types of gas fillable.
 #[allow(unreachable_pub)]
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasFillable {
     Legacy { gas_limit: u128, gas_price: u128 },
     Eip1559 { gas_limit: u128, estimate: Eip1559Estimation },
@@ -61,7 +61,7 @@ pub enum GasFillable {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct GasFiller;
 
 impl GasFiller {

@@ -15,7 +15,7 @@ pub const EIP1559_TX_TYPE_ID: u8 = 2;
 pub const EIP4844_TX_TYPE_ID: u8 = 3;
 
 /// Transaction Types supported by ethereum.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TxType {
     /// Legacy transaction pre EIP-2929
     #[default]

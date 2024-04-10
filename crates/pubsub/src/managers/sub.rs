@@ -3,7 +3,7 @@ use alloy_json_rpc::{EthNotification, SerializedRequest};
 use alloy_primitives::{B256, U256};
 use bimap::BiBTreeMap;
 
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct SubscriptionManager {
     /// The subscriptions.
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,

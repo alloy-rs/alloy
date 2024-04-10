@@ -4,7 +4,7 @@ use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
 /// Opcode gas usage for a transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockOpcodeGas {
     /// The block hash
@@ -17,7 +17,7 @@ pub struct BlockOpcodeGas {
 }
 
 /// Opcode gas usage for a transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionOpcodeGas {
     /// The transaction hash
@@ -27,7 +27,7 @@ pub struct TransactionOpcodeGas {
 }
 
 /// Gas information for a single opcode.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpcodeGas {
     /// The name of the opcode

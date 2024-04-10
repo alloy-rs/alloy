@@ -25,7 +25,7 @@ pub const fn minimum_fe(data: &[u8]) -> usize {
 }
 
 /// A wrapper for a slice of bytes that is a whole, valid field element.
-#[derive(Debug, Copy, Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct WholeFe<'a>(&'a [u8]);
 
 impl<'a> WholeFe<'a> {

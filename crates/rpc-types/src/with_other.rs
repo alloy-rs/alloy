@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct WithOtherFields<T> {
     /// The inner struct.
     #[serde(flatten)]

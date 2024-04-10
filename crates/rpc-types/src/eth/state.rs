@@ -8,7 +8,7 @@ use std::collections::HashMap;
 pub type StateOverride = HashMap<Address, AccountOverride>;
 
 /// Custom account override used in call
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct AccountOverride {
     /// Fake balance to set for the account before executing the call.

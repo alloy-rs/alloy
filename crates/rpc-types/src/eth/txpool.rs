@@ -9,7 +9,7 @@ use serde::{
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
 /// Transaction summary as found in the Txpool Inspection property.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxpoolInspectSummary {
     /// Recipient (None when contract creation)
     pub to: Option<Address>,
@@ -113,7 +113,7 @@ impl Serialize for TxpoolInspectSummary {
 /// as the ones that are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContent {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, Transaction>>,
@@ -136,7 +136,7 @@ impl TxpoolContent {
 /// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContentFrom {
     /// pending tx
     pub pending: BTreeMap<String, Transaction>,
@@ -153,7 +153,7 @@ pub struct TxpoolContentFrom {
 /// transactions in the pool and find any potential issues.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolInspect {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
@@ -168,7 +168,7 @@ pub struct TxpoolInspect {
 /// are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status) for more details
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolStatus {
     /// number of pending tx
     pub pending: U64,

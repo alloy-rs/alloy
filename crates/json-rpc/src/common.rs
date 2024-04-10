@@ -22,7 +22,7 @@ use std::fmt::Display;
 /// [`BTreeSet`]: std::collections::BTreeSet
 /// [`HashMap`]: std::collections::HashMap
 /// [`HashSet`]: std::collections::HashSet
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Id {
     /// A number.
     Number(u64),
@@ -161,7 +161,7 @@ impl Id {
 mod test {
     use super::*;
 
-    #[derive(Deserialize, Serialize, Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
     struct TestCase {
         id: Id,
     }

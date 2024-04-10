@@ -126,7 +126,7 @@ impl fmt::Debug for GcpSigner {
 }
 
 /// Errors thrown by [`GcpSigner`].
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum GcpSignerError {
     /// Thrown when the GCP KMS API returns a signing error.
     #[error(transparent)]

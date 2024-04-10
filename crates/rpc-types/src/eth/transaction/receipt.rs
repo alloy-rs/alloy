@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 /// Represents _all_ transaction requests to/from RPC.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
@@ -180,7 +180,7 @@ impl TransactionRequest {
 ///
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TransactionInput {
     /// Transaction data
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -12,7 +12,7 @@ use futures::try_join;
 /// [`TxFiller`], and can be nested to compose any number of fill layers.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct JoinFill<L, R> {
     left: L,
     right: R,

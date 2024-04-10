@@ -8,7 +8,7 @@ use core::mem;
 use alloc::vec::Vec;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip1559 {

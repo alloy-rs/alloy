@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Container type for `trace_call` arguments
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct TraceCallRequest {
     /// call request object
     pub call: TransactionRequest,

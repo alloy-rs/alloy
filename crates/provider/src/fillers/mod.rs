@@ -32,7 +32,7 @@ use futures_utils_wasm::impl_future;
 use std::marker::PhantomData;
 
 /// The control flow for a filler.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FillerControlFlow {
     /// The filler is missing a required property.
     ///
@@ -205,7 +205,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 /// [`ProviderBuilder::filler`] to construct and apply it to a stack.
 ///
 /// [`ProviderBuilder::filler`]: crate::ProviderBuilder::filler
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct FillProvider<F, P, T, N>
 where
     F: TxFiller<N>,

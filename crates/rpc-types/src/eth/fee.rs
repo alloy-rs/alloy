@@ -25,7 +25,7 @@ impl Ord for TxGasAndReward {
 }
 
 /// Response type for `eth_feeHistory`
-#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeeHistory {
     /// An array of block base fees per gas.

@@ -31,7 +31,7 @@ use alloy_serde::{
 use serde::{Deserialize, Serialize};
 
 /// The genesis block specification.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
@@ -211,7 +211,7 @@ impl Genesis {
 }
 
 /// An account in the state of the genesis block.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
@@ -271,7 +271,7 @@ impl GenesisAccount {
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
-#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
@@ -522,11 +522,11 @@ const fn mainnet_id() -> u64 {
 }
 
 /// Empty consensus configuration for proof-of-work networks.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthashConfig {}
 
 /// Consensus configuration for Clique.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]

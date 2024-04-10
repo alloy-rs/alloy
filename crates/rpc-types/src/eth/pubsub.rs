@@ -8,7 +8,7 @@ use alloy_primitives::B256;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Subscription result.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub enum SubscriptionResult {
     /// New block header.
@@ -24,7 +24,7 @@ pub enum SubscriptionResult {
 }
 
 /// Response type for a SyncStatus subscription.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PubSubSyncStatus {
     /// If not currently syncing, this should always be `false`.
@@ -34,7 +34,7 @@ pub enum PubSubSyncStatus {
 }
 
 /// Sync status metadata.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
@@ -64,7 +64,7 @@ impl Serialize for SubscriptionResult {
 }
 
 /// Subscription kind.
-#[derive(Debug, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub enum SubscriptionKind {
@@ -99,7 +99,7 @@ pub enum SubscriptionKind {
 }
 
 /// Any additional parameters for a subscription.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Params {
     /// No parameters passed.
     #[default]

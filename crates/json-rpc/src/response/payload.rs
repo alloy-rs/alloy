@@ -15,7 +15,7 @@ use std::borrow::Borrow;
 /// deserialized as part of the [`Response`] type.
 ///
 /// [`Response`]: crate::Response
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     /// A successful response payload.
     Success(Payload),

@@ -26,7 +26,7 @@ use super::{FillerControlFlow, TxFiller};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SignerFiller<S> {
     signer: S,
 }

@@ -13,7 +13,7 @@ use core::mem;
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodable, RlpEncodable)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodable, RlpEncodable)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -42,7 +42,7 @@ impl AccessListItem {
 }
 
 /// AccessList as defined in EIP-2930
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, RlpDecodableWrapper, RlpEncodableWrapper)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodableWrapper, RlpEncodableWrapper)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -111,7 +111,7 @@ impl AccessList {
 }
 
 /// Access list with gas used appended.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct AccessListWithGasUsed {

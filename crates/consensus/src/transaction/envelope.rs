@@ -13,7 +13,7 @@ use core::mem;
 /// [2930]: https://eips.ethereum.org/EIPS/eip-2930
 /// [4844]: https://eips.ethereum.org/EIPS/eip-4844
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TxType {
     /// Legacy transaction type.
     Legacy = 0,
@@ -61,7 +61,7 @@ impl TryFrom<u8> for TxType {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
