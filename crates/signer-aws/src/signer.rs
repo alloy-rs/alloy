@@ -68,7 +68,7 @@ impl fmt::Debug for AwsSigner {
 }
 
 /// Errors thrown by [`AwsSigner`].
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum AwsSignerError {
     /// Thrown when the AWS KMS API returns a signing error.
     #[error(transparent)]

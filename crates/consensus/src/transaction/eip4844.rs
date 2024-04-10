@@ -63,7 +63,7 @@ pub enum BlobTransactionValidationError {
 /// It can either be a standalone transaction, mainly seen when retrieving historical transactions,
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum TxEip4844Variant {
@@ -321,7 +321,7 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844 {
@@ -762,7 +762,7 @@ impl Decodable for TxEip4844 {
 /// This is defined in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#networking) as an element
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
 /// through the network (eth_sendRawTransaction/eth_sendTransaction).
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip4844WithSidecar {
@@ -960,7 +960,7 @@ impl Transaction for TxEip4844WithSidecar {
 }
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobTransactionSidecar {

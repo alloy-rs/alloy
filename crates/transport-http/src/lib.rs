@@ -42,7 +42,7 @@ mod reqwest;
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`reqwest`](::reqwest::Client)")]
 #[cfg_attr(feature = "hyper", doc = " - [`hyper`](hyper_util::client::legacy::Client)")]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Http<T> {
     client: T,
     url: Url,

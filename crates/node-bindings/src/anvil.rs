@@ -140,7 +140,7 @@ pub enum AnvilError {
 ///
 /// drop(anvil); // this will kill the instance
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Anvil {
     program: Option<PathBuf>,

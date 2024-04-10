@@ -34,7 +34,7 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ChainIdFiller(Arc<OnceLock<u64>>);
 
 impl ChainIdFiller {

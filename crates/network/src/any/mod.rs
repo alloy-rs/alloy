@@ -10,7 +10,7 @@ mod builder;
 /// Essentially just returns the regular Ethereum types + a catch all field.
 /// This [`Network`] should be used only when the network is not known at
 /// compile time.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
     _private: (),
 }

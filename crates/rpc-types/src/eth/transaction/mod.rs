@@ -31,7 +31,7 @@ mod signature;
 pub use signature::{Parity, Signature};
 
 /// Transaction object used in RPC
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {

@@ -30,7 +30,7 @@ impl fmt::Display for DerivationType {
 }
 
 /// Error when using the Ledger transport.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum LedgerError {
     /// Underlying Ledger transport error.
     #[error(transparent)]
@@ -63,7 +63,7 @@ pub enum LedgerError {
 pub(crate) const P1_FIRST: u8 = 0x00;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types, dead_code)]
 pub(crate) enum INS {
     GET_PUBLIC_KEY = 0x02,
@@ -86,7 +86,7 @@ impl fmt::Display for INS {
 }
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub(crate) enum P1 {
     NON_CONFIRM = 0x00,
@@ -94,7 +94,7 @@ pub(crate) enum P1 {
 }
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub(crate) enum P2 {
     NO_CHAINCODE = 0x00,

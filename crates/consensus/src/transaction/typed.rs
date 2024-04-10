@@ -8,7 +8,7 @@ use alloy_primitives::TxKind;
 /// 2. EIP2930 (state access lists) [`TxEip2930`]
 /// 3. EIP1559 [`TxEip1559`]
 /// 4. EIP4844 [`TxEip4844Variant`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TypedTransaction {

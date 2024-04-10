@@ -16,7 +16,7 @@ use serde::{
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
 /// Block representation
-#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     /// Header of the block.
@@ -52,7 +52,7 @@ impl Block {
 
 /// Block header representation.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
@@ -164,7 +164,7 @@ impl Header {
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum BlockTransactions<T = Transaction> {
     /// Only hashes
@@ -399,7 +399,7 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
 ///
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockTransactionsKind {
     /// Only include hashes: [BlockTransactions::Hashes]
     Hashes,
@@ -418,7 +418,7 @@ impl From<bool> for BlockTransactionsKind {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
     /// A transaction failed sender recovery
     #[error("transaction failed sender recovery")]
@@ -435,7 +435,7 @@ pub enum BlockError {
 /// If true, an RPC call should additionally raise if
 /// the block is not in the canonical chain.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct RpcBlockHash {
     /// A block hash
     pub block_hash: B256,
@@ -469,7 +469,7 @@ impl AsRef<B256> for RpcBlockHash {
 }
 
 /// A block Number (or tag - "latest", "earliest", "pending")
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockNumberOrTag {
     /// Latest block
     #[default]
@@ -615,14 +615,14 @@ pub enum ParseBlockNumberError {
 }
 
 /// Thrown when a 0x-prefixed hex string was expected
-#[derive(Copy, Clone, Debug, Default, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Default, thiserror::Error)]
 #[non_exhaustive]
 #[error("hex string without 0x prefix")]
 pub struct HexStringMissingPrefixError;
 
 /// A Block Identifier
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockId {
     /// A block hash and an optional bool that defines if it's canonical
     Hash(RpcBlockHash),
@@ -891,7 +891,7 @@ impl FromStr for BlockId {
 }
 
 /// Block number and hash.
-#[derive(Clone, Copy, Hash, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct BlockNumHash {
     /// Block number
     pub number: BlockNumber,
@@ -941,7 +941,7 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 }
 
 /// Either a block hash _or_ a block number
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -1068,7 +1068,7 @@ impl From<Header> for RichHeader {
 }
 
 /// Value representation with additional info
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Rich<T> {
     /// Standard value.
     #[serde(flatten)]
@@ -1109,7 +1109,7 @@ impl<T: Serialize> Serialize for Rich<T> {
 }
 
 /// BlockOverrides is a set of header fields to override.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct BlockOverrides {
     /// Overrides the block number.

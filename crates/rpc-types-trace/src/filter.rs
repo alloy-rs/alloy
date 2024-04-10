@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 /// Trace filter.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct TraceFilter {
@@ -42,7 +42,7 @@ impl TraceFilter {
 }
 
 /// How to apply `from_address` and `to_address` filters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TraceFilterMode {
     /// Return traces for transactions with matching `from` OR `to` addresses.
@@ -53,7 +53,7 @@ pub enum TraceFilterMode {
 }
 
 /// Helper type for matching `from` and `to` addresses. Empty sets match all addresses.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TraceFilterMatcher {
     mode: TraceFilterMode,
     from_addresses: HashSet<Address>,

@@ -5,7 +5,7 @@ use alloy_primitives::{B256, U128, U64};
 use serde::{Deserialize, Serialize};
 
 /// Optimism specific transaction fields
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimismTransactionFields {
     /// Hash that uniquely identifies the source of the deposit.
     #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
@@ -20,7 +20,7 @@ pub struct OptimismTransactionFields {
 }
 
 /// Additional fields for Optimism transaction receipts
-#[derive(Clone, Copy, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith

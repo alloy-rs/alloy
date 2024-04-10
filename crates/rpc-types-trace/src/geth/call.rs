@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/91cb6f863a965481e51d5d9c0e5ccd54796fd967/eth/tracers/native/call.go#L44>
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallFrame {
     /// The address of that initiated the call.
     pub from: Address,
@@ -46,7 +46,7 @@ pub struct CallFrame {
 }
 
 /// Represents a recorded call.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallLogFrame {
     /// The address of the contract that was called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,7 +60,7 @@ pub struct CallLogFrame {
 }
 
 /// The configuration for the call tracer.
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CallConfig {
     /// When set to true, this will only trace the primary (top-level) call and not any sub-calls.

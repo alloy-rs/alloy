@@ -6,7 +6,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use alloc::vec::Vec;
 
 /// Receipt containing result of transaction execution.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -61,7 +61,7 @@ impl TxReceipt for Receipt {
 /// receipt, similar to [`Sealed`].
 ///
 /// [`Sealed`]: crate::sealed::Sealed
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ReceiptWithBloom<T = Log> {

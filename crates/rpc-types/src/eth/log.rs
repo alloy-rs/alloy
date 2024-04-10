@@ -4,7 +4,7 @@ use alloy_primitives::{LogData, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)

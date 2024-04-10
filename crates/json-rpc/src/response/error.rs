@@ -10,7 +10,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData};
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
 /// included in the `message` field of the response payload.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ErrorPayload<ErrData = Box<RawValue>> {
     /// The error code.
     pub code: i64,
@@ -196,7 +196,7 @@ mod test {
 
     #[test]
     fn smooth_deser() {
-        #[derive(Debug, serde::Deserialize, PartialEq)]
+        #[derive(Debug, PartialEq, serde::Deserialize)]
         struct TestData {
             a: u32,
             b: Option<String>,

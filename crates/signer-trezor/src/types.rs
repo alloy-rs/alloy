@@ -27,7 +27,7 @@ impl fmt::Display for DerivationType {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 /// Error when using the Trezor transport
 pub enum TrezorError {
     /// Underlying Trezor transport error.

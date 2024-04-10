@@ -40,7 +40,7 @@ use tokio::sync::Mutex;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct NonceFiller {
     nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
 }

@@ -26,7 +26,7 @@ pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Et
 }
 
 /// An identity layer that does nothing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Identity;
 
 impl<N> TxFiller<N> for Identity

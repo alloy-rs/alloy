@@ -9,7 +9,7 @@ use std::fmt;
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PayloadId(B64);
 
 // === impl PayloadId ===
@@ -674,7 +674,7 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
 }
 
 /// Error that can occur when handling payloads.
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum PayloadError {
     /// Invalid payload extra data.
     #[error("invalid payload extra data: {0}")]
@@ -915,7 +915,7 @@ impl fmt::Display for PayloadStatusEnum {
 /// Various errors that can occur when validating a payload or forkchoice update.
 ///
 /// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum PayloadValidationError {
     /// Thrown when a forkchoice update's head links to a previously rejected payload.
     #[error("links to previously rejected block")]

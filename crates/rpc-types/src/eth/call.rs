@@ -3,7 +3,7 @@ use alloy_primitives::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Bundle of transactions
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Bundle {
     /// All transactions to execute
@@ -13,7 +13,7 @@ pub struct Bundle {
 }
 
 /// State context for callMany
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {
     /// Block Number
@@ -25,7 +25,7 @@ pub struct StateContext {
 }
 
 /// CallResponse for eth_callMany
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EthCallResponse {
     /// eth_call output (if no error)
@@ -47,7 +47,7 @@ impl EthCallResponse {
 }
 
 /// Represents a transaction index where -1 means all transactions
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TransactionIndex {
     /// -1 means all transactions
     #[default]

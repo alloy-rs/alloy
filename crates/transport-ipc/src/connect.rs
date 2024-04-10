@@ -4,7 +4,7 @@ use std::{
 };
 
 /// An IPC Connection object.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct IpcConnect<T> {
     inner: T,
 }

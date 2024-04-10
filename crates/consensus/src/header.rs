@@ -21,7 +21,7 @@ pub const EMPTY_ROOT_HASH: B256 =
     b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
 
 /// Ethereum Block header
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.

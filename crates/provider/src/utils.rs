@@ -11,7 +11,7 @@ pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
 /// Return type of EIP1155 gas fee estimator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eip1559Estimation {
     /// The base fee per gas.
     pub max_fee_per_gas: u128,

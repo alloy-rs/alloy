@@ -7,7 +7,7 @@ use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, Transpo
 use alloy_pubsub::PubSubConnect;
 
 /// Connection string for built-in transports.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BuiltInConnectionString {
     #[cfg(any(feature = "reqwest", feature = "hyper"))]

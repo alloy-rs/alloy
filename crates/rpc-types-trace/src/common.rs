@@ -4,7 +4,7 @@ use alloy_primitives::TxHash;
 use serde::{Deserialize, Serialize};
 
 /// The result of a single transaction trace.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TraceResult<Ok, Err> {
     /// Untagged success variant

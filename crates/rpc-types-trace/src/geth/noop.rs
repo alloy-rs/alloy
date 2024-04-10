@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 /// An empty frame response that's only an empty json object `{}`.
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/91cb6f863a965481e51d5d9c0e5ccd54796fd967/eth/tracers/native/noop.go#L34>
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoopFrame(BTreeMap<(), ()>);
 
 #[cfg(test)]

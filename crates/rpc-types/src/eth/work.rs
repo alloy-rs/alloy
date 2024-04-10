@@ -6,7 +6,7 @@ use serde::{
 use std::fmt;
 
 /// The result of an `eth_getWork` request
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Work {
     /// The proof-of-work hash.
     pub pow_hash: B256,
