@@ -71,7 +71,6 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
-        trace!("Polling prepared");
         let fut = {
             let CallStateProj::Prepared { connection, request } = self.as_mut().project() else {
                 unreachable!("Called poll_prepared in incorrect state")
@@ -81,11 +80,18 @@ where
                 self.set(CallState::Complete);
                 return Ready(RpcResult::Err(e));
             }
-            let request = request.take().expect("no request").serialize();
 
+            let request = request.take().expect("no request");
+            debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+            trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
+            let request = request.serialize();
             match request {
-                Ok(request) => connection.call(request.into()),
+                Ok(request) => {
+                    trace!(request=%request.serialized(), "serialized request");
+                    connection.call(request.into())
+                }
                 Err(err) => {
+                    trace!(?err, "failed to serialize request");
                     self.set(CallState::Complete);
                     return Ready(RpcResult::Err(TransportError::ser_err(err)));
                 }
@@ -102,7 +108,6 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
-        trace!("Polling awaiting");
         let CallStateProj::AwaitingResponse { fut } = self.as_mut().project() else {
             unreachable!("Called poll_awaiting in incorrect state")
         };
@@ -122,7 +127,6 @@ where
 {
     type Output = TransportResult<Box<RawValue>>;
 
-    #[instrument(skip(self, cx))]
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         if matches!(*self.as_mut(), CallState::Prepared { .. }) {
             return self.poll_prepared(cx);
@@ -284,7 +288,7 @@ where
     type Output = TransportResult<Resp>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        trace!(?self.state, "Polling RpcCall");
+        trace!(?self.state, "polling RpcCall");
         self.project().state.poll(cx).map(try_deserialize_ok)
     }
 }
