@@ -236,7 +236,9 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             value: tx.value,
             input: tx.input,
             access_list: tx.access_list.unwrap_or_default(),
-            blob_versioned_hashes: tx.blob_versioned_hashes.unwrap_or_default(),
+            blob_versioned_hashes: tx
+                .blob_versioned_hashes
+                .ok_or(ConversionError::MissingBlobVersionedHashes)?,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
                 .ok_or(ConversionError::MissingMaxFeePerBlobGas)?,

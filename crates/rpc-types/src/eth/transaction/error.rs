@@ -28,6 +28,9 @@ pub enum ConversionError {
     /// Missing `chainId` field for EIP-1559 transaction.
     #[error("missing `chainId` field for EIP-155 transaction")]
     MissingChainId,
+    /// Missing `chainId` field for EIP-1559 transaction.
+    #[error("missing `blobVersionedHashes` field for EIP-4844 transaction")]
+    MissingBlobVersionedHashes,
     /// [`alloy_primitives::SignatureError`].
     #[error(transparent)]
     SignatureError(#[from] alloy_primitives::SignatureError),
