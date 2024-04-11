@@ -106,6 +106,14 @@ where
         self.default
     }
 
+    fn is_signer_for(&self, address: &Address) -> bool {
+        self.secp_signers.contains_key(address)
+    }
+
+    fn signers(&self) -> impl Iterator<Item = &Address> {
+        self.secp_signers.keys()
+    }
+
     async fn sign_transaction_from(
         &self,
         sender: Option<Address>,
