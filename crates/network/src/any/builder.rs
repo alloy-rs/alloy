@@ -130,6 +130,6 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self,
         signer: &S,
     ) -> BuilderResult<alloy_consensus::TxEnvelope> {
-        Ok(signer.sign_transaction(self.build_unsigned()?).await?)
+        Ok(signer.sign_request(self.build_unsigned()?.into()).await?)
     }
 }
