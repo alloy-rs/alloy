@@ -110,14 +110,14 @@ impl AccessList {
     }
 
     /// Returns the position of the given address in the access list, if present.
-    pub fn index_of_address(&self, address: Address) -> Option<usize> {
+    fn index_of_address(&self, address: Address) -> Option<usize> {
         self.iter().position(|item| item.address == address)
     }
 
     /// Checks if a specific storage slot within an account is present in the access list.
     ///
     /// Returns a tuple with flags for the presence of the account and the slot.
-    pub fn contains(&self, address: Address, slot: B256) -> (bool, bool) {
+    pub fn contains_storage(&self, address: Address, slot: B256) -> (bool, bool) {
         self.index_of_address(address)
             .map_or((false, false), |idx| (true, self.contains_storage_key_at_index(slot, idx)))
     }
@@ -129,7 +129,7 @@ impl AccessList {
 
     /// Checks if the storage keys at the given index within an account are present in the access
     /// list.
-    pub fn contains_storage_key_at_index(&self, slot: B256, index: usize) -> bool {
+    fn contains_storage_key_at_index(&self, slot: B256, index: usize) -> bool {
         self.get(index).map_or(false, |entry| {
             entry.storage_keys.iter().any(|storage_key| *storage_key == slot)
         })
