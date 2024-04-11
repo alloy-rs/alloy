@@ -69,7 +69,7 @@ impl EthereumSigner {
 
     /// Get the default signer.
     pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
-        self.secp_signers.get(&self.default).map(Arc::clone).expect("invalid signer")
+        self.secp_signers.get(&self.default).cloned().expect("invalid signer")
     }
 
     /// Get the signer for the given address.
@@ -77,7 +77,7 @@ impl EthereumSigner {
         &self,
         address: Address,
     ) -> Option<Arc<dyn TxSigner<Signature> + Send + Sync + 'static>> {
-        self.secp_signers.get(&address).map(Arc::clone)
+        self.secp_signers.get(&address).cloned()
     }
 
     async fn sign_transaction_inner(
