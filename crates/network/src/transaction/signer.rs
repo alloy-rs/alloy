@@ -6,9 +6,14 @@ use futures_utils_wasm::impl_future;
 
 /// A signer capable of signing any transaction for the given network.
 ///
-/// Network crate authors should implement this trait on a type capable of signing any transaction
-/// (regardless of signature type) on a given network. Signer crate authors should instead implement
-/// [`TxSigner`] to signify signing capability for specific signature types.
+/// Network crate authors should implement this trait on a type capable of
+/// signing any transaction (regardless of signature type) on a given network.
+/// Signer crate authors should instead implement [`TxSigner`] to signify
+/// signing capability for specific signature types.
+///
+/// Network signers are expected to contain one or more signing credentials,
+/// keyed by signing address. The default signer address should be used when
+/// no specific signer address is specified.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
@@ -33,7 +38,8 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         self.sign_transaction_from(None, tx)
     }
 
-    /// Asynchronously sign a transaction request.
+    /// Asynchronously sign a transaction request, using the sender specified
+    /// in the `from` field.
     async fn sign_request(
         &self,
         request: N::TransactionRequest,
