@@ -110,8 +110,8 @@ where
         self.secp_signers.contains_key(address)
     }
 
-    fn signers(&self) -> impl Iterator<Item = &Address> {
-        self.secp_signers.keys()
+    fn signers(&self) -> impl Iterator<Item = Address> {
+        self.secp_signers.keys().copied()
     }
 
     async fn sign_transaction_from(

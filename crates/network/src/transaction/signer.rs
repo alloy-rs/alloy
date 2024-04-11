@@ -26,7 +26,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     fn is_signer_for(&self, address: &Address) -> bool;
 
     /// Return an iterator of all signer addresses.
-    fn signers(&self) -> impl Iterator<Item = &Address>;
+    fn signers(&self) -> impl Iterator<Item = Address>;
 
     /// Asynchronously sign an unsigned transaction, with a specified
     /// credential.
