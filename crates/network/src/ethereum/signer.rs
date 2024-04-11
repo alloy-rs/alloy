@@ -37,7 +37,7 @@ impl EthereumSigner {
         S: TxSigner<Signature> + Send + Sync + 'static,
     {
         let mut this = Self { default: Default::default(), secp_signers: BTreeMap::new() };
-        this.register_signer(signer);
+        this.register_default_signer(signer);
         this
     }
 
