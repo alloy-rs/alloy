@@ -82,14 +82,12 @@ impl EthereumSigner {
 
     async fn sign_transaction_inner(
         &self,
-        sender: Option<Address>,
+        sender: Address,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        let address = sender.unwrap_or(self.default);
-
-        self.signer_by_address(address)
+        self.signer_by_address(sender)
             .ok_or_else(|| {
-                alloy_signer::Error::other(format!("Missing signing credential for {}", address))
+                alloy_signer::Error::other(format!("Missing signing credential for {}", sender))
             })?
             .sign_transaction(tx)
             .await
@@ -116,7 +114,7 @@ where
 
     async fn sign_transaction_from(
         &self,
-        sender: Option<Address>,
+        sender: Address,
         tx: TypedTransaction,
     ) -> alloy_signer::Result<TxEnvelope> {
         match tx {

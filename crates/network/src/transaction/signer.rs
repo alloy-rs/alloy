@@ -32,7 +32,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     /// credential.
     async fn sign_transaction_from(
         &self,
-        sender: Option<Address>,
+        sender: Address,
         tx: N::UnsignedTx,
     ) -> alloy_signer::Result<N::TxEnvelope>;
 
@@ -41,7 +41,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         &self,
         tx: N::UnsignedTx,
     ) -> impl_future!(<Output = alloy_signer::Result<N::TxEnvelope>>) {
-        self.sign_transaction_from(None, tx)
+        self.sign_transaction_from(self.default_signer(), tx)
     }
 
     /// Asynchronously sign a transaction request, using the sender specified
@@ -50,7 +50,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         &self,
         request: N::TransactionRequest,
     ) -> alloy_signer::Result<N::TxEnvelope> {
-        let sender = request.from();
+        let sender = request.from().unwrap_or_else(|| self.default_signer());
         let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
         self.sign_transaction_from(sender, tx).await
     }
