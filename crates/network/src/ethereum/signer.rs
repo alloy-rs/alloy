@@ -57,6 +57,8 @@ impl EthereumSigner {
     /// This signer will be used to sign [`TransactionRequest`] and
     /// [`TypedTransaction`] objects that do not specify a signer address in the
     /// `from` field.
+    ///
+    /// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
     pub fn register_default_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -67,7 +69,7 @@ impl EthereumSigner {
 
     /// Get the default signer.
     pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
-        self.secp_signers.get(&self.default).map(|s| Arc::clone(s)).expect("invalid signer")
+        self.secp_signers.get(&self.default).map(Arc::clone).expect("invalid signer")
     }
 
     /// Get the signer for the given address.
@@ -75,7 +77,7 @@ impl EthereumSigner {
         &self,
         address: Address,
     ) -> Option<Arc<dyn TxSigner<Signature> + Send + Sync + 'static>> {
-        self.secp_signers.get(&address).map(|s| Arc::clone(s))
+        self.secp_signers.get(&address).map(Arc::clone)
     }
 
     async fn sign_transaction_inner(
@@ -83,7 +85,7 @@ impl EthereumSigner {
         sender: Option<Address>,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        let address = sender.unwrap_or_else(|| self.default);
+        let address = sender.unwrap_or(self.default);
 
         self.signer_by_address(address)
             .ok_or_else(|| {
