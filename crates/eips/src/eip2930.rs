@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
-use core::mem;
+use core::{mem, ops::Deref};
 
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
@@ -70,6 +70,14 @@ impl From<AccessList> for Vec<AccessListItem> {
     }
 }
 
+impl Deref for AccessList {
+    type Target = Vec<AccessListItem>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl AccessList {
     /// Converts the list into a vec, expected by revm
     pub fn flattened(&self) -> Vec<(Address, Vec<U256>)> {
@@ -99,6 +107,41 @@ impl AccessList {
                 item.storage_keys.iter().map(|slot| U256::from_be_bytes(slot.0)).collect(),
             )
         })
+    }
+
+    /// Returns the position of the given address in the access list, if present.
+    fn index_of_address(&self, address: Address) -> Option<usize> {
+        self.iter().position(|item| item.address == address)
+    }
+
+    /// Checks if a specific storage slot within an account is present in the access list.
+    ///
+    /// Returns a tuple with flags for the presence of the account and the slot.
+    pub fn contains_storage(&self, address: Address, slot: B256) -> (bool, bool) {
+        self.index_of_address(address)
+            .map_or((false, false), |idx| (true, self.contains_storage_key_at_index(slot, idx)))
+    }
+
+    /// Checks if the access list contains the specified address.
+    pub fn contains_address(&self, address: Address) -> bool {
+        self.iter().any(|item| item.address == address)
+    }
+
+    /// Checks if the storage keys at the given index within an account are present in the access
+    /// list.
+    fn contains_storage_key_at_index(&self, slot: B256, index: usize) -> bool {
+        self.get(index).map_or(false, |entry| {
+            entry.storage_keys.iter().any(|storage_key| *storage_key == slot)
+        })
+    }
+
+    /// Adds an address to the access list and returns `true` if the operation results in a change,
+    /// indicating that the address was not previously present.
+    pub fn add_address(&mut self, address: Address) -> bool {
+        !self.contains_address(address) && {
+            self.0.push(AccessListItem { address, storage_keys: Vec::new() });
+            true
+        }
     }
 
     /// Calculates a heuristic for the in-memory size of the [AccessList].
