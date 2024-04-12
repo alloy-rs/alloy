@@ -34,7 +34,7 @@ pub enum ConversionError {
     /// Missing `to` field for EIP-4844 transaction.
     #[error("missing `to` field for EIP-4844 transaction")]
     MissingTo,
-    /// Missing `chainId` field for EIP-1559 transaction.
+    /// Missing `blobVersionedHashes` field for EIP-4844 transaction.
     #[error("missing `blobVersionedHashes` field for EIP-4844 transaction")]
     MissingBlobVersionedHashes,
 }

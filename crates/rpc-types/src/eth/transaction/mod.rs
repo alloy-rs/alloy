@@ -105,8 +105,9 @@ pub struct Transaction {
     pub access_list: Option<AccessList>,
     /// EIP2718
     ///
-    /// Transaction type, Some(2) for EIP-1559 transaction,
-    /// Some(1) for AccessList transaction, None for Legacy
+    /// Transaction type,
+    /// Some(3) for EIP-4844 transaction, Some(2) for EIP-1559 transaction,
+    /// Some(1) for AccessList transaction, None or Some(0) for Legacy
     #[serde(
         default,
         rename = "type",
