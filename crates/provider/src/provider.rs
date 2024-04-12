@@ -689,7 +689,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         match tx {
-            SendableTx::Builder(tx) => {
+            SendableTx::Builder(mut tx) => {
+                alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
                 Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
             }

@@ -1,8 +1,3 @@
-use std::{
-    fmt::Display,
-    ops::{Deref, DerefMut},
-};
-
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_consensus::{BlobTransactionSidecar, TxType};
@@ -10,12 +5,18 @@ use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::AccessList;
 use futures_utils_wasm::impl_future;
 
+/// Result type for transaction builders
+pub type BuilderResult<T, E = TransactionBuilderError> = Result<T, E>;
+
+/// An unbuilt transaction, along with some error.
+pub type Unbuilt<T> = (T, TransactionBuilderError);
+
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
 pub enum TransactionBuilderError {
     /// Invalid transaction request
-    #[error("{0} transaction can't be built: {1}")]
-    InvalidTransactionRequest(TxType, InvalidTransactionRequestErrors),
+    #[error("{0} transaction can't be built due to missing keys: {1:?}")]
+    InvalidTransactionRequest(TxType, Vec<&'static str>),
 
     /// Signer cannot produce signature type required for transaction.
     #[error("Signer cannot produce signature type required for transaction")]
@@ -39,55 +40,6 @@ impl TransactionBuilderError {
         Self::Custom(Box::new(e))
     }
 }
-
-/// Wrapper for [`InvalidTransactionRequestError`]s.
-#[derive(Debug)]
-pub struct InvalidTransactionRequestErrors(pub Vec<InvalidTransactionRequestError>);
-
-impl Deref for InvalidTransactionRequestErrors {
-    type Target = Vec<InvalidTransactionRequestError>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for InvalidTransactionRequestErrors {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Display for InvalidTransactionRequestErrors {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let to_display = self.0.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
-
-        write!(f, "{to_display}")
-    }
-}
-
-impl From<Vec<&'static str>> for InvalidTransactionRequestErrors {
-    fn from(value: Vec<&'static str>) -> Self {
-        InvalidTransactionRequestErrors(
-            value.into_iter().map(InvalidTransactionRequestError::MissingKey).collect(),
-        )
-    }
-}
-
-/// Error type for invalid transaction requests.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
-pub enum InvalidTransactionRequestError {
-    /// A required key is missing.
-    #[error("Missing {0}")]
-    MissingKey(&'static str),
-
-    /// Mutually exclusive fields have been set.
-    #[error("{0} and {1} are mutually exclusive")]
-    MutuallyExclusive(&'static str, &'static str),
-}
-
-/// [`TransactionBuilder`] result type.
-pub type BuilderResult<T, E = TransactionBuilderError> = std::result::Result<T, E>;
 
 /// A Transaction builder for a network.
 ///
@@ -278,16 +230,24 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// a valid transaction.
     fn can_build(&self) -> bool;
 
-    /// Returns the transaction type that this builder will attempt to build. This does not imply
-    /// that the builder is ready to build.
+    /// Returns the transaction type that this builder will attempt to build.
+    /// This does not imply that the builder is ready to build.
     fn output_tx_type(&self) -> TxType;
 
-    /// Returns the transaction type that this builder will build. `Err` if the builder
-    /// is not ready to build, containing the attempt type and missing/conflicted information
-    fn output_tx_type_checked(&self) -> BuilderResult<TxType>;
+    /// Returns the transaction type that this builder will build. `None` if
+    /// the builder is not ready to build.
+    fn output_tx_type_checked(&self) -> Option<TxType>;
+
+    /// Trim any conflicting keys
+    ///
+    /// This is useful for transaction requests that have multiple conflicting
+    /// fields. While these may be buildable, they may not be submitted to the
+    /// RPC. This method should be called before RPC submission, but is not
+    /// necessary before building.
+    fn prep_for_submission(&mut self);
 
     /// Build an unsigned, but typed, transaction.
-    fn build_unsigned(self) -> BuilderResult<N::UnsignedTx>;
+    fn build_unsigned(self) -> BuilderResult<N::UnsignedTx, Unbuilt<Self>>;
 
     /// Build a signed transaction.
     fn build<S: NetworkSigner<N>>(

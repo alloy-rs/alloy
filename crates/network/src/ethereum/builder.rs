@@ -1,11 +1,8 @@
 use crate::{
-    transaction::{InvalidTransactionRequestError, InvalidTransactionRequestErrors},
     BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
+    Unbuilt,
 };
-use alloy_consensus::{
-    BlobTransactionSidecar, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxLegacy, TxType,
-    TypedTransaction,
-};
+use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::{request::TransactionRequest, AccessList};
 
@@ -142,23 +139,26 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn output_tx_type(&self) -> TxType {
-        todo!()
+        self.preferred_type()
     }
 
-    fn output_tx_type_checked(&self) -> BuilderResult<TxType> {
-        if will_build_4844(self)? {
-            Ok(TxType::Eip4844)
-        } else if will_build_2930(self)? {
-            Ok(TxType::Eip2930)
-        } else if will_build_legacy(self)? {
-            Ok(TxType::Legacy)
-        } else {
-            Ok(TxType::Eip1559)
+    fn output_tx_type_checked(&self) -> Option<TxType> {
+        self.buildable_type()
+    }
+
+    fn prep_for_submission(&mut self) {
+        self.trim_conflicting_keys();
+        self.populate_blob_hashes();
+    }
+
+    fn build_unsigned(self) -> Result<TypedTransaction, Unbuilt<Self>> {
+        if let Err((tx_type, missing)) = self.missing_keys() {
+            return Err((
+                self,
+                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
+            ));
         }
-    }
-
-    fn build_unsigned(self) -> BuilderResult<TypedTransaction> {
-        build_unsigned::<Ethereum>(self)
+        Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
 
     async fn build<S: NetworkSigner<Ethereum>>(
@@ -169,207 +169,43 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 }
 
-/// Build an unsigned transaction
-pub(crate) fn build_unsigned<N>(request: TransactionRequest) -> BuilderResult<N::UnsignedTx>
-where
-    N: Network,
-    N::UnsignedTx: From<TxLegacy> + From<TxEip1559> + From<TxEip2930> + From<TxEip4844Variant>,
-{
-    match request.output_tx_type_checked()? {
-        TxType::Legacy => build_legacy(request).map(Into::into),
-        TxType::Eip2930 => build_2930(request).map(Into::into),
-        TxType::Eip1559 => build_1559(request).map(Into::into),
-        TxType::Eip4844 => build_4844(request).map(TxEip4844Variant::from).map(Into::into),
-    }
-}
-
-fn will_build_legacy(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.gas_price.is_none() {
-        return Ok(false);
-    }
-
-    let errors = request.get_invalid_common_fields();
-
-    if errors.is_empty() {
-        Ok(true)
-    } else {
-        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Legacy, errors.into()))
-    }
-}
-
-fn will_build_2930(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.access_list.is_none() {
-        return Ok(false);
-    }
-
-    let mut errors = InvalidTransactionRequestErrors::from(request.get_invalid_common_fields());
-
-    if request.gas_price.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("gas_price"));
-    }
-
-    if request.sidecar.is_some() {
-        errors.push(InvalidTransactionRequestError::MutuallyExclusive("access_list", "sidecar"));
-    }
-
-    if errors.is_empty() {
-        Ok(true)
-    } else {
-        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip2930, errors))
-    }
-}
-
-fn will_build_4844(request: &TransactionRequest) -> Result<bool, TransactionBuilderError> {
-    if request.sidecar.is_none()
-        && request.blob_versioned_hashes.is_none()
-        && request.max_fee_per_blob_gas.is_none()
-    {
-        return Ok(false);
-    }
-
-    let mut errors = request.get_invalid_common_fields();
-
-    errors.append(&mut request.get_invalid_1559_fields());
-
-    let mut errors = InvalidTransactionRequestErrors::from(errors);
-
-    if request.access_list.is_some() {
-        errors.push(InvalidTransactionRequestError::MutuallyExclusive("sidecar", "access_list"))
-    }
-
-    if request.sidecar.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("sidecar"));
-    }
-
-    if request.blob_versioned_hashes.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("blob_versioned_hashes"));
-    }
-
-    if request.blob_versioned_hashes.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("max_fee_per_blob_gas"));
-    }
-
-    if request.to.is_none() {
-        errors.push(InvalidTransactionRequestError::MissingKey("to"));
-    }
-
-    if errors.is_empty() {
-        Ok(true)
-    } else {
-        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip4844, errors))
-    }
-}
-
-/// Build a legacy transaction.
-fn build_legacy(request: TransactionRequest) -> Result<TxLegacy, TransactionBuilderError> {
-    Ok(TxLegacy {
-        chain_id: request.chain_id,
-        nonce: request.nonce.expect("checked in will_build_legacy"),
-        gas_price: request.gas_price.expect("checked in will_build_legacy"),
-        gas_limit: request.gas.expect("checked in will_build_legacy"),
-        to: request.to.into(),
-        value: request.value.unwrap_or_default(),
-        input: request.input.into_input().unwrap_or_default(),
-    })
-}
-
-/// Build an EIP-1559 transaction.
-fn build_1559(request: TransactionRequest) -> Result<TxEip1559, TransactionBuilderError> {
-    let mut errors = request.get_invalid_common_fields();
-
-    errors.append(&mut request.get_invalid_1559_fields());
-
-    let errors = InvalidTransactionRequestErrors::from(errors);
-
-    if errors.is_empty() {
-        Ok(TxEip1559 {
-            chain_id: request.chain_id.unwrap_or(1),
-            nonce: request.nonce.expect("checked in invalid_common_fields"),
-            max_priority_fee_per_gas: request
-                .max_priority_fee_per_gas
-                .expect("checked in invalid_1559_fields"),
-            max_fee_per_gas: request.max_fee_per_gas.expect("checked in invalid_1559_fields"),
-            gas_limit: request.gas.expect("checked in invalid_common_fields"),
-            to: request.to.into(),
-            value: request.value.unwrap_or_default(),
-            input: request.input.into_input().unwrap_or_default(),
-            access_list: request.access_list.unwrap_or_default(),
-        })
-    } else {
-        Err(TransactionBuilderError::InvalidTransactionRequest(TxType::Eip1559, errors))
-    }
-}
-
-/// Build an EIP-2930 transaction.
-fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuilderError> {
-    Ok(TxEip2930 {
-        chain_id: request.chain_id.unwrap_or(1),
-        nonce: request.nonce.expect("checked in will_build_2930"),
-        gas_price: request.gas_price.expect("checked in will_build_2930"),
-        gas_limit: request.gas.expect("checked in will_build_2930"),
-        to: request.to.into(),
-        value: request.value.unwrap_or_default(),
-        input: request.input.into_input().unwrap_or_default(),
-        access_list: request.access_list.unwrap_or_default(),
-    })
-}
-
-/// Build an EIP-4844 transaction.
-fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuilderError> {
-    Ok(TxEip4844 {
-        chain_id: request.chain_id.unwrap_or(1),
-        nonce: request.nonce.expect("checked in will_build_4844"),
-        gas_limit: request.gas.expect("checked in will_build_4844"),
-        max_fee_per_gas: request.max_fee_per_gas.expect("checked in will_build_4844"),
-        max_priority_fee_per_gas: request
-            .max_priority_fee_per_gas
-            .expect("checked in will_build_4844"),
-        to: request.to.expect("checked in will_build_4844"),
-        value: request.value.unwrap_or_default(),
-        access_list: request.access_list.unwrap_or_default(),
-        blob_versioned_hashes: request.blob_versioned_hashes.expect("checked in will_build_4844"),
-        max_fee_per_blob_gas: request.max_fee_per_blob_gas.expect("checked in will_build_4844"),
-        input: request.input.into_input().unwrap_or_default(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
-    use alloy_primitives::{Address, U256};
+    use alloy_primitives::Address;
     use alloy_rpc_types::{AccessList, TransactionRequest};
 
-    use crate::{InvalidTransactionRequestError, TransactionBuilder, TransactionBuilderError};
+    use crate::{TransactionBuilder, TransactionBuilderError};
 
     #[test]
     fn test_4844_when_sidecar() {
         let request = TransactionRequest::default()
             .with_nonce(1)
-            .with_gas_limit(U256::default())
-            .with_max_fee_per_gas(U256::default())
-            .with_max_priority_fee_per_gas(U256::default())
+            .with_gas_limit(0)
+            .with_max_fee_per_gas(0)
+            .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO.into())
             .with_blob_sidecar(BlobTransactionSidecar::default())
-            .with_max_fee_per_blob_gas(U256::default());
+            .with_max_fee_per_blob_gas(0);
 
         let tx = request.clone().build_unsigned().unwrap();
 
         assert!(matches!(tx, TypedTransaction::Eip4844(_)));
 
-        let tx = request.with_gas_price(U256::default()).build_unsigned().unwrap();
+        let tx = request.with_gas_price(0).build_unsigned().unwrap();
 
         assert!(matches!(tx, TypedTransaction::Eip4844(_)));
     }
 
     #[test]
-    fn test_2930_when_acces_list() {
+    fn test_2930_when_access_list() {
         let request = TransactionRequest::default()
             .with_nonce(1)
-            .with_gas_limit(U256::default())
-            .with_max_fee_per_gas(U256::default())
-            .with_max_priority_fee_per_gas(U256::default())
+            .with_gas_limit(0)
+            .with_max_fee_per_gas(0)
+            .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO.into())
-            .with_gas_price(U256::default())
+            .with_gas_price(0)
             .access_list(AccessList::default());
 
         let tx = request.build_unsigned().unwrap();
@@ -381,17 +217,18 @@ mod tests {
     fn test_default_to_1559() {
         let request = TransactionRequest::default()
             .with_nonce(1)
-            .with_gas_limit(U256::default())
-            .with_max_fee_per_gas(U256::default())
-            .with_max_priority_fee_per_gas(U256::default())
+            .with_gas_limit(0)
+            .with_max_fee_per_gas(0)
+            .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO.into());
 
         let tx = request.clone().build_unsigned().unwrap();
 
         assert!(matches!(tx, TypedTransaction::Eip1559(_)));
 
-        let tx = request.with_gas_price(U256::default()).build_unsigned().unwrap();
-
+        let request = request.with_gas_price(0);
+        dbg!(request.preferred_type());
+        let tx = request.build_unsigned().unwrap();
         assert!(matches!(tx, TypedTransaction::Legacy(_)));
     }
 
@@ -403,23 +240,23 @@ mod tests {
 
         let error = request.clone().build_unsigned().unwrap_err();
 
-        assert!(matches!(error, TransactionBuilderError::InvalidTransactionRequest(_, _)));
+        assert!(matches!(error.1, TransactionBuilderError::InvalidTransactionRequest(_, _)));
     }
 
     #[test]
     fn test_invalid_legacy_fields() {
-        let request = TransactionRequest::default().with_gas_price(U256::default());
+        let request = TransactionRequest::default().with_gas_price(0);
 
         let error = request.clone().build_unsigned().unwrap_err();
 
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
         };
 
         assert_eq!(tx_type, TxType::Legacy);
         assert_eq!(errors.len(), 2);
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("nonce")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("gas_limit")));
+        assert!(errors.contains(&"nonce"));
+        assert!(errors.contains(&"gas_limit"));
     }
 
     #[test]
@@ -428,17 +265,16 @@ mod tests {
 
         let error = request.clone().build_unsigned().unwrap_err();
 
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
         };
 
         assert_eq!(tx_type, TxType::Eip1559);
         assert_eq!(errors.len(), 4);
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("nonce")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("gas_limit")));
-        assert!(errors
-            .contains(&InvalidTransactionRequestError::MissingKey("max_priority_fee_per_gas")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("max_fee_per_gas")));
+        assert!(errors.contains(&"nonce"));
+        assert!(errors.contains(&"gas_limit"));
+        assert!(errors.contains(&"max_priority_fee_per_gas"));
+        assert!(errors.contains(&"max_fee_per_gas"));
     }
 
     #[test]
@@ -447,15 +283,15 @@ mod tests {
 
         let error = request.clone().build_unsigned().unwrap_err();
 
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
         };
 
         assert_eq!(tx_type, TxType::Eip2930);
         assert_eq!(errors.len(), 3);
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("nonce")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("gas_limit")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("gas_price")));
+        assert!(errors.contains(&"nonce"));
+        assert!(errors.contains(&"gas_limit"));
+        assert!(errors.contains(&"gas_price"));
     }
 
     #[test]
@@ -465,17 +301,17 @@ mod tests {
 
         let error = request.clone().build_unsigned().unwrap_err();
 
-        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
         };
 
         assert_eq!(tx_type, TxType::Eip4844);
         assert_eq!(errors.len(), 5);
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("nonce")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("gas_limit")));
-        assert!(errors
-            .contains(&InvalidTransactionRequestError::MissingKey("max_priority_fee_per_gas")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("max_fee_per_gas")));
-        assert!(errors.contains(&InvalidTransactionRequestError::MissingKey("to")));
+        dbg!("errors");
+        assert!(errors.contains(&"nonce"));
+        assert!(errors.contains(&"gas_limit"));
+        assert!(errors.contains(&"max_priority_fee_per_gas"));
+        assert!(errors.contains(&"max_fee_per_gas"));
+        assert!(errors.contains(&"to"));
     }
 }

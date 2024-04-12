@@ -1,7 +1,6 @@
 use crate::{Network, ReceiptResponse};
 
 mod builder;
-pub(crate) use builder::build_unsigned;
 
 mod signer;
 pub use signer::EthereumSigner;

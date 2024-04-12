@@ -133,6 +133,11 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    /// Returns true if the transaction is a legacy or 2930 transaction.
+    pub fn is_legacy_gas(&self) -> bool {
+        self.gas_price.is_none()
+    }
+
     /// Converts [Transaction] into [TransactionRequest].
     ///
     /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
@@ -147,6 +152,7 @@ impl Transaction {
             // unreachable
             (None, None) => None,
         };
+
         TransactionRequest {
             from: Some(self.from),
             to: self.to,
@@ -157,7 +163,6 @@ impl Transaction {
             nonce: Some(self.nonce),
             chain_id: self.chain_id,
             access_list: self.access_list,
-            transaction_type: self.transaction_type,
             max_fee_per_gas: self.max_fee_per_gas,
             max_priority_fee_per_gas: self.max_priority_fee_per_gas,
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,

@@ -21,8 +21,8 @@ use alloy_primitives::Address;
 
 mod transaction;
 pub use transaction::{
-    BuilderResult, InvalidTransactionRequestError, InvalidTransactionRequestErrors, NetworkSigner,
-    TransactionBuilder, TransactionBuilderError, TxSigner, TxSignerSync,
+    BuilderResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    TxSignerSync, Unbuilt,
 };
 
 mod ethereum;

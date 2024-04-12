@@ -4,7 +4,7 @@ use alloy_consensus::{BlobTransactionSidecar, TxType};
 use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{
-    any::AnyNetwork, ethereum::build_unsigned, BuilderResult, Network, TransactionBuilder,
+    any::AnyNetwork, BuilderResult, Network, TransactionBuilder, TransactionBuilderError, Unbuilt,
 };
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
@@ -126,12 +126,22 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().output_tx_type()
     }
 
-    fn output_tx_type_checked(&self) -> BuilderResult<TxType> {
+    fn output_tx_type_checked(&self) -> Option<TxType> {
         self.deref().output_tx_type_checked()
     }
 
-    fn build_unsigned(self) -> BuilderResult<<AnyNetwork as Network>::UnsignedTx> {
-        build_unsigned::<AnyNetwork>(self.inner)
+    fn prep_for_submission(&mut self) {
+        self.deref_mut().prep_for_submission()
+    }
+
+    fn build_unsigned(self) -> Result<<AnyNetwork as Network>::UnsignedTx, Unbuilt<Self>> {
+        if let Err((tx_type, missing)) = self.missing_keys() {
+            return Err((
+                self,
+                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
+            ));
+        }
+        Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
     }
 
     async fn build<S: crate::NetworkSigner<AnyNetwork>>(
