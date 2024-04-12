@@ -835,6 +835,22 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         }
     }
 
+    /// Gets the number of uncles for the block specified by the tag [BlockId].
+    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
+        match tag {
+            BlockId::Hash(hash) => self
+                .client()
+                .request("eth_getUncleCountByBlockHash", (hash,))
+                .await
+                .map(|count: U64| count.to::<u64>()),
+            BlockId::Number(number) => self
+                .client()
+                .request("eth_getUncleCountByBlockNumber", (number,))
+                .await
+                .map(|count: U64| count.to::<u64>()),
+        }
+    }
+
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus> {
         self.client().request("eth_syncing", ()).await
@@ -1538,5 +1554,14 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_uncle_count() {
+        init_tracing();
+        let (provider, _anvil) = spawn_anvil();
+
+        let count = provider.get_uncle_count(BlockId::Number(0.into())).await.unwrap();
+        assert_eq!(count, 0);
     }
 }
