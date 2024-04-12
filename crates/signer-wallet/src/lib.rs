@@ -179,6 +179,10 @@ impl<D> TxSigner<Signature> for Wallet<D>
 where
     D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
 {
+    fn address(&self) -> Address {
+        self.address
+    }
+
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -191,6 +195,10 @@ impl<D> TxSignerSync<Signature> for Wallet<D>
 where
     D: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
 {
+    fn address(&self) -> Address {
+        self.address
+    }
+
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,

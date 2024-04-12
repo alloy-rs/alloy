@@ -31,6 +31,10 @@ pub struct LedgerSigner {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl alloy_network::TxSigner<Signature> for LedgerSigner {
+    fn address(&self) -> Address {
+        self.address
+    }
+
     #[inline]
     async fn sign_transaction(
         &self,

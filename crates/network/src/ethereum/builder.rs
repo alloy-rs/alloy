@@ -148,7 +148,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self,
         signer: &S,
     ) -> BuilderResult<<Ethereum as Network>::TxEnvelope> {
-        Ok(signer.sign_transaction(self.build_unsigned()?).await?)
+        Ok(signer.sign_request(self).await?)
     }
 }
 
