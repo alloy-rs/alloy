@@ -835,6 +835,22 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         }
     }
 
+    /// Gets the number of uncles for the block specified by the tag [BlockId].
+    async fn get_uncle_count(&self, tag: BlockId) -> TransportResult<u64> {
+        match tag {
+            BlockId::Hash(hash) => self
+                .client()
+                .request("eth_getUncleCountByBlockHash", (hash,))
+                .await
+                .map(|count: U64| count.to::<u64>()),
+            BlockId::Number(number) => self
+                .client()
+                .request("eth_getUncleCountByBlockNumber", (number,))
+                .await
+                .map(|count: U64| count.to::<u64>()),
+        }
+    }
+
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus> {
         self.client().request("eth_syncing", ()).await
@@ -1116,6 +1132,8 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
+    use crate::ProviderBuilder;
+
     use super::*;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
@@ -1538,5 +1556,14 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_uncle_count() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_builtin("https://eth.merkle.io").await.unwrap();
+
+        let count = provider.get_uncle_count(BlockId::Number(190.into())).await.unwrap();
+        assert_eq!(count, 2);
     }
 }
