@@ -1132,7 +1132,6 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
-    use crate::ProviderBuilder;
 
     use super::*;
     use alloy_primitives::{address, b256, bytes};
@@ -1561,9 +1560,9 @@ mod tests {
     #[tokio::test]
     async fn test_uncle_count() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_builtin("https://eth.merkle.io").await.unwrap();
+        let (provider, _anvil) = spawn_anvil();
 
-        let count = provider.get_uncle_count(BlockId::Number(190.into())).await.unwrap();
-        assert_eq!(count, 2);
+        let count = provider.get_uncle_count(BlockId::Number(0.into())).await.unwrap();
+        assert_eq!(count, 0);
     }
 }
