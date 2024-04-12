@@ -766,8 +766,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
-        self.client().request("eth_getCode", (address, tag)).await
+    async fn get_code_at(&self, address: Address, tag: Option<BlockId>) -> TransportResult<Bytes> {
+        self.client().request("eth_getCode", (address, tag.unwrap_or_default())).await
     }
 
     /// Gets a transaction by its [TxHash].
@@ -824,14 +824,20 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
-        match tag {
-            BlockId::Hash(hash) => {
-                self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
+    async fn get_uncle(&self, tag: Option<BlockId>, idx: U64) -> TransportResult<Option<Block>> {
+        if let Some(tag) = tag {
+            match tag {
+                BlockId::Hash(hash) => {
+                    self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
+                }
+                BlockId::Number(number) => {
+                    self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
+                }
             }
-            BlockId::Number(number) => {
-                self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
-            }
+        } else {
+            self.client()
+                .request("eth_getUncleByBlockNumberAndIndex", (tag.unwrap_or_default(), idx))
+                .await
         }
     }
 
@@ -1385,10 +1391,7 @@ mod tests {
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider
-            .get_code_at(addr, BlockId::Number(alloy_rpc_types::BlockNumberOrTag::Latest))
-            .await
-            .unwrap();
+        let _code = provider.get_code_at(addr, None).await.unwrap();
     }
 
     #[tokio::test]
