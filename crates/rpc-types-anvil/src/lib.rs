@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 
 /// Represents the params to set forking which can take various forms
 ///  - untagged
-///  - tagged `forking`
+///  - tagged forking
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Forking {
