@@ -34,19 +34,20 @@ pub struct ForkchoiceState {
 ///
 /// These are considered hard RPC errors and are _not_ returned as [PayloadStatus] or
 /// [PayloadStatusEnum::Invalid].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum ForkchoiceUpdateError {
     /// The forkchoice update has been processed, but the requested contained invalid
     /// [PayloadAttributes](crate::PayloadAttributes).
     ///
     /// This is returned as an error because the payload attributes are invalid and the payload is not valid, See <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#engine_forkchoiceupdatedv1>
-    #[error("invalid payload attributes")]
+    #[cfg_attr(feature = "std", error("invalid payload attributes"))]
     UpdatedInvalidPayloadAttributes,
     /// The given [ForkchoiceState] is invalid or inconsistent.
-    #[error("invalid forkchoice state")]
+    #[cfg_attr(feature = "std", error("invalid forkchoice state"))]
     InvalidState,
     /// Thrown when a forkchoice final block does not exist in the database.
-    #[error("final block not available in database")]
+    #[cfg_attr(feature = "std", error("final block not available in database"))]
     UnknownFinalBlock,
 }
 

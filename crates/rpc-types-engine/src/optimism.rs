@@ -2,6 +2,9 @@ use crate::{BlobsBundleV1, ExecutionPayloadV3, PayloadAttributes};
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// Optimism Payload Attributes
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

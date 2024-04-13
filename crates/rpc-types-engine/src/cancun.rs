@@ -3,6 +3,9 @@
 
 use alloy_primitives::B256;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// Fields introduced in `engine_newPayloadV3` that are not present in the `ExecutionPayload` RPC
 /// object.
 ///

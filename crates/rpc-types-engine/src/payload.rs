@@ -2,8 +2,13 @@
 use alloy_consensus::{Blob, Bytes48};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
+use core::fmt;
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
+
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -674,25 +679,26 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
 }
 
 /// Error that can occur when handling payloads.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum PayloadError {
     /// Invalid payload extra data.
-    #[error("invalid payload extra data: {0}")]
+    #[cfg_attr(feature = "std", error("invalid payload extra data: {0}"))]
     ExtraData(Bytes),
     /// Invalid payload base fee.
-    #[error("invalid payload base fee: {0}")]
+    #[cfg_attr(feature = "std", error("invalid payload base fee: {0}"))]
     BaseFee(U256),
     /// Invalid payload blob gas used.
-    #[error("invalid payload blob gas used: {0}")]
+    #[cfg_attr(feature = "std", error("invalid payload blob gas used: {0}"))]
     BlobGasUsed(U256),
     /// Invalid payload excess blob gas.
-    #[error("invalid payload excess blob gas: {0}")]
+    #[cfg_attr(feature = "std", error("invalid payload excess blob gas: {0}"))]
     ExcessBlobGas(U256),
     /// Pre-cancun Payload has blob transactions.
-    #[error("pre-Cancun payload has blob transactions")]
+    #[cfg_attr(feature = "std", error("pre-Cancun payload has blob transactions"))]
     PreCancunBlockWithBlobTransactions,
     /// Invalid payload block hash.
-    #[error("block hash mismatch: want {consensus}, got {execution}")]
+    #[cfg_attr(feature = "std", error("block hash mismatch: want {consensus}, got {execution}"))]
     BlockHash {
         /// The block hash computed from the payload.
         execution: B256,
@@ -700,11 +706,14 @@ pub enum PayloadError {
         consensus: B256,
     },
     /// Expected blob versioned hashes do not match the given transactions.
-    #[error("expected blob versioned hashes do not match the given transactions")]
+    #[cfg_attr(
+        feature = "std",
+        error("expected blob versioned hashes do not match the given transactions")
+    )]
     InvalidVersionedHashes,
     /// Encountered decoding error.
-    #[error(transparent)]
-    Decode(#[from] alloy_rlp::Error),
+    #[cfg_attr(feature = "std", error(transparent))]
+    Decode(#[cfg_attr(feature = "std", from)] alloy_rlp::Error),
 }
 
 impl PayloadError {
@@ -832,7 +841,17 @@ impl Serialize for PayloadStatus {
 
 impl From<PayloadError> for PayloadStatusEnum {
     fn from(error: PayloadError) -> Self {
-        PayloadStatusEnum::Invalid { validation_error: error.to_string() }
+        PayloadStatusEnum::Invalid {
+            validation_error: {
+                #[cfg(not(feature = "std"))]
+                {
+                    alloc::format!("{error:?}")
+                }
+
+                #[cfg(feature = "std")]
+                error.to_string()
+            },
+        }
     }
 }
 
@@ -915,16 +934,20 @@ impl fmt::Display for PayloadStatusEnum {
 /// Various errors that can occur when validating a payload or forkchoice update.
 ///
 /// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum PayloadValidationError {
     /// Thrown when a forkchoice update's head links to a previously rejected payload.
-    #[error("links to previously rejected block")]
+    #[cfg_attr(feature = "std", error("links to previously rejected block"))]
     LinksToRejectedPayload,
     /// Thrown when a new payload contains a wrong block number.
-    #[error("invalid block number")]
+    #[cfg_attr(feature = "std", error("invalid block number"))]
     InvalidBlockNumber,
     /// Thrown when a new payload contains a wrong state root
-    #[error("invalid merkle root: (remote: {remote:?} local: {local:?})")]
+    #[cfg_attr(
+        feature = "std",
+        error("invalid merkle root: (remote: {remote:?} local: {local:?})")
+    )]
     InvalidStateRoot {
         /// The state root of the payload we received from remote (CL)
         remote: B256,
@@ -936,6 +959,9 @@ pub enum PayloadValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn serde_payload_status() {
@@ -956,6 +982,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn serde_payload_status_error_deserialize() {
         let s = r#"{"status":"INVALID","latestValidHash":null,"validationError":"Failed to decode block"}"#;
         let q = PayloadStatus {

@@ -1,7 +1,9 @@
-use std::{path::PathBuf, str::FromStr};
-
 use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
+use std::str::FromStr;
+
+#[cfg(feature = "ipc")]
+use std::path::PathBuf;
 
 #[cfg(feature = "pubsub")]
 use alloy_pubsub::PubSubConnect;

@@ -69,6 +69,7 @@ std = [
     "alloy-genesis?/std",
     "alloy-serde?/std",
     "alloy-consensus?/std",
+    "alloy-rpc-types-engine?/std"
 ]
 
 # configuration
