@@ -234,8 +234,8 @@ fn build_2930(request: TransactionRequest) -> Result<TxEip2930, TransactionBuild
 }
 
 /// Build an EIP-4844 transaction.
-fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuilderError> {
-    Ok(TxEip4844 {
+fn build_4844(request: TransactionRequest) -> Result<(TxEip4844, BlobTransactionSidecar), TransactionBuilderError> {
+    Ok((TxEip4844 {
         chain_id: request.chain_id.unwrap_or(1),
         nonce: request.nonce.ok_or_else(|| TransactionBuilderError::MissingKey("nonce"))?,
         gas_limit: request.gas.ok_or_else(|| TransactionBuilderError::MissingKey("gas_limit"))?,
@@ -255,5 +255,7 @@ fn build_4844(request: TransactionRequest) -> Result<TxEip4844, TransactionBuild
             .max_fee_per_blob_gas
             .ok_or_else(|| TransactionBuilderError::MissingKey("max_fee_per_blob_gas"))?,
         input: request.input.into_input().unwrap_or_default(),
-    })
+    },
+    request.sidecar.unwrap()
+    ))
 }
