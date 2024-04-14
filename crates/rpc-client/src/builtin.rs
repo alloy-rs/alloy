@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{str::FromStr};
 
 use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
@@ -18,7 +18,7 @@ pub enum BuiltInConnectionString {
     Ws(url::Url, Option<alloy_transport::Authorization>),
     /// IPC transport.
     #[cfg(feature = "ipc")]
-    Ipc(PathBuf),
+    Ipc(std::path::PathBuf),
 }
 
 impl BoxTransportConnect for BuiltInConnectionString {
