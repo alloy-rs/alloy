@@ -8,12 +8,22 @@ use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
+use core::{fmt, num::ParseIntError, ops::Deref, str::FromStr};
 use serde::{
     de::{MapAccess, Visitor},
     ser::{Error, SerializeStruct},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use std::collections::BTreeMap;
 
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,8 +271,8 @@ pub struct BlockTransactionHashes<'a>(BlockTransactionHashesInner<'a>);
 
 #[derive(Clone, Debug)]
 enum BlockTransactionHashesInner<'a> {
-    Hashes(std::slice::Iter<'a, B256>),
-    Full(std::slice::Iter<'a, Transaction>),
+    Hashes(core::slice::Iter<'a, B256>),
+    Full(core::slice::Iter<'a, Transaction>),
     Uncle,
 }
 
@@ -321,7 +331,7 @@ impl DoubleEndedIterator for BlockTransactionHashes<'_> {
     }
 }
 
-impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a> {}
+impl<'a> core::iter::FusedIterator for BlockTransactionHashes<'a> {}
 
 /// An Iterator over the transaction hashes of a block.
 ///
@@ -331,8 +341,8 @@ pub struct BlockTransactionHashesMut<'a>(BlockTransactionHashesInnerMut<'a>);
 
 #[derive(Debug)]
 enum BlockTransactionHashesInnerMut<'a> {
-    Hashes(std::slice::IterMut<'a, B256>),
-    Full(std::slice::IterMut<'a, Transaction>),
+    Hashes(core::slice::IterMut<'a, B256>),
+    Full(core::slice::IterMut<'a, Transaction>),
     Uncle,
 }
 
@@ -393,7 +403,7 @@ impl DoubleEndedIterator for BlockTransactionHashesMut<'_> {
     }
 }
 
-impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
+impl<'a> core::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
 
 /// Determines how the `transactions` field of [Block] should be filled.
 ///
@@ -418,13 +428,14 @@ impl From<bool> for BlockTransactionsKind {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Clone, Copy, Debug, thiserror::Error)]
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum BlockError {
     /// A transaction failed sender recovery
-    #[error("transaction failed sender recovery")]
+    #[cfg_attr(feature = "std", error("transaction failed sender recovery"))]
     InvalidSignature,
     /// A raw block failed to decode
-    #[error("failed to decode raw block {0}")]
+    #[cfg_attr(feature = "std", error("failed to decode raw block {0}"))]
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
@@ -577,9 +588,11 @@ impl FromStr for BlockNumberOrTag {
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
                     let number = u64::from_str_radix(hex_val, 16);
-                    BlockNumberOrTag::Number(number?)
+                    BlockNumberOrTag::Number(number.map_err(ParseBlockNumberError::ParseIntErr)?)
                 } else {
-                    return Err(HexStringMissingPrefixError::default().into());
+                    return Err(ParseBlockNumberError::MissingPrefix(
+                        HexStringMissingPrefixError::default(),
+                    ));
                 }
             }
         };
@@ -601,23 +614,32 @@ impl fmt::Display for BlockNumberOrTag {
 }
 
 /// Error variants when parsing a [BlockNumberOrTag]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum ParseBlockNumberError {
     /// Failed to parse hex value
-    #[error(transparent)]
-    ParseIntErr(#[from] ParseIntError),
+    #[cfg_attr(feature = "std", error(transparent))]
+    ParseIntErr(#[cfg_attr(feature = "std", from)] ParseIntError),
     /// Failed to parse hex value
-    #[error(transparent)]
-    ParseErr(#[from] ParseError),
+    #[cfg_attr(feature = "std", error(transparent))]
+    ParseErr(#[cfg_attr(feature = "std", from)] ParseError),
     /// Block numbers should be 0x-prefixed
-    #[error(transparent)]
-    MissingPrefix(#[from] HexStringMissingPrefixError),
+    #[cfg_attr(feature = "std", error(transparent))]
+    MissingPrefix(#[cfg_attr(feature = "std", from)] HexStringMissingPrefixError),
+}
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for ParseBlockNumberError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 /// Thrown when a 0x-prefixed hex string was expected
-#[derive(Clone, Copy, Debug, Default, thiserror::Error)]
+#[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 #[non_exhaustive]
-#[error("hex string without 0x prefix")]
+#[cfg_attr(feature = "std", error("hex string without 0x prefix"))]
 pub struct HexStringMissingPrefixError;
 
 /// A Block Identifier
@@ -859,14 +881,15 @@ impl<'de> Deserialize<'de> for BlockId {
 }
 
 /// Error thrown when parsing a [BlockId] from a string.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
 pub enum ParseBlockIdError {
     /// Failed to parse a block id from a number.
-    #[error(transparent)]
-    ParseIntError(#[from] ParseIntError),
+    #[cfg_attr(feature = "std", error(transparent))]
+    ParseIntError(#[cfg_attr(feature = "std", from)] ParseIntError),
     /// Failed to parse a block id as a hex string.
-    #[error(transparent)]
-    FromHexError(#[from] alloy_primitives::hex::FromHexError),
+    #[cfg_attr(feature = "std", error(transparent))]
+    FromHexError(#[cfg_attr(feature = "std", from)] alloy_primitives::hex::FromHexError),
 }
 
 impl FromStr for BlockId {
@@ -1023,8 +1046,13 @@ impl Decodable for BlockHashOrNumber {
 }
 
 /// Error thrown when parsing a [BlockHashOrNumber] from a string.
-#[derive(Debug, thiserror::Error)]
-#[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]
+#[derive(Debug)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[cfg_attr(
+    feature = "std",
+    error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")
+)]
+#[cfg_attr(not(feature = "std"), allow(dead_code))]
 pub struct ParseBlockHashOrNumberError {
     input: String,
     parse_int_error: ParseIntError,
@@ -1149,6 +1177,9 @@ mod tests {
     use super::*;
     use arbitrary::Arbitrary;
     use rand::Rng;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn arbitrary_header() {

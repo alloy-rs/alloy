@@ -7,6 +7,9 @@ use crate::{
 use alloy_primitives::B256;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, format};
+
 /// Subscription result.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]

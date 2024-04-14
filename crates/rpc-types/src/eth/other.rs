@@ -1,10 +1,15 @@
 //! Support for capturing other fields
+use core::ops::{Deref, DerefMut};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Map;
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    collections::{self, BTreeMap},
+    string::String,
 };
+#[cfg(feature = "std")]
+use std::collections::{self, BTreeMap};
 
 /// A type that is supposed to capture additional fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
 ///
@@ -122,7 +127,7 @@ impl AsRef<BTreeMap<String, serde_json::Value>> for OtherFields {
 
 impl IntoIterator for OtherFields {
     type Item = (String, serde_json::Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, serde_json::Value>;
+    type IntoIter = collections::btree_map::IntoIter<String, serde_json::Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
@@ -131,7 +136,7 @@ impl IntoIterator for OtherFields {
 
 impl<'a> IntoIterator for &'a OtherFields {
     type Item = (&'a String, &'a serde_json::Value);
-    type IntoIter = std::collections::btree_map::Iter<'a, String, serde_json::Value>;
+    type IntoIter = collections::btree_map::Iter<'a, String, serde_json::Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_ref().iter()

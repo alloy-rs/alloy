@@ -1,16 +1,19 @@
 use crate::{eth::log::Log as RpcLog, BlockNumberOrTag, Transaction};
 use alloy_primitives::{keccak256, Address, Bloom, BloomInput, B256, U256, U64};
+use core::{
+    hash::Hash,
+    ops::{Range, RangeFrom, RangeTo},
+};
+use hashbrown::HashSet;
 use itertools::{EitherOrBoth::*, Itertools};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{
-    collections::HashSet,
-    hash::Hash,
-    ops::{Range, RangeFrom, RangeTo},
-};
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String, vec::Vec};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -42,7 +45,7 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
 }
 
 impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         for value in &self.0 {
             value.hash(state);
         }
@@ -536,7 +539,7 @@ impl<'de> Deserialize<'de> for Filter {
         impl<'de> Visitor<'de> for FilterVisitor {
             type Value = Filter;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 formatter.write_str("Filter object")
             }
 
@@ -993,6 +996,9 @@ impl<'a> Deserialize<'a> for PendingTransactionFilterKind {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     fn serialize<T: serde::Serialize>(t: &T) -> serde_json::Value {
         serde_json::to_value(t).expect("Failed to serialize value")

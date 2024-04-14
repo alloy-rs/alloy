@@ -1,9 +1,12 @@
 use alloy_primitives::U256;
+use core::fmt;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::fmt;
+
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String};
 
 /// A hex encoded or decimal index that's intended to be used as a rust index, hence it's
 /// deserialized into a `usize`.

@@ -6,8 +6,11 @@ use alloy_consensus::{
     TypedTransaction,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use core::hash::Hash;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,7 +77,7 @@ pub struct TransactionRequest {
 }
 
 impl Hash for TransactionRequest {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.from.hash(state);
         self.to.hash(state);
         self.gas_price.hash(state);
@@ -461,8 +464,9 @@ impl From<TxEnvelope> for TransactionRequest {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[cfg_attr(feature = "std", error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data"))]
 #[non_exhaustive]
 pub struct TransactionInputError;
 
@@ -471,6 +475,9 @@ mod tests {
     use super::*;
     use crate::WithOtherFields;
     use alloy_primitives::b256;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::format;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]

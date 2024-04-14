@@ -71,6 +71,9 @@ impl From<OptimismTransactionReceiptFields> for OtherFields {
 mod l1_fee_scalar_serde {
     use serde::{de, Deserialize};
 
+    #[cfg(not(feature = "std"))]
+    use alloc::string::{String, ToString};
+
     pub(super) fn serialize<S>(value: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -98,6 +101,9 @@ mod l1_fee_scalar_serde {
 mod tests {
     use super::*;
     use serde_json::{json, Value};
+
+    #[cfg(not(feature = "std"))]
+    use alloc::string::ToString;
 
     #[test]
     fn serialize_empty_optimism_transaction_receipt_fields_struct() {

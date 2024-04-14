@@ -2,6 +2,9 @@ use alloy_primitives::{Address, Bytes, B256, B512, U256, U64};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
+
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountInfo {

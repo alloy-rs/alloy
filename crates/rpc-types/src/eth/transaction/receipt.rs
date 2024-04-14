@@ -137,6 +137,9 @@ mod test {
     use arbitrary::Arbitrary;
     use rand::Rng;
 
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
+
     #[test]
     fn transaction_receipt_arbitrary() {
         let mut bytes = [0u8; 1024];

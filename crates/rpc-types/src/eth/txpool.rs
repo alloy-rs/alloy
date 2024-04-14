@@ -2,11 +2,21 @@
 
 use crate::Transaction;
 use alloy_primitives::{Address, U256, U64};
+use core::{fmt, str::FromStr};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
 };
-use std::{collections::BTreeMap, fmt, str::FromStr};
+
+#[cfg(not(feature = "std"))]
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use std::collections::BTreeMap;
 
 /// Transaction summary as found in the Txpool Inspection property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

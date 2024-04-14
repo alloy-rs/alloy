@@ -8,6 +8,9 @@ use alloy_consensus::{
 use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
 
@@ -171,7 +174,11 @@ impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx
+            .signature
+            .ok_or(ConversionError::MissingSignature)?
+            .try_into()
+            .map_err(ConversionError::SignatureError)?;
 
         let tx = TxLegacy {
             chain_id: tx.chain_id,
@@ -190,7 +197,11 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx
+            .signature
+            .ok_or(ConversionError::MissingSignature)?
+            .try_into()
+            .map_err(ConversionError::SignatureError)?;
 
         let tx = TxEip1559 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
@@ -213,7 +224,11 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx
+            .signature
+            .ok_or(ConversionError::MissingSignature)?
+            .try_into()
+            .map_err(ConversionError::SignatureError)?;
 
         let tx = TxEip2930 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
@@ -233,7 +248,11 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx
+            .signature
+            .ok_or(ConversionError::MissingSignature)?
+            .try_into()
+            .map_err(ConversionError::SignatureError)?;
         let tx = TxEip4844 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
@@ -273,7 +292,12 @@ impl TryFrom<Transaction> for TxEnvelope {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        match tx.transaction_type.unwrap_or_default().try_into()? {
+        match tx
+            .transaction_type
+            .unwrap_or_default()
+            .try_into()
+            .map_err(ConversionError::Eip2718Error)?
+        {
             TxType::Legacy => Ok(Self::Legacy(tx.try_into()?)),
             TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
             TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
@@ -287,6 +311,9 @@ mod tests {
     use super::*;
     use arbitrary::Arbitrary;
     use rand::Rng;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn arbitrary_transaction() {

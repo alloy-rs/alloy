@@ -1,11 +1,13 @@
 //! Types for the admin api
 use alloy_genesis::ChainConfig;
 use alloy_primitives::{B256, U256};
+use core::net::{IpAddr, SocketAddr};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    net::{IpAddr, SocketAddr},
-};
+
+#[cfg(not(feature = "std"))]
+use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+#[cfg(feature = "std")]
+use std::collections::BTreeMap;
 
 /// This includes general information about a running node, spanning networking and protocol
 /// details.

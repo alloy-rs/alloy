@@ -1,5 +1,9 @@
 use alloy_primitives::{B512, U256, U64};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
+#[cfg(feature = "std")]
 use std::collections::BTreeMap;
 
 /// Syncing info

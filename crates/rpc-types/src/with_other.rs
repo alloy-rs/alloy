@@ -1,8 +1,8 @@
 use crate::{other::OtherFields, TransactionRequest};
 use alloy_consensus::{TxEnvelope, TypedTransaction};
+use core::ops::{Deref, DerefMut};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
@@ -89,10 +89,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use super::*;
     use serde_json::json;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::{collections::BTreeMap, string::ToString, vec};
+    #[cfg(feature = "std")]
+    use std::collections::BTreeMap;
 
     #[derive(Serialize, Deserialize)]
     struct Inner {

@@ -126,11 +126,13 @@ impl<T> AsMut<T> for Log<T> {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{Address, Bytes};
-
     use super::*;
+    use alloy_primitives::{Address, Bytes};
     use arbitrary::Arbitrary;
     use rand::Rng;
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn log_arbitrary() {
