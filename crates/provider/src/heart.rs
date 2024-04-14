@@ -506,7 +506,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
                     },
 
                     // Wake up to handle new blocks.
-                    block = self.stream.select_next_some() => {
+                    Some(block) = self.stream.next() => {
                         self.handle_new_block(block, &latest);
                     },
 
