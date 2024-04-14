@@ -1,4 +1,4 @@
-use std::{str::FromStr};
+use std::str::FromStr;
 
 use alloy_json_rpc::RpcError;
 use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, TransportErrorKind};
