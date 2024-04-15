@@ -1008,20 +1008,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     // todo: move to extension trait
-    /// Trace the given transaction.
-    ///
-    /// # Note
-    ///
-    /// Not all nodes support this call.
-    async fn debug_trace_transaction(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<GethTrace> {
-        self.client().request("debug_traceTransaction", (hash, trace_options)).await
-    }
-
-    // todo: move to extension trait
     /// Trace all transactions in the given block.
     ///
     /// # Note
