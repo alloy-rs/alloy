@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use core::fmt;
 
 use crate::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
@@ -32,8 +32,8 @@ impl From<TxType> for u8 {
     }
 }
 
-impl Display for TxType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for TxType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TxType::Legacy => write!(f, "Legacy"),
             TxType::Eip2930 => write!(f, "EIP-2930"),
