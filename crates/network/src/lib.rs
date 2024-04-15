@@ -15,11 +15,10 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use std::fmt::{Debug, Display};
-
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::Address;
+use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
