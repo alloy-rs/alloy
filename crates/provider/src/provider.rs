@@ -20,10 +20,7 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_rpc_types_trace::{
-    geth::{GethDebugTracingOptions, GethTrace},
-    parity::{LocalizedTransactionTrace, TraceResults, TraceType},
-};
+use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,

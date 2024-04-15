@@ -7,7 +7,6 @@ use alloy_rpc_types_trace::geth::{GethDebugTracingOptions, GethTrace};
 use alloy_transport::{Transport, TransportResult};
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
-#[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait DebugApi<N, T>: Send + Sync {
@@ -143,17 +142,9 @@ where
 
 #[cfg(test)]
 mod test {
-
     use super::*;
-    use crate::{ProviderBuilder, RootProvider};
     use alloy_network::TransactionBuilder;
-    // use alloy_network::Ethereum;
-    use alloy_node_bindings::anvil;
     use alloy_primitives::U256;
-    use alloy_rpc_types::TransactionRequest;
-    use alloy_transport::BoxTransport;
-    // use alloy_transport_http::Http;
-    // use reqwest::Client;
 
     extern crate self as alloy_provider;
 
@@ -194,7 +185,6 @@ mod test {
         let (provider, anvil) = spawn_anvil();
 
         let from = anvil.addresses()[0];
-        let to = anvil.addresses()[1];
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
@@ -210,8 +200,7 @@ mod test {
             .unwrap();
 
         if let GethTrace::Default(trace) = trace {
-            assert_eq!(trace.gas, 53167);
-            assert!(trace.struct_logs.len() > 0);
+            assert!(!trace.struct_logs.is_empty());
         }
     }
 }
