@@ -52,10 +52,13 @@ pub trait ReceiptResponse {
 pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     // -- Consensus types --
 
-    /// The network transaction type enum. This should be a simple u8 repr
-    /// enum, and as such has strict type bounds for better use in error
-    /// messages, etc.
+    /// The network transaction type enum.
+    ///
+    /// This should be a simple `#[repr(u8)]` enum, and as such has strict type
+    /// bounds for better use in error messages, assertions etc.
     type TxType: Into<u8>
+        + PartialEq
+        + Eq
         + TryFrom<u8, Error = Eip2718Error>
         + Debug
         + Display
@@ -85,10 +88,13 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + Debug
         + From<Self::TxEnvelope>
         + From<Self::UnsignedTx>;
+
     /// The JSON body of a transaction response.
     type TransactionResponse: RpcObject;
+
     /// The JSON body of a transaction receipt.
     type ReceiptResponse: RpcObject + ReceiptResponse;
+
     /// The JSON body of a header response.
     type HeaderResponse: RpcObject;
 }

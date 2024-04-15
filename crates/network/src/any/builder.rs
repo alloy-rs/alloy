@@ -112,6 +112,10 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_blob_sidecar(sidecar)
     }
 
+    fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {
+        self.deref().complete_type(ty)
+    }
+
     fn can_build(&self) -> bool {
         self.deref().can_build()
     }

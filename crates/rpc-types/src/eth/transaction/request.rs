@@ -434,6 +434,7 @@ impl TransactionRequest {
     }
 
     /// Check if all necessary keys are present to build a legacy transaction,
+    /// returning a list of keys that are missing.
     pub fn complete_legacy(&self) -> Result<(), Vec<&'static str>> {
         let mut missing = self.check_reqd_fields();
         self.check_legacy_fields(&mut missing);

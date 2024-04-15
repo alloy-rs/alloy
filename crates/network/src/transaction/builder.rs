@@ -222,6 +222,27 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Check if all necessary keys are present to build the specified type,
+    /// returning a list of missing keys.
+    fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;
+
+    /// Assert that the builder prefers a certain transaction type. This does
+    /// not indicate that the builder is ready to build. This function uses a
+    /// `dbg_assert_eq!` to check the builder status, and will have no affect
+    /// in release builds.
+    fn assert_preferred(&self, ty: N::TxType) {
+        debug_assert_eq!(self.output_tx_type(), ty);
+    }
+
+    /// Assert that the builder prefers a certain transaction type. This does
+    /// not indicate that the builder is ready to build. This function uses a
+    /// `dbg_assert_eq!` to check the builder status, and will have no affect
+    /// in release builds.
+    fn assert_preferred_chained(self, ty: N::TxType) -> Self {
+        self.assert_preferred(ty);
+        self
+    }
+
     /// True if the builder contains all necessary information to be submitted
     /// to the `eth_sendTransaction` endpoint.
     fn can_submit(&self) -> bool;
