@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 /// Error variants when converting from [crate::Transaction] to [alloy_consensus::Signed]
 /// transaction.
 #[derive(Debug, thiserror::Error)]
@@ -40,22 +42,16 @@ pub enum ConversionError {
     /// Missing full transactions required for block decoding
     #[error("missing full transactions required for block decoding")]
     MissingFullTransactions,
-    /// Base fee per gas conversion error
-    #[error("base fee per gas conversion error")]
-    BaseFeePerGasConversion,
-    /// Gas limit conversion error
-    #[error("gas limit conversion error")]
-    GasLimitConversion,
-    /// Gas used conversion error
-    #[error("gas used conversion error")]
-    GasUsedConversion,
+    /// Base fee per gas integer conversion error
+    #[error("base fee per gas integer conversion error")]
+    BaseFeePerGasConversion(TryFromIntError),
+    /// Gas limit integer conversion error
+    #[error("gas limit integer conversion error")]
+    GasLimitConversion(TryFromIntError),
+    /// Gas used integer conversion error
+    #[error("gas used integer conversion error")]
+    GasUsedConversion(TryFromIntError),
     /// Missing block number
     #[error("missing block number")]
     MissingBlockNumber,
-    /// Block number conversion error
-    #[error("block number conversion error")]
-    BlockNumberConversion,
-    /// Timestamp conversion error
-    #[error("timestamp conversion error")]
-    TimestampConversion,
 }
