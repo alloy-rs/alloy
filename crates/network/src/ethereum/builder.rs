@@ -110,7 +110,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect());
+        self.populate_blob_hashes();
         self.sidecar = Some(sidecar);
     }
 
@@ -305,12 +305,13 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip4844);
-        assert_eq!(errors.len(), 5);
-        dbg!("errors");
+        dbg!(&errors);
+        assert_eq!(errors.len(), 6);
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));
         assert!(errors.contains(&"max_fee_per_gas"));
         assert!(errors.contains(&"to"));
+        assert!(errors.contains(&"max_fee_per_blob_gas"));
     }
 }

@@ -156,16 +156,12 @@ impl TransactionRequest {
         self.gas_price.or(self.max_fee_per_gas)
     }
 
-    /// Returns true if the request has a `blobVersionedHashes` field but it is empty.
-    #[inline]
-    pub fn has_empty_blob_hashes(&self) -> bool {
-        self.blob_versioned_hashes.as_ref().map(|blobs| blobs.is_empty()).unwrap_or(false)
-    }
-
     /// Populate the `blob_versioned_hashes` key, if a sidecar exists. No
     /// effect otherwise.
     pub fn populate_blob_hashes(&mut self) {
-        todo!()
+        if let Some(sidecar) = self.sidecar.as_ref() {
+            self.blob_versioned_hashes = Some(sidecar.versioned_hashes().collect())
+        }
     }
 
     /// Gets invalid fields for all transaction types
@@ -202,14 +198,14 @@ impl TransactionRequest {
     ///
     /// # Panics
     ///
-    /// If required fields are missing. Use `will_build_legacy` to check if the
+    /// If required fields are missing. Use `complete_legacy` to check if the
     /// request can be built.
     fn build_legacy(self) -> TxLegacy {
         TxLegacy {
             chain_id: self.chain_id,
-            nonce: self.nonce.expect("checked in will_build_legacy"),
-            gas_price: self.gas_price.expect("checked in will_build_legacy"),
-            gas_limit: self.gas.expect("checked in will_build_legacy"),
+            nonce: self.nonce.expect("checked in complete_legacy"),
+            gas_price: self.gas_price.expect("checked in complete_legacy"),
+            gas_limit: self.gas.expect("checked in complete_legacy"),
             to: self.to.into(),
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
@@ -220,7 +216,7 @@ impl TransactionRequest {
     ///
     /// # Panics
     ///
-    /// If required fields are missing. Use `will_build_1559` to check if the
+    /// If required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     fn build_1559(self) -> TxEip1559 {
         TxEip1559 {
@@ -242,14 +238,14 @@ impl TransactionRequest {
     ///
     /// # Panics
     ///
-    /// If required fields are missing. Use `will_build_2930` to check if the
+    /// If required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
     fn build_2930(self) -> TxEip2930 {
         TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.expect("checked in will_build_2930"),
-            gas_price: self.gas_price.expect("checked in will_build_2930"),
-            gas_limit: self.gas.expect("checked in will_build_2930"),
+            nonce: self.nonce.expect("checked in complete_2930"),
+            gas_price: self.gas_price.expect("checked in complete_2930"),
+            gas_limit: self.gas.expect("checked in complete_2930"),
             to: self.to.into(),
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
@@ -261,28 +257,28 @@ impl TransactionRequest {
     ///
     /// # Panics
     ///
-    /// If required fields are missing. Use `will_build_4844` to check if the
+    /// If required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844(self) -> TxEip4844WithSidecar {
+    fn build_4844(mut self) -> TxEip4844WithSidecar {
+        self.populate_blob_hashes();
+
         TxEip4844WithSidecar {
-            sidecar: self.sidecar.expect("checked in will_build_4844"),
+            sidecar: self.sidecar.expect("checked in complete_4844"),
             tx: TxEip4844 {
                 chain_id: self.chain_id.unwrap_or(1),
-                nonce: self.nonce.expect("checked in will_build_4844"),
-                gas_limit: self.gas.expect("checked in will_build_4844"),
-                max_fee_per_gas: self.max_fee_per_gas.expect("checked in will_build_4844"),
+                nonce: self.nonce.expect("checked in complete_4844"),
+                gas_limit: self.gas.expect("checked in complete_4844"),
+                max_fee_per_gas: self.max_fee_per_gas.expect("checked in complete_4844"),
                 max_priority_fee_per_gas: self
                     .max_priority_fee_per_gas
-                    .expect("checked in will_build_4844"),
-                to: self.to.expect("checked in will_build_4844"),
+                    .expect("checked in complete_4844"),
+                to: self.to.expect("checked in complete_4844"),
                 value: self.value.unwrap_or_default(),
                 access_list: self.access_list.unwrap_or_default(),
                 blob_versioned_hashes: self
                     .blob_versioned_hashes
-                    .expect("checked in will_build_4844"),
-                max_fee_per_blob_gas: self
-                    .max_fee_per_blob_gas
-                    .expect("checked in will_build_4844"),
+                    .expect("populated at top of block"),
+                max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
                 input: self.input.into_input().unwrap_or_default(),
             },
         }
@@ -349,7 +345,7 @@ impl TransactionRequest {
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
-    pub fn preferred_type(&self) -> TxType {
+    pub const fn preferred_type(&self) -> TxType {
         if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
             TxType::Eip4844
         } else if self.access_list.is_some() {

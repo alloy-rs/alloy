@@ -134,7 +134,7 @@ pub struct Transaction {
 
 impl Transaction {
     /// Returns true if the transaction is a legacy or 2930 transaction.
-    pub fn is_legacy_gas(&self) -> bool {
+    pub const fn is_legacy_gas(&self) -> bool {
         self.gas_price.is_none()
     }
 

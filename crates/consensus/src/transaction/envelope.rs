@@ -26,9 +26,9 @@ pub enum TxType {
     Eip4844 = 3,
 }
 
-impl Into<u8> for TxType {
-    fn into(self) -> u8 {
-        self as u8
+impl From<TxType> for u8 {
+    fn from(value: TxType) -> Self {
+        value as u8
     }
 }
 
