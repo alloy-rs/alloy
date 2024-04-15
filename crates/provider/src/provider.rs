@@ -627,13 +627,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
-    async fn get_transaction_count(
-        &self,
-        address: Address,
-        tag: Option<BlockId>,
-    ) -> TransportResult<u64> {
+    async fn get_transaction_count(&self, address: Address, tag: BlockId) -> TransportResult<u64> {
         self.client()
-            .request("eth_getTransactionCount", (address, tag.unwrap_or_default()))
+            .request("eth_getTransactionCount", (address, tag))
             .await
             .map(|count: U64| count.to::<u64>())
     }
@@ -714,13 +710,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    async fn get_balance(&self, address: Address, tag: Option<BlockId>) -> TransportResult<U256> {
-        self.client()
-            .request(
-                "eth_getBalance",
-                (address, tag.unwrap_or(BlockId::Number(BlockNumberOrTag::Latest))),
-            )
-            .await
+    async fn get_balance(&self, address: Address, tag: BlockId) -> TransportResult<U256> {
+        self.client().request("eth_getBalance", (address, tag)).await
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -760,14 +751,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         key: U256,
-        tag: Option<BlockId>,
+        tag: BlockId,
     ) -> TransportResult<StorageValue> {
-        self.client().request("eth_getStorageAt", (address, key, tag.unwrap_or_default())).await
+        self.client().request("eth_getStorageAt", (address, key, tag)).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: Option<BlockId>) -> TransportResult<Bytes> {
-        self.client().request("eth_getCode", (address, tag.unwrap_or_default())).await
+    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
+        self.client().request("eth_getCode", (address, tag)).await
     }
 
     /// Gets a transaction by its [TxHash].
@@ -824,20 +815,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle(&self, tag: Option<BlockId>, idx: U64) -> TransportResult<Option<Block>> {
-        if let Some(tag) = tag {
-            match tag {
-                BlockId::Hash(hash) => {
-                    self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
-                }
-                BlockId::Number(number) => {
-                    self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
-                }
+    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
+        match tag {
+            BlockId::Hash(hash) => {
+                self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
             }
-        } else {
-            self.client()
-                .request("eth_getUncleByBlockNumberAndIndex", (tag.unwrap_or_default(), idx))
-                .await
+            BlockId::Number(number) => {
+                self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
+            }
         }
     }
 
@@ -847,12 +832,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Execute a smart contract call with a transaction request, without publishing a transaction.
-    async fn call(
-        &self,
-        tx: &N::TransactionRequest,
-        block: Option<BlockId>,
-    ) -> TransportResult<Bytes> {
-        self.client().request("eth_call", (tx, block.unwrap_or_default())).await
+    async fn call(&self, tx: &N::TransactionRequest, block: BlockId) -> TransportResult<Bytes> {
+        self.client().request("eth_call", (tx, block)).await
     }
 
     /// Execute a smart contract call with a transaction request and state overrides, without
@@ -864,10 +845,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn call_with_overrides(
         &self,
         tx: &N::TransactionRequest,
-        block: Option<BlockId>,
+        block: BlockId,
         state: StateOverride,
     ) -> TransportResult<Bytes> {
-        self.client().request("eth_call", (tx, block.unwrap_or_default(), state)).await
+        self.client().request("eth_call", (tx, block, state)).await
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which
@@ -886,16 +867,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn estimate_gas(
         &self,
         tx: &N::TransactionRequest,
-        block: Option<BlockId>,
+        block: BlockId,
     ) -> TransportResult<u128> {
-        if let Some(block_id) = block {
-            self.client()
-                .request("eth_estimateGas", (tx, block_id))
-                .await
-                .map(|gas: U128| gas.to::<u128>())
-        } else {
-            self.client().request("eth_estimateGas", (tx,)).await.map(|gas: U128| gas.to::<u128>())
-        }
+        self.client()
+            .request("eth_estimateGas", (tx, block))
+            .await
+            .map(|gas: U128| gas.to::<u128>())
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -942,9 +919,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-        block: Option<BlockId>,
+        block: BlockId,
     ) -> TransportResult<EIP1186AccountProofResponse> {
-        self.client().request("eth_getProof", (address, keys, block.unwrap_or_default())).await
+        self.client().request("eth_getProof", (address, keys, block)).await
     }
 
     /// Create an [EIP-2930] access list.
@@ -953,9 +930,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn create_access_list(
         &self,
         request: &N::TransactionRequest,
-        block: Option<BlockId>,
+        block: BlockId,
     ) -> TransportResult<AccessListWithGasUsed> {
-        self.client().request("eth_createAccessList", (request, block.unwrap_or_default())).await
+        self.client().request("eth_createAccessList", (request, block)).await
     }
 
     /// Executes the given transaction and returns a number of possible traces.
@@ -967,7 +944,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         request: &N::TransactionRequest,
         trace_type: &[TraceType],
-        block: Option<BlockId>,
+        block: BlockId,
     ) -> TransportResult<TraceResults> {
         self.client().request("trace_call", (request, trace_type, block)).await
     }
@@ -983,7 +960,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn trace_call_many(
         &self,
         request: &[(N::TransactionRequest, Vec<TraceType>)],
-        block: Option<BlockId>,
+        block: BlockId,
     ) -> TransportResult<TraceResults> {
         self.client().request("trace_callMany", (request, block)).await
     }
@@ -1291,7 +1268,7 @@ mod tests {
         let count = provider
             .get_transaction_count(
                 address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
-                Some(BlockNumberOrTag::Latest.into()),
+                BlockNumberOrTag::Latest.into(),
             )
             .await
             .unwrap();
@@ -1391,7 +1368,7 @@ mod tests {
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider.get_code_at(addr, None).await.unwrap();
+        let _code = provider.get_code_at(addr, BlockId::default()).await.unwrap();
     }
 
     #[tokio::test]
@@ -1400,7 +1377,7 @@ mod tests {
         let (provider, _anvil) = spawn_anvil();
 
         let addr = Address::with_last_byte(16);
-        let storage = provider.get_storage_at(addr, U256::ZERO, None).await.unwrap();
+        let storage = provider.get_storage_at(addr, U256::ZERO, BlockId::default()).await.unwrap();
         assert_eq!(storage, U256::ZERO);
     }
 
