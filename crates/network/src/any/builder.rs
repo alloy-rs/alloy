@@ -3,9 +3,7 @@ use std::ops::{Deref, DerefMut};
 use alloy_consensus::{BlobTransactionSidecar, TxType};
 use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
-use crate::{
-    any::AnyNetwork, BuilderResult, Network, TransactionBuilder, TransactionBuilderError, Unbuilt,
-};
+use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
@@ -134,7 +132,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().prep_for_submission()
     }
 
-    fn build_unsigned(self) -> Result<<AnyNetwork as Network>::UnsignedTx, Unbuilt<Self>> {
+    fn build_unsigned(self) -> BuildResult<<AnyNetwork as Network>::UnsignedTx, AnyNetwork> {
         if let Err((tx_type, missing)) = self.missing_keys() {
             return Err((
                 self,
@@ -147,7 +145,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     async fn build<S: crate::NetworkSigner<AnyNetwork>>(
         self,
         signer: &S,
-    ) -> BuilderResult<alloy_consensus::TxEnvelope> {
+    ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
         Ok(signer.sign_request(self).await?)
     }
 }

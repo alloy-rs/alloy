@@ -1,22 +1,22 @@
 use super::signer::NetworkSigner;
 use crate::Network;
-use alloy_consensus::{BlobTransactionSidecar, TxType};
+use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::AccessList;
 use futures_utils_wasm::impl_future;
 
 /// Result type for transaction builders
-pub type BuilderResult<T, E = TransactionBuilderError> = Result<T, E>;
+pub type BuildResult<T, N> = Result<T, Unbuilt<N>>;
 
 /// An unbuilt transaction, along with some error.
-pub type Unbuilt<T> = (T, TransactionBuilderError);
+pub type Unbuilt<N> = (<N as Network>::TransactionRequest, TransactionBuilderError<N>);
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
-pub enum TransactionBuilderError {
+pub enum TransactionBuilderError<N: Network> {
     /// Invalid transaction request
     #[error("{0} transaction can't be built due to missing keys: {1:?}")]
-    InvalidTransactionRequest(TxType, Vec<&'static str>),
+    InvalidTransactionRequest(N::TxType, Vec<&'static str>),
 
     /// Signer cannot produce signature type required for transaction.
     #[error("Signer cannot produce signature type required for transaction")]
@@ -31,7 +31,7 @@ pub enum TransactionBuilderError {
     Custom(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
-impl TransactionBuilderError {
+impl<N: Network> TransactionBuilderError<N> {
     /// Instantiate a custom error.
     pub fn custom<E>(e: E) -> Self
     where
@@ -232,11 +232,11 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
-    fn output_tx_type(&self) -> TxType;
+    fn output_tx_type(&self) -> N::TxType;
 
     /// Returns the transaction type that this builder will build. `None` if
     /// the builder is not ready to build.
-    fn output_tx_type_checked(&self) -> Option<TxType>;
+    fn output_tx_type_checked(&self) -> Option<N::TxType>;
 
     /// Trim any conflicting keys
     ///
@@ -247,11 +247,11 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn prep_for_submission(&mut self);
 
     /// Build an unsigned, but typed, transaction.
-    fn build_unsigned(self) -> BuilderResult<N::UnsignedTx, Unbuilt<Self>>;
+    fn build_unsigned(self) -> BuildResult<N::UnsignedTx, N>;
 
     /// Build a signed transaction.
     fn build<S: NetworkSigner<N>>(
         self,
         signer: &S,
-    ) -> impl_future!(<Output = BuilderResult<N::TxEnvelope>>);
+    ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
 }

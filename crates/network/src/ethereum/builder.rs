@@ -1,6 +1,5 @@
 use crate::{
-    BuilderResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
-    Unbuilt,
+    BuildResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
@@ -151,7 +150,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.populate_blob_hashes();
     }
 
-    fn build_unsigned(self) -> Result<TypedTransaction, Unbuilt<Self>> {
+    fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
         if let Err((tx_type, missing)) = self.missing_keys() {
             return Err((
                 self,
@@ -164,7 +163,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     async fn build<S: NetworkSigner<Ethereum>>(
         self,
         signer: &S,
-    ) -> BuilderResult<<Ethereum as Network>::TxEnvelope> {
+    ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
         Ok(signer.sign_request(self).await?)
     }
 }

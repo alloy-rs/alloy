@@ -16,6 +16,8 @@ pub struct AnyNetwork {
 }
 
 impl Network for AnyNetwork {
+    type TxType = alloy_consensus::TxType;
+
     type TxEnvelope = alloy_consensus::TxEnvelope;
 
     type UnsignedTx = alloy_consensus::TypedTransaction;

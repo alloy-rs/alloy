@@ -263,21 +263,28 @@ impl TransactionRequest {
     ///
     /// If required fields are missing. Use `will_build_4844` to check if the
     /// request can be built.
-    fn build_4844(self) -> TxEip4844 {
-        TxEip4844 {
-            chain_id: self.chain_id.unwrap_or(1),
-            nonce: self.nonce.expect("checked in will_build_4844"),
-            gas_limit: self.gas.expect("checked in will_build_4844"),
-            max_fee_per_gas: self.max_fee_per_gas.expect("checked in will_build_4844"),
-            max_priority_fee_per_gas: self
-                .max_priority_fee_per_gas
-                .expect("checked in will_build_4844"),
-            to: self.to.expect("checked in will_build_4844"),
-            value: self.value.unwrap_or_default(),
-            access_list: self.access_list.unwrap_or_default(),
-            blob_versioned_hashes: self.blob_versioned_hashes.expect("checked in will_build_4844"),
-            max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in will_build_4844"),
-            input: self.input.into_input().unwrap_or_default(),
+    fn build_4844(self) -> TxEip4844WithSidecar {
+        TxEip4844WithSidecar {
+            sidecar: self.sidecar.expect("checked in will_build_4844"),
+            tx: TxEip4844 {
+                chain_id: self.chain_id.unwrap_or(1),
+                nonce: self.nonce.expect("checked in will_build_4844"),
+                gas_limit: self.gas.expect("checked in will_build_4844"),
+                max_fee_per_gas: self.max_fee_per_gas.expect("checked in will_build_4844"),
+                max_priority_fee_per_gas: self
+                    .max_priority_fee_per_gas
+                    .expect("checked in will_build_4844"),
+                to: self.to.expect("checked in will_build_4844"),
+                value: self.value.unwrap_or_default(),
+                access_list: self.access_list.unwrap_or_default(),
+                blob_versioned_hashes: self
+                    .blob_versioned_hashes
+                    .expect("checked in will_build_4844"),
+                max_fee_per_blob_gas: self
+                    .max_fee_per_blob_gas
+                    .expect("checked in will_build_4844"),
+                input: self.input.into_input().unwrap_or_default(),
+            },
         }
     }
 

@@ -26,6 +26,12 @@ pub enum TxType {
     Eip4844 = 3,
 }
 
+impl Into<u8> for TxType {
+    fn into(self) -> u8 {
+        self as u8
+    }
+}
+
 impl Display for TxType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

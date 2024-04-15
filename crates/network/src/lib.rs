@@ -15,13 +15,15 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_eips::eip2718::Eip2718Envelope;
+use std::fmt::{Debug, Display};
+
+use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::Address;
 
 mod transaction;
 pub use transaction::{
-    BuilderResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    BuildResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
     TxSignerSync, Unbuilt,
 };
 
@@ -48,17 +50,31 @@ pub trait ReceiptResponse {
 /// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
 // todo: block responses are ethereum only, so we need to include this in here too, or make `Block`
 // generic over tx/header type
-pub trait Network: std::fmt::Debug + Clone + Copy + Sized + Send + Sync + 'static {
+pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     // -- Consensus types --
 
+    /// The network transaction type enum. This should be a simple u8 repr
+    /// enum, and as such has strict type bounds for better use in error
+    /// messages, etc.
+    type TxType: Into<u8>
+        + TryFrom<u8, Error = Eip2718Error>
+        + Debug
+        + Display
+        + Clone
+        + Copy
+        + Send
+        + Sync
+        + 'static;
+
     /// The network transaction envelope type.
-    type TxEnvelope: Eip2718Envelope + std::fmt::Debug;
+    type TxEnvelope: Eip2718Envelope + Debug;
 
     /// An enum over the various transaction types.
     type UnsignedTx: From<Self::TxEnvelope>;
 
     /// The network receipt envelope type.
     type ReceiptEnvelope: Eip2718Envelope;
+
     /// The network header type.
     type Header;
 
@@ -67,7 +83,7 @@ pub trait Network: std::fmt::Debug + Clone + Copy + Sized + Send + Sync + 'stati
     /// The JSON body of a transaction request.
     type TransactionRequest: RpcObject
         + TransactionBuilder<Self>
-        + std::fmt::Debug
+        + Debug
         + From<Self::TxEnvelope>
         + From<Self::UnsignedTx>;
     /// The JSON body of a transaction response.
