@@ -50,6 +50,7 @@ mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
 pub mod admin;
+pub mod txpool;
 pub mod utils;
 
 #[doc(no_inline)]
