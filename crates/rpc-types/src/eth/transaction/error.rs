@@ -37,4 +37,25 @@ pub enum ConversionError {
     /// Missing `blobVersionedHashes` field for EIP-4844 transaction.
     #[error("missing `blobVersionedHashes` field for EIP-4844 transaction")]
     MissingBlobVersionedHashes,
+    /// Missing full transactions required for block decoding
+    #[error("missing full transactions required for block decoding")]
+    MissingFullTransactions,
+    /// Base fee per gas conversion error
+    #[error("base fee per gas conversion error")]
+    BaseFeePerGasConversion,
+    /// Gas limit conversion error
+    #[error("gas limit conversion error")]
+    GasLimitConversion,
+    /// Gas used conversion error
+    #[error("gas used conversion error")]
+    GasUsedConversion,
+    /// Missing block number
+    #[error("missing block number")]
+    MissingBlockNumber,
+    /// Block number conversion error
+    #[error("block number conversion error")]
+    BlockNumberConversion,
+    /// Timestamp conversion error
+    #[error("timestamp conversion error")]
+    TimestampConversion,
 }
