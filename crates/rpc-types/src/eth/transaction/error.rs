@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 /// Error variants when converting from [crate::Transaction] to [alloy_consensus::Signed]
 /// transaction.
 #[derive(Debug, thiserror::Error)]
@@ -37,4 +39,19 @@ pub enum ConversionError {
     /// Missing `blobVersionedHashes` field for EIP-4844 transaction.
     #[error("missing `blobVersionedHashes` field for EIP-4844 transaction")]
     MissingBlobVersionedHashes,
+    /// Missing full transactions required for block decoding
+    #[error("missing full transactions required for block decoding")]
+    MissingFullTransactions,
+    /// Base fee per gas integer conversion error
+    #[error("base fee per gas integer conversion error")]
+    BaseFeePerGasConversion(TryFromIntError),
+    /// Gas limit integer conversion error
+    #[error("gas limit integer conversion error")]
+    GasLimitConversion(TryFromIntError),
+    /// Gas used integer conversion error
+    #[error("gas used integer conversion error")]
+    GasUsedConversion(TryFromIntError),
+    /// Missing block number
+    #[error("missing block number")]
+    MissingBlockNumber,
 }
