@@ -54,4 +54,10 @@ pub enum ConversionError {
     /// Missing block number
     #[error("missing block number")]
     MissingBlockNumber,
+    /// Blob gas used integer conversion error
+    #[error("blob gas used integer conversion error")]
+    BlobGasUsedConversion(TryFromIntError),
+    /// Excess blob gas integer conversion error
+    #[error("excess blob gas integer conversion error")]
+    ExcessBlobGasConversion(TryFromIntError),
 }
