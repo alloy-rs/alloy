@@ -1,7 +1,6 @@
 use crate::{Network, ReceiptResponse};
 
 mod builder;
-pub(crate) use builder::build_unsigned;
 
 mod signer;
 pub use signer::EthereumSigner;
@@ -13,6 +12,8 @@ pub struct Ethereum {
 }
 
 impl Network for Ethereum {
+    type TxType = alloy_consensus::TxType;
+
     type TxEnvelope = alloy_consensus::TxEnvelope;
 
     type UnsignedTx = alloy_consensus::TypedTransaction;

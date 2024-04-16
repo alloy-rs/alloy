@@ -51,7 +51,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         request: N::TransactionRequest,
     ) -> alloy_signer::Result<N::TxEnvelope> {
         let sender = request.from().unwrap_or_else(|| self.default_signer());
-        let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
+        let tx = request.build_unsigned().map_err(|(_, e)| alloy_signer::Error::other(e))?;
         self.sign_transaction_from(sender, tx).await
     }
 }
