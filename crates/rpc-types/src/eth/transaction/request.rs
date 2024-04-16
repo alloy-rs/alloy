@@ -16,7 +16,7 @@ pub struct TransactionRequest {
     /// The address of the transaction author.
     pub from: Option<Address>,
     /// The destination address of the transaction.
-    pub to: Option<Address>,
+    pub to: Option<TxKind>,
     /// The legacy gas price.
     #[serde(
         default,
@@ -144,7 +144,7 @@ impl TransactionRequest {
     /// Sets the recipient address for the transaction.
     #[inline]
     pub const fn to(mut self, to: Address) -> Self {
-        self.to = Some(to);
+        self.to = Some(TxKind::Call(to));
         self
     }
 
@@ -323,7 +323,7 @@ impl From<TxEip4844> for TransactionRequest {
     fn from(tx: TxEip4844) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: Some(tx.to),
+            to: Some(TxKind::Call(tx.to)),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
@@ -459,6 +459,18 @@ impl From<TxEnvelope> for TransactionRequest {
         }
     }
 }
+
+/// Error thrown when `to` is `None` in non-EIP4844 transaction requests 
+#[derive(Debug, Default, thiserror::Error)]
+#[error("the field `to` is unset. Please populate it.")]
+#[non_exhaustive]
+pub struct TransactionRequestNon4844Error;
+
+/// Error thrown when `to` is `None` in non-EIP4844 transaction requests 
+#[derive(Debug, Default, thiserror::Error)]
+#[error("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")]
+#[non_exhaustive]
+pub struct TransactionRequest4844Error;
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
 #[derive(Debug, Default, thiserror::Error)]
