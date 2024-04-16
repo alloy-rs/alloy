@@ -62,6 +62,9 @@ pub struct TransactionRequest {
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default)]
     pub access_list: Option<AccessList>,
+    /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
+    #[serde(default, rename = "type", with = "alloy_serde::num::u8_hex_opt")]
+    pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
@@ -84,6 +87,7 @@ impl Hash for TransactionRequest {
         self.nonce.hash(state);
         self.chain_id.hash(state);
         self.access_list.hash(state);
+        self.transaction_type.hash(state);
         self.blob_versioned_hashes.hash(state);
         self.sidecar.hash(state);
     }
@@ -96,6 +100,12 @@ impl TransactionRequest {
     #[inline]
     pub const fn from(mut self, from: Address) -> Self {
         self.from = Some(from);
+        self
+    }
+
+    /// Sets the transactions type for the transactions.
+    pub const fn transaction_type(mut self, transaction_type: u8) -> Self {
+        self.transaction_type = Some(transaction_type);
         self
     }
 
@@ -579,6 +589,7 @@ impl From<TxLegacy> for TransactionRequest {
             input: TransactionInput::from(tx.input),
             nonce: Some(tx.nonce),
             chain_id: tx.chain_id,
+            transaction_type: Some(0),
             ..Default::default()
         }
     }
@@ -596,6 +607,7 @@ impl From<TxEip2930> for TransactionRequest {
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
+            transaction_type: Some(1),
             ..Default::default()
         }
     }
@@ -614,6 +626,7 @@ impl From<TxEip1559> for TransactionRequest {
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
+            transaction_type: Some(2),
             ..Default::default()
         }
     }
@@ -634,6 +647,7 @@ impl From<TxEip4844> for TransactionRequest {
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
             blob_versioned_hashes: Some(tx.blob_versioned_hashes),
+            transaction_type: Some(3),
             ..Default::default()
         }
     }
@@ -657,6 +671,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
             access_list: Some(tx.access_list),
             blob_versioned_hashes: Some(tx.blob_versioned_hashes),
             sidecar: Some(sidecar),
+            transaction_type: Some(3),
             ..Default::default()
         }
     }
