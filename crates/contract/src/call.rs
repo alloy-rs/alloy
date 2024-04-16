@@ -190,7 +190,7 @@ impl CallDecoder for () {
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
 pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     request: N::TransactionRequest,
-    block: Option<BlockId>,
+    block: BlockId,
     state: Option<StateOverride>,
     /// The provider.
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
@@ -262,7 +262,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
             request: <N::TransactionRequest>::default().with_input(input),
             decoder,
             provider,
-            block: None,
+            block: BlockId::default(),
             state: None,
             transport: PhantomData,
         }
@@ -322,7 +322,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Sets the `block` field for sending the tx to the chain
     pub const fn block(mut self, block: BlockId) -> Self {
-        self.block = Some(block);
+        self.block = block;
         self
     }
 
