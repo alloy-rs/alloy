@@ -162,7 +162,7 @@ mod test {
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
             .from(from)
-            .to(Some(to))
+            .to(to)
             .value(U256::from(100))
             .max_fee_per_gas(gas_price + 1)
             .max_priority_fee_per_gas(gas_price + 1);
@@ -189,7 +189,6 @@ mod test {
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
             .from(from)
-            .to(None)
             .with_input("0xdeadbeef".into())
             .max_fee_per_gas(gas_price + 1)
             .max_priority_fee_per_gas(gas_price + 1);
