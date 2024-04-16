@@ -163,6 +163,7 @@ impl Transaction {
             nonce: Some(self.nonce),
             chain_id: self.chain_id,
             access_list: self.access_list,
+            transaction_type: self.transaction_type,
             max_fee_per_gas: self.max_fee_per_gas,
             max_priority_fee_per_gas: self.max_priority_fee_per_gas,
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,
