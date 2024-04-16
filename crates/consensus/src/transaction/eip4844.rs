@@ -148,6 +148,7 @@ impl TxEip4844Variant {
     }
 
     /// Outputs the length of the transaction's fields, without a RLP header.
+    #[doc(hidden)]
     pub fn fields_len(&self) -> usize {
         match self {
             TxEip4844Variant::TxEip4844(tx) => tx.fields_len(),
@@ -161,6 +162,7 @@ impl TxEip4844Variant {
     ///
     /// If `with_header` is `true`, the following will be encoded:
     /// `rlp(tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs]))`
+    #[doc(hidden)]
     pub fn encode_with_signature(
         &self,
         signature: &Signature,
@@ -203,6 +205,7 @@ impl TxEip4844Variant {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
+    #[doc(hidden)]
     pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let mut current_buf = *buf;
         let _header = Header::decode(&mut current_buf)?;
@@ -517,6 +520,7 @@ impl TxEip4844 {
     }
 
     /// Outputs the length of the transaction's fields, without a RLP header.
+    #[doc(hidden)]
     pub fn fields_len(&self) -> usize {
         let mut len = 0;
         len += self.chain_id.length();
@@ -595,6 +599,7 @@ impl TxEip4844 {
 
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header
+    #[doc(hidden)]
     pub fn encode_with_signature(
         &self,
         signature: &Signature,
@@ -631,6 +636,7 @@ impl TxEip4844 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
+    #[doc(hidden)]
     pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
@@ -865,6 +871,7 @@ impl TxEip4844WithSidecar {
     /// This __does__ expect the bytes to start with a list header and include a signature.
     ///
     /// This is the inverse of [TxEip4844WithSidecar::encode_with_signature_fields].
+    #[doc(hidden)]
     pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {

@@ -118,6 +118,7 @@ impl TxEip1559 {
     }
 
     /// Outputs the length of the transaction's fields, without a RLP header.
+    #[doc(hidden)]
     pub fn fields_len(&self) -> usize {
         let mut len = 0;
         len += self.chain_id.length();
@@ -176,6 +177,7 @@ impl TxEip1559 {
 
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header.
+    #[doc(hidden)]
     pub fn encode_with_signature(
         &self,
         signature: &Signature,
@@ -200,6 +202,7 @@ impl TxEip1559 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
+    #[doc(hidden)]
     pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {

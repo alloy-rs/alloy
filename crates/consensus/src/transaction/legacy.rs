@@ -75,6 +75,7 @@ impl TxLegacy {
 
     /// Outputs the length of the transaction's fields, without a RLP header or length of the
     /// eip155 fields.
+    #[doc(hidden)]
     pub fn fields_len(&self) -> usize {
         let mut len = 0;
         len += self.nonce.length();
@@ -153,6 +154,7 @@ impl TxLegacy {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
+    #[doc(hidden)]
     pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
