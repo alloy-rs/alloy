@@ -20,10 +20,7 @@ use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_rpc_types_trace::{
-    geth::{GethDebugTracingOptions, GethTrace},
-    parity::{LocalizedTransactionTrace, TraceResults, TraceType},
-};
+use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{
     BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
     TransportResult,
@@ -1005,20 +1002,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.client().request("trace_transaction", (hash,)).await
-    }
-
-    // todo: move to extension trait
-    /// Trace the given transaction.
-    ///
-    /// # Note
-    ///
-    /// Not all nodes support this call.
-    async fn debug_trace_transaction(
-        &self,
-        hash: TxHash,
-        trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<GethTrace> {
-        self.client().request("debug_traceTransaction", (hash, trace_options)).await
     }
 
     // todo: move to extension trait
