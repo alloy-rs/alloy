@@ -15,7 +15,6 @@ exclude.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
 alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
 alloy-serde.workspace = true
-thiserror.workspace = true
 
 # serde
 serde = { workspace = true, default-features = false, optional = true }
