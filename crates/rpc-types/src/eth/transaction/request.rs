@@ -322,9 +322,18 @@ impl TransactionRequest {
         }
     }
 
-    fn with_call<T: SolCall>(self, t: T) -> Self {
+    fn with_call<T: SolCall>(mut self, t: &T) -> Self {
+
+        if matches!(self.to, Some(TxKind::Create)) {
+            self.to = None;
+        }
+
+        let data: Vec<u8> = t.abi_encode();
         Self {
-            // wip
+            input: TransactionInput {
+                input: Some(Bytes::from(data)),
+                data: Some(Bytes::from(data)),
+            },
             ..self
         }
     }
