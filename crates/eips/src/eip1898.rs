@@ -2,16 +2,17 @@
 
 #![allow(unknown_lints, non_local_definitions)]
 
-use alloy_primitives::{
-    hex::FromHexError, ruint::ParseError, B256, U64
+use alloy_primitives::{hex::FromHexError, ruint::ParseError, B256, U64};
+use core::{
+    fmt::{self, Debug, Display, Formatter},
+    num::ParseIntError,
+    str::FromStr,
 };
-use core::{fmt::{self, Display, Formatter}, num::ParseIntError, str::FromStr};
-use core::fmt::Debug;
 
 #[cfg(feature = "serde")]
 use serde::{
     de::{MapAccess, Visitor},
-    ser::{SerializeStruct},
+    ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
@@ -204,14 +205,22 @@ pub enum ParseBlockNumberError {
 
 /// Error variants when parsing a [BlockNumberOrTag]
 #[cfg(feature = "std")]
-impl std::error::Error for ParseBlockNumberError{}
+impl std::error::Error for ParseBlockNumberError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ParseBlockNumberError::ParseIntErr(err) => std::error::Error::source(err),
+            ParseBlockNumberError::ParseErr(err) => std::error::Error::source(err),
+            ParseBlockNumberError::MissingPrefix(err) => std::error::Error::source(err),
+        }
+    }
+}
 
-impl Display for ParseBlockNumberError { 
+impl Display for ParseBlockNumberError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ParseIntErr(err) => write!(f,"{err}"),
-            Self::ParseErr(err) => write!(f,"{err}"),
-            Self::MissingPrefix(err) =>write!(f,"{err}"),
+            Self::ParseIntErr(err) => write!(f, "{err}"),
+            Self::ParseErr(err) => write!(f, "{err}"),
+            Self::MissingPrefix(err) => write!(f, "{err}"),
         }
     }
 }
@@ -241,9 +250,12 @@ pub struct HexStringMissingPrefixError;
 
 impl Display for HexStringMissingPrefixError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-       f.write_str("hex string without 0x prefix")
+        f.write_str("hex string without 0x prefix")
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for HexStringMissingPrefixError {}
 
 /// A Block Identifier.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
@@ -489,7 +501,7 @@ impl<'de> Deserialize<'de> for BlockId {
 #[derive(Debug)]
 pub enum ParseBlockIdError {
     /// Failed to parse a block id from a number.
-    ParseIntError( ParseIntError),
+    ParseIntError(ParseIntError),
     /// Failed to parse a block id as a hex string.
     FromHexError(FromHexError),
 }
@@ -497,14 +509,21 @@ pub enum ParseBlockIdError {
 impl Display for ParseBlockIdError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ParseIntError(err) => write!(f,"{err}"),
-            Self::FromHexError(err)=> write!(f,"{err}"),
+            Self::ParseIntError(err) => write!(f, "{err}"),
+            Self::FromHexError(err) => write!(f, "{err}"),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for ParseBlockIdError{}
+impl std::error::Error for ParseBlockIdError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ParseBlockIdError::ParseIntError(err) => std::error::Error::source(err),
+            ParseBlockIdError::FromHexError(err) => std::error::Error::source(err),
+        }
+    }
+}
 
 impl From<ParseIntError> for ParseBlockIdError {
     fn from(err: ParseIntError) -> Self {
@@ -543,42 +562,48 @@ impl FromStr for BlockId {
 mod tests {
     use super::*;
 
+    #[test]
+    fn compact_block_number_serde() {
+        let num: BlockNumberOrTag = 1u64.into();
+        let serialized = serde_json::to_string(&num).unwrap();
+        assert_eq!(serialized, "\"0x1\"");
+    }
 
     #[test]
     fn can_parse_eip1898_block_ids() {
         let num = serde_json::json!(
-        { "blockNumber": "0x0" }
-    );
+            { "blockNumber": "0x0" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
 
         let num = serde_json::json!(
-        { "blockNumber": "pending" }
-    );
+            { "blockNumber": "pending" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
 
         let num = serde_json::json!(
-        { "blockNumber": "latest" }
-    );
+            { "blockNumber": "latest" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
 
         let num = serde_json::json!(
-        { "blockNumber": "finalized" }
-    );
+            { "blockNumber": "finalized" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
 
         let num = serde_json::json!(
-        { "blockNumber": "safe" }
-    );
+            { "blockNumber": "safe" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
 
         let num = serde_json::json!(
-        { "blockNumber": "earliest" }
-    );
+            { "blockNumber": "earliest" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
 
@@ -607,8 +632,8 @@ mod tests {
         assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
 
         let num = serde_json::json!(
-        { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3" }
-    );
+            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3" }
+        );
         let id = serde_json::from_value::<BlockId>(num).unwrap();
         assert_eq!(
             id,
