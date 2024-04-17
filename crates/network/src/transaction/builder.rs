@@ -259,7 +259,8 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// the builder is not ready to build.
     fn output_tx_type_checked(&self) -> Option<N::TxType>;
 
-    /// Trim any conflicting keys
+    /// Trim any conflicting keys and populate any computed fields (like blob
+    /// hashes).
     ///
     /// This is useful for transaction requests that have multiple conflicting
     /// fields. While these may be buildable, they may not be submitted to the
