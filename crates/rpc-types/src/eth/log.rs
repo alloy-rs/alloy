@@ -78,17 +78,34 @@ impl Log<LogData> {
     }
 }
 
+impl<T> alloy_rlp::Encodable for Log<T>
+where
+    for<'a> &'a T: Into<LogData>,
+{
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.reserialize_inner().encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.reserialize_inner().length()
+    }
+}
+
 impl<T> Log<T>
 where
     for<'a> &'a T: Into<LogData>,
 {
-    /// Reserialize the data.
+    /// Reserialize the inner data, returning an [`alloy_primitives::Log`].
+    pub fn reserialize_inner(&self) -> alloy_primitives::Log {
+        alloy_primitives::Log { address: self.inner.address, data: (&self.inner.data).into() }
+    }
+
+    /// Reserialize the data, returning a new `Log` object wrapping an
+    /// [`alloy_primitives::Log`]. this copies the log metadata, preserving
+    /// the original object.
     pub fn reserialize(&self) -> Log<LogData> {
         Log {
-            inner: alloy_primitives::Log {
-                address: self.inner.address,
-                data: (&self.inner.data).into(),
-            },
+            inner: self.reserialize_inner(),
             block_hash: self.block_hash,
             block_number: self.block_number,
             block_timestamp: self.block_timestamp,
