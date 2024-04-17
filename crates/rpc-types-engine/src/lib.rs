@@ -23,11 +23,14 @@
 mod cancun;
 mod exit;
 mod forkchoice;
+mod identification;
 mod optimism;
 pub mod payload;
 mod transition;
 
-pub use self::{cancun::*, exit::*, forkchoice::*, optimism::*, payload::*, transition::*};
+pub use self::{
+    cancun::*, exit::*, forkchoice::*, identification::*, optimism::*, payload::*, transition::*,
+};
 
 #[doc(inline)]
 pub use alloy_eips::eip6110::Deposit;
