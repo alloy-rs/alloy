@@ -6,7 +6,6 @@ use alloy_consensus::{
     TxType, TypedTransaction,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
-use alloy_sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
