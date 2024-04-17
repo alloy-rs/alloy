@@ -212,7 +212,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_legacy` to check if the
     /// request can be built.
     fn build_legacy(self) -> TxLegacy {
-        let checked_to = self.to.expect("the `to` field should have value.");
+        let checked_to = self.to.expect("checked in complete_legacy.");
 
         TxLegacy {
             chain_id: self.chain_id,
@@ -232,7 +232,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     fn build_1559(self) -> TxEip1559 {
-        let checked_to = self.to.expect("the `to` field should have value.");
+        let checked_to = self.to.expect("checked in complete_1559.");
 
         TxEip1559 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -256,7 +256,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
     fn build_2930(self) -> TxEip2930 {
-        let checked_to = self.to.expect("the `to` field should have value.");
+        let checked_to = self.to.expect("checked in complete_2930.");
 
         TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -279,7 +279,7 @@ impl TransactionRequest {
     fn build_4844(mut self) -> TxEip4844WithSidecar {
         self.populate_blob_hashes();
 
-        let checked_to = self.to.expect("the `to` field should have value.");
+        let checked_to = self.to.expect("checked in complete_4844.");
         let to_address = match checked_to {
             TxKind::Create => panic!("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
             TxKind::Call(to) => to,
@@ -307,37 +307,6 @@ impl TransactionRequest {
         }
     }
 
-    fn as_create(self) -> Self {
-        Self { to: Some(TxKind::Create), ..self }
-    }
-
-    fn deploy_code(self, code: Vec<u8>) -> Self {
-        Self {
-            to: Some(TxKind::Create),
-            input: TransactionInput {
-                input: Some(Bytes::from(code)),
-                data: Some(Bytes::from(code)),
-            },
-            ..self
-        }
-    }
-
-    fn with_call<T: SolCall>(mut self, t: &T) -> Self {
-
-        if matches!(self.to, Some(TxKind::Create)) {
-            self.to = None;
-        }
-
-        let data: Vec<u8> = t.abi_encode();
-        Self {
-            input: TransactionInput {
-                input: Some(Bytes::from(data)),
-                data: Some(Bytes::from(data)),
-            },
-            ..self
-        }
-    }
-
     fn check_reqd_fields(&self) -> Vec<&'static str> {
         let mut missing = Vec::with_capacity(12);
         if self.nonce.is_none() {
@@ -345,6 +314,9 @@ impl TransactionRequest {
         }
         if self.gas.is_none() {
             missing.push("gas_limit");
+        }
+        if self.to.is_none() {
+            missing.push("to");
         }
         missing
     }
@@ -626,7 +598,7 @@ impl From<TxLegacy> for TransactionRequest {
     fn from(tx: TxLegacy) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
@@ -643,7 +615,7 @@ impl From<TxEip2930> for TransactionRequest {
     fn from(tx: TxEip2930) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
@@ -661,7 +633,7 @@ impl From<TxEip1559> for TransactionRequest {
     fn from(tx: TxEip1559) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(to) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
             gas: Some(tx.gas_limit),
@@ -703,7 +675,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
         let tx = tx.tx;
         TransactionRequest {
             from: None,
-            to: Some(tx.to),
+            to: Some(TxKind::Call(tx.to)),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),

@@ -152,4 +152,17 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
         Ok(signer.sign_request(self).await?)
     }
+    
+    fn as_create(self) -> Self {
+        // self.deref().as_create()
+        todo!()
+    }
+    
+    fn deploy_code(self, code: Vec<u8>) -> Self {
+        todo!()
+    }
+    
+    fn with_call<T: alloy_sol_types::SolCall>(&mut self, t: &T) -> &mut Self {
+        todo!()
+    }
 }

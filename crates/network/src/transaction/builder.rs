@@ -3,6 +3,7 @@ use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types::AccessList;
+use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
 /// Result type for transaction builders
@@ -103,6 +104,15 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Set the recipient for the transaction.
     fn set_to(&mut self, to: TxKind);
+
+    /// Set the `to` field to a create call.
+    fn as_create(self) -> Self;
+
+    /// Deploy the code by making a create call with data.
+    fn deploy_code(self, code: Vec<u8>) -> Self;
+
+    /// Make a contract call with data.
+    fn with_call<T: SolCall>(&mut self, t: &T) -> &mut Self;
 
     /// Builder-pattern method for setting the recipient.
     fn with_to(mut self, to: TxKind) -> Self {
