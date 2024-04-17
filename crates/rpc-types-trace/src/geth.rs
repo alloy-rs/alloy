@@ -568,7 +568,7 @@ mod tests {
     // <https://etherscan.io/tx/0xd01212e8ab48d2fd2ea9c4f33f8670fd1cf0cfb09d2e3c6ceddfaf54152386e5>
     #[test]
     fn serde_default_frame() {
-        let input = include_str!("../../test_data/default/structlogs_01.json");
+        let input = include_str!("../test_data/default/structlogs_01.json");
         let _frame: DefaultFrame = serde_json::from_str(input).unwrap();
     }
 
