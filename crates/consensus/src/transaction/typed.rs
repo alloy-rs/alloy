@@ -1,4 +1,7 @@
-use crate::{Transaction, TxEip1559, TxEip2930, TxEip4844Variant, TxEnvelope, TxLegacy, TxType};
+use crate::{
+    Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEnvelope, TxLegacy, TxType,
+};
 use alloy_primitives::TxKind;
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
@@ -47,6 +50,18 @@ impl From<TxEip1559> for TypedTransaction {
 impl From<TxEip4844Variant> for TypedTransaction {
     fn from(tx: TxEip4844Variant) -> Self {
         Self::Eip4844(tx)
+    }
+}
+
+impl From<TxEip4844> for TypedTransaction {
+    fn from(tx: TxEip4844) -> Self {
+        Self::Eip4844(tx.into())
+    }
+}
+
+impl From<TxEip4844WithSidecar> for TypedTransaction {
+    fn from(tx: TxEip4844WithSidecar) -> Self {
+        Self::Eip4844(tx.into())
     }
 }
 

@@ -5,6 +5,7 @@ use crate::{
 };
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;
+use alloy_rpc_types::BlockId;
 use alloy_transport::{Transport, TransportResult};
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -103,7 +104,8 @@ impl NonceFiller {
             }
             None => {
                 // initialize the nonce if we haven't seen this account before
-                let initial_nonce = provider.get_transaction_count(from, None).await?;
+                let initial_nonce =
+                    provider.get_transaction_count(from, BlockId::default()).await?;
                 *nonce = Some(initial_nonce);
                 Ok(initial_nonce)
             }
@@ -120,8 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let (provider, _anvil) =
-            ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
+        let (provider, _anvil) = ProviderBuilder::new().with_nonce_management().on_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),

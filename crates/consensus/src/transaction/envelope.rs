@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
 };
@@ -22,6 +24,23 @@ pub enum TxType {
     Eip1559 = 2,
     /// EIP-4844 transaction type.
     Eip4844 = 3,
+}
+
+impl From<TxType> for u8 {
+    fn from(value: TxType) -> Self {
+        value as u8
+    }
+}
+
+impl fmt::Display for TxType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TxType::Legacy => write!(f, "Legacy"),
+            TxType::Eip2930 => write!(f, "EIP-2930"),
+            TxType::Eip1559 => write!(f, "EIP-1559"),
+            TxType::Eip4844 => write!(f, "EIP-4844"),
+        }
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
