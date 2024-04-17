@@ -17,10 +17,7 @@ pub struct OptimismPayloadAttributes {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub no_tx_pool: Option<bool>,
     /// If set, this sets the exact gas limit the block produced with.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "alloy_serde::u64_hex_opt::deserialize"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt")]
     pub gas_limit: Option<u64>,
 }
 

@@ -180,6 +180,13 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
+        // Try fetching receipt immediately to ensure that we don't watch for a transaction that is
+        // already confirmed.
+        let receipt = self.provider.get_transaction_receipt(self.config.tx_hash).await?;
+        if let Some(receipt) = receipt {
+            return Ok(receipt);
+        }
+
         let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
         let hash = pending_tx.await?;
         let receipt = self.provider.get_transaction_receipt(hash).await?;
