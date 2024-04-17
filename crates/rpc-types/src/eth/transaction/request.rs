@@ -6,6 +6,7 @@ use alloy_consensus::{
     TxType, TypedTransaction,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use alloy_sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -303,6 +304,28 @@ impl TransactionRequest {
                 max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
                 input: self.input.into_input().unwrap_or_default(),
             },
+        }
+    }
+
+    fn as_create(self) -> Self {
+        Self { to: Some(TxKind::Create), ..self }
+    }
+
+    fn deploy_code(self, code: Vec<u8>) -> Self {
+        Self {
+            to: Some(TxKind::Create),
+            input: TransactionInput {
+                input: Some(Bytes::from(code)),
+                data: Some(Bytes::from(code)),
+            },
+            ..self
+        }
+    }
+
+    fn with_call<T: SolCall>(self, t: T) -> Self {
+        Self {
+            // wip
+            ..self
         }
     }
 
