@@ -211,12 +211,14 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_legacy` to check if the
     /// request can be built.
     fn build_legacy(self) -> TxLegacy {
+        let checked_to = self.to.expect("the `to` field should have value.");
+
         TxLegacy {
             chain_id: self.chain_id,
             nonce: self.nonce.expect("checked in complete_legacy"),
             gas_price: self.gas_price.expect("checked in complete_legacy"),
             gas_limit: self.gas.expect("checked in complete_legacy"),
-            to: self.to.into(),
+            to: checked_to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
         }
@@ -229,6 +231,8 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_1559` to check if the
     /// request can be built.
     fn build_1559(self) -> TxEip1559 {
+        let checked_to = self.to.expect("the `to` field should have value.");
+
         TxEip1559 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.expect("checked in invalid_common_fields"),
@@ -237,7 +241,7 @@ impl TransactionRequest {
                 .expect("checked in invalid_1559_fields"),
             max_fee_per_gas: self.max_fee_per_gas.expect("checked in invalid_1559_fields"),
             gas_limit: self.gas.expect("checked in invalid_common_fields"),
-            to: self.to.into(),
+            to: checked_to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -251,12 +255,14 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_2930` to check if the
     /// request can be built.
     fn build_2930(self) -> TxEip2930 {
+        let checked_to = self.to.expect("the `to` field should have value.");
+
         TxEip2930 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.expect("checked in complete_2930"),
             gas_price: self.gas_price.expect("checked in complete_2930"),
             gas_limit: self.gas.expect("checked in complete_2930"),
-            to: self.to.into(),
+            to: checked_to,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -272,6 +278,12 @@ impl TransactionRequest {
     fn build_4844(mut self) -> TxEip4844WithSidecar {
         self.populate_blob_hashes();
 
+        let checked_to = self.to.expect("the `to` field should have value.");
+        let to_address = match checked_to {
+            TxKind::Create => panic!("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Call(to) => to,
+        };
+
         TxEip4844WithSidecar {
             sidecar: self.sidecar.expect("checked in complete_4844"),
             tx: TxEip4844 {
@@ -282,7 +294,7 @@ impl TransactionRequest {
                 max_priority_fee_per_gas: self
                     .max_priority_fee_per_gas
                     .expect("checked in complete_4844"),
-                to: self.to.expect("checked in complete_4844"),
+                to: to_address,
                 value: self.value.unwrap_or_default(),
                 access_list: self.access_list.unwrap_or_default(),
                 blob_versioned_hashes: self
@@ -773,13 +785,13 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
-/// Error thrown when `to` is `None` in non-EIP4844 transaction requests 
+/// Error thrown when `to` is `None` in non-EIP4844 transaction requests
 #[derive(Debug, Default, thiserror::Error)]
 #[error("the field `to` is unset. Please populate it.")]
 #[non_exhaustive]
 pub struct TransactionRequestNon4844Error;
 
-/// Error thrown when `to` is `None` in non-EIP4844 transaction requests 
+/// Error thrown when `to` is `None` in non-EIP4844 transaction requests
 #[derive(Debug, Default, thiserror::Error)]
 #[error("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")]
 #[non_exhaustive]
