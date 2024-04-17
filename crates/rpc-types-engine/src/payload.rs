@@ -424,7 +424,7 @@ pub struct ExecutionPayloadV4 {
 impl ExecutionPayloadV4 {
     /// Returns the withdrawals for the payload.
     pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
-        &self.payload_inner.withdrawals()
+        self.payload_inner.withdrawals()
     }
 
     /// Returns the timestamp for the payload.
