@@ -21,12 +21,16 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod cancun;
+mod exit;
 mod forkchoice;
 mod optimism;
 pub mod payload;
 mod transition;
 
-pub use self::{cancun::*, forkchoice::*, optimism::*, payload::*, transition::*};
+pub use self::{cancun::*, exit::*, forkchoice::*, optimism::*, payload::*, transition::*};
+
+#[doc(inline)]
+pub use alloy_eips::eip6110::Deposit;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
 pub const CAPABILITIES: [&str; 12] = [
