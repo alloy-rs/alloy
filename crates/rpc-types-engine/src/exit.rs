@@ -13,7 +13,7 @@ pub struct ExitV1 {
     pub pubkey: FixedBytes<48>,
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
-    /// Amount in GWEI
+    /// Amount of withdrawn ether in gwei
     #[serde(with = "alloy_serde::u64_hex")]
     pub amount: u64,
     /// Deposit signature
