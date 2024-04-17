@@ -149,7 +149,7 @@ impl<'de> Deserialize<'de> for BlockNumberOrTag {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?.to_lowercase();
+        let s = alloc::string::String::deserialize(deserializer)?.to_lowercase();
         s.parse().map_err(serde::de::Error::custom)
     }
 }
@@ -443,7 +443,7 @@ impl<'de> Deserialize<'de> for BlockId {
                 let mut number = None;
                 let mut block_hash = None;
                 let mut require_canonical = None;
-                while let Some(key) = map.next_key::<String>()? {
+                while let Some(key) = map.next_key::<alloc::string::String>()? {
                     match key.as_str() {
                         "blockNumber" => {
                             if number.is_some() || block_hash.is_some() {
