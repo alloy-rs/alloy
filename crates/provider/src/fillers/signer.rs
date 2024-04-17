@@ -83,7 +83,7 @@ where
 
         if builder.from().is_none() {
             builder.set_from(self.signer.default_signer());
-            if !(builder.can_build()) {
+            if !builder.can_build() {
                 return Ok(SendableTx::Builder(builder));
             }
         }
