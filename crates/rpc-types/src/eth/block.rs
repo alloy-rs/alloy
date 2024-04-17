@@ -3,7 +3,9 @@
 #![allow(unknown_lints, non_local_definitions)]
 
 use crate::{other::OtherFields, Transaction, Withdrawal};
-pub use alloy_eips::{calc_blob_gasprice, calc_excess_blob_gas,RpcBlockHash,BlockNumberOrTag,BlockId};
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockId, BlockNumberOrTag, RpcBlockHash,
+};
 use alloy_primitives::{
     ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
 };
