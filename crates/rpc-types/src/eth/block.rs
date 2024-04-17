@@ -1,20 +1,12 @@
 //! Block RPC types.
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use crate::{other::OtherFields, Transaction, Withdrawal};
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockId, BlockNumberOrTag, RpcBlockHash,
 };
-use alloy_primitives::{
-    ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
-};
+use alloy_primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
-use serde::{
-    de::{MapAccess, Visitor},
-    ser::{Error, SerializeStruct},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
 /// Block representation
@@ -686,9 +678,10 @@ pub struct BlockOverrides {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use arbitrary::Arbitrary;
     use rand::Rng;
+
+    use super::*;
 
     #[test]
     fn arbitrary_header() {

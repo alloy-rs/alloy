@@ -1,7 +1,5 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, B256, U64};
 use core::{
     fmt::{self, Debug, Display, Formatter},
