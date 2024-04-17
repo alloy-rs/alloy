@@ -10,7 +10,7 @@ pub enum ClientCode {
     /// Besu
     BU,
     /// EthereumJS
-    EJ, // ethereumJS
+    EJ,
     /// Erigon
     EG,
     /// Geth, go-ethereum
