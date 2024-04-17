@@ -2,7 +2,7 @@
 //!
 //! See also [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
 
-use alloy_primitives::{Address, FixedBytes, B256};
+use alloy_primitives::{Address, FixedBytes};
 use serde::{Deserialize, Serialize};
 
 /// This structure maps onto the exit object
