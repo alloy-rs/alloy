@@ -1,7 +1,7 @@
 //! Payload types.
 use crate::ExitV1;
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::eip6110::Deposit;
+use alloy_eips::eip6110::DepositReceipt;
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -416,7 +416,7 @@ pub struct ExecutionPayloadV4 {
     /// Array of deposits.
     ///
     /// This maps directly to the Deposits defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_receipts: Vec<Deposit>,
+    pub deposit_receipts: Vec<DepositReceipt>,
     /// Array of exits
     pub exits: Vec<ExitV1>,
 }

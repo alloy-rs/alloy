@@ -33,7 +33,7 @@ pub use self::{
 };
 
 #[doc(inline)]
-pub use alloy_eips::eip6110::Deposit;
+pub use alloy_eips::eip6110::DepositReceipt;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
 pub const CAPABILITIES: [&str; 12] = [
