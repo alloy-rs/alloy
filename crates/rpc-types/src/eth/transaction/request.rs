@@ -808,18 +808,6 @@ impl From<TxEnvelope> for TransactionRequest {
     }
 }
 
-/// Error thrown when `to` is `None` in non-EIP4844 transaction requests
-#[derive(Debug, Default, thiserror::Error)]
-#[error("the field `to` is unset. Please populate it.")]
-#[non_exhaustive]
-pub struct TransactionRequestNon4844Error;
-
-/// Error thrown when `to` is `None` in non-EIP4844 transaction requests
-#[derive(Debug, Default, thiserror::Error)]
-#[error("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")]
-#[non_exhaustive]
-pub struct TransactionRequest4844Error;
-
 /// Error thrown when both `data` and `input` fields are set and not equal.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
