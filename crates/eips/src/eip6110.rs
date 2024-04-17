@@ -24,7 +24,7 @@ pub struct Deposit {
     pub pubkey: FixedBytes<48>,
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
-    /// Amount in GWEI
+    /// Amount of ether deposited in gwei
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex"))]
     pub amount: u64,
     /// Deposit signature
