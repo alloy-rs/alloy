@@ -1,5 +1,7 @@
 //! Payload types.
+use crate::ExitV1;
 use alloy_consensus::{Blob, Bytes48};
+use alloy_eips::eip6110::Deposit;
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -396,6 +398,38 @@ impl ssz::Encode for ExecutionPayloadV3 {
     fn ssz_bytes_len(&self) -> usize {
         <ExecutionPayloadV2 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
             + <u64 as ssz::Encode>::ssz_fixed_len() * 2
+    }
+}
+
+/// This structure maps on the ExecutionPayloadV4 structure of the beacon chain spec.
+///
+/// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
+///
+/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositReceipts
+/// and exits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPayloadV4 {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    pub payload_inner: ExecutionPayloadV3,
+    /// Array of deposits.
+    ///
+    /// This maps directly to the Deposits defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
+    pub deposit_receipts: Vec<Deposit>,
+    /// Array of exits
+    pub exits: Vec<ExitV1>,
+}
+
+impl ExecutionPayloadV4 {
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
+        &self.payload_inner.withdrawals()
+    }
+
+    /// Returns the timestamp for the payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.payload_inner.payload_inner.timestamp()
     }
 }
 
