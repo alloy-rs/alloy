@@ -3,8 +3,7 @@ use crate::{
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types::{request::TransactionRequest, AccessList, TransactionInput};
-use alloy_sol_types::SolCall;
+use alloy_rpc_types::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
@@ -47,32 +46,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.to = Some(to);
     }
 
-    fn as_create(self) -> Self {
-        Self { to: Some(TxKind::Create), ..self }
-    }
-
-    fn deploy_code(self, code: Vec<u8>) -> Self {
-        Self {
-            to: Some(TxKind::Create),
-            input: TransactionInput {
-                input: Some(Bytes::from(code.clone())),
-                data: Some(Bytes::from(code)),
-            },
-            ..self
-        }
-    }
-
-    fn with_call<T: SolCall>(&mut self, t: &T) -> &mut Self {
-        if matches!(self.to, Some(TxKind::Create)) {
-            self.to = None;
-        }
-
-        let data: Vec<u8> = t.abi_encode();
-        self.input = TransactionInput {
-            input: Some(Bytes::from(data.clone())),
-            data: Some(Bytes::from(data)),
-        };
-        self
+    fn clear_to(&mut self) {
+        self.to = None;
     }
 
     fn value(&self) -> Option<U256> {

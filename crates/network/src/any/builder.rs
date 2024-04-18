@@ -42,6 +42,10 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().to()
     }
 
+    fn clear_to(&mut self) {
+        self.deref_mut().clear_to()
+    }
+
     fn set_to(&mut self, to: alloy_primitives::TxKind) {
         self.deref_mut().set_to(to)
     }
@@ -151,18 +155,5 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         signer: &S,
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
         Ok(signer.sign_request(self).await?)
-    }
-    
-    fn as_create(self) -> Self {
-        // self.deref().as_create()
-        todo!()
-    }
-    
-    fn deploy_code(self, code: Vec<u8>) -> Self {
-        todo!()
-    }
-    
-    fn with_call<T: alloy_sol_types::SolCall>(&mut self, t: &T) -> &mut Self {
-        todo!()
     }
 }

@@ -105,18 +105,53 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Set the recipient for the transaction.
     fn set_to(&mut self, to: TxKind);
 
-    /// Set the `to` field to a create call.
-    fn as_create(self) -> Self;
-
-    /// Deploy the code by making a create call with data.
-    fn deploy_code(self, code: Vec<u8>) -> Self;
-
-    /// Make a contract call with data.
-    fn with_call<T: SolCall>(&mut self, t: &T) -> &mut Self;
+    /// Clear the recipient for the transaction. Note that this sets the
+    /// receipient to `None`, not to [`TxKind::Create`];
+    fn clear_to(&mut self);
 
     /// Builder-pattern method for setting the recipient.
     fn with_to(mut self, to: TxKind) -> Self {
         self.set_to(to);
+        self
+    }
+
+    /// Set the `to` field to a create call.
+    fn set_create(&mut self) {
+        self.set_to(TxKind::Create);
+    }
+
+    /// Set the `to` field to a create call.
+    fn as_create(mut self) -> Self {
+        self.set_create();
+        self
+    }
+
+    /// Deploy the code by making a create call with data. This will set the
+    /// `to` field to [`TxKind::Create`].
+    fn set_deploy_code(&mut self, code: Vec<u8>) {
+        self.set_input(Bytes::from(code));
+        self.set_create()
+    }
+
+    /// Deploy the code by making a create call with data. This will set the
+    /// `to` field to [`TxKind::Create`].
+    fn with_deploy_code(mut self, code: Vec<u8>) -> Self {
+        self.set_deploy_code(code);
+        self
+    }
+
+    /// Set the data field to a contract call. This will clear the `to` field
+    /// if it is set to [`TxKind::Create`].
+    fn set_call<T: SolCall>(&mut self, t: &T) {
+        self.set_input(t.abi_encode().into());
+        if matches!(self.to(), Some(TxKind::Create)) {
+            self.clear_to();
+        }
+    }
+
+    /// Make a contract call with data.
+    fn with_call<T: SolCall>(mut self, t: &T) -> Self {
+        self.set_call(t);
         self
     }
 
