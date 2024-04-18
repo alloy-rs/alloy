@@ -144,8 +144,8 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 }
 
 impl TxEnvelope {
-    /// Return the [`hash`] of the inner Signed
-    pub fn tx_hash(&self) -> &B256 {
+    /// Return the hash of the inner Signed
+    pub const fn tx_hash(&self) -> &B256 {
         match self {
             TxEnvelope::Legacy(tx) => tx.hash(),
             TxEnvelope::Eip2930(tx) => tx.hash(),
