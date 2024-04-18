@@ -88,3 +88,16 @@ where
         self.filler.signer_mut()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ProviderBuilder;
+
+    #[test]
+    fn basic_usage() {
+        let (provider, _anvil) = ProviderBuilder::new().on_anvil_with_signer();
+
+        assert_eq!(provider.default_signer(), provider.signers().next().unwrap());
+    }
+}
