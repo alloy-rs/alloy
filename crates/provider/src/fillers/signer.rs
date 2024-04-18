@@ -94,7 +94,7 @@ where
         };
 
         if builder.from().is_none() {
-            builder.set_from(self.signer.default_signer());
+            builder.set_from(self.signer.default_signer_address());
             if !builder.can_build() {
                 return Ok(SendableTx::Builder(builder));
             }

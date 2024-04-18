@@ -18,18 +18,20 @@ pub trait WalletProvider<N: Network = Ethereum> {
     fn signer_mut(&mut self) -> &mut Self::Signer;
 
     /// Get the default signer address.
-    fn default_signer(&self) -> Address {
-        self.signer().default_signer()
+    fn default_signer_address(&self) -> Address {
+        self.signer().default_signer_address()
     }
 
     /// Check if the signer can sign for the given address.
-    fn is_signer_for(&self, address: &Address) -> bool {
-        self.signer().is_signer_for(address)
+    fn has_signer_for(&self, address: &Address) -> bool {
+        self.signer().has_signer_for(address)
     }
 
-    /// Get an iterator of all signer addresses.
-    fn signers(&self) -> impl Iterator<Item = Address> {
-        self.signer().signers()
+    /// Get an iterator of all signer addresses. Note that because the signer
+    /// always has at least one address, this iterator will always have at least
+    /// one element.
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        self.signer().signer_addresses()
     }
 }
 
@@ -98,7 +100,7 @@ mod test {
     fn basic_usage() {
         let (provider, _anvil) = ProviderBuilder::new().on_anvil_with_signer();
 
-        assert_eq!(provider.default_signer(), provider.signers().next().unwrap());
+        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }
 
     #[test]
@@ -106,6 +108,6 @@ mod test {
         let (provider, _anvil) =
             ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
-        assert_eq!(provider.default_signer(), provider.signers().next().unwrap());
+        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }
 }
