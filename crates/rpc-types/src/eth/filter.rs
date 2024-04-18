@@ -849,7 +849,7 @@ impl FilteredParams {
 /// Response of the `eth_getFilterChanges` RPC.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
-pub enum FilterChanges {
+pub enum FilterChanges<T = Transaction> {
     /// Empty result.
     #[serde(with = "empty_array")]
     Empty,
@@ -858,7 +858,7 @@ pub enum FilterChanges {
     /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
-    Transactions(Vec<Transaction>),
+    Transactions(Vec<T>),
 }
 
 mod empty_array {
@@ -879,10 +879,10 @@ impl<'de> Deserialize<'de> for FilterChanges {
     {
         #[derive(Deserialize)]
         #[serde(untagged)]
-        enum Changes {
+        enum Changes<T = Transaction> {
             Hashes(Vec<B256>),
             Logs(Vec<RpcLog>),
-            Transactions(Vec<Transaction>),
+            Transactions(Vec<T>),
         }
 
         let changes = Changes::deserialize(deserializer)?;

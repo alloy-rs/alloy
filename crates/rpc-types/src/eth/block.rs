@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromS
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block {
+pub struct Block<T = Transaction> {
     /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
@@ -25,7 +25,7 @@ pub struct Block {
         default = "BlockTransactions::uncle",
         skip_serializing_if = "BlockTransactions::is_uncle"
     )]
-    pub transactions: BlockTransactions,
+    pub transactions: BlockTransactions<T>,
     /// Integer the size of this block in bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<U256>,
@@ -37,9 +37,9 @@ pub struct Block {
     pub other: OtherFields,
 }
 
-impl Block {
+impl<T> Block<T> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: BlockTransactions::Full(txs), ..self }
     }
 }
@@ -169,13 +169,13 @@ pub enum BlockTransactions<T = Transaction> {
     Uncle,
 }
 
-impl Default for BlockTransactions {
+impl<T> Default for BlockTransactions<T> {
     fn default() -> Self {
         BlockTransactions::Hashes(Vec::default())
     }
 }
 
-impl BlockTransactions {
+impl<T> BlockTransactions<T> {
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn convert_to_hashes(&mut self) {
@@ -212,19 +212,19 @@ impl BlockTransactions {
     /// Returns an iterator over the transaction hashes.
     #[deprecated = "use `hashes` instead"]
     #[inline]
-    pub fn iter(&self) -> BlockTransactionHashes<'_> {
+    pub fn iter(&self) -> BlockTransactionHashes<'_, T> {
         self.hashes()
     }
 
     /// Returns an iterator over references to the transaction hashes.
     #[inline]
-    pub fn hashes(&self) -> BlockTransactionHashes<'_> {
+    pub fn hashes(&self) -> BlockTransactionHashes<'_, T> {
         BlockTransactionHashes::new(self)
     }
 
     /// Returns an iterator over mutable references to the transaction hashes.
     #[inline]
-    pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_> {
+    pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_, T> {
         BlockTransactionHashesMut::new(self)
     }
 
@@ -251,18 +251,18 @@ impl BlockTransactions {
 ///
 /// See [`BlockTransactions::hashes`].
 #[derive(Clone, Debug)]
-pub struct BlockTransactionHashes<'a>(BlockTransactionHashesInner<'a>);
+pub struct BlockTransactionHashes<'a, T = Transaction>(BlockTransactionHashesInner<'a, T>);
 
 #[derive(Clone, Debug)]
-enum BlockTransactionHashesInner<'a> {
+enum BlockTransactionHashesInner<'a, T = Transaction> {
     Hashes(std::slice::Iter<'a, B256>),
-    Full(std::slice::Iter<'a, Transaction>),
+    Full(std::slice::Iter<'a, T>),
     Uncle,
 }
 
-impl<'a> BlockTransactionHashes<'a> {
+impl<'a, T> BlockTransactionHashes<'a,T > {
     #[inline]
-    fn new(txs: &'a BlockTransactions) -> Self {
+    fn new(txs: &'a BlockTransactions<T>) -> Self {
         Self(match txs {
             BlockTransactions::Hashes(txs) => BlockTransactionHashesInner::Hashes(txs.iter()),
             BlockTransactions::Full(txs) => BlockTransactionHashesInner::Full(txs.iter()),
@@ -271,7 +271,7 @@ impl<'a> BlockTransactionHashes<'a> {
     }
 }
 
-impl<'a> Iterator for BlockTransactionHashes<'a> {
+impl<'a, T> Iterator for BlockTransactionHashes<'a, T> {
     type Item = &'a B256;
 
     #[inline]
@@ -293,7 +293,7 @@ impl<'a> Iterator for BlockTransactionHashes<'a> {
     }
 }
 
-impl ExactSizeIterator for BlockTransactionHashes<'_> {
+impl<T> ExactSizeIterator for BlockTransactionHashes<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         match &self.0 {
@@ -304,7 +304,7 @@ impl ExactSizeIterator for BlockTransactionHashes<'_> {
     }
 }
 
-impl DoubleEndedIterator for BlockTransactionHashes<'_> {
+impl<T> DoubleEndedIterator for BlockTransactionHashes<'_, T> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         match &mut self.0 {
@@ -315,24 +315,24 @@ impl DoubleEndedIterator for BlockTransactionHashes<'_> {
     }
 }
 
-impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a> {}
+impl<'a, T> std::iter::FusedIterator for BlockTransactionHashes<'a, T> {}
 
 /// An Iterator over the transaction hashes of a block.
 ///
 /// See [`BlockTransactions::hashes_mut`].
 #[derive(Debug)]
-pub struct BlockTransactionHashesMut<'a>(BlockTransactionHashesInnerMut<'a>);
+pub struct BlockTransactionHashesMut<'a, T = Transaction>(BlockTransactionHashesInnerMut<'a, T>);
 
 #[derive(Debug)]
-enum BlockTransactionHashesInnerMut<'a> {
+enum BlockTransactionHashesInnerMut<'a, T = Transaction> {
     Hashes(std::slice::IterMut<'a, B256>),
-    Full(std::slice::IterMut<'a, Transaction>),
+    Full(std::slice::IterMut<'a, T>),
     Uncle,
 }
 
-impl<'a> BlockTransactionHashesMut<'a> {
+impl<'a, T> BlockTransactionHashesMut<'a, T> {
     #[inline]
-    fn new(txs: &'a mut BlockTransactions) -> Self {
+    fn new(txs: &'a mut BlockTransactions<T>) -> Self {
         Self(match txs {
             BlockTransactions::Hashes(txs) => {
                 BlockTransactionHashesInnerMut::Hashes(txs.iter_mut())
@@ -343,7 +343,7 @@ impl<'a> BlockTransactionHashesMut<'a> {
     }
 }
 
-impl<'a> Iterator for BlockTransactionHashesMut<'a> {
+impl<'a, T> Iterator for BlockTransactionHashesMut<'a, T> {
     type Item = &'a mut B256;
 
     #[inline]
@@ -365,7 +365,7 @@ impl<'a> Iterator for BlockTransactionHashesMut<'a> {
     }
 }
 
-impl ExactSizeIterator for BlockTransactionHashesMut<'_> {
+impl<T> ExactSizeIterator for BlockTransactionHashesMut<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         match &self.0 {
@@ -376,7 +376,7 @@ impl ExactSizeIterator for BlockTransactionHashesMut<'_> {
     }
 }
 
-impl DoubleEndedIterator for BlockTransactionHashesMut<'_> {
+impl<T> DoubleEndedIterator for BlockTransactionHashesMut<'_, T> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         match &mut self.0 {
@@ -387,7 +387,7 @@ impl DoubleEndedIterator for BlockTransactionHashesMut<'_> {
     }
 }
 
-impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
+impl<'a, T> std::iter::FusedIterator for BlockTransactionHashesMut<'a, T> {}
 
 /// Determines how the `transactions` field of [Block] should be filled.
 ///
