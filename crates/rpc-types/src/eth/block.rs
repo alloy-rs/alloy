@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromS
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block {
     /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
@@ -25,7 +25,7 @@ pub struct Block<T = Transaction> {
         default = "BlockTransactions::uncle",
         skip_serializing_if = "BlockTransactions::is_uncle"
     )]
-    pub transactions: BlockTransactions<T>,
+    pub transactions: BlockTransactions,
     /// Integer the size of this block in bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<U256>,
@@ -37,9 +37,9 @@ pub struct Block<T = Transaction> {
     pub other: OtherFields,
 }
 
-impl<T> Block<T> {
+impl Block {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<T>) -> Self {
+    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
         Self { transactions: BlockTransactions::Full(txs), ..self }
     }
 }
@@ -160,22 +160,22 @@ impl Header {
 /// or if used by `eth_getUncle*`
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BlockTransactions<T = Transaction> {
+pub enum BlockTransactions {
     /// Only hashes
     Hashes(Vec<B256>),
     /// Full transactions
-    Full(Vec<T>),
+    Full(Vec<Transaction>),
     /// Special case for uncle response.
     Uncle,
 }
 
-impl<T> Default for BlockTransactions<T> {
+impl Default for BlockTransactions {
     fn default() -> Self {
         BlockTransactions::Hashes(Vec::default())
     }
 }
 
-impl<T> BlockTransactions<T> {
+impl BlockTransactions {
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn convert_to_hashes(&mut self) {
@@ -262,7 +262,7 @@ enum BlockTransactionHashesInner<'a> {
 
 impl<'a> BlockTransactionHashes<'a> {
     #[inline]
-    fn new(txs: &'a BlockTransactions<Transaction>) -> Self {
+    fn new(txs: &'a BlockTransactions) -> Self {
         Self(match txs {
             BlockTransactions::Hashes(txs) => BlockTransactionHashesInner::Hashes(txs.iter()),
             BlockTransactions::Full(txs) => BlockTransactionHashesInner::Full(txs.iter()),
@@ -332,7 +332,7 @@ enum BlockTransactionHashesInnerMut<'a> {
 
 impl<'a> BlockTransactionHashesMut<'a> {
     #[inline]
-    fn new(txs: &'a mut BlockTransactions<Transaction>) -> Self {
+    fn new(txs: &'a mut BlockTransactions) -> Self {
         Self(match txs {
             BlockTransactions::Hashes(txs) => {
                 BlockTransactionHashesInnerMut::Hashes(txs.iter_mut())
