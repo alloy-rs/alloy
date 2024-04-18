@@ -14,6 +14,9 @@ pub trait WalletProvider<N: Network = Ethereum> {
     /// Get a reference to the underlying signer.
     fn signer(&self) -> &Self::Signer;
 
+    /// Get a mutable reference to the underlying signer.
+    fn signer_mut(&mut self) -> &mut Self::Signer;
+
     /// Get the default signer address.
     fn default_signer(&self) -> Address {
         self.signer().default_signer()
@@ -41,6 +44,11 @@ where
     fn signer(&self) -> &Self::Signer {
         self.as_ref()
     }
+
+    #[inline(always)]
+    fn signer_mut(&mut self) -> &mut Self::Signer {
+        self.as_mut()
+    }
 }
 
 impl<L, R, N> WalletProvider<N> for JoinFill<L, R>
@@ -53,6 +61,11 @@ where
     #[inline(always)]
     fn signer(&self) -> &Self::Signer {
         self.right().signer()
+    }
+
+    #[inline(always)]
+    fn signer_mut(&mut self) -> &mut Self::Signer {
+        self.right_mut().signer_mut()
     }
 }
 
@@ -68,5 +81,10 @@ where
     #[inline(always)]
     fn signer(&self) -> &Self::Signer {
         self.filler.signer()
+    }
+
+    #[inline(always)]
+    fn signer_mut(&mut self) -> &mut Self::Signer {
+        self.filler.signer_mut()
     }
 }
