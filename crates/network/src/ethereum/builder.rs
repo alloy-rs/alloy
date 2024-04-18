@@ -236,7 +236,6 @@ mod tests {
         assert!(matches!(tx, TypedTransaction::Eip1559(_)));
 
         let request = request.with_gas_price(0);
-        dbg!(request.preferred_type());
         let tx = request.build_unsigned().unwrap();
         assert!(matches!(tx, TypedTransaction::Legacy(_)));
     }
@@ -263,7 +262,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Legacy);
-        assert_eq!(errors.len(), 2);
+        assert_eq!(errors.len(), 3);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
     }
@@ -279,7 +279,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip1559);
-        assert_eq!(errors.len(), 4);
+        assert_eq!(errors.len(), 5);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));
@@ -297,7 +298,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip2930);
-        assert_eq!(errors.len(), 3);
+        assert_eq!(errors.len(), 4);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"gas_price"));
@@ -315,8 +317,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip4844);
-        dbg!(&errors);
-        assert_eq!(errors.len(), 6);
+        assert_eq!(errors.len(), 7);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));
