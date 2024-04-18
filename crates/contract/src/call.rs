@@ -2,7 +2,7 @@ use crate::{Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, BlockId};
 use alloy_sol_types::SolCall;
@@ -226,7 +226,7 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network>
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
-        Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(Some(*address))
+        Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(*address)
     }
 }
 
@@ -274,9 +274,15 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         self
     }
 
+    /// Sets the transaction request to the provided tx kind.
+    pub fn kind(mut self, to: TxKind) -> Self {
+        self.request.set_kind(to);
+        self
+    }
+
     /// Sets the `to` field in the transaction to the provided address.
-    pub fn to(mut self, to: Option<Address>) -> Self {
-        self.request.set_to(to.into());
+    pub fn to(mut self, to: Address) -> Self {
+        self.request.set_to(to);
         self
     }
 
@@ -386,7 +392,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Note that the deployment address can be pre-calculated if the `from` address and `nonce` are
     /// known using [`calculate_create_address`](Self::calculate_create_address).
     pub async fn deploy(&self) -> Result<Address> {
-        if !self.request.to().is_some_and(|to| to.is_create()) {
+        if !self.request.kind().is_some_and(|to| to.is_create()) {
             return Err(Error::NotADeploymentTransaction);
         }
         let pending_tx = self.send().await?;

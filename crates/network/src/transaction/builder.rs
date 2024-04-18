@@ -99,25 +99,43 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Get the kind of transaction.
+    fn kind(&self) -> Option<alloy_primitives::TxKind>;
+
+    /// Clear the kind of transaction.
+    fn clear_kind(&mut self);
+
+    /// Set the kind of transaction.
+    fn set_kind(&mut self, kind: alloy_primitives::TxKind);
+
+    /// Builder-pattern method for setting the kind of transaction.
+    fn with_kind(mut self, kind: alloy_primitives::TxKind) -> Self {
+        self.set_kind(kind);
+        self
+    }
+
     /// Get the recipient for the transaction.
-    fn to(&self) -> Option<TxKind>;
+    fn to(&self) -> Option<Address> {
+        if let Some(TxKind::Call(addr)) = self.kind() {
+            return Some(addr);
+        }
+        None
+    }
 
     /// Set the recipient for the transaction.
-    fn set_to(&mut self, to: TxKind);
-
-    /// Clear the recipient for the transaction. Note that this sets the
-    /// receipient to `None`, not to [`TxKind::Create`];
-    fn clear_to(&mut self);
+    fn set_to(&mut self, to: Address) {
+        self.set_kind(TxKind::Call(to));
+    }
 
     /// Builder-pattern method for setting the recipient.
-    fn with_to(mut self, to: TxKind) -> Self {
+    fn with_to(mut self, to: Address) -> Self {
         self.set_to(to);
         self
     }
 
     /// Set the `to` field to a create call.
     fn set_create(&mut self) {
-        self.set_to(TxKind::Create);
+        self.set_kind(TxKind::Create);
     }
 
     /// Set the `to` field to a create call.
@@ -144,8 +162,8 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// if it is set to [`TxKind::Create`].
     fn set_call<T: SolCall>(&mut self, t: &T) {
         self.set_input(t.abi_encode().into());
-        if matches!(self.to(), Some(TxKind::Create)) {
-            self.clear_to();
+        if matches!(self.kind(), Some(TxKind::Create)) {
+            self.clear_kind();
         }
     }
 
@@ -160,7 +178,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Returns `None` if the transaction is not a contract creation (the `to` field is set), or if
     /// the `from` or `nonce` fields are not set.
     fn calculate_create_address(&self) -> Option<Address> {
-        if !self.to().is_some_and(|to| to.is_create()) {
+        if !self.kind().is_some_and(|to| to.is_create()) {
             return None;
         }
         let from = self.from()?;

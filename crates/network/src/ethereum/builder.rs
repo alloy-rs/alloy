@@ -38,15 +38,15 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.from = Some(from);
     }
 
-    fn to(&self) -> Option<TxKind> {
+    fn kind(&self) -> Option<TxKind> {
         self.to
     }
 
-    fn set_to(&mut self, to: TxKind) {
-        self.to = Some(to);
+    fn set_kind(&mut self, kind: TxKind) {
+        self.to = Some(kind);
     }
 
-    fn clear_to(&mut self) {
+    fn clear_kind(&mut self) {
         self.to = None;
     }
 
@@ -193,7 +193,7 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into())
+            .with_to(Address::ZERO)
             .with_blob_sidecar(BlobTransactionSidecar::default())
             .with_max_fee_per_blob_gas(0);
 
@@ -213,7 +213,7 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into())
+            .with_to(Address::ZERO)
             .with_gas_price(0)
             .access_list(AccessList::default());
 
@@ -229,7 +229,7 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into());
+            .with_to(Address::ZERO);
 
         let tx = request.clone().build_unsigned().unwrap();
 
