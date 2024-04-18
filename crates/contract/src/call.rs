@@ -347,6 +347,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If state overrides are set, they will be applied to the call.
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
@@ -356,6 +357,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If state overrides are set, they will be applied to the call.
     ///
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
