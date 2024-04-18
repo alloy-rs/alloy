@@ -31,6 +31,18 @@ pub struct SignerFiller<S> {
     signer: S,
 }
 
+impl<S> AsRef<S> for SignerFiller<S> {
+    fn as_ref(&self) -> &S {
+        &self.signer
+    }
+}
+
+impl<S> AsMut<S> for SignerFiller<S> {
+    fn as_mut(&mut self) -> &mut S {
+        &mut self.signer
+    }
+}
+
 impl<S> SignerFiller<S> {
     /// Creates a new signing layer with the given signer.
     pub const fn new(signer: S) -> Self {

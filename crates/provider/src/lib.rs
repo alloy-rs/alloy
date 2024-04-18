@@ -49,6 +49,9 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 mod provider;
 pub use provider::{FilterPollerBuilder, Provider, RootProvider};
 
+mod wallet;
+pub use wallet::WalletProvider;
+
 pub mod admin;
 pub mod debug;
 pub mod txpool;

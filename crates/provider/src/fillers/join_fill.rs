@@ -23,6 +23,16 @@ impl<L, R> JoinFill<L, R> {
     pub const fn new(left: L, right: R) -> Self {
         Self { left, right }
     }
+
+    /// Get a reference to the left filler.
+    pub const fn left(&self) -> &L {
+        &self.left
+    }
+
+    /// Get a reference to the right filler.
+    pub const fn right(&self) -> &R {
+        &self.right
+    }
 }
 
 impl<L, R> JoinFill<L, R> {

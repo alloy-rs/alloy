@@ -213,8 +213,8 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    inner: P,
-    filler: F,
+    pub(crate) inner: P,
+    pub(crate) filler: F,
     _pd: PhantomData<fn() -> (T, N)>,
 }
 
