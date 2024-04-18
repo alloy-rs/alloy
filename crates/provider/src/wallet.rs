@@ -100,4 +100,12 @@ mod test {
 
         assert_eq!(provider.default_signer(), provider.signers().next().unwrap());
     }
+
+    #[test]
+    fn bubbles_through_fillers() {
+        let (provider, _anvil) =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+
+        assert_eq!(provider.default_signer(), provider.signers().next().unwrap());
+    }
 }
