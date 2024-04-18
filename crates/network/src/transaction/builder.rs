@@ -121,7 +121,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Set the `to` field to a create call.
-    fn as_create(mut self) -> Self {
+    fn into_create(mut self) -> Self {
         self.set_create();
         self
     }

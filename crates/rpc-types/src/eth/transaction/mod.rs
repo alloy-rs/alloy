@@ -153,10 +153,7 @@ impl Transaction {
             (None, None) => None,
         };
 
-        let to = match self.to {
-            Some(to_address) => Some(TxKind::Call(to_address)),
-            None => None,
-        };
+        let to = self.to.map(TxKind::Call);
 
         TransactionRequest {
             from: Some(self.from),
