@@ -77,6 +77,12 @@ impl ActiveSubscription {
     /// Notify the subscription channel of a new value, if any receiver exists.
     /// If no receiver exists, the notification is dropped.
     pub(crate) fn notify(&mut self, notification: Box<RawValue>) {
+        tracing::debug!(
+            buffer_size = self.tx.len(),
+            receiver_count = self.tx.receiver_count(),
+            "notifying sub"
+        );
+
         if self.tx.receiver_count() > 0 {
             let _ = self.tx.send(notification);
         }

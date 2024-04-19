@@ -85,6 +85,7 @@ impl SubscriptionManager {
     pub(crate) fn notify(&mut self, notification: EthNotification) {
         if let Some(local_id) = self.local_id_for(notification.subscription) {
             if let Some((_, mut sub)) = self.local_to_sub.remove_by_left(&local_id) {
+                tracing::debug!(%local_id, server_id = %notification.subscription, "Sending notification to subscribers");
                 sub.notify(notification.result);
                 self.local_to_sub.insert(local_id, sub);
             }
