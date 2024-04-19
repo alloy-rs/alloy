@@ -813,10 +813,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [U64].
-    async fn get_uncle(&self, tag: BlockId, idx: U64) -> TransportResult<Option<Block>> {
+    async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<Block>> {
         match tag {
             BlockId::Hash(hash) => {
-                self.client().request("eth_getUncleByBlockHashAndIndex", (hash, idx)).await
+                self.client()
+                    .request("eth_getUncleByBlockHashAndIndex", (hash.block_hash, idx))
+                    .await
             }
             BlockId::Number(number) => {
                 self.client().request("eth_getUncleByBlockNumberAndIndex", (number, idx)).await
@@ -829,7 +831,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         match tag {
             BlockId::Hash(hash) => self
                 .client()
-                .request("eth_getUncleCountByBlockHash", (hash,))
+                .request("eth_getUncleCountByBlockHash", (hash.block_hash,))
                 .await
                 .map(|count: U64| count.to::<u64>()),
             BlockId::Number(number) => self
