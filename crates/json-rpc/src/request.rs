@@ -29,7 +29,13 @@ impl RequestMeta {
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
     pub fn set_is_subscription(&mut self) {
-        self.is_subscription = true;
+        self.set_subscription_status(true);
+    }
+
+    /// Setter for `is_subscription`. Indicates to RPC clients that the request
+    /// triggers a stream of notifications.
+    pub fn set_subscription_status(&mut self, sub: bool) {
+        self.is_subscription = sub;
     }
 }
 
@@ -65,6 +71,12 @@ impl<Params> Request<Params> {
     /// "eth_subscribe").
     pub fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
+    }
+
+    /// Setter for `is_subscription`. Indicates to RPC clients that the request
+    /// triggers a stream of notifications.
+    pub fn set_subscription_status(&mut self, sub: bool) {
+        self.meta.set_subscription_status(sub);
     }
 }
 
