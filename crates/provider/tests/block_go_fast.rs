@@ -21,11 +21,4 @@ async fn test_sub_new_heads_fast() {
     while let Some(block) = blocks.next().await {
         dbg!(block.header.number.unwrap());
     }
-
-    // // collect all the blocks
-    // let blocks = blocks.into_stream().take(num as usize).collect::<Vec<_>>().await;
-    // let block_numbers = blocks.into_iter().map(|b| b.header.number.unwrap()).collect::<Vec<_>>();
-
-    // let numbers = (1..=num).collect::<Vec<_>>();
-    // assert_eq!(block_numbers, numbers);
 }
