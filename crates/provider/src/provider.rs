@@ -814,6 +814,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets an uncle block through the tag [BlockId] and index [u64].
     async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<Block>> {
+        let idx = U64::from(idx);
         match tag {
             BlockId::Hash(hash) => {
                 self.client()
