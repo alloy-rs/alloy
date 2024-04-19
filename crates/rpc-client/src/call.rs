@@ -192,6 +192,15 @@ where
         Self { state: CallState::Prepared { request: Some(req), connection }, _pd: PhantomData }
     }
 
+    /// Returns `true` if the request is a subscription.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn is_subscription(&self) -> bool {
+        self.request().meta.is_subscription()
+    }
+
     /// Set the request to be a non-standard subscription (i.e. not
     /// "eth_subscribe").
     ///
@@ -202,13 +211,9 @@ where
         self.request_mut().meta.set_is_subscription();
     }
 
-    /// Returns `true` if the request is a subscription.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called after the request has been sent.
-    pub fn is_subscription(&self) -> bool {
-        self.request().meta.is_subscription()
+    /// Set the subscription status of the request.
+    pub fn set_subscription_status(&mut self, status: bool) {
+        self.request_mut().meta.set_subscription_status(status);
     }
 
     /// Get a mutable reference to the params of the request.
