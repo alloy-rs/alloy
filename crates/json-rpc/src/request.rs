@@ -29,7 +29,11 @@ impl RequestMeta {
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
     pub fn set_is_subscription(&mut self) {
-        self.is_subscription = true;
+        self.set_subscription_status(true);
+    }
+
+    pub fn set_subscription_status(&mut self, sub: bool) {
+        self.is_subscription = sub;
     }
 }
 
