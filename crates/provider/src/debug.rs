@@ -3,7 +3,9 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{BlockNumber, TxHash, B256};
 use alloy_rpc_types::{BlockNumberOrTag, TransactionRequest};
-use alloy_rpc_types_trace::geth::{GethDebugTracingOptions, GethTrace};
+use alloy_rpc_types_trace::geth::{
+    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
+};
 use alloy_transport::{Transport, TransportResult};
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
@@ -71,7 +73,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         &self,
         tx: TransactionRequest,
         block: BlockNumberOrTag,
-        trace_options: GethDebugTracingOptions,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
 
     /// Same as `debug_trace_call` but it used to run and trace multiple transactions at once.
@@ -85,7 +87,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         &self,
         txs: Vec<TransactionRequest>,
         block: BlockNumberOrTag,
-        trace_options: GethDebugTracingOptions,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
 }
 
@@ -125,7 +127,7 @@ where
         &self,
         tx: TransactionRequest,
         block: BlockNumberOrTag,
-        trace_options: GethDebugTracingOptions,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
         self.client().request("debug_traceCall", (tx, block, trace_options)).await
     }
@@ -134,7 +136,7 @@ where
         &self,
         txs: Vec<TransactionRequest>,
         block: BlockNumberOrTag,
-        trace_options: GethDebugTracingOptions,
+        trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
         self.client().request("debug_traceCallMany", (txs, block, trace_options)).await
     }
@@ -194,7 +196,7 @@ mod test {
             .max_priority_fee_per_gas(gas_price + 1);
 
         let trace = provider
-            .debug_trace_call(tx, BlockNumberOrTag::Latest, GethDebugTracingOptions::default())
+            .debug_trace_call(tx, BlockNumberOrTag::Latest, Default::default())
             .await
             .unwrap();
 
