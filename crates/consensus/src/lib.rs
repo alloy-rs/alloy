@@ -29,7 +29,7 @@ pub use receipt::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom
 
 mod transaction;
 pub use transaction::{
-    eip4844_utils, Blob, BlobTransactionSidecar, Bytes48, SidecarBuilder, SidecarCoder,
+    eip4844_utils, AnyTxType, Blob, BlobTransactionSidecar, Bytes48, SidecarBuilder, SidecarCoder,
     SignableTransaction, SimpleCoder, Transaction, TxEip1559, TxEip2930, TxEip4844,
     TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };

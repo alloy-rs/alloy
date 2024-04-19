@@ -132,13 +132,13 @@ impl Decodable for ReceiptEnvelope {
     }
 }
 
-impl Encodable2718 for ReceiptEnvelope {
-    fn type_flag(&self) -> Option<u8> {
+impl Encodable2718<TxType> for ReceiptEnvelope {
+    fn type_flag(&self) -> u8 {
         match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
+            Self::Legacy(_) => TxType::Legacy as u8,
+            Self::Eip2930(_) => TxType::Eip2930 as u8,
+            Self::Eip1559(_) => TxType::Eip1559 as u8,
+            Self::Eip4844(_) => TxType::Eip4844 as u8,
         }
     }
 
@@ -148,17 +148,17 @@ impl Encodable2718 for ReceiptEnvelope {
 
     fn encode_2718(&self, out: &mut dyn BufMut) {
         match self.type_flag() {
-            None => {}
-            Some(ty) => out.put_u8(ty),
+            0 => {}
+            ty => out.put_u8(ty),
         }
         self.as_receipt_with_bloom().unwrap().encode(out);
     }
 }
 
-impl Decodable2718 for ReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+impl Decodable2718<TxType> for ReceiptEnvelope {
+    fn typed_decode(tx_type: TxType, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let receipt = Decodable::decode(buf)?;
-        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))? {
+        match tx_type {
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
             TxType::Eip4844 => Ok(Self::Eip4844(receipt)),

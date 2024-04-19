@@ -20,7 +20,7 @@ pub use eip4844::{
 };
 
 mod envelope;
-pub use envelope::{TxEnvelope, TxType};
+pub use envelope::{AnyTxType, TxEnvelope, TxType};
 
 mod legacy;
 pub use legacy::TxLegacy;

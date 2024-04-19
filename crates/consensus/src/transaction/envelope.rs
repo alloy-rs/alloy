@@ -64,6 +64,44 @@ impl TryFrom<u8> for TxType {
     }
 }
 
+/// Ethereum `TransactionType` flags wrapper
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AnyTxType(u8);
+
+impl fmt::Display for AnyTxType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AnyTxType({})", self.0)
+    }
+}
+
+impl TryFrom<u8> for AnyTxType {
+    type Error = Eip2718Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(Self(value))
+    }
+}
+
+impl From<AnyTxType> for u8 {
+    fn from(value: AnyTxType) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<AnyTxType> for TxType {
+    type Error = Eip2718Error;
+
+    fn try_from(value: AnyTxType) -> Result<Self, Self::Error> {
+        value.0.try_into()
+    }
+}
+
+impl From<TxType> for AnyTxType {
+    fn from(value: TxType) -> Self {
+        Self(value as u8)
+    }
+}
+
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
 /// # Note:
@@ -218,9 +256,9 @@ impl Decodable for TxEnvelope {
     }
 }
 
-impl Decodable2718 for TxEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
+impl Decodable2718<TxType> for TxEnvelope {
+    fn typed_decode(tx_type: TxType, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        match tx_type {
             TxType::Eip2930 => Ok(Self::Eip2930(TxEip2930::decode_signed_fields(buf)?)),
             TxType::Eip1559 => Ok(Self::Eip1559(TxEip1559::decode_signed_fields(buf)?)),
             TxType::Eip4844 => Ok(Self::Eip4844(TxEip4844Variant::decode_signed_fields(buf)?)),
@@ -235,13 +273,13 @@ impl Decodable2718 for TxEnvelope {
     }
 }
 
-impl Encodable2718 for TxEnvelope {
-    fn type_flag(&self) -> Option<u8> {
+impl Encodable2718<TxType> for TxEnvelope {
+    fn type_flag(&self) -> u8 {
         match self {
-            Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
+            Self::Legacy(_) => TxType::Legacy as u8,
+            Self::Eip2930(_) => TxType::Eip2930 as u8,
+            Self::Eip1559(_) => TxType::Eip1559 as u8,
+            Self::Eip4844(_) => TxType::Eip4844 as u8,
         }
     }
 

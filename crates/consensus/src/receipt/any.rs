@@ -1,4 +1,4 @@
-use crate::ReceiptWithBloom;
+use crate::{AnyTxType, ReceiptWithBloom};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -71,12 +71,9 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 }
 
-impl Encodable2718 for AnyReceiptEnvelope {
-    fn type_flag(&self) -> Option<u8> {
-        match self.r#type {
-            0 => None,
-            ty => Some(ty),
-        }
+impl Encodable2718<AnyTxType> for AnyReceiptEnvelope {
+    fn type_flag(&self) -> u8 {
+        self.r#type
     }
 
     fn encode_2718_len(&self) -> usize {
@@ -85,20 +82,20 @@ impl Encodable2718 for AnyReceiptEnvelope {
 
     fn encode_2718(&self, out: &mut dyn BufMut) {
         match self.type_flag() {
-            None => {}
-            Some(ty) => out.put_u8(ty),
+            0 => {}
+            ty => out.put_u8(ty),
         }
         self.inner.encode(out);
     }
 }
 
-impl Decodable2718 for AnyReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+impl Decodable2718<AnyTxType> for AnyReceiptEnvelope {
+    fn typed_decode(tx_type: AnyTxType, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let receipt = Decodable::decode(buf)?;
-        Ok(Self { inner: receipt, r#type: ty })
+        Ok(Self { inner: receipt, r#type: tx_type.into() })
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::typed_decode(0, buf)
+        Self::typed_decode(0.try_into()?, buf)
     }
 }

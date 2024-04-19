@@ -41,6 +41,15 @@ impl From<alloy_rlp::Error> for Eip2718Error {
     }
 }
 
+impl From<Eip2718Error> for alloy_rlp::Error {
+    fn from(err: Eip2718Error) -> Self {
+        match err {
+            Eip2718Error::RlpError(err) => err,
+            Eip2718Error::UnexpectedType(_) => alloy_rlp::Error::Custom("Unexpected type flag"),
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for Eip2718Error {}
 
@@ -48,11 +57,15 @@ impl std::error::Error for Eip2718Error {}
 /// or a receipt with a type flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub trait Decodable2718: Sized {
+pub trait Decodable2718<T: TryFrom<u8, Error = Eip2718Error>>: Sized {
     /// Extract the type byte from the buffer, if any. The type byte is the
     /// first byte, provided that that first byte is 0x7f or lower.
-    fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
-        buf.first().copied().filter(|b| *b <= TX_TYPE_BYTE_MAX)
+    fn extract_tx_type(buf: &mut &[u8]) -> Result<Option<T>, Eip2718Error> {
+        buf.first()
+            .copied()
+            .filter(|b| *b <= TX_TYPE_BYTE_MAX)
+            .map(|byte| byte.try_into())
+            .transpose()
     }
 
     /// Decode the appropriate variant, based on the type flag.
@@ -63,7 +76,7 @@ pub trait Decodable2718: Sized {
     /// ## Note
     ///
     /// This should be a simple match block that invokes an inner type's RLP decoder.
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
+    fn typed_decode(tx_type: T, buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode the default variant.
     ///
@@ -71,10 +84,11 @@ pub trait Decodable2718: Sized {
     fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
 
     /// Decode an EIP-2718 transaction into a concrete instance
-    fn decode_2718(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::extract_type_byte(buf)
+    fn decode_2718(buf: &mut &[u8]) -> Result<Self, Eip2718Error> {
+        Self::extract_tx_type(buf)?
             .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
             .unwrap_or_else(|| Self::fallback_decode(buf))
+            .map_err(Into::into)
     }
 
     /// Decode an EIP-2718 transaction in the network format.
@@ -103,7 +117,7 @@ pub trait Decodable2718: Sized {
 
         let ty = buf[0];
         buf.advance(1);
-        let tx = Self::typed_decode(ty, buf)?;
+        let tx = Self::typed_decode(ty.try_into().map_err(alloy_rlp::Error::from)?, buf)?;
 
         let bytes_consumed = remaining_len - buf.len();
         // because Header::decode works for single bytes (including the tx type), returning a
@@ -121,18 +135,17 @@ pub trait Decodable2718: Sized {
 /// or a receipt with a type flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub trait Encodable2718: Sized + Send + Sync + 'static {
-    /// Return the type flag (if any).
+pub trait Encodable2718<T: Into<u8>>: Sized + Send + Sync + 'static {
+    /// Return the type flag.
     ///
-    /// This should return `None` for the default (legacy) variant of the
+    /// This should return 0 for the default (legacy) variant of the
     /// envelope.
-    fn type_flag(&self) -> Option<u8>;
+    fn type_flag(&self) -> u8;
 
     /// True if the envelope is the legacy variant.
     fn is_legacy(&self) -> bool {
-        matches!(self.type_flag(), None | Some(0))
+        self.type_flag() == 0
     }
-
     /// The length of the 2718 encoded envelope. This is the length of the type
     /// flag + the length of the inner transaction RLP.
     fn encode_2718_len(&self) -> usize;
@@ -186,5 +199,11 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
 /// EIP-2718 transaction type.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-pub trait Eip2718Envelope: Decodable2718 + Encodable2718 {}
-impl<T> Eip2718Envelope for T where T: Decodable2718 + Encodable2718 {}
+pub trait Eip2718Envelope<T: Into<u8> + TryFrom<u8, Error = Eip2718Error>>:
+    Decodable2718<T> + Encodable2718<T>
+{
+}
+impl<T, Ty: Into<u8> + TryFrom<u8, Error = Eip2718Error>> Eip2718Envelope<Ty> for T where
+    T: Decodable2718<Ty> + Encodable2718<Ty>
+{
+}
