@@ -3,7 +3,6 @@
 use alloy_node_bindings::Anvil;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::WsConnect;
-use futures::StreamExt;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_sub_new_heads_fast() {
@@ -11,14 +10,19 @@ async fn test_sub_new_heads_fast() {
 
     let provider = ProviderBuilder::new().on_ws(WsConnect::new(anvil.ws_endpoint())).await.unwrap();
 
-    let blocks = provider.subscribe_blocks().await.unwrap();
+    let mut blocks = provider.subscribe_blocks().await.unwrap();
 
-    let p = provider.clone();
-    let num = 1_000u64; // WON'T WORK
-    provider.client().request::<_, ()>("anvil_mine", vec![num]).await.unwrap();
+    let num = 5;
 
-    let mut blocks = blocks.into_stream();
-    while let Some(block) = blocks.next().await {
-        dbg!(block.header.number.unwrap());
+    provider
+        .client()
+        .request::<_, ()>("anvil_mine", vec![alloy_primitives::U256::from(num)])
+        .await
+        .unwrap();
+
+    let mut count = 0;
+    while let Ok(_block) = blocks.recv_any().await {
+        count += 1;
     }
+    assert_eq!(count, num);
 }
