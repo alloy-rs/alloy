@@ -202,7 +202,11 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
 // See [`ContractInstance`].
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
     pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
-        Ok(Self::new_inner(provider, function.abi_encode_input(args)?.into(), function.clone()))
+        Ok(Self::new_inner_call(
+            provider,
+            function.abi_encode_input(args)?.into(),
+            function.clone(),
+        ))
     }
 
     /// Clears the decoder, returning a raw call builder.
@@ -226,7 +230,7 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network>
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address, call: &C) -> Self {
-        Self::new_inner(provider, call.abi_encode().into(), PhantomData::<C>).to(*address)
+        Self::new_inner_call(provider, call.abi_encode().into(), PhantomData::<C>).to(*address)
     }
 }
 
@@ -252,12 +256,33 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N
     /// same as [`call_raw`](Self::call_raw).
     #[inline]
     pub fn new_raw(provider: P, input: Bytes) -> Self {
-        Self::new_inner(provider, input, ())
+        Self::new_inner_call(provider, input, ())
+    }
+
+    /// Creates a new call builder with the provided provider and contract
+    /// deploy code.
+    ///
+    /// Will not decode the output of the call, meaning that
+    /// [`call`](Self::call) will behave the same as
+    /// [`call_raw`](Self::call_raw).
+    pub fn new_raw_deploy(provider: P, input: Bytes) -> Self {
+        Self::new_inner_deploy(provider, input, ())
     }
 }
 
 impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBuilder<T, P, D, N> {
-    fn new_inner(provider: P, input: Bytes, decoder: D) -> Self {
+    fn new_inner_deploy(provider: P, input: Bytes, decoder: D) -> Self {
+        Self {
+            request: <N::TransactionRequest>::default().with_deploy_code(input),
+            decoder,
+            provider,
+            block: BlockId::default(),
+            state: None,
+            transport: PhantomData,
+        }
+    }
+
+    fn new_inner_call(provider: P, input: Bytes, decoder: D) -> Self {
         Self {
             request: <N::TransactionRequest>::default().with_input(input),
             decoder,

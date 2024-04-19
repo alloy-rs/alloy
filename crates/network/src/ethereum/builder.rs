@@ -26,8 +26,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.input.input()
     }
 
-    fn set_input(&mut self, input: Bytes) {
-        self.input.input = Some(input);
+    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
+        self.input.input = Some(input.into());
     }
 
     fn from(&self) -> Option<Address> {

@@ -79,10 +79,10 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn input(&self) -> Option<&Bytes>;
 
     /// Set the input data for the transaction.
-    fn set_input(&mut self, input: Bytes);
+    fn set_input<T: Into<Bytes>>(&mut self, input: T);
 
     /// Builder-pattern method for setting the input data.
-    fn with_input(mut self, input: Bytes) -> Self {
+    fn with_input<T: Into<Bytes>>(mut self, input: T) -> Self {
         self.set_input(input);
         self
     }
@@ -146,14 +146,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Deploy the code by making a create call with data. This will set the
     /// `to` field to [`TxKind::Create`].
-    fn set_deploy_code(&mut self, code: Vec<u8>) {
-        self.set_input(Bytes::from(code));
+    fn set_deploy_code<T: Into<Bytes>>(&mut self, code: T) {
+        self.set_input(code.into());
         self.set_create()
     }
 
     /// Deploy the code by making a create call with data. This will set the
     /// `to` field to [`TxKind::Create`].
-    fn with_deploy_code(mut self, code: Vec<u8>) -> Self {
+    fn with_deploy_code<T: Into<Bytes>>(mut self, code: T) -> Self {
         self.set_deploy_code(code);
         self
     }
@@ -161,7 +161,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Set the data field to a contract call. This will clear the `to` field
     /// if it is set to [`TxKind::Create`].
     fn set_call<T: SolCall>(&mut self, t: &T) {
-        self.set_input(t.abi_encode().into());
+        self.set_input(t.abi_encode());
         if matches!(self.kind(), Some(TxKind::Create)) {
             self.clear_kind();
         }

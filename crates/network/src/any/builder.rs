@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
+use alloy_primitives::Bytes;
 use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
@@ -26,7 +27,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().input()
     }
 
-    fn set_input(&mut self, input: alloy_primitives::Bytes) {
+    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
         self.deref_mut().set_input(input);
     }
 
