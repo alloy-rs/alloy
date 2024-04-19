@@ -10,7 +10,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 /// Subscription result.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
-pub enum SubscriptionResult<T = Transaction> {
+pub enum SubscriptionResult {
     /// New block header.
     Header(Box<RichHeader>),
     /// Log
@@ -18,7 +18,7 @@ pub enum SubscriptionResult<T = Transaction> {
     /// Transaction hash
     TransactionHash(B256),
     /// Full Transaction
-    FullTransaction(Box<T>),
+    FullTransaction(Box<Transaction>),
     /// SyncStatus
     SyncState(PubSubSyncStatus),
 }
