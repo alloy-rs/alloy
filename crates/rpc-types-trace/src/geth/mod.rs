@@ -497,6 +497,26 @@ pub struct GethDebugTracingCallOptions {
     pub block_overrides: Option<BlockOverrides>,
 }
 
+impl GethDebugTracingCallOptions {
+    /// Enables state overrides
+    pub fn with_state_overrides(&mut self, overrides: StateOverride) -> &mut Self {
+        self.state_overrides = Some(overrides);
+        self
+    }
+
+    /// Enables block overrides
+    pub fn with_block_overrides(&mut self, overrides: BlockOverrides) -> &mut Self {
+        self.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the tracing options
+    pub fn with_tracing_options(&mut self, options: GethDebugTracingOptions) -> &mut Self {
+        self.tracing_options = options;
+        self
+    }
+}
+
 /// Serializes a storage map as a list of key-value pairs _without_ 0x-prefix
 fn serialize_string_storage_map_opt<S: Serializer>(
     storage: &Option<BTreeMap<B256, B256>>,
