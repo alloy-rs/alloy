@@ -265,6 +265,8 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N
     /// Will not decode the output of the call, meaning that
     /// [`call`](Self::call) will behave the same as
     /// [`call_raw`](Self::call_raw).
+    // NOTE: please avoid changing this function due to its use in the `sol!`
+    // macro.
     pub fn new_raw_deploy(provider: P, input: Bytes) -> Self {
         Self::new_inner_deploy(provider, input, ())
     }
