@@ -34,37 +34,37 @@ pub struct TraceFilter {
 
 impl TraceFilter {
     /// Sets the `from_block` field of the struct
-    pub fn set_from_block(&mut self, block: u64) -> &mut Self {
+    pub fn with_from_block(&mut self, block: u64) -> &mut Self {
         self.from_block = Some(block);
         self
     }
 
     /// Sets the `to_block` field of the struct
-    pub fn set_to_block(&mut self, block: u64) -> &mut Self {
+    pub fn with_to_block(&mut self, block: u64) -> &mut Self {
         self.to_block = Some(block);
         self
     }
 
     /// Sets the `from_address` field of the struct
-    pub fn set_from_address(&mut self, addresses: Vec<Address>) -> &mut Self {
+    pub fn with_from_address(&mut self, addresses: Vec<Address>) -> &mut Self {
         self.from_address = addresses;
         self
     }
 
     /// Sets the `to_address` field of the struct
-    pub fn set_to_address(&mut self, addresses: Vec<Address>) -> &mut Self {
+    pub fn with_to_address(&mut self, addresses: Vec<Address>) -> &mut Self {
         self.to_address = addresses;
         self
     }
 
     /// Sets the `after` field of the struct
-    pub fn set_after(&mut self, after: u64) -> &mut Self {
+    pub fn with_after(&mut self, after: u64) -> &mut Self {
         self.after = Some(after);
         self
     }
 
     /// Sets the `count` field of the struct
-    pub fn set_count(&mut self, count: u64) -> &mut Self {
+    pub fn with_count(&mut self, count: u64) -> &mut Self {
         self.count = Some(count);
         self
     }
