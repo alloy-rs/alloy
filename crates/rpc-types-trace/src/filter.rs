@@ -34,13 +34,13 @@ pub struct TraceFilter {
 
 impl TraceFilter {
     /// Sets the `from_block` field of the struct
-    pub fn from_block(mut self, block: u64) -> Self {
+    pub const fn from_block(mut self, block: u64) -> Self {
         self.from_block = Some(block);
         self
     }
 
     /// Sets the `to_block` field of the struct
-    pub fn to_block(mut self, block: u64) -> Self {
+    pub const fn to_block(mut self, block: u64) -> Self {
         self.to_block = Some(block);
         self
     }
@@ -58,19 +58,19 @@ impl TraceFilter {
     }
 
     /// Sets the `after` field of the struct
-    pub fn after(mut self, after: u64) -> Self {
+    pub const fn after(mut self, after: u64) -> Self {
         self.after = Some(after);
         self
     }
 
     /// Sets the `count` field of the struct
-    pub fn count(mut self, count: u64) -> Self {
+    pub const fn count(mut self, count: u64) -> Self {
         self.count = Some(count);
         self
     }
 
     /// Sets the `from_address` field of the struct
-    pub fn mode(mut self, mode: TraceFilterMode) -> Self {
+    pub const fn mode(mut self, mode: TraceFilterMode) -> Self {
         self.mode = mode;
         self
     }
