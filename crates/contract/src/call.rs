@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlockId};
+use alloy_rpc_types::{state::StateOverride, BlockId, BlobTransactionSidecar};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -277,6 +277,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Sets the `to` field in the transaction to the provided address.
     pub fn to(mut self, to: Option<Address>) -> Self {
         self.request.set_to(to.into());
+        self
+    }
+
+    /// Sets the `sidecar` field in the transaction to the provided value.
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+        self.request.set_blob_sidecar(blob_sidecar);
         self
     }
 
