@@ -499,19 +499,19 @@ pub struct GethDebugTracingCallOptions {
 
 impl GethDebugTracingCallOptions {
     /// Enables state overrides
-    pub fn with_state_overrides(&mut self, overrides: StateOverride) -> &mut Self {
+    pub fn with_state_overrides(mut self, overrides: StateOverride) -> Self {
         self.state_overrides = Some(overrides);
         self
     }
 
     /// Enables block overrides
-    pub fn with_block_overrides(&mut self, overrides: BlockOverrides) -> &mut Self {
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
         self.block_overrides = Some(overrides);
         self
     }
 
     /// Sets the tracing options
-    pub fn with_tracing_options(&mut self, options: GethDebugTracingOptions) -> &mut Self {
+    pub fn with_tracing_options(mut self, options: GethDebugTracingOptions) -> Self {
         self.tracing_options = options;
         self
     }
