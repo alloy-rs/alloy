@@ -186,7 +186,7 @@ impl<T> RpcClientInner<T> {
 
     /// Set the poll interval for the client in milliseconds.
     pub fn set_poll_interval(&self, poll_interval: u64) {
-        self.poll_interval.store(poll_interval, Ordering::SeqCst);
+        self.poll_interval.store(poll_interval, Ordering::Relaxed);
     }
 
     /// Returns a reference to the underlying transport.
