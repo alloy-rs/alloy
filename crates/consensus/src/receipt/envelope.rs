@@ -93,7 +93,7 @@ impl<T> ReceiptEnvelope<T> {
     }
 }
 
-impl TxReceipt for ReceiptEnvelope {
+impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
     fn status(&self) -> bool {
         self.as_receipt().unwrap().status
     }
@@ -113,7 +113,7 @@ impl TxReceipt for ReceiptEnvelope {
     }
 
     /// Return the receipt logs.
-    fn logs(&self) -> &[Log] {
+    fn logs(&self) -> &[T] {
         &self.as_receipt().unwrap().logs
     }
 }

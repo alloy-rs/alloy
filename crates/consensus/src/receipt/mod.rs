@@ -10,7 +10,7 @@ mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom};
 
 /// Receipt is the result of a transaction execution.
-pub trait TxReceipt<T=Log> {
+pub trait TxReceipt<T = Log> {
     /// Returns true if the transaction was successful.
     fn status(&self) -> bool;
 

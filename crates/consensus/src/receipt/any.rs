@@ -56,7 +56,7 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 
     /// Return the receipt's bloom.
-    pub fn bloom(&self) -> Bloom {
+    pub const fn bloom(&self) -> Bloom {
         self.inner.logs_bloom
     }
 
