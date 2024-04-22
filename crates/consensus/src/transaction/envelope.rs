@@ -146,7 +146,9 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 impl TxEnvelope {
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
-    pub fn recover_signer(&self) -> alloy_signer::Result<alloy_primitives::Address> {
+    pub fn recover_signer(
+        &self,
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         match self {
             TxEnvelope::Legacy(tx) => tx.recover_signer(),
             TxEnvelope::Eip2930(tx) => tx.recover_signer(),
