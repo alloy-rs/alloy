@@ -126,7 +126,7 @@ impl fmt::Debug for GcpSigner {
 }
 
 /// Errors thrown by [`GcpSigner`].
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum GcpSignerError {
     /// Thrown when the GCP KMS API returns a signing error.
     #[error(transparent)]
@@ -148,6 +148,10 @@ pub enum GcpSignerError {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl alloy_network::TxSigner<Signature> for GcpSigner {
+    fn address(&self) -> Address {
+        self.address
+    }
+
     #[inline]
     async fn sign_transaction(
         &self,

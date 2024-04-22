@@ -3,7 +3,7 @@ use alloy_primitives::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Bundle of transactions
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Bundle {
     /// All transactions to execute
@@ -13,7 +13,7 @@ pub struct Bundle {
 }
 
 /// State context for callMany
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {
     /// Block Number
@@ -25,7 +25,7 @@ pub struct StateContext {
 }
 
 /// CallResponse for eth_callMany
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EthCallResponse {
     /// eth_call output (if no error)
@@ -47,7 +47,7 @@ impl EthCallResponse {
 }
 
 /// Represents a transaction index where -1 means all transactions
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TransactionIndex {
     /// -1 means all transactions
     #[default]
@@ -134,5 +134,19 @@ mod tests {
         let bundle = serde_json::from_str::<Bundle>(s).unwrap();
         assert_eq!(bundle.transactions.len(), 1);
         assert_eq!(bundle.block_override.unwrap().time.unwrap().to::<u64>(), 1711546233);
+    }
+
+    #[test]
+    fn full_bundle() {
+        // <https://github.com/paradigmxyz/reth/issues/7542>
+        let s = r#"{"transactions":[{"from":"0x0000000000000011110000000000000000000000","to":"0x1100000000000000000000000000000000000000","value":"0x1111111","maxFeePerGas":"0x3a35294400","maxPriorityFeePerGas":"0x3b9aca00"}]}"#;
+        let bundle = serde_json::from_str::<Bundle>(s).unwrap();
+        assert_eq!(bundle.transactions.len(), 1);
+        assert_eq!(
+            bundle.transactions[0].from,
+            Some("0x0000000000000011110000000000000000000000".parse().unwrap())
+        );
+        assert_eq!(bundle.transactions[0].value, Some("0x1111111".parse().unwrap()));
+        assert_eq!(bundle.transactions[0].max_priority_fee_per_gas, Some(1000000000));
     }
 }

@@ -15,7 +15,7 @@ type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 const KEEPALIVE: u64 = 10;
 
 /// Simple connection details for a websocket connection.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
     pub url: String,

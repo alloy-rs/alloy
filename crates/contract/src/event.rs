@@ -34,7 +34,13 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event
     // `sol!` macro constructor, see `#[sol(rpc)]`. Not public API.
     // NOTE: please avoid changing this function due to its use in the `sol!` macro.
     pub fn new_sol(provider: &'a P, address: &Address) -> Self {
-        Self::new(provider, Filter::new().address(*address))
+        // keccak256 hash of the event signature needed for the filter to actually filter by event
+        // check that the event is not anonymous to include the event signature in the filter
+        if E::ANONYMOUS {
+            Self::new(provider, Filter::new().address(*address))
+        } else {
+            Self::new(provider, Filter::new().address(*address).event_signature(E::SIGNATURE_HASH))
+        }
     }
 }
 
@@ -200,13 +206,21 @@ mod tests {
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
-        #[sol(rpc, bytecode = "608080604052346100155760be908161001a8239f35b5f80fdfe60808060405260043610156011575f80fd5b5f3560e01c63299d8665146023575f80fd5b346084575f3660031901126084577f4e4cd44610926680098f1b54e2bdd1fb952659144c471173bbb9cf966af3a98860a0826060602a9452600560608201526468656c6c6f60d81b60808201526001602082015263deadbeef6040820152a2005b5f80fdfea2646970667358221220664e55b832143354f058e35b8948668184da14fcc5bf3300afb39dc6188c9add64736f6c63430008180033")]
+        #[sol(rpc, bytecode = "60808060405234601557610147908161001a8239f35b5f80fdfe6080806040526004361015610012575f80fd5b5f3560e01c908163299d8665146100a7575063ffdf4f1b14610032575f80fd5b346100a3575f3660031901126100a357602a7f6d10b8446ff0ac11bb95d154e7b10a73042fb9fc3bca0c92de5397b2fe78496c6040518061009e819060608252600560608301526468656c6c6f60d81b608083015263deadbeef604060a0840193600160208201520152565b0390a2005b5f80fd5b346100a3575f3660031901126100a3577f4e4cd44610926680098f1b54e2bdd1fb952659144c471173bbb9cf966af3a988818061009e602a949060608252600560608301526468656c6c6f60d81b608083015263deadbeef604060a084019360016020820152015256fea26469706673582212202e640cd14a7310d4165f902d2721ef5b4640a08f5ae38e9ae5c315a9f9f4435864736f6c63430008190033")]
+        #[allow(dead_code)]
         contract MyContract {
             #[derive(Debug, PartialEq)]
             event MyEvent(uint64 indexed, string, bool, bytes32);
 
+            #[derive(Debug, PartialEq)]
+            event WrongEvent(uint64 indexed, string, bool, bytes32);
+
             function doEmit() external {
                 emit MyEvent(42, "hello", true, bytes32(uint256(0xdeadbeef)));
+            }
+
+            function doEmitWrongEvent() external {
+                emit WrongEvent(42, "hello", true, bytes32(uint256(0xdeadbeef)));
             }
         }
     }
@@ -234,6 +248,7 @@ mod tests {
 
         let _receipt =
             contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+
         let expected_event = MyContract::MyEvent {
             _0: 42,
             _1: "hello".to_string(),
@@ -243,6 +258,7 @@ mod tests {
 
         let mut stream = poller.into_stream();
         let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+        assert_eq!(MyContract::MyEvent::SIGNATURE_HASH.0, stream_log.topics().first().unwrap().0); // add check that the received event signature is the same as the one we expect
         assert_eq!(stream_event, expected_event);
         assert_eq!(stream_log.inner.address, *contract.address());
         assert_eq!(stream_log.block_number, Some(2));
@@ -254,6 +270,21 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].0, expected_event);
         assert_eq!(all[0].1, stream_log);
+
+        // send the wrong event and make sure it is NOT picked up by the event filter
+        let _wrong_receipt = contract
+            .doEmitWrongEvent()
+            .send()
+            .await
+            .unwrap()
+            .get_receipt()
+            .await
+            .expect("no receipt");
+
+        // we sent the wrong event
+        // so no events should be returned when querying event.query() (MyEvent)
+        let all = event.query().await.unwrap();
+        assert_eq!(all.len(), 0);
 
         #[cfg(feature = "ws")]
         {
@@ -272,9 +303,28 @@ mod tests {
             let mut stream = sub.into_stream();
 
             let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+            assert_eq!(
+                MyContract::MyEvent::SIGNATURE_HASH.0,
+                stream_log.topics().first().unwrap().0
+            );
             assert_eq!(stream_event, expected_event);
             assert_eq!(stream_log.address, *contract.address());
             assert_eq!(stream_log.block_number, Some(U256::from(3)));
+
+            // send the request to emit the wrong event
+            contract
+                .doEmitWrongEvent()
+                .send()
+                .await
+                .unwrap()
+                .get_receipt()
+                .await
+                .expect("no receipt");
+
+            // we sent the wrong event
+            // so no events should be returned when querying event.query() (MyEvent)
+            let all = event.query().await.unwrap();
+            assert_eq!(all.len(), 0);
         }
     }
 }

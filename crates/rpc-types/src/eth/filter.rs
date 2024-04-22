@@ -13,7 +13,7 @@ use std::{
 };
 
 /// Helper type to represent a bloom filter used for matching logs.
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct BloomFilter(Vec<Bloom>);
 
 impl From<Vec<Bloom>> for BloomFilter {
@@ -31,7 +31,7 @@ impl BloomFilter {
     }
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Clone, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 /// FilterSet is a set of values that will be used to filter logs
 pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
@@ -130,7 +130,7 @@ impl From<U256> for Topic {
 }
 
 /// Represents the target range of blocks for the filter
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FilterBlockOption {
     /// Represents a range of blocks with optional from and to blocks
     ///
@@ -253,7 +253,7 @@ impl FilterBlockOption {
 }
 
 /// Filter for logs.
-#[derive(Default, Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Filter {
     /// Filter block options, specifying on which blocks the filter should match.
     // https://eips.ethereum.org/EIPS/eip-234
@@ -642,7 +642,7 @@ impl<'de> Deserialize<'de> for Filter {
 }
 
 /// Union type for representing a single value or a vector of values inside a filter
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ValueOrArray<T> {
     /// A single value
     Value(T),
@@ -847,9 +847,9 @@ impl FilteredParams {
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
-pub enum FilterChanges {
+pub enum FilterChanges<T = Transaction> {
     /// Empty result.
     #[serde(with = "empty_array")]
     Empty,
@@ -858,7 +858,7 @@ pub enum FilterChanges {
     /// New hashes (block or transactions).
     Hashes(Vec<B256>),
     /// New transactions.
-    Transactions(Vec<Transaction>),
+    Transactions(Vec<T>),
 }
 
 mod empty_array {
@@ -879,10 +879,10 @@ impl<'de> Deserialize<'de> for FilterChanges {
     {
         #[derive(Deserialize)]
         #[serde(untagged)]
-        enum Changes {
+        enum Changes<T = Transaction> {
             Hashes(Vec<B256>),
             Logs(Vec<RpcLog>),
-            Transactions(Vec<Transaction>),
+            Transactions(Vec<T>),
         }
 
         let changes = Changes::deserialize(deserializer)?;
@@ -914,7 +914,7 @@ impl<'de> Deserialize<'de> for FilterChanges {
 }
 
 /// Owned equivalent of a `SubscriptionId`
-#[derive(Debug, PartialEq, Clone, Hash, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(untagged)]
 pub enum FilterId {
@@ -949,7 +949,7 @@ impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
 /// When this type is used in a request, it determines whether the client wishes to receive:
 /// - Only the transaction hashes (`Hashes` variant), or
 /// - Full transaction details (`Full` variant).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum PendingTransactionFilterKind {
     /// Receive only the hashes of the transactions.
     #[default]
@@ -1054,7 +1054,7 @@ mod tests {
 
     #[test]
     fn can_serde_value_or_array() {
-        #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Item {
             value: ValueOrArray<U256>,
         }

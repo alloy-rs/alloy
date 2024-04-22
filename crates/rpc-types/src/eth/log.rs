@@ -1,14 +1,19 @@
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{LogData, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Log<T = LogData> {
     #[serde(flatten)]
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
-
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
@@ -73,17 +78,34 @@ impl Log<LogData> {
     }
 }
 
+impl<T> alloy_rlp::Encodable for Log<T>
+where
+    for<'a> &'a T: Into<LogData>,
+{
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.reserialize_inner().encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.reserialize_inner().length()
+    }
+}
+
 impl<T> Log<T>
 where
     for<'a> &'a T: Into<LogData>,
 {
-    /// Reserialize the data.
+    /// Reserialize the inner data, returning an [`alloy_primitives::Log`].
+    pub fn reserialize_inner(&self) -> alloy_primitives::Log {
+        alloy_primitives::Log { address: self.inner.address, data: (&self.inner.data).into() }
+    }
+
+    /// Reserialize the data, returning a new `Log` object wrapping an
+    /// [`alloy_primitives::Log`]. this copies the log metadata, preserving
+    /// the original object.
     pub fn reserialize(&self) -> Log<LogData> {
         Log {
-            inner: alloy_primitives::Log {
-                address: self.inner.address,
-                data: (&self.inner.data).into(),
-            },
+            inner: self.reserialize_inner(),
             block_hash: self.block_hash,
             block_number: self.block_number,
             block_timestamp: self.block_timestamp,
@@ -124,6 +146,16 @@ mod tests {
     use alloy_primitives::{Address, Bytes};
 
     use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn log_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _: Log = Log::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn serde_log() {

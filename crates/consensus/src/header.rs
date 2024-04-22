@@ -7,7 +7,10 @@ use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
-use std::mem;
+use core::mem;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
@@ -18,7 +21,7 @@ pub const EMPTY_ROOT_HASH: B256 =
     b256!("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421");
 
 /// Ethereum Block header
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Header {
     /// The Keccak 256-bit hash of the parent
     /// block’s header, in its entirety; formally Hp.
@@ -51,9 +54,9 @@ pub struct Header {
     /// zero; formally Hi.
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
-    pub gas_limit: u64,
+    pub gas_limit: u128,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
-    pub gas_used: u64,
+    pub gas_used: u128,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
     /// formally Hs.
     pub timestamp: u64,
@@ -63,21 +66,21 @@ pub struct Header {
     pub mix_hash: B256,
     /// A 64-bit value which, combined with the mixhash, proves that a sufficient amount of
     /// computation has been carried out on this block; formally Hn.
-    pub nonce: u64,
+    pub nonce: B64,
     /// A scalar representing EIP1559 base fee which can move up or down each block according
     /// to a formula which is a function of gas used in parent block and gas target
     /// (block gas limit divided by elasticity multiplier) of parent block.
     /// The algorithm results in the base fee per gas increasing when blocks are
     /// above the gas target, and decreasing when blocks are below the gas target. The base fee per
     /// gas is burned.
-    pub base_fee_per_gas: Option<u64>,
+    pub base_fee_per_gas: Option<u128>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
-    pub blob_gas_used: Option<u64>,
+    pub blob_gas_used: Option<u128>,
     /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
     /// with above-target blob gas consumption increase this value, blocks with below-target blob
     /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
-    pub excess_blob_gas: Option<u64>,
+    pub excess_blob_gas: Option<u128>,
     /// The hash of the parent beacon block's root is included in execution blocks, as proposed by
     /// EIP-4788.
     ///
@@ -108,7 +111,7 @@ impl Default for Header {
             timestamp: 0,
             extra_data: Default::default(),
             mix_hash: Default::default(),
-            nonce: 0,
+            nonce: B64::ZERO,
             base_fee_per_gas: None,
             withdrawals_root: None,
             blob_gas_used: None,
@@ -191,7 +194,7 @@ impl Header {
     /// Calculate base fee for next block according to the EIP-1559 spec.
     ///
     /// Returns a `None` if no base fee is set, no EIP-1559 support
-    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u128> {
         Some(calc_next_block_base_fee(
             self.gas_used,
             self.gas_limit,
@@ -204,7 +207,7 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
+    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 
@@ -221,14 +224,14 @@ impl Header {
         mem::size_of::<Bloom>() + // logs bloom
         mem::size_of::<U256>() + // difficulty
         mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u64>() + // gas limit
-        mem::size_of::<u64>() + // gas used
+        mem::size_of::<u128>() + // gas limit
+        mem::size_of::<u128>() + // gas used
         mem::size_of::<u64>() + // timestamp
         mem::size_of::<B256>() + // mix hash
         mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u64>>() + // base fee per gas
-        mem::size_of::<Option<u64>>() + // blob gas used
-        mem::size_of::<Option<u64>>() + // excess blob gas
+        mem::size_of::<Option<u128>>() + // base fee per gas
+        mem::size_of::<Option<u128>>() + // blob gas used
+        mem::size_of::<Option<u128>>() + // excess blob gas
         mem::size_of::<Option<B256>>() + // parent beacon block root
         self.extra_data.len() // extra data
     }
@@ -249,7 +252,7 @@ impl Header {
         length += self.timestamp.length();
         length += self.extra_data.length();
         length += self.mix_hash.length();
-        length += B64::new(self.nonce.to_be_bytes()).length();
+        length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
             length += U256::from(base_fee).length();
@@ -316,7 +319,7 @@ impl Encodable for Header {
         self.timestamp.encode(out);
         self.extra_data.encode(out);
         self.mix_hash.encode(out);
-        B64::new(self.nonce.to_be_bytes()).encode(out);
+        self.nonce.encode(out);
 
         // Encode base fee. Put empty list if base fee is missing,
         // but withdrawals root is present.
@@ -393,13 +396,13 @@ impl Decodable for Header {
             receipts_root: Decodable::decode(buf)?,
             logs_bloom: Decodable::decode(buf)?,
             difficulty: Decodable::decode(buf)?,
-            number: U256::decode(buf)?.to::<u64>(),
-            gas_limit: U256::decode(buf)?.to::<u64>(),
-            gas_used: U256::decode(buf)?.to::<u64>(),
+            number: u64::decode(buf)?,
+            gas_limit: u128::decode(buf)?,
+            gas_used: u128::decode(buf)?,
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
-            nonce: u64::from_be_bytes(B64::decode(buf)?.0),
+            nonce: B64::decode(buf)?,
             base_fee_per_gas: None,
             withdrawals_root: None,
             blob_gas_used: None,
@@ -411,7 +414,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
+                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 
@@ -429,7 +432,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
+                this.blob_gas_used = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 
@@ -437,7 +440,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());
+                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u128>());
             }
         }
 

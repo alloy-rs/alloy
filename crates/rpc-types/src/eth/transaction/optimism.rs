@@ -1,11 +1,11 @@
 //! Misc Optimism-specific types.
 
 use crate::other::OtherFields;
-use alloy_primitives::{B256, U128, U256, U64};
+use alloy_primitives::{B256, U128, U64};
 use serde::{Deserialize, Serialize};
 
 /// Optimism specific transaction fields
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OptimismTransactionFields {
     /// Hash that uniquely identifies the source of the deposit.
     #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
@@ -20,7 +20,7 @@ pub struct OptimismTransactionFields {
 }
 
 /// Additional fields for Optimism transaction receipts
-#[derive(Clone, Copy, Default, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith
@@ -30,17 +30,29 @@ pub struct OptimismTransactionReceiptFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deposit_receipt_version: Option<U64>,
     /// L1 fee for the transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub l1_fee: Option<U256>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub l1_fee: Option<u128>,
     /// L1 fee scalar for the transaction
     #[serde(default, skip_serializing_if = "Option::is_none", with = "l1_fee_scalar_serde")]
     pub l1_fee_scalar: Option<f64>,
     /// L1 gas price for the transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub l1_gas_price: Option<U256>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub l1_gas_price: Option<u128>,
     /// L1 gas used for the transaction
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub l1_gas_used: Option<U256>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub l1_gas_used: Option<u128>,
 }
 
 impl From<OptimismTransactionFields> for OtherFields {

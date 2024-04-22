@@ -1,0 +1,21 @@
+[package]
+name = "alloy-rpc-types-anvil"
+description = "Anvil RPC types"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["serde"] }
+alloy-serde.workspace = true
+
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

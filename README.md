@@ -3,7 +3,7 @@
 Alloy connects applications to blockchains.
 
 Alloy is a rewrite of [`ethers-rs`] from the ground up, with exciting new
-features, high performance, and excellent docs.
+features, high performance, and excellent [docs](alloy-rs.github.io/alloy/).
 
 [`ethers-rs`] will continue to be maintained until we have achieved
 feature-parity in Alloy. No action is currently needed from devs.
@@ -30,8 +30,8 @@ This repository contains the following crates:
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Ethereum JSON-RPC types
-  - [`alloy-rpc-engine-types`] - Ethereum execution-consensus layer (engine) API RPC types
-  - [`alloy-rpc-trace-types`] - Ethereum RPC trace types
+  - [`alloy-rpc-types-engine`] - Ethereum execution-consensus layer (engine) API RPC types
+  - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
@@ -42,30 +42,29 @@ This repository contains the following crates:
   - [`alloy-transport-ipc`] - IPC transport implementation
   - [`alloy-transport-ws`] - WS transport implementation
 
-[`alloy`]: crates/alloy
-[`alloy-consensus`]: crates/consensus
-[`alloy-contract`]: crates/contract
-[`alloy-eips`]: crates/eips
-[`alloy-genesis`]: crates/genesis
-[`alloy-json-rpc`]: crates/json-rpc
-[`alloy-network`]: crates/network
-[`alloy-node-bindings`]: crates/node-bindings
-[`alloy-provider`]: crates/provider
-[`alloy-pubsub`]: crates/pubsub
-[`alloy-rpc-client`]: crates/rpc-client
-[`alloy-rpc-engine-types`]: crates/rpc-engine-types
-[`alloy-rpc-trace-types`]: crates/rpc-trace-types
-[`alloy-rpc-types`]: crates/rpc-types
-[`alloy-signer`]: crates/signer
-[`alloy-signer-aws`]: crates/signer-aws
-[`alloy-signer-gcp`]: crates/signer-gcp
-[`alloy-signer-ledger`]: crates/signer-ledger
-[`alloy-signer-trezor`]: crates/signer-trezor
-[`alloy-transport`]: crates/transport
-[`alloy-transport-http`]: crates/transport-http
-[`alloy-transport-ipc`]: crates/transport-ipc
-[`alloy-transport-ws`]: crates/transport-ws
-
+[`alloy`]: https://github.com/alloy-rs/alloy/tree/main/crates/alloy
+[`alloy-consensus`]: https://github.com/alloy-rs/alloy/tree/main/crates/consensus
+[`alloy-contract`]: https://github.com/alloy-rs/alloy/tree/main/crates/contract
+[`alloy-eips`]: https://github.com/alloy-rs/alloy/tree/main/crates/eips
+[`alloy-genesis`]: https://github.com/alloy-rs/alloy/tree/main/crates/genesis
+[`alloy-json-rpc`]: https://github.com/alloy-rs/alloy/tree/main/crates/json-rpc
+[`alloy-network`]: https://github.com/alloy-rs/alloy/tree/main/crates/network
+[`alloy-node-bindings`]: https://github.com/alloy-rs/alloy/tree/main/crates/node-bindings
+[`alloy-provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider
+[`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub
+[`alloy-rpc-client`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-client
+[`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
+[`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
+[`alloy-rpc-types`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types
+[`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
+[`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
+[`alloy-signer-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp
+[`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
+[`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
+[`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
+[`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
+[`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
+[`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
 [`alloy-core`]: https://docs.rs/alloy-core
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
@@ -104,9 +103,11 @@ Because these crates are primarily network-focused, we do not intend to support
 `no_std` for most of them at this time.
 
 The following crates support `no_std`:
+
 - alloy-eips
 - alloy-genesis
 - alloy-serde
+- alloy-consensus
 
 If you would like to add `no_std` support to a crate, please make sure to update
 `scripts/check_no_std.sh` as well.

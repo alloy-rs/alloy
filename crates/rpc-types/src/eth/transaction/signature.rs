@@ -3,7 +3,8 @@ use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
 
 /// Container type for all signature fields in RPC
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Signature {
     /// The R field of the signature; the point on the curve.
     pub r: U256,
@@ -26,7 +27,8 @@ pub struct Signature {
 /// Type that represents the signature parity byte, meant for use in RPC.
 ///
 /// This will be serialized as "0x0" if false, and "0x1" if true.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Parity(
     #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
 );

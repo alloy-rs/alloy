@@ -3,14 +3,17 @@ use alloy_eips::eip4844::Blob;
 #[cfg(feature = "kzg")]
 use c_kzg::{Blob, KzgCommitment, KzgProof};
 
-use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use super::utils::WholeFe;
+use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
+use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///
 /// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct PartialSidecar {
     /// The blobs in the sidecar.
     blobs: Vec<Blob>,
@@ -175,7 +178,7 @@ pub trait SidecarCoder {
 /// - The first byte of every 32-byte word.
 /// - The right padding on the header word containing the data length.
 /// - Any right padding on the last word for each piece of data.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[non_exhaustive]
 pub struct SimpleCoder;
 
@@ -196,7 +199,7 @@ impl SimpleCoder {
 
         let mut res = Vec::with_capacity(num_bytes);
         while num_bytes > 0 {
-            let to_copy = std::cmp::min(31, num_bytes);
+            let to_copy = cmp::min(31, num_bytes);
             let fe = fes.next().ok_or(())?;
             res.extend_from_slice(&fe.as_ref()[1..1 + to_copy]);
             num_bytes -= to_copy;
@@ -220,7 +223,7 @@ impl SidecarCoder for SimpleCoder {
 
         // ingest the rest of the data
         while !data.is_empty() {
-            let (left, right) = data.split_at(std::cmp::min(31, data.len()));
+            let (left, right) = data.split_at(cmp::min(31, data.len()));
             builder.ingest_partial_fe(left);
             data = right
         }
@@ -252,7 +255,7 @@ impl SidecarCoder for SimpleCoder {
 /// until all data is ready.
 ///
 /// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SidecarBuilder<T = SimpleCoder> {
     /// The blob array we will code data into
     inner: PartialSidecar,
@@ -386,9 +389,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
-
     use super::*;
+    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
 
     #[test]
     fn ingestion_strategy() {

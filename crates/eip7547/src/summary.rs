@@ -2,7 +2,7 @@
 //! definitions.
 
 use alloy_primitives::{Address, B256};
-use alloy_rpc_engine_types::PayloadStatusEnum;
+use alloy_rpc_types_engine::PayloadStatusEnum;
 use alloy_serde::u64_hex;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
@@ -77,7 +77,7 @@ impl Serialize for InclusionListStatusV1 {
 ///
 /// - `address` : `DATA`, 20 Bytes
 /// - `nonce` : `QUANTITY`, 64 Bits
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InclusionListSummaryEntryV1 {
     /// The address of the inclusion list entry.
@@ -104,7 +104,7 @@ impl fmt::Display for InclusionListSummaryEntryV1 {
 /// - `proposer_index`: `QUANTITY`, 64 Bits
 /// - `parent_hash`: `DATA`, 32 Bytes
 /// - `summary`: `Array of InclusionListSummaryEntryV1`, Array of entries that must be satisfied.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InclusionListSummaryV1 {
     /// The slot of the inclusion list summary.

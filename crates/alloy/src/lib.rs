@@ -143,11 +143,11 @@ pub mod rpc {
 
         #[cfg(feature = "rpc-types-engine")]
         #[doc(inline)]
-        pub use alloy_rpc_engine_types as engine;
+        pub use alloy_rpc_types_engine as engine;
 
         #[cfg(feature = "rpc-types-trace")]
         #[doc(inline)]
-        pub use alloy_rpc_trace_types as trace;
+        pub use alloy_rpc_types_trace as trace;
     }
 }
 

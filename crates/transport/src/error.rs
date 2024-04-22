@@ -12,7 +12,7 @@ pub type TransportResult<T, ErrResp = Box<RawValue>> = RpcResult<T, TransportErr
 /// Transport error.
 ///
 /// All transport errors are wrapped in this enum.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum TransportErrorKind {
     /// Missing batch response.

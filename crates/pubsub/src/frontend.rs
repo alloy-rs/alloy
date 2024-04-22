@@ -13,7 +13,7 @@ use tokio::sync::{mpsc, oneshot};
 /// PubSub service.
 ///
 /// [`Transport`]: alloy_transport::Transport
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
     /// The number of items to buffer in new subscription channels. Defaults to

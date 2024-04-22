@@ -4,8 +4,14 @@ use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
 use reqwest::Response;
 use std::task;
 use tower::Service;
+use url::Url;
 
 impl Http<reqwest::Client> {
+    /// Create a new [`Http`] transport.
+    pub fn new(url: Url) -> Self {
+        Self { client: Default::default(), url }
+    }
+
     /// Make a request.
     fn request_reqwest(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();

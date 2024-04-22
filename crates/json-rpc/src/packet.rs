@@ -8,7 +8,7 @@ use std::{collections::HashSet, fmt, marker::PhantomData};
 
 /// A [`RequestPacket`] is a [`SerializedRequest`] or a batch of serialized
 /// request.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum RequestPacket {
     /// A single request.
     Single(SerializedRequest),
@@ -105,7 +105,7 @@ impl RequestPacket {
 }
 
 /// A [`ResponsePacket`] is a [`Response`] or a batch of responses.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum ResponsePacket<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     /// A single response.
     Single(Response<Payload, ErrData>),
@@ -278,7 +278,7 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
 }
 
 /// An Iterator over the [ErrorPayload]s in a [ResponsePacket].
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 enum ResponsePacketErrorsIter<'a, Payload, ErrData> {
     Single(Option<&'a Response<Payload, ErrData>>),
     Batch(std::slice::Iter<'a, Response<Payload, ErrData>>),

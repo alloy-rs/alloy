@@ -32,8 +32,8 @@ alloy-pubsub = { workspace = true, default-features = false, optional = true }
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
 alloy-rpc-client = { workspace = true, default-features = false, optional = true }
-alloy-rpc-engine-types = { workspace = true, default-features = false, optional = true }
-alloy-rpc-trace-types = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types-engine = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types-trace = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types = { workspace = true, default-features = false, optional = true }
 
 # serde
@@ -68,6 +68,7 @@ std = [
     "alloy-eips?/std",
     "alloy-genesis?/std",
     "alloy-serde?/std",
+    "alloy-consensus?/std",
 ]
 
 # configuration
@@ -93,7 +94,7 @@ contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
 eips = ["dep:alloy-eips"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
-node-bindings = ["dep:alloy-node-bindings"]
+node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil"]
 
 # providers
 providers = ["dep:alloy-provider"]
@@ -116,12 +117,12 @@ rpc-client-ws = ["rpc", "alloy-rpc-client?/ws"]
 rpc-client-ipc = ["rpc", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc"]
 rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
-rpc-types-engine = ["rpc-types", "dep:alloy-rpc-engine-types"]
+rpc-types-engine = ["rpc-types", "dep:alloy-rpc-types-engine"]
 rpc-types-json = [
     "alloy-rpc-types?/jsonrpsee-types",
-    "alloy-rpc-engine-types?/jsonrpsee-types",
+    "alloy-rpc-types-engine?/jsonrpsee-types",
 ]
-rpc-types-trace = ["rpc-types", "dep:alloy-rpc-trace-types"]
+rpc-types-trace = ["rpc-types", "dep:alloy-rpc-types-trace"]
 
 # signers
 signers = ["dep:alloy-signer"]
@@ -163,7 +164,7 @@ getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "alloy-serde"]
-ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz", "alloy-rpc-engine-types?/ssz"]
+ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz", "alloy-rpc-types-engine?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
     "alloy-consensus?/arbitrary",

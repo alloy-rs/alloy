@@ -42,21 +42,13 @@ mod reqwest;
 /// Currently supported clients are:
 #[cfg_attr(feature = "reqwest", doc = " - [`reqwest`](::reqwest::Client)")]
 #[cfg_attr(feature = "hyper", doc = " - [`hyper`](hyper_util::client::legacy::Client)")]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Http<T> {
     client: T,
     url: Url,
 }
 
 impl<T> Http<T> {
-    /// Create a new [`Http`] transport.
-    pub fn new(url: Url) -> Self
-    where
-        T: Default,
-    {
-        Self { client: Default::default(), url }
-    }
-
     /// Create a new [`Http`] transport with a custom client.
     pub const fn with_client(client: T, url: Url) -> Self {
         Self { client, url }

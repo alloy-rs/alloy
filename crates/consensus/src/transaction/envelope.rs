@@ -1,7 +1,10 @@
+use core::fmt;
+
 use crate::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -12,7 +15,7 @@ use alloy_rlp::{Decodable, Encodable, Header};
 /// [2930]: https://eips.ethereum.org/EIPS/eip-2930
 /// [4844]: https://eips.ethereum.org/EIPS/eip-4844
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TxType {
     /// Legacy transaction type.
     Legacy = 0,
@@ -24,16 +27,27 @@ pub enum TxType {
     Eip4844 = 3,
 }
 
+impl From<TxType> for u8 {
+    fn from(value: TxType) -> Self {
+        value as u8
+    }
+}
+
+impl fmt::Display for TxType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TxType::Legacy => write!(f, "Legacy"),
+            TxType::Eip2930 => write!(f, "EIP-2930"),
+            TxType::Eip1559 => write!(f, "EIP-1559"),
+            TxType::Eip4844 => write!(f, "EIP-4844"),
+        }
+    }
+}
+
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(match u.int_in_range(0..=3)? {
-            0 => TxType::Legacy,
-            1 => TxType::Eip2930,
-            2 => TxType::Eip1559,
-            3 => TxType::Eip4844,
-            _ => unreachable!(),
-        })
+        Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
     }
 }
 
@@ -41,11 +55,13 @@ impl TryFrom<u8> for TxType {
     type Error = Eip2718Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            // SAFETY: repr(u8) with explicit discriminant
-            0..=3 => Ok(unsafe { std::mem::transmute(value) }),
-            _ => Err(Eip2718Error::UnexpectedType(value)),
-        }
+        Ok(match value {
+            0 => TxType::Legacy,
+            1 => TxType::Eip2930,
+            2 => TxType::Eip1559,
+            3 => TxType::Eip4844,
+            _ => return Err(Eip2718Error::UnexpectedType(value)),
+        })
     }
 }
 
@@ -60,9 +76,10 @@ impl TryFrom<u8> for TxType {
 /// flag.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
@@ -127,6 +144,39 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 }
 
 impl TxEnvelope {
+    /// Recover the signer of the transaction.
+    #[cfg(feature = "k256")]
+    pub fn recover_signer(
+        &self,
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.recover_signer(),
+            TxEnvelope::Eip2930(tx) => tx.recover_signer(),
+            TxEnvelope::Eip1559(tx) => tx.recover_signer(),
+            TxEnvelope::Eip4844(tx) => tx.recover_signer(),
+        }
+    }
+
+    /// Calculate the signing hash for the transaction.
+    pub fn signature_hash(&self) -> B256 {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.signature_hash(),
+            TxEnvelope::Eip2930(tx) => tx.signature_hash(),
+            TxEnvelope::Eip1559(tx) => tx.signature_hash(),
+            TxEnvelope::Eip4844(tx) => tx.signature_hash(),
+        }
+    }
+
+    /// Return the hash of the inner Signed
+    pub const fn tx_hash(&self) -> &B256 {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.hash(),
+            TxEnvelope::Eip2930(tx) => tx.hash(),
+            TxEnvelope::Eip1559(tx) => tx.hash(),
+            TxEnvelope::Eip4844(tx) => tx.hash(),
+        }
+    }
+
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
         match self {
@@ -256,7 +306,10 @@ mod tests {
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
     use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, B256, U256};
-    use std::{fs, path::PathBuf};
+    use std::{fs, path::PathBuf, vec};
+
+    #[cfg(not(feature = "std"))]
+    use std::vec::Vec;
 
     #[test]
     #[cfg(feature = "k256")]
@@ -484,7 +537,7 @@ mod tests {
             chain_id: u64::MAX,
             nonce: u64::MAX,
             gas_price: u128::MAX,
-            gas_limit: u64::MAX,
+            gas_limit: u128::MAX,
             to: TxKind::Call(Address::random()),
             value: U256::MAX,
             input: Bytes::new(),

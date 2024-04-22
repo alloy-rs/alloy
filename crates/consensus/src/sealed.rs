@@ -1,6 +1,6 @@
 use alloy_primitives::B256;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 /// A consensus hashable item, with its memoized hash.
 ///
 /// We do not implement

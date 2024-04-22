@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlockId};
+use alloy_rpc_types::{state::StateOverride, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -190,7 +190,7 @@ impl CallDecoder for () {
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
 pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     request: N::TransactionRequest,
-    block: Option<BlockId>,
+    block: BlockId,
     state: Option<StateOverride>,
     /// The provider.
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
@@ -262,7 +262,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
             request: <N::TransactionRequest>::default().with_input(input),
             decoder,
             provider,
-            block: None,
+            block: BlockId::default(),
             state: None,
             transport: PhantomData,
         }
@@ -280,13 +280,19 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         self
     }
 
+    /// Sets the `sidecar` field in the transaction to the provided value.
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+        self.request.set_blob_sidecar(blob_sidecar);
+        self
+    }
+
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
     pub fn legacy(self) -> Self {
         todo!()
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub fn gas(mut self, gas: U256) -> Self {
+    pub fn gas(mut self, gas: u128) -> Self {
         self.request.set_gas_limit(gas);
         self
     }
@@ -294,7 +300,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Sets the `gas_price` field in the transaction to the provided value
     /// If the internal transaction is an EIP-1559 one, then it sets both
     /// `max_fee_per_gas` and `max_priority_fee_per_gas` to the same value
-    pub fn gas_price(mut self, gas_price: U256) -> Self {
+    pub fn gas_price(mut self, gas_price: u128) -> Self {
         self.request.set_gas_price(gas_price);
         self
     }
@@ -322,7 +328,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Sets the `block` field for sending the tx to the chain
     pub const fn block(mut self, block: BlockId) -> Self {
-        self.block = Some(block);
+        self.block = block;
         self
     }
 
@@ -342,11 +348,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
-    pub async fn estimate_gas(&self) -> Result<U256> {
+    pub async fn estimate_gas(&self) -> Result<u128> {
         self.provider.estimate_gas(&self.request, self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
@@ -356,6 +363,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Does not decode the output of the call, returning the raw output data instead.
     ///

@@ -14,7 +14,7 @@ pub const NUM_G1_POINTS: usize = 4096;
 pub const NUM_G2_POINTS: usize = 65;
 
 /// A newtype over list of G1 point from kzg trusted setup.
-#[derive(Debug, Clone, PartialEq, AsRef, AsMut, Deref, DerefMut)]
+#[derive(Clone, Debug, PartialEq, AsRef, AsMut, Deref, DerefMut)]
 #[repr(transparent)]
 pub struct G1Points(pub [[u8; BYTES_PER_G1_POINT]; NUM_G1_POINTS]);
 
@@ -25,7 +25,7 @@ impl Default for G1Points {
 }
 
 /// A newtype over list of G2 point from kzg trusted setup.
-#[derive(Debug, Clone, Eq, PartialEq, AsRef, AsMut, Deref, DerefMut)]
+#[derive(Clone, Debug, PartialEq, Eq, AsRef, AsMut, Deref, DerefMut)]
 #[repr(transparent)]
 pub struct G2Points(pub [[u8; BYTES_PER_G2_POINT]; NUM_G2_POINTS]);
 
@@ -100,7 +100,7 @@ pub fn parse_kzg_trusted_setup(
 }
 
 /// KZG custom Error types
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum KzgErrors {
     /// Failed to get current directory.
     FailedCurrentDirectory,

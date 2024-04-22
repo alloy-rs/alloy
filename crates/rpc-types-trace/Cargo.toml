@@ -1,0 +1,29 @@
+[package]
+name = "alloy-rpc-types-trace"
+description = "Ethereum RPC trace types"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-rpc-types.workspace = true
+alloy-serde.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+
+arbitrary = { workspace = true, features = ["derive"] }
+proptest.workspace = true
+proptest-derive.workspace = true
+rand.workspace = true
+similar-asserts.workspace = true

@@ -1,22 +1,16 @@
 //! Block RPC types.
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use crate::{other::OtherFields, Transaction, Withdrawal};
-use alloy_eips::{calc_blob_gasprice, calc_excess_blob_gas};
-use alloy_primitives::{
-    ruint::ParseError, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
+pub use alloy_eips::{
+    calc_blob_gasprice, calc_excess_blob_gas, BlockId, BlockNumberOrTag, RpcBlockHash,
 };
+use alloy_primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
-use serde::{
-    de::{MapAccess, Visitor},
-    ser::{Error, SerializeStruct},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
 
 /// Block representation
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
     /// Header of the block.
@@ -51,7 +45,8 @@ impl Block {
 }
 
 /// Block header representation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
@@ -74,13 +69,17 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    pub number: Option<U256>,
+    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    pub number: Option<u64>,
     /// Gas Limit
-    pub gas_limit: U256,
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal")]
+    pub gas_limit: u128,
     /// Gas Used
-    pub gas_used: U256,
+    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal")]
+    pub gas_used: u128,
     /// Timestamp
-    pub timestamp: U256,
+    #[serde(default, with = "alloy_serde::num::u64_hex")]
+    pub timestamp: u64,
     /// Total difficulty
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,
@@ -100,19 +99,32 @@ pub struct Header {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mix_hash: Option<B256>,
     /// Nonce
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_fee_per_gas: Option<U256>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub withdrawals_root: Option<B256>,
     /// Blob gas used
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub blob_gas_used: Option<U64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub blob_gas_used: Option<u128>,
     /// Excess blob gas
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub excess_blob_gas: Option<U64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
+    pub excess_blob_gas: Option<u128>,
     /// Parent beacon block root
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
@@ -123,7 +135,7 @@ impl Header {
     ///
     /// Returns `None` if `excess_blob_gas` is None
     pub fn blob_fee(&self) -> Option<u128> {
-        self.excess_blob_gas.map(|gas| calc_blob_gasprice(gas.to()))
+        self.excess_blob_gas.map(calc_blob_gasprice)
     }
 
     /// Returns the blob fee for the next block according to the EIP-4844 spec.
@@ -139,22 +151,28 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
-        Some(calc_excess_blob_gas(self.excess_blob_gas?.to(), self.blob_gas_used?.to()))
+    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
+        Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 }
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
 /// or if used by `eth_getUncle*`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum BlockTransactions {
+pub enum BlockTransactions<T = Transaction> {
     /// Only hashes
     Hashes(Vec<B256>),
     /// Full transactions
-    Full(Vec<Transaction>),
+    Full(Vec<T>),
     /// Special case for uncle response.
     Uncle,
+}
+
+impl Default for BlockTransactions {
+    fn default() -> Self {
+        BlockTransactions::Hashes(Vec::default())
+    }
 }
 
 impl BlockTransactions {
@@ -375,7 +393,7 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a> {}
 ///
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockTransactionsKind {
     /// Only include hashes: [BlockTransactions::Hashes]
     Hashes,
@@ -394,7 +412,7 @@ impl From<bool> for BlockTransactionsKind {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
     /// A transaction failed sender recovery
     #[error("transaction failed sender recovery")]
@@ -404,470 +422,8 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A block hash which may have
-/// a boolean requireCanonical field.
-/// If false, an RPC call should raise if a block
-/// matching the hash is not found.
-/// If true, an RPC call should additionally raise if
-/// the block is not in the canonical chain.
-/// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct RpcBlockHash {
-    /// A block hash
-    pub block_hash: B256,
-    /// Whether the block must be a canonical block
-    pub require_canonical: Option<bool>,
-}
-
-impl RpcBlockHash {
-    /// Returns an [RpcBlockHash] from a [B256].
-    pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
-        RpcBlockHash { block_hash, require_canonical }
-    }
-}
-
-impl From<B256> for RpcBlockHash {
-    fn from(value: B256) -> Self {
-        Self::from_hash(value, None)
-    }
-}
-
-impl From<RpcBlockHash> for B256 {
-    fn from(value: RpcBlockHash) -> Self {
-        value.block_hash
-    }
-}
-
-impl AsRef<B256> for RpcBlockHash {
-    fn as_ref(&self) -> &B256 {
-        &self.block_hash
-    }
-}
-
-/// A block Number (or tag - "latest", "earliest", "pending")
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub enum BlockNumberOrTag {
-    /// Latest block
-    #[default]
-    Latest,
-    /// Finalized block accepted as canonical
-    Finalized,
-    /// Safe head block
-    Safe,
-    /// Earliest block (genesis)
-    Earliest,
-    /// Pending block (not yet part of the blockchain)
-    Pending,
-    /// Block by number from canon chain
-    Number(u64),
-}
-
-impl BlockNumberOrTag {
-    /// Returns the numeric block number if explicitly set
-    pub const fn as_number(&self) -> Option<u64> {
-        match *self {
-            BlockNumberOrTag::Number(num) => Some(num),
-            _ => None,
-        }
-    }
-
-    /// Returns `true` if a numeric block number is set
-    pub const fn is_number(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Number(_))
-    }
-
-    /// Returns `true` if it's "latest"
-    pub const fn is_latest(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Latest)
-    }
-
-    /// Returns `true` if it's "finalized"
-    pub const fn is_finalized(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Finalized)
-    }
-
-    /// Returns `true` if it's "safe"
-    pub const fn is_safe(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Safe)
-    }
-
-    /// Returns `true` if it's "pending"
-    pub const fn is_pending(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Pending)
-    }
-
-    /// Returns `true` if it's "earliest"
-    pub const fn is_earliest(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Earliest)
-    }
-}
-
-impl From<u64> for BlockNumberOrTag {
-    fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(num)
-    }
-}
-
-impl From<U64> for BlockNumberOrTag {
-    fn from(num: U64) -> Self {
-        num.to::<u64>().into()
-    }
-}
-
-impl Serialize for BlockNumberOrTag {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match *self {
-            BlockNumberOrTag::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
-            BlockNumberOrTag::Latest => serializer.serialize_str("latest"),
-            BlockNumberOrTag::Finalized => serializer.serialize_str("finalized"),
-            BlockNumberOrTag::Safe => serializer.serialize_str("safe"),
-            BlockNumberOrTag::Earliest => serializer.serialize_str("earliest"),
-            BlockNumberOrTag::Pending => serializer.serialize_str("pending"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for BlockNumberOrTag {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?.to_lowercase();
-        s.parse().map_err(serde::de::Error::custom)
-    }
-}
-
-impl FromStr for BlockNumberOrTag {
-    type Err = ParseBlockNumberError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let block = match s {
-            "latest" => Self::Latest,
-            "finalized" => Self::Finalized,
-            "safe" => Self::Safe,
-            "earliest" => Self::Earliest,
-            "pending" => Self::Pending,
-            _number => {
-                if let Some(hex_val) = s.strip_prefix("0x") {
-                    let number = u64::from_str_radix(hex_val, 16);
-                    BlockNumberOrTag::Number(number?)
-                } else {
-                    return Err(HexStringMissingPrefixError::default().into());
-                }
-            }
-        };
-        Ok(block)
-    }
-}
-
-impl fmt::Display for BlockNumberOrTag {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BlockNumberOrTag::Number(x) => write!(f, "0x{x:x}"),
-            BlockNumberOrTag::Latest => f.write_str("latest"),
-            BlockNumberOrTag::Finalized => f.write_str("finalized"),
-            BlockNumberOrTag::Safe => f.write_str("safe"),
-            BlockNumberOrTag::Earliest => f.write_str("earliest"),
-            BlockNumberOrTag::Pending => f.write_str("pending"),
-        }
-    }
-}
-
-/// Error variants when parsing a [BlockNumberOrTag]
-#[derive(Debug, thiserror::Error)]
-pub enum ParseBlockNumberError {
-    /// Failed to parse hex value
-    #[error(transparent)]
-    ParseIntErr(#[from] ParseIntError),
-    /// Failed to parse hex value
-    #[error(transparent)]
-    ParseErr(#[from] ParseError),
-    /// Block numbers should be 0x-prefixed
-    #[error(transparent)]
-    MissingPrefix(#[from] HexStringMissingPrefixError),
-}
-
-/// Thrown when a 0x-prefixed hex string was expected
-#[derive(Copy, Clone, Debug, Default, thiserror::Error)]
-#[non_exhaustive]
-#[error("hex string without 0x prefix")]
-pub struct HexStringMissingPrefixError;
-
-/// A Block Identifier
-/// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum BlockId {
-    /// A block hash and an optional bool that defines if it's canonical
-    Hash(RpcBlockHash),
-    /// A block number
-    Number(BlockNumberOrTag),
-}
-
-// === impl BlockId ===
-
-impl BlockId {
-    /// Returns the block hash if it is [BlockId::Hash]
-    pub const fn as_block_hash(&self) -> Option<B256> {
-        match self {
-            BlockId::Hash(hash) => Some(hash.block_hash),
-            BlockId::Number(_) => None,
-        }
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Latest]
-    pub const fn is_latest(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Latest))
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Pending]
-    pub const fn is_pending(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Pending))
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Safe]
-    pub const fn is_safe(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Safe))
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Finalized]
-    pub const fn is_finalized(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Finalized))
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Earliest]
-    pub const fn is_earliest(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Earliest))
-    }
-
-    /// Returns true if this is [BlockNumberOrTag::Number]
-    pub const fn is_number(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Number(_)))
-    }
-    /// Returns true if this is [BlockId::Hash]
-    pub const fn is_hash(&self) -> bool {
-        matches!(self, BlockId::Hash(_))
-    }
-
-    /// Creates a new "pending" tag instance.
-    pub const fn pending() -> Self {
-        BlockId::Number(BlockNumberOrTag::Pending)
-    }
-
-    /// Creates a new "latest" tag instance.
-    pub const fn latest() -> Self {
-        BlockId::Number(BlockNumberOrTag::Latest)
-    }
-
-    /// Creates a new "earliest" tag instance.
-    pub const fn earliest() -> Self {
-        BlockId::Number(BlockNumberOrTag::Earliest)
-    }
-
-    /// Creates a new "finalized" tag instance.
-    pub const fn finalized() -> Self {
-        BlockId::Number(BlockNumberOrTag::Finalized)
-    }
-
-    /// Creates a new "safe" tag instance.
-    pub const fn safe() -> Self {
-        BlockId::Number(BlockNumberOrTag::Safe)
-    }
-
-    /// Creates a new block number instance.
-    pub const fn number(num: u64) -> Self {
-        BlockId::Number(BlockNumberOrTag::Number(num))
-    }
-
-    /// Create a new block hash instance.
-    pub const fn hash(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
-    }
-
-    /// Create a new block hash instance that requires the block to be canonical.
-    pub const fn hash_canonical(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
-    }
-}
-
-impl Default for BlockId {
-    fn default() -> Self {
-        BlockId::Number(BlockNumberOrTag::Latest)
-    }
-}
-
-impl From<u64> for BlockId {
-    fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(num).into()
-    }
-}
-
-impl From<U64> for BlockId {
-    fn from(value: U64) -> Self {
-        BlockNumberOrTag::Number(value.to()).into()
-    }
-}
-
-impl From<BlockNumberOrTag> for BlockId {
-    fn from(num: BlockNumberOrTag) -> Self {
-        BlockId::Number(num)
-    }
-}
-
-impl From<B256> for BlockId {
-    fn from(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
-    }
-}
-
-impl From<(B256, Option<bool>)> for BlockId {
-    fn from(hash_can: (B256, Option<bool>)) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
-    }
-}
-
-impl Serialize for BlockId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            BlockId::Hash(RpcBlockHash { block_hash, require_canonical }) => {
-                let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
-                s.serialize_field("blockHash", block_hash)?;
-                if let Some(require_canonical) = require_canonical {
-                    s.serialize_field("requireCanonical", require_canonical)?;
-                }
-                s.end()
-            }
-            BlockId::Number(num) => num.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for BlockId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct BlockIdVisitor;
-
-        impl<'de> Visitor<'de> for BlockIdVisitor {
-            type Value = BlockId;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("Block identifier following EIP-1898")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                // Since there is no way to clearly distinguish between a DATA parameter and a QUANTITY parameter. A str is therefor deserialized into a Block Number: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md>
-                // However, since the hex string should be a QUANTITY, we can safely assume that if the len is 66 bytes, it is in fact a hash, ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/rpc/types.go#L184-L184>
-                if v.len() == 66 {
-                    Ok(BlockId::Hash(v.parse::<B256>().map_err(serde::de::Error::custom)?.into()))
-                } else {
-                    // quantity hex string or tag
-                    Ok(BlockId::Number(v.parse().map_err(serde::de::Error::custom)?))
-                }
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut number = None;
-                let mut block_hash = None;
-                let mut require_canonical = None;
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "blockNumber" => {
-                            if number.is_some() || block_hash.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockNumber"));
-                            }
-                            if require_canonical.is_some() {
-                                return Err(serde::de::Error::custom(
-                                    "Non-valid require_canonical field",
-                                ));
-                            }
-                            number = Some(map.next_value::<BlockNumberOrTag>()?)
-                        }
-                        "blockHash" => {
-                            if number.is_some() || block_hash.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockHash"));
-                            }
-
-                            block_hash = Some(map.next_value::<B256>()?);
-                        }
-                        "requireCanonical" => {
-                            if number.is_some() || require_canonical.is_some() {
-                                return Err(serde::de::Error::duplicate_field("requireCanonical"));
-                            }
-
-                            require_canonical = Some(map.next_value::<bool>()?)
-                        }
-                        key => {
-                            return Err(serde::de::Error::unknown_field(
-                                key,
-                                &["blockNumber", "blockHash", "requireCanonical"],
-                            ))
-                        }
-                    }
-                }
-
-                if let Some(number) = number {
-                    Ok(BlockId::Number(number))
-                } else if let Some(block_hash) = block_hash {
-                    Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
-                } else {
-                    Err(serde::de::Error::custom(
-                        "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
-                    ))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(BlockIdVisitor)
-    }
-}
-
-/// Error thrown when parsing a [BlockId] from a string.
-#[derive(Debug, thiserror::Error)]
-pub enum ParseBlockIdError {
-    /// Failed to parse a block id from a number.
-    #[error(transparent)]
-    ParseIntError(#[from] ParseIntError),
-    /// Failed to parse a block id as a hex string.
-    #[error(transparent)]
-    FromHexError(#[from] alloy_primitives::hex::FromHexError),
-}
-
-impl FromStr for BlockId {
-    type Err = ParseBlockIdError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("0x") {
-            return B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError);
-        }
-
-        match s {
-            "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
-            "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
-            "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
-            "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
-            "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
-            _ => s
-                .parse::<u64>()
-                .map_err(ParseBlockIdError::ParseIntError)
-                .map(|n| BlockId::Number(n.into())),
-        }
-    }
-}
-
 /// Block number and hash.
-#[derive(Clone, Copy, Hash, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct BlockNumHash {
     /// Block number
     pub number: BlockNumber,
@@ -917,7 +473,7 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 }
 
 /// Either a block hash _or_ a block number
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -998,6 +554,15 @@ impl Decodable for BlockHashOrNumber {
     }
 }
 
+impl fmt::Display for BlockHashOrNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => write!(f, "{}", hash),
+            Self::Number(num) => write!(f, "{}", num),
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockHashOrNumber] from a string.
 #[derive(Debug, thiserror::Error)]
 #[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]
@@ -1044,7 +609,7 @@ impl From<Header> for RichHeader {
 }
 
 /// Value representation with additional info
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct Rich<T> {
     /// Standard value.
     #[serde(flatten)]
@@ -1085,7 +650,7 @@ impl<T: Serialize> Serialize for Rich<T> {
 }
 
 /// BlockOverrides is a set of header fields to override.
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct BlockOverrides {
     /// Overrides the block number.
@@ -1122,7 +687,17 @@ pub struct BlockOverrides {
 
 #[cfg(test)]
 mod tests {
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
     use super::*;
+
+    #[test]
+    fn arbitrary_header() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
 
     #[test]
     fn test_full_conversion() {
@@ -1156,17 +731,17 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(U256::from(9)),
-                gas_used: U256::from(10),
-                gas_limit: U256::from(11),
+                number: Some(9),
+                gas_used: 10,
+                gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(U256::from(20)),
+                base_fee_per_gas: Some(20),
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
@@ -1198,17 +773,17 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(U256::from(9)),
-                gas_used: U256::from(10),
-                gas_limit: U256::from(11),
+                number: Some(9),
+                gas_used: 10,
+                gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(U256::from(20)),
+                base_fee_per_gas: Some(20),
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
@@ -1240,17 +815,17 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: None,
-                number: Some(U256::from(9)),
-                gas_used: U256::from(10),
-                gas_limit: U256::from(11),
+                number: Some(9),
+                gas_used: 10,
+                gas_limit: 11,
                 extra_data: Bytes::from(vec![1, 2, 3]),
                 logs_bloom: Bloom::default(),
-                timestamp: U256::from(12),
+                timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
                 mix_hash: Some(B256::with_last_byte(14)),
                 nonce: Some(B64::with_last_byte(15)),
-                base_fee_per_gas: Some(U256::from(20)),
+                base_fee_per_gas: Some(20),
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
@@ -1387,93 +962,9 @@ mod tests {
          }"#;
 
         let block = serde_json::from_str::<Block>(s).unwrap();
-        assert!(block.uncles.len() == 2);
+        assert_eq!(block.uncles.len(), 2);
         let serialized = serde_json::to_string(&block).unwrap();
         let block2 = serde_json::from_str::<Block>(&serialized).unwrap();
         assert_eq!(block, block2);
-    }
-
-    #[test]
-    fn compact_block_number_serde() {
-        let num: BlockNumberOrTag = 1u64.into();
-        let serialized = serde_json::to_string(&num).unwrap();
-        assert_eq!(serialized, "\"0x1\"");
-    }
-
-    #[test]
-    fn can_parse_eip1898_block_ids() {
-        let num = serde_json::json!(
-            { "blockNumber": "0x0" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
-
-        let num = serde_json::json!(
-            { "blockNumber": "pending" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
-
-        let num = serde_json::json!(
-            { "blockNumber": "latest" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
-
-        let num = serde_json::json!(
-            { "blockNumber": "finalized" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
-
-        let num = serde_json::json!(
-            { "blockNumber": "safe" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
-
-        let num = serde_json::json!(
-            { "blockNumber": "earliest" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
-
-        let num = serde_json::json!("0x0");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Number(0u64)));
-
-        let num = serde_json::json!("pending");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Pending));
-
-        let num = serde_json::json!("latest");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Latest));
-
-        let num = serde_json::json!("finalized");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Finalized));
-
-        let num = serde_json::json!("safe");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Safe));
-
-        let num = serde_json::json!("earliest");
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(id, BlockId::Number(BlockNumberOrTag::Earliest));
-
-        let num = serde_json::json!(
-            { "blockHash": "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3" }
-        );
-        let id = serde_json::from_value::<BlockId>(num).unwrap();
-        assert_eq!(
-            id,
-            BlockId::Hash(
-                "0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
-                    .parse::<B256>()
-                    .unwrap()
-                    .into()
-            )
-        );
     }
 }

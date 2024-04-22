@@ -71,7 +71,6 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
-        trace!("Polling prepared");
         let fut = {
             let CallStateProj::Prepared { connection, request } = self.as_mut().project() else {
                 unreachable!("Called poll_prepared in incorrect state")
@@ -81,11 +80,18 @@ where
                 self.set(CallState::Complete);
                 return Ready(RpcResult::Err(e));
             }
-            let request = request.take().expect("No request. This is a bug.").serialize();
 
+            let request = request.take().expect("no request");
+            debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+            trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
+            let request = request.serialize();
             match request {
-                Ok(request) => connection.call(request.into()),
+                Ok(request) => {
+                    trace!(request=%request.serialized(), "serialized request");
+                    connection.call(request.into())
+                }
                 Err(err) => {
+                    trace!(?err, "failed to serialize request");
                     self.set(CallState::Complete);
                     return Ready(RpcResult::Err(TransportError::ser_err(err)));
                 }
@@ -102,7 +108,6 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
     ) -> task::Poll<<Self as Future>::Output> {
-        trace!("Polling awaiting");
         let CallStateProj::AwaitingResponse { fut } = self.as_mut().project() else {
             unreachable!("Called poll_awaiting in incorrect state")
         };
@@ -122,7 +127,6 @@ where
 {
     type Output = TransportResult<Box<RawValue>>;
 
-    #[instrument(skip(self, cx))]
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         if matches!(*self.as_mut(), CallState::Prepared { .. }) {
             return self.poll_prepared(cx);
@@ -147,7 +151,7 @@ where
 /// either a successful response of the `Resp` type, an error response, or a
 /// transport error.
 ///
-/// ### Note:
+/// ### Note
 ///
 /// Serializing the request is done lazily. The request is not serialized until
 /// the future is polled. This differs from the behavior of
@@ -188,6 +192,15 @@ where
         Self { state: CallState::Prepared { request: Some(req), connection }, _pd: PhantomData }
     }
 
+    /// Returns `true` if the request is a subscription.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn is_subscription(&self) -> bool {
+        self.request().meta.is_subscription()
+    }
+
     /// Set the request to be a non-standard subscription (i.e. not
     /// "eth_subscribe").
     ///
@@ -195,28 +208,12 @@ where
     ///
     /// Panics if called after the request has been sent.
     pub fn set_is_subscription(&mut self) {
-        if let CallState::Prepared { request, .. } = &mut self.state {
-            request
-                .as_mut()
-                .expect("No request in prepared. This is a bug")
-                .meta
-                .set_is_subscription();
-        } else {
-            panic!("Cannot set non-standard sub after request has been sent");
-        }
+        self.request_mut().meta.set_is_subscription();
     }
 
-    /// Returns `true` if the request is a subscription.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called after the request has been sent.
-    pub fn is_subscription(&self) -> bool {
-        if let CallState::Prepared { request, .. } = &self.state {
-            request.as_ref().expect("No request in prepared. This is a bug").meta.is_subscription()
-        } else {
-            panic!("Cannot get is_subscription after request has been sent");
-        }
+    /// Set the subscription status of the request.
+    pub fn set_subscription_status(&mut self, status: bool) {
+        self.request_mut().meta.set_subscription_status(status);
     }
 
     /// Get a mutable reference to the params of the request.
@@ -228,11 +225,31 @@ where
     ///
     /// Panics if called after the request has been sent.
     pub fn params(&mut self) -> &mut Params {
-        if let CallState::Prepared { request, .. } = &mut self.state {
-            &mut request.as_mut().expect("No params in prepared. This is a bug").params
-        } else {
-            panic!("Cannot get params after request has been sent");
-        }
+        &mut self.request_mut().params
+    }
+
+    /// Returns a reference to the request.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn request(&self) -> &Request<Params> {
+        let CallState::Prepared { request, .. } = &self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        request.as_ref().expect("no request in prepared")
+    }
+
+    /// Returns a mutable reference to the request.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
+    pub fn request_mut(&mut self) -> &mut Request<Params> {
+        let CallState::Prepared { request, .. } = &mut self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        request.as_mut().expect("no request in prepared")
     }
 }
 
@@ -242,14 +259,16 @@ where
     Params: RpcParam + Clone,
 {
     /// Convert this call into one with owned params, by cloning the params.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called after the request has been sent.
     pub fn into_owned_params(self) -> RpcCall<Conn, Params, Resp> {
-        if let CallState::Prepared { request, connection } = self.state {
-            let request =
-                request.expect("No params in prepared. This is a bug").into_owned_params();
-            RpcCall::new(request, connection)
-        } else {
+        let CallState::Prepared { request, connection } = self.state else {
             panic!("Cannot get params after request has been sent");
-        }
+        };
+        let request = request.expect("no request in prepared").into_owned_params();
+        RpcCall::new(request, connection)
     }
 }
 
@@ -274,11 +293,7 @@ where
     type Output = TransportResult<Resp>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        trace!(?self.state, "Polling RpcCall");
-        let this = self.project();
-
-        let result = task::ready!(this.state.poll(cx));
-
-        Ready(try_deserialize_ok(result))
+        trace!(?self.state, "polling RpcCall");
+        self.project().state.poll(cx).map(try_deserialize_ok)
     }
 }

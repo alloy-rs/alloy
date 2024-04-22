@@ -40,17 +40,16 @@ where
 
             if status != hyper::StatusCode::OK {
                 return Err(TransportErrorKind::custom_str(&format!(
-                    r#"HTTP error: {} with body: "{}""#,
-                    status,
-                    String::from_utf8_lossy(body.as_ref())
+                    "HTTP error {status} with body: {}",
+                    String::from_utf8_lossy(&body)
                 )));
             }
 
             // Deser a Box<RawValue> from the body. If deser fails, return the
             // body as a string in the error. If the body is not UTF8, this will
             // fail and give the empty string in the error.
-            serde_json::from_slice(body.as_ref()).map_err(|err| {
-                TransportError::deser_err(err, std::str::from_utf8(body.as_ref()).unwrap_or(""))
+            serde_json::from_slice(&body).map_err(|err| {
+                TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref()))
             })
         })
     }

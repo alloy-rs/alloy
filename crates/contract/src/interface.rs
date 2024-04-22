@@ -5,7 +5,7 @@ use alloy_primitives::{Address, Selector};
 use std::collections::{BTreeMap, HashMap};
 
 /// A smart contract interface.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Interface {
     abi: JsonAbi,
     functions: HashMap<Selector, (String, usize)>,

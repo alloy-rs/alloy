@@ -16,10 +16,10 @@ exclude.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
-alloy-genesis.workspace=true
+alloy-genesis.workspace = true
 
-alloy-consensus = { workspace = true, features = ["serde"] }
-alloy-eips = {workspace = true, features = ["std", "serde"]}
+alloy-consensus = { workspace = true, features = ["std", "serde"] }
+alloy-eips = { workspace = true, features = ["std", "serde"] }
 
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -33,16 +33,29 @@ proptest = { version = "1.4", optional = true }
 proptest-derive = { version = "0.4", optional = true }
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.20", optional = true }
+jsonrpsee-types = { version = "0.22", optional = true }
 alloy-sol-types.workspace = true
 
 [features]
-arbitrary = ["dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+arbitrary = [
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+    "alloy-eips/arbitrary",
+]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
+k256 = ["alloy-consensus/k256"]
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "rlp",
+    "serde",
+    "arbitrary",
+] }
+alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true

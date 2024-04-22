@@ -9,7 +9,7 @@ use std::{
 /// A type that is supposed to capture additional fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
 ///
 /// This type is supposed to be used with [`#[serde(flatten)`](https://serde.rs/field-attrs.html#flatten)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OtherFields {
     /// Contains all unknown fields
@@ -135,5 +135,45 @@ impl<'a> IntoIterator for &'a OtherFields {
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_ref().iter()
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl arbitrary::Arbitrary<'_> for OtherFields {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+        // Generate a random number of entries for the BTreeMap
+        let num_entries = u.int_in_range(0..=10)?;
+
+        // Generate random key-value pairs and insert them into the BTreeMap
+        let mut inner = BTreeMap::new();
+        for _ in 0..num_entries {
+            inner.insert(
+                String::arbitrary(u)?,
+                match u.int_in_range(0..=3)? {
+                    0 => serde_json::Value::Null,
+                    1 => serde_json::Value::Bool(u.arbitrary()?),
+                    2 => serde_json::Value::Number(serde_json::Number::from(u.arbitrary::<u64>()?)),
+                    3 => serde_json::Value::String(u.arbitrary()?),
+                    _ => unreachable!(),
+                },
+            );
+        }
+
+        Ok(Self { inner })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn other_fields_arbitrary() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+
+        let _ = OtherFields::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 }

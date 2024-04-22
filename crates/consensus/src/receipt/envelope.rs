@@ -1,6 +1,6 @@
 use crate::{Receipt, ReceiptWithBloom, TxType};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
-use alloy_primitives::Log;
+use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
@@ -13,9 +13,10 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 /// Transaction receipt payloads are specified in their respective EIPs.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
@@ -46,6 +47,31 @@ impl<T> ReceiptEnvelope<T> {
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
         }
+    }
+
+    /// Return true if the transaction was successful.
+    pub fn is_success(&self) -> bool {
+        self.status()
+    }
+
+    /// Returns the success status of the receipt's transaction.
+    pub fn status(&self) -> bool {
+        self.as_receipt().unwrap().status
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    pub fn cumulative_gas_used(&self) -> u128 {
+        self.as_receipt().unwrap().cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    pub fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
+    }
+
+    /// Return the receipt's bloom.
+    pub fn logs_bloom(&self) -> &Bloom {
+        &self.as_receipt_with_bloom().unwrap().logs_bloom
     }
 
     /// Return the inner receipt with bloom. Currently this is infallible,
@@ -148,15 +174,18 @@ impl Decodable2718 for ReceiptEnvelope {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for ReceiptEnvelope {
+impl<'a, T> arbitrary::Arbitrary<'a> for ReceiptEnvelope<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let tx_type = u.int_in_range(0..=2)?;
-        let receipt = Receipt::arbitrary(u)?.with_bloom();
+        let receipt = ReceiptWithBloom::<T>::arbitrary(u)?;
 
-        match tx_type {
+        match u.int_in_range(0..=3)? {
             0 => Ok(Self::Legacy(receipt)),
             1 => Ok(Self::Eip2930(receipt)),
             2 => Ok(Self::Eip1559(receipt)),
+            3 => Ok(Self::Eip4844(receipt)),
             _ => unreachable!(),
         }
     }

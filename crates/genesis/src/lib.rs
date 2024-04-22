@@ -24,32 +24,31 @@ use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
-    json_u256::{deserialize_json_ttd_opt, deserialize_json_u256},
-    num::{u64_hex_or_decimal, u64_hex_or_decimal_opt},
+    num::{u128_hex_or_decimal, u128_hex_or_decimal_opt, u64_hex, u64_hex_or_decimal_opt},
     storage::deserialize_storage_map,
+    ttd::deserialize_json_ttd_opt,
 };
 use serde::{Deserialize, Serialize};
 
 /// The genesis block specification.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Genesis {
     /// The fork configuration for this network.
     #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "u64_hex")]
     pub nonce: u64,
     /// The genesis header timestamp.
-    #[serde(with = "u64_hex_or_decimal")]
+    #[serde(with = "u64_hex")]
     pub timestamp: u64,
     /// The genesis header extra data.
     pub extra_data: Bytes,
     /// The genesis header gas limit.
-    #[serde(with = "u64_hex_or_decimal")]
-    pub gas_limit: u64,
+    #[serde(with = "u128_hex_or_decimal")]
+    pub gas_limit: u128,
     /// The genesis header difficulty.
-    #[serde(deserialize_with = "deserialize_json_u256")]
     pub difficulty: U256,
     /// The genesis header mix hash.
     pub mix_hash: B256,
@@ -65,16 +64,16 @@ pub struct Genesis {
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub base_fee_per_gas: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub excess_blob_gas: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub excess_blob_gas: Option<u128>,
     /// The genesis header blob gas used
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
-    pub blob_gas_used: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_hex_or_decimal_opt")]
+    pub blob_gas_used: Option<u128>,
     /// The genesis block number
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt")]
     pub number: Option<u64>,
 }
 
@@ -159,7 +158,7 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u128) -> Self {
         self.gas_limit = gas_limit;
         self
     }
@@ -183,19 +182,19 @@ impl Genesis {
     }
 
     /// Set the base fee.
-    pub const fn with_base_fee(mut self, base_fee: Option<u64>) -> Self {
+    pub const fn with_base_fee(mut self, base_fee: Option<u128>) -> Self {
         self.base_fee_per_gas = base_fee;
         self
     }
 
     /// Set the excess blob gas.
-    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u128>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u128>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
@@ -212,14 +211,13 @@ impl Genesis {
 }
 
 /// An account in the state of the genesis block.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
     #[serde(skip_serializing_if = "Option::is_none", with = "u64_hex_or_decimal_opt", default)]
     pub nonce: Option<u64>,
     /// The balance of the account at genesis.
-    #[serde(deserialize_with = "deserialize_json_u256")]
     pub balance: U256,
     /// The account's bytecode at genesis.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -273,7 +271,7 @@ impl GenesisAccount {
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
-#[derive(Clone, Debug, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
@@ -524,11 +522,11 @@ const fn mainnet_id() -> u64 {
 }
 
 /// Empty consensus configuration for proof-of-work networks.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EthashConfig {}
 
 /// Consensus configuration for Clique.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CliqueConfig {
     /// Number of seconds between blocks to enforce.
     #[serde(default, skip_serializing_if = "Option::is_none")]

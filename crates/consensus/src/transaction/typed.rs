@@ -1,4 +1,7 @@
-use crate::{Transaction, TxEip1559, TxEip2930, TxEip4844Variant, TxLegacy, TxType};
+use crate::{
+    Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar,
+    TxEnvelope, TxLegacy, TxType,
+};
 use alloy_primitives::TxKind;
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
@@ -8,7 +11,7 @@ use alloy_primitives::TxKind;
 /// 2. EIP2930 (state access lists) [`TxEip2930`]
 /// 3. EIP1559 [`TxEip1559`]
 /// 4. EIP4844 [`TxEip4844Variant`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 pub enum TypedTransaction {
@@ -47,6 +50,29 @@ impl From<TxEip1559> for TypedTransaction {
 impl From<TxEip4844Variant> for TypedTransaction {
     fn from(tx: TxEip4844Variant) -> Self {
         Self::Eip4844(tx)
+    }
+}
+
+impl From<TxEip4844> for TypedTransaction {
+    fn from(tx: TxEip4844) -> Self {
+        Self::Eip4844(tx.into())
+    }
+}
+
+impl From<TxEip4844WithSidecar> for TypedTransaction {
+    fn from(tx: TxEip4844WithSidecar) -> Self {
+        Self::Eip4844(tx.into())
+    }
+}
+
+impl From<TxEnvelope> for TypedTransaction {
+    fn from(envelope: TxEnvelope) -> Self {
+        match envelope {
+            TxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
+            TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
+            TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
+            TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
+        }
     }
 }
 
@@ -96,7 +122,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn gas_limit(&self) -> u64 {
+    fn gas_limit(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
             Self::Eip2930(tx) => tx.gas_limit(),
@@ -105,7 +131,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn gas_price(&self) -> Option<alloy_primitives::U256> {
+    fn gas_price(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.gas_price(),
             Self::Eip2930(tx) => tx.gas_price(),
