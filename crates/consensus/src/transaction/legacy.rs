@@ -7,7 +7,7 @@ use core::mem;
 use alloc::vec::Vec;
 
 /// Legacy transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxLegacy {
@@ -75,7 +75,8 @@ impl TxLegacy {
 
     /// Outputs the length of the transaction's fields, without a RLP header or length of the
     /// eip155 fields.
-    pub(crate) fn fields_len(&self) -> usize {
+    #[doc(hidden)]
+    pub fn fields_len(&self) -> usize {
         let mut len = 0;
         len += self.nonce.length();
         len += self.gas_price.length();
@@ -153,7 +154,8 @@ impl TxLegacy {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+    #[doc(hidden)]
+    pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);

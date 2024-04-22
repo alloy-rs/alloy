@@ -22,7 +22,7 @@ pub use optimism::OptimismTransactionReceiptFields;
 
 mod receipt;
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
-pub use receipt::TransactionReceipt;
+pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
@@ -31,7 +31,7 @@ mod signature;
 pub use signature::{Parity, Signature};
 
 /// Transaction object used in RPC
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {
@@ -41,12 +41,21 @@ pub struct Transaction {
     #[serde(with = "alloy_serde::num::u64_hex")]
     pub nonce: u64,
     /// Block hash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_hash: Option<B256>,
     /// Block number
-    #[serde(with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u64_hex_opt"
+    )]
     pub block_number: Option<u64>,
     /// Transaction Index
-    #[serde(with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u64_hex_opt"
+    )]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
@@ -105,8 +114,9 @@ pub struct Transaction {
     pub access_list: Option<AccessList>,
     /// EIP2718
     ///
-    /// Transaction type, Some(2) for EIP-1559 transaction,
-    /// Some(1) for AccessList transaction, None for Legacy
+    /// Transaction type,
+    /// Some(3) for EIP-4844 transaction, Some(2) for EIP-1559 transaction,
+    /// Some(1) for AccessList transaction, None or Some(0) for Legacy
     #[serde(
         default,
         rename = "type",
@@ -123,6 +133,11 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    /// Returns true if the transaction is a legacy or 2930 transaction.
+    pub const fn is_legacy_gas(&self) -> bool {
+        self.gas_price.is_none()
+    }
+
     /// Converts [Transaction] into [TransactionRequest].
     ///
     /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
@@ -137,6 +152,7 @@ impl Transaction {
             // unreachable
             (None, None) => None,
         };
+
         TransactionRequest {
             from: Some(self.from),
             to: self.to,
@@ -236,7 +252,9 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
             value: tx.value,
             input: tx.input,
             access_list: tx.access_list.unwrap_or_default(),
-            blob_versioned_hashes: tx.blob_versioned_hashes.unwrap_or_default(),
+            blob_versioned_hashes: tx
+                .blob_versioned_hashes
+                .ok_or(ConversionError::MissingBlobVersionedHashes)?,
             max_fee_per_blob_gas: tx
                 .max_fee_per_blob_gas
                 .ok_or(ConversionError::MissingMaxFeePerBlobGas)?,
@@ -374,7 +392,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);

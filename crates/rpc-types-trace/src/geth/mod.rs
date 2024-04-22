@@ -28,7 +28,7 @@ pub type TraceResult = crate::common::TraceResult<GethTrace, String>;
 
 /// blockTraceResult represents the results of tracing a single block when an entire chain is being
 /// traced. ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/eth/tracers/api.go#L218-L222>
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockTraceResult {
     /// Block number corresponding to the trace task
     pub block: U256,
@@ -41,7 +41,7 @@ pub struct BlockTraceResult {
 /// Geth Default struct log trace frame
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/a9ef135e2dd53682d106c6a2aede9187026cc1de/eth/tracers/logger/logger.go#L406-L411>
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DefaultFrame {
     /// Whether the transaction failed
@@ -58,7 +58,7 @@ pub struct DefaultFrame {
 /// Represents a struct log entry in a trace
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/366d2169fbc0e0f803b68c042b77b6b480836dbc/eth/tracers/logger/logger.go#L413-L426>
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StructLog {
     /// program counter
     pub pc: u64,
@@ -104,7 +104,7 @@ pub struct StructLog {
 /// Note: This deserializes untagged, so it's possible that a custom javascript tracer response
 /// matches another variant, for example a js tracer that returns `{}` would be deserialized as
 /// [GethTrace::NoopTracer]
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethTrace {
     /// The response for the default struct log tracer
@@ -162,7 +162,7 @@ impl From<MuxFrame> for GethTrace {
 /// Available built-in tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers>
-#[derive(Debug, Copy, PartialEq, Eq, Clone, Hash, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GethDebugBuiltInTracerType {
     /// The 4byteTracer collects the function selectors of every function executed in the lifetime
     /// of a transaction, along with the size of the supplied call data. The result is a
@@ -196,7 +196,7 @@ pub enum GethDebugBuiltInTracerType {
 /// Available tracers
 ///
 /// See <https://geth.ethereum.org/docs/developers/evm-tracing/built-in-tracers> and <https://geth.ethereum.org/docs/developers/evm-tracing/custom-tracer>
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GethDebugTracerType {
     /// built-in tracer
@@ -215,7 +215,7 @@ impl From<GethDebugBuiltInTracerType> for GethDebugTracerType {
 ///
 /// This is a simple wrapper around serde_json::Value.
 /// with helpers for deserializing tracer configs.
-#[derive(Debug, PartialEq, Eq, Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GethDebugTracerConfig(pub serde_json::Value);
 
@@ -271,7 +271,7 @@ impl From<serde_json::Value> for GethDebugTracerConfig {
 /// Bindings for additional `debug_traceTransaction` options
 ///
 /// See <https://geth.ethereum.org/docs/rpc/ns-debug#debug_tracetransaction>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GethDebugTracingOptions {
     /// The common tracing options
@@ -331,7 +331,7 @@ impl GethDebugTracingOptions {
 /// These are all known general purpose tracer options that may or not be supported by a given
 /// tracer. For example, the `enableReturnData` option is a noop on regular
 /// `debug_trace{Transaction,Block}` calls.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GethDefaultTracingOptions {
     /// enable memory capture
@@ -483,7 +483,7 @@ impl GethDefaultTracingOptions {
 /// Bindings for additional `debug_traceCall` options
 ///
 /// See <https://geth.ethereum.org/docs/rpc/ns-debug#debug_tracecall>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GethDebugTracingCallOptions {
     /// All the options
@@ -495,6 +495,26 @@ pub struct GethDebugTracingCallOptions {
     /// The block overrides to apply
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_overrides: Option<BlockOverrides>,
+}
+
+impl GethDebugTracingCallOptions {
+    /// Enables state overrides
+    pub fn with_state_overrides(mut self, overrides: StateOverride) -> Self {
+        self.state_overrides = Some(overrides);
+        self
+    }
+
+    /// Enables block overrides
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Sets the tracing options
+    pub fn with_tracing_options(mut self, options: GethDebugTracingOptions) -> Self {
+        self.tracing_options = options;
+        self
+    }
 }
 
 /// Serializes a storage map as a list of key-value pairs _without_ 0x-prefix

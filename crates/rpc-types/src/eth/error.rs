@@ -1,7 +1,7 @@
 //! Commonly used errors for the `eth_` namespace.
 
 /// List of JSON-RPC error codes
-#[derive(Debug, Copy, PartialEq, Eq, Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EthRpcErrorCode {
     /// Failed to send transaction, See also <https://github.com/MetaMask/eth-rpc-errors/blob/main/src/error-constants.ts>
     TransactionRejected,

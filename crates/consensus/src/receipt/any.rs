@@ -13,7 +13,7 @@ use alloy_rlp::{Decodable, Encodable};
 /// Transaction receipt payloads are specified in their respective EIPs.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AnyReceiptEnvelope<T = Log> {
     /// The receipt envelope.
@@ -24,12 +24,10 @@ pub struct AnyReceiptEnvelope<T = Log> {
     pub r#type: u8,
 }
 
-impl AnyReceiptEnvelope {
-    /// Returns whether this is a legacy receipt (type 0)
-    pub const fn is_legacy(&self) -> bool {
-        self.r#type == 0
-    }
-
+impl<T> AnyReceiptEnvelope<T>
+where
+    T: Encodable,
+{
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
         let length = self.inner.length();
@@ -41,7 +39,39 @@ impl AnyReceiptEnvelope {
     }
 }
 
-impl TxReceipt for AnyReceiptEnvelope {
+impl<T> AnyReceiptEnvelope<T> {
+    /// Returns whether this is a legacy receipt (type 0)
+    pub const fn is_legacy(&self) -> bool {
+        self.r#type == 0
+    }
+
+    /// Return true if the transaction was successful.
+    pub const fn is_success(&self) -> bool {
+        self.status()
+    }
+
+    /// Returns the success status of the receipt's transaction.
+    pub const fn status(&self) -> bool {
+        self.inner.receipt.status
+    }
+
+    /// Return the receipt's bloom.
+    pub fn bloom(&self) -> Bloom {
+        self.inner.logs_bloom
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    pub const fn cumulative_gas_used(&self) -> u128 {
+        self.inner.receipt.cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    pub fn logs(&self) -> &[T] {
+        &self.inner.receipt.logs
+    }
+}
+
+impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
     /// Returns the success status of the receipt's transaction.
     fn status(&self) -> bool {
         self.inner.receipt.status
@@ -53,13 +83,14 @@ impl TxReceipt for AnyReceiptEnvelope {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    fn cumulative_gas_used(&self) -> u64 {
+    fn cumulative_gas_used(&self) -> u128 {
         self.inner.receipt.cumulative_gas_used
     }
 
     /// Return the receipt logs.
-    fn logs(&self) -> &[Log] {
-        &self.inner.receipt.logs
+    fn logs(&self) -> &[T] {
+        // &self.inner.receipt.logs
+        todo!()
     }
 }
 

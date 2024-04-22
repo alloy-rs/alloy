@@ -34,15 +34,13 @@ use tower::Service;
 ///
 /// [`TransportConnect`]: crate::TransportConnect
 pub trait Transport:
-    private::Sealed
-    + Service<
+    Service<
         RequestPacket,
         Response = ResponsePacket,
         Error = TransportError,
         Future = TransportFut<'static>,
     > + Send
     + Sync
-    + std::any::Any
     + 'static
 {
     /// Convert this transport into a boxed trait object.
@@ -63,8 +61,7 @@ pub trait Transport:
 }
 
 impl<T> Transport for T where
-    T: private::Sealed
-        + Service<
+    T: Service<
             RequestPacket,
             Response = ResponsePacket,
             Error = TransportError,
@@ -73,21 +70,4 @@ impl<T> Transport for T where
         + Sync
         + 'static
 {
-}
-
-mod private {
-    use super::*;
-
-    pub trait Sealed {}
-    impl<T> Sealed for T where
-        T: Service<
-                RequestPacket,
-                Response = ResponsePacket,
-                Error = TransportError,
-                Future = TransportFut<'static>,
-            > + Send
-            + Sync
-            + 'static
-    {
-    }
 }

@@ -39,7 +39,7 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
-pub mod layers;
+pub mod fillers;
 
 mod chain;
 
@@ -47,9 +47,14 @@ mod heart;
 pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
 mod provider;
-pub use provider::{FilterPollerBuilder, Provider, RootProvider};
+pub use provider::{FilterPollerBuilder, Provider, RootProvider, SendableTx};
+
+mod wallet;
+pub use wallet::WalletProvider;
 
 pub mod admin;
+pub mod debug;
+pub mod txpool;
 pub mod utils;
 
 #[doc(no_inline)]

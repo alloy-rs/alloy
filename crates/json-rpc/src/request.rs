@@ -5,7 +5,7 @@ use serde_json::value::RawValue;
 use std::borrow::Cow;
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct RequestMeta {
     /// The method name.
     pub method: Cow<'static, str>,
@@ -29,7 +29,13 @@ impl RequestMeta {
     /// Indicates that the request is a non-standard subscription (i.e. not
     /// "eth_subscribe").
     pub fn set_is_subscription(&mut self) {
-        self.is_subscription = true;
+        self.set_subscription_status(true);
+    }
+
+    /// Setter for `is_subscription`. Indicates to RPC clients that the request
+    /// triggers a stream of notifications.
+    pub fn set_subscription_status(&mut self, sub: bool) {
+        self.is_subscription = sub;
     }
 }
 
@@ -42,7 +48,7 @@ impl RequestMeta {
 /// ### Note
 ///
 /// The value of `method` should be known at compile time.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Request<Params> {
     /// The request metadata (ID and method).
     pub meta: RequestMeta,
@@ -65,6 +71,12 @@ impl<Params> Request<Params> {
     /// "eth_subscribe").
     pub fn set_is_subscription(&mut self) {
         self.meta.set_is_subscription()
+    }
+
+    /// Setter for `is_subscription`. Indicates to RPC clients that the request
+    /// triggers a stream of notifications.
+    pub fn set_subscription_status(&mut self, sub: bool) {
+        self.meta.set_subscription_status(sub);
     }
 }
 
@@ -166,7 +178,7 @@ where
 /// This struct is used to represent a request that has been serialized, but
 /// not yet sent. It is used by RPC clients to build batch requests and manage
 /// in-flight requests.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SerializedRequest {
     meta: RequestMeta,
     request: Box<RawValue>,

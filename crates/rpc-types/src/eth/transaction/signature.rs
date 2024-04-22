@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Container type for all signature fields in RPC
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Signature {
     /// The R field of the signature; the point on the curve.
     pub r: U256,
@@ -28,7 +28,7 @@ pub struct Signature {
 ///
 /// This will be serialized as "0x0" if false, and "0x1" if true.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Parity(
     #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
 );

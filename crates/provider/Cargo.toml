@@ -12,8 +12,11 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
+alloy-eips.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
+alloy-node-bindings = { workspace = true, optional = true }
+alloy-signer-wallet = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-trace.workspace = true
 alloy-rpc-types.workspace = true
@@ -35,6 +38,7 @@ serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
+futures-utils-wasm.workspace = true
 
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
@@ -48,7 +52,7 @@ tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
 
 [features]
-default = ["reqwest"]
+default = ["reqwest", "reqwest-default-tls"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
@@ -59,3 +63,7 @@ reqwest = [
 hyper = ["dep:alloy-transport-http", "dep:url", "alloy-rpc-client/hyper"]
 ws = ["pubsub", "alloy-rpc-client/ws", "alloy-transport-ws"]
 ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
+reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
+reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
+reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
+anvil = ["reqwest", "dep:alloy-node-bindings", "dep:alloy-signer-wallet"]

@@ -11,7 +11,7 @@ pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
 /// Return type of EIP1155 gas fee estimator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Eip1559Estimation {
     /// The base fee per gas.
     pub max_fee_per_gas: u128,
@@ -47,7 +47,10 @@ pub fn eip1559_default_estimator(
     let max_priority_fee_per_gas = estimate_priority_fee(rewards);
     let potential_max_fee = base_fee_per_gas * EIP1559_BASE_FEE_MULTIPLIER;
 
-    Eip1559Estimation { max_fee_per_gas: potential_max_fee, max_priority_fee_per_gas }
+    Eip1559Estimation {
+        max_fee_per_gas: potential_max_fee + max_priority_fee_per_gas,
+        max_priority_fee_per_gas,
+    }
 }
 
 #[cfg(test)]
@@ -88,7 +91,22 @@ mod tests {
         assert_eq!(
             super::eip1559_default_estimator(base_fee_per_gas, &rewards),
             Eip1559Estimation {
-                max_fee_per_gas: 2_000_000_000_u128,
+                max_fee_per_gas: 202_000_000_000_u128,
+                max_priority_fee_per_gas: 200_000_000_000_u128
+            }
+        );
+
+        let base_fee_per_gas = 0u128;
+        let rewards = vec![
+            vec![200_000_000_000_u128],
+            vec![200_000_000_000_u128],
+            vec![300_000_000_000_u128],
+        ];
+
+        assert_eq!(
+            super::eip1559_default_estimator(base_fee_per_gas, &rewards),
+            Eip1559Estimation {
+                max_fee_per_gas: 200_000_000_000_u128,
                 max_priority_fee_per_gas: 200_000_000_000_u128
             }
         );

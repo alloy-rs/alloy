@@ -10,7 +10,7 @@ use alloy_rpc_types::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(missing_copy_implementations)]
 pub enum OperationType {
     /// Operation Transfer
@@ -24,7 +24,7 @@ pub enum OperationType {
 }
 
 /// Custom struct for otterscan `getInternalOperations` RPC response
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InternalOperation {
     pub r#type: OperationType,
     pub from: Address,
@@ -33,7 +33,7 @@ pub struct InternalOperation {
 }
 
 /// Custom struct for otterscan `traceTransaction` RPC response
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceEntry {
     pub r#type: String,
     pub depth: u32,
@@ -44,7 +44,7 @@ pub struct TraceEntry {
 }
 
 /// Internal issuance struct for `BlockDetails` struct
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(missing_copy_implementations)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalIssuance {
@@ -54,7 +54,7 @@ pub struct InternalIssuance {
 }
 
 /// Custom `Block` struct that includes transaction count for Otterscan responses
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsBlock {
     #[serde(flatten)]
@@ -69,7 +69,7 @@ impl From<Block> for OtsBlock {
 }
 
 /// Custom struct for otterscan `getBlockDetails` RPC response
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockDetails {
     pub block: OtsBlock,
@@ -88,7 +88,7 @@ impl From<Rich<Block>> for BlockDetails {
 }
 
 /// Custom transaction receipt struct for otterscan `OtsBlockTransactions` struct
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsTransactionReceipt {
     /// The transaction receipt.
@@ -101,7 +101,7 @@ pub struct OtsTransactionReceipt {
 }
 
 /// The receipt of a transaction.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsReceipt {
     /// If transaction is executed successfully.
@@ -126,7 +126,7 @@ pub struct OtsReceipt {
 }
 
 /// Custom struct for otterscan `getBlockTransactions` RPC response
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OtsBlockTransactions {
     pub fullblock: OtsBlock,
     pub receipts: Vec<OtsTransactionReceipt>,
@@ -134,7 +134,7 @@ pub struct OtsBlockTransactions {
 
 /// Custom struct for otterscan `searchTransactionsAfter`and `searchTransactionsBefore` RPC
 /// responses
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionsWithReceipts {
     pub txs: Vec<Transaction>,
@@ -144,7 +144,7 @@ pub struct TransactionsWithReceipts {
 }
 
 /// Custom struct for otterscan `getContractCreator` RPC responses
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     pub tx: Transaction,
     pub creator: Address,

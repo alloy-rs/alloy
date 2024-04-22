@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 
 /// Syncing info
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
     /// Starting block
@@ -19,7 +19,7 @@ pub struct SyncInfo {
 }
 
 /// Peers info
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Peers {
     /// Number of active peers
     pub active: usize,
@@ -32,7 +32,7 @@ pub struct Peers {
 }
 
 /// Number of peers connected to.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PeerCount {
     /// Peer count as integer
@@ -42,7 +42,7 @@ pub enum PeerCount {
 }
 
 /// Peer connection information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerInfo {
     /// Public node id
     pub id: Option<String>,
@@ -57,7 +57,7 @@ pub struct PeerInfo {
 }
 
 /// Peer network information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PeerNetworkInfo {
     /// Remote endpoint address
@@ -67,7 +67,7 @@ pub struct PeerNetworkInfo {
 }
 
 /// Peer protocols information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerProtocolsInfo {
     /// Ethereum protocol information
     pub eth: Option<PeerEthProtocolInfo>,
@@ -77,7 +77,7 @@ pub struct PeerProtocolsInfo {
 }
 
 /// Peer Ethereum protocol information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerEthProtocolInfo {
     /// Negotiated ethereum protocol version
     pub version: u32,
@@ -88,7 +88,7 @@ pub struct PeerEthProtocolInfo {
 }
 
 /// Peer PIP protocol information
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PipProtocolInfo {
     /// Negotiated PIP protocol version
     pub version: u32,
@@ -99,7 +99,7 @@ pub struct PipProtocolInfo {
 }
 
 /// Sync status
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SyncStatus {
     /// Info when syncing
     Info(SyncInfo),
@@ -143,7 +143,7 @@ impl Serialize for SyncStatus {
 }
 
 /// Propagation statistics for pending transaction.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionStats {
     /// Block no this transaction was first seen.
@@ -153,7 +153,7 @@ pub struct TransactionStats {
 }
 
 /// Chain status.
-#[derive(Debug, Copy, Clone, Default, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChainStatus {
     /// Describes the gap in the blockchain, if there is one: (first, last)

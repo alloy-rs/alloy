@@ -1,7 +1,7 @@
 //! Types for the `txpool` namespace: <https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-txpool>
 
 use crate::Transaction;
-use alloy_primitives::{Address, U256, U64};
+use alloy_primitives::{Address, U256};
 use serde::{
     de::{self, Deserializer, Visitor},
     Deserialize, Serialize,
@@ -9,16 +9,16 @@ use serde::{
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
 /// Transaction summary as found in the Txpool Inspection property.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TxpoolInspectSummary {
     /// Recipient (None when contract creation)
     pub to: Option<Address>,
     /// Transferred value
     pub value: U256,
     /// Gas amount
-    pub gas: U256,
+    pub gas: u128,
     /// Gas Price
-    pub gas_price: U256,
+    pub gas_price: u128,
 }
 
 /// Visitor struct for TxpoolInspectSummary.
@@ -62,8 +62,8 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
             }
         };
         let value = U256::from_str(value_split[0]).map_err(de::Error::custom)?;
-        let gas = U256::from_str(gas_split[0]).map_err(de::Error::custom)?;
-        let gas_price = U256::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
+        let gas = u128::from_str(gas_split[0]).map_err(de::Error::custom)?;
+        let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
         Ok(TxpoolInspectSummary { to: addr, value, gas, gas_price })
     }
@@ -113,7 +113,7 @@ impl Serialize for TxpoolInspectSummary {
 /// as the ones that are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContent {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, Transaction>>,
@@ -136,7 +136,7 @@ impl TxpoolContent {
 /// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContentFrom {
     /// pending tx
     pub pending: BTreeMap<String, Transaction>,
@@ -153,7 +153,7 @@ pub struct TxpoolContentFrom {
 /// transactions in the pool and find any potential issues.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect) for more details
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolInspect {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
@@ -168,12 +168,14 @@ pub struct TxpoolInspect {
 /// are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status) for more details
-#[derive(Debug, Copy, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolStatus {
     /// number of pending tx
-    pub pending: U64,
+    #[serde(with = "alloy_serde::num::u64_hex")]
+    pub pending: u64,
     /// number of queued tx
-    pub queued: U64,
+    #[serde(with = "alloy_serde::num::u64_hex")]
+    pub queued: u64,
 }
 
 #[cfg(test)]
@@ -190,8 +192,6 @@ mod tests {
   "pending": {
     "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a": {
       "29": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a",
         "gas": "0x2af9e",
         "gasPrice": "0x218711a00",
@@ -201,7 +201,6 @@ mod tests {
         "input": "0x5ae401dc00000000000000000000000000000000000000000000000000000000636c757700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e404e45aaf000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000863b56a3c1f0f1be8bc4f8b7bd78f57a000000000000000000000000000000000000000000000000000000007781df4000000000000000000000000000000000000000000000006c240454bf9c87cd84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x1d",
         "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -213,8 +212,6 @@ mod tests {
     },
     "0x000042429c09de5881f05a0c2a068222f4f5b091": {
       "38": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x000042429c09de5881f05a0c2a068222f4f5b091",
         "gas": "0x61a80",
         "gasPrice": "0x2540be400",
@@ -222,7 +219,6 @@ mod tests {
         "input": "0x27dc297e800332e506f28f49a13c1edf087bdd6482d6cb3abdf2a4c455642aef1e98fc240000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002d7b22444149223a313439332e37342c2254555344223a313438392e36362c2255534443223a313439322e34387d00000000000000000000000000000000000000",
         "nonce": "0x26",
         "to": "0xabd279febe00c93fb0c9e683c6919ec4f107241f",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x0",
         "chainId": "0x1",
@@ -233,8 +229,6 @@ mod tests {
     },
     "0x000fab888651fbceb55de230493562159ead0340": {
       "12": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x000fab888651fbceb55de230493562159ead0340",
         "gas": "0x12fed",
         "gasPrice": "0x1a13b8600",
@@ -244,7 +238,6 @@ mod tests {
         "input": "0xa9059cbb00000000000000000000000050272a56ef9aff7238e8b40347da62e87c1f69e200000000000000000000000000000000000000000000000000000000428d3dfc",
         "nonce": "0xc",
         "to": "0x8e8d6ab093905c400d583efd37fbeeb1ee1c0c39",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -258,8 +251,6 @@ mod tests {
   "queued": {
     "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf": {
       "143": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf",
         "gas": "0x33c3b",
         "gasPrice": "0x218711a00",
@@ -269,7 +260,6 @@ mod tests {
         "input": "0x03a9ea6d00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000f2ff840000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000041d0c4694374d7893d63605625687be2f01028a5b49eca00f72901e773ad8ba7906e58d43e114a28353efaf8abd6a2675de83a3a07af579b8b268e6b714376610d1c00000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x8f",
         "to": "0xfbddadd80fe7bda00b901fbaf73803f2238ae655",
-        "transactionIndex": null,
         "value": "0x1f58a57c1794eb",
         "type": "0x2",
         "accessList": [],
@@ -281,8 +271,6 @@ mod tests {
     },
     "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd": {
       "1": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7918",
         "gasPrice": "0x12e531724e",
@@ -292,7 +280,6 @@ mod tests {
         "input": "0x",
         "nonce": "0x1",
         "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -302,8 +289,6 @@ mod tests {
         "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a"
       },
       "4": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7530",
         "gasPrice": "0x1919617600",
@@ -313,7 +298,6 @@ mod tests {
         "input": "0x",
         "nonce": "0x4",
         "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -325,8 +309,6 @@ mod tests {
     },
     "0x02666081cfb787de3562efbbca5f0fe890e927f1": {
       "44": {
-        "blockHash": null,
-        "blockNumber": null,
         "from": "0x02666081cfb787de3562efbbca5f0fe890e927f1",
         "gas": "0x16404",
         "gasPrice": "0x4bad00695",
@@ -336,7 +318,6 @@ mod tests {
         "input": "0x095ea7b300000000000000000000000029fbd00940df70cfc5dad3f2370686991e2bbf5cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "nonce": "0x2c",
         "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -413,8 +394,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("000000000000000000000000000000000000007E").unwrap()),
                 value: U256::from(0u128),
-                gas: U256::from(100187u128),
-                gas_price: U256::from(20000000000u128),
+                gas: 100187u128,
+                gas_price: 20000000000u128,
             },
         );
         pending_map.insert(
@@ -427,8 +408,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: U256::from(65792u128),
-                gas_price: U256::from(2000000000u128),
+                gas: 65792u128,
+                gas_price: 2000000000u128,
             },
         );
         pending_map_inner.insert(
@@ -436,8 +417,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: U256::from(65792u128),
-                gas_price: U256::from(2000000000u128),
+                gas: 65792u128,
+                gas_price: 2000000000u128,
             },
         );
         pending_map_inner.insert(
@@ -445,8 +426,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: U256::from(65780u128),
-                gas_price: U256::from(2000000000u128),
+                gas: 65780u128,
+                gas_price: 2000000000u128,
             },
         );
         pending_map_inner.insert(
@@ -454,8 +435,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
-                gas: U256::from(65780u128),
-                gas_price: U256::from(2000000000u128),
+                gas: 65780u128,
+                gas_price: 2000000000u128,
             },
         );
         pending_map.insert(
@@ -468,8 +449,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: None,
                 value: U256::from(0u128),
-                gas: U256::from(612412u128),
-                gas_price: U256::from(6000000000u128),
+                gas: 612412u128,
+                gas_price: 6000000000u128,
             },
         );
         pending_map.insert(
@@ -483,8 +464,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("3479BE69e07E838D9738a301Bb0c89e8EA2Bef4a").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: U256::from(21000u128),
-                gas_price: U256::from(10000000000u128),
+                gas: 21000u128,
+                gas_price: 10000000000u128,
             },
         );
         queued_map_inner.insert(
@@ -492,8 +473,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(1000000000000000u128),
-                gas: U256::from(21000u128),
-                gas_price: U256::from(10000000000u128),
+                gas: 21000u128,
+                gas_price: 10000000000u128,
             },
         );
         queued_map.insert(
@@ -506,8 +487,8 @@ mod tests {
             TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(10000000000000000u128),
-                gas: U256::from(21000u128),
-                gas_price: U256::from(10000000000u128),
+                gas: 21000u128,
+                gas_price: 10000000000u128,
             },
         );
         queued_map.insert(

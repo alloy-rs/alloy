@@ -7,18 +7,18 @@ use alloy_transport::{BoxTransport, BoxTransportConnect, TransportError, Transpo
 use alloy_pubsub::PubSubConnect;
 
 /// Connection string for built-in transports.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BuiltInConnectionString {
-    #[cfg(any(feature = "reqwest", feature = "hyper"))]
     /// HTTP transport.
+    #[cfg(any(feature = "reqwest", feature = "hyper"))]
     Http(url::Url),
-    #[cfg(feature = "ws")]
     /// WebSocket transport.
+    #[cfg(feature = "ws")]
     Ws(url::Url, Option<alloy_transport::Authorization>),
-    #[cfg(feature = "ipc")]
     /// IPC transport.
-    Ipc(String),
+    #[cfg(feature = "ipc")]
+    Ipc(std::path::PathBuf),
 }
 
 impl BoxTransportConnect for BuiltInConnectionString {
@@ -43,7 +43,7 @@ impl BoxTransportConnect for BuiltInConnectionString {
     fn get_boxed_transport<'a: 'b, 'b>(
         &'a self,
     ) -> alloy_transport::Pbf<'b, BoxTransport, TransportError> {
-        Box::pin(async move { self.connect_boxed().await })
+        Box::pin(self.connect_boxed())
     }
 }
 
@@ -106,15 +106,17 @@ impl BuiltInConnectionString {
     #[cfg(any(feature = "reqwest", feature = "hyper"))]
     pub fn try_as_http(s: &str) -> Result<Self, TransportError> {
         let url = if s.starts_with("localhost:") || s.parse::<std::net::SocketAddr>().is_ok() {
-            let s = format!("http://{}", s);
+            let s = format!("http://{s}");
             url::Url::parse(&s)
         } else {
             url::Url::parse(s)
         }
         .map_err(TransportErrorKind::custom)?;
 
-        if url.scheme() != "http" && url.scheme() != "https" {
-            Err(TransportErrorKind::custom_str("Invalid scheme. Expected http or https"))?;
+        let scheme = url.scheme();
+        if scheme != "http" && scheme != "https" {
+            let msg = format!("invalid URL scheme: {scheme}; expected `http` or `https`");
+            return Err(TransportErrorKind::custom_str(&msg));
         }
 
         Ok(Self::Http(url))
@@ -131,8 +133,10 @@ impl BuiltInConnectionString {
         }
         .map_err(TransportErrorKind::custom)?;
 
-        if url.scheme() != "ws" && url.scheme() != "wss" {
-            Err(TransportErrorKind::custom_str("Invalid scheme. Expected ws or wss"))?;
+        let scheme = url.scheme();
+        if scheme != "ws" && scheme != "wss" {
+            let msg = format!("invalid URL scheme: {scheme}; expected `ws` or `wss`");
+            return Err(TransportErrorKind::custom_str(&msg));
         }
 
         let auth = alloy_transport::Authorization::extract_from_url(&url);
@@ -144,18 +148,16 @@ impl BuiltInConnectionString {
     /// the path does not exist.
     #[cfg(feature = "ipc")]
     pub fn try_as_ipc(s: &str) -> Result<Self, TransportError> {
-        let s = s.strip_prefix("file://").unwrap_or(s);
-        let s = s.strip_prefix("ipc://").unwrap_or(s);
+        let s = s.strip_prefix("file://").or_else(|| s.strip_prefix("ipc://")).unwrap_or(s);
 
-        // Check if s is a path and it exists
-        let path = std::path::Path::new(&s);
+        // Check if it exists.
+        let path = std::path::Path::new(s);
+        let _meta = path.metadata().map_err(|e| {
+            let msg = format!("failed to read IPC path {}: {e}", path.display());
+            TransportErrorKind::custom_str(&msg)
+        })?;
 
-        path.is_file().then_some(Self::Ipc(s.to_string())).ok_or_else(|| {
-            TransportErrorKind::custom_str(&format!(
-                "Invalid IPC path. File does not exist: {}",
-                path.display()
-            ))
-        })
+        Ok(Self::Ipc(path.to_path_buf()))
     }
 }
 
@@ -213,6 +215,10 @@ mod test {
             BuiltInConnectionString::from_str("127.0.0.1:8545").unwrap(),
             BuiltInConnectionString::Http("http://127.0.0.1:8545".parse::<Url>().unwrap())
         );
+        assert_eq!(
+            BuiltInConnectionString::from_str("http://user:pass@example.com").unwrap(),
+            BuiltInConnectionString::Http("http://user:pass@example.com".parse::<Url>().unwrap())
+        );
     }
 
     #[test]
@@ -245,35 +251,28 @@ mod test {
     #[test]
     #[cfg(feature = "ipc")]
     fn test_parsing_ipc() {
-        // Create a temp file and save it.
+        use alloy_node_bindings::Anvil;
+
+        // Spawn an Anvil instance to create an IPC socket, as it's different from a normal file.
         let temp_dir = tempfile::tempdir().unwrap();
-        let temp_file = temp_dir.path().join("reth.ipc");
-
-        // Save it
-        std::fs::write(&temp_file, "reth ipc").unwrap();
-        assert!(temp_file.is_file());
-        let temp_file_str = temp_file.to_str().unwrap().to_string();
+        let ipc_path = temp_dir.path().join("anvil.ipc");
+        let ipc_arg = format!("--ipc={}", ipc_path.display());
+        let _anvil = Anvil::new().arg(ipc_arg).spawn();
+        let path_str = ipc_path.to_str().unwrap();
 
         assert_eq!(
-            BuiltInConnectionString::from_str(&format!("ipc://{}", temp_file_str)).unwrap(),
-            BuiltInConnectionString::Ipc(temp_file_str.clone())
+            BuiltInConnectionString::from_str(&format!("ipc://{}", path_str)).unwrap(),
+            BuiltInConnectionString::Ipc(ipc_path.clone())
         );
 
         assert_eq!(
-            BuiltInConnectionString::from_str(&format!("file://{}", temp_file_str)).unwrap(),
-            BuiltInConnectionString::Ipc(temp_file_str.clone())
+            BuiltInConnectionString::from_str(&format!("file://{}", path_str)).unwrap(),
+            BuiltInConnectionString::Ipc(ipc_path.clone())
         );
 
         assert_eq!(
-            BuiltInConnectionString::from_str(temp_file.to_str().unwrap()).unwrap(),
-            BuiltInConnectionString::Ipc(temp_file_str.clone())
-        );
-
-        // Delete the written file after test
-        std::fs::remove_file(temp_file).unwrap();
-        assert_eq!(
-            BuiltInConnectionString::from_str("http://user:pass@example.com").unwrap(),
-            BuiltInConnectionString::Http("http://user:pass@example.com".parse::<Url>().unwrap())
+            BuiltInConnectionString::from_str(ipc_path.to_str().unwrap()).unwrap(),
+            BuiltInConnectionString::Ipc(ipc_path.clone())
         );
     }
 }

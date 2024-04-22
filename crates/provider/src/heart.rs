@@ -3,7 +3,7 @@
 use crate::{Provider, RootProvider};
 use alloy_json_rpc::RpcError;
 use alloy_network::Network;
-use alloy_primitives::{B256, U256};
+use alloy_primitives::B256;
 use alloy_rpc_types::Block;
 use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
@@ -180,6 +180,13 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
+        // Try fetching receipt immediately to ensure that we don't watch for a transaction that is
+        // already confirmed.
+        let receipt = self.provider.get_transaction_receipt(self.config.tx_hash).await?;
+        if let Some(receipt) = receipt {
+            return Ok(receipt);
+        }
+
         let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
         let hash = pending_tx.await?;
         let receipt = self.provider.get_transaction_receipt(hash).await?;
@@ -363,7 +370,7 @@ pub(crate) struct Heartbeat<S> {
     unconfirmed: HashMap<B256, TxWatcher>,
 
     /// Ordered map of transactions waiting for confirmations.
-    waiting_confs: BTreeMap<U256, Vec<TxWatcher>>,
+    waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
 
     /// Ordered map of transactions to reap at a certain time.
     reap_at: BTreeMap<Instant, B256>,
@@ -383,8 +390,8 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
 
 impl<S> Heartbeat<S> {
     /// Check if any transactions have enough confirmations to notify.
-    fn check_confirmations(&mut self, current_height: &U256) {
-        let to_keep = self.waiting_confs.split_off(&(current_height + U256::from(1)));
+    fn check_confirmations(&mut self, current_height: u64) {
+        let to_keep = self.waiting_confs.split_off(&(current_height + 1));
         let to_notify = std::mem::replace(&mut self.waiting_confs, to_keep);
         for watcher in to_notify.into_values().flatten() {
             watcher.notify();
@@ -444,13 +451,10 @@ impl<S> Heartbeat<S> {
             }
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-            self.waiting_confs
-                .entry(*block_height + U256::from(confirmations) - U256::from(1))
-                .or_default()
-                .push(watcher);
+            self.waiting_confs.entry(*block_height + confirmations - 1).or_default().push(watcher);
         }
 
-        self.check_confirmations(block_height);
+        self.check_confirmations(*block_height);
 
         // Update the latest block. We use `send_replace` here to ensure the
         // latest block is always up to date, even if no receivers exist.
@@ -509,7 +513,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
                     },
 
                     // Wake up to handle new blocks.
-                    block = self.stream.select_next_some() => {
+                    Some(block) = self.stream.next() => {
                         self.handle_new_block(block, &latest);
                     },
 

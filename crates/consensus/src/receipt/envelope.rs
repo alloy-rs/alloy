@@ -13,7 +13,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 /// Transaction receipt payloads are specified in their respective EIPs.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
@@ -47,6 +47,31 @@ impl<T> ReceiptEnvelope<T> {
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
         }
+    }
+
+    /// Return true if the transaction was successful.
+    pub fn is_success(&self) -> bool {
+        self.status()
+    }
+
+    /// Returns the success status of the receipt's transaction.
+    pub fn status(&self) -> bool {
+        self.as_receipt().unwrap().status
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    pub fn cumulative_gas_used(&self) -> u128 {
+        self.as_receipt().unwrap().cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    pub fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
+    }
+
+    /// Return the receipt's bloom.
+    pub fn logs_bloom(&self) -> &Bloom {
+        &self.as_receipt_with_bloom().unwrap().logs_bloom
     }
 
     /// Return the inner receipt with bloom. Currently this is infallible,
@@ -83,7 +108,7 @@ impl TxReceipt for ReceiptEnvelope {
     }
 
     /// Returns the cumulative gas used at this receipt.
-    fn cumulative_gas_used(&self) -> u64 {
+    fn cumulative_gas_used(&self) -> u128 {
         self.as_receipt().unwrap().cumulative_gas_used
     }
 

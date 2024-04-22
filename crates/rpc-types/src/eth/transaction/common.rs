@@ -4,7 +4,7 @@
 use alloy_primitives::{TxHash, B256};
 
 /// Additional fields in the context of a block that contains this transaction.
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TransactionInfo {
     /// Hash of the transaction.
     pub hash: Option<TxHash>,
@@ -15,5 +15,5 @@ pub struct TransactionInfo {
     /// Number of the block.
     pub block_number: Option<u64>,
     /// Base fee of the block.
-    pub base_fee: Option<u64>,
+    pub base_fee: Option<u128>,
 }

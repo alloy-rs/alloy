@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlockId};
+use alloy_rpc_types::{state::StateOverride, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -190,7 +190,7 @@ impl CallDecoder for () {
 #[must_use = "call builders do nothing unless you `.call`, `.send`, or `.await` them"]
 pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     request: N::TransactionRequest,
-    block: Option<BlockId>,
+    block: BlockId,
     state: Option<StateOverride>,
     /// The provider.
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
@@ -262,7 +262,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
             request: <N::TransactionRequest>::default().with_input(input),
             decoder,
             provider,
-            block: None,
+            block: BlockId::default(),
             state: None,
             transport: PhantomData,
         }
@@ -277,6 +277,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Sets the `to` field in the transaction to the provided address.
     pub fn to(mut self, to: Option<Address>) -> Self {
         self.request.set_to(to.into());
+        self
+    }
+
+    /// Sets the `sidecar` field in the transaction to the provided value.
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+        self.request.set_blob_sidecar(blob_sidecar);
         self
     }
 
@@ -322,7 +328,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Sets the `block` field for sending the tx to the chain
     pub const fn block(mut self, block: BlockId) -> Self {
-        self.block = Some(block);
+        self.block = block;
         self
     }
 
@@ -347,6 +353,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
@@ -356,6 +363,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Does not decode the output of the call, returning the raw output data instead.
     ///

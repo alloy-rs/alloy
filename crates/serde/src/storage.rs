@@ -24,7 +24,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 ///
 /// The contained [B256] and From implementation for String are used to preserve the input and
 /// implement this behavior from geth.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "U256", into = "String")]
 pub struct JsonStorageKey(pub B256);
 

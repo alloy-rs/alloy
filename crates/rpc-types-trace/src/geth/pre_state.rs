@@ -9,7 +9,7 @@ use std::collections::{btree_map, BTreeMap};
 /// The prestate tracer has two modes: prestate and diff
 ///
 /// <https://github.com/ethereum/go-ethereum/blob/91cb6f863a965481e51d5d9c0e5ccd54796fd967/eth/tracers/native/prestate.go#L38>
-#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PreStateFrame {
     /// The default mode returns the accounts necessary to execute a given transaction.
@@ -56,7 +56,7 @@ impl PreStateFrame {
 /// This corresponds to the default mode of the [PreStateConfig].
 ///
 /// The [AccountState]'s storage will include all touched slots of an account.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreStateMode(pub BTreeMap<Address, AccountState>);
 
 /// Represents the account states before and after the transaction is executed.
@@ -65,7 +65,7 @@ pub struct PreStateMode(pub BTreeMap<Address, AccountState>);
 ///
 /// This will only contain changed [AccountState]s, created accounts will not be included in the pre
 /// state and selfdestructed accounts will not be included in the post state.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DiffMode {
     /// The account states after the transaction is executed.
@@ -106,7 +106,7 @@ impl DiffMode {
 }
 
 /// Helper type for [DiffMode] to represent a specific set
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiffStateKind {
     /// Corresponds to the pre state of the [DiffMode]
     Pre,
@@ -127,7 +127,7 @@ impl DiffStateKind {
 }
 
 /// Represents the state of an account
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AccountState {
     /// The optional balance of the account.
     #[serde(
@@ -179,7 +179,7 @@ impl AccountState {
 }
 
 /// Helper type to track the kind of change of an [AccountState].
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountChangeKind {
     /// The account was modified.
     #[default]
@@ -208,7 +208,7 @@ impl AccountChangeKind {
 }
 
 /// The config for the prestate tracer.
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreStateConfig {
     /// If `diffMode` is set to true, the response frame includes all the account and storage diffs

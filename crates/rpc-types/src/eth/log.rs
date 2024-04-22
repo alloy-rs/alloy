@@ -1,8 +1,10 @@
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{LogData, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -76,17 +78,34 @@ impl Log<LogData> {
     }
 }
 
+impl<T> alloy_rlp::Encodable for Log<T>
+where
+    for<'a> &'a T: Into<LogData>,
+{
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.reserialize_inner().encode(out)
+    }
+
+    fn length(&self) -> usize {
+        self.reserialize_inner().length()
+    }
+}
+
 impl<T> Log<T>
 where
     for<'a> &'a T: Into<LogData>,
 {
-    /// Reserialize the data.
+    /// Reserialize the inner data, returning an [`alloy_primitives::Log`].
+    pub fn reserialize_inner(&self) -> alloy_primitives::Log {
+        alloy_primitives::Log { address: self.inner.address, data: (&self.inner.data).into() }
+    }
+
+    /// Reserialize the data, returning a new `Log` object wrapping an
+    /// [`alloy_primitives::Log`]. this copies the log metadata, preserving
+    /// the original object.
     pub fn reserialize(&self) -> Log<LogData> {
         Log {
-            inner: alloy_primitives::Log {
-                address: self.inner.address,
-                data: (&self.inner.data).into(),
-            },
+            inner: self.reserialize_inner(),
             block_hash: self.block_hash,
             block_number: self.block_number,
             block_timestamp: self.block_timestamp,

@@ -9,7 +9,7 @@ use serde_json::value::RawValue;
 use ws_stream_wasm::{WsErr, WsMessage, WsMeta, WsStream};
 
 /// Simple connection info for the websocket.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct WsConnect {
     /// The URL to connect to.
     pub url: String,

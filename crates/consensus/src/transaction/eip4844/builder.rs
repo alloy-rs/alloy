@@ -13,7 +13,7 @@ use core::cmp;
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///
 /// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct PartialSidecar {
     /// The blobs in the sidecar.
     blobs: Vec<Blob>,
@@ -178,7 +178,7 @@ pub trait SidecarCoder {
 /// - The first byte of every 32-byte word.
 /// - The right padding on the header word containing the data length.
 /// - Any right padding on the last word for each piece of data.
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[non_exhaustive]
 pub struct SimpleCoder;
 
@@ -255,7 +255,7 @@ impl SidecarCoder for SimpleCoder {
 /// until all data is ready.
 ///
 /// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SidecarBuilder<T = SimpleCoder> {
     /// The blob array we will code data into
     inner: PartialSidecar,

@@ -4,7 +4,7 @@ use c_kzg::KzgSettings;
 use core::hash::{Hash, Hasher};
 
 /// KZG settings.
-#[derive(Debug, Clone, Default, Eq)]
+#[derive(Clone, Debug, Default, Eq)]
 pub enum EnvKzgSettings {
     /// Default mainnet trusted setup.
     #[default]

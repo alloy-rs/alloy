@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MuxConfig(pub HashMap<GethDebugBuiltInTracerType, Option<GethDebugTracerConfig>>);
 
 /// A `muxTracer` frame response that contains the results of multiple tracers
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MuxFrame(pub HashMap<GethDebugBuiltInTracerType, GethTrace>);
 
 #[cfg(test)]

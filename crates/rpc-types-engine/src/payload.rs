@@ -1,5 +1,7 @@
 //! Payload types.
+use crate::ExitV1;
 use alloy_consensus::{Blob, Bytes48};
+use alloy_eips::eip6110::DepositReceipt;
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -9,7 +11,7 @@ use std::fmt;
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PayloadId(B64);
 
 // === impl PayloadId ===
@@ -399,6 +401,38 @@ impl ssz::Encode for ExecutionPayloadV3 {
     }
 }
 
+/// This structure maps on the ExecutionPayloadV4 structure of the beacon chain spec.
+///
+/// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
+///
+/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositReceipts
+/// and exits.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPayloadV4 {
+    /// Inner V3 payload
+    #[serde(flatten)]
+    pub payload_inner: ExecutionPayloadV3,
+    /// Array of deposits.
+    ///
+    /// This maps directly to the Deposits defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
+    pub deposit_receipts: Vec<DepositReceipt>,
+    /// Array of exits
+    pub exits: Vec<ExitV1>,
+}
+
+impl ExecutionPayloadV4 {
+    /// Returns the withdrawals for the payload.
+    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
+        self.payload_inner.withdrawals()
+    }
+
+    /// Returns the timestamp for the payload.
+    pub const fn timestamp(&self) -> u64 {
+        self.payload_inner.payload_inner.timestamp()
+    }
+}
+
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlobsBundleV1 {
@@ -674,7 +708,7 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
 }
 
 /// Error that can occur when handling payloads.
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum PayloadError {
     /// Invalid payload extra data.
     #[error("invalid payload extra data: {0}")]
@@ -915,7 +949,7 @@ impl fmt::Display for PayloadStatusEnum {
 /// Various errors that can occur when validating a payload or forkchoice update.
 ///
 /// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum PayloadValidationError {
     /// Thrown when a forkchoice update's head links to a previously rejected payload.
     #[error("links to previously rejected block")]

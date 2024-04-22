@@ -20,13 +20,18 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 /// assert_eq!(number, hex);
 /// assert_eq!(hex.to(), 100);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct U64HexOrNumber(U64);
 
 impl U64HexOrNumber {
     /// Returns the wrapped u64
     pub fn to(self) -> u64 {
         self.0.to()
+    }
+
+    /// Checks if the wrapped value is zero.
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -364,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_hex_u64() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "u64_hex")]
             inner: u64,
@@ -380,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_u128_hex_or_decimal() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "u128_hex_or_decimal")]
             inner: u128,
@@ -401,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_u128_hex_or_decimal_opt() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "u128_hex_or_decimal_opt")]
             inner: Option<u128>,
@@ -429,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_u128_hex_or_decimal_vec() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "u128_hex_or_decimal_vec")]
             inner: Vec<u128>,
@@ -445,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_u128_hex_or_decimal_vec_vec_opt() {
-        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
             #[serde(with = "u128_hex_or_decimal_vec_vec_opt")]
             inner: Option<Vec<Vec<u128>>>,

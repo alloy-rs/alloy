@@ -8,7 +8,7 @@ use core::mem;
 use alloc::vec::Vec;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip2930 {
@@ -98,7 +98,8 @@ impl TxEip2930 {
     }
 
     /// Outputs the length of the transaction's fields, without a RLP header.
-    pub(crate) fn fields_len(&self) -> usize {
+    #[doc(hidden)]
+    pub fn fields_len(&self) -> usize {
         let mut len = 0;
         len += self.chain_id.length();
         len += self.nonce.length();
@@ -154,7 +155,8 @@ impl TxEip2930 {
 
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header
-    pub(crate) fn encode_with_signature(
+    #[doc(hidden)]
+    pub fn encode_with_signature(
         &self,
         signature: &Signature,
         out: &mut dyn BufMut,
@@ -190,7 +192,8 @@ impl TxEip2930 {
     /// header.
     ///
     /// This __does__ expect the bytes to start with a list header and include a signature.
-    pub(crate) fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+    #[doc(hidden)]
+    pub fn decode_signed_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);

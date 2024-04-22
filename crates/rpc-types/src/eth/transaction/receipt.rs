@@ -1,5 +1,7 @@
-use crate::Log;
-use alloy_consensus::{ReceiptEnvelope, TxType};
+#![allow(unknown_lints, non_local_definitions)]
+
+use crate::{Log, WithOtherFields};
+use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +9,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -20,29 +22,38 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Transaction Hash.
     pub transaction_hash: B256,
     /// Index within the block.
-    #[serde(with = "alloy_serde::u64_hex")]
-    pub transaction_index: u64,
+    #[serde(default, with = "alloy_serde::u64_hex_opt", skip_serializing_if = "Option::is_none")]
+    pub transaction_index: Option<u64>,
     /// Hash of the block this transaction was included within.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
-    #[serde(with = "alloy_serde::u64_hex_opt")]
+    #[serde(default, with = "alloy_serde::u64_hex_opt", skip_serializing_if = "Option::is_none")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
-    #[serde(with = "alloy_serde::u64_hex_opt")]
-    pub gas_used: Option<u64>,
+    #[serde(with = "alloy_serde::u128_hex_or_decimal")]
+    pub gas_used: u128,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
-    #[serde(with = "alloy_serde::u64_hex")]
-    pub effective_gas_price: u64,
+    #[serde(with = "alloy_serde::u128_hex_or_decimal")]
+    pub effective_gas_price: u128,
     /// Blob gas used by the eip-4844 transaction
     ///
     /// This is None for non eip-4844 transactions
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
-    pub blob_gas_used: Option<u64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u128_hex_or_decimal_opt",
+        default
+    )]
+    pub blob_gas_used: Option<u128>,
     /// The price paid by the eip-4844 transaction per blob gas.
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
-    pub blob_gas_price: Option<u64>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u128_hex_or_decimal_opt",
+        default
+    )]
+    pub blob_gas_price: Option<u128>,
     /// Address of the sender
     pub from: Address,
     /// Address of the receiver. None when its a contract creation transaction.
@@ -115,6 +126,9 @@ impl<T> TransactionReceipt<T> {
     }
 }
 
+/// Alias for a catch-all receipt type.
+pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -143,7 +157,7 @@ mod test {
         );
 
         const EXPECTED_BLOOM: Bloom = bloom!("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000200000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000800000000000000000000000000000000004000000000000000000800000000100000020000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000010000000000000000000000000000");
-        const EXPECTED_CGU: u64 = 0xa42aec;
+        const EXPECTED_CGU: u128 = 0xa42aec;
 
         assert!(matches!(
             receipt.inner,
