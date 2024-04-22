@@ -281,8 +281,10 @@ mod tests {
             .await
             .expect("no receipt");
 
+        // we sent the wrong event
+        // so no events should be returned when querying event.query() (MyEvent)
         let all = event.query().await.unwrap();
-        assert_eq!(all.len(), 0); // we sent the wrong event, so no events should be returned when querying event.query() (MyEvent)
+        assert_eq!(all.len(), 0);
 
         #[cfg(feature = "ws")]
         {
@@ -319,7 +321,8 @@ mod tests {
                 .await
                 .expect("no receipt");
 
-            // we sent the wrong event, so no events should be returned when querying event.query() (MyEvent)
+            // we sent the wrong event
+            // so no events should be returned when querying event.query() (MyEvent)
             let all = event.query().await.unwrap();
             assert_eq!(all.len(), 0);
         }
