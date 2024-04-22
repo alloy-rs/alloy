@@ -89,8 +89,7 @@ impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
 
     /// Return the receipt logs.
     fn logs(&self) -> &[T] {
-        // &self.inner.receipt.logs
-        todo!()
+        &self.inner.receipt.logs
     }
 }
 
