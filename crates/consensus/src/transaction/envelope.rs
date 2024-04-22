@@ -144,6 +144,29 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 }
 
 impl TxEnvelope {
+    /// Recover the signer of the transaction.
+    #[cfg(feature = "k256")]
+    pub fn recover_signer(
+        &self,
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.recover_signer(),
+            TxEnvelope::Eip2930(tx) => tx.recover_signer(),
+            TxEnvelope::Eip1559(tx) => tx.recover_signer(),
+            TxEnvelope::Eip4844(tx) => tx.recover_signer(),
+        }
+    }
+
+    /// Calculate the signing hash for the transaction.
+    pub fn signature_hash(&self) -> B256 {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.signature_hash(),
+            TxEnvelope::Eip2930(tx) => tx.signature_hash(),
+            TxEnvelope::Eip1559(tx) => tx.signature_hash(),
+            TxEnvelope::Eip4844(tx) => tx.signature_hash(),
+        }
+    }
+
     /// Return the hash of the inner Signed
     pub const fn tx_hash(&self) -> &B256 {
         match self {
