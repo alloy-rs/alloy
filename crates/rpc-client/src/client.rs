@@ -9,7 +9,6 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
-    time::Duration,
 };
 use tower::{layer::util::Identity, ServiceBuilder};
 
@@ -82,19 +81,13 @@ impl<T> RpcClient<T> {
         &self.0
     }
 
-    /// Sets the poll interval for the client.
+    /// Sets the poll interval for the client in milliseconds.
     ///
     /// Note: This will only set the poll interval for the client if it is the only reference to the
     /// inner client. If the reference is held by many, then it will not update the poll interval.
-    pub fn with_poll_interval(mut self, poll_interval: Duration) -> Self {
-        let inner = Arc::get_mut(&mut self.0);
-
-        if let Some(inner) = inner {
-            inner.set_poll_interval(poll_interval);
-            self
-        } else {
-            todo!("TBD: Value is already shared. Cannot be mutated");
-        }
+    pub fn with_poll_interval(self, poll_interval: u64) -> Self {
+        self.inner().set_poll_interval(poll_interval);
+        self
     }
 }
 
@@ -167,8 +160,8 @@ pub struct RpcClientInner<T> {
     pub(crate) is_local: bool,
     /// The next request ID to use.
     pub(crate) id: AtomicU64,
-    /// The poll interval for the client.
-    pub(crate) poll_interval: Duration,
+    /// The poll interval for the client in milliseconds.
+    pub(crate) poll_interval: AtomicU64,
 }
 
 impl<T> RpcClientInner<T> {
@@ -182,22 +175,18 @@ impl<T> RpcClientInner<T> {
             transport: t,
             is_local,
             id: AtomicU64::new(0),
-            poll_interval: if is_local {
-                Duration::from_millis(250)
-            } else {
-                Duration::from_secs(7)
-            },
+            poll_interval: if is_local { AtomicU64::new(250) } else { AtomicU64::new(7000) },
         }
     }
 
-    /// Returns the default poll interval for the client.
-    pub const fn poll_interval(&self) -> Duration {
-        self.poll_interval
+    /// Returns the default poll interval (milliseconds) for the client.
+    pub fn poll_interval(&self) -> u64 {
+        self.poll_interval.load(Ordering::Relaxed)
     }
 
-    /// Set the poll interval for the client.
-    pub fn set_poll_interval(&mut self, poll_interval: Duration) {
-        self.poll_interval = poll_interval;
+    /// Set the poll interval for the client in milliseconds.
+    pub fn set_poll_interval(&self, poll_interval: u64) {
+        self.poll_interval.store(poll_interval, Ordering::SeqCst);
     }
 
     /// Returns a reference to the underlying transport.
