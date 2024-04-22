@@ -24,12 +24,14 @@ mod cancun;
 mod exit;
 mod forkchoice;
 mod identification;
+mod jwt;
 mod optimism;
 pub mod payload;
 mod transition;
 
 pub use self::{
-    cancun::*, exit::*, forkchoice::*, identification::*, optimism::*, payload::*, transition::*,
+    cancun::*, exit::*, forkchoice::*, identification::*, jwt::*, optimism::*, payload::*,
+    transition::*,
 };
 
 #[doc(inline)]

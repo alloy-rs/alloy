@@ -29,14 +29,26 @@ thiserror.workspace = true
 
 # jsonrpsee
 jsonrpsee-types = { version = "0.22", optional = true }
+jsonwebtoken = "9.3.0"
 
 [features]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz", "alloy-rpc-types/ssz",  "alloy-eips/ssz"]
+ssz = [
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+    "alloy-rpc-types/ssz",
+    "alloy-eips/ssz",
+]
 kzg = ["alloy-consensus/kzg"]
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "rlp",
+    "serde",
+    "arbitrary",
+] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
