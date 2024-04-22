@@ -33,6 +33,48 @@ pub struct TraceFilter {
 // === impl TraceFilter ===
 
 impl TraceFilter {
+    /// Sets the `from_block` field of the struct
+    pub const fn from_block(mut self, block: u64) -> Self {
+        self.from_block = Some(block);
+        self
+    }
+
+    /// Sets the `to_block` field of the struct
+    pub const fn to_block(mut self, block: u64) -> Self {
+        self.to_block = Some(block);
+        self
+    }
+
+    /// Sets the `from_address` field of the struct
+    pub fn from_address(mut self, addresses: Vec<Address>) -> Self {
+        self.from_address = addresses;
+        self
+    }
+
+    /// Sets the `to_address` field of the struct
+    pub fn to_address(mut self, addresses: Vec<Address>) -> Self {
+        self.to_address = addresses;
+        self
+    }
+
+    /// Sets the `after` field of the struct
+    pub const fn after(mut self, after: u64) -> Self {
+        self.after = Some(after);
+        self
+    }
+
+    /// Sets the `count` field of the struct
+    pub const fn count(mut self, count: u64) -> Self {
+        self.count = Some(count);
+        self
+    }
+
+    /// Sets the `from_address` field of the struct
+    pub const fn mode(mut self, mode: TraceFilterMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
     /// Returns a `TraceFilterMatcher` for this filter.
     pub fn matcher(&self) -> TraceFilterMatcher {
         let from_addresses = self.from_address.iter().cloned().collect();
