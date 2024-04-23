@@ -338,52 +338,52 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 #[cfg(any(all(test, feature = "reqwest"), feature = "anvil"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport.
-    pub fn on_anvil(self) -> (F::Provider, alloy_node_bindings::AnvilInstance)
+    pub fn on_anvil(self) -> F::Provider
     where
         F: TxFiller<Ethereum>
             + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
-        L: ProviderLayer<
-            crate::ReqwestProvider<Ethereum>,
+        L: crate::builder::ProviderLayer<
+            crate::layers::AnvilProvider<
+                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
+                alloy_transport_http::Http<reqwest::Client>,
+            >,
             alloy_transport_http::Http<reqwest::Client>,
-            Ethereum,
         >,
     {
-        let anvil = alloy_node_bindings::Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
+        let anvil_layer = crate::layers::AnvilLayer::default();
+        let url = anvil_layer.endpoint_url();
 
-        (self.on_http(url).unwrap(), anvil)
+        self.layer(anvil_layer).on_http(url).unwrap()
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
     /// function configures a signer backed by anvil keys, and is intended for
     /// use in tests.
-    #[allow(clippy::type_complexity)]
     pub fn on_anvil_with_signer(
         self,
-    ) -> (
-        <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
-            L::Provider,
-            alloy_transport_http::Http<reqwest::Client>,
-        >>::Provider,
-        alloy_node_bindings::AnvilInstance,
-    )
+    ) -> <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+        L::Provider,
+        alloy_transport_http::Http<reqwest::Client>,
+    >>::Provider
     where
-        L: ProviderLayer<
-            crate::ReqwestProvider<Ethereum>,
-            alloy_transport_http::Http<reqwest::Client>,
-            Ethereum,
-        >,
         F: TxFiller<Ethereum>
             + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        L: crate::builder::ProviderLayer<
+            crate::layers::AnvilProvider<
+                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
+                alloy_transport_http::Http<reqwest::Client>,
+            >,
+            alloy_transport_http::Http<reqwest::Client>,
+        >,
     {
-        let anvil = alloy_node_bindings::Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
+        let anvil_layer = crate::layers::AnvilLayer::default();
+        let url = anvil_layer.endpoint_url();
 
-        let wallet = alloy_signer_wallet::Wallet::from(anvil.keys()[0].clone());
+        let wallet = alloy_signer_wallet::Wallet::from(anvil_layer.instance().keys()[0].clone());
 
-        let this = self.signer(crate::network::EthereumSigner::from(wallet));
+        let signer = crate::network::EthereumSigner::from(wallet);
 
-        (this.on_http(url).unwrap(), anvil)
+        self.signer(signer).layer(anvil_layer).on_http(url).unwrap()
     }
 }
 
