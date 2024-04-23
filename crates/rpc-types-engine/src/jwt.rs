@@ -1,11 +1,12 @@
+//! JWT (JSON Web Token) utilities for the Engine API.
+
 use alloy_primitives::hex;
-use jsonwebtoken::{decode, errors::ErrorKind, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{
+    decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
+};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{
-    str::FromStr,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{str::FromStr, time::Duration};
 use thiserror::Error;
 
 /// Errors returned by the [`JwtSecret`]
@@ -50,6 +51,39 @@ const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 
+/// Claims in JWT are used to represent a set of information about an entity.
+/// Claims are essentially key-value pairs that are encoded as JSON objects and included in the
+/// payload of a JWT. They are used to transmit information such as the identity of the entity, the
+/// time the JWT was issued, and the expiration time of the JWT, among others.
+///
+/// The Engine API spec requires that just the `iat` (issued-at) claim is provided.
+/// It ignores claims that are optional or additional for this specification.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct Claims {
+    /// The "iat" value MUST be a number containing a NumericDate value.
+    /// According to the RFC A NumericDate represents the number of seconds since
+    /// the UNIX_EPOCH.
+    /// - [`RFC-7519 - Spec`](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6)
+    /// - [`RFC-7519 - Notations`](https://www.rfc-editor.org/rfc/rfc7519#section-2)
+    pub iat: u64,
+    /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
+    /// MUST NOT be accepted for processing.
+    pub exp: Option<u64>,
+}
+
+impl Claims {
+    /// Creates a new instance of [`Claims`] with the current timestamp as the `iat` claim.
+    fn with_current_timestamp() -> Self {
+        Self { iat: get_current_timestamp(), exp: None }
+    }
+
+    /// Checks if the `iat` claim is within the allowed range from the current time.
+    fn is_within_time_window(&self) -> bool {
+        let now_secs = get_current_timestamp();
+        now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
+    }
+}
+
 /// Value-object holding a reference to a hex-encoded 256-bit secret key.
 /// A JWT secret key is used to secure JWT-based authentication. The secret key is
 /// a shared secret between the server and the client and is used to calculate a digital signature
@@ -83,12 +117,12 @@ impl JwtSecret {
     /// - The JWT signature is valid.
     /// - The JWT is signed with the `HMAC + SHA256 (HS256)` algorithm.
     /// - The JWT `iat` (issued-at) claim is a timestamp within +-60 seconds from the current time.
+    /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
     pub fn validate(&self, jwt: String) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
-        // and ensure that the `iat` claim is present. The `exp` claim is validated by default if
-        // defined.
+        // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
         validation.set_required_spec_claims(&["iat"]);
         let bytes = &self.0;
@@ -143,38 +177,11 @@ impl FromStr for JwtSecret {
     }
 }
 
-/// Claims in JWT are used to represent a set of information about an entity.
-/// Claims are essentially key-value pairs that are encoded as JSON objects and included in the
-/// payload of a JWT. They are used to transmit information such as the identity of the entity, the
-/// time the JWT was issued, and the expiration time of the JWT, among others.
-///
-/// The Engine API spec requires that just the `iat` (issued-at) claim is provided.
-/// It ignores claims that are optional or additional for this specification.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct Claims {
-    /// The "iat" value MUST be a number containing a NumericDate value.
-    /// According to the RFC A NumericDate represents the number of seconds since
-    /// the UNIX_EPOCH.
-    /// - [`RFC-7519 - Spec`](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6)
-    /// - [`RFC-7519 - Notations`](https://www.rfc-editor.org/rfc/rfc7519#section-2)
-    pub iat: u64,
-    /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
-    /// MUST NOT be accepted for processing.
-    pub exp: Option<u64>,
-}
-
-impl Claims {
-    fn is_within_time_window(&self) -> bool {
-        let now = SystemTime::now();
-        let now_secs = now.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn from_hex() {
@@ -228,7 +235,7 @@ mod tests {
     #[test]
     fn validation_ok() {
         let secret = JwtSecret::random();
-        let claims = Claims { iat: to_u64(SystemTime::now()), exp: Some(10000000000) };
+        let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
         let jwt: String = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
@@ -236,8 +243,15 @@ mod tests {
         assert!(matches!(result, Ok(())));
     }
 
-    fn to_u64(time: SystemTime) -> u64 {
-        time.duration_since(UNIX_EPOCH).unwrap().as_secs()
+    #[test]
+    fn validation_with_current_time_ok() {
+        let secret = JwtSecret::random();
+        let claims = Claims::with_current_timestamp();
+        let jwt: String = secret.encode(&claims).unwrap();
+
+        let result = secret.validate(jwt);
+
+        assert!(matches!(result, Ok(())));
     }
 
     #[test]
@@ -266,9 +280,9 @@ mod tests {
     }
 
     #[test]
-    fn validation_error_expired() {
+    fn validation_error_exp_expired() {
         let secret = JwtSecret::random();
-        let claims = Claims { iat: to_u64(SystemTime::now()), exp: Some(1) };
+        let claims = Claims { iat: get_current_timestamp(), exp: Some(1) };
         let jwt: String = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
@@ -279,7 +293,7 @@ mod tests {
     #[test]
     fn validation_error_wrong_signature() {
         let secret_1 = JwtSecret::random();
-        let claims = Claims { iat: to_u64(SystemTime::now()), exp: Some(10000000000) };
+        let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
         let jwt: String = secret_1.encode(&claims).unwrap();
 
         // A different secret will generate a different signature.
@@ -296,7 +310,7 @@ mod tests {
         let key = EncodingKey::from_secret(bytes);
         let unsupported_algo = Header::new(Algorithm::HS384);
 
-        let claims = Claims { iat: to_u64(SystemTime::now()), exp: Some(10000000000) };
+        let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
         let jwt: String = encode(&unsupported_algo, &claims, &key).unwrap();
         let result = secret.validate(jwt);
 
@@ -307,11 +321,15 @@ mod tests {
     fn valid_without_exp_claim() {
         let secret = JwtSecret::random();
 
-        let claims = Claims { iat: to_u64(SystemTime::now()), exp: None };
+        let claims = Claims { iat: get_current_timestamp(), exp: None };
         let jwt: String = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
         assert!(matches!(result, Ok(())));
+    }
+
+    fn to_u64(time: SystemTime) -> u64 {
+        time.duration_since(UNIX_EPOCH).unwrap().as_secs()
     }
 }
