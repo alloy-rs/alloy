@@ -29,7 +29,10 @@ thiserror.workspace = true
 
 # jsonrpsee
 jsonrpsee-types = { version = "0.22", optional = true }
+
+# jwt
 jsonwebtoken = "9.3.0"
+rand.workspace = true
 
 [features]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
