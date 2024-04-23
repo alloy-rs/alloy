@@ -98,15 +98,14 @@ mod test {
 
     #[test]
     fn basic_usage() {
-        let (provider, _anvil) = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
 
         assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }
 
     #[test]
     fn bubbles_through_fillers() {
-        let (provider, _anvil) =
-            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
         assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }

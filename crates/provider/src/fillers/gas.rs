@@ -253,18 +253,17 @@ impl<N: Network> TxFiller<N> for GasFiller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types::TransactionRequest;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let (provider, anvil) =
-            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
-
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let from = provider.default_signer_address();
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
-            from: Some(anvil.addresses()[0]),
+            from: Some(from),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
             chain_id: Some(31337),
@@ -281,12 +280,13 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let (provider, anvil) =
-            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+
+        let from = provider.default_signer_address();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
-            from: Some(anvil.addresses()[0]),
+            from: Some(from),
             value: Some(U256::from(100)),
             to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
             gas_price: Some(gas_price),
@@ -302,7 +302,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let (provider, _anvil) = ProviderBuilder::new()
+        let provider = ProviderBuilder::new()
             .filler(crate::fillers::GasFiller)
             .filler(crate::fillers::NonceFiller::default())
             .filler(crate::fillers::ChainIdFiller::default())
