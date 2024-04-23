@@ -84,6 +84,13 @@ impl Claims {
     }
 }
 
+impl Default for Claims {
+    /// By default, the `iat` claim is set to the current timestamp.
+    fn default() -> Self {
+        Self::with_current_timestamp()
+    }
+}
+
 /// Value-object holding a reference to a hex-encoded 256-bit secret key.
 /// A JWT secret key is used to secure JWT-based authentication. The secret key is
 /// a shared secret between the server and the client and is used to calculate a digital signature
@@ -246,7 +253,7 @@ mod tests {
     #[test]
     fn validation_with_current_time_ok() {
         let secret = JwtSecret::random();
-        let claims = Claims::with_current_timestamp();
+        let claims = Claims::default();
         let jwt: String = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
