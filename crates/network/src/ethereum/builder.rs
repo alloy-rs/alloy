@@ -26,8 +26,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.input.input()
     }
 
-    fn set_input(&mut self, input: Bytes) {
-        self.input.input = Some(input);
+    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
+        self.input.input = Some(input.into());
     }
 
     fn from(&self) -> Option<Address> {
@@ -38,15 +38,16 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.from = Some(from);
     }
 
-    fn to(&self) -> Option<TxKind> {
-        self.to.map(TxKind::Call).or(Some(TxKind::Create))
+    fn kind(&self) -> Option<TxKind> {
+        self.to
     }
 
-    fn set_to(&mut self, to: TxKind) {
-        match to {
-            TxKind::Create => self.to = None,
-            TxKind::Call(to) => self.to = Some(to),
-        }
+    fn set_kind(&mut self, kind: TxKind) {
+        self.to = Some(kind);
+    }
+
+    fn clear_kind(&mut self) {
+        self.to = None;
     }
 
     fn value(&self) -> Option<U256> {
@@ -193,7 +194,7 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into())
+            .with_to(Address::ZERO)
             .with_blob_sidecar(BlobTransactionSidecar::default())
             .with_max_fee_per_blob_gas(0);
 
@@ -213,7 +214,7 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into())
+            .with_to(Address::ZERO)
             .with_gas_price(0)
             .access_list(AccessList::default());
 
@@ -229,14 +230,13 @@ mod tests {
             .with_gas_limit(0)
             .with_max_fee_per_gas(0)
             .with_max_priority_fee_per_gas(0)
-            .with_to(Address::ZERO.into());
+            .with_to(Address::ZERO);
 
         let tx = request.clone().build_unsigned().unwrap();
 
         assert!(matches!(tx, TypedTransaction::Eip1559(_)));
 
         let request = request.with_gas_price(0);
-        dbg!(request.preferred_type());
         let tx = request.build_unsigned().unwrap();
         assert!(matches!(tx, TypedTransaction::Legacy(_)));
     }
@@ -263,7 +263,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Legacy);
-        assert_eq!(errors.len(), 2);
+        assert_eq!(errors.len(), 3);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
     }
@@ -279,7 +280,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip1559);
-        assert_eq!(errors.len(), 4);
+        assert_eq!(errors.len(), 5);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));
@@ -297,7 +299,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip2930);
-        assert_eq!(errors.len(), 3);
+        assert_eq!(errors.len(), 4);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"gas_price"));
@@ -315,8 +318,8 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip4844);
-        dbg!(&errors);
-        assert_eq!(errors.len(), 6);
+        assert_eq!(errors.len(), 7);
+        assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
         assert!(errors.contains(&"max_priority_fee_per_gas"));

@@ -46,11 +46,11 @@ alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crat
 
 test-utils = { version = "0.1.0", default-features = false, path = "crates/internal-test-utils", package = "alloy-internal-test-utils" }
 
-alloy-core = { version = "0.7.0", default-features = false }
-alloy-dyn-abi = { version = "0.7.0", default-features = false }
-alloy-json-abi = { version = "0.7.0", default-features = false }
-alloy-primitives = { version = "0.7.0", default-features = false }
-alloy-sol-types = { version = "0.7.0", default-features = false }
+alloy-core = { version = "0.7.1", default-features = false }
+alloy-dyn-abi = { version = "0.7.1", default-features = false }
+alloy-json-abi = { version = "0.7.1", default-features = false }
+alloy-primitives = { version = "0.7.1", default-features = false }
+alloy-sol-types = { version = "0.7.1", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 

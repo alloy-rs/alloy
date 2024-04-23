@@ -266,7 +266,7 @@ mod tests {
         let tx = TransactionRequest {
             from: Some(anvil.addresses()[0]),
             value: Some(U256::from(100)),
-            to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             chain_id: Some(31337),
             ..Default::default()
         };
@@ -288,7 +288,7 @@ mod tests {
         let tx = TransactionRequest {
             from: Some(anvil.addresses()[0]),
             value: Some(U256::from(100)),
-            to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             gas_price: Some(gas_price),
             ..Default::default()
         };
@@ -311,7 +311,7 @@ mod tests {
         let tx = TransactionRequest {
             from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),
             value: Some(U256::from(100)),
-            to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             // access list forces legacy gassing
             access_list: Some(vec![Default::default()].into()),
             ..Default::default()

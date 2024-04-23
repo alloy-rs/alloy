@@ -5,7 +5,7 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -153,9 +153,11 @@ impl Transaction {
             (None, None) => None,
         };
 
+        let to = self.to.map(TxKind::Call);
+
         TransactionRequest {
             from: Some(self.from),
-            to: self.to,
+            to,
             gas: Some(self.gas),
             gas_price,
             value: Some(self.value),

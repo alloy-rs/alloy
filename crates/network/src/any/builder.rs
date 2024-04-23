@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
+use alloy_primitives::Bytes;
 use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
@@ -26,7 +27,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().input()
     }
 
-    fn set_input(&mut self, input: alloy_primitives::Bytes) {
+    fn set_input<T: Into<Bytes>>(&mut self, input: T) {
         self.deref_mut().set_input(input);
     }
 
@@ -38,12 +39,16 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_from(from);
     }
 
-    fn to(&self) -> Option<alloy_primitives::TxKind> {
-        self.deref().to()
+    fn kind(&self) -> Option<alloy_primitives::TxKind> {
+        self.deref().kind()
     }
 
-    fn set_to(&mut self, to: alloy_primitives::TxKind) {
-        self.deref_mut().set_to(to)
+    fn clear_kind(&mut self) {
+        self.deref_mut().clear_kind()
+    }
+
+    fn set_kind(&mut self, kind: alloy_primitives::TxKind) {
+        self.deref_mut().set_kind(kind)
     }
 
     fn value(&self) -> Option<alloy_primitives::U256> {

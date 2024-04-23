@@ -1103,7 +1103,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
-    use alloy_primitives::{address, b256, bytes};
+    use alloy_primitives::{address, b256, bytes, TxKind};
     use alloy_rpc_types::request::TransactionRequest;
 
     extern crate self as alloy_provider;
@@ -1227,7 +1227,7 @@ mod tests {
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
-            to: address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into(),
+            to: Some(TxKind::Call(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))),
             gas_price: Some(20e9 as u128),
             gas: Some(21000),
             ..Default::default()

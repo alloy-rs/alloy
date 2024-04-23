@@ -18,6 +18,7 @@ alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
 alloy-signer.workspace = true
+alloy-sol-types.workspace = true
 
 async-trait.workspace = true
 futures-utils-wasm.workspace = true
