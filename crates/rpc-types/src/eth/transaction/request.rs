@@ -10,12 +10,14 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 /// Represents _all_ transaction requests to/from RPC.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<Address>,
     /// The destination address of the transaction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<TxKind>,
     /// The legacy gas price.
     #[serde(
@@ -46,54 +48,50 @@ pub struct TransactionRequest {
     )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
-    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+    )]
     pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<U256>,
     /// Transaction data.
     #[serde(default, flatten)]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u64_hex_opt"
+    )]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
-    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u64_hex_opt"
+    )]
     pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub access_list: Option<AccessList>,
     /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
-    #[serde(default, rename = "type", with = "alloy_serde::num::u8_hex_opt")]
+    #[serde(
+        default,
+        rename = "type",
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::num::u8_hex_opt"
+    )]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// Blob sidecar for EIP-4844 transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
 }
-
-impl Hash for TransactionRequest {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.from.hash(state);
-        self.to.hash(state);
-        self.gas_price.hash(state);
-        self.max_fee_per_gas.hash(state);
-        self.max_priority_fee_per_gas.hash(state);
-        self.max_fee_per_blob_gas.hash(state);
-        self.gas.hash(state);
-        self.value.hash(state);
-        self.input.hash(state);
-        self.nonce.hash(state);
-        self.chain_id.hash(state);
-        self.access_list.hash(state);
-        self.transaction_type.hash(state);
-        self.blob_versioned_hashes.hash(state);
-        self.sidecar.hash(state);
-    }
-}
-
-// == impl TransactionRequest ==
 
 impl TransactionRequest {
     /// Sets the `from` field in the call to the provided address
@@ -511,12 +509,12 @@ impl TransactionRequest {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TransactionInput {
     /// Transaction data
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input: Option<Bytes>,
     /// Transaction data
     ///
     /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<Bytes>,
 }
 
@@ -854,5 +852,12 @@ mod tests {
         let chain_id_as_hex = format!(r#"{{"chainId": "0x{:x}" }}"#, chain_id);
         let req2 = serde_json::from_str::<TransactionRequest>(&chain_id_as_hex).unwrap();
         assert_eq!(req2.chain_id.unwrap(), chain_id);
+    }
+
+    #[test]
+    fn serde_empty() {
+        let tx = TransactionRequest::default();
+        let serialized = serde_json::to_string(&tx).unwrap();
+        assert_eq!(serialized, "{}");
     }
 }
