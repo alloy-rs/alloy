@@ -847,11 +847,12 @@ impl FilteredParams {
 }
 
 /// Response of the `eth_getFilterChanges` RPC.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum FilterChanges<T = Transaction> {
     /// Empty result.
     #[serde(with = "empty_array")]
+    #[default]
     Empty,
     /// New logs.
     Logs(Vec<RpcLog>),
@@ -859,6 +860,24 @@ pub enum FilterChanges<T = Transaction> {
     Hashes(Vec<B256>),
     /// New transactions.
     Transactions(Vec<T>),
+}
+
+impl From<Vec<RpcLog>> for FilterChanges {
+    fn from(logs: Vec<RpcLog>) -> Self {
+        FilterChanges::Logs(logs)
+    }
+}
+
+impl From<Vec<B256>> for FilterChanges {
+    fn from(hashes: Vec<B256>) -> Self {
+        FilterChanges::Hashes(hashes)
+    }
+}
+
+impl From<Vec<Transaction>> for FilterChanges {
+    fn from(transactions: Vec<Transaction>) -> Self {
+        FilterChanges::Transactions(transactions)
+    }
 }
 
 mod empty_array {

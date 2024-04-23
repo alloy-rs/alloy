@@ -109,6 +109,9 @@ impl IpcBackend {
     }
 }
 
+/// Default capacity for the IPC buffer.
+const CAPACITY: usize = 4096;
+
 /// A stream of JSON-RPC items, read from an [`AsyncRead`] stream.
 #[derive(Debug)]
 #[pin_project::pin_project]
@@ -127,7 +130,7 @@ where
     T: AsyncRead,
 {
     fn new(reader: T) -> Self {
-        Self { reader: reader.compat(), buf: BytesMut::with_capacity(4096), drained: true }
+        Self { reader: reader.compat(), buf: BytesMut::with_capacity(CAPACITY), drained: true }
     }
 }
 
@@ -170,7 +173,21 @@ where
                         return Ready(Some(response));
                     }
                     Some(Err(err)) => {
-                        if err.is_eof() {
+                        if err.is_data() {
+                            trace!(
+                                buffer = %String::from_utf8_lossy(this.buf.as_ref()),
+                                "IPC buffer contains invalid JSON data",
+                            );
+
+                            if this.buf.len() > CAPACITY {
+                                // buffer is full, we can't decode any more
+                                error!("IPC response too large to decode");
+                                return Ready(None);
+                            }
+
+                            // this happens if the deserializer is unable to decode a partial object
+                            *this.drained = true;
+                        } else if err.is_eof() {
                             trace!("partial object in IPC buffer");
                             // nothing decoded
                             *this.drained = true;
@@ -211,5 +228,55 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::future::poll_fn;
+    use tokio_util::compat::TokioAsyncReadCompatExt;
+
+    #[tokio::test]
+    async fn test_partial_stream() {
+        let mock = tokio_test::io::Builder::new()
+            // partial object
+            .read(b"{\"jsonrpc\":\"2.0\",\"method\":\"eth_subscription\"")
+            // trigger pending read
+            .wait(std::time::Duration::from_millis(1))
+            // complete object
+            .read(r#", "params": {"subscription": "0xcd0c3e8af590364c09d0fa6a1210faf5", "result": {"difficulty": "0xd9263f42a87", "uncles": []}} }"#.as_bytes())
+            .build();
+
+        let mut reader = ReadJsonStream::new(mock.compat());
+        poll_fn(|cx| {
+            let res = reader.poll_next_unpin(cx);
+            assert!(res.is_pending());
+            Ready(())
+        })
+        .await;
+        let _obj = reader.next().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_large_invalid() {
+        let mock = tokio_test::io::Builder::new()
+            // partial object
+            .read(b"{\"jsonrpc\":\"2.0\",\"method\":\"eth_subscription\"")
+            // trigger pending read
+            .wait(std::time::Duration::from_millis(1))
+            // fill buffer with invalid data
+            .read(vec![b'a'; CAPACITY].as_ref())
+            .build();
+
+        let mut reader = ReadJsonStream::new(mock.compat());
+        poll_fn(|cx| {
+            let res = reader.poll_next_unpin(cx);
+            assert!(res.is_pending());
+            Ready(())
+        })
+        .await;
+        let obj = reader.next().await;
+        assert!(obj.is_none());
     }
 }
