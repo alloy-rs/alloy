@@ -5,6 +5,7 @@ use alloy_transport::{TransportError, TransportErrorKind, TransportFut, Transpor
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
     future::Future,
+    sync::atomic::{AtomicUsize, Ordering},
     task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
@@ -13,18 +14,25 @@ use tokio::sync::{mpsc, oneshot};
 /// PubSub service.
 ///
 /// [`Transport`]: alloy_transport::Transport
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct PubSubFrontend {
     tx: mpsc::UnboundedSender<PubSubInstruction>,
     /// The number of items to buffer in new subscription channels. Defaults to
     /// 16. See [`tokio::sync::broadcast::channel`] for a description.
-    channel_size: usize,
+    channel_size: AtomicUsize,
+}
+
+impl Clone for PubSubFrontend {
+    fn clone(&self) -> Self {
+        let channel_size = self.channel_size.load(Ordering::Relaxed);
+        Self { tx: self.tx.clone(), channel_size: AtomicUsize::new(channel_size) }
+    }
 }
 
 impl PubSubFrontend {
     /// Create a new frontend.
     pub(crate) const fn new(tx: mpsc::UnboundedSender<PubSubInstruction>) -> Self {
-        Self { tx, channel_size: 16 }
+        Self { tx, channel_size: AtomicUsize::new(16) }
     }
 
     /// Get the subscription ID for a local ID.
@@ -55,7 +63,7 @@ impl PubSubFrontend {
         req: SerializedRequest,
     ) -> impl Future<Output = TransportResult<Response>> + Send + 'static {
         let tx = self.tx.clone();
-        let channel_size = self.channel_size;
+        let channel_size = self.channel_size.load(Ordering::Relaxed);
 
         async move {
             let (in_flight, rx) = InFlight::new(req, channel_size);
@@ -81,17 +89,17 @@ impl PubSubFrontend {
     /// to buffer in new subscription channels. Defaults to 16. See
     /// [`tokio::sync::broadcast`] for a description of relevant
     /// behavior.
-    pub const fn channel_size(&self) -> usize {
-        self.channel_size
+    pub fn channel_size(&self) -> usize {
+        self.channel_size.load(Ordering::Relaxed)
     }
 
     /// Set the channel size. This is the number of items to buffer in new
     /// subscription channels. Defaults to 16. See
     /// [`tokio::sync::broadcast`] for a description of relevant
     /// behavior.
-    pub fn set_channel_size(&mut self, channel_size: usize) {
+    pub fn set_channel_size(&self, channel_size: usize) {
         debug_assert_ne!(channel_size, 0, "channel size must be non-zero");
-        self.channel_size = channel_size;
+        self.channel_size.store(channel_size, Ordering::Relaxed);
     }
 }
 

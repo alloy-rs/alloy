@@ -305,5 +305,10 @@ mod pubsub_impl {
         pub fn channel_size(&self) -> usize {
             self.transport.channel_size()
         }
+
+        /// Set the channel size.
+        pub fn set_channel_size(&self, size: usize) {
+            self.transport.set_channel_size(size)
+        }
     }
 }
