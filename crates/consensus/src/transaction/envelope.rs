@@ -237,12 +237,12 @@ impl TxEnvelope {
 
 impl Encodable for TxEnvelope {
     fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
-        self.network_encode(out)
+        Encodable2718::<TxType>::network_encode(self, out)
     }
 
     fn length(&self) -> usize {
         let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
+        if !Encodable2718::<TxType>::is_legacy(self) {
             payload_length += Header { list: false, payload_length }.length();
         }
 
@@ -252,7 +252,7 @@ impl Encodable for TxEnvelope {
 
 impl Decodable for TxEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::network_decode(buf)
+        Decodable2718::<TxType>::network_decode(buf)
     }
 }
 
@@ -273,6 +273,20 @@ impl Decodable2718<TxType> for TxEnvelope {
     }
 }
 
+impl<T: TryInto<TxType, Error = Eip2718Error> + TryFrom<u8, Error = Eip2718Error>> Decodable2718<T>
+    for TxEnvelope
+{
+    fn typed_decode(tx_type: T, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let tx_type: TxType = tx_type.try_into().map_err::<Eip2718Error, _>(Into::into)?;
+
+        Decodable2718::<TxType>::typed_decode(tx_type, buf)
+    }
+
+    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Decodable2718::<TxType>::fallback_decode(buf)
+    }
+}
+
 impl Encodable2718<TxType> for TxEnvelope {
     fn type_flag(&self) -> u8 {
         match self {
@@ -284,7 +298,7 @@ impl Encodable2718<TxType> for TxEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.inner_length() + !self.is_legacy() as usize
+        self.inner_length() + !Encodable2718::<TxType>::is_legacy(self) as usize
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -301,6 +315,20 @@ impl Encodable2718<TxType> for TxEnvelope {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
         }
+    }
+}
+
+impl<T: TryInto<TxType, Error = Eip2718Error> + Into<u8>> Encodable2718<T> for TxEnvelope {
+    fn type_flag(&self) -> u8 {
+        Encodable2718::<TxType>::type_flag(self)
+    }
+
+    fn encode_2718_len(&self) -> usize {
+        Encodable2718::<TxType>::encode_2718_len(self)
+    }
+
+    fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
+        Encodable2718::<TxType>::encode_2718(self, out)
     }
 }
 
@@ -408,9 +436,10 @@ mod tests {
         let signature = Signature::test_signature();
         let tx_signed = tx.into_signed(signature);
         let tx_envelope: TxEnvelope = tx_signed.into();
-        let encoded = tx_envelope.encoded_2718();
-        let decoded = TxEnvelope::decode_2718(&mut encoded.as_ref()).unwrap();
-        assert_eq!(encoded.len(), tx_envelope.encode_2718_len());
+        let encoded = Encodable2718::<TxType>::encoded_2718(&tx_envelope);
+        let decoded =
+            <TxEnvelope as Decodable2718<TxType>>::decode_2718(&mut encoded.as_ref()).unwrap();
+        assert_eq!(encoded.len(), Encodable2718::<TxType>::encode_2718_len(&tx_envelope));
         assert_eq!(decoded, tx_envelope);
     }
 
@@ -479,10 +508,11 @@ mod tests {
         let data = fs::read_to_string(network_data_path).expect("Unable to read file");
         let hex_data = hex::decode(data.trim()).unwrap();
 
-        let tx: TxEnvelope = TxEnvelope::decode_2718(&mut hex_data.as_slice()).unwrap();
-        let encoded = tx.encoded_2718();
+        let tx: TxEnvelope =
+            <TxEnvelope as Decodable2718<TxType>>::decode_2718(&mut hex_data.as_slice()).unwrap();
+        let encoded = Encodable2718::<TxType>::encoded_2718(&tx);
         assert_eq!(encoded, hex_data);
-        assert_eq!(tx.encode_2718_len(), hex_data.len());
+        assert_eq!(Encodable2718::<TxType>::encode_2718_len(&tx), hex_data.len());
     }
 
     #[cfg(feature = "serde")]
