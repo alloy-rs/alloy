@@ -265,8 +265,8 @@ mod tests {
             .read(b"{\"jsonrpc\":\"2.0\",\"method\":\"eth_subscription\"")
             // trigger pending read
             .wait(std::time::Duration::from_millis(1))
-            // complete object
-            .read(vec![b"a"[0]; CAPACITY].as_ref())
+            // fill buffer with invalid data
+            .read(vec![b'a'; CAPACITY].as_ref())
             .build();
 
         let mut reader = ReadJsonStream::new(mock.compat());
