@@ -86,8 +86,10 @@ impl JwtSecret {
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
     pub fn validate(&self, jwt: String) -> Result<(), JwtError> {
+        // Create a new validation object with the required signature algorithm
+        // and ensure that the `iat` claim is present. The `exp` claim is validated by default if
+        // defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
-        // ensure that the JWT has an `iat` claim
         validation.set_required_spec_claims(&["iat"]);
         let bytes = &self.0;
 
@@ -156,7 +158,8 @@ pub struct Claims {
     /// - [`RFC-7519 - Spec`](https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6)
     /// - [`RFC-7519 - Notations`](https://www.rfc-editor.org/rfc/rfc7519#section-2)
     pub iat: u64,
-    /// Expiration, if any
+    /// The "exp" (expiration time) claim identifies the expiration time on or after which the JWT
+    /// MUST NOT be accepted for processing.
     pub exp: Option<u64>,
 }
 
@@ -260,6 +263,17 @@ mod tests {
         let result = secret.validate(jwt);
 
         assert!(matches!(result, Err(JwtError::InvalidIssuanceTimestamp)));
+    }
+
+    #[test]
+    fn validation_error_expired() {
+        let secret = JwtSecret::random();
+        let claims = Claims { iat: to_u64(SystemTime::now()), exp: Some(1) };
+        let jwt: String = secret.encode(&claims).unwrap();
+
+        let result = secret.validate(jwt);
+
+        assert!(matches!(result, Err(JwtError::JwtDecodingError(_))));
     }
 
     #[test]
