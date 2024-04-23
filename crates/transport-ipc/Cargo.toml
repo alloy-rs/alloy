@@ -28,6 +28,9 @@ interprocess = { version = "1.2.1", features = ["tokio", "tokio_support"] }
 serde = { workspace = true, optional = true }
 tempfile = { workspace = true, optional = true }
 
+[dev-dependencies]
+tokio-test.workspace = true
+
 [features]
 default = []
 mock = ["dep:serde", "dep:tempfile"]
