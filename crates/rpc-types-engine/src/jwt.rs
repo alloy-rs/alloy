@@ -127,7 +127,7 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
-    pub fn validate(&self, jwt: String) -> Result<(), JwtError> {
+    pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
         let mut validation = Validation::new(JWT_SIGNATURE_ALGO);
@@ -245,7 +245,7 @@ mod tests {
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Ok(())));
     }
@@ -256,7 +256,7 @@ mod tests {
         let claims = Claims::default();
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Ok(())));
     }
@@ -271,7 +271,7 @@ mod tests {
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::InvalidIssuanceTimestamp)));
 
@@ -281,7 +281,7 @@ mod tests {
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::InvalidIssuanceTimestamp)));
     }
@@ -292,7 +292,7 @@ mod tests {
         let claims = Claims { iat: get_current_timestamp(), exp: Some(1) };
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::JwtDecodingError(_))));
     }
@@ -305,7 +305,7 @@ mod tests {
 
         // A different secret will generate a different signature.
         let secret_2 = JwtSecret::random();
-        let result = secret_2.validate(jwt);
+        let result = secret_2.validate(&jwt);
         assert!(matches!(result, Err(JwtError::InvalidSignature)));
     }
 
@@ -319,7 +319,7 @@ mod tests {
 
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
         let jwt = encode(&unsupported_algo, &claims, &key).unwrap();
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Err(JwtError::UnsupportedSignatureAlgorithm)));
     }
@@ -331,7 +331,7 @@ mod tests {
         let claims = Claims { iat: get_current_timestamp(), exp: None };
         let jwt = secret.encode(&claims).unwrap();
 
-        let result = secret.validate(jwt);
+        let result = secret.validate(&jwt);
 
         assert!(matches!(result, Ok(())));
     }
