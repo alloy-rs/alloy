@@ -243,7 +243,7 @@ mod tests {
     fn validation_ok() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
@@ -254,7 +254,7 @@ mod tests {
     fn validation_with_current_time_ok() {
         let secret = JwtSecret::random();
         let claims = Claims::default();
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
@@ -269,7 +269,7 @@ mod tests {
         let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
         let out_of_window_time = SystemTime::now().checked_sub(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
@@ -279,7 +279,7 @@ mod tests {
         let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
         let out_of_window_time = SystemTime::now().checked_add(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
@@ -290,7 +290,7 @@ mod tests {
     fn validation_error_exp_expired() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(1) };
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
@@ -301,7 +301,7 @@ mod tests {
     fn validation_error_wrong_signature() {
         let secret_1 = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
-        let jwt: String = secret_1.encode(&claims).unwrap();
+        let jwt = secret_1.encode(&claims).unwrap();
 
         // A different secret will generate a different signature.
         let secret_2 = JwtSecret::random();
@@ -318,7 +318,7 @@ mod tests {
         let unsupported_algo = Header::new(Algorithm::HS384);
 
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
-        let jwt: String = encode(&unsupported_algo, &claims, &key).unwrap();
+        let jwt = encode(&unsupported_algo, &claims, &key).unwrap();
         let result = secret.validate(jwt);
 
         assert!(matches!(result, Err(JwtError::UnsupportedSignatureAlgorithm)));
@@ -329,7 +329,7 @@ mod tests {
         let secret = JwtSecret::random();
 
         let claims = Claims { iat: get_current_timestamp(), exp: None };
-        let jwt: String = secret.encode(&claims).unwrap();
+        let jwt = secret.encode(&claims).unwrap();
 
         let result = secret.validate(jwt);
 
