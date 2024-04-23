@@ -134,7 +134,7 @@ impl JwtSecret {
         validation.set_required_spec_claims(&["iat"]);
         let bytes = &self.0;
 
-        match decode::<Claims>(&jwt, &DecodingKey::from_secret(bytes), &validation) {
+        match decode::<Claims>(jwt, &DecodingKey::from_secret(bytes), &validation) {
             Ok(token) => {
                 if !token.claims.is_within_time_window() {
                     Err(JwtError::InvalidIssuanceTimestamp)?
