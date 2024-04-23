@@ -554,6 +554,15 @@ impl Decodable for BlockHashOrNumber {
     }
 }
 
+impl fmt::Display for BlockHashOrNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => write!(f, "{}", hash),
+            Self::Number(num) => write!(f, "{}", num),
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockHashOrNumber] from a string.
 #[derive(Debug, thiserror::Error)]
 #[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]

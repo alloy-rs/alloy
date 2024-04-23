@@ -15,6 +15,12 @@ pub enum ConversionError {
     /// Missing signature for transaction.
     #[error("missing signature for transaction")]
     MissingSignature,
+    /// Missing y parity in signature.
+    #[error("missing y parity in signature")]
+    MissingYParity,
+    /// Invalid signature
+    #[error("invalid signature")]
+    InvalidSignature,
     /// Missing `chainId` field for EIP-1559 transaction.
     #[error("missing `chainId` field for EIP-155 transaction")]
     MissingChainId,

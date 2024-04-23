@@ -20,13 +20,13 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     /// Get the default signer address. This address should be used
     /// in [`NetworkSigner::sign_transaction_from`] when no specific signer is
     /// specified.
-    fn default_signer(&self) -> Address;
+    fn default_signer_address(&self) -> Address;
 
     /// Return true if the signer contains a credential for the given address.
-    fn is_signer_for(&self, address: &Address) -> bool;
+    fn has_signer_for(&self, address: &Address) -> bool;
 
     /// Return an iterator of all signer addresses.
-    fn signers(&self) -> impl Iterator<Item = Address>;
+    fn signer_addresses(&self) -> impl Iterator<Item = Address>;
 
     /// Asynchronously sign an unsigned transaction, with a specified
     /// credential.
@@ -41,7 +41,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         &self,
         tx: N::UnsignedTx,
     ) -> impl_future!(<Output = alloy_signer::Result<N::TxEnvelope>>) {
-        self.sign_transaction_from(self.default_signer(), tx)
+        self.sign_transaction_from(self.default_signer_address(), tx)
     }
 
     /// Asynchronously sign a transaction request, using the sender specified
@@ -50,7 +50,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         &self,
         request: N::TransactionRequest,
     ) -> alloy_signer::Result<N::TxEnvelope> {
-        let sender = request.from().unwrap_or_else(|| self.default_signer());
+        let sender = request.from().unwrap_or_else(|| self.default_signer_address());
         let tx = request.build_unsigned().map_err(|(_, e)| alloy_signer::Error::other(e))?;
         self.sign_transaction_from(sender, tx).await
     }
