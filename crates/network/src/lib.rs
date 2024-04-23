@@ -15,6 +15,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::Address;
@@ -75,7 +76,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type UnsignedTx: From<Self::TxEnvelope>;
 
     /// The network receipt envelope type.
-    type ReceiptEnvelope: Eip2718Envelope;
+    type ReceiptEnvelope: Eip2718Envelope + TxReceipt;
 
     /// The network header type.
     type Header;

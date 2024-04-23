@@ -43,7 +43,7 @@ where
 }
 
 impl TxReceipt for Receipt {
-    fn success(&self) -> bool {
+    fn status(&self) -> bool {
         self.status
     }
 
@@ -78,7 +78,7 @@ pub struct ReceiptWithBloom<T = Log> {
 }
 
 impl TxReceipt for ReceiptWithBloom {
-    fn success(&self) -> bool {
+    fn status(&self) -> bool {
         self.receipt.status
     }
 

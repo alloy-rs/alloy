@@ -10,9 +10,9 @@ mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom};
 
 /// Receipt is the result of a transaction execution.
-pub trait TxReceipt {
+pub trait TxReceipt<T = Log> {
     /// Returns true if the transaction was successful.
-    fn success(&self) -> bool;
+    fn status(&self) -> bool;
 
     /// Returns the bloom filter for the logs in the receipt. This operation
     /// may be expensive.
@@ -28,7 +28,7 @@ pub trait TxReceipt {
     fn cumulative_gas_used(&self) -> u128;
 
     /// Returns the logs emitted by this transaction.
-    fn logs(&self) -> &[Log];
+    fn logs(&self) -> &[T];
 }
 
 #[cfg(test)]
