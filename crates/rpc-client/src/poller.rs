@@ -85,8 +85,9 @@ where
         method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> Self {
-        let poll_interval =
-            client.upgrade().map_or_else(|| Duration::from_secs(7), |c| c.default_poll_interval());
+        let poll_interval = client
+            .upgrade()
+            .map_or_else(|| Duration::from_secs(7), |c| Duration::from_millis(c.poll_interval()));
         Self {
             client,
             method: method.into(),

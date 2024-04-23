@@ -1,4 +1,4 @@
-use crate::{Receipt, ReceiptWithBloom, TxType};
+use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
@@ -90,6 +90,31 @@ impl<T> ReceiptEnvelope<T> {
                 Some(&t.receipt)
             }
         }
+    }
+}
+
+impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
+    fn status(&self) -> bool {
+        self.as_receipt().unwrap().status
+    }
+
+    /// Return the receipt's bloom.
+    fn bloom(&self) -> Bloom {
+        self.as_receipt_with_bloom().unwrap().logs_bloom
+    }
+
+    fn bloom_cheap(&self) -> Option<Bloom> {
+        Some(self.bloom())
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    fn cumulative_gas_used(&self) -> u128 {
+        self.as_receipt().unwrap().cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    fn logs(&self) -> &[T] {
+        &self.as_receipt().unwrap().logs
     }
 }
 

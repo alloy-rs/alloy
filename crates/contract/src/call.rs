@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlockId};
+use alloy_rpc_types::{state::StateOverride, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -313,6 +313,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         self
     }
 
+    /// Sets the `sidecar` field in the transaction to the provided value.
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+        self.request.set_blob_sidecar(blob_sidecar);
+        self
+    }
+
     /// Uses a Legacy transaction instead of an EIP-1559 one to execute the call
     pub fn legacy(self) -> Self {
         todo!()
@@ -380,6 +386,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
@@ -389,6 +396,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
+    /// If [`state overrides`](Self::state) are set, they will be applied to the call.
     ///
     /// Does not decode the output of the call, returning the raw output data instead.
     ///

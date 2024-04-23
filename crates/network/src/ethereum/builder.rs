@@ -156,6 +156,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn prep_for_submission(&mut self) {
+        self.transaction_type = Some(self.preferred_type() as u8);
         self.trim_conflicting_keys();
         self.populate_blob_hashes();
     }

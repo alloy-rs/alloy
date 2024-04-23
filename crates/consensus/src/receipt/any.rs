@@ -1,4 +1,4 @@
-use crate::ReceiptWithBloom;
+use crate::{ReceiptWithBloom, TxReceipt};
 use alloy_eips::eip2718::{Decodable2718, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
@@ -24,12 +24,10 @@ pub struct AnyReceiptEnvelope<T = Log> {
     pub r#type: u8,
 }
 
-impl AnyReceiptEnvelope {
-    /// Returns whether this is a legacy receipt (type 0)
-    pub const fn is_legacy(&self) -> bool {
-        self.r#type == 0
-    }
-
+impl<T> AnyReceiptEnvelope<T>
+where
+    T: Encodable,
+{
     /// Calculate the length of the rlp payload of the network encoded receipt.
     pub fn rlp_payload_length(&self) -> usize {
         let length = self.inner.length();
@@ -38,6 +36,13 @@ impl AnyReceiptEnvelope {
         } else {
             length + 1
         }
+    }
+}
+
+impl<T> AnyReceiptEnvelope<T> {
+    /// Returns whether this is a legacy receipt (type 0)
+    pub const fn is_legacy(&self) -> bool {
+        self.r#type == 0
     }
 
     /// Return true if the transaction was successful.
@@ -50,19 +55,41 @@ impl AnyReceiptEnvelope {
         self.inner.receipt.status
     }
 
+    /// Return the receipt's bloom.
+    pub const fn bloom(&self) -> Bloom {
+        self.inner.logs_bloom
+    }
+
     /// Returns the cumulative gas used at this receipt.
     pub const fn cumulative_gas_used(&self) -> u128 {
         self.inner.receipt.cumulative_gas_used
     }
 
     /// Return the receipt logs.
-    pub fn logs(&self) -> &[Log] {
+    pub fn logs(&self) -> &[T] {
         &self.inner.receipt.logs
+    }
+}
+
+impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
+    /// Returns the success status of the receipt's transaction.
+    fn status(&self) -> bool {
+        self.inner.receipt.status
     }
 
     /// Return the receipt's bloom.
-    pub const fn logs_bloom(&self) -> &Bloom {
-        &self.inner.logs_bloom
+    fn bloom(&self) -> Bloom {
+        self.inner.logs_bloom
+    }
+
+    /// Returns the cumulative gas used at this receipt.
+    fn cumulative_gas_used(&self) -> u128 {
+        self.inner.receipt.cumulative_gas_used
+    }
+
+    /// Return the receipt logs.
+    fn logs(&self) -> &[T] {
+        &self.inner.receipt.logs
     }
 }
 

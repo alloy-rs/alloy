@@ -4,6 +4,7 @@ use crate::{
     Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
 };
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
@@ -143,6 +144,39 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 }
 
 impl TxEnvelope {
+    /// Recover the signer of the transaction.
+    #[cfg(feature = "k256")]
+    pub fn recover_signer(
+        &self,
+    ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.recover_signer(),
+            TxEnvelope::Eip2930(tx) => tx.recover_signer(),
+            TxEnvelope::Eip1559(tx) => tx.recover_signer(),
+            TxEnvelope::Eip4844(tx) => tx.recover_signer(),
+        }
+    }
+
+    /// Calculate the signing hash for the transaction.
+    pub fn signature_hash(&self) -> B256 {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.signature_hash(),
+            TxEnvelope::Eip2930(tx) => tx.signature_hash(),
+            TxEnvelope::Eip1559(tx) => tx.signature_hash(),
+            TxEnvelope::Eip4844(tx) => tx.signature_hash(),
+        }
+    }
+
+    /// Return the hash of the inner Signed
+    pub const fn tx_hash(&self) -> &B256 {
+        match self {
+            TxEnvelope::Legacy(tx) => tx.hash(),
+            TxEnvelope::Eip2930(tx) => tx.hash(),
+            TxEnvelope::Eip1559(tx) => tx.hash(),
+            TxEnvelope::Eip4844(tx) => tx.hash(),
+        }
+    }
+
     /// Return the [`TxType`] of the inner txn.
     pub const fn tx_type(&self) -> TxType {
         match self {

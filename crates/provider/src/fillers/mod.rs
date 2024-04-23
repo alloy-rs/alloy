@@ -213,8 +213,8 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    inner: P,
-    filler: F,
+    pub(crate) inner: P,
+    pub(crate) filler: F,
     _pd: PhantomData<fn() -> (T, N)>,
 }
 
@@ -236,6 +236,14 @@ where
         other: Other,
     ) -> FillProvider<JoinFill<F, Other>, P, T, N> {
         self.filler.join_with(other).layer(self.inner)
+    }
+
+    /// Fills the transaction request, using the configured fillers
+    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>>
+    where
+        N::TxEnvelope: Clone,
+    {
+        self.filler.prepare_and_fill(self, SendableTx::Builder(tx)).await
     }
 }
 

@@ -122,8 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let (provider, _anvil) =
-            ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
+        let (provider, _anvil) = ProviderBuilder::new().with_nonce_management().on_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),

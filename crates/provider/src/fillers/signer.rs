@@ -31,6 +31,18 @@ pub struct SignerFiller<S> {
     signer: S,
 }
 
+impl<S> AsRef<S> for SignerFiller<S> {
+    fn as_ref(&self) -> &S {
+        &self.signer
+    }
+}
+
+impl<S> AsMut<S> for SignerFiller<S> {
+    fn as_mut(&mut self) -> &mut S {
+        &mut self.signer
+    }
+}
+
 impl<S> SignerFiller<S> {
     /// Creates a new signing layer with the given signer.
     pub const fn new(signer: S) -> Self {
@@ -46,6 +58,10 @@ where
     type Fillable = ();
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        if tx.from().is_none() {
+            return FillerControlFlow::Ready;
+        }
+
         if tx.can_build() {
             FillerControlFlow::Ready
         } else {
@@ -72,10 +88,17 @@ where
         _fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        let builder = match tx {
+        let mut builder = match tx {
             SendableTx::Builder(builder) => builder,
             _ => return Ok(tx),
         };
+
+        if builder.from().is_none() {
+            builder.set_from(self.signer.default_signer_address());
+            if !builder.can_build() {
+                return Ok(SendableTx::Builder(builder));
+            }
+        }
 
         let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
 
