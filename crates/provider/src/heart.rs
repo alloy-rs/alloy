@@ -183,7 +183,8 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
         let hash = self.config.tx_hash;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
-        // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the block the tx was mined in
+        // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
+        // block the tx was mined in
         let mut interval = tokio::time::interval(Duration::from_secs(7));
 
         loop {
