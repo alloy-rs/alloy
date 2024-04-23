@@ -28,7 +28,7 @@ pub struct Signature {
 ///
 /// This will be serialized as "0x0" if false, and "0x1" if true.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Parity(
     #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
 );
