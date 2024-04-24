@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Installs Solc and Geth binaries
+# Installs Geth binary
 # Note: intended for use only with CI (x86_64 Ubuntu, MacOS or Windows)
 set -e
 
-GETH_BUILD=${GETH_BUILD:-"1.13.15-c5ba367e"}
+GETH_BUILD=${GETH_BUILD:-"1.14.0-87246f3c"}
 
 BIN_DIR=${BIN_DIR:-"$HOME/bin"}
 

@@ -103,6 +103,7 @@ impl GethInstance {
     }
 
     /// Returns the private key used to configure clique on this instance
+    #[deprecated = "clique support was removed in geth >=1.14"]
     pub fn clique_private_key(&self) -> &Option<SigningKey> {
         &self.clique_private_key
     }
@@ -301,6 +302,7 @@ impl Geth {
     ///
     /// The address derived from this private key will be used to set the `miner.etherbase` field
     /// on the node.
+    #[deprecated = "clique support was removed in geth >=1.14"]
     pub fn set_clique_private_key<T: Into<SigningKey>>(mut self, private_key: T) -> Self {
         self.clique_private_key = Some(private_key.into());
         self
@@ -726,6 +728,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "fails on geth >=1.14"]
+    #[allow(deprecated)]
     fn clique_correctly_configured() {
         run_with_tempdir(|temp_dir_path| {
             let private_key = SigningKey::random(&mut rand::thread_rng());
