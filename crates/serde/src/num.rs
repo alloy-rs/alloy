@@ -44,7 +44,7 @@ pub mod u8_opt_via_ruint {
     }
 }
 
-/// serde functions for handling `u64` via [U64]
+/// serde functions for handling `u64` via [U64](alloy_primitives::U64)
 pub mod u64_via_ruint {
     use alloy_primitives::U64;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -63,7 +63,7 @@ pub mod u64_via_ruint {
     }
 }
 
-/// serde functions for handling `Option<u64>` via [U64]
+/// serde functions for handling `Option<u64>` via [U64](alloy_primitives::U64)
 pub mod u64_opt_via_ruint {
     use alloy_primitives::U64;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
