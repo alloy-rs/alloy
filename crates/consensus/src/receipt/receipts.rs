@@ -42,7 +42,10 @@ where
     }
 }
 
-impl TxReceipt for Receipt {
+impl<T> TxReceipt<T> for Receipt<T>
+where
+    T: Borrow<Log>,
+{
     fn status(&self) -> bool {
         self.status
     }
@@ -55,7 +58,7 @@ impl TxReceipt for Receipt {
         self.cumulative_gas_used
     }
 
-    fn logs(&self) -> &[Log] {
+    fn logs(&self) -> &[T] {
         &self.logs
     }
 }
@@ -77,7 +80,7 @@ pub struct ReceiptWithBloom<T = Log> {
     pub logs_bloom: Bloom,
 }
 
-impl TxReceipt for ReceiptWithBloom {
+impl<T> TxReceipt<T> for ReceiptWithBloom<T> {
     fn status(&self) -> bool {
         self.receipt.status
     }
@@ -94,7 +97,7 @@ impl TxReceipt for ReceiptWithBloom {
         self.receipt.cumulative_gas_used
     }
 
-    fn logs(&self) -> &[Log] {
+    fn logs(&self) -> &[T] {
         &self.receipt.logs
     }
 }
