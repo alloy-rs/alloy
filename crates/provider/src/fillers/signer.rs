@@ -115,7 +115,7 @@ mod tests {
 
     #[tokio::test]
     async fn poc() {
-        let (provider, _anvil) = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
 
         let tx = TransactionRequest {
             nonce: Some(0),

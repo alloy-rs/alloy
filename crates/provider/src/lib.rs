@@ -40,6 +40,7 @@ mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
 pub mod fillers;
+pub mod layers;
 
 mod chain;
 

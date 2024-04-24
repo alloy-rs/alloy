@@ -116,13 +116,13 @@ impl NonceFiller {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types::TransactionRequest;
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let (provider, _anvil) = ProviderBuilder::new().with_nonce_management().on_anvil();
+        let provider = ProviderBuilder::new().with_nonce_management().on_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -138,10 +138,9 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let (provider, anvil) =
-            ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_nonce_management().on_anvil_with_signer();
 
-        let from = anvil.addresses()[0];
+        let from = provider.default_signer_address();
         let tx = TransactionRequest {
             from: Some(from),
             value: Some(U256::from(100)),
