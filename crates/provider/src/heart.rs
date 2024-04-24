@@ -180,18 +180,35 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
-        // Try fetching receipt immediately to ensure that we don't watch for a transaction that is
-        // already confirmed.
-        let receipt = self.provider.get_transaction_receipt(self.config.tx_hash).await?;
-        if let Some(receipt) = receipt {
-            return Ok(receipt);
+        let hash = self.config.tx_hash;
+        let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
+
+        // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
+        // block the tx was mined in
+        let mut interval =
+            tokio::time::interval(Duration::from_millis(self.provider.client().poll_interval()));
+
+        loop {
+            let mut confirmed = false;
+
+            select! {
+                 _ = interval.tick() => {},
+                 res = &mut pending_tx => {
+                        let _ = res?;
+                        confirmed = true;
+                    }
+            }
+
+            // try to fetch the receipt
+            let receipt = self.provider.get_transaction_receipt(hash).await?;
+            if let Some(receipt) = receipt {
+                return Ok(receipt);
+            }
+
+            if confirmed {
+                return Err(RpcError::NullResp);
+            }
         }
-
-        let pending_tx = self.provider.watch_pending_transaction(self.config).await?;
-        let hash = pending_tx.await?;
-        let receipt = self.provider.get_transaction_receipt(hash).await?;
-
-        receipt.ok_or(RpcError::NullResp)
     }
 }
 
