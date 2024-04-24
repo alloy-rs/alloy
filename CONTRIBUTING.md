@@ -138,6 +138,8 @@ cargo test --no-default-features
 cargo +nightly clippy --all-features
 ```
 
+> You need to have [geth](https://geth.ethereum.org/downloads) and [Anvil](https://book.getfoundry.sh/getting-started/installation) to be able to run the tests
+
 ### Tests
 
 If the change being proposed alters code (as opposed to only documentation for
