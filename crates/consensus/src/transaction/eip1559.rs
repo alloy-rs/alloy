@@ -13,17 +13,17 @@ use alloc::vec::Vec;
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip1559 {
     /// EIP-155: Simple replay attack protection
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
     pub nonce: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub gas_limit: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -36,7 +36,7 @@ pub struct TxEip1559 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasFeeCap`
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub max_fee_per_gas: u128,
     /// Max Priority fee that transaction is paying
     ///
@@ -45,7 +45,7 @@ pub struct TxEip1559 {
     /// 340282366920938463463374607431768211455
     ///
     /// This is also known as `GasTipCap`
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub max_priority_fee_per_gas: u128,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.

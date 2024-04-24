@@ -1,7 +1,6 @@
 //! Pre-state Geth tracer types.
 
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_serde::num::from_int_or_hex_opt;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map, BTreeMap};
 
@@ -126,15 +125,11 @@ impl DiffStateKind {
     }
 }
 
-/// Represents the state of an account
+/// Represents the state of an account.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AccountState {
     /// The optional balance of the account.
-    #[serde(
-        default,
-        deserialize_with = "from_int_or_hex_opt",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub balance: Option<U256>,
     /// The optional code of the account.
     #[serde(default, skip_serializing_if = "Option::is_none")]

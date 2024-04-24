@@ -2,83 +2,9 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use core::str::FromStr;
 
-use alloy_primitives::{U256, U64};
-use serde::{de, Deserialize, Deserializer, Serialize};
-
-/// A `u64` wrapper type that deserializes from hex or a u64 and serializes as hex.
-///
-///
-/// ```rust
-/// use alloy_serde::num::U64HexOrNumber;
-/// let number_json = "100";
-/// let hex_json = "\"0x64\"";
-///
-/// let number: U64HexOrNumber = serde_json::from_str(number_json).unwrap();
-/// let hex: U64HexOrNumber = serde_json::from_str(hex_json).unwrap();
-/// assert_eq!(number, hex);
-/// assert_eq!(hex.to(), 100);
-/// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct U64HexOrNumber(U64);
-
-impl U64HexOrNumber {
-    /// Returns the wrapped u64
-    pub fn to(self) -> u64 {
-        self.0.to()
-    }
-
-    /// Checks if the wrapped value is zero.
-    pub fn is_zero(&self) -> bool {
-        self.0.is_zero()
-    }
-}
-
-impl From<u64> for U64HexOrNumber {
-    fn from(value: u64) -> Self {
-        Self(U64::from(value))
-    }
-}
-
-impl From<U64> for U64HexOrNumber {
-    fn from(value: U64) -> Self {
-        Self(value)
-    }
-}
-
-impl From<U64HexOrNumber> for u64 {
-    fn from(value: U64HexOrNumber) -> Self {
-        value.to()
-    }
-}
-
-impl From<U64HexOrNumber> for U64 {
-    fn from(value: U64HexOrNumber) -> Self {
-        value.0
-    }
-}
-
-impl<'de> Deserialize<'de> for U64HexOrNumber {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum NumberOrHexU64 {
-            Hex(U64),
-            Int(u64),
-        }
-        match NumberOrHexU64::deserialize(deserializer)? {
-            NumberOrHexU64::Int(val) => Ok(val.into()),
-            NumberOrHexU64::Hex(val) => Ok(val.into()),
-        }
-    }
-}
-
-/// serde functions for handling `u8` as [U8](alloy_primitives::U8)
-pub mod u8_hex {
+/// serde functions for handling `u8` via [U8](alloy_primitives::U8)
+pub mod u8_via_ruint {
     use alloy_primitives::U8;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -96,8 +22,8 @@ pub mod u8_hex {
     }
 }
 
-/// serde functions for handling `Option<u8>` as [U8](alloy_primitives::U8)
-pub mod u8_hex_opt {
+/// serde functions for handling `Option<u8>` via [U8](alloy_primitives::U8)
+pub mod u8_opt_via_ruint {
     use alloy_primitives::U8;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -118,8 +44,8 @@ pub mod u8_hex_opt {
     }
 }
 
-/// serde functions for handling `u64` as [U64]
-pub mod u64_hex {
+/// serde functions for handling `u64` via [U64]
+pub mod u64_via_ruint {
     use alloy_primitives::U64;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -137,8 +63,8 @@ pub mod u64_hex {
     }
 }
 
-/// serde functions for handling `Option<u64>` as [U64]
-pub mod u64_hex_opt {
+/// serde functions for handling `Option<u64>` via [U64]
+pub mod u64_opt_via_ruint {
     use alloy_primitives::U64;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -160,97 +86,8 @@ pub mod u64_hex_opt {
     }
 }
 
-/// serde functions for handling primitive `u64` as [U64]
-pub mod u64_hex_or_decimal {
-    use crate::num::U64HexOrNumber;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
-    /// a number
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        U64HexOrNumber::deserialize(deserializer).map(Into::into)
-    }
-
-    /// Serializes u64 as hex string
-    pub fn serialize<S: Serializer>(value: &u64, s: S) -> Result<S::Ok, S::Error> {
-        U64HexOrNumber::from(*value).serialize(s)
-    }
-}
-
-/// serde functions for handling primitive optional `u64` as [U64]
-pub mod u64_hex_or_decimal_opt {
-    use crate::num::U64HexOrNumber;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    /// Deserializes an `u64` accepting a hex quantity string with optional 0x prefix or
-    /// a number
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        match Option::<U64HexOrNumber>::deserialize(deserializer)? {
-            Some(val) => Ok(Some(val.into())),
-            None => Ok(None),
-        }
-    }
-
-    /// Serializes u64 as hex string
-    pub fn serialize<S: Serializer>(value: &Option<u64>, s: S) -> Result<S::Ok, S::Error> {
-        match value {
-            Some(val) => U64HexOrNumber::from(*val).serialize(s),
-            None => s.serialize_none(),
-        }
-    }
-}
-
-/// Deserializes the input into an `Option<U256>`, using [`from_int_or_hex`] to deserialize the
-/// inner value.
-pub fn from_int_or_hex_opt<'de, D>(deserializer: D) -> Result<Option<U256>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match Option::<NumberOrHexU256>::deserialize(deserializer)? {
-        Some(val) => val.try_into_u256().map(Some),
-        None => Ok(None),
-    }
-}
-
-/// An enum that represents either a [serde_json::Number] integer, or a hex [U256].
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum NumberOrHexU256 {
-    /// An integer
-    Int(serde_json::Number),
-    /// A hex U256
-    Hex(U256),
-}
-
-impl NumberOrHexU256 {
-    /// Tries to convert this into a [U256]].
-    pub fn try_into_u256<E: de::Error>(self) -> Result<U256, E> {
-        match self {
-            NumberOrHexU256::Int(num) => {
-                U256::from_str(num.to_string().as_str()).map_err(E::custom)
-            }
-            NumberOrHexU256::Hex(val) => Ok(val),
-        }
-    }
-}
-
-/// Deserializes the input into a U256, accepting both 0x-prefixed hex and decimal strings with
-/// arbitrary precision, defined by serde_json's [`Number`](serde_json::Number).
-pub fn from_int_or_hex<'de, D>(deserializer: D) -> Result<U256, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    NumberOrHexU256::deserialize(deserializer)?.try_into_u256()
-}
-
-/// serde functions for handling primitive `u128` as [U128](alloy_primitives::U128)
-pub mod u128_hex_or_decimal {
+/// serde functions for handling primitive `u128` via [U128](alloy_primitives::U128)
+pub mod u128_via_ruint {
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -269,8 +106,8 @@ pub mod u128_hex_or_decimal {
     }
 }
 
-/// serde functions for handling primitive optional `u128` as [U128](alloy_primitives::U128)
-pub mod u128_hex_or_decimal_opt {
+/// serde functions for handling primitive optional `u128` via [U128](alloy_primitives::U128)
+pub mod u128_opt_via_ruint {
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -295,8 +132,8 @@ pub mod u128_hex_or_decimal_opt {
     }
 }
 
-/// serde functions for handling `Vec<u128>` as [U128](alloy_primitives::U128)
-pub mod u128_hex_or_decimal_vec {
+/// serde functions for handling `Vec<u128>` via [U128](alloy_primitives::U128)
+pub mod u128_vec_via_ruint {
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
     use alloy_primitives::U128;
@@ -319,8 +156,8 @@ pub mod u128_hex_or_decimal_vec {
     }
 }
 
-/// serde functions for handling `Vec<Vec<u128>>` as [U128](alloy_primitives::U128)
-pub mod u128_hex_or_decimal_vec_vec_opt {
+/// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
+pub mod u128_vec_vec_opt_via_ruint {
     use alloy_primitives::U128;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -371,7 +208,7 @@ mod tests {
     fn test_hex_u64() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
-            #[serde(with = "u64_hex")]
+            #[serde(with = "u64_via_ruint")]
             inner: u64,
         }
 
@@ -384,10 +221,10 @@ mod tests {
     }
 
     #[test]
-    fn test_u128_hex_or_decimal() {
+    fn test_u128_via_ruint() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
-            #[serde(with = "u128_hex_or_decimal")]
+            #[serde(with = "u128_via_ruint")]
             inner: u128,
         }
 
@@ -405,10 +242,10 @@ mod tests {
     }
 
     #[test]
-    fn test_u128_hex_or_decimal_opt() {
+    fn test_u128_opt_via_ruint() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
-            #[serde(with = "u128_hex_or_decimal_opt")]
+            #[serde(with = "u128_opt_via_ruint")]
             inner: Option<u128>,
         }
 
@@ -433,10 +270,10 @@ mod tests {
     }
 
     #[test]
-    fn test_u128_hex_or_decimal_vec() {
+    fn test_u128_vec_via_ruint() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
-            #[serde(with = "u128_hex_or_decimal_vec")]
+            #[serde(with = "u128_vec_via_ruint")]
             inner: Vec<u128>,
         }
 
@@ -449,10 +286,10 @@ mod tests {
     }
 
     #[test]
-    fn test_u128_hex_or_decimal_vec_vec_opt() {
+    fn test_u128_vec_vec_opt_via_ruint() {
         #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
         struct Value {
-            #[serde(with = "u128_hex_or_decimal_vec_vec_opt")]
+            #[serde(with = "u128_vec_vec_opt_via_ruint")]
             inner: Option<Vec<Vec<u128>>>,
         }
 

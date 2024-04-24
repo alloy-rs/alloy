@@ -71,16 +71,16 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::num::u64_hex_opt")]
+    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
     pub number: Option<u64>,
     /// Gas Limit
-    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal")]
+    #[serde(default, with = "alloy_serde::num::u128_via_ruint")]
     pub gas_limit: u128,
     /// Gas Used
-    #[serde(default, with = "alloy_serde::num::u128_hex_or_decimal")]
+    #[serde(default, with = "alloy_serde::num::u128_via_ruint")]
     pub gas_used: u128,
     /// Timestamp
-    #[serde(default, with = "alloy_serde::num::u64_hex")]
+    #[serde(default, with = "alloy_serde::num::u64_via_ruint")]
     pub timestamp: u64,
     /// Total difficulty
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -107,7 +107,7 @@ pub struct Header {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
@@ -117,14 +117,14 @@ pub struct Header {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub blob_gas_used: Option<u128>,
     /// Excess blob gas
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub excess_blob_gas: Option<u128>,
     /// Parent beacon block root

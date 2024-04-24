@@ -8,10 +8,10 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BaseFeeParams {
     /// The base_fee_max_change_denominator from EIP-1559
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u128_via_ruint"))]
     pub max_change_denominator: u128,
     /// The elasticity multiplier from EIP-1559
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u128_via_ruint"))]
     pub elasticity_multiplier: u128,
 }
 

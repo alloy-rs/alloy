@@ -38,7 +38,7 @@ pub struct Transaction {
     /// Hash
     pub hash: B256,
     /// Nonce
-    #[serde(with = "alloy_serde::num::u64_hex")]
+    #[serde(with = "alloy_serde::num::u64_via_ruint")]
     pub nonce: u64,
     /// Block hash
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,14 +47,14 @@ pub struct Transaction {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_hex_opt"
+        with = "alloy_serde::num::u64_opt_via_ruint"
     )]
     pub block_number: Option<u64>,
     /// Transaction Index
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_hex_opt"
+        with = "alloy_serde::num::u64_opt_via_ruint"
     )]
     pub transaction_index: Option<u64>,
     /// Sender
@@ -67,31 +67,31 @@ pub struct Transaction {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub gas_price: Option<u128>,
     /// Gas amount
-    #[serde(with = "alloy_serde::num::u128_hex_or_decimal")]
+    #[serde(with = "alloy_serde::num::u128_via_ruint")]
     pub gas: u128,
     /// Max BaseFeePerGas the user is willing to pay.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_opt"
+        with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// Data
@@ -102,7 +102,11 @@ pub struct Transaction {
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u64_opt_via_ruint"
+    )]
     pub chain_id: Option<u64>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,7 +125,7 @@ pub struct Transaction {
         default,
         rename = "type",
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u8_hex_opt"
+        with = "alloy_serde::num::u8_opt_via_ruint"
     )]
     pub transaction_type: Option<u8>,
 
