@@ -13,10 +13,10 @@ use alloc::vec::Vec;
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct TxEip2930 {
     /// Added as EIP-pub 155: Simple replay attack protection
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
     pub nonce: u64,
     /// A scalar value equal to the number of
     /// Wei to be paid per unit of gas for all computation
@@ -25,14 +25,14 @@ pub struct TxEip2930 {
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
     /// 340282366920938463463374607431768211455
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub gas_price: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_hex_or_decimal"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub gas_limit: u128,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.

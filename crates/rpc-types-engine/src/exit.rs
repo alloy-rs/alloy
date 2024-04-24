@@ -14,6 +14,6 @@ pub struct ExitV1 {
     /// Validator public key.
     pub pubkey: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
-    #[serde(with = "alloy_serde::u64_hex")]
+    #[serde(with = "alloy_serde::u64_via_ruint")]
     pub amount: u64,
 }

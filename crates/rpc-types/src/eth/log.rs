@@ -17,20 +17,24 @@ pub struct Log<T = LogData> {
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<B256>,
     /// Number of the block the transaction that emitted this log was mined in
-    #[serde(with = "alloy_serde::u64_hex_opt")]
+    #[serde(with = "alloy_serde::u64_opt_via_ruint")]
     pub block_number: Option<u64>,
     /// The timestamp of the block as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::u64_hex_opt", default)]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::u64_opt_via_ruint",
+        default
+    )]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
     pub transaction_hash: Option<B256>,
     /// Index of the Transaction in the block
-    #[serde(with = "alloy_serde::u64_hex_opt")]
+    #[serde(with = "alloy_serde::u64_opt_via_ruint")]
     pub transaction_index: Option<u64>,
     /// Log Index in Block
-    #[serde(with = "alloy_serde::u64_hex_opt")]
+    #[serde(with = "alloy_serde::u64_opt_via_ruint")]
     pub log_index: Option<u64>,
     /// Geth Compatibility Field: whether this log was removed
     #[serde(default)]

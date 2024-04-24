@@ -1,7 +1,6 @@
 //! Geth call tracer types.
 
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_serde::num::from_int_or_hex;
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
@@ -12,10 +11,10 @@ pub struct CallFrame {
     /// The address of that initiated the call.
     pub from: Address,
     /// How much gas was left before the call.
-    #[serde(default, deserialize_with = "from_int_or_hex")]
+    #[serde(default)]
     pub gas: U256,
     /// How much gas was used by the call.
-    #[serde(default, deserialize_with = "from_int_or_hex", rename = "gasUsed")]
+    #[serde(default, rename = "gasUsed")]
     pub gas_used: U256,
     /// The address of the contract that was called.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -20,7 +20,7 @@ pub struct AnyReceiptEnvelope<T = Log> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: ReceiptWithBloom<T>,
     /// The transaction type.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u8_hex"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u8_via_ruint"))]
     pub r#type: u8,
 }
 

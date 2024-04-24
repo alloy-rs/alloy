@@ -39,7 +39,7 @@ pub struct FeeHistory {
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
-        with = "alloy_serde::num::u128_hex_or_decimal_vec"
+        with = "alloy_serde::num::u128_vec_via_ruint"
     )]
     pub base_fee_per_gas: Vec<u128>,
     /// An array of block gas used ratios. These are calculated as the ratio
@@ -56,7 +56,7 @@ pub struct FeeHistory {
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
-        // with = "alloy_serde::num::u128_hex_or_decimal_vec"
+        // with = "alloy_serde::num::u128_vec_via_ruint"
     )]
     pub base_fee_per_blob_gas: Vec<u128>,
     /// An array of block blob gas used ratios. These are calculated as the ratio of gasUsed and
@@ -64,14 +64,14 @@ pub struct FeeHistory {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blob_gas_used_ratio: Vec<f64>,
     /// Lowest number block of the returned range.
-    #[serde(default, with = "alloy_serde::num::u64_hex")]
+    #[serde(default, with = "alloy_serde::num::u64_via_ruint")]
     pub oldest_block: u64,
     /// An (optional) array of effective priority fee per gas data points from a single
     /// block. All zeroes are returned if the block is empty.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_hex_or_decimal_vec_vec_opt"
+        with = "alloy_serde::num::u128_vec_vec_opt_via_ruint"
     )]
     pub reward: Option<Vec<Vec<u128>>>,
 }

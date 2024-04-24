@@ -96,7 +96,7 @@ pub struct OtsTransactionReceipt {
     /// Note: the otterscan API sets all log fields to null.
     #[serde(flatten)]
     pub receipt: TransactionReceipt<OtsReceipt>,
-    #[serde(default, with = "alloy_serde::u64_hex_opt")]
+    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
     pub timestamp: Option<u64>,
 }
 
@@ -110,7 +110,7 @@ pub struct OtsReceipt {
     #[serde(with = "alloy_serde::quantity_bool")]
     pub status: bool,
     /// Gas used
-    #[serde(with = "alloy_serde::u64_hex")]
+    #[serde(with = "alloy_serde::u64_via_ruint")]
     pub cumulative_gas_used: u64,
     /// Log send from contracts.
     ///
@@ -121,7 +121,7 @@ pub struct OtsReceipt {
     /// Note: this is set to null
     pub logs_bloom: Option<Bloom>,
     /// The transaction type.
-    #[serde(with = "alloy_serde::num::u8_hex")]
+    #[serde(with = "alloy_serde::num::u8_via_ruint")]
     pub r#type: u8,
 }
 
