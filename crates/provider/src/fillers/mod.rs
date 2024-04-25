@@ -40,7 +40,7 @@ pub enum FillerControlFlow {
     /// lists, this variant contains a list of `(name, missing)` tuples. When
     /// absorbing another control flow, if both are missing, the missing lists
     /// are combined.
-    Missing(Vec<(&'static str, &'static [&'static str])>),
+    Missing(Vec<(&'static str, Vec<&'static str>)>),
     /// The filler is ready to fill in the transaction request.
     Ready,
     /// The filler has filled in all properties that it can fill.
@@ -76,12 +76,12 @@ impl FillerControlFlow {
     }
 
     /// Creates a new `Missing` control flow.
-    pub fn missing(name: &'static str, missing: &'static [&'static str]) -> Self {
+    pub fn missing(name: &'static str, missing: Vec<&'static str>) -> Self {
         Self::Missing(vec![(name, missing)])
     }
 
     /// Returns true if the filler is missing a required property.
-    pub fn as_missing(&self) -> Option<&[(&'static str, &'static [&'static str])]> {
+    pub fn as_missing(&self) -> Option<&[(&'static str, Vec<&'static str>)]> {
         match self {
             Self::Missing(missing) => Some(missing),
             _ => None,

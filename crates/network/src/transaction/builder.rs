@@ -289,6 +289,12 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// returning a list of missing keys.
     fn complete_type(&self, ty: N::TxType) -> Result<(), Vec<&'static str>>;
 
+    /// Check if all necessary keys are present to build the currently-preferred
+    /// transaction type, returning a list of missing keys.
+    fn complete_preferred(&self) -> Result<(), Vec<&'static str>> {
+        self.complete_type(self.output_tx_type())
+    }
+
     /// Assert that the builder prefers a certain transaction type. This does
     /// not indicate that the builder is ready to build. This function uses a
     /// `dbg_assert_eq!` to check the builder status, and will have no affect
