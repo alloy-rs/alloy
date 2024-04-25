@@ -224,16 +224,12 @@ mod tests {
         }
     }
 
-    #[cfg(TODO)]
     #[tokio::test]
     async fn event_filters() {
         let _ = tracing_subscriber::fmt::try_init();
 
-        #[cfg(feature = "ws")]
-        let (provider, anvil) = spawn_anvil();
-
-        #[cfg(not(feature = "ws"))]
-        let (provider, _anvil) = spawn_anvil();
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+        let provider = alloy_provider::ProviderBuilder::default().on_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 
