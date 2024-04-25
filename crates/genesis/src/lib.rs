@@ -20,7 +20,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
