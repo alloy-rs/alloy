@@ -3,7 +3,7 @@
 Alloy connects applications to blockchains.
 
 Alloy is a rewrite of [`ethers-rs`] from the ground up, with exciting new
-features, high performance, and excellent [docs](alloy-rs.github.io/alloy/).
+features, high performance, and excellent [docs](https://alloy-rs.github.io/alloy/).
 
 [`ethers-rs`] will continue to be maintained until we have achieved
 feature-parity in Alloy. No action is currently needed from devs.
