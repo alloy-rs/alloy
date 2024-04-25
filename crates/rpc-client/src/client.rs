@@ -9,6 +9,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
+    time::Duration,
 };
 use tower::{layer::util::Identity, ServiceBuilder};
 
@@ -180,8 +181,8 @@ impl<T> RpcClientInner<T> {
     }
 
     /// Returns the default poll interval (milliseconds) for the client.
-    pub fn poll_interval(&self) -> u64 {
-        self.poll_interval.load(Ordering::Relaxed)
+    pub fn poll_interval(&self) -> Duration {
+        Duration::from_millis(self.poll_interval.load(Ordering::Relaxed))
     }
 
     /// Set the poll interval for the client in milliseconds.
