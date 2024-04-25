@@ -55,7 +55,7 @@ pub enum GasFillable {
 /// let provider = ProviderBuilder::new()
 ///     .with_gas_estimation()
 ///     .signer(signer)
-///     .on_http(url)?;
+///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())

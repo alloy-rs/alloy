@@ -28,7 +28,7 @@ use crate::{
 /// let provider = ProviderBuilder::new()
 ///     .with_chain_id(1)
 ///     .signer(signer)
-///     .on_http(url)?;
+///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())

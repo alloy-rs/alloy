@@ -1,8 +1,5 @@
 //! Numeric serde helpers.
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
-
 /// serde functions for handling `u8` via [U8](alloy_primitives::U8)
 pub mod u8_via_ruint {
     use alloy_primitives::U8;
