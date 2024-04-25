@@ -24,7 +24,6 @@ use alloc::{collections::BTreeMap, string::String};
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
-    json_value,
     num::{u128_opt_via_ruint, u128_via_ruint, u64_opt_via_ruint, u64_via_ruint},
     storage::deserialize_storage_map,
     ttd::deserialize_json_ttd_opt,
