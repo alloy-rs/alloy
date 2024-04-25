@@ -202,7 +202,6 @@ mod tests {
     use super::*;
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
-    use test_utils::{init_tracing, spawn_anvil};
 
     sol! {
         // solc v0.8.24; solc a.sol --via-ir --optimize --bin
@@ -227,13 +226,10 @@ mod tests {
 
     #[tokio::test]
     async fn event_filters() {
-        init_tracing();
+        let _ = tracing_subscriber::fmt::try_init();
 
-        #[cfg(feature = "ws")]
-        let (provider, anvil) = spawn_anvil();
-
-        #[cfg(not(feature = "ws"))]
-        let (provider, _anvil) = spawn_anvil();
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+        let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
 
         let contract = MyContract::deploy(&provider).await.unwrap();
 

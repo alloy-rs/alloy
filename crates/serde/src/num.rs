@@ -1,8 +1,5 @@
 //! Numeric serde helpers.
 
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
-
 /// serde functions for handling `u8` via [U8](alloy_primitives::U8)
 pub mod u8_via_ruint {
     use alloy_primitives::U8;
@@ -202,7 +199,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[cfg(not(feature = "std"))]
-    use alloc::{vec, vec::Vec};
+    use alloc::{string::ToString, vec, vec::Vec};
 
     #[test]
     fn test_hex_u64() {

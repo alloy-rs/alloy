@@ -70,19 +70,16 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::ProviderBuilder;
+
     use super::*;
     use alloy_node_bindings::Geth;
-
-    extern crate self as alloy_provider;
-
-    // NOTE: We cannot import the test-utils crate here due to a circular dependency.
-    include!("../../internal-test-utils/src/providers.rs");
 
     #[tokio::test]
     async fn node_info() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = http_provider(&geth.endpoint());
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let node_info = provider.node_info().await.unwrap();
         assert!(node_info.enode.starts_with("enode://"));
     }
@@ -95,8 +92,8 @@ mod test {
         let mut geth2 =
             Geth::new().disable_discovery().port(0u16).data_dir(temp_dir_2.path()).spawn();
 
-        let provider1 = http_provider(&geth1.endpoint());
-        let provider2 = http_provider(&geth2.endpoint());
+        let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
+        let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
         let node1_info = provider1.node_info().await.unwrap();
         let node1_id = node1_info.id;
         let node1_enode = node1_info.enode;

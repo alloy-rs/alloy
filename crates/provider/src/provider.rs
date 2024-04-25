@@ -118,7 +118,7 @@ impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
 #[cfg(feature = "reqwest")]
 impl<N: Network> RootProvider<Http<reqwest::Client>, N> {
     /// Creates a new HTTP root provider from the given URL.
-    pub fn new_http(url: reqwest::Url) -> Self {
+    pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }
 }
@@ -1102,20 +1102,22 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
+    use crate::ProviderBuilder;
+
     use super::*;
+    use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, TxKind};
     use alloy_rpc_types::request::TransactionRequest;
 
-    extern crate self as alloy_provider;
-
-    // NOTE: We cannot import the test-utils crate here due to a circular dependency.
-    include!("../../internal-test-utils/src/providers.rs");
+    fn init_tracing() {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
 
     #[cfg(feature = "reqwest")]
     #[tokio::test]
     async fn object_safety() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
 
         // These blocks are not necessary.
         {
@@ -1126,7 +1128,7 @@ mod tests {
 
         // Clones the underlying provider too.
         {
-            let clone_boxed = provider.clone().boxed();
+            let clone_boxed = provider.root().clone().boxed();
             let num = clone_boxed.get_block_number().await.unwrap();
             assert_eq!(0, num);
         }
@@ -1138,7 +1140,7 @@ mod tests {
             assert_eq!(0, num);
         }
 
-        let boxed = provider.boxed();
+        let boxed = provider.root().clone().boxed();
         let num = boxed.get_block_number().await.unwrap();
         assert_eq!(0, num);
 
@@ -1151,7 +1153,8 @@ mod tests {
     #[tokio::test]
     async fn subscribe_blocks_http() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil_with(|a| a.block_time(1));
+
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
 
         let err = provider.subscribe_blocks().await.unwrap_err();
         let alloy_json_rpc::RpcError::Transport(TransportErrorKind::PubsubUnavailable) = err else {
@@ -1223,8 +1226,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_tx() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
             to: Some(TxKind::Call(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))),
@@ -1248,8 +1250,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_number() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num)
     }
@@ -1257,8 +1258,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_number_with_raw_req() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num: U64 = provider.raw_request("eth_blockNumber".into(), ()).await.unwrap();
         assert_eq!(0, num.to::<u64>())
     }
@@ -1266,8 +1266,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let count = provider
             .get_transaction_count(
                 address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
@@ -1281,8 +1280,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_hash() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
@@ -1294,8 +1292,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_hash_with_raw_req() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
@@ -1310,8 +1307,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_number_full() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
@@ -1321,8 +1317,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_by_number() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
@@ -1332,8 +1327,7 @@ mod tests {
     #[tokio::test]
     async fn gets_client_version() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let version = provider.get_client_version().await.unwrap();
         assert!(version.contains("anvil"));
     }
@@ -1341,10 +1335,8 @@ mod tests {
     #[tokio::test]
     async fn gets_chain_id() {
         let dev_chain_id: u64 = 13371337;
-        let anvil = Anvil::new().args(["--chain-id", dev_chain_id.to_string().as_str()]).spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-        let provider = RootProvider::<_, Ethereum>::new(RpcClient::new(http, true));
+
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.chain_id(dev_chain_id));
 
         let chain_id = provider.get_chain_id().await.unwrap();
         assert_eq!(chain_id, dev_chain_id);
@@ -1353,10 +1345,7 @@ mod tests {
     #[tokio::test]
     async fn gets_network_id() {
         let dev_chain_id: u64 = 13371337;
-        let anvil = Anvil::new().args(["--chain-id", dev_chain_id.to_string().as_str()]).spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-        let provider = RootProvider::<_, Ethereum>::new(RpcClient::new(http, true));
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.chain_id(dev_chain_id));
 
         let chain_id = provider.get_net_version().await.unwrap();
         assert_eq!(chain_id, dev_chain_id);
@@ -1366,8 +1355,7 @@ mod tests {
     #[cfg(feature = "anvil")]
     async fn gets_code_at() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
@@ -1377,8 +1365,7 @@ mod tests {
     #[tokio::test]
     async fn gets_storage_at() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let addr = Address::with_last_byte(16);
         let storage = provider.get_storage_at(addr, U256::ZERO, BlockId::default()).await.unwrap();
         assert_eq!(storage, U256::ZERO);
@@ -1388,8 +1375,7 @@ mod tests {
     #[ignore]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let tx = provider
             .get_transaction_by_hash(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
@@ -1407,8 +1393,7 @@ mod tests {
     #[ignore]
     async fn gets_logs() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let filter = Filter::new()
             .at_block_hash(b256!(
                 "b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3"
@@ -1424,8 +1409,7 @@ mod tests {
     #[ignore]
     async fn gets_tx_receipt() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let receipt = provider
             .get_transaction_receipt(b256!(
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
@@ -1443,16 +1427,14 @@ mod tests {
     #[tokio::test]
     async fn gets_max_priority_fee_per_gas() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let _fee = provider.get_max_priority_fee_per_gas().await.unwrap();
     }
 
     #[tokio::test]
     async fn gets_fee_history() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let block_number = provider.get_block_number().await.unwrap();
         let fee_history = provider
             .get_fee_history(
@@ -1468,8 +1450,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_receipts() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
         assert!(receipts.is_some());
     }
@@ -1477,8 +1458,7 @@ mod tests {
     #[tokio::test]
     async fn gets_block_traces() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
         assert_eq!(traces.len(), 0);
     }
@@ -1486,8 +1466,7 @@ mod tests {
     #[tokio::test]
     async fn sends_raw_transaction() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
-
+        let provider = ProviderBuilder::new().on_anvil();
         let pending = provider
             .send_raw_transaction(
                 // Transfer 1 ETH from default EOA address to the Genesis address.
@@ -1503,7 +1482,7 @@ mod tests {
     #[tokio::test]
     async fn connect_boxed() {
         init_tracing();
-        let (_provider, anvil) = spawn_anvil();
+        let anvil = Anvil::new().spawn();
 
         let provider =
             RootProvider::<BoxTransport, Ethereum>::connect_builtin(anvil.endpoint().as_str())
@@ -1526,7 +1505,7 @@ mod tests {
     #[tokio::test]
     async fn test_uncle_count() {
         init_tracing();
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
 
         let count = provider.get_uncle_count(BlockId::Number(0.into())).await.unwrap();
         assert_eq!(count, 0);

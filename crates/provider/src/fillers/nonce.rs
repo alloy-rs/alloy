@@ -35,7 +35,7 @@ use tokio::sync::Mutex;
 /// let provider = ProviderBuilder::new()
 ///     .with_nonce_management()
 ///     .signer(signer)
-///     .on_http(url)?;
+///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())

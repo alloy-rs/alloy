@@ -20,7 +20,7 @@ use super::{FillerControlFlow, TxFiller};
 /// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .signer(signer)
-///     .on_http(url)?;
+///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
 /// # Ok(())

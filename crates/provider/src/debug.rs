@@ -144,27 +144,26 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::{ProviderBuilder, WalletProvider};
+
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_primitives::U256;
+    use alloy_primitives::{address, U256};
 
-    extern crate self as alloy_provider;
-
-    // NOTE: We cannot import the test-utils crate here due to a circular dependency.
-    include!("../../internal-test-utils/src/providers.rs");
+    fn init_tracing() {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
 
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         init_tracing();
-        let (provider, anvil) = spawn_anvil();
-
-        let from = anvil.addresses()[0];
-        let to = anvil.addresses()[1];
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let from = provider.default_signer_address();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
             .from(from)
-            .to(to)
+            .to(address!("deadbeef00000000deadbeef00000000deadbeef"))
             .value(U256::from(100))
             .max_fee_per_gas(gas_price + 1)
             .max_priority_fee_per_gas(gas_price + 1);
@@ -184,10 +183,8 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_call() {
         init_tracing();
-        let (provider, anvil) = spawn_anvil();
-
-        let from = anvil.addresses()[0];
-
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let from = provider.default_signer_address();
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
             .from(from)

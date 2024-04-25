@@ -531,19 +531,15 @@ mod tests {
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
-    use alloy_provider::{Provider, ReqwestProvider, RootProvider};
+    use alloy_provider::{
+        layers::AnvilProvider, Provider, ProviderBuilder, ReqwestProvider, RootProvider,
+        WalletProvider,
+    };
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
-
-    fn spawn_anvil() -> (ReqwestProvider, AnvilInstance) {
-        let anvil = Anvil::new().spawn();
-        let url = anvil.endpoint().parse().unwrap();
-        let http = Http::<Client>::new(url);
-        (RootProvider::new(RpcClient::new(http, true)), anvil)
-    }
 
     #[test]
     fn empty_constructor() {
@@ -554,7 +550,7 @@ mod tests {
             }
         }
 
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
         let call_builder = EmptyConstructor::deploy_builder(&provider);
         assert_eq!(*call_builder.calldata(), bytes!("6942"));
     }
@@ -589,11 +585,14 @@ mod tests {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    fn build_call_builder(
-    ) -> CallBuilder<Http<Client>, RootProvider<Http<Client>>, PhantomData<MyContract::doStuffCall>>
-    {
-        let (provider, _anvil) = spawn_anvil();
+    fn build_call_builder() -> CallBuilder<
+        Http<Client>,
+        AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,
+        PhantomData<MyContract::doStuffCall>,
+    > {
+        let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         call_builder
@@ -638,7 +637,7 @@ mod tests {
 
     #[test]
     fn call_encoding() {
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, &&provider).with_cloned_provider();
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         assert_eq!(
@@ -656,7 +655,7 @@ mod tests {
 
     #[test]
     fn deploy_encoding() {
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
         let bytecode = &MyContract::BYTECODE[..];
         let call_builder = MyContract::deploy_builder(&provider, false);
         assert_eq!(
@@ -680,10 +679,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let (provider, anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
 
+        let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
-        let expected_address = anvil.addresses()[0].create(0);
         assert_eq!(*my_contract.address(), expected_address);
 
         let my_state_builder = my_contract.myState();
@@ -706,7 +705,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call_with_priority() {
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
         let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
         let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
         let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
