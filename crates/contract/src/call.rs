@@ -532,7 +532,8 @@ mod tests {
     use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{
-        Provider, ProviderBuilder, ReqwestProvider, RootProvider, WalletProvider,
+        layers::AnvilProvider, Provider, ProviderBuilder, ReqwestProvider, RootProvider,
+        WalletProvider,
     };
     use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::AccessListItem;
@@ -585,10 +586,12 @@ mod tests {
     }
 
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
-    fn build_call_builder(
-    ) -> CallBuilder<Http<Client>, RootProvider<Http<Client>>, PhantomData<MyContract::doStuffCall>>
-    {
-        let (provider, _anvil) = spawn_anvil();
+    fn build_call_builder() -> CallBuilder<
+        Http<Client>,
+        AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,
+        PhantomData<MyContract::doStuffCall>,
+    > {
+        let provider = ProviderBuilder::new().on_anvil();
         let contract = MyContract::new(Address::ZERO, provider);
         let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
         call_builder
@@ -701,7 +704,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call_with_priority() {
-        let (provider, _anvil) = spawn_anvil();
+        let provider = ProviderBuilder::new().on_anvil();
         let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
         let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
         let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();

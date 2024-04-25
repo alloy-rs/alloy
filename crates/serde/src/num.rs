@@ -199,7 +199,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     #[cfg(not(feature = "std"))]
-    use alloc::{vec, vec::Vec};
+    use alloc::{string::ToString, vec, vec::Vec};
 
     #[test]
     fn test_hex_u64() {
