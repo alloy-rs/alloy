@@ -181,11 +181,25 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
 #[cfg(test)]
 mod tests {
-    use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
-    use alloy_primitives::Address;
+    use crate::{TransactionBuilder, TransactionBuilderError};
+    use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
+    use alloy_primitives::{Address, TxKind};
     use alloy_rpc_types::{AccessList, TransactionRequest};
 
-    use crate::{TransactionBuilder, TransactionBuilderError};
+    #[test]
+    fn from_eip1559_to_tx_req() {
+        let tx = TxEip1559 {
+            chain_id: 1,
+            nonce: 0,
+            gas_limit: 21_000,
+            to: TxKind::Call(Address::ZERO),
+            max_priority_fee_per_gas: 20e9 as u128,
+            max_fee_per_gas: 20e9 as u128,
+            ..Default::default()
+        };
+        let tx_req: TransactionRequest = tx.into();
+        tx_req.build_unsigned().unwrap();
+    }
 
     #[test]
     fn test_4844_when_sidecar() {

@@ -371,7 +371,10 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
             TxType::Eip4844
-        } else if self.access_list.is_some() {
+        } else if self.access_list.is_some()
+            && self.max_fee_per_gas.is_none()
+            && self.max_priority_fee_per_gas.is_none()
+        {
             TxType::Eip2930
         } else if self.gas_price.is_some() {
             TxType::Legacy
