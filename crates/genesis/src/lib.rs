@@ -24,6 +24,7 @@ use alloc::collections::BTreeMap;
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
+    json_value,
     num::{u128_opt_via_ruint, u128_via_ruint, u64_opt_via_ruint, u64_via_ruint},
     storage::deserialize_storage_map,
     ttd::deserialize_json_ttd_opt,
@@ -422,6 +423,10 @@ pub struct ChainConfig {
     /// Clique parameters.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clique: Option<CliqueConfig>,
+
+    /// Additional fields specific to each chain.
+    #[serde(flatten, default)]
+    pub extra_fields: BTreeMap<String, json_value>,
 }
 
 impl ChainConfig {
