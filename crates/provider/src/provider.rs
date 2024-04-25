@@ -118,7 +118,7 @@ impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
 #[cfg(feature = "reqwest")]
 impl<N: Network> RootProvider<Http<reqwest::Client>, N> {
     /// Creates a new HTTP root provider from the given URL.
-    pub fn new_http(url: reqwest::Url) -> Self {
+    pub fn new_http(url: url::Url) -> Self {
         Self::new(RpcClient::new_http(url))
     }
 }
