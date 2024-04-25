@@ -585,6 +585,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
     fn build_call_builder() -> CallBuilder<
         Http<Client>,
