@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, BlobTransactionSidecar, BlockId};
+use alloy_rpc_types::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -335,6 +335,24 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         self
     }
 
+    /// Sets the `max_fee_per_gas` in the transaction to the provide value
+    pub fn max_fee_per_gas(mut self, max_fee_per_gas: u128) -> Self {
+        self.request.set_max_fee_per_gas(max_fee_per_gas);
+        self
+    }
+
+    /// Sets the `max_priority_fee_per_gas` in the transaction to the provide value
+    pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
+        self.request.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        self
+    }
+
+    /// Sets the `access_list` in the transaction to the provided value
+    pub fn access_list(mut self, access_list: AccessList) -> Self {
+        self.request.set_access_list(access_list);
+        self
+    }
+
     /// Sets the `value` field in the transaction to the provided value
     pub fn value(mut self, value: U256) -> Self {
         self.request.set_value(value);
@@ -512,9 +530,10 @@ mod tests {
     use super::*;
     use alloy_network::Ethereum;
     use alloy_node_bindings::{Anvil, AnvilInstance};
-    use alloy_primitives::{address, b256, bytes, hex};
+    use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{Provider, ReqwestProvider, RootProvider};
     use alloy_rpc_client::RpcClient;
+    use alloy_rpc_types::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
@@ -555,6 +574,66 @@ mod tests {
                 return (address(uint160(a)), bytes32(uint256(b ? 1 : 0)));
             }
         }
+    }
+
+    sol! {
+        // Solc: 0.8.24+commit.e11b9ed9.Linux.g++
+        // Command: solc counter.sol --bin --via-ir --optimize --optimize-runs 1
+        #[sol(rpc, bytecode = "608080604052346100155760d4908161001a8239f35b5f80fdfe60808060405260043610156011575f80fd5b5f3560e01c90816361bc221a14607e575063d09de08a14602f575f80fd5b34607a575f366003190112607a575f546001600160801b038082166001018181116066576001600160801b03199092169116175f55005b634e487b7160e01b5f52601160045260245ffd5b5f80fd5b34607a575f366003190112607a575f546001600160801b03168152602090f3fea26469706673582212208b360e442c4bb2a4bbdec007ee24588c7a88e0aa52ac39efac748e5e23eff69064736f6c63430008180033")]
+        contract Counter {
+            uint128 public counter;
+
+            function increment() external {
+                counter += 1;
+            }
+        }
+    }
+
+    /// Creates a new call_builder to test field modifications, taken from [call_encoding]
+    fn build_call_builder(
+    ) -> CallBuilder<Http<Client>, RootProvider<Http<Client>>, PhantomData<MyContract::doStuffCall>>
+    {
+        let (provider, _anvil) = spawn_anvil();
+        let contract = MyContract::new(Address::ZERO, provider);
+        let call_builder = contract.doStuff(U256::ZERO, true).with_cloned_provider();
+        call_builder
+    }
+
+    #[test]
+    fn change_max_fee_per_gas() {
+        let call_builder = build_call_builder().max_fee_per_gas(42);
+        assert_eq!(
+            call_builder.request.max_fee_per_gas.expect("max_fee_per_gas should be set"),
+            42,
+            "max_fee_per_gas of request should be '42'"
+        );
+    }
+
+    #[test]
+    fn change_max_priority_fee_per_gas() {
+        let call_builder = build_call_builder().max_priority_fee_per_gas(45);
+        assert_eq!(
+            call_builder
+                .request
+                .max_priority_fee_per_gas
+                .expect("max_priority_fee_per_gas should be set"),
+            45,
+            "max_priority_fee_per_gas of request should be '45'"
+        );
+    }
+
+    #[test]
+    fn change_access_list() {
+        let access_list = AccessList::from(vec![AccessListItem {
+            address: Address::ZERO,
+            storage_keys: vec![B256::ZERO],
+        }]);
+        let call_builder = build_call_builder().access_list(access_list.clone());
+        assert_eq!(
+            call_builder.request.access_list.expect("access_list should be set"),
+            access_list,
+            "Access list of the transaction should have been set to our access list"
+        )
     }
 
     #[test]
@@ -623,5 +702,40 @@ mod tests {
             result.d,
             b256!("0000000000000000000000000000000000000000000000000000000000000001"),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deploy_and_call_with_priority() {
+        let (provider, _anvil) = spawn_anvil();
+        let counter_contract = Counter::deploy(provider.clone()).await.unwrap();
+        let max_fee_per_gas: U256 = parse_units("50", "gwei").unwrap().into();
+        let max_priority_fee_per_gas: U256 = parse_units("0.1", "gwei").unwrap().into();
+        let receipt = counter_contract
+            .increment()
+            .max_fee_per_gas(max_fee_per_gas.to())
+            .max_priority_fee_per_gas(max_priority_fee_per_gas.to())
+            .send()
+            .await
+            .expect("Could not send transaction")
+            .get_receipt()
+            .await
+            .expect("Could not get the receipt");
+        let transaction_hash = receipt.transaction_hash;
+        let transaction = provider
+            .get_transaction_by_hash(transaction_hash)
+            .await
+            .expect("Could not get transaction");
+        assert_eq!(
+            transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
+            max_fee_per_gas.to(),
+            "max_fee_per_gas of the transaction should be set to the right value"
+        );
+        assert_eq!(
+            transaction
+                .max_priority_fee_per_gas
+                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            max_priority_fee_per_gas.to(),
+            "max_priority_fee_per_gas of the transaction should be set to the right value"
+        )
     }
 }
