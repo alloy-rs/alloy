@@ -183,6 +183,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         if tx.max_fee_per_blob_gas().is_some()
             && tx.max_fee_per_gas().is_some()
             && tx.max_priority_fee_per_gas().is_some()
+            && tx.gas_limit().is_some()
         {
             return FillerControlFlow::Finished;
         }
@@ -191,6 +192,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         if tx.blob_sidecar().is_none()
             && tx.max_fee_per_gas().is_some()
             && tx.max_priority_fee_per_gas().is_some()
+            && tx.gas_limit().is_some()
         {
             return FillerControlFlow::Finished;
         }
