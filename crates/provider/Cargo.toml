@@ -43,10 +43,13 @@ futures-utils-wasm.workspace = true
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-node-bindings.workspace = true
+alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
 alloy-signer.workspace = true
 alloy-signer-wallet.workspace = true
+alloy-transport-http = { workspace = true, features = ["reqwest"] }
 
+reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true

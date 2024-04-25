@@ -164,6 +164,7 @@ impl BuiltInConnectionString {
 impl FromStr for BuiltInConnectionString {
     type Err = RpcError<TransportErrorKind>;
 
+    #[allow(clippy::let_and_return)]
     fn from_str(s: &str) -> Result<BuiltInConnectionString, Self::Err> {
         let res = Err(TransportErrorKind::custom_str(&format!(
             "No transports enabled. Enable one of: reqwest, hyper, ws, ipc. Connection info: '{}'",

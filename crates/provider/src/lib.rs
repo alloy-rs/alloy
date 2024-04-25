@@ -15,14 +15,12 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use network::Ethereum;
-
-#[cfg(feature = "reqwest")]
+#[cfg(any(test, feature = "reqwest"))]
 /// Type alias for a [`RootProvider`] using the [`Http`] transport and a
 /// reqwest client.
 ///
 /// [`Http`]: alloy_transport_http::Http
-pub type ReqwestProvider<N = Ethereum> =
+pub type ReqwestProvider<N = alloy_network::Ethereum> =
     crate::RootProvider<alloy_transport_http::Http<reqwest::Client>, N>;
 
 #[cfg(feature = "hyper")]
@@ -30,7 +28,7 @@ pub type ReqwestProvider<N = Ethereum> =
 /// client.
 ///
 /// [`Http`]: alloy_transport_http::Http
-pub type HyperProvider<N = Ethereum> =
+pub type HyperProvider<N = alloy_network::Ethereum> =
     crate::RootProvider<alloy_transport_http::Http<alloy_transport_http::HyperClient>, N>;
 
 #[macro_use]

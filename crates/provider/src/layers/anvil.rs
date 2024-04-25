@@ -1,11 +1,11 @@
 use alloy_network::Ethereum;
 use alloy_node_bindings::{Anvil, AnvilInstance};
 use alloy_transport::Transport;
+use reqwest::Url;
 use std::{
     marker::PhantomData,
     sync::{Arc, OnceLock},
 };
-use url::Url;
 
 use crate::{Provider, ProviderLayer, RootProvider};
 

@@ -1,6 +1,6 @@
 //! This modules extends the Ethereum JSON-RPC provider with the Txpool namespace available in geth.
 use crate::Provider;
-use alloy_network::Network;
+use alloy_network::{Ethereum, Network};
 use alloy_primitives::Address;
 use alloy_rpc_types::txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, TxpoolStatus};
 use alloy_transport::{Transport, TransportResult};
@@ -9,7 +9,7 @@ use alloy_transport::{Transport, TransportResult};
 #[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait TxPoolApi<N, T>: Send + Sync {
+pub trait TxPoolApi<T, N = Ethereum>: Send + Sync {
     /// Returns the content of the transaction pool.
     ///
     /// Lists the exact details of all the transactions currently pending for inclusion in the next
@@ -44,11 +44,11 @@ pub trait TxPoolApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> TxPoolApi<N, T> for P
+impl<P, T, N> TxPoolApi<T, N> for P
 where
-    N: Network,
-    T: Transport + Clone,
     P: Provider<T, N>,
+    T: Transport + Clone,
+    N: Network,
 {
     async fn txpool_content(&self) -> TransportResult<TxpoolContent> {
         self.client().request("txpool_content", ()).await
@@ -69,19 +69,16 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::ProviderBuilder;
+
     use super::*;
     use alloy_node_bindings::Geth;
-
-    extern crate self as alloy_provider;
-
-    // NOTE: We cannot import the test-utils crate here due to a circular dependency.
-    include!("../../internal-test-utils/src/providers.rs");
 
     #[tokio::test]
     async fn test_txpool_content() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = http_provider(&geth.endpoint());
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let content = provider.txpool_content().await.unwrap();
         assert_eq!(content, TxpoolContent::default());
     }
@@ -90,7 +87,7 @@ mod tests {
     async fn test_txpool_content_from() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = http_provider(&geth.endpoint());
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let content = provider.txpool_content_from(Address::default()).await.unwrap();
         assert_eq!(content, TxpoolContentFrom::default());
     }
@@ -99,7 +96,7 @@ mod tests {
     async fn test_txpool_inspect() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = http_provider(&geth.endpoint());
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let content = provider.txpool_inspect().await.unwrap();
         assert_eq!(content, TxpoolInspect::default());
     }
@@ -108,7 +105,7 @@ mod tests {
     async fn test_txpool_status() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = http_provider(&geth.endpoint());
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let content = provider.txpool_status().await.unwrap();
         assert_eq!(content, TxpoolStatus::default());
     }
