@@ -426,7 +426,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
-    pub extra_fields: BTreeMap<String, json_value>,
+    pub extra_fields: BTreeMap<String, serde_json::Value>,
 }
 
 impl ChainConfig {
