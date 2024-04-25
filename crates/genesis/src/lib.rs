@@ -20,7 +20,7 @@
 
 extern crate alloc;
 
-use alloc::collections::BTreeMap;
+use alloc::{collections::BTreeMap, string::String};
 
 use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{
@@ -422,6 +422,10 @@ pub struct ChainConfig {
     /// Clique parameters.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clique: Option<CliqueConfig>,
+
+    /// Additional fields specific to each chain.
+    #[serde(flatten, default)]
+    pub extra_fields: BTreeMap<String, serde_json::Value>,
 }
 
 impl ChainConfig {
@@ -1303,5 +1307,32 @@ mod tests {
         let s = serde_json::to_string_pretty(&gen).unwrap();
         let gen2 = serde_json::from_str::<Genesis>(&s).unwrap();
         assert_eq!(gen, gen2);
+    }
+
+    #[test]
+    fn parse_extra_fields() {
+        let geth_genesis = r#"
+    {
+        "difficulty": "0x20000",
+        "gasLimit": "0x1",
+        "alloc": {},
+        "config": {
+          "ethash": {},
+          "chainId": 1,
+          "string_field": "string_value",
+          "numeric_field": 7,
+          "object_field": {
+            "sub_field": "sub_value"
+          }
+        }
+    }
+    "#;
+        let genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
+        let actual_string_value = genesis.config.extra_fields.get("string_field").unwrap();
+        assert_eq!(actual_string_value, "string_value");
+        let actual_numeric_value = genesis.config.extra_fields.get("numeric_field").unwrap();
+        assert_eq!(actual_numeric_value, 7);
+        let actual_object_value = genesis.config.extra_fields.get("object_field").unwrap();
+        assert_eq!(actual_object_value, &serde_json::json!({"sub_field": "sub_value"}));
     }
 }
