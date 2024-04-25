@@ -62,12 +62,9 @@ where
             return FillerControlFlow::Ready;
         }
 
-        if tx.can_build() {
-            FillerControlFlow::Ready
-        } else {
-            // Blocked by #431
-            // https://github.com/alloy-rs/alloy/pull/431
-            FillerControlFlow::Missing(vec![("Signer", &["TODO"])])
+        match tx.complete_preferred() {
+            Ok(_) => FillerControlFlow::Ready,
+            Err(e) => FillerControlFlow::Missing(vec![("Signer", e)]),
         }
     }
 
