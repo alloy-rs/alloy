@@ -347,6 +347,6 @@ mod tests {
         let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
             .with_poll_interval(5000);
         // let client = client;
-        assert_eq!(client.poll_interval(), 5000);
+        assert_eq!(client.poll_interval(), Duration::from_millis(5000));
     }
 }
