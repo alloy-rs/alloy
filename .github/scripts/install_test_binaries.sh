@@ -12,12 +12,13 @@ PLATFORM="$(uname -s | awk '{print tolower($0)}')"
 main() {
     mkdir -p "$BIN_DIR"
     cd "$BIN_DIR"
+
+    install_geth
+
     export PATH="$BIN_DIR:$PATH"
     if [ "$GITHUB_PATH" ]; then
         echo "$BIN_DIR" >> "$GITHUB_PATH"
     fi
-
-    install_geth
 
     echo ""
     echo "Installed Geth:"
