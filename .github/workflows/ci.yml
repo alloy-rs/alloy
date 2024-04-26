@@ -16,6 +16,7 @@ jobs:
   test:
     name: test ${{ matrix.os }} ${{ matrix.rust }} ${{ matrix.flags }}
     timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
