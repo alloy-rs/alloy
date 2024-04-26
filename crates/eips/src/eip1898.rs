@@ -614,7 +614,8 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 }
 
 /// Either a block hash _or_ a block number
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
@@ -707,7 +708,7 @@ impl fmt::Display for BlockHashOrNumber {
 /// Error thrown when parsing a [BlockHashOrNumber] from a string.
 #[derive(Debug)]
 pub struct ParseBlockHashOrNumberError {
-    input: String,
+    input: alloc::string::String,
     parse_int_error: ParseIntError,
     hex_error: alloy_primitives::hex::FromHexError,
 }
@@ -729,6 +730,8 @@ impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        #[allow(unused_imports)]
+        use alloc::string::ToString;
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
             Err(pares_int_error) => match B256::from_str(s) {
