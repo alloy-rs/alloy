@@ -705,13 +705,25 @@ impl fmt::Display for BlockHashOrNumber {
 }
 
 /// Error thrown when parsing a [BlockHashOrNumber] from a string.
-#[derive(Debug, thiserror::Error)]
-#[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]
+#[derive(Debug)]
 pub struct ParseBlockHashOrNumberError {
     input: String,
     parse_int_error: ParseIntError,
     hex_error: alloy_primitives::hex::FromHexError,
 }
+
+impl fmt::Display for ParseBlockHashOrNumberError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "failed to parse {:?} as a number: {} or hash: {}",
+            self.input, self.parse_int_error, self.hex_error
+        )
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ParseBlockHashOrNumberError {}
 
 impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
