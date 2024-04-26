@@ -16,8 +16,9 @@ alloy-primitives = { workspace = true, features = ["rlp"], default-features = fa
 alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
 alloy-serde.workspace = true
 
-# serde
+# misc
 serde = { workspace = true, default-features = false, optional = true }
+thiserror.workspace = true
 
 # kzg
 derive_more = { workspace = true, optional = true }

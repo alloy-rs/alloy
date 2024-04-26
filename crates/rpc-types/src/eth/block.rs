@@ -4,12 +4,12 @@
 
 use crate::{other::OtherFields, Transaction, Withdrawal};
 pub use alloy_eips::{
-    calc_blob_gasprice, calc_excess_blob_gas, BlockId, BlockNumberOrTag, RpcBlockHash,
+    calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
+    BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64};
-use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256, U64};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, fmt, num::ParseIntError, ops::Deref, str::FromStr};
+use std::{collections::BTreeMap, ops::Deref};
 
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -422,174 +422,6 @@ pub enum BlockError {
     /// A raw block failed to decode
     #[error("failed to decode raw block {0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
-}
-
-/// Block number and hash.
-#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct BlockNumHash {
-    /// Block number
-    pub number: BlockNumber,
-    /// Block hash
-    pub hash: BlockHash,
-}
-
-/// Block number and hash of the forked block.
-pub type ForkBlock = BlockNumHash;
-
-impl fmt::Debug for BlockNumHash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("").field(&self.number).field(&self.hash).finish()
-    }
-}
-
-impl BlockNumHash {
-    /// Creates a new `BlockNumHash` from a block number and hash.
-    pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
-        Self { number, hash }
-    }
-
-    /// Consumes `Self` and returns [`BlockNumber`], [`BlockHash`]
-    pub const fn into_components(self) -> (BlockNumber, BlockHash) {
-        (self.number, self.hash)
-    }
-
-    /// Returns whether or not the block matches the given [BlockHashOrNumber].
-    pub fn matches_block_or_num(&self, block: &BlockHashOrNumber) -> bool {
-        match block {
-            BlockHashOrNumber::Hash(hash) => self.hash == *hash,
-            BlockHashOrNumber::Number(number) => self.number == *number,
-        }
-    }
-}
-
-impl From<(BlockNumber, BlockHash)> for BlockNumHash {
-    fn from(val: (BlockNumber, BlockHash)) -> Self {
-        BlockNumHash { number: val.0, hash: val.1 }
-    }
-}
-
-impl From<(BlockHash, BlockNumber)> for BlockNumHash {
-    fn from(val: (BlockHash, BlockNumber)) -> Self {
-        BlockNumHash { hash: val.0, number: val.1 }
-    }
-}
-
-/// Either a block hash _or_ a block number
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
-pub enum BlockHashOrNumber {
-    /// A block hash
-    Hash(B256),
-    /// A block number
-    Number(u64),
-}
-
-// === impl BlockHashOrNumber ===
-
-impl BlockHashOrNumber {
-    /// Returns the block number if it is a [`BlockHashOrNumber::Number`].
-    #[inline]
-    pub const fn as_number(self) -> Option<u64> {
-        match self {
-            BlockHashOrNumber::Hash(_) => None,
-            BlockHashOrNumber::Number(num) => Some(num),
-        }
-    }
-}
-
-impl From<B256> for BlockHashOrNumber {
-    fn from(value: B256) -> Self {
-        BlockHashOrNumber::Hash(value)
-    }
-}
-
-impl From<u64> for BlockHashOrNumber {
-    fn from(value: u64) -> Self {
-        BlockHashOrNumber::Number(value)
-    }
-}
-
-impl From<U64> for BlockHashOrNumber {
-    fn from(value: U64) -> Self {
-        value.to::<u64>().into()
-    }
-}
-
-/// Allows for RLP encoding of either a block hash or block number
-impl Encodable for BlockHashOrNumber {
-    fn encode(&self, out: &mut dyn bytes::BufMut) {
-        match self {
-            Self::Hash(block_hash) => block_hash.encode(out),
-            Self::Number(block_number) => block_number.encode(out),
-        }
-    }
-    fn length(&self) -> usize {
-        match self {
-            Self::Hash(block_hash) => block_hash.length(),
-            Self::Number(block_number) => block_number.length(),
-        }
-    }
-}
-
-/// Allows for RLP decoding of a block hash or block number
-impl Decodable for BlockHashOrNumber {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header: u8 = *buf.first().ok_or(RlpError::InputTooShort)?;
-        // if the byte string is exactly 32 bytes, decode it into a Hash
-        // 0xa0 = 0x80 (start of string) + 0x20 (32, length of string)
-        if header == 0xa0 {
-            // strip the first byte, parsing the rest of the string.
-            // If the rest of the string fails to decode into 32 bytes, we'll bubble up the
-            // decoding error.
-            let hash = B256::decode(buf)?;
-            Ok(Self::Hash(hash))
-        } else {
-            // a block number when encoded as bytes ranges from 0 to any number of bytes - we're
-            // going to accept numbers which fit in less than 64 bytes.
-            // Any data larger than this which is not caught by the Hash decoding should error and
-            // is considered an invalid block number.
-            Ok(Self::Number(u64::decode(buf)?))
-        }
-    }
-}
-
-impl fmt::Display for BlockHashOrNumber {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Hash(hash) => write!(f, "{}", hash),
-            Self::Number(num) => write!(f, "{}", num),
-        }
-    }
-}
-
-/// Error thrown when parsing a [BlockHashOrNumber] from a string.
-#[derive(Debug, thiserror::Error)]
-#[error("failed to parse {input:?} as a number: {parse_int_error} or hash: {hex_error}")]
-pub struct ParseBlockHashOrNumberError {
-    input: String,
-    parse_int_error: ParseIntError,
-    hex_error: alloy_primitives::hex::FromHexError,
-}
-
-impl FromStr for BlockHashOrNumber {
-    type Err = ParseBlockHashOrNumberError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match u64::from_str(s) {
-            Ok(val) => Ok(val.into()),
-            Err(pares_int_error) => match B256::from_str(s) {
-                Ok(val) => Ok(val.into()),
-                Err(hex_error) => Err(ParseBlockHashOrNumberError {
-                    input: s.to_string(),
-                    parse_int_error: pares_int_error,
-                    hex_error,
-                }),
-            },
-        }
-    }
 }
 
 /// A Block representation that allows to include additional fields
