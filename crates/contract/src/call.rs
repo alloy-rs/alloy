@@ -292,7 +292,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         }
     }
 
-    /// Sets the `from` field in the transaction to the provided value. Defaults to [Address::ZERO].
+    /// Sets the `from` field in the transaction to the provided value.
     pub fn from(mut self, from: Address) -> Self {
         self.request.set_from(from);
         self
@@ -585,8 +585,8 @@ mod tests {
         }
     }
 
-    #[allow(clippy::type_complexity)]
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
+    #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<
         Http<Client>,
         AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,
