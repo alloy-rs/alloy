@@ -14,12 +14,12 @@ concurrency:
 
 jobs:
   test:
-    name: test ${{ matrix.rust }} ${{ matrix.flags }}
-    runs-on: ubuntu-latest
+    name: test ${{ matrix.os }} ${{ matrix.rust }} ${{ matrix.flags }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        os: ["ubuntu-latest", "windows-latest"]
         rust: ["stable", "nightly", "1.76"] # MSRV
         flags: ["--no-default-features", "", "--all-features"]
         exclude:
