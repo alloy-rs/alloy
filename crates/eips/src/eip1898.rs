@@ -558,7 +558,7 @@ impl FromStr for BlockId {
 }
 
 /// Block number and hash.
-#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BlockNumHash {
     /// Block number
     pub number: BlockNumber,
@@ -568,18 +568,6 @@ pub struct BlockNumHash {
 
 /// Block number and hash of the forked block.
 pub type ForkBlock = BlockNumHash;
-
-impl fmt::Debug for BlockNumHash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("").field(&self.number).field(&self.hash).finish()
-    }
-}
-
-impl fmt::Display for BlockNumHash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "BlockNumHash{{ number: {}, hash: {} }}", self.number, self.hash)
-    }
-}
 
 impl BlockNumHash {
     /// Creates a new `BlockNumHash` from a block number and hash.
@@ -734,11 +722,11 @@ impl FromStr for BlockHashOrNumber {
         use alloc::string::ToString;
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
-            Err(pares_int_error) => match B256::from_str(s) {
+            Err(parse_int_error) => match B256::from_str(s) {
                 Ok(val) => Ok(val.into()),
                 Err(hex_error) => Err(ParseBlockHashOrNumberError {
                     input: s.to_string(),
-                    parse_int_error: pares_int_error,
+                    parse_int_error,
                     hex_error,
                 }),
             },
