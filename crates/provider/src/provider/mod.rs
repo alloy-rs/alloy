@@ -1,3 +1,6 @@
+mod call;
+pub use call::CallBuilder;
+
 mod root;
 pub use root::RootProvider;
 

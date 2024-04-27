@@ -14,13 +14,15 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
 use alloy_rpc_types::{
-    state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
-    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
+    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
+
+use super::CallBuilder;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -650,24 +652,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_syncing", ()).await
     }
 
-    /// Execute a smart contract call with a transaction request, without publishing a transaction.
-    async fn call(&self, tx: &N::TransactionRequest, block: BlockId) -> TransportResult<Bytes> {
-        self.client().request("eth_call", (tx, block)).await
-    }
-
     /// Execute a smart contract call with a transaction request and state overrides, without
     /// publishing a transaction.
     ///
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    async fn call_with_overrides(
-        &self,
-        tx: &N::TransactionRequest,
-        block: BlockId,
-        state: StateOverride,
-    ) -> TransportResult<Bytes> {
-        self.client().request("eth_call", (tx, block, state)).await
+    async fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> CallBuilder<'a, 'b, T, N> {
+        CallBuilder::new(self.client(), tx)
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which

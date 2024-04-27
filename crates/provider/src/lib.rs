@@ -48,7 +48,9 @@ mod heart;
 pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
 mod provider;
-pub use provider::{FilterPollerBuilder, Provider, RootProvider, SendableTx, WalletProvider};
+pub use provider::{
+    CallBuilder, FilterPollerBuilder, Provider, RootProvider, SendableTx, WalletProvider,
+};
 
 pub mod utils;
 
