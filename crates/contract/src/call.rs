@@ -402,7 +402,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
-    pub fn call<'a>(&'a self) -> EthCall<'a, 'a, 'a, D, T, N> {
+    pub fn call(&self) -> EthCall<'_, '_, '_, D, T, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -412,7 +412,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw<'a>(&'a self) -> EthCall<'a, 'a, 'a, (), T, N> {
+    pub fn call_raw(&self) -> EthCall<'_, '_, '_, (), T, N> {
         let call = self.provider.call(&self.request).block(self.block);
         let call = match &self.state {
             Some(state) => call.overrides(state.clone()),

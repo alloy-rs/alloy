@@ -37,7 +37,7 @@ where
     D: CallDecoder,
 {
     /// Create a new [`EthCall`].
-    pub fn new(inner: alloy_provider::EthCall<'a, 'b, T, N>, decoder: &'c D) -> Self {
+    pub const fn new(inner: alloy_provider::EthCall<'a, 'b, T, N>, decoder: &'c D) -> Self {
         Self { inner, decoder }
     }
 
