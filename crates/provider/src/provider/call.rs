@@ -5,12 +5,12 @@ use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportResult};
 
-/// A builder for an `"eth_call"`` request. This type is returned by the
+/// A builder for an `"eth_call"` request. This type is returned by the
 /// [`Provider::call`] method.
 ///
 /// [`Provider::call`]: crate::Provider::call
 #[derive(Debug, Clone)]
-pub struct CallBuilder<'a, 'b, T, N>
+pub struct EthCall<'a, 'b, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -22,7 +22,7 @@ where
     block: Option<BlockId>,
 }
 
-impl<'a, 'b, T, N> CallBuilder<'a, 'b, T, N>
+impl<'a, 'b, T, N> EthCall<'a, 'b, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<'a, 'b, T, N> std::future::IntoFuture for CallBuilder<'a, 'b, T, N>
+impl<'a, 'b, T, N> std::future::IntoFuture for EthCall<'a, 'b, T, N>
 where
     T: Transport + Clone,
     N: Network,

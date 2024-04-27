@@ -49,7 +49,7 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 
 mod provider;
 pub use provider::{
-    CallBuilder, FilterPollerBuilder, Provider, RootProvider, SendableTx, WalletProvider,
+    EthCall, FilterPollerBuilder, Provider, RootProvider, SendableTx, WalletProvider,
 };
 
 pub mod utils;

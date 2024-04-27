@@ -22,7 +22,7 @@ use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResu
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
-use super::CallBuilder;
+use super::EthCall;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
@@ -658,8 +658,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    async fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> CallBuilder<'a, 'b, T, N> {
-        CallBuilder::new(self.client(), tx)
+    fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> EthCall<'a, 'b, T, N> {
+        EthCall::new(self.client(), tx)
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which

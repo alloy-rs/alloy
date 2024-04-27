@@ -18,6 +18,9 @@
 #[cfg(test)]
 extern crate self as alloy_contract;
 
+mod call_decoder;
+pub use call_decoder::{CallDecoder, EthCall};
+
 mod error;
 pub use error::*;
 

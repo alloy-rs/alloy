@@ -1,5 +1,5 @@
-use crate::{Error, Result};
-use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
+use crate::{CallDecoder, Error, EthCall, Result};
+use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, TxKind, U256};
@@ -22,74 +22,6 @@ pub type DynCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, Function, N>;
 
 /// [`CallBuilder`] that does not have a call decoder.
 pub type RawCallBuilder<T, P, N = Ethereum> = CallBuilder<T, P, (), N>;
-
-mod private {
-    pub trait Sealed {}
-    impl Sealed for super::Function {}
-    impl<C: super::SolCall> Sealed for super::PhantomData<C> {}
-    impl Sealed for () {}
-}
-
-/// A trait for decoding the output of a contract function.
-///
-/// This trait is sealed and cannot be implemented manually.
-/// It is an implementation detail of [`CallBuilder`].
-pub trait CallDecoder: private::Sealed {
-    // Not public API.
-
-    /// The output type of the contract function.
-    #[doc(hidden)]
-    type CallOutput;
-
-    /// Decodes the output of a contract function.
-    #[doc(hidden)]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput>;
-
-    #[doc(hidden)]
-    fn as_debug_field(&self) -> impl std::fmt::Debug;
-}
-
-impl CallDecoder for Function {
-    type CallOutput = Vec<DynSolValue>;
-
-    #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        FunctionExt::abi_decode_output(self, &data, validate).map_err(Error::AbiError)
-    }
-
-    #[inline]
-    fn as_debug_field(&self) -> impl std::fmt::Debug {
-        self
-    }
-}
-
-impl<C: SolCall> CallDecoder for PhantomData<C> {
-    type CallOutput = C::Return;
-
-    #[inline]
-    fn abi_decode_output(&self, data: Bytes, validate: bool) -> Result<Self::CallOutput> {
-        C::abi_decode_returns(&data, validate).map_err(|e| Error::AbiError(e.into()))
-    }
-
-    #[inline]
-    fn as_debug_field(&self) -> impl std::fmt::Debug {
-        std::any::type_name::<C>()
-    }
-}
-
-impl CallDecoder for () {
-    type CallOutput = Bytes;
-
-    #[inline]
-    fn abi_decode_output(&self, data: Bytes, _validate: bool) -> Result<Self::CallOutput> {
-        Ok(data)
-    }
-
-    #[inline]
-    fn as_debug_field(&self) -> impl std::fmt::Debug {
-        format_args!("()")
-    }
-}
 
 /// A builder for sending a transaction via `eth_sendTransaction`, or calling a contract via
 /// `eth_call`.
@@ -470,9 +402,8 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
-    pub async fn call(&self) -> Result<D::CallOutput> {
-        let data = self.call_raw().await?;
-        self.decode_output(data, false)
+    pub fn call<'a>(&'a self) -> EthCall<'a, 'a, 'a, D, T, N> {
+        self.call_raw().with_decoder(&self.decoder)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -481,13 +412,13 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub async fn call_raw(&self) -> Result<Bytes> {
-        if let Some(state) = &self.state {
-            self.provider.call_with_overrides(&self.request, self.block, state.clone()).await
-        } else {
-            self.provider.call(&self.request, self.block).await
-        }
-        .map_err(Into::into)
+    pub fn call_raw<'a>(&'a self) -> EthCall<'a, 'a, 'a, (), T, N> {
+        let call = self.provider.call(&self.request).block(self.block);
+        let call = match &self.state {
+            Some(state) => call.overrides(state.clone()),
+            None => call,
+        };
+        call.into()
     }
 
     /// Decodes the output of a contract function using the provided decoder.
@@ -560,7 +491,7 @@ impl<T, P, D, N> IntoFuture for CallBuilder<T, P, D, N>
 where
     T: Transport + Clone,
     P: Provider<T, N>,
-    D: CallDecoder + Send + Sync,
+    D: CallDecoder + Send + Sync + Unpin,
     N: Network,
     Self: 'static,
 {
@@ -715,7 +646,7 @@ mod tests {
         );
         // Box the future to assert its concrete output type.
         let _future: Box<dyn Future<Output = Result<MyContract::doStuffReturn>> + Send> =
-            Box::new(call_builder.call());
+            Box::new(async move { call_builder.call().await });
     }
 
     #[test]
