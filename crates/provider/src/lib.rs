@@ -37,6 +37,8 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
+pub mod ext;
+
 pub mod fillers;
 pub mod layers;
 
@@ -51,9 +53,6 @@ pub use provider::{FilterPollerBuilder, Provider, RootProvider, SendableTx};
 mod wallet;
 pub use wallet::WalletProvider;
 
-pub mod admin;
-pub mod debug;
-pub mod txpool;
 pub mod utils;
 
 #[doc(no_inline)]
