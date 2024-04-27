@@ -340,23 +340,28 @@ impl TransactionRequest {
     /// submission via rpc.
     pub fn trim_conflicting_keys(&mut self) {
         match self.preferred_type() {
-            TxType::Legacy | TxType::Eip2930 => {
+            TxType::Legacy => {
                 self.max_fee_per_gas = None;
                 self.max_priority_fee_per_gas = None;
                 self.max_fee_per_blob_gas = None;
+                self.blob_versioned_hashes = None;
+                self.sidecar = None;
                 self.access_list = None;
+            }
+            TxType::Eip2930 => {
+                self.max_fee_per_gas = None;
+                self.max_priority_fee_per_gas = None;
+                self.max_fee_per_blob_gas = None;
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
             }
             TxType::Eip1559 => {
                 self.gas_price = None;
-                self.access_list = None;
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
             }
             TxType::Eip4844 => {
                 self.gas_price = None;
-                self.access_list = None;
             }
         }
     }
@@ -371,10 +376,7 @@ impl TransactionRequest {
     pub const fn preferred_type(&self) -> TxType {
         if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
             TxType::Eip4844
-        } else if self.access_list.is_some()
-            && self.max_fee_per_gas.is_none()
-            && self.max_priority_fee_per_gas.is_none()
-        {
+        } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
         } else if self.gas_price.is_some() {
             TxType::Legacy

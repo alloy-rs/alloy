@@ -230,7 +230,7 @@ mod tests {
             .with_max_priority_fee_per_gas(0)
             .with_to(Address::ZERO)
             .with_gas_price(0)
-            .access_list(AccessList::default());
+            .with_access_list(AccessList::default());
 
         let tx = request.build_unsigned().unwrap();
 
@@ -259,7 +259,7 @@ mod tests {
     fn test_fail_when_sidecar_and_access_list() {
         let request = TransactionRequest::default()
             .with_blob_sidecar(BlobTransactionSidecar::default())
-            .access_list(AccessList::default());
+            .with_access_list(AccessList::default());
 
         let error = request.clone().build_unsigned().unwrap_err();
 
@@ -304,7 +304,9 @@ mod tests {
 
     #[test]
     fn test_invalid_2930_fields() {
-        let request = TransactionRequest::default().access_list(AccessList::default());
+        let request = TransactionRequest::default()
+            .with_access_list(AccessList::default())
+            .with_gas_price(Default::default());
 
         let error = request.clone().build_unsigned().unwrap_err();
 
@@ -313,11 +315,10 @@ mod tests {
         };
 
         assert_eq!(tx_type, TxType::Eip2930);
-        assert_eq!(errors.len(), 4);
+        assert_eq!(errors.len(), 3);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
         assert!(errors.contains(&"gas_limit"));
-        assert!(errors.contains(&"gas_price"));
     }
 
     #[test]
