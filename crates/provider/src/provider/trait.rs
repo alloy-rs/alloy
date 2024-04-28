@@ -2,7 +2,7 @@
 
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
+    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
     SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
@@ -21,8 +21,6 @@ use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, Tra
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
-
-use super::EthCall;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
