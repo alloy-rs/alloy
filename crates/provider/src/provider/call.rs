@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_primitives::Bytes;
@@ -62,9 +64,14 @@ where
     type Output = TransportResult<Bytes>;
 
     type IntoFuture =
-        RpcCall<T, (&'req N::TransactionRequest, BlockId, Option<&'state StateOverride>), Bytes>;
+        RpcCall<T, (&'req N::TransactionRequest, BlockId, Cow<'state, StateOverride>), Bytes>;
 
     fn into_future(self) -> Self::IntoFuture {
-        self.client.request("eth_call", (self.data, self.block.unwrap_or_default(), self.overrides))
+        let overrides = match self.overrides {
+            Some(overrides) => Cow::Borrowed(overrides),
+            None => Cow::Owned(StateOverride::default()),
+        };
+
+        self.client.request("eth_call", (self.data, self.block.unwrap_or_default(), overrides))
     }
 }
