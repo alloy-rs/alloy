@@ -10,6 +10,9 @@ use alloy_transport::Transport;
 
 use crate::{Error, Result};
 
+/// Raw coder.
+const RAW_CODER: () = ();
+
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Function {}
@@ -20,38 +23,62 @@ mod private {
 /// An [`alloy_provider::EthCall`] with an abi decoder.
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
-pub struct EthCall<'a, 'b, 'c, D, T, N>
+pub struct EthCall<'client, 'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: alloy_provider::EthCall<'a, 'b, T, N>,
+    inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>,
 
-    decoder: &'c D,
+    decoder: &'coder D,
 }
 
-impl<'a, 'b, 'c, D, T, N> EthCall<'a, 'b, 'c, D, T, N>
+impl<'client, 'req, 'state, 'coder, D, T, N> EthCall<'client, 'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
     /// Create a new [`EthCall`].
-    pub const fn new(inner: alloy_provider::EthCall<'a, 'b, T, N>, decoder: &'c D) -> Self {
+    pub const fn new(
+        inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>,
+        decoder: &'coder D,
+    ) -> Self {
         Self { inner, decoder }
     }
+}
 
+impl<'client, 'req, 'state, T, N> EthCall<'client, 'req, 'state, 'static, (), T, N>
+where
+    T: Transport + Clone,
+    N: Network,
+{
+    /// Create a new [`EthCall`].
+    pub const fn new_raw(inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>) -> Self {
+        EthCall::new(inner, &RAW_CODER)
+    }
+}
+
+impl<'client, 'req, 'state, 'coder, D, T, N> EthCall<'client, 'req, 'state, 'coder, D, T, N>
+where
+    T: Transport + Clone,
+    N: Network,
+    D: CallDecoder,
+{
     /// Swap the decoder for this call.
-    pub fn with_decoder<'e, E>(self, decoder: &'e E) -> EthCall<'a, 'b, 'e, E, T, N>
+    pub fn with_decoder<'new_coder, E>(
+        self,
+        decoder: &'new_coder E,
+    ) -> EthCall<'client, 'req, 'state, 'new_coder, E, T, N>
     where
         E: CallDecoder,
     {
-        EthCall::new(self.inner, decoder)
+        EthCall { inner: self.inner, decoder }
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: StateOverride) -> Self {
+    pub fn overrides(mut self, overrides: &'state StateOverride) -> Self {
         self.inner = self.inner.overrides(overrides);
         self
     }
@@ -63,18 +90,19 @@ where
     }
 }
 
-impl<'a, 'b, T, N> From<alloy_provider::EthCall<'a, 'b, T, N>>
-    for EthCall<'a, 'b, 'static, (), T, N>
+impl<'client, 'req, 'state, T, N> From<alloy_provider::EthCall<'client, 'req, 'state, T, N>>
+    for EthCall<'client, 'req, 'state, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
-    fn from(inner: alloy_provider::EthCall<'a, 'b, T, N>) -> Self {
-        EthCall::new(inner, &())
+    fn from(inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>) -> Self {
+        EthCall { inner, decoder: &RAW_CODER }
     }
 }
 
-impl<'a, 'b, 'c, D, T, N> std::future::IntoFuture for EthCall<'a, 'b, 'c, D, T, N>
+impl<'client, 'req, 'state, 'coder, D, T, N> std::future::IntoFuture
+    for EthCall<'client, 'req, 'state, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,
@@ -82,7 +110,7 @@ where
 {
     type Output = Result<D::CallOutput>;
 
-    type IntoFuture = EthCallFut<'a, 'b, 'c, D, T, N>;
+    type IntoFuture = EthCallFut<'client, 'req, 'state, 'coder, D, T, N>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut { inner: self.inner.into_future(), decoder: self.decoder }
@@ -93,17 +121,18 @@ where
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug, Clone)]
-pub struct EthCallFut<'a, 'b, 'c, D, T, N>
+pub struct EthCallFut<'client, 'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: <alloy_provider::EthCall<'a, 'b, T, N> as IntoFuture>::IntoFuture,
-    decoder: &'c D,
+    inner: <alloy_provider::EthCall<'client, 'req, 'state, T, N> as IntoFuture>::IntoFuture,
+    decoder: &'coder D,
 }
 
-impl<'a, 'b, 'c, D, T, N> std::future::Future for EthCallFut<'a, 'b, 'c, D, T, N>
+impl<'client, 'req, 'state, 'coder, D, T, N> std::future::Future
+    for EthCallFut<'client, 'req, 'state, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,

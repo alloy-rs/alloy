@@ -658,7 +658,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> EthCall<'a, 'b, T, N> {
+    fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> EthCall<'a, 'b, 'static, T, N> {
         EthCall::new(self.client(), tx)
     }
 

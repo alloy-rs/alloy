@@ -11,31 +11,37 @@ use alloy_transport::{Transport, TransportResult};
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
-pub struct EthCall<'a, 'b, T, N>
+pub struct EthCall<'client, 'req, 'state, T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
-    client: ClientRef<'a, T>,
+    client: ClientRef<'client, T>,
 
-    data: &'b N::TransactionRequest,
-    overrides: Option<StateOverride>,
+    data: &'req N::TransactionRequest,
+    overrides: Option<&'state StateOverride>,
     block: Option<BlockId>,
 }
 
-impl<'a, 'b, T, N> EthCall<'a, 'b, T, N>
+impl<'client, 'req, T, N> EthCall<'client, 'req, 'static, T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
     /// Create a new CallBuilder.
-    pub const fn new(client: ClientRef<'a, T>, data: &'b N::TransactionRequest) -> Self {
+    pub const fn new(client: ClientRef<'client, T>, data: &'req N::TransactionRequest) -> Self {
         Self { client, data, overrides: None, block: None }
     }
+}
 
+impl<'client, 'req, 'state, T, N> EthCall<'client, 'req, 'state, T, N>
+where
+    T: Transport + Clone,
+    N: Network,
+{
     /// Set the state overrides for this call.
     #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn overrides(mut self, overrides: StateOverride) -> Self {
+    pub fn overrides(mut self, overrides: &'state StateOverride) -> Self {
         self.overrides = Some(overrides);
         self
     }
@@ -48,19 +54,17 @@ where
     }
 }
 
-impl<'a, 'b, T, N> std::future::IntoFuture for EthCall<'a, 'b, T, N>
+impl<'client, 'req, 'state, T, N> std::future::IntoFuture for EthCall<'client, 'req, 'state, T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
     type Output = TransportResult<Bytes>;
 
-    type IntoFuture = RpcCall<T, (&'b N::TransactionRequest, BlockId, StateOverride), Bytes>;
+    type IntoFuture =
+        RpcCall<T, (&'req N::TransactionRequest, BlockId, Option<&'state StateOverride>), Bytes>;
 
     fn into_future(self) -> Self::IntoFuture {
-        self.client.request(
-            "eth_call",
-            (self.data, self.block.unwrap_or_default(), self.overrides.unwrap_or_default()),
-        )
+        self.client.request("eth_call", (self.data, self.block.unwrap_or_default(), self.overrides))
     }
 }
