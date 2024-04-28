@@ -67,6 +67,7 @@ where
     D: CallDecoder,
 {
     /// Swap the decoder for this call.
+    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn with_decoder<'new_coder, E>(
         self,
         decoder: &'new_coder E,
