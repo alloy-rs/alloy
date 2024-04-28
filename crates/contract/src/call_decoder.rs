@@ -18,6 +18,7 @@ mod private {
 }
 
 /// An [`alloy_provider::EthCall`] with an abi decoder.
+#[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
 pub struct EthCall<'a, 'b, 'c, D, T, N>
 where
@@ -90,6 +91,7 @@ where
 
 /// Future for the [`EthCall`] type. This future wraps an RPC call with an abi
 /// decoder.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug, Clone)]
 pub struct EthCallFut<'a, 'b, 'c, D, T, N>
 where
