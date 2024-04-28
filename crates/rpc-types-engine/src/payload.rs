@@ -12,7 +12,7 @@ pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
 /// And 8-byte identifier for an execution payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PayloadId(B64);
+pub struct PayloadId(pub B64);
 
 // === impl PayloadId ===
 
