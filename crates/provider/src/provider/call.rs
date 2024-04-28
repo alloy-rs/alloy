@@ -9,6 +9,7 @@ use alloy_transport::{Transport, TransportResult};
 /// [`Provider::call`] method.
 ///
 /// [`Provider::call`]: crate::Provider::call
+#[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
 pub struct EthCall<'a, 'b, T, N>
 where
