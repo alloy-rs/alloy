@@ -68,11 +68,7 @@ where
             unreachable!("bad states")
         };
 
-        match std::pin::pin!(call).poll(cx) {
-            Poll::Ready(Ok(data)) => Poll::Ready(Ok(data)),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
-        }
+        std::pin::pin!(call).poll(cx)
     }
 }
 
