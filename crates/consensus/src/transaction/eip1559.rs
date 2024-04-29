@@ -289,6 +289,10 @@ impl Transaction for TxEip1559 {
 }
 
 impl SignableTransaction<Signature> for TxEip1559 {
+    fn tx_type(&self) -> TxType {
+        TxType::Eip1559
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
     }

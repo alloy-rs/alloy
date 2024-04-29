@@ -84,6 +84,9 @@ pub trait SignableTransaction<Signature>: Transaction {
     /// RLP-encodes the transaction for signing.
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut);
 
+    /// Transaction Type
+    fn tx_type(&self) -> TxType;
+
     /// Outputs the length of the signature RLP encoding for the transaction.
     fn payload_len_for_signature(&self) -> usize;
 

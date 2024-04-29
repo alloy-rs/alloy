@@ -1,7 +1,7 @@
 //! Ledger Ethereum app wrapper.
 
 use crate::types::{DerivationType, LedgerError, INS, P1, P1_FIRST, P2};
-use alloy_consensus::SignableTransaction;
+use alloy_consensus::{SignableTransaction, TxType};
 use alloy_primitives::{hex, Address, ChainId, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;

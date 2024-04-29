@@ -287,6 +287,10 @@ impl Transaction for TxEip4844Variant {
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
+    fn tx_type(&self) -> TxType {
+        TxType::Eip4844
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         match self {
             TxEip4844Variant::TxEip4844(ref mut inner) => {
@@ -686,6 +690,10 @@ impl TxEip4844 {
 }
 
 impl SignableTransaction<Signature> for TxEip4844 {
+    fn tx_type(&self) -> TxType {
+        TxType::Eip4844
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
     }
@@ -906,6 +914,10 @@ impl TxEip4844WithSidecar {
 }
 
 impl SignableTransaction<Signature> for TxEip4844WithSidecar {
+    fn tx_type(&self) -> TxType {
+        TxType::Eip4844
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.tx.chain_id = chain_id;
     }

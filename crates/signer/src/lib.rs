@@ -48,8 +48,10 @@ macro_rules! sign_transaction_with_chain_id {
 
         let mut sig = $sign.map_err(alloy_signer::Error::other)?;
 
-        if let Some(chain_id) = $signer.chain_id().or_else(|| $tx.chain_id()) {
-            sig = sig.with_chain_id(chain_id);
+        if $tx.tx_type() == TxType::Legacy {
+            if let Some(chain_id) = $signer.chain_id().or_else(|| $tx.chain_id()) {
+                sig = sig.with_chain_id(chain_id);
+            }
         }
 
         Ok(sig)

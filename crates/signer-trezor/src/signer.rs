@@ -1,5 +1,5 @@
 use super::types::{DerivationType, TrezorError};
-use alloy_consensus::{SignableTransaction, TxEip1559};
+use alloy_consensus::{SignableTransaction, TxEip1559, TxType};
 use alloy_primitives::{hex, Address, ChainId, Parity, TxKind, B256, U256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
