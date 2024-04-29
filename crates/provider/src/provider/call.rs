@@ -38,7 +38,10 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    fn poll_preparing(mut self: std::pin::Pin<&mut Self>) -> Poll<TransportResult<Bytes>> {
+    fn poll_preparing(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<TransportResult<Bytes>> {
         let fut = {
             let States::Preparing { client, data, overrides, block } = &self.as_ref().state else {
                 unreachable!("bad state")
@@ -57,7 +60,7 @@ where
         };
 
         self.state = States::Running(fut);
-        Poll::Pending
+        self.poll_running(cx)
     }
 
     fn poll_running(
@@ -65,7 +68,7 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Bytes>> {
         let Self { state: States::Running(call) } = self.get_mut() else {
-            unreachable!("bad states")
+            unreachable!("bad state")
         };
 
         std::pin::pin!(call).poll(cx)
@@ -84,7 +87,7 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         if matches!(self.state, States::Preparing { .. }) {
-            self.poll_preparing()
+            self.poll_preparing(cx)
         } else {
             self.poll_running(cx)
         }
