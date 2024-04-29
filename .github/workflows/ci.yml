@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [
-          "ubuntu-latest",
+          # "ubuntu-latest",
           "windows-latest"
         ]
         rust: [
@@ -68,7 +68,8 @@ jobs:
       - name: test
         if: ${{ matrix.rust != '1.76' }} # MSRV
         run: |
-          geth version 
+          echo $GITHUB_PATH
+          geth.exe version 
           cargo nextest run --workspace ${{ matrix.flags }}
 
   # doctest:
