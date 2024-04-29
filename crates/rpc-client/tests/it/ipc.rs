@@ -3,21 +3,17 @@ use alloy_primitives::U64;
 use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{ClientBuilder, RpcCall, RpcClient};
 use alloy_transport_ipc::IpcConnect;
-use tempfile::NamedTempFile;
-use tracing::error;
+use tempfile::TempDir;
 
 async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
-    let temp_file = NamedTempFile::new().unwrap();
-    let path = temp_file.into_temp_path().to_path_buf();
-    let geth = Geth::new().enable_ipc().block_time(1u64).ipc_path(&path).spawn();
-
-    // [Windows named pipes](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipes)
-    // are located at `\\<machine_address>\pipe\<pipe_name>`.
-    #[cfg(windows)]
-    let path = format!(r"\\.\pipe\{}", path.display());
-
-    error!("IPC path: {:?}", path);
-
+    let temp_dir = TempDir::with_prefix("geth-test-").unwrap();
+    let geth = Geth::new()
+        .disable_discovery()
+        .data_dir(temp_dir.path())
+        .enable_ipc()
+        .block_time(1u64)
+        .spawn();
+    let path = temp_dir.path().join("geth.ipc");
     let connector: IpcConnect<_> = path.into();
 
     let client = ClientBuilder::default().pubsub(connector).await.unwrap();
