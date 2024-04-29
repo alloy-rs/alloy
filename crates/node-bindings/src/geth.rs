@@ -77,6 +77,15 @@ impl GethInstance {
         format!("ws://localhost:{}", self.port)
     }
 
+    /// Returns the IPC endpoint of this instance
+    pub fn ipc_endpoint(&self) -> String {
+        if let Some(ipc_path) = self.ipc_path() {
+            ipc_path.display().to_string()
+        } else {
+            "geth.ipc".to_string()
+        }
+    }
+
     /// Returns the HTTP endpoint url of this instance
     pub fn endpoint_url(&self) -> Url {
         Url::parse(&self.endpoint()).unwrap()
