@@ -4,6 +4,7 @@ use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{ClientBuilder, RpcCall, RpcClient};
 use alloy_transport_ipc::IpcConnect;
 use tempfile::NamedTempFile;
+use tracing::error;
 
 async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
     let temp_file = NamedTempFile::new().unwrap();
@@ -14,6 +15,8 @@ async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
     // are located at `\\<machine_address>\pipe\<pipe_name>`.
     #[cfg(windows)]
     let path = format!(r"\\.\pipe\{}", path.display());
+
+    error!("IPC path: {:?}", path);
 
     let connector: IpcConnect<_> = path.into();
 
