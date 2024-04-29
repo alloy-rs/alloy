@@ -74,11 +74,9 @@ mod test {
 
     use super::*;
     use alloy_node_bindings::Geth;
-    use serial_test::serial;
     use tempfile::TempDir;
 
     #[tokio::test]
-    #[serial]
     async fn node_info() {
         let temp_dir = TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
@@ -88,7 +86,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[serial]
     async fn admin_peers() {
         let temp_dir = TempDir::with_prefix("reth-test-1").unwrap();
         let temp_dir_2 = TempDir::with_prefix("reth-test-2").unwrap();

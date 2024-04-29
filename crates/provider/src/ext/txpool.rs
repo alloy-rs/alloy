@@ -73,10 +73,8 @@ mod tests {
 
     use super::*;
     use alloy_node_bindings::Geth;
-    use serial_test::serial;
 
     #[tokio::test]
-    #[serial]
     async fn test_txpool_content() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
@@ -86,7 +84,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_txpool_content_from() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
@@ -96,7 +93,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_txpool_inspect() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
@@ -106,7 +102,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn test_txpool_status() {
         let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();

@@ -45,7 +45,6 @@ alloy-transport-ipc = { workspace = true, features = ["mock"] }
 
 tempfile = "3"
 futures-util.workspace = true
-serial_test.workspace = true
 
 [features]
 default = ["reqwest"]

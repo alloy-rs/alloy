@@ -681,18 +681,15 @@ fn extract_endpoint(line: &str) -> Option<SocketAddr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serial_test::serial;
     use std::path::Path;
 
     #[test]
-    #[serial]
     fn test_extract_address() {
         let line = "INFO [07-01|13:20:42.774] HTTP server started                      endpoint=127.0.0.1:8545 auth=false prefix= cors= vhosts=localhost";
         assert_eq!(extract_endpoint(line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
     }
 
     #[test]
-    #[serial]
     fn port_0() {
         run_with_tempdir(|_| {
             let _geth = Geth::new().disable_discovery().port(0u16).spawn();
@@ -714,7 +711,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn p2p_port() {
         run_with_tempdir(|temp_dir_path| {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir_path).spawn();
@@ -724,7 +720,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn explicit_p2p_port() {
         run_with_tempdir(|temp_dir_path| {
             // if a p2p port is explicitly set, it should be used
@@ -735,7 +730,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn dev_mode() {
         run_with_tempdir(|temp_dir_path| {
             // dev mode should not have a p2p port, and dev should be the default
@@ -746,7 +740,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     #[ignore = "fails on geth >=1.14"]
     #[allow(deprecated)]
     fn clique_correctly_configured() {
