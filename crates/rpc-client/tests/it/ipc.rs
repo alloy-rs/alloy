@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use alloy_node_bindings::Geth;
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
@@ -12,7 +14,12 @@ async fn it_makes_a_request() {
         .block_time(1u64)
         .data_dir(temp_dir.path())
         .spawn();
-    let ipc_path = temp_dir.into_path().join("geth.ipc");
+
+    let ipc_path = if cfg!(windows) {
+        PathBuf::from("\\\\.\\pipe\\geth.ipc")
+    } else {
+        temp_dir.into_path().join("geth.ipc")
+    };
 
     let connector: IpcConnect<_> = ipc_path.into();
     let client = ClientBuilder::default().pubsub(connector).await.unwrap();
