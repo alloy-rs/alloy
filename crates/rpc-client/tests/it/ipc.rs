@@ -9,7 +9,7 @@ async fn it_makes_a_request() {
     let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
     let geth = Geth::new()
         .disable_discovery()
-        .ipc_path(temp_dir.path().join("geth.ipc"))
+        .ipc_path(temp_dir.path().join("alloy.ipc"))
         .enable_ipc()
         .block_time(1u64)
         .data_dir(temp_dir.path())

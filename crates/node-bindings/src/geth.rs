@@ -79,8 +79,8 @@ impl GethInstance {
 
     /// Returns the IPC endpoint of this instance
     pub fn ipc_endpoint(&self) -> String {
-        if let Some(ipc_path) = self.ipc_path() {
-            ipc_path.display().to_string()
+        if let Some(ipc) = self.ipc.clone() {
+            ipc.display().to_string()
         } else {
             "geth.ipc".to_string()
         }
@@ -94,11 +94,6 @@ impl GethInstance {
     /// Returns the Websocket endpoint url of this instance
     pub fn ws_endpoint_url(&self) -> Url {
         Url::parse(&self.ws_endpoint()).unwrap()
-    }
-
-    /// Returns the path to this instances' IPC socket
-    pub fn ipc_path(&self) -> &Option<PathBuf> {
-        &self.ipc
     }
 
     /// Returns the path to this instances' data directory
