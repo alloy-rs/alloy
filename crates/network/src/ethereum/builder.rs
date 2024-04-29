@@ -111,8 +111,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.populate_blob_hashes();
         self.sidecar = Some(sidecar);
+        self.populate_blob_hashes();
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
