@@ -66,10 +66,11 @@ jobs:
         if: ${{ matrix.rust == '1.76' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
+        shell: bash
         if: ${{ matrix.rust != '1.76' }} # MSRV
         run: |
           echo $GITHUB_PATH
-          geth.exe version 
+          geth version 
           cargo nextest run --workspace ${{ matrix.flags }}
 
   # doctest:
