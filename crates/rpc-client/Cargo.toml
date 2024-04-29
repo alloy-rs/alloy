@@ -42,6 +42,7 @@ alloy-transport-ipc = { workspace = true, optional = true }
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
+alloy-transport-ws.workspace = true
 
 tempfile = "3"
 futures-util.workspace = true
