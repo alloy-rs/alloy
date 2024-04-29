@@ -439,7 +439,7 @@ impl Geth {
         let mut port = self.port.unwrap_or(0);
         let port_s = port.to_string();
 
-        // If IPC is disabled, disable it
+        // If IPC is not enabled on the builder, disable it.
         if !self.ipc_enabled {
             cmd.arg("--ipcdisable");
         }
