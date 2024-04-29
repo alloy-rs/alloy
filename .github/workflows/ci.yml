@@ -20,29 +20,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [
-          # "ubuntu-latest",
-          "windows-latest"
-        ]
+        os: ["ubuntu-latest", "windows-latest"]
         rust: [
-          # "stable",
+          "stable",
           "nightly",
-          # "1.76" # MSRV
+          "1.76" # MSRV
         ]
-        # flags: [
-        #   # No features
-        #   "--no-default-features",
-        #   # Default features
-        #   "",
-        # ]
-        # include:
-        #   # All features
-        #   - os: "ubuntu-latest"
-        #     rust: "stable"
-        #     flags: "--all-features"
-        #   - os: "ubuntu-latest"
-        #     rust: "nightly"
-        #     flags: "--all-features"
+        flags: [
+          # No features
+          "--no-default-features",
+          # Default features
+          "",
+        ]
+        include:
+          # All features
+          - os: "ubuntu-latest"
+            rust: "stable"
+            flags: "--all-features"
+          - os: "ubuntu-latest"
+            rust: "nightly"
+            flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
@@ -70,155 +67,155 @@ jobs:
         if: ${{ matrix.rust != '1.76' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
-  # doctest:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - run: cargo test --workspace --doc
-  #     - run: cargo test --all-features --workspace --doc
+  doctest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo test --workspace --doc
+      - run: cargo test --all-features --workspace --doc
 
-  # wasm-unknown:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@stable
-  #       with:
-  #         target: wasm32-unknown-unknown
-  #     - uses: taiki-e/install-action@cargo-hack
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - name: cargo hack
-  #       run: |
-  #         cargo hack build --workspace --target wasm32-unknown-unknown \
-  #           --exclude alloy-contract \
-  #           --exclude alloy-internal-test-utils \
-  #           --exclude alloy-network \
-  #           --exclude alloy-node-bindings \
-  #           --exclude alloy-provider \
-  #           --exclude alloy-signer \
-  #           --exclude alloy-signer-aws \
-  #           --exclude alloy-signer-gcp \
-  #           --exclude alloy-signer-ledger \
-  #           --exclude alloy-signer-trezor \
-  #           --exclude alloy-signer-wallet \
-  #           --exclude alloy-transport-ipc
+  wasm-unknown:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: |
+          cargo hack build --workspace --target wasm32-unknown-unknown \
+            --exclude alloy-contract \
+            --exclude alloy-internal-test-utils \
+            --exclude alloy-network \
+            --exclude alloy-node-bindings \
+            --exclude alloy-provider \
+            --exclude alloy-signer \
+            --exclude alloy-signer-aws \
+            --exclude alloy-signer-gcp \
+            --exclude alloy-signer-ledger \
+            --exclude alloy-signer-trezor \
+            --exclude alloy-signer-wallet \
+            --exclude alloy-transport-ipc
 
-  # wasm-wasi:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@stable
-  #       with:
-  #         target: wasm32-wasi
-  #     - uses: taiki-e/install-action@cargo-hack
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - name: cargo hack
-  #       run: |
-  #         cargo hack build --workspace --target wasm32-wasi \
-  #           --exclude alloy-signer-gcp \
-  #           --exclude alloy-signer-ledger \
-  #           --exclude alloy-signer-trezor \
-  #           --exclude alloy-transport-ipc
-  #     # Ledger signer requires one of `browser` or `node` features.
-  #     - name: build ledger
-  #       run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
+  wasm-wasi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: wasm32-wasi
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: |
+          cargo hack build --workspace --target wasm32-wasi \
+            --exclude alloy-signer-gcp \
+            --exclude alloy-signer-ledger \
+            --exclude alloy-signer-trezor \
+            --exclude alloy-transport-ipc
+      # Ledger signer requires one of `browser` or `node` features.
+      - name: build ledger
+        run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
 
-  # no-std:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@stable
-  #       with:
-  #         target: riscv32imac-unknown-none-elf
-  #     - uses: taiki-e/install-action@cargo-hack
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - name: check
-  #       run: ./scripts/check_no_std.sh
+  no-std:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: riscv32imac-unknown-none-elf
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: check
+        run: ./scripts/check_no_std.sh
 
-  # feature-checks:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - uses: taiki-e/install-action@cargo-hack
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - name: cargo hack
-  #       run: cargo hack check --feature-powerset --depth 1
+  feature-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: cargo hack check --feature-powerset --depth 1
 
-  # clippy:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: stable
-  #         components: clippy
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - run: cargo +stable clippy --workspace --all-targets --all-features
-  #       env:
-  #         RUSTFLAGS: -Dwarnings
+  clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo +stable clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings
 
-  # docs:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@nightly
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - name: Build documentation
-  #       run: cargo doc --workspace --all-features --no-deps --document-private-items
-  #       env:
-  #         RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
-  #     - name: Doc index page redirection
-  #       run: echo '<meta http-equiv="refresh" content="1; url=alloy/index.html">' > target/doc/index.html
-  #     - name: Deploy documentation
-  #       uses: peaceiris/actions-gh-pages@v3
-  #       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  #       with:
-  #         github_token: ${{ secrets.GITHUB_TOKEN }}
-  #         publish_dir: target/doc
-  #         force_orphan: true
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Build documentation
+        run: cargo doc --workspace --all-features --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
+      - name: Doc index page redirection
+        run: echo '<meta http-equiv="refresh" content="1; url=alloy/index.html">' > target/doc/index.html
+      - name: Deploy documentation
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/doc
+          force_orphan: true
 
-  # fmt:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@nightly
-  #       with:
-  #         components: rustfmt
-  #     - run: cargo fmt --all --check
+  fmt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
 
-  # cfg-check:
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: dtolnay/rust-toolchain@nightly
-  #       with:
-  #         toolchain: nightly
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         cache-on-failure: true
-  #     - run: cargo check -Zcheck-cfg --workspace
+  cfg-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo check -Zcheck-cfg --workspace

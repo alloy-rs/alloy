@@ -13,12 +13,12 @@ main() {
     mkdir -p "$BIN_DIR"
     cd "$BIN_DIR"
 
-    install_geth
-
     export PATH="$BIN_DIR:$PATH"
     if [ "$GITHUB_PATH" ]; then
         echo "$BIN_DIR" >> "$GITHUB_PATH"
     fi
+
+    install_geth
 
     echo ""
     echo "Installed Geth:"
@@ -42,7 +42,6 @@ install_geth() {
             unzip "$zip"
             mv -f "$name/geth.exe" ./
             rm -rf "$name" "$zip"
-            chmod +x geth
             ;;
     esac
 }
