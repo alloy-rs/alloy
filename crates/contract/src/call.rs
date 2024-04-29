@@ -250,6 +250,71 @@ impl<T: Transport + Clone, P: Provider<T, N>, C: SolCall, N: Network> SolCallBui
 }
 
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N> {
+    /// Sets the decoder to the provided [`SolCall`].
+    ///
+    /// Converts the raw call builder into a sol call builder.
+    ///
+    /// Note that generally you would want to instantiate a sol call builder directly using the
+    /// `sol!` macro, but this method is provided for flexibility, for example to convert a raw
+    /// deploy call builder into a sol call builder.
+    ///
+    /// # Examples
+    ///
+    /// Decode a return value from a constructor:
+    ///
+    /// ```no_run
+    /// # use alloy_sol_types::sol;
+    /// sol! {
+    ///     // NOTE: This contract is not meant to be deployed on-chain, but rather
+    ///     // used in a static call with its creation code as the call data.
+    ///     #[sol(rpc, bytecode = "34601457602a60e052600161010052604060e0f35b5f80fdfe")]
+    ///     contract MyContract {
+    ///         // The type returned by the constructor.
+    ///         #[derive(Debug, PartialEq)]
+    ///         struct MyStruct {
+    ///             uint64 a;
+    ///             bool b;
+    ///         }
+    ///
+    ///         constructor() {
+    ///             MyStruct memory s = MyStruct(42, true);
+    ///             bytes memory returnData = abi.encode(s);
+    ///             assembly {
+    ///                 return(add(returnData, 0x20), mload(returnData))
+    ///             }
+    ///         }
+    ///
+    ///         // A shim that represents the return value of the constructor.
+    ///         function constructorReturn() external view returns (MyStruct memory s);
+    ///     }
+    /// }
+    ///
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// # stringify!(
+    /// let provider = ...;
+    /// # );
+    /// # let provider = alloy_provider::ProviderBuilder::new().on_anvil();
+    /// let call_builder = MyContract::deploy_builder(&provider)
+    ///     .with_sol_decoder::<MyContract::constructorReturnCall>();
+    /// let result = call_builder.call().await?;
+    /// assert_eq!(result.s, MyContract::MyStruct { a: 42, b: true });
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn with_sol_decoder<C: SolCall>(self) -> SolCallBuilder<T, P, C, N> {
+        SolCallBuilder {
+            request: self.request,
+            block: self.block,
+            state: self.state,
+            provider: self.provider,
+            decoder: PhantomData::<C>,
+            transport: PhantomData,
+        }
+    }
+}
+
+impl<T: Transport + Clone, P: Provider<T, N>, N: Network> RawCallBuilder<T, P, N> {
     /// Creates a new call builder with the provided provider and ABI encoded input.
     ///
     /// Will not decode the output of the call, meaning that [`call`](Self::call) will behave the
@@ -292,7 +357,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         }
     }
 
-    /// Sets the `from` field in the transaction to the provided value. Defaults to [Address::ZERO].
+    /// Sets the `from` field in the transaction to the provided value.
     pub fn from(mut self, from: Address) -> Self {
         self.request.set_from(from);
         self
@@ -585,8 +650,8 @@ mod tests {
         }
     }
 
-    #[allow(clippy::type_complexity)]
     /// Creates a new call_builder to test field modifications, taken from [call_encoding]
+    #[allow(clippy::type_complexity)]
     fn build_call_builder() -> CallBuilder<
         Http<Client>,
         AnvilProvider<RootProvider<Http<Client>>, Http<Client>>,

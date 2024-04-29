@@ -1,10 +1,9 @@
 //! Ethereum JSON-RPC provider.
 
 use crate::{
-    chain::ChainStreamPoller,
-    heart::{Heartbeat, HeartbeatHandle, PendingTransaction, PendingTransactionConfig},
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    PendingTransactionBuilder,
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
+    SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -13,222 +12,20 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{
-    BuiltInConnectionString, ClientBuilder, ClientRef, PollerBuilder, RpcClient, WeakClient,
-};
+use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
 use alloy_rpc_types::{
     state::StateOverride, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
-use alloy_transport::{
-    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportErrorKind,
-    TransportResult,
-};
+use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
-use std::{
-    borrow::Cow,
-    fmt,
-    marker::PhantomData,
-    sync::{Arc, OnceLock},
-};
-
-#[cfg(feature = "reqwest")]
-use alloy_transport_http::Http;
-
-#[cfg(feature = "pubsub")]
-use alloy_pubsub::{PubSubFrontend, Subscription};
+use std::borrow::Cow;
 
 /// A task that polls the provider with `eth_getFilterChanges`, returning a list of `R`.
 ///
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
-
-/// A transaction that can be sent. This is either a builder or an envelope.
-///
-/// This type is used to allow for fillers to convert a builder into an envelope
-/// without changing the user-facing API.
-///
-/// Users should NOT use this type directly. It should only be used as an
-/// implementation detail of [`Provider::send_transaction_internal`].
-#[doc(hidden)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SendableTx<N: Network> {
-    /// A transaction that is not yet signed.
-    Builder(N::TransactionRequest),
-    /// A transaction that is signed and fully constructed.
-    Envelope(N::TxEnvelope),
-}
-
-impl<N: Network> SendableTx<N> {
-    /// Fallible cast to an unbuilt transaction request.
-    pub fn as_mut_builder(&mut self) -> Option<&mut N::TransactionRequest> {
-        match self {
-            Self::Builder(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Fallible cast to an unbuilt transaction request.
-    pub const fn as_builder(&self) -> Option<&N::TransactionRequest> {
-        match self {
-            Self::Builder(tx) => Some(tx),
-            _ => None,
-        }
-    }
-
-    /// Checks if the transaction is a builder.
-    pub const fn is_builder(&self) -> bool {
-        matches!(self, Self::Builder(_))
-    }
-
-    /// Check if the transaction is an envelope.
-    pub const fn is_envelope(&self) -> bool {
-        matches!(self, Self::Envelope(_))
-    }
-
-    /// Fallible cast to a built transaction envelope.
-    pub const fn as_envelope(&self) -> Option<&N::TxEnvelope> {
-        match self {
-            Self::Envelope(tx) => Some(tx),
-            _ => None,
-        }
-    }
-}
-
-/// The root provider manages the RPC client and the heartbeat. It is at the
-/// base of every provider stack.
-pub struct RootProvider<T, N = Ethereum> {
-    /// The inner state of the root provider.
-    pub(crate) inner: Arc<RootProviderInner<T, N>>,
-}
-
-impl<T, N> Clone for RootProvider<T, N> {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.clone() }
-    }
-}
-
-impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
-    }
-}
-
-#[cfg(feature = "reqwest")]
-impl<N: Network> RootProvider<Http<reqwest::Client>, N> {
-    /// Creates a new HTTP root provider from the given URL.
-    pub fn new_http(url: url::Url) -> Self {
-        Self::new(RpcClient::new_http(url))
-    }
-}
-
-impl<T: Transport, N: Network> RootProvider<T, N> {
-    /// Creates a new root provider from the given RPC client.
-    pub fn new(client: RpcClient<T>) -> Self {
-        Self { inner: Arc::new(RootProviderInner::new(client)) }
-    }
-}
-
-impl<N: Network> RootProvider<BoxTransport, N> {
-    /// Connects to a boxed transport with the given connector.
-    pub async fn connect_boxed<C: BoxTransportConnect>(conn: C) -> Result<Self, TransportError> {
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
-    }
-
-    /// Creates a new root provider from the provided connection details.
-    pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
-        let conn: BuiltInConnectionString = s.parse()?;
-        let client = ClientBuilder::default().connect_boxed(conn).await?;
-        Ok(Self::new(client))
-    }
-}
-
-impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
-    /// Boxes the inner client.
-    ///
-    /// This will create a new provider if this instance is not the only reference to the inner
-    /// client.
-    pub fn boxed(self) -> RootProvider<BoxTransport, N> {
-        let inner = Arc::unwrap_or_clone(self.inner);
-        RootProvider { inner: Arc::new(inner.boxed()) }
-    }
-
-    /// Gets the subscription corresponding to the given RPC subscription ID.
-    #[cfg(feature = "pubsub")]
-    pub async fn get_subscription<R: RpcReturn>(
-        &self,
-        id: U256,
-    ) -> TransportResult<Subscription<R>> {
-        self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
-    }
-
-    /// Unsubscribes from the subscription corresponding to the given RPC subscription ID.
-    #[cfg(feature = "pubsub")]
-    pub fn unsubscribe(&self, id: U256) -> TransportResult<()> {
-        self.pubsub_frontend()?.unsubscribe(id)
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn pubsub_frontend(&self) -> TransportResult<&PubSubFrontend> {
-        let t = self.transport() as &dyn std::any::Any;
-        t.downcast_ref::<PubSubFrontend>()
-            .or_else(|| {
-                t.downcast_ref::<BoxTransport>()
-                    .and_then(|t| t.as_any().downcast_ref::<PubSubFrontend>())
-            })
-            .ok_or_else(TransportErrorKind::pubsub_unavailable)
-    }
-
-    #[cfg(feature = "pubsub")]
-    fn transport(&self) -> &T {
-        self.inner.client.transport()
-    }
-
-    #[inline]
-    fn get_heart(&self) -> &HeartbeatHandle {
-        self.inner.heart.get_or_init(|| {
-            let poller = ChainStreamPoller::from_root(self);
-            // TODO: Can we avoid `Box::pin` here?
-            Heartbeat::new(Box::pin(poller.into_stream())).spawn()
-        })
-    }
-}
-
-/// The root provider manages the RPC client and the heartbeat. It is at the
-/// base of every provider stack.
-pub(crate) struct RootProviderInner<T, N = Ethereum> {
-    client: RpcClient<T>,
-    heart: OnceLock<HeartbeatHandle>,
-    _network: PhantomData<N>,
-}
-
-impl<T, N> Clone for RootProviderInner<T, N> {
-    fn clone(&self) -> Self {
-        Self { client: self.client.clone(), heart: self.heart.clone(), _network: PhantomData }
-    }
-}
-
-impl<T, N> RootProviderInner<T, N> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
-        Self { client, heart: OnceLock::new(), _network: PhantomData }
-    }
-
-    pub(crate) fn weak_client(&self) -> WeakClient<T> {
-        self.client.get_weak()
-    }
-
-    pub(crate) fn client_ref(&self) -> ClientRef<'_, T> {
-        self.client.get_ref()
-    }
-}
-
-impl<T: Transport + Clone, N> RootProviderInner<T, N> {
-    fn boxed(self) -> RootProviderInner<BoxTransport, N> {
-        RootProviderInner { client: self.client.boxed(), heart: self.heart, _network: PhantomData }
-    }
-}
 
 // todo: adjust docs
 // todo: reorder
@@ -309,7 +106,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(&self) -> TransportResult<Subscription<Block>> {
+    async fn subscribe_blocks(&self) -> TransportResult<alloy_pubsub::Subscription<Block>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -341,7 +138,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_pending_transactions(&self) -> TransportResult<Subscription<B256>> {
+    async fn subscribe_pending_transactions(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<B256>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newPendingTransactions",)).await?;
         self.root().get_subscription(id).await
@@ -380,7 +179,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[cfg(feature = "pubsub")]
     async fn subscribe_full_pending_transactions(
         &self,
-    ) -> TransportResult<Subscription<N::TransactionResponse>> {
+    ) -> TransportResult<alloy_pubsub::Subscription<N::TransactionResponse>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newPendingTransactions", true)).await?;
         self.root().get_subscription(id).await
@@ -417,7 +216,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_logs(&self, filter: &Filter) -> TransportResult<Subscription<Log>> {
+    async fn subscribe_logs(
+        &self,
+        filter: &Filter,
+    ) -> TransportResult<alloy_pubsub::Subscription<Log>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("logs", filter)).await?;
         self.root().get_subscription(id).await
@@ -426,7 +228,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Subscribe to an RPC event.
     #[cfg(feature = "pubsub")]
     #[auto_impl(keep_default_for(&, &mut, Rc, Arc, Box))]
-    async fn subscribe<P, R>(&self, params: P) -> TransportResult<Subscription<R>>
+    async fn subscribe<P, R>(&self, params: P) -> TransportResult<alloy_pubsub::Subscription<R>>
     where
         P: RpcParam,
         R: RpcReturn,
@@ -1121,7 +923,7 @@ mod tests {
 
         // These blocks are not necessary.
         {
-            let refdyn = &provider as &dyn Provider<Http<reqwest::Client>, _>;
+            let refdyn = &provider as &dyn Provider<alloy_transport_http::Http<reqwest::Client>, _>;
             let num = refdyn.get_block_number().await.unwrap();
             assert_eq!(0, num);
         }
@@ -1135,7 +937,7 @@ mod tests {
 
         // Note the `Http` arg, vs no arg (defaulting to `BoxedTransport`) below.
         {
-            let refdyn = &provider as &dyn Provider<Http<reqwest::Client>, _>;
+            let refdyn = &provider as &dyn Provider<alloy_transport_http::Http<reqwest::Client>, _>;
             let num = refdyn.get_block_number().await.unwrap();
             assert_eq!(0, num);
         }
@@ -1170,7 +972,7 @@ mod tests {
         init_tracing();
         let anvil = Anvil::new().block_time(1).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
         let provider = RootProvider::<_, Ethereum>::new(client);
 
         let sub = provider.subscribe_blocks().await.unwrap();
@@ -1191,7 +993,7 @@ mod tests {
         init_tracing();
         let anvil = Anvil::new().block_time(1).spawn();
         let ws = alloy_rpc_client::WsConnect::new(anvil.ws_endpoint());
-        let client = RpcClient::connect_pubsub(ws).await.unwrap();
+        let client = alloy_rpc_client::RpcClient::connect_pubsub(ws).await.unwrap();
         let provider = RootProvider::<_, Ethereum>::new(client);
         let provider = provider.boxed();
 
@@ -1213,7 +1015,7 @@ mod tests {
         init_tracing();
         let url = "wss://eth-mainnet.g.alchemy.com/v2/viFmeVzhg6bWKVMIWWS8MhmzREB-D4f7";
         let ws = alloy_rpc_client::WsConnect::new(url);
-        let Ok(client) = RpcClient::connect_pubsub(ws).await else { return };
+        let Ok(client) = alloy_rpc_client::RpcClient::connect_pubsub(ws).await else { return };
         let provider = RootProvider::<_, Ethereum>::new(client);
         let sub = provider.subscribe_blocks().await.unwrap();
         let mut stream = sub.into_stream().take(1);

@@ -23,7 +23,9 @@ pub mod eip1559;
 pub use eip1559::calc_next_block_base_fee;
 
 pub mod eip1898;
-pub use eip1898::{BlockId, BlockNumberOrTag, RpcBlockHash};
+pub use eip1898::{
+    BlockHashOrNumber, BlockId, BlockNumHash, BlockNumberOrTag, ForkBlock, RpcBlockHash,
+};
 
 pub mod eip2718;
 
