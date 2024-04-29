@@ -656,8 +656,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all client implementations support state overrides.
-    fn call<'a, 'b>(&'a self, tx: &'b N::TransactionRequest) -> EthCall<'a, 'b, 'static, T, N> {
-        EthCall::new(self.client(), tx)
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N> {
+        EthCall::new(self.weak_client(), tx)
     }
 
     /// Returns a collection of historical gas information [FeeHistory] which

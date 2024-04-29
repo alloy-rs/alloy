@@ -23,18 +23,18 @@ mod private {
 /// An [`alloy_provider::EthCall`] with an abi decoder.
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
-pub struct EthCall<'client, 'req, 'state, 'coder, D, T, N>
+pub struct EthCall<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>,
+    inner: alloy_provider::EthCall<'req, 'state, T, N>,
 
     decoder: &'coder D,
 }
 
-impl<'client, 'req, 'state, 'coder, D, T, N> EthCall<'client, 'req, 'state, 'coder, D, T, N>
+impl<'req, 'state, 'coder, D, T, N> EthCall<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -42,25 +42,25 @@ where
 {
     /// Create a new [`EthCall`].
     pub const fn new(
-        inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>,
+        inner: alloy_provider::EthCall<'req, 'state, T, N>,
         decoder: &'coder D,
     ) -> Self {
         Self { inner, decoder }
     }
 }
 
-impl<'client, 'req, 'state, T, N> EthCall<'client, 'req, 'state, 'static, (), T, N>
+impl<'req, 'state, T, N> EthCall<'req, 'state, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
     /// Create a new [`EthCall`].
-    pub const fn new_raw(inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>) -> Self {
+    pub const fn new_raw(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
         EthCall::new(inner, &RAW_CODER)
     }
 }
 
-impl<'client, 'req, 'state, 'coder, D, T, N> EthCall<'client, 'req, 'state, 'coder, D, T, N>
+impl<'req, 'state, 'coder, D, T, N> EthCall<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -71,7 +71,7 @@ where
     pub fn with_decoder<'new_coder, E>(
         self,
         decoder: &'new_coder E,
-    ) -> EthCall<'client, 'req, 'state, 'new_coder, E, T, N>
+    ) -> EthCall<'req, 'state, 'new_coder, E, T, N>
     where
         E: CallDecoder,
     {
@@ -91,19 +91,19 @@ where
     }
 }
 
-impl<'client, 'req, 'state, T, N> From<alloy_provider::EthCall<'client, 'req, 'state, T, N>>
-    for EthCall<'client, 'req, 'state, 'static, (), T, N>
+impl<'req, 'state, T, N> From<alloy_provider::EthCall<'req, 'state, T, N>>
+    for EthCall<'req, 'state, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
-    fn from(inner: alloy_provider::EthCall<'client, 'req, 'state, T, N>) -> Self {
+    fn from(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
         EthCall { inner, decoder: &RAW_CODER }
     }
 }
 
-impl<'client, 'req, 'state, 'coder, D, T, N> std::future::IntoFuture
-    for EthCall<'client, 'req, 'state, 'coder, D, T, N>
+impl<'req, 'state, 'coder, D, T, N> std::future::IntoFuture
+    for EthCall<'req, 'state, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,
@@ -111,7 +111,7 @@ where
 {
     type Output = Result<D::CallOutput>;
 
-    type IntoFuture = EthCallFut<'client, 'req, 'state, 'coder, D, T, N>;
+    type IntoFuture = EthCallFut<'req, 'state, 'coder, D, T, N>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut { inner: self.inner.into_future(), decoder: self.decoder }
@@ -122,18 +122,18 @@ where
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Debug, Clone)]
-pub struct EthCallFut<'client, 'req, 'state, 'coder, D, T, N>
+pub struct EthCallFut<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: <alloy_provider::EthCall<'client, 'req, 'state, T, N> as IntoFuture>::IntoFuture,
+    inner: <alloy_provider::EthCall<'req, 'state, T, N> as IntoFuture>::IntoFuture,
     decoder: &'coder D,
 }
 
-impl<'client, 'req, 'state, 'coder, D, T, N> std::future::Future
-    for EthCallFut<'client, 'req, 'state, 'coder, D, T, N>
+impl<'req, 'state, 'coder, D, T, N> std::future::Future
+    for EthCallFut<'req, 'state, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,
