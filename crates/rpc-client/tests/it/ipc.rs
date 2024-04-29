@@ -3,6 +3,7 @@ use alloy_primitives::U64;
 use alloy_pubsub::PubSubFrontend;
 use alloy_rpc_client::{ClientBuilder, RpcCall, RpcClient};
 use alloy_transport_ipc::IpcConnect;
+use serial_test::serial;
 use tempfile::NamedTempFile;
 
 async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
@@ -23,6 +24,7 @@ async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
 }
 
 #[tokio::test]
+#[serial]
 async fn it_makes_a_request() {
     let (client, _geth) = connect().await;
     let req: RpcCall<_, (), U64> = client.request("eth_blockNumber", ());
