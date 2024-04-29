@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Installs Geth binary
 # Note: intended for use only with CI (x86_64 Ubuntu, MacOS or Windows)
-set -e
+set -ex
 
 GETH_BUILD=${GETH_BUILD:-"1.14.0-87246f3c"}
 

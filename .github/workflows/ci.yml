@@ -21,11 +21,24 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        rust: ["stable", "nightly", "1.76"] # MSRV
-        flags: ["--no-default-features", "", "--all-features"]
-        exclude:
-          # Some features have higher MSRV.
-          - rust: "1.76" # MSRV
+        rust: [
+          "stable",
+          "nightly",
+          "1.76" # MSRV
+        ]
+        flags: [
+          # No features
+          "--no-default-features",
+          # Default features
+          "",
+        ]
+        include:
+          # All features
+          - os: "ubuntu-latest"
+            rust: "stable"
+            flags: "--all-features"
+          - os: "ubuntu-latest"
+            rust: "nightly"
             flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
