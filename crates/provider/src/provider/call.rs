@@ -6,6 +6,7 @@ use alloy_primitives::Bytes;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use futures::FutureExt;
 
 /// States for the [`EthCallFut`] future.
 #[derive(Debug, Clone)]
@@ -71,7 +72,7 @@ where
             unreachable!("bad state")
         };
 
-        std::pin::pin!(call).poll(cx)
+        call.poll_unpin(cx)
     }
 }
 
