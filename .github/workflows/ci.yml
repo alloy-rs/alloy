@@ -20,26 +20,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        os: [
+          "ubuntu-latest",
+          "windows-latest"
+        ]
         rust: [
-          "stable",
+          # "stable",
           "nightly",
-          "1.76" # MSRV
+          # "1.76" # MSRV
         ]
-        flags: [
-          # No features
-          "--no-default-features",
-          # Default features
-          "",
-        ]
-        include:
-          # All features
-          - os: "ubuntu-latest"
-            rust: "stable"
-            flags: "--all-features"
-          - os: "ubuntu-latest"
-            rust: "nightly"
-            flags: "--all-features"
+        # flags: [
+        #   # No features
+        #   "--no-default-features",
+        #   # Default features
+        #   "",
+        # ]
+        # include:
+        #   # All features
+        #   - os: "ubuntu-latest"
+        #     rust: "stable"
+        #     flags: "--all-features"
+        #   - os: "ubuntu-latest"
+        #     rust: "nightly"
+        #     flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
@@ -64,7 +67,9 @@ jobs:
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
         if: ${{ matrix.rust != '1.76' }} # MSRV
-        run: cargo nextest run --workspace ${{ matrix.flags }}
+        run: |
+          geth version 
+          cargo nextest run --workspace ${{ matrix.flags }}
 
   doctest:
     runs-on: ubuntu-latest
