@@ -9,7 +9,7 @@ use tempfile::NamedTempFile;
 async fn connect() -> (RpcClient<PubSubFrontend>, GethInstance) {
     let temp_file = NamedTempFile::new().unwrap();
     let path = temp_file.into_temp_path().to_path_buf();
-    let geth = Geth::new().block_time(1u64).ipc_path(&path).spawn();
+    let geth = Geth::new().enable_ipc().block_time(1u64).ipc_path(&path).spawn();
 
     // [Windows named pipes](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipes)
     // are located at `\\<machine_address>\pipe\<pipe_name>`.

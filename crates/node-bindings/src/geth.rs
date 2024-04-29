@@ -246,6 +246,7 @@ pub struct Geth {
     port: Option<u16>,
     authrpc_port: Option<u16>,
     ipc_path: Option<PathBuf>,
+    ipc_enabled: bool,
     data_dir: Option<PathBuf>,
     chain_id: Option<u64>,
     insecure_unlock: bool,
@@ -355,6 +356,12 @@ impl Geth {
         self
     }
 
+    /// Enable IPC for the geth instance.
+    pub fn enable_ipc(mut self) -> Self {
+        self.ipc_enabled = true;
+        self
+    }
+
     /// Disable discovery for the geth instance.
     ///
     /// This will put the geth instance into non-dev mode, discarding any previously set dev-mode
@@ -427,6 +434,11 @@ impl Geth {
         // If no port provided, let the os chose it for us
         let mut port = self.port.unwrap_or(0);
         let port_s = port.to_string();
+
+        // If IPC is disabled, disable it
+        if !self.ipc_enabled {
+            cmd.arg("--ipcdisable");
+        }
 
         // Open the HTTP API
         cmd.arg("--http");
