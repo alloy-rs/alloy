@@ -6,7 +6,7 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_rpc_types::{BlockId, BlockNumberOrTag};
+use alloy_rpc_types::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
@@ -84,7 +84,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx, BlockId::default()).await }.right_future()
+            async { provider.estimate_gas(tx, Default::default()).await }.right_future()
         };
 
         let (gas_price, gas_limit) = futures::try_join!(gas_price_fut, gas_limit_fut)?;
@@ -105,7 +105,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx, BlockId::default()).await }.right_future()
+            async { provider.estimate_gas(tx, Default::default()).await }.right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
@@ -135,7 +135,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx, BlockId::default()).await }.right_future()
+            async { provider.estimate_gas(tx, Default::default()).await }.right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =

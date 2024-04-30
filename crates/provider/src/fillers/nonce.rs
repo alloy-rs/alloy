@@ -5,7 +5,6 @@ use crate::{
 };
 use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;
-use alloy_rpc_types::BlockId;
 use alloy_transport::{Transport, TransportResult};
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -105,7 +104,7 @@ impl NonceFiller {
             None => {
                 // initialize the nonce if we haven't seen this account before
                 let initial_nonce =
-                    provider.get_transaction_count(from, BlockId::default()).await?;
+                    provider.get_transaction_count(from, Default::default()).await?;
                 *nonce = Some(initial_nonce);
                 Ok(initial_nonce)
             }
