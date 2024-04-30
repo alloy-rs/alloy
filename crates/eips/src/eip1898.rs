@@ -35,7 +35,7 @@ pub struct RpcBlockHash {
 impl RpcBlockHash {
     /// Returns an [RpcBlockHash] from a [B256].
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
-        RpcBlockHash { block_hash, require_canonical }
+        Self { block_hash, require_canonical }
     }
 }
 
@@ -544,11 +544,11 @@ impl FromStr for BlockId {
         }
 
         match s {
-            "latest" => Ok(BlockId::Number(BlockNumberOrTag::Latest)),
-            "finalized" => Ok(BlockId::Number(BlockNumberOrTag::Finalized)),
-            "safe" => Ok(BlockId::Number(BlockNumberOrTag::Safe)),
-            "earliest" => Ok(BlockId::Number(BlockNumberOrTag::Earliest)),
-            "pending" => Ok(BlockId::Number(BlockNumberOrTag::Pending)),
+            "latest" => Ok(BlockNumberOrTag::Latest.into()),
+            "finalized" => Ok(BlockNumberOrTag::Finalized.into()),
+            "safe" => Ok(BlockNumberOrTag::Safe.into()),
+            "earliest" => Ok(BlockNumberOrTag::Earliest.into()),
+            "pending" => Ok(BlockNumberOrTag::Pending.into()),
             _ => s
                 .parse::<u64>()
                 .map_err(ParseBlockIdError::ParseIntError)
@@ -591,13 +591,13 @@ impl BlockNumHash {
 
 impl From<(BlockNumber, BlockHash)> for BlockNumHash {
     fn from(val: (BlockNumber, BlockHash)) -> Self {
-        BlockNumHash { number: val.0, hash: val.1 }
+        Self { number: val.0, hash: val.1 }
     }
 }
 
 impl From<(BlockHash, BlockNumber)> for BlockNumHash {
     fn from(val: (BlockHash, BlockNumber)) -> Self {
-        BlockNumHash { hash: val.0, number: val.1 }
+        Self { hash: val.0, number: val.1 }
     }
 }
 

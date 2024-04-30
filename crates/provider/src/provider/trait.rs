@@ -1308,7 +1308,7 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
 
-        let count = provider.get_uncle_count(BlockId::Number(0.into())).await.unwrap();
+        let count = provider.get_uncle_count(0.into()).await.unwrap();
         assert_eq!(count, 0);
     }
 }
