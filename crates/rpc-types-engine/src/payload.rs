@@ -740,6 +740,9 @@ pub enum PayloadError {
     /// Pre-cancun Payload has cancun fields.
     #[error("pre-Cancun payload has Cancun fields")]
     PreCancunWithCancunFields,
+    /// Post-cancun Payload does not have blob transactions.
+    #[error("post-Cancun payload does not have blob transactions")]
+    PostCancunBlockWithoutBlobTransactions,
     /// Post-cancun Payload does not have blob gas used.
     #[error("post-Cancun payload does not have blob gas used")]
     PostCancunBlockWithoutBlobGasUsed,
