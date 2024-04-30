@@ -402,6 +402,8 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns the decoded the output by using the provided decoder.
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
+    #[doc(alias = "eth_call")]
+    #[doc(alias = "call_with_overrides")]
     pub fn call(&self) -> EthCall<'_, '_, '_, D, T, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
