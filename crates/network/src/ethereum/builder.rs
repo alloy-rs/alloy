@@ -183,7 +183,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 mod tests {
     use crate::{TransactionBuilder, TransactionBuilderError};
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
-    use alloy_primitives::{Address, TxKind};
+    use alloy_primitives::Address;
     use alloy_rpc_types::{AccessList, TransactionRequest};
 
     #[test]
