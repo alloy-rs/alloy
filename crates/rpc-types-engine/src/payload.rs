@@ -722,9 +722,34 @@ pub enum PayloadError {
     /// Invalid payload excess blob gas.
     #[error("invalid payload excess blob gas: {0}")]
     ExcessBlobGas(U256),
+    /// Pre-shanghai Payload has withdrawals.
+    #[error("pre-Shanghai payload has withdrawals")]
+    PreShanghaiBlockWithWitdrawals,
+    /// Post-shanghai Payload does not have withdrawals.
+    #[error("post-Shanghai payload does not have withdrawals")]
+    PostShanghaiBlockWithoutWitdrawals,
     /// Pre-cancun Payload has blob transactions.
     #[error("pre-Cancun payload has blob transactions")]
     PreCancunBlockWithBlobTransactions,
+    /// Pre-cancun Payload has blob gas used.
+    #[error("pre-Cancun payload has blob gas used")]
+    PreCancunBlockWithBlobGasUsed,
+    /// Pre-cancun Payload has excess blob gas.
+    #[error("pre-Cancun payload has excess blob gas")]
+    PreCancunBlockWithExcessBlobGas,
+    /// Pre-cancun Payload has cancun fields.
+    #[error("pre-Cancun payload has Cancun fields")]
+    PreCancunWithCancunFields,
+    /// Post-cancun Payload does not have blob gas used.
+    #[error("post-Cancun payload does not have blob gas used")]
+    PostCancunBlockWithoutBlobGasUsed,
+    /// Post-cancun Payload does not have excess blob gas.
+    #[error("post-Cancun payload does not have excess blob gas")]
+    PostCancunBlockWithoutExcessBlobGas,
+    /// Post-cancun Payload does not have cancun fields.
+    #[error("post-Cancun payload does not have Cancun fields")]
+    PostCancunWithoutCancunFields,
+
     /// Invalid payload block hash.
     #[error("block hash mismatch: want {consensus}, got {execution}")]
     BlockHash {
