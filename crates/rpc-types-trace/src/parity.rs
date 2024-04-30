@@ -235,6 +235,8 @@ pub enum CallType {
     DelegateCall,
     /// Static call
     StaticCall,
+    /// Authorized call
+    AuthCall,
 }
 
 /// Represents a certain [CallType] of a _call_ or message transaction.
