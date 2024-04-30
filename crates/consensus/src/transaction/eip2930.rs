@@ -342,7 +342,7 @@ mod tests {
             nonce: 0,
             gas_price: 1,
             gas_limit: 2,
-            to: TxKind::Call(Address::default()),
+            to: Address::default().into(),
             value: U256::from(3_u64),
             input: Bytes::from(vec![1, 2]),
             access_list: Default::default(),

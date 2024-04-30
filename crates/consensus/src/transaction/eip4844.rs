@@ -271,11 +271,11 @@ impl Transaction for TxEip4844Variant {
     }
 
     fn to(&self) -> TxKind {
-        let address = match self {
+        match self {
             TxEip4844Variant::TxEip4844(tx) => tx.to,
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to,
-        };
-        TxKind::Call(address)
+        }
+        .into()
     }
 
     fn value(&self) -> U256 {
@@ -716,7 +716,7 @@ impl Transaction for TxEip4844 {
     }
 
     fn to(&self) -> TxKind {
-        TxKind::Call(self.to)
+        self.to.into()
     }
 
     fn value(&self) -> U256 {
