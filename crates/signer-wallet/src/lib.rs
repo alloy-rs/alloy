@@ -247,9 +247,7 @@ mod test {
         // retrieved test vector from:
         // https://web3js.readthedocs.io/en/v1.2.0/web3-eth-accounts.html#eth-accounts-signtransaction
         let mut tx = TxLegacy {
-            to: alloy_primitives::TxKind::Call(address!(
-                "F0109fC8DF283027b6285cc889F5aA624EaC1F55"
-            )),
+            to: address!("F0109fC8DF283027b6285cc889F5aA624EaC1F55").into(),
             value: U256::from(1_000_000_000),
             gas_limit: 2_000_000,
             nonce: 0,

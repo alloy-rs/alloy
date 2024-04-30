@@ -124,7 +124,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Set the recipient for the transaction.
     fn set_to(&mut self, to: Address) {
-        self.set_kind(TxKind::Call(to));
+        self.set_kind(to.into());
     }
 
     /// Builder-pattern method for setting the recipient.

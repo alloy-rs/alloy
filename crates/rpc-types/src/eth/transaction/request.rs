@@ -600,7 +600,7 @@ impl From<TxLegacy> for TransactionRequest {
     fn from(tx: TxLegacy) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
@@ -617,7 +617,7 @@ impl From<TxEip2930> for TransactionRequest {
     fn from(tx: TxEip2930) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
@@ -635,7 +635,7 @@ impl From<TxEip1559> for TransactionRequest {
     fn from(tx: TxEip1559) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: if let TxKind::Call(to) = tx.to { Some(TxKind::Call(to)) } else { None },
+            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
             gas: Some(tx.gas_limit),
@@ -654,7 +654,7 @@ impl From<TxEip4844> for TransactionRequest {
     fn from(tx: TxEip4844) -> TransactionRequest {
         TransactionRequest {
             from: None,
-            to: Some(TxKind::Call(tx.to)),
+            to: Some(tx.to.into()),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
@@ -677,7 +677,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
         let tx = tx.tx;
         TransactionRequest {
             from: None,
-            to: Some(TxKind::Call(tx.to)),
+            to: Some(tx.to.into()),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),

@@ -192,7 +192,7 @@ mod tests {
             chain_id: 1,
             nonce: 0,
             gas_limit: 21_000,
-            to: TxKind::Call(Address::ZERO),
+            to: Address::ZERO.into(),
             max_priority_fee_per_gas: 20e9 as u128,
             max_fee_per_gas: 20e9 as u128,
             ..Default::default()
