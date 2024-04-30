@@ -660,6 +660,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
     ///
+    /// ## Example
+    ///
     /// ```
     /// # use alloy_provider::Provider;
     /// # use alloy_eips::BlockId;
