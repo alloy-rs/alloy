@@ -49,11 +49,10 @@ pub use sol_types::sol;
 #[doc(inline)]
 pub use self::core::rlp;
 
-/// [`sol!`](sol_types::sol!) macro wrapper to route imports to the correct crate.
+/// [`sol!`](sol_types::sol!) `macro_rules!` wrapper to set import attributes.
 ///
 /// See [`sol!`](sol_types::sol!) for the actual macro documentation.
 #[cfg(all(not(doc), feature = "sol-types"))] // Show the actual macro in docs.
-#[doc(hidden)]
 #[macro_export]
 macro_rules! sol {
     ($($t:tt)*) => {
