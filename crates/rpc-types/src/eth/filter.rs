@@ -943,6 +943,18 @@ pub enum FilterId {
     Str(String),
 }
 
+impl From<u64> for FilterId {
+    fn from(num: u64) -> Self {
+        FilterId::Num(num)
+    }
+}
+
+impl From<String> for FilterId {
+    fn from(str: String) -> Self {
+        FilterId::Str(str)
+    }
+}
+
 #[cfg(feature = "jsonrpsee-types")]
 impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
     fn from(value: FilterId) -> Self {
@@ -957,8 +969,8 @@ impl From<FilterId> for jsonrpsee_types::SubscriptionId<'_> {
 impl From<jsonrpsee_types::SubscriptionId<'_>> for FilterId {
     fn from(value: jsonrpsee_types::SubscriptionId<'_>) -> Self {
         match value {
-            jsonrpsee_types::SubscriptionId::Num(n) => FilterId::Num(n),
-            jsonrpsee_types::SubscriptionId::Str(s) => FilterId::Str(s.into_owned()),
+            jsonrpsee_types::SubscriptionId::Num(n) => n.into(),
+            jsonrpsee_types::SubscriptionId::Str(s) => s.into_owned().into(),
         }
     }
 }
