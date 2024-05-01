@@ -21,7 +21,7 @@ This repository contains the following crates:
 - [`alloy`]: Meta-crate for the entire project, including [`alloy-core`]
 - [`alloy-consensus`] - Ethereum consensus interface
 - [`alloy-contract`] - Interact with on-chain contracts
-- [`alloy-eips`] - Ethereum Improvement Proprosal (EIP) implementations
+- [`alloy-eips`] - Ethereum Improvement Proposal (EIP) implementations
 - [`alloy-genesis`] - Ethereum genesis file definitions
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
 - [`alloy-network`] - Network abstraction for RPC types
