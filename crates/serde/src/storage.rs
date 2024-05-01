@@ -34,10 +34,16 @@ impl From<B256> for JsonStorageKey {
     }
 }
 
+impl From<[u8; 32]> for JsonStorageKey {
+    fn from(value: [u8; 32]) -> Self {
+        B256::from(value).into()
+    }
+}
+
 impl From<U256> for JsonStorageKey {
     fn from(value: U256) -> Self {
         // SAFETY: Address (B256) and U256 have the same number of bytes
-        B256::from(value.to_be_bytes()).into()
+        value.to_be_bytes().into()
     }
 }
 
