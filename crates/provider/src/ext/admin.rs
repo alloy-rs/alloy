@@ -74,10 +74,11 @@ mod test {
 
     use super::*;
     use alloy_node_bindings::Geth;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn node_info() {
-        let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
+        let temp_dir = TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
         let node_info = provider.node_info().await.unwrap();
@@ -86,8 +87,8 @@ mod test {
 
     #[tokio::test]
     async fn admin_peers() {
-        let temp_dir = tempfile::TempDir::with_prefix("reth-test-1").unwrap();
-        let temp_dir_2 = tempfile::TempDir::with_prefix("reth-test-2").unwrap();
+        let temp_dir = TempDir::with_prefix("geth-test-1").unwrap();
+        let temp_dir_2 = TempDir::with_prefix("geth-test-2").unwrap();
         let geth1 = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let mut geth2 =
             Geth::new().disable_discovery().port(0u16).data_dir(temp_dir_2.path()).spawn();

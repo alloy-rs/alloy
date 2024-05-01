@@ -14,17 +14,31 @@ concurrency:
 
 jobs:
   test:
-    name: test ${{ matrix.rust }} ${{ matrix.flags }}
-    runs-on: ubuntu-latest
+    name: test ${{ matrix.os }} ${{ matrix.rust }} ${{ matrix.flags }}
     timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        rust: ["stable", "nightly", "1.76"] # MSRV
-        flags: ["--no-default-features", "", "--all-features"]
-        exclude:
-          # Some features have higher MSRV.
-          - rust: "1.76" # MSRV
+        os: ["ubuntu-latest", "windows-latest"]
+        rust: [
+          "stable",
+          "nightly",
+          "1.76" # MSRV
+        ]
+        flags: [
+          # No features
+          "--no-default-features",
+          # Default features
+          "",
+        ]
+        include:
+          # All features
+          - os: "ubuntu-latest"
+            rust: "stable"
+            flags: "--all-features"
+          - os: "ubuntu-latest"
+            rust: "nightly"
             flags: "--all-features"
     steps:
       - uses: actions/checkout@v3
@@ -49,6 +63,7 @@ jobs:
         if: ${{ matrix.rust == '1.76' }} # MSRV
         run: cargo build --workspace ${{ matrix.flags }}
       - name: test
+        shell: bash
         if: ${{ matrix.rust != '1.76' }} # MSRV
         run: cargo nextest run --workspace ${{ matrix.flags }}
 
