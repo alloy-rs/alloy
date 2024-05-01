@@ -28,10 +28,16 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[serde(from = "U256", into = "String")]
 pub struct JsonStorageKey(pub B256);
 
+impl From<B256> for JsonStorageKey {
+    fn from(value: B256) -> Self {
+        JsonStorageKey(value)
+    }
+}
+
 impl From<U256> for JsonStorageKey {
     fn from(value: U256) -> Self {
         // SAFETY: Address (B256) and U256 have the same number of bytes
-        JsonStorageKey(B256::from(value.to_be_bytes()))
+        B256::from(value.to_be_bytes()).into()
     }
 }
 
