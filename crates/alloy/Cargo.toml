@@ -172,6 +172,7 @@ arbitrary = [
     "alloy-rpc-types?/arbitrary",
 ]
 k256 = ["alloy-core/k256", "alloy-consensus?/k256", "alloy-network?/k256"]
+kzg = ["alloy-consensus?/kzg"]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",
