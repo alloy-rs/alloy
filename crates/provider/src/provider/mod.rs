@@ -1,3 +1,6 @@
+mod call;
+pub use call::EthCall;
+
 mod root;
 pub use root::RootProvider;
 
