@@ -42,7 +42,7 @@ pub struct Block {
 impl Block {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
-        Self { transactions: BlockTransactions::Full(txs), ..self }
+        Self { transactions: txs.into(), ..self }
     }
 }
 
@@ -246,6 +246,18 @@ impl BlockTransactions {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl From<Vec<B256>> for BlockTransactions {
+    fn from(hashes: Vec<B256>) -> Self {
+        BlockTransactions::Hashes(hashes)
+    }
+}
+
+impl<T> From<Vec<T>> for BlockTransactions<T> {
+    fn from(transactions: Vec<T>) -> Self {
+        BlockTransactions::Full(transactions)
     }
 }
 
@@ -581,7 +593,7 @@ mod tests {
                 parent_beacon_block_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
-            transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
+            transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
             other: Default::default(),
@@ -665,7 +677,7 @@ mod tests {
                 parent_beacon_block_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
-            transactions: BlockTransactions::Hashes(vec![B256::with_last_byte(18)]),
+            transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: None,
             other: Default::default(),
