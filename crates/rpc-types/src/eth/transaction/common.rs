@@ -2,7 +2,6 @@
 //! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
-use alloy_eips::eip2718::Eip2718Error;
 use alloy_primitives::{TxHash, B256};
 
 /// Additional fields in the context of a block that contains this transaction.
@@ -20,11 +19,9 @@ pub struct TransactionInfo {
     pub base_fee: Option<u128>,
 }
 
-impl TryFrom<Transaction> for TransactionInfo {
-    type Error = Eip2718Error;
-
-    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        Ok(TransactionInfo {
+impl From<Transaction> for TransactionInfo {
+    fn from(tx: Transaction) -> Self {
+        TransactionInfo {
             hash: Some(tx.hash),
             index: tx.transaction_index,
             block_hash: tx.block_hash,
@@ -32,6 +29,6 @@ impl TryFrom<Transaction> for TransactionInfo {
             // We don't know the base fee of the block when we're constructing this from
             // `Transaction`
             base_fee: None,
-        })
+        }
     }
 }
