@@ -1,5 +1,5 @@
 //! Commonly used additional types that are not part of the JSON RPC spec but are often required
-//! when working with RPC types, such as [Transaction](crate::Transaction)
+//! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
 use alloy_consensus::TxType;
