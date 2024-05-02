@@ -89,8 +89,8 @@ pub struct Header {
     ///
     /// The beacon roots contract handles root storage, enhancing Ethereum's functionalities.
     pub parent_beacon_block_root: Option<B256>,
-    /// The Keccak 256-bit hash of the root node of the trie structure populated with each [EIP-7685]
-    /// request in the block body.
+    /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+    /// [EIP-7685] request in the block body.
     ///
     /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
     pub requests_root: Option<B256>,
