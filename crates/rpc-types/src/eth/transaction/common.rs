@@ -19,8 +19,8 @@ pub struct TransactionInfo {
     pub base_fee: Option<u128>,
 }
 
-impl From<Transaction> for TransactionInfo {
-    fn from(tx: Transaction) -> Self {
+impl From<&Transaction> for TransactionInfo {
+    fn from(tx: &Transaction) -> Self {
         TransactionInfo {
             hash: Some(tx.hash),
             index: tx.transaction_index,
