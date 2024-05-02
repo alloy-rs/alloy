@@ -2,7 +2,6 @@
 //! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
-use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
 use alloy_primitives::{TxHash, B256};
 
@@ -30,16 +29,9 @@ impl TryFrom<Transaction> for TransactionInfo {
             index: tx.transaction_index,
             block_hash: tx.block_hash,
             block_number: tx.block_number,
-            base_fee: match tx.transaction_type {
-                Some(tx_type) => match tx_type.try_into() {
-                    Ok(TxType::Legacy) | Ok(TxType::Eip2930) => tx.gas_price,
-                    Ok(TxType::Eip1559) | Ok(TxType::Eip4844) => tx.max_fee_per_gas.map(|fee| {
-                        fee.saturating_sub(tx.max_priority_fee_per_gas.unwrap_or_default())
-                    }),
-                    Err(err) => return Err(err),
-                },
-                None => None,
-            },
+            // We don't know the base fee of the block when we're constructing this from
+            // `Transaction`
+            base_fee: None,
         })
     }
 }
