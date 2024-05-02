@@ -1,6 +1,7 @@
 //! Commonly used additional types that are not part of the JSON RPC spec but are often required
-//! when working with RPC types, such as [Transaction](crate::Transaction)
+//! when working with RPC types, such as [Transaction]
 
+use crate::Transaction;
 use alloy_primitives::{TxHash, B256};
 
 /// Additional fields in the context of a block that contains this transaction.
@@ -16,4 +17,18 @@ pub struct TransactionInfo {
     pub block_number: Option<u64>,
     /// Base fee of the block.
     pub base_fee: Option<u128>,
+}
+
+impl From<&Transaction> for TransactionInfo {
+    fn from(tx: &Transaction) -> Self {
+        TransactionInfo {
+            hash: Some(tx.hash),
+            index: tx.transaction_index,
+            block_hash: tx.block_hash,
+            block_number: tx.block_number,
+            // We don't know the base fee of the block when we're constructing this from
+            // `Transaction`
+            base_fee: None,
+        }
+    }
 }
