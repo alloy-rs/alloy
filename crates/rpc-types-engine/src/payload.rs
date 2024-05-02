@@ -722,35 +722,35 @@ pub enum PayloadError {
     /// Invalid payload excess blob gas.
     #[error("invalid payload excess blob gas: {0}")]
     ExcessBlobGas(U256),
-    /// Pre-shanghai Payload has withdrawals.
-    #[error("pre-Shanghai payload has withdrawals")]
+    /// withdrawals present in pre-shanghai payload.
+    #[error("withdrawals present in pre-shanghai payload")]
     PreShanghaiBlockWithWitdrawals,
-    /// Post-shanghai Payload does not have withdrawals.
-    #[error("post-Shanghai payload does not have withdrawals")]
+    /// withdrawals missing in post-shanghai payload.
+    #[error("withdrawals missing in post-shanghai payload")]
     PostShanghaiBlockWithoutWitdrawals,
-    /// Pre-cancun Payload has blob transactions.
-    #[error("pre-Cancun payload has blob transactions")]
+    /// blob transactions present in pre-cancun payload.
+    #[error("blob transactions present in pre-cancun payload")]
     PreCancunBlockWithBlobTransactions,
-    /// Pre-cancun Payload has blob gas used.
-    #[error("pre-Cancun payload has blob gas used")]
+    /// blob gas used present in pre-cancun payload.
+    #[error("blob gas used present in pre-cancun payload")]
     PreCancunBlockWithBlobGasUsed,
-    /// Pre-cancun Payload has excess blob gas.
-    #[error("pre-Cancun payload has excess blob gas")]
+    /// excess blob gas present in pre-cancun payload.
+    #[error("excess blob gas present in pre-cancun payload")]
     PreCancunBlockWithExcessBlobGas,
-    /// Pre-cancun Payload has cancun fields.
-    #[error("pre-Cancun payload has Cancun fields")]
+    /// cancun fields present in pre-cancun payload.
+    #[error("cancun fields present in pre-cancun payload")]
     PreCancunWithCancunFields,
-    /// Post-cancun Payload does not have blob transactions.
-    #[error("post-Cancun payload does not have blob transactions")]
+    /// blob transactions missing in post-cancun payload.
+    #[error("blob transactions missing in post-cancun payload")]
     PostCancunBlockWithoutBlobTransactions,
-    /// Post-cancun Payload does not have blob gas used.
-    #[error("post-Cancun payload does not have blob gas used")]
+    /// blob gas used missing in post-cancun payload.
+    #[error("blob gas used missing in post-cancun payload")]
     PostCancunBlockWithoutBlobGasUsed,
-    /// Post-cancun Payload does not have excess blob gas.
-    #[error("post-Cancun payload does not have excess blob gas")]
+    /// excess blob gas missing in post-cancun payload.
+    #[error("excess blob gas missing in post-cancun payload")]
     PostCancunBlockWithoutExcessBlobGas,
-    /// Post-cancun Payload does not have cancun fields.
-    #[error("post-Cancun payload does not have Cancun fields")]
+    /// cancun fields missing in post-cancun payload.
+    #[error("cancun fields missing in post-cancun payload")]
     PostCancunWithoutCancunFields,
 
     /// Invalid payload block hash.
