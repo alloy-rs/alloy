@@ -675,7 +675,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// // Execute a call on the latest block, with no state overrides
     /// let output = provider.call(&tx).await?;
     /// // Execute a call with a block ID.
-    /// let output = provider.call(&tx).block(BlockId::Number(1.into())).await?;
+    /// let output = provider.call(&tx).block(1.into()).await?;
     /// // Execute a call with state overrides.
     /// let output = provider.call(&tx).overrides(&my_overrides).await?;
     /// # Ok(())
