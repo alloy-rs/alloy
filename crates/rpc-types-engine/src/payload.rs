@@ -722,9 +722,37 @@ pub enum PayloadError {
     /// Invalid payload excess blob gas.
     #[error("invalid payload excess blob gas: {0}")]
     ExcessBlobGas(U256),
-    /// Pre-cancun Payload has blob transactions.
-    #[error("pre-Cancun payload has blob transactions")]
+    /// withdrawals present in pre-shanghai payload.
+    #[error("withdrawals present in pre-shanghai payload")]
+    PreShanghaiBlockWithWitdrawals,
+    /// withdrawals missing in post-shanghai payload.
+    #[error("withdrawals missing in post-shanghai payload")]
+    PostShanghaiBlockWithoutWitdrawals,
+    /// blob transactions present in pre-cancun payload.
+    #[error("blob transactions present in pre-cancun payload")]
     PreCancunBlockWithBlobTransactions,
+    /// blob gas used present in pre-cancun payload.
+    #[error("blob gas used present in pre-cancun payload")]
+    PreCancunBlockWithBlobGasUsed,
+    /// excess blob gas present in pre-cancun payload.
+    #[error("excess blob gas present in pre-cancun payload")]
+    PreCancunBlockWithExcessBlobGas,
+    /// cancun fields present in pre-cancun payload.
+    #[error("cancun fields present in pre-cancun payload")]
+    PreCancunWithCancunFields,
+    /// blob transactions missing in post-cancun payload.
+    #[error("blob transactions missing in post-cancun payload")]
+    PostCancunBlockWithoutBlobTransactions,
+    /// blob gas used missing in post-cancun payload.
+    #[error("blob gas used missing in post-cancun payload")]
+    PostCancunBlockWithoutBlobGasUsed,
+    /// excess blob gas missing in post-cancun payload.
+    #[error("excess blob gas missing in post-cancun payload")]
+    PostCancunBlockWithoutExcessBlobGas,
+    /// cancun fields missing in post-cancun payload.
+    #[error("cancun fields missing in post-cancun payload")]
+    PostCancunWithoutCancunFields,
+
     /// Invalid payload block hash.
     #[error("block hash mismatch: want {consensus}, got {execution}")]
     BlockHash {
