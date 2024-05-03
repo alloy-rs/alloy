@@ -11,7 +11,7 @@ pub mod trusted_setup_points;
 
 /// Contains sidecar related types
 mod sidecar;
-pub use sidecar::BlobTransactionSidecar;
+pub use sidecar::*;
 
 use alloy_primitives::{b256, FixedBytes, B256, U256};
 
