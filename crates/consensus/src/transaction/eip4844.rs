@@ -465,15 +465,17 @@ impl TxEip4844 {
             }
         }
 
-        // SAFTEY: ALL types have the same size
+        // SAFETY: ALL types have the same size
         let res = unsafe {
             KzgProof::verify_blob_kzg_proof_batch(
                 // blobs
-                std::mem::transmute(sidecar.blobs.as_slice()),
+                std::mem::transmute::<&[Blob], &[c_kzg::Blob]>(sidecar.blobs.as_slice()),
                 // commitments
-                std::mem::transmute(sidecar.commitments.as_slice()),
+                std::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(
+                    sidecar.commitments.as_slice(),
+                ),
                 // proofs
-                std::mem::transmute(sidecar.proofs.as_slice()),
+                std::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(sidecar.proofs.as_slice()),
                 proof_settings,
             )
         }
