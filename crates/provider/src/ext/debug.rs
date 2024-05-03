@@ -3,9 +3,7 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{BlockNumber, TxHash, B256};
 use alloy_rpc_types::{BlockNumberOrTag, TransactionRequest};
-use alloy_rpc_types_trace::geth::{
-    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
-};
+use alloy_rpc_types_trace::geth::{GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, GethTraceBlockResponse};
 use alloy_transport::{Transport, TransportResult};
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
@@ -42,7 +40,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>>;
+    ) -> TransportResult<Vec<GethTraceBlockResponse>>;
 
     /// Same as `debug_trace_block_by_hash` but block is specified by number.
     ///
@@ -53,9 +51,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_block_by_number(
         &self,
-        block: BlockNumber,
+        block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>>;
+    ) -> TransportResult<Vec<GethTraceBlockResponse>>;
 
     /// Executes the given transaction without publishing it like `eth_call` and returns the trace
     /// of the execution.
@@ -111,15 +109,15 @@ where
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>> {
+    ) -> TransportResult<Vec<GethTraceBlockResponse>> {
         self.client().request("debug_traceBlockByHash", (block, trace_options)).await
     }
 
     async fn debug_trace_block_by_number(
         &self,
-        block: BlockNumber,
+        block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>> {
+    ) -> TransportResult<Vec<GethTraceBlockResponse>> {
         self.client().request("debug_traceBlockByNumber", (block, trace_options)).await
     }
 
