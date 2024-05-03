@@ -13,42 +13,14 @@ use core::mem;
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobTransactionSidecar;
 
+#[cfg(feature = "kzg")]
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobTransactionValidationError;
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 pub use alloy_eips::eip4844::{Blob, Bytes48};
-
-#[cfg(feature = "kzg")]
-use c_kzg::{KzgCommitment, KzgProof, KzgSettings};
-#[cfg(feature = "kzg")]
-use std::ops::Deref;
-
-/// An error that can occur when validating a [TxEip4844Variant].
-#[derive(Debug, thiserror::Error)]
-#[cfg(feature = "kzg")]
-pub enum BlobTransactionValidationError {
-    /// Proof validation failed.
-    #[error("invalid KZG proof")]
-    InvalidProof,
-    /// An error returned by [`c_kzg`].
-    #[error("KZG error: {0:?}")]
-    KZGError(#[from] c_kzg::Error),
-    /// The inner transaction is not a blob transaction.
-    #[error("unable to verify proof for non blob transaction: {0}")]
-    NotBlobTransaction(u8),
-    /// Using a standalone [TxEip4844] instead of the [TxEip4844WithSidecar] variant, which
-    /// includes the sidecar for validation.
-    #[error("eip4844 tx variant without sidecar being used for verification. Please use the TxEip4844WithSidecar variant, which includes the sidecar")]
-    MissingSidecar,
-    /// The versioned hash is incorrect.
-    #[error("wrong versioned hash: have {have}, expected {expected}")]
-    WrongVersionedHash {
-        /// The versioned hash we got
-        have: B256,
-        /// The versioned hash we expected
-        expected: B256,
-    },
-}
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -119,7 +91,7 @@ impl TxEip4844Variant {
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
             TxEip4844Variant::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
@@ -422,8 +394,8 @@ impl TxEip4844 {
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
-    /// Takes as input the [KzgSettings], which should contain the parameters derived from the
-    /// KZG trusted setup.
+    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
+    /// derived from the KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
     /// commitments, and proofs. Each blob data element is verified against its commitment and
@@ -436,56 +408,9 @@ impl TxEip4844 {
     pub fn validate_blob(
         &self,
         sidecar: &BlobTransactionSidecar,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
-        // Ensure the versioned hashes and commitments have the same length.
-        if self.blob_versioned_hashes.len() != sidecar.commitments.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "There are {} versioned commitment hashes and {} commitments",
-                self.blob_versioned_hashes.len(),
-                sidecar.commitments.len()
-            ))
-            .into());
-        }
-
-        // calculate versioned hashes by zipping & iterating
-        for (versioned_hash, commitment) in
-            self.blob_versioned_hashes.iter().zip(sidecar.commitments.iter())
-        {
-            let commitment = KzgCommitment::from(*commitment.deref());
-
-            // calculate & verify versioned hash
-            let calculated_versioned_hash =
-                alloy_eips::eip4844::kzg_to_versioned_hash(commitment.as_slice());
-            if *versioned_hash != calculated_versioned_hash {
-                return Err(BlobTransactionValidationError::WrongVersionedHash {
-                    have: *versioned_hash,
-                    expected: calculated_versioned_hash,
-                });
-            }
-        }
-
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            KzgProof::verify_blob_kzg_proof_batch(
-                // blobs
-                std::mem::transmute::<&[Blob], &[c_kzg::Blob]>(sidecar.blobs.as_slice()),
-                // commitments
-                std::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(
-                    sidecar.commitments.as_slice(),
-                ),
-                // proofs
-                std::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(sidecar.proofs.as_slice()),
-                proof_settings,
-            )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
-
-        if res {
-            Ok(())
-        } else {
-            Err(BlobTransactionValidationError::InvalidProof)
-        }
+        sidecar.validate(&self.blob_versioned_hashes, proof_settings)
     }
 
     /// Decodes the inner [TxEip4844Variant] fields from RLP bytes.
@@ -800,7 +725,7 @@ impl TxEip4844WithSidecar {
     #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         self.tx.validate_blob(&self.sidecar, proof_settings)
     }
