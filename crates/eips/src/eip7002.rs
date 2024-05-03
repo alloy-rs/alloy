@@ -18,7 +18,7 @@ pub struct WithdrawalRequest {
     /// Address of the source of the exit.
     pub source_address: Address,
     /// Validator public key.
-    pub pubkey: FixedBytes<48>,
+    pub validator_public_key: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
     #[serde(with = "alloy_serde::u64_via_ruint")]
     pub amount: u64,
