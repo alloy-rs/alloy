@@ -3,13 +3,17 @@
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
 use alloy_primitives::{Address, FixedBytes};
-use serde::{Deserialize, Serialize};
 
 /// Represents an execution layer triggerable withdrawal request.
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 pub struct WithdrawalRequest {
     /// Address of the source of the exit.
     pub source_address: Address,
