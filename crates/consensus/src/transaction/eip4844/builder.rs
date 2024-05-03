@@ -1,7 +1,6 @@
-#[cfg(not(feature = "kzg"))]
 use alloy_eips::eip4844::Blob;
 #[cfg(feature = "kzg")]
-use c_kzg::{Blob, KzgCommitment, KzgProof};
+use c_kzg::{KzgCommitment, KzgProof};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -351,13 +350,25 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
+            // SAFETY: same size
+            let blob = unsafe { std::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
             let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
             let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
-            commitments.push(commitment.to_bytes());
-            proofs.push(proof.to_bytes());
+
+            // SAFETY: same size
+            unsafe {
+                commitments.push(
+                    std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
+                        commitment.to_bytes(),
+                    ),
+                );
+                proofs.push(std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
+                    proof.to_bytes(),
+                ));
+            }
         }
 
-        Ok(crate::BlobTransactionSidecar { blobs: self.inner.blobs, commitments, proofs })
+        Ok(crate::BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)
