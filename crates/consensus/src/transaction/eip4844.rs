@@ -92,11 +92,9 @@ impl TxEip4844Variant {
     pub fn validate(
         &self,
         proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), alloy_eips::eip4844::BlobTransactionValidationError> {
+    ) -> Result<(), BlobTransactionValidationError> {
         match self {
-            TxEip4844Variant::TxEip4844(_) => {
-                Err(alloy_eips::eip4844::BlobTransactionValidationError::MissingSidecar)
-            }
+            TxEip4844Variant::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
         }
     }
@@ -396,8 +394,8 @@ impl TxEip4844 {
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
-    /// Takes as input the [KzgSettings], which should contain the parameters derived from the
-    /// KZG trusted setup.
+    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
+    /// derived from the KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
     /// commitments, and proofs. Each blob data element is verified against its commitment and
@@ -411,7 +409,7 @@ impl TxEip4844 {
         &self,
         sidecar: &BlobTransactionSidecar,
         proof_settings: &c_kzg::KzgSettings,
-    ) -> Result<(), alloy_eips::eip4844::BlobTransactionValidationError> {
+    ) -> Result<(), BlobTransactionValidationError> {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
     }
 

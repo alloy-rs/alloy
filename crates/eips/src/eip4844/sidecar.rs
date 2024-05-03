@@ -189,8 +189,7 @@ pub enum BlobTransactionValidationError {
     KZGError(c_kzg::Error),
     /// The inner transaction is not a blob transaction.
     NotBlobTransaction(u8),
-    /// Using a standalone [TxEip4844] instead of the [TxEip4844WithSidecar] variant, which
-    /// includes the sidecar for validation.
+    /// Error variant for thrown by EIP-4844 tx variants without a sidecar.
     MissingSidecar,
     /// The versioned hash is incorrect.
     WrongVersionedHash {
