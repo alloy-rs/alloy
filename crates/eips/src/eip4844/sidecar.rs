@@ -39,7 +39,7 @@ impl BlobTransactionSidecar {
     ) -> Self {
         // transmutes the vec of items, see also [std::mem::transmute](https://doc.rust-lang.org/std/mem/fn.transmute.html)
         unsafe fn transmute_vec<U, T>(input: Vec<T>) -> Vec<U> {
-            let mut v = std::mem::ManuallyDrop::new(input);
+            let mut v = core::mem::ManuallyDrop::new(input);
             Vec::from_raw_parts(v.as_mut_ptr() as *mut U, v.len(), v.capacity())
         }
 
