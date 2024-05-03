@@ -43,7 +43,6 @@ where
     P: Provider<T, N>,
 {
     async fn add_peer(&self, record: &str) -> TransportResult<bool> {
-        // self.client().
         self.client().request("admin_addPeer", (record,)).await
     }
 
