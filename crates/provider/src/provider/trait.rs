@@ -595,7 +595,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
     async fn get_blob_base_fee(&self) -> TransportResult<u128> {
-        self.client().request("eth_blobBaseFee", ()).await
+        self.client().request("eth_blobBaseFee", ()).await.map(|fee: U128| fee.to::<u128>())
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
