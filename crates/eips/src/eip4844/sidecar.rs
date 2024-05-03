@@ -6,6 +6,9 @@ use crate::eip4844::{
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
 /// This type encodes and decodes the fields without an rlp header.
