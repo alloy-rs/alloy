@@ -357,7 +357,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
             proofs.push(proof.to_bytes());
         }
 
-        Ok(crate::BlobTransactionSidecar { blobs: self.inner.blobs, commitments, proofs })
+        Ok(crate::BlobTransactionSidecar::from_kzg(self.inner.blobs, commitments, proofs))
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)

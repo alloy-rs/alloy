@@ -17,8 +17,6 @@ alloy-rlp.workspace = true
 alloy-eips.workspace = true
 alloy-serde = { workspace = true, optional = true }
 
-sha2 = { version = "0.10", default-features = false }
-
 # kzg
 thiserror = { workspace = true, optional = true }
 c-kzg = { workspace = true, features = ["serde"], optional = true }
@@ -30,7 +28,9 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-signer.workspace = true
+
 arbitrary = { workspace = true, features = ["derive"] }
 k256.workspace = true
 tokio = { workspace = true, features = ["macros"] }
@@ -38,7 +38,7 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-eips/std", "sha2/std", "c-kzg?/std"]
+std = ["alloy-eips/std", "c-kzg?/std"]
 k256 = ["alloy-primitives/k256"]
 kzg = ["dep:c-kzg", "dep:thiserror", "alloy-eips/kzg", "std"]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]

@@ -9,7 +9,11 @@ pub mod env_settings;
 #[cfg(feature = "kzg")]
 pub mod trusted_setup_points;
 
-use alloy_primitives::{b256, FixedBytes, U256};
+/// Contains sidecar related types
+mod sidecar;
+pub use sidecar::BlobTransactionSidecar;
+
+use alloy_primitives::{b256, FixedBytes, B256, U256};
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
 /// elements contained in a blob MUST be STRICTLY LESS than this value.
@@ -74,6 +78,22 @@ pub type Blob = FixedBytes<BYTES_PER_BLOB>;
 
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
+
+/// Calculates the versioned hash for a KzgCommitment of 48 bytes.
+///
+/// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
+///
+/// # Panics
+///
+/// If the given commitment is not 48 bytes long.
+pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
+    use sha2::Digest;
+
+    debug_assert_eq!(commitment.len(), 48, "commitment length is not 48");
+    let mut res = sha2::Sha256::digest(commitment);
+    res[0] = VERSIONED_HASH_VERSION_KZG;
+    B256::new(res.into())
+}
 
 /// Calculates the `excess_blob_gas` from the parent header's `blob_gas_used` and `excess_blob_gas`.
 ///
