@@ -752,13 +752,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Get the account and storage values of the specified account including the merkle proofs.
     ///
     /// This call can be used to verify that the data has not been tampered with.
-    async fn get_proof(
+    fn get_proof(
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-        block: BlockId,
-    ) -> TransportResult<EIP1186AccountProofResponse> {
-        self.client().request("eth_getProof", (address, keys, block)).await
+    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        RpcWithBlock::new(self.weak_client(), "eth_getProof", (address, keys))
     }
 
     /// Create an [EIP-2930] access list.
