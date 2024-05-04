@@ -763,12 +763,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Create an [EIP-2930] access list.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
-    async fn create_access_list(
+    fn create_access_list<'a>(
         &self,
-        request: &N::TransactionRequest,
-        block: BlockId,
-    ) -> TransportResult<AccessListWithGasUsed> {
-        self.client().request("eth_createAccessList", (request, block)).await
+        request: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+        RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
     /// Executes the given transaction and returns a number of possible traces.
