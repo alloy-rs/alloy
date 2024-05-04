@@ -27,6 +27,9 @@ use std::borrow::Cow;
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 
+/// List of trace calls for use with [`Provider::trace_call_many`]
+pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
+
 // todo: adjust docs
 // todo: reorder
 /// Provider is parameterized with a network and a transport. The default
@@ -508,8 +511,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    async fn get_balance(&self, address: Address, tag: BlockId) -> TransportResult<U256> {
-        self.client().request("eth_getBalance", (address, tag)).await
+    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
+        RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -545,18 +548,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the specified storage value from [Address].
-    async fn get_storage_at(
+    fn get_storage_at(
         &self,
         address: Address,
         key: U256,
-        tag: BlockId,
-    ) -> TransportResult<StorageValue> {
-        self.client().request("eth_getStorageAt", (address, key, tag)).await
+    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+        RpcWithBlock::new(self.weak_client(), "eth_getStorageAt", (address, key))
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
-        self.client().request("eth_getCode", (address, tag)).await
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+        RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
     /// Gets a transaction by its [TxHash].
@@ -791,12 +793,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
-        request: &[(N::TransactionRequest, Vec<TraceType>)],
-        block: BlockId,
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_callMany", (request, block)).await
+        request: TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
+        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
     // todo: move to extension trait
@@ -1172,7 +1173,7 @@ mod tests {
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider.get_code_at(addr, BlockId::default()).await.unwrap();
+        let _code = provider.get_code_at(addr).await.unwrap();
     }
 
     #[tokio::test]
@@ -1180,7 +1181,7 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let addr = Address::with_last_byte(16);
-        let storage = provider.get_storage_at(addr, U256::ZERO, BlockId::default()).await.unwrap();
+        let storage = provider.get_storage_at(addr, U256::ZERO).await.unwrap();
         assert_eq!(storage, U256::ZERO);
     }
 

@@ -50,7 +50,7 @@ where
     }
 }
 
-/// A future for [`BlockIdRpc`]. Simple wrapper around [`RpcCall`].
+/// A future for [`RpcWithBlock`]. Simple wrapper around [`RpcCall`].
 #[derive(Debug, Clone)]
 pub struct RpcWithBlockFut<T, Params, Resp, Output, Map>
 where
