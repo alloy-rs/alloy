@@ -51,7 +51,7 @@ where
                     .map_err(TransportErrorKind::custom)?
                     .to_bytes();
 
-                debug!(bytes = body.len(), "retrieved response body");
+                debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
                 trace!(body = %String::from_utf8_lossy(&body), "response body");
 
                 if status != hyper::StatusCode::OK {
