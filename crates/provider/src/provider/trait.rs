@@ -3,7 +3,7 @@
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
-    SendableTx,
+    RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -706,15 +706,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(
+    fn estimate_gas(
         &self,
         tx: &N::TransactionRequest,
-        block: BlockId,
-    ) -> TransportResult<u128> {
-        self.client()
-            .request("eth_estimateGas", (tx, block))
-            .await
-            .map(|gas: U128| gas.to::<u128>())
+    ) -> RpcWithBlock<T, &N::TransactionRequest, U128> {
+        RpcWithBlock::new(self.weak_client(), "eth_estimateGas", tx)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.

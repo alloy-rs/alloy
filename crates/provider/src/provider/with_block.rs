@@ -24,7 +24,7 @@ where
 
 /// A future for [`BlockIdRpc`]. Simple wrapper around [`RpcCall`].
 #[derive(Debug, Clone)]
-pub struct BlockIdRpcFut<T, Params, Resp>
+pub struct RpcWithBlockFut<T, Params, Resp>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -33,7 +33,7 @@ where
     state: States<T, Params, Resp>,
 }
 
-impl<T, Params, Resp> BlockIdRpcFut<T, Params, Resp>
+impl<T, Params, Resp> RpcWithBlockFut<T, Params, Resp>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -92,7 +92,7 @@ where
     }
 }
 
-impl<T, Params, Resp> std::future::Future for BlockIdRpcFut<T, Params, Resp>
+impl<T, Params, Resp> std::future::Future for RpcWithBlockFut<T, Params, Resp>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -131,8 +131,18 @@ where
     Resp: RpcReturn,
 {
     /// Create a new [`RpcWithBlock`] instance.
-    pub fn new(client: WeakClient<T>, method: Cow<'static, str>, params: Params) -> Self {
-        Self { client, method, params, block_id: Default::default(), _pd: PhantomData }
+    pub fn new(
+        client: WeakClient<T>,
+        method: impl Into<Cow<'static, str>>,
+        params: Params,
+    ) -> Self {
+        Self {
+            client,
+            method: method.into(),
+            params,
+            block_id: Default::default(),
+            _pd: PhantomData,
+        }
     }
 
     /// Set the block id.
@@ -150,10 +160,10 @@ where
 {
     type Output = TransportResult<Resp>;
 
-    type IntoFuture = BlockIdRpcFut<T, Params, Resp>;
+    type IntoFuture = RpcWithBlockFut<T, Params, Resp>;
 
     fn into_future(self) -> Self::IntoFuture {
-        BlockIdRpcFut {
+        RpcWithBlockFut {
             state: States::Preparing {
                 client: self.client,
                 method: self.method,
