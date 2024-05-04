@@ -15,6 +15,10 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     pub blobs: Vec<Blob>,
