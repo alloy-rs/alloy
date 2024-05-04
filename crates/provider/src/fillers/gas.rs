@@ -1,3 +1,5 @@
+use std::future::IntoFuture;
+
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
     provider::SendableTx,
@@ -84,7 +86,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx).await }.right_future()
+            provider.estimate_gas(tx).into_future().right_future()
         };
 
         let (gas_price, gas_limit) = futures::try_join!(gas_price_fut, gas_limit_fut)?;
@@ -105,7 +107,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx, Default::default()).await }.right_future()
+            provider.estimate_gas(tx).into_future().right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
@@ -114,7 +116,7 @@ impl GasFiller {
             async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
                 .left_future()
         } else {
-            async { provider.estimate_eip1559_fees(None).await }.right_future()
+            provider.estimate_eip1559_fees(None).right_future()
         };
 
         let (gas_limit, estimate) = futures::try_join!(gas_limit_fut, eip1559_fees_fut)?;
@@ -135,7 +137,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx, Default::default()).await }.right_future()
+            async { provider.estimate_gas(tx).await }.right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
