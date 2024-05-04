@@ -1,9 +1,9 @@
 use crate::Http;
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
-use reqwest::Response;
 use std::task;
 use tower::Service;
+use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
 
 impl Http<reqwest::Client> {
@@ -15,21 +15,43 @@ impl Http<reqwest::Client> {
     /// Make a request.
     fn request_reqwest(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
-        Box::pin(async move {
-            let resp = this
-                .client
-                .post(this.url)
-                .json(&req)
-                .send()
-                .await
-                .and_then(Response::error_for_status)
-                .map_err(TransportErrorKind::custom)?;
+        let span: tracing::Span = debug_span!("ReqwestTransport", url = %self.url);
+        Box::pin(
+            async move {
+                let resp = this
+                    .client
+                    .post(this.url)
+                    .json(&req)
+                    .send()
+                    .await
+                    .map_err(TransportErrorKind::custom)?;
+                let status = resp.status();
 
-            let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+                debug!(%status, "received response from server");
 
-            serde_json::from_slice(&body)
-                .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
-        })
+                // Unpack data from the response body. We do this regardless of
+                // the status code, as we want to return the error in the body
+                // if there is one.
+                let body = resp.bytes().await.map_err(TransportErrorKind::custom)?;
+
+                debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+                trace!(body = %String::from_utf8_lossy(&body), "response body");
+
+                if status != reqwest::StatusCode::OK {
+                    return Err(TransportErrorKind::custom_str(&format!(
+                        "HTTP error {status} with body: {}",
+                        String::from_utf8_lossy(&body)
+                    )));
+                }
+
+                // Deser a Box<RawValue> from the body. If deser fails, return
+                // the body as a string in the error. The conversion to String
+                // is lossy and may not cover all the bytes in the body.
+                serde_json::from_slice(&body)
+                    .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(&body)))
+            }
+            .instrument(span),
+        )
     }
 }
 
