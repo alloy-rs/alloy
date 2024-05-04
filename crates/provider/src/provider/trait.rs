@@ -775,13 +775,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
-        request: &N::TransactionRequest,
-        trace_type: &[TraceType],
-        block: BlockId,
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_call", (request, trace_type, block)).await
+        request: &'a N::TransactionRequest,
+        trace_type: &'b [TraceType],
+    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults> {
+        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
     }
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
