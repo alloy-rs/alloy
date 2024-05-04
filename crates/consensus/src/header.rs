@@ -89,6 +89,11 @@ pub struct Header {
     ///
     /// The beacon roots contract handles root storage, enhancing Ethereum's functionalities.
     pub parent_beacon_block_root: Option<B256>,
+    /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+    /// [EIP-7685] request in the block body.
+    ///
+    /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub requests_root: Option<B256>,
     /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
     /// fewer; formally Hx.
     pub extra_data: Bytes,
@@ -117,6 +122,7 @@ impl Default for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
+            requests_root: None,
         }
     }
 }
@@ -285,15 +291,22 @@ impl Header {
             length += 1; // EMPTY LIST CODE
         }
 
-        // Encode parent beacon block root length. If new fields are added, the above pattern will
+        // Encode parent beacon block root length.
+        if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
+            length += parent_beacon_block_root.length();
+        }
+
+        // Encode requests root length.
+        //
+        // If new fields are added, the above pattern will
         // need to be repeated and placeholder length added. Otherwise, it's impossible to
         // tell _which_ fields are missing. This is mainly relevant for contrived cases
         // where a header is created at random, for example:
         //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
         //    post-London, so this is technically not valid. However, a tool like proptest would
         //    generate a block like this.
-        if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
-            length += parent_beacon_block_root.length();
+        if let Some(requests_root) = self.requests_root {
+            length += requests_root.length();
         }
 
         length
@@ -360,15 +373,22 @@ impl Encodable for Header {
             out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode parent beacon block root. If new fields are added, the above pattern will need to
+        // Encode parent beacon block root.
+        if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
+            parent_beacon_block_root.encode(out);
+        }
+
+        // Encode requests root.
+        //
+        // If new fields are added, the above pattern will need to
         // be repeated and placeholders added. Otherwise, it's impossible to tell _which_
         // fields are missing. This is mainly relevant for contrived cases where a header is
         // created at random, for example:
         //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
         //    post-London, so this is technically not valid. However, a tool like proptest would
         //    generate a block like this.
-        if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
-            parent_beacon_block_root.encode(out);
+        if let Some(ref requests_root) = self.requests_root {
+            requests_root.encode(out);
         }
     }
 
@@ -408,6 +428,7 @@ impl Decodable for Header {
             blob_gas_used: None,
             excess_blob_gas: None,
             parent_beacon_block_root: None,
+            requests_root: None,
         };
 
         if started_len - buf.len() < rlp_head.payload_length {
@@ -444,7 +465,14 @@ impl Decodable for Header {
             }
         }
 
-        // Decode parent beacon block root. If new fields are added, the above pattern will need to
+        // Decode parent beacon block root.
+        if started_len - buf.len() < rlp_head.payload_length {
+            this.parent_beacon_block_root = Some(B256::decode(buf)?);
+        }
+
+        // Decode requests root.
+        //
+        // If new fields are added, the above pattern will need to
         // be repeated and placeholders decoded. Otherwise, it's impossible to tell _which_
         // fields are missing. This is mainly relevant for contrived cases where a header is
         // created at random, for example:

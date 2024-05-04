@@ -127,9 +127,12 @@ pub struct Header {
         with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub excess_blob_gas: Option<u128>,
-    /// Parent beacon block root
+    /// EIP-4788 parent beacon block root
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+    /// EIP-7685 requests root.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requests_root: Option<B256>,
 }
 
 impl Header {
@@ -620,6 +623,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
@@ -662,6 +666,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
@@ -704,6 +709,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
