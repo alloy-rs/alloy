@@ -9,6 +9,7 @@ use hyper::{
 use hyper_util::client::legacy::{connect::Connect, Client};
 use std::task;
 use tower::Service;
+use tracing::{debug, debug_span, trace, Instrument};
 
 impl<C, B> Http<Client<C, Full<B>>>
 where
@@ -18,40 +19,57 @@ where
     /// Make a request.
     fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
-        Box::pin(async move {
-            let ser = req.serialize().map_err(TransportError::ser_err)?;
+        let span = debug_span!("HyperTransport", url = %self.url);
+        Box::pin(
+            async move {
+                debug!(count = req.len(), "sending request packet to server");
+                let ser = req.serialize().map_err(TransportError::ser_err)?;
+                // convert the Box<RawValue> into a hyper request<B>
+                let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
+                let req = hyper::Request::builder()
+                    .method(hyper::Method::POST)
+                    .uri(this.url.as_str())
+                    .header(
+                        header::CONTENT_TYPE,
+                        header::HeaderValue::from_static("application/json"),
+                    )
+                    .body(body)
+                    .expect("request parts are valid");
 
-            // convert the Box<RawValue> into a hyper request<B>
-            let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
-            let req = hyper::Request::builder()
-                .method(hyper::Method::POST)
-                .uri(this.url.as_str())
-                .header(header::CONTENT_TYPE, header::HeaderValue::from_static("application/json"))
-                .body(body)
-                .expect("request parts are valid");
+                let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
+                let status = resp.status();
 
-            let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
-            let status = resp.status();
+                debug!(%status, "received response from server");
 
-            // Unpack data from the response body. We do this regardless of the status code, as we
-            // want to return the error in the body if there is one.
-            let body =
-                resp.into_body().collect().await.map_err(TransportErrorKind::custom)?.to_bytes();
+                // Unpack data from the response body. We do this regardless of
+                // the status code, as we want to return the error in the body
+                // if there is one.
+                let body = resp
+                    .into_body()
+                    .collect()
+                    .await
+                    .map_err(TransportErrorKind::custom)?
+                    .to_bytes();
 
-            if status != hyper::StatusCode::OK {
-                return Err(TransportErrorKind::custom_str(&format!(
-                    "HTTP error {status} with body: {}",
-                    String::from_utf8_lossy(&body)
-                )));
+                debug!(bytes = body.len(), "retrieved response body");
+                trace!(body = %String::from_utf8_lossy(&body), "response body");
+
+                if status != hyper::StatusCode::OK {
+                    return Err(TransportErrorKind::custom_str(&format!(
+                        "HTTP error {status} with body: {}",
+                        String::from_utf8_lossy(&body)
+                    )));
+                }
+
+                // Deser a Box<RawValue> from the body. If deser fails, return
+                // the body as a string in the error. The conversion to String
+                // is lossy and may not cover all the bytes in the body.
+                serde_json::from_slice(&body).map_err(|err| {
+                    TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref()))
+                })
             }
-
-            // Deser a Box<RawValue> from the body. If deser fails, return the
-            // body as a string in the error. If the body is not UTF8, this will
-            // fail and give the empty string in the error.
-            serde_json::from_slice(&body).map_err(|err| {
-                TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref()))
-            })
-        })
+            .instrument(span),
+        )
     }
 }
 
