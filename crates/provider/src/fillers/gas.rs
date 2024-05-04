@@ -80,7 +80,7 @@ impl GasFiller {
         let gas_price_fut = if let Some(gas_price) = tx.gas_price() {
             async move { Ok(gas_price) }.left_future()
         } else {
-            async { provider.get_gas_price().await }.right_future()
+            provider.get_gas_price().right_future()
         };
 
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
@@ -137,7 +137,7 @@ impl GasFiller {
         let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
             async move { Ok(gas_limit) }.left_future()
         } else {
-            async { provider.estimate_gas(tx).await }.right_future()
+            provider.estimate_gas(tx).into_future().right_future()
         };
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
@@ -146,7 +146,7 @@ impl GasFiller {
             async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
                 .left_future()
         } else {
-            async { provider.estimate_eip1559_fees(None).await }.right_future()
+            provider.estimate_eip1559_fees(None).right_future()
         };
 
         let max_fee_per_blob_gas_fut = if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas()

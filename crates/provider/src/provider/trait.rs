@@ -704,10 +704,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Estimate the gas needed for a transaction.
-    fn estimate_gas<'a, 'b>(
-        &'b self,
+    fn estimate_gas<'a>(
+        &self,
         tx: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, U128, u128, fn(U128) -> u128> {
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, U128, u128> {
         RpcWithBlock::new(self.weak_client(), "eth_estimateGas", tx)
             .map_resp(crate::utils::convert_u128)
     }
@@ -1087,10 +1087,7 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let count = provider
-            .get_transaction_count(
-                address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
-                BlockNumberOrTag::Latest.into(),
-            )
+            .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
             .await
             .unwrap();
         assert_eq!(count, 0);
