@@ -1,9 +1,9 @@
 use alloy_network::Network;
 use alloy_primitives::{BlockHash, B256};
 use alloy_rpc_types_engine::{
-    ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV2,
-    ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId,
-    PayloadStatus,
+    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ExecutionPayloadV1,
+    ExecutionPayloadV2, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
+    PayloadId, PayloadStatus,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -127,6 +127,14 @@ pub trait EngineApi<N, T>: Send + Sync {
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV1>;
 
+    /// Returns the execution client version information.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md#engine_getclientversionv1>
+    async fn get_client_version_v1(
+        &self,
+        client_version: ClientVersionV1,
+    ) -> TransportResult<Vec<ClientVersionV1>>;
+
     /// Returns the list of Engine api methods supported by the execution layer client software.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/common.md#capabilities>
@@ -221,6 +229,13 @@ where
         count: u64,
     ) -> TransportResult<ExecutionPayloadBodiesV1> {
         self.client().request("engine_getPayloadBodiesByRangeV1", (start, count)).await
+    }
+
+    async fn get_client_version_v1(
+        &self,
+        client_version: ClientVersionV1,
+    ) -> TransportResult<Vec<ClientVersionV1>> {
+        self.client().request("engine_getClientVersionV1", (client_version,)).await
     }
 
     async fn exchange_capabilities(
