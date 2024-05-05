@@ -20,7 +20,7 @@ futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-tokio-util = { workspace = true, features = ["io", "compat"] }
+tokio-util = { workspace = true, features = ["io"] }
 tracing.workspace = true
 
 bytes = "1.5.0"
