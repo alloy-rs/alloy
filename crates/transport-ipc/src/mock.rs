@@ -1,7 +1,7 @@
 //! Mock IPC server.
 
 use alloy_json_rpc::Response;
-use interprocess::local_socket::{tokio::prelude::*, GenericFilePath};
+use interprocess::local_socket::tokio::prelude::*;
 use serde::Serialize;
 use std::{collections::VecDeque, path::PathBuf};
 use tempfile::NamedTempFile;
@@ -73,7 +73,7 @@ impl MockIpcServer {
     pub async fn spawn(mut self) {
         tokio::spawn(async move {
             let tmp = self.path.into_temp_path();
-            let name = tmp.to_fs_name::<GenericFilePath>().unwrap();
+            let name = crate::connect::to_name(&*tmp).unwrap();
             let socket = LocalSocketStream::connect(name).await.unwrap();
 
             let (mut reader, mut writer) = socket.split();

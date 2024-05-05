@@ -2,7 +2,7 @@ use interprocess::local_socket as ls;
 use std::io;
 
 #[cfg(unix)]
-fn to_name<'a, S>(path: impl ls::ToFsName<'a, S>) -> io::Result<ls::Name<'a>>
+pub(crate) fn to_name<'a, S>(path: impl ls::ToFsName<'a, S>) -> io::Result<ls::Name<'a>>
 where
     S: ToOwned + ?Sized,
     ls::GenericFilePath: ls::PathNameType<S>,
@@ -11,7 +11,7 @@ where
 }
 
 #[cfg(windows)]
-fn to_name<'a, S>(path: impl ls::ToNsName<'a, S>) -> io::Result<ls::Name<'a>>
+pub(crate) fn to_name<'a, S>(path: impl ls::ToNsName<'a, S>) -> io::Result<ls::Name<'a>>
 where
     S: ToOwned + ?Sized,
     ls::GenericNamespaced: ls::NamespacedNameType<S>,
