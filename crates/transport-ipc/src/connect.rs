@@ -62,7 +62,7 @@ macro_rules! impl_connect {
 
 impl_connect!(std::ffi::OsString => |s| s.as_os_str());
 impl_connect!(std::path::PathBuf => |s| s.as_os_str());
-impl_connect!(String => |s| std::ffi::OsStr::new(s));
+impl_connect!(String => |s| s.as_ref());
 
 #[cfg(unix)]
 impl_connect!(std::ffi::CString => |s| {
