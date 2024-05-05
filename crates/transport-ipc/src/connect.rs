@@ -6,10 +6,8 @@ pub(crate) fn to_name(mut path: &std::ffi::OsStr) -> io::Result<ls::Name<'_>> {
         if let Some(name) = path.as_encoded_bytes().strip_prefix(br"\\.\pipe\") {
             path = unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(name) }
         }
-        ls::ToNsName::to_ns_name::<ls::GenericNamespaced>(path)
-    } else {
-        ls::ToFsName::to_fs_name::<ls::GenericFilePath>(path)
     }
+    ls::ToFsName::to_fs_name::<ls::GenericFilePath>(path)
 }
 
 /// An IPC Connection object.
