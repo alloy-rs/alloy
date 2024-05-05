@@ -1,8 +1,13 @@
-use interprocess::local_socket::{GenericFilePath, ToFsName};
+use interprocess::local_socket::ToFsName;
 use std::{
     ffi::{CString, OsString},
     path::PathBuf,
 };
+
+#[cfg(unix)]
+type FsName = interprocess::local_socket::GenericFilePath;
+#[cfg(windows)]
+type FsName = interprocess::local_socket::GenericNamespaced;
 
 /// An IPC Connection object.
 #[derive(Clone, Debug)]
@@ -46,7 +51,7 @@ macro_rules! impl_connect {
                 let name = self
                     .inner
                     .$map()
-                    .to_fs_name::<GenericFilePath>()
+                    .to_fs_name::<FsName>()
                     .map_err(alloy_transport::TransportErrorKind::custom)?;
                 crate::IpcBackend::connect(name)
                     .await

@@ -2,7 +2,6 @@ use alloy_node_bindings::Geth;
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
 use alloy_transport_ipc::IpcConnect;
-use std::path::PathBuf;
 
 #[tokio::test]
 async fn it_makes_a_request() {
@@ -15,8 +14,8 @@ async fn it_makes_a_request() {
         .data_dir(temp_dir.path())
         .spawn();
 
-    let connector: IpcConnect<_> = PathBuf::from(geth.ipc_endpoint()).into();
-    let client = ClientBuilder::default().pubsub(connector).await.unwrap();
+    let connect = IpcConnect::new(geth.ipc_endpoint());
+    let client = ClientBuilder::default().pubsub(connect).await.unwrap();
 
     let req: RpcCall<_, (), U64> = client.request("eth_blockNumber", ());
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
