@@ -268,6 +268,24 @@ impl From<serde_json::Value> for GethDebugTracerConfig {
     }
 }
 
+impl From<CallConfig> for GethDebugTracerConfig {
+    fn from(value: CallConfig) -> Self {
+        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+    }
+}
+
+impl From<PreStateConfig> for GethDebugTracerConfig {
+    fn from(value: PreStateConfig) -> Self {
+        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+    }
+}
+
+impl From<MuxConfig> for GethDebugTracerConfig {
+    fn from(value: MuxConfig) -> Self {
+        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+    }
+}
+
 /// Bindings for additional `debug_traceTransaction` options
 ///
 /// See <https://geth.ethereum.org/docs/rpc/ns-debug#debug_tracetransaction>
@@ -311,17 +329,12 @@ impl GethDebugTracingOptions {
         self
     }
 
-    /// Configures a [CallConfig]
-    pub fn call_config(mut self, config: CallConfig) -> Self {
-        self.tracer_config =
-            GethDebugTracerConfig(serde_json::to_value(config).expect("is serializable"));
-        self
-    }
-
-    /// Configures a [PreStateConfig]
-    pub fn prestate_config(mut self, config: PreStateConfig) -> Self {
-        self.tracer_config =
-            GethDebugTracerConfig(serde_json::to_value(config).expect("is serializable"));
+    /// Sets the tracer config
+    pub fn with_config<T>(mut self, config: T) -> Self
+    where
+        T: Into<GethDebugTracerConfig>,
+    {
+        self.tracer_config = config.into();
         self
     }
 }
