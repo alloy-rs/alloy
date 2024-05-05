@@ -1,3 +1,4 @@
+use interprocess::local_socket::{GenericFilePath, ToFsName};
 use std::{
     ffi::{CString, OsString},
     path::PathBuf,
@@ -21,7 +22,7 @@ impl<T> IpcConnect<T> {
 }
 
 macro_rules! impl_connect {
-    ($target:ty) => {
+    ($target:ty => $map:ident) => {
         impl From<$target> for IpcConnect<$target> {
             fn from(inner: $target) -> Self {
                 Self { inner }
@@ -42,7 +43,12 @@ macro_rules! impl_connect {
             async fn connect(
                 &self,
             ) -> Result<alloy_pubsub::ConnectionHandle, alloy_transport::TransportError> {
-                crate::IpcBackend::connect(&self.inner)
+                let name = self
+                    .inner
+                    .$map()
+                    .to_fs_name::<GenericFilePath>()
+                    .map_err(alloy_transport::TransportErrorKind::custom)?;
+                crate::IpcBackend::connect(name)
                     .await
                     .map_err(alloy_transport::TransportErrorKind::custom)
             }
@@ -50,7 +56,7 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(OsString);
-impl_connect!(CString);
-impl_connect!(PathBuf);
-impl_connect!(String);
+impl_connect!(OsString => as_os_str);
+impl_connect!(CString => as_c_str);
+impl_connect!(PathBuf => as_path);
+impl_connect!(String => as_str);
