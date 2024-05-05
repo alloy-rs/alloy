@@ -57,6 +57,7 @@ macro_rules! impl_connect {
 }
 
 impl_connect!(OsString => as_os_str);
+#[cfg(unix)]
 impl_connect!(CString => as_c_str);
 impl_connect!(PathBuf => as_path);
 impl_connect!(String => as_str);
