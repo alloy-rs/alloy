@@ -385,7 +385,7 @@ impl Geth {
         }
     }
 
-    /// Manually sets the IPC path for the socket manually.
+    /// Sets the IPC path for the socket.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
         self

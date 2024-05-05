@@ -1,13 +1,23 @@
-use interprocess::local_socket::ToFsName;
-use std::{
-    ffi::{CString, OsString},
-    path::PathBuf,
-};
+use interprocess::local_socket as ls;
+use std::io;
 
 #[cfg(unix)]
-type FsName = interprocess::local_socket::GenericFilePath;
+fn to_name<'a, S>(path: impl ls::ToFsName<'a, S>) -> io::Result<ls::Name<'a>>
+where
+    S: ToOwned + ?Sized,
+    ls::GenericFilePath: ls::PathNameType<S>,
+{
+    path.to_fs_name::<ls::GenericFilePath>()
+}
+
 #[cfg(windows)]
-type FsName = interprocess::local_socket::GenericNamespaced;
+fn to_name<'a, S>(path: impl ls::ToNsName<'a, S>) -> io::Result<ls::Name<'a>>
+where
+    S: ToOwned + ?Sized,
+    ls::GenericNamespaced: ls::NamespacedNameType<S>,
+{
+    path.to_ns_name::<ls::GenericNamespaced>()
+}
 
 /// An IPC Connection object.
 #[derive(Clone, Debug)]
@@ -27,7 +37,7 @@ impl<T> IpcConnect<T> {
 }
 
 macro_rules! impl_connect {
-    ($target:ty => $map:ident) => {
+    ($target:ty => $($map:tt)*) => {
         impl From<$target> for IpcConnect<$target> {
             fn from(inner: $target) -> Self {
                 Self { inner }
@@ -48,10 +58,7 @@ macro_rules! impl_connect {
             async fn connect(
                 &self,
             ) -> Result<alloy_pubsub::ConnectionHandle, alloy_transport::TransportError> {
-                let name = self
-                    .inner
-                    .$map()
-                    .to_fs_name::<FsName>()
+                let name = to_name(self.inner $($map)*)
                     .map_err(alloy_transport::TransportErrorKind::custom)?;
                 crate::IpcBackend::connect(name)
                     .await
@@ -61,8 +68,8 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(OsString => as_os_str);
+impl_connect!(std::ffi::OsString => .as_os_str());
 #[cfg(unix)]
-impl_connect!(CString => as_c_str);
-impl_connect!(PathBuf => as_path);
-impl_connect!(String => as_str);
+impl_connect!(std::ffi::CString => .as_c_str());
+impl_connect!(std::path::PathBuf => .as_os_str());
+impl_connect!(String => .as_str());
