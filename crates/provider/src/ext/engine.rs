@@ -10,6 +10,9 @@ use alloy_transport::{Transport, TransportResult};
 use crate::Provider;
 
 /// Extension trait that gives access to engine api RPC methods.
+///
+/// Note:
+/// > The provider should use a JWT authentication layer.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait EngineApi<N, T>: Send + Sync {
