@@ -1,22 +1,15 @@
 use interprocess::local_socket as ls;
 use std::io;
 
-#[cfg(unix)]
-pub(crate) fn to_name<'a, S>(path: impl ls::ToFsName<'a, S>) -> io::Result<ls::Name<'a>>
-where
-    S: ToOwned + ?Sized,
-    ls::GenericFilePath: ls::PathNameType<S>,
-{
-    path.to_fs_name::<ls::GenericFilePath>()
-}
-
-#[cfg(windows)]
-pub(crate) fn to_name<'a, S>(path: impl ls::ToNsName<'a, S>) -> io::Result<ls::Name<'a>>
-where
-    S: ToOwned + ?Sized,
-    ls::GenericNamespaced: ls::NamespacedNameType<S>,
-{
-    path.to_ns_name::<ls::GenericNamespaced>()
+pub(crate) fn to_name(mut path: &std::ffi::OsStr) -> io::Result<ls::Name<'_>> {
+    if cfg!(windows) {
+        if let Some(name) = path.as_encoded_bytes().strip_prefix(br"\\.\pipe\") {
+            path = unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(name) }
+        }
+        ls::ToNsName::to_ns_name::<ls::GenericNamespaced>(path)
+    } else {
+        ls::ToFsName::to_fs_name::<ls::GenericFilePath>(path)
+    }
 }
 
 /// An IPC Connection object.
@@ -37,7 +30,7 @@ impl<T> IpcConnect<T> {
 }
 
 macro_rules! impl_connect {
-    ($target:ty => $($map:tt)*) => {
+    ($target:ty => | $inner:ident | $map:expr) => {
         impl From<$target> for IpcConnect<$target> {
             fn from(inner: $target) -> Self {
                 Self { inner }
@@ -58,8 +51,9 @@ macro_rules! impl_connect {
             async fn connect(
                 &self,
             ) -> Result<alloy_pubsub::ConnectionHandle, alloy_transport::TransportError> {
-                let name = to_name(self.inner $($map)*)
-                    .map_err(alloy_transport::TransportErrorKind::custom)?;
+                let $inner = &self.inner;
+                let inner = $map;
+                let name = to_name(inner).map_err(alloy_transport::TransportErrorKind::custom)?;
                 crate::IpcBackend::connect(name)
                     .await
                     .map_err(alloy_transport::TransportErrorKind::custom)
@@ -68,8 +62,12 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(std::ffi::OsString => .as_os_str());
+impl_connect!(std::ffi::OsString => |s| s.as_os_str());
+impl_connect!(std::path::PathBuf => |s| s.as_os_str());
+impl_connect!(String => |s| std::ffi::OsStr::new(s));
+
 #[cfg(unix)]
-impl_connect!(std::ffi::CString => .as_c_str());
-impl_connect!(std::path::PathBuf => .as_os_str());
-impl_connect!(String => .as_str());
+impl_connect!(std::ffi::CString => |s| {
+    use std::os::unix::ffi::OsStrExt;
+    std::ffi::OsStr::from_bytes(s.to_bytes())
+});
