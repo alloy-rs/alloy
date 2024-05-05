@@ -327,14 +327,14 @@ impl Geth {
     /// This will put the geth instance into non-dev mode, discarding any previously set dev-mode
     /// options.
     pub fn p2p_port(mut self, port: u16) -> Self {
-        match self.mode {
+        match &mut self.mode {
             GethMode::Dev(_) => {
                 self.mode = GethMode::NonDev(PrivateNetOptions {
                     p2p_port: Some(port),
                     ..Default::default()
                 })
             }
-            GethMode::NonDev(ref mut opts) => opts.p2p_port = Some(port),
+            GethMode::NonDev(opts) => opts.p2p_port = Some(port),
         }
         self
     }
@@ -376,16 +376,16 @@ impl Geth {
     }
 
     fn inner_disable_discovery(&mut self) {
-        match self.mode {
+        match &mut self.mode {
             GethMode::Dev(_) => {
                 self.mode =
                     GethMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
             }
-            GethMode::NonDev(ref mut opts) => opts.discovery = false,
+            GethMode::NonDev(opts) => opts.discovery = false,
         }
     }
 
-    /// Manually sets the IPC path for the socket manually.
+    /// Sets the IPC path for the socket.
     pub fn ipc_path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.ipc_path = Some(path.into());
         self
@@ -506,7 +506,7 @@ impl Geth {
             cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
         }
 
-        if let Some(ref genesis) = self.genesis {
+        if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
             let temp_genesis_dir_path = tempdir().map_err(GethError::CreateDirError)?.into_path();
 
@@ -524,7 +524,7 @@ impl Geth {
             })?;
 
             let mut init_cmd = Command::new(bin_path);
-            if let Some(ref data_dir) = self.data_dir {
+            if let Some(data_dir) = &self.data_dir {
                 init_cmd.arg("--datadir").arg(data_dir);
             }
 
@@ -548,7 +548,7 @@ impl Geth {
             })?;
         }
 
-        if let Some(ref data_dir) = self.data_dir {
+        if let Some(data_dir) = &self.data_dir {
             cmd.arg("--datadir").arg(data_dir);
 
             // create the directory if it doesn't exist
@@ -586,7 +586,7 @@ impl Geth {
         // debug verbosity is needed to check when peers are added
         cmd.arg("--verbosity").arg("4");
 
-        if let Some(ref ipc) = self.ipc_path {
+        if let Some(ipc) = &self.ipc_path {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
