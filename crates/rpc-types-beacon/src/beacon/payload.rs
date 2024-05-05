@@ -165,7 +165,7 @@ pub mod beacon_api_payload_attributes_optimism {
 /// A helper module for serializing and deserializing the payload attributes for the beacon API.
 ///
 /// The beacon API encoded object has equivalent fields to the
-/// [PayloadAttributes](crate::engine::PayloadAttributes) with two differences:
+/// [PayloadAttributes](alloy_rpc_types_engine::PayloadAttributes) with two differences:
 /// 1) `snake_case` identifiers must be used rather than `camelCase`;
 /// 2) integers must be encoded as quoted decimals rather than big-endian hex.
 pub mod beacon_api_payload_attributes {
