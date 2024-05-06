@@ -3,6 +3,11 @@
 mod admin;
 pub use admin::AdminApi;
 
+#[cfg(feature = "engine-api")]
+mod engine;
+#[cfg(feature = "engine-api")]
+pub use engine::EngineApi;
+
 mod debug;
 pub use debug::DebugApi;
 
