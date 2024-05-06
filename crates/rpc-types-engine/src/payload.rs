@@ -712,6 +712,12 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
+impl From<ExecutionPayloadV4> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadV4) -> Self {
+        Self::V4(payload)
+    }
+}
+
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
 impl<'de> Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -721,11 +727,13 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum ExecutionPayloadDesc {
+            V4(ExecutionPayloadV4),
             V3(ExecutionPayloadV3),
             V2(ExecutionPayloadV2),
             V1(ExecutionPayloadV1),
         }
         match ExecutionPayloadDesc::deserialize(deserializer)? {
+            ExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
