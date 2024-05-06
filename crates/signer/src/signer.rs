@@ -55,8 +55,7 @@ pub trait Signer<Sig = Signature> {
     #[cfg(feature = "eip712")]
     #[inline]
     async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Sig> {
-        let hash = payload.eip712_signing_hash()?;
-        self.sign_hash(&hash).await
+        self.sign_hash(&payload.eip712_signing_hash()?).await
     }
 
     /// Returns the signer's Ethereum Address.
