@@ -11,14 +11,15 @@
 #![allow(missing_docs)]
 
 use crate::beacon::{withdrawals::BeaconWithdrawal, BlsPublicKey};
-use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
-use alloy_rpc_types_engine::{ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3, ExecutionPayloadV4};
+use alloy_rpc_types_engine::{
+    ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayloadV4,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
 use std::borrow::Cow;
-use alloy_eips::eip6110::DepositRequest;
-use alloy_eips::eip7002::WithdrawalRequest;
 
 /// Response object of GET `/eth/v1/builder/header/{slot}/{parent_hash}/{pubkey}`
 ///
@@ -449,8 +450,13 @@ struct BeaconExecutionPayloadV4<'a> {
 
 impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
-        let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } = payload;
-        ExecutionPayloadV4 { payload_inner: payload_inner.into(), deposit_requests, withdrawal_requests }
+        let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } =
+            payload;
+        ExecutionPayloadV4 {
+            payload_inner: payload_inner.into(),
+            deposit_requests,
+            withdrawal_requests,
+        }
     }
 }
 
