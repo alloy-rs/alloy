@@ -132,6 +132,9 @@ pub trait EngineApi<N, T>: Send + Sync {
 
     /// Returns the execution client version information.
     ///
+    /// Note:
+    /// > The `client_version` parameter identifies the consensus client.
+    ///
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md#engine_getclientversionv1>
     async fn get_client_version_v1(
         &self,
