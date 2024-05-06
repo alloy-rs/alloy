@@ -1,5 +1,5 @@
 [package]
-name = "rpc-types-beacon"
+name = "alloy-rpc-types-beacon"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
