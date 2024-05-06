@@ -571,6 +571,8 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
+    /// V4 payload
+    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -580,6 +582,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => &payload.payload_inner,
             ExecutionPayload::V3(payload) => &payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -589,6 +592,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => &mut payload.payload_inner,
             ExecutionPayload::V3(payload) => &mut payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -598,6 +602,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => payload.payload_inner,
             ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -607,6 +612,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(_) => None,
             ExecutionPayload::V2(payload) => Some(payload),
             ExecutionPayload::V3(payload) => Some(&payload.payload_inner),
+            ExecutionPayload::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -616,6 +622,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(_) => None,
             ExecutionPayload::V2(payload) => Some(payload),
             ExecutionPayload::V3(payload) => Some(&mut payload.payload_inner),
+            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -624,6 +631,7 @@ impl ExecutionPayload {
         match self {
             ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
             ExecutionPayload::V3(payload) => Some(payload),
+            ExecutionPayload::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -632,6 +640,23 @@ impl ExecutionPayload {
         match self {
             ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
             ExecutionPayload::V3(payload) => Some(payload),
+            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V4 payload, if any.
+    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
+            ExecutionPayload::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V4 payload, if any.
+    pub fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
+            ExecutionPayload::V4(payload) => Some(payload),
         }
     }
 
