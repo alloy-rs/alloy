@@ -1,4 +1,4 @@
-use crate::Withdrawal;
+use alloy_eips::eip4895::Withdrawal;
 use alloy_primitives::Address;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{serde_as, DeserializeAs, DisplayFromStr, SerializeAs};
