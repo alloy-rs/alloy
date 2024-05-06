@@ -3,20 +3,19 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Map;
 use std::{
     collections::BTreeMap,
+    fmt,
     ops::{Deref, DerefMut},
 };
 
 /// A type that is supposed to capture additional fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
 ///
 /// This type is supposed to be used with [`#[serde(flatten)`](https://serde.rs/field-attrs.html#flatten)
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OtherFields {
     /// Contains all unknown fields
     inner: BTreeMap<String, serde_json::Value>,
 }
-
-// === impl OtherFields ===
 
 impl OtherFields {
     /// Creates a new instance
@@ -79,6 +78,13 @@ impl OtherFields {
         let mut map = Map::with_capacity(self.inner.len());
         map.extend(self);
         serde_json::from_value(serde_json::Value::Object(map))
+    }
+}
+
+impl fmt::Debug for OtherFields {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("OtherFields ")?;
+        self.inner.fmt(f)
     }
 }
 
