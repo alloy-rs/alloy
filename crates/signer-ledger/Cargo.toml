@@ -25,6 +25,7 @@ tracing.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true }
+alloy-dyn-abi = { workspace = true, optional = true }
 alloy-network.workspace = true
 
 [dev-dependencies]
@@ -35,7 +36,7 @@ serial_test.workspace = true
 tracing-subscriber.workspace = true
 
 [features]
-eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types"]
+eip712 = ["alloy-signer/eip712", "dep:alloy-sol-types", "dep:alloy-dyn-abi"]
 
 # WASM support
 browser = ["coins-ledger/browser"]
