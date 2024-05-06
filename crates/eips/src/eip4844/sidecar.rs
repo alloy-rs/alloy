@@ -21,7 +21,10 @@ use alloc::vec::Vec;
 )]
 pub struct BlobTransactionSidecar {
     /// The blob data.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "deserialize_blobs"))]
+    #[cfg_attr(
+        all(debug_assertions, feature = "serde"),
+        serde(deserialize_with = "deserialize_blobs")
+    )]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
