@@ -21,7 +21,7 @@ pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-pub struct DepositReceipt {
+pub struct DepositRequest {
     /// Validator public key
     pub pubkey: FixedBytes<48>,
     /// Withdrawal credentials

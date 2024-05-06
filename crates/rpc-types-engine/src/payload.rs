@@ -1,6 +1,6 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{eip6110::DepositReceipt, eip7002::WithdrawalRequest};
+use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -404,18 +404,18 @@ impl ssz::Encode for ExecutionPayloadV3 {
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
 ///
-/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositReceipts
-/// and exits.
+/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositRequests
+/// and withdrawalRequests.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionPayloadV4 {
     /// Inner V3 payload
     #[serde(flatten)]
     pub payload_inner: ExecutionPayloadV3,
-    /// Array of deposits.
+    /// Array of deposit requests.
     ///
-    /// This maps directly to the Deposits defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_receipts: Vec<DepositReceipt>,
+    /// This maps directly to the deposit requests defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
+    pub deposit_requests: Vec<DepositRequest>,
     /// Array of execution layer triggerable withdrawal requests.
     ///
     /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
