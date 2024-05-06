@@ -21,6 +21,10 @@ use alloc::vec::Vec;
 )]
 pub struct BlobTransactionSidecar {
     /// The blob data.
+    #[cfg_attr(
+        all(debug_assertions, feature = "serde"),
+        serde(deserialize_with = "deserialize_blobs")
+    )]
     pub blobs: Vec<Blob>,
     /// The blob commitments.
     pub commitments: Vec<Bytes48>,
@@ -183,6 +187,22 @@ impl Decodable for BlobTransactionSidecar {
     }
 }
 
+// Helper function to deserialize boxed blobs
+#[cfg(all(debug_assertions, feature = "serde"))]
+fn deserialize_blobs<'de, D>(deserializer: D) -> Result<Vec<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+
+    let raw_blobs = Vec::<alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let mut blobs = Vec::with_capacity(raw_blobs.len());
+    for blob in raw_blobs {
+        blobs.push(Blob::try_from(blob.as_ref()).map_err(serde::de::Error::custom)?);
+    }
+    Ok(blobs)
+}
+
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
 #[derive(Debug)]
 #[cfg(feature = "kzg")]
@@ -242,5 +262,33 @@ impl core::fmt::Display for BlobTransactionValidationError {
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
         BlobTransactionValidationError::KZGError(source)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserialize_blob() {
+        let blob = BlobTransactionSidecar {
+            blobs: vec![Blob::default(), Blob::default(), Blob::default(), Blob::default()],
+            commitments: vec![
+                Bytes48::default(),
+                Bytes48::default(),
+                Bytes48::default(),
+                Bytes48::default(),
+            ],
+            proofs: vec![
+                Bytes48::default(),
+                Bytes48::default(),
+                Bytes48::default(),
+                Bytes48::default(),
+            ],
+        };
+        let s = serde_json::to_string(&blob).unwrap();
+        let deserialized: BlobTransactionSidecar = serde_json::from_str(&s).unwrap();
+        assert_eq!(blob, deserialized);
     }
 }

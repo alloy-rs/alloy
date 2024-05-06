@@ -33,7 +33,7 @@ pub use self::{
 };
 
 #[doc(inline)]
-pub use alloy_eips::eip6110::DepositReceipt;
+pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;
 
 #[doc(inline)]
 pub use alloy_eips::eip7002::WithdrawalRequest as WithdrawalRequestV1;

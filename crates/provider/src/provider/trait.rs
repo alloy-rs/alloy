@@ -700,7 +700,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         last_block: BlockNumberOrTag,
         reward_percentiles: &[f64],
     ) -> TransportResult<FeeHistory> {
-        self.client().request("eth_feeHistory", (block_count, last_block, reward_percentiles)).await
+        self.client()
+            .request("eth_feeHistory", (U64::from(block_count), last_block, reward_percentiles))
+            .await
     }
 
     /// Estimate the gas needed for a transaction.

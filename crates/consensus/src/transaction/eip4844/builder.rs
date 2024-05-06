@@ -6,7 +6,7 @@ use c_kzg::{KzgCommitment, KzgProof};
 use alloc::vec::Vec;
 
 use super::utils::WholeFe;
-use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB};
+use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK};
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
@@ -194,6 +194,11 @@ impl SimpleCoder {
         // if no more bytes is 0, we're done
         if num_bytes == 0 {
             return Ok(None);
+        }
+
+        // if there are too many bytes
+        if num_bytes > BYTES_PER_BLOB * MAX_BLOBS_PER_BLOCK {
+            return Err(());
         }
 
         let mut res = Vec::with_capacity(num_bytes);

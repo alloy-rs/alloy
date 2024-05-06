@@ -1,6 +1,6 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{eip6110::DepositReceipt, eip7002::WithdrawalRequest};
+use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -404,18 +404,18 @@ impl ssz::Encode for ExecutionPayloadV3 {
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
 ///
-/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositReceipts
-/// and exits.
+/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositRequests
+/// and withdrawalRequests.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExecutionPayloadV4 {
     /// Inner V3 payload
     #[serde(flatten)]
     pub payload_inner: ExecutionPayloadV3,
-    /// Array of deposits.
+    /// Array of deposit requests.
     ///
-    /// This maps directly to the Deposits defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_receipts: Vec<DepositReceipt>,
+    /// This maps directly to the deposit requests defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
+    pub deposit_requests: Vec<DepositRequest>,
     /// Array of execution layer triggerable withdrawal requests.
     ///
     /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
@@ -571,6 +571,8 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
+    /// V4 payload
+    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -580,6 +582,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => &payload.payload_inner,
             ExecutionPayload::V3(payload) => &payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -589,6 +592,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => &mut payload.payload_inner,
             ExecutionPayload::V3(payload) => &mut payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -598,6 +602,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(payload) => payload,
             ExecutionPayload::V2(payload) => payload.payload_inner,
             ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner,
+            ExecutionPayload::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -607,6 +612,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(_) => None,
             ExecutionPayload::V2(payload) => Some(payload),
             ExecutionPayload::V3(payload) => Some(&payload.payload_inner),
+            ExecutionPayload::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -616,6 +622,7 @@ impl ExecutionPayload {
             ExecutionPayload::V1(_) => None,
             ExecutionPayload::V2(payload) => Some(payload),
             ExecutionPayload::V3(payload) => Some(&mut payload.payload_inner),
+            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -624,6 +631,7 @@ impl ExecutionPayload {
         match self {
             ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
             ExecutionPayload::V3(payload) => Some(payload),
+            ExecutionPayload::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -632,6 +640,23 @@ impl ExecutionPayload {
         match self {
             ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
             ExecutionPayload::V3(payload) => Some(payload),
+            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner),
+        }
+    }
+
+    /// Returns a reference to the V4 payload, if any.
+    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
+            ExecutionPayload::V4(payload) => Some(payload),
+        }
+    }
+
+    /// Returns a mutable reference to the V4 payload, if any.
+    pub fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
+        match self {
+            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
+            ExecutionPayload::V4(payload) => Some(payload),
         }
     }
 
@@ -687,6 +712,12 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
+impl From<ExecutionPayloadV4> for ExecutionPayload {
+    fn from(payload: ExecutionPayloadV4) -> Self {
+        Self::V4(payload)
+    }
+}
+
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
 impl<'de> Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -696,11 +727,13 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum ExecutionPayloadDesc {
+            V4(ExecutionPayloadV4),
             V3(ExecutionPayloadV3),
             V2(ExecutionPayloadV2),
             V1(ExecutionPayloadV1),
         }
         match ExecutionPayloadDesc::deserialize(deserializer)? {
+            ExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),
