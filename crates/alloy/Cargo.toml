@@ -105,6 +105,7 @@ provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
 # pubsub
 pubsub = [
     "dep:alloy-pubsub",
+    "alloy-contract?/pubsub",
     "alloy-provider?/pubsub",
     "alloy-rpc-client?/pubsub",
 ]
