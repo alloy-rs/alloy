@@ -58,7 +58,7 @@ fn deserialize_blob<'de, D>(deserializer: D) -> Result<Box<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
 {
-    let raw_blob = <alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let raw_blob = <Bytes>::deserialize(deserializer)?;
 
     let blob = Box::new(Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?);
 
@@ -69,13 +69,10 @@ where
 mod tests {
     use super::*;
 
-    // example beacon blob payload
-    const JSON_DATA: &str = include_str!("examples/sidecar.json");
-
     // Should deserialise json containing 6 blobs
     #[test]
     fn serde_sidecar_bundle() {
-        let s: &str = JSON_DATA;
+        let s = include_str!("examples/sidecar.json");
         let resp: BeaconBlobBundle = serde_json::from_str(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         assert_eq!(json, serde_json::to_value(resp.clone()).unwrap());
