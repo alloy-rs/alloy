@@ -67,21 +67,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
-
     use super::*;
 
-    fn read_blob_json() -> String {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("examples/sidecar.json");
-        fs::read_to_string(path).expect("Unable to read the JSON file")
-    }
+    // example beacon blob payload
+    const JSON_DATA: &str = include_str!("examples/sidecar.json");
 
     // Should deserialise json containing 6 blobs
     #[test]
     fn serde_sidecar_bundle() {
-        let json = read_blob_json();
-        let s: &str = json.as_ref();
+        let s: &str = JSON_DATA;
         let resp: BeaconBlobBundle = serde_json::from_str(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
         assert_eq!(json, serde_json::to_value(resp.clone()).unwrap());
