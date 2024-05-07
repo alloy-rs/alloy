@@ -21,6 +21,18 @@ pub enum Request {
     WithdrawalRequest(WithdrawalRequest),
 }
 
+impl From<DepositRequest> for Request {
+    fn from(v: DepositRequest) -> Self {
+        Self::DepositRequest(v)
+    }
+}
+
+impl From<WithdrawalRequest> for Request {
+    fn from(v: WithdrawalRequest) -> Self {
+        Self::WithdrawalRequest(v)
+    }
+}
+
 impl Encodable7685 for Request {
     fn request_type(&self) -> u8 {
         match self {
