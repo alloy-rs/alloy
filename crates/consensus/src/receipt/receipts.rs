@@ -108,7 +108,7 @@ where
 {
     fn from(receipt: Receipt<T>) -> Self {
         let bloom = receipt.bloom_slow();
-        ReceiptWithBloom { receipt, logs_bloom: bloom }
+        Self { receipt, logs_bloom: bloom }
     }
 }
 

@@ -101,7 +101,7 @@ pub struct Header {
 
 impl Default for Header {
     fn default() -> Self {
-        Header {
+        Self {
             parent_hash: Default::default(),
             ommers_hash: EMPTY_OMMER_ROOT_HASH,
             beneficiary: Default::default(),
