@@ -7,16 +7,16 @@ use serde_with::{serde_as, DisplayFromStr};
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlobBundle {
-    /// Vec of sidecars
-    pub data: Vec<BlobSidecar>,
+    /// Vec of individual blob data
+    pub data: Vec<BlobData>,
 }
 
-/// Individual Blob data for a given EIP4844 Tx
+/// Individual Blob data that belongs to a 4844 transaction.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlobSidecar {
-    #[serde_as(as = "DisplayFromStr")]
+pub struct BlobData {
     /// Blob index
+    #[serde_as(as = "DisplayFromStr")]
     pub index: u64,
     #[serde(deserialize_with = "deserialize_blob")]
     /// Blob data
