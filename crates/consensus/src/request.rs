@@ -33,6 +33,34 @@ impl From<WithdrawalRequest> for Request {
     }
 }
 
+impl Request {
+    /// Whether this is a [`DepositRequest`].
+    pub fn is_deposit_request(&self) -> bool {
+        matches!(self, Self::DepositRequest(_))
+    }
+
+    /// Whether this is a [`WithdrawalRequest`].
+    pub fn is_withdrawal_request(&self) -> bool {
+        matches!(self, Self::WithdrawalRequest(_))
+    }
+
+    /// Return the inner [`DepositRequest`], or `None` of this is not a deposit request.
+    pub const fn as_deposit_request(&self) -> Option<&DepositRequest> {
+        match self {
+            Self::DepositRequest(req) => Some(req),
+            _ => None,
+        }
+    }
+
+    /// Return the inner [`WithdrawalRequest`], or `None` if this is not a withdrawal request.
+    pub const fn as_withdrawal_request(&self) -> Option<&WithdrawalRequest> {
+        match self {
+            Self::WithdrawalRequest(req) => Some(req),
+            _ => None,
+        }
+    }
+}
+
 impl Encodable7685 for Request {
     fn request_type(&self) -> u8 {
         match self {
