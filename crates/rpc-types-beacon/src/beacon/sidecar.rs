@@ -1,3 +1,4 @@
+use crate::beacon::header::Header;
 use alloy_eips::eip4844::{Blob, Bytes48};
 use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
@@ -26,31 +27,9 @@ pub struct BlobData {
     /// The blob's proof
     pub kzg_proof: Bytes48,
     /// The block header containing the blob
-    pub signed_block_header: SignedBlockHeader,
+    pub signed_block_header: Header,
     /// The blob's inclusion proofs
     pub kzg_commitment_inclusion_proof: Vec<B256>,
-}
-
-/// The Block data for a set of blobs
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SignedBlockHeader {
-    pub message: BlockHeaderMessage,
-    pub signature: Bytes,
-}
-
-/// Detailed Block data
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockHeaderMessage {
-    /// The block slot.
-    #[serde_as(as = "DisplayFromStr")]
-    pub slot: u64,
-    #[serde_as(as = "DisplayFromStr")]
-    pub proposer_index: u64,
-    pub parent_root: B256,
-    pub state_root: B256,
-    pub body_root: B256,
 }
 
 // Helper function to deserialize boxed blobs
