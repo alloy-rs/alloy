@@ -14,6 +14,7 @@ exclude.workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = [
     "rlp",
+    "arbitrary",
 ], default-features = false }
 alloy-rlp = { workspace = true, features = [
     "derive",

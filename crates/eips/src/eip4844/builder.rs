@@ -10,8 +10,10 @@ use crate::eip4844::{
     MAX_BLOBS_PER_BLOCK,
 };
 
+#[cfg(feature = "kzg")]
+use crate::eip4844::env_settings::EnvKzgSettings;
+use crate::eip4844::Bytes48;
 use alloy_primitives::private::arbitrary::{Arbitrary, Unstructured};
-
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
@@ -363,7 +365,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     pub fn build_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
-    ) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
+    ) -> Result<BlobTransactionSidecar, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
@@ -374,25 +376,20 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
 
             // SAFETY: same size
             unsafe {
-                commitments.push(
-                    std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
-                        commitment.to_bytes(),
-                    ),
-                );
-                proofs.push(std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
-                    proof.to_bytes(),
-                ));
+                commitments
+                    .push(std::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                proofs.push(std::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
             }
         }
 
-        Ok(crate::BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
+        Ok(BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)
     /// settings.
     #[cfg(feature = "kzg")]
-    pub fn build(self) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
-        self.build_with_settings(crate::EnvKzgSettings::Default.get())
+    pub fn build(self) -> Result<BlobTransactionSidecar, c_kzg::Error> {
+        self.build_with_settings(EnvKzgSettings::Default.get())
     }
 
     /// Take the blobs from the builder, without committing them to a KZG proof.
