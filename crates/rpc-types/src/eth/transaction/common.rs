@@ -21,7 +21,7 @@ pub struct TransactionInfo {
 
 impl From<&Transaction> for TransactionInfo {
     fn from(tx: &Transaction) -> Self {
-        TransactionInfo {
+        Self {
             hash: Some(tx.hash),
             index: tx.transaction_index,
             block_hash: tx.block_hash,

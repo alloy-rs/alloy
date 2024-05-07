@@ -30,7 +30,7 @@ pub struct JsonStorageKey(pub B256);
 
 impl From<B256> for JsonStorageKey {
     fn from(value: B256) -> Self {
-        JsonStorageKey(value)
+        Self(value)
     }
 }
 
