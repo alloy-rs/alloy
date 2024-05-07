@@ -8,6 +8,8 @@ use alloy_rlp::{Decodable, Encodable};
 /// Ethereum execution layer requests.
 ///
 /// See also [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Request {
     /// An [EIP-6110] deposit request.
     ///

@@ -8,7 +8,7 @@ use alloy_rlp::{RlpDecodable, RlpEncodable};
 /// Represents an execution layer triggerable withdrawal request.
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(
