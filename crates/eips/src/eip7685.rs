@@ -113,3 +113,11 @@ pub trait Encodable7685: Sized + Send + Sync + 'static {
         out
     }
 }
+
+/// An [EIP-7685] request envelope, blanket implemented for types that impl
+/// [`Encodable7685`] and [`Decodable7685`]. This envelope is a wrapper around
+/// a request, differentiated by the request type.
+///
+/// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
+pub trait Eip7685RequestEnvelope: Decodable7685 + Encodable7685 {}
+impl<T> Eip7685RequestEnvelope for T where T: Decodable7685 + Encodable7685 {}
