@@ -17,6 +17,7 @@ use core::{
 ///
 /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum Eip7685Error {
     /// Rlp error from [`alloy_rlp`].
     RlpError(alloy_rlp::Error),
