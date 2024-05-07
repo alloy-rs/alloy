@@ -9,7 +9,9 @@ use crate::eip4844::{
     utils::WholeFe, BlobTransactionSidecar, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
     MAX_BLOBS_PER_BLOCK,
 };
-use alloy_primitives::private::arbitrary::Arbitrary;
+
+use alloy_primitives::private::arbitrary::{Arbitrary, Unstructured};
+
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
@@ -279,10 +281,10 @@ where
     }
 }
 
-impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
+impl<'a, T: Arbitrary<'a> + Clone> SidecarBuilder<T> {
     /// Builds an arbitrary realization for BlobTransactionSidecar.
     pub fn build_arbitrary(&self) -> BlobTransactionSidecar {
-        BlobTransactionSidecar::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap()
+        BlobTransactionSidecar::arbitrary(&mut Unstructured::new(&[])).unwrap()
     }
 }
 

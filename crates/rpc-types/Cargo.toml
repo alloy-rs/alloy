@@ -14,7 +14,12 @@ exclude.workspace = true
 [dependencies]
 # ethereum
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
+alloy-primitives = { workspace = true, features = [
+    "rlp",
+    "serde",
+    "std",
+    "arbitrary",
+] }
 alloy-serde.workspace = true
 alloy-genesis.workspace = true
 

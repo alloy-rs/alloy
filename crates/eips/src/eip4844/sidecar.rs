@@ -5,7 +5,7 @@ use crate::eip4844::{
 };
 use alloy_primitives::{
     bytes::BufMut,
-    private::arbitrary::{Arbitrary, Unstructured},
+    private::arbitrary::{Arbitrary, Result, Unstructured},
     B256,
 };
 use alloy_rlp::{Decodable, Encodable};
@@ -32,9 +32,8 @@ pub struct BlobTransactionSidecar {
     pub proofs: Vec<Bytes48>,
 }
 
-#[cfg(any(test, feature = "arbitrary"))]
 impl<'a> Arbitrary<'a> for BlobTransactionSidecar {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
         let num_blobs = u.int_in_range(1..=crate::eip4844::MAX_BLOBS_PER_BLOCK)?;
         let mut blobs = Vec::with_capacity(num_blobs);
         for _ in 0..num_blobs {
