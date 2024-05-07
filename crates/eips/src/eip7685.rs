@@ -42,7 +42,8 @@ impl From<alloy_rlp::Error> for Eip7685Error {
     }
 }
 
-/// Decoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that wraps each possible request type.
+/// Decoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that
+/// wraps each possible request type.
 ///
 /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
 pub trait Decodable7685: Sized {
@@ -59,7 +60,8 @@ pub trait Decodable7685: Sized {
     ///
     /// ## Note
     ///
-    /// This should be a simple match block that invokes an inner type's decoder. The decoder is request type dependent.
+    /// This should be a simple match block that invokes an inner type's decoder. The decoder is
+    /// request type dependent.
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, Eip7685Error>;
 
     /// Decode an EIP-7685 request into a concrete instance
@@ -70,7 +72,8 @@ pub trait Decodable7685: Sized {
     }
 }
 
-/// Encoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that wraps each possible request type.
+/// Encoding trait for [EIP-7685] requests. The trait should be implemented for an envelope that
+/// wraps each possible request type.
 ///
 /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
 pub trait Encodable7685: Sized + Send + Sync + 'static {
