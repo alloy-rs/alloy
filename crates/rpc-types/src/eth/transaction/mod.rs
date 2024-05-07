@@ -2,8 +2,7 @@
 
 use crate::eth::other::OtherFields;
 use alloy_consensus::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
-    TxLegacy, TxType,
+    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
@@ -29,6 +28,8 @@ pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
 pub use signature::{Parity, Signature};
+
+use alloy_consensus::transaction::eip4844::{TxEip4844, TxEip4844Variant};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

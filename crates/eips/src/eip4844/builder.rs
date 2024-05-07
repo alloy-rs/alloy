@@ -1,12 +1,15 @@
-use alloy_eips::eip4844::Blob;
+use crate::eip4844::Blob;
 #[cfg(feature = "kzg")]
 use c_kzg::{KzgCommitment, KzgProof};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use super::utils::WholeFe;
-use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK};
+use crate::eip4844::{
+    utils::WholeFe, BlobTransactionSidecar, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
+    MAX_BLOBS_PER_BLOCK,
+};
+use alloy_primitives::private::arbitrary::Arbitrary;
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
@@ -276,6 +279,13 @@ where
     }
 }
 
+impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
+    /// Builds an arbitrary realization for BlobTransactionSidecar.
+    pub fn build_arbitrary(&self) -> BlobTransactionSidecar {
+        BlobTransactionSidecar::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap()
+    }
+}
+
 impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     /// Instantiate a new builder and new coder instance.
     ///
@@ -406,7 +416,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
+    use crate::eip4844::USABLE_BYTES_PER_BLOB;
 
     #[test]
     fn ingestion_strategy() {

@@ -9,6 +9,9 @@ pub mod env_settings;
 #[cfg(feature = "kzg")]
 pub mod trusted_setup_points;
 
+pub mod builder;
+pub mod utils;
+
 /// Contains sidecar related types
 mod sidecar;
 pub use sidecar::*;

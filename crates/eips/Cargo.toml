@@ -12,8 +12,12 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
-alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
+alloy-primitives = { workspace = true, features = [
+    "rlp",
+], default-features = false }
+alloy-rlp = { workspace = true, features = [
+    "derive",
+], default-features = false }
 alloy-serde.workspace = true
 
 sha2 = { workspace = true, default-features = false }
@@ -31,12 +35,16 @@ ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
 # arbitrary
-arbitrary = { workspace = true, features = ["derive"], optional = true }
+arbitrary = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "serde",
+    "arbitrary",
+] }
 arbitrary = { workspace = true, features = ["derive"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
@@ -44,10 +52,21 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std", "c-kzg?/std", "once_cell?/std"]
+std = [
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+    "serde?/std",
+    "c-kzg?/std",
+    "once_cell?/std",
+]
 serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
 kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
+ssz = [
+    "std",
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+]
 arbitrary = [
     "std",
     "dep:arbitrary",

@@ -1,4 +1,4 @@
-use crate::{request::TransactionRequest, BlockId, BlockOverrides};
+use crate::{BlockId, BlockOverrides, TransactionRequest};
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

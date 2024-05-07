@@ -41,4 +41,9 @@ std = ["alloy-eips/std", "c-kzg?/std"]
 k256 = ["alloy-primitives/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = ["std", "dep:arbitrary", "alloy-eips/arbitrary"]
-serde = ["dep:serde", "alloy-primitives/serde", "dep:alloy-serde", "alloy-eips/serde"]
+serde = [
+    "dep:serde",
+    "alloy-primitives/serde",
+    "dep:alloy-serde",
+    "alloy-eips/serde",
+]

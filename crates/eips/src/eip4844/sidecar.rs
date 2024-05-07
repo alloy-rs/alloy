@@ -3,9 +3,12 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloy_primitives::{bytes::BufMut, B256};
+use alloy_primitives::{
+    bytes::BufMut,
+    private::arbitrary::{Arbitrary, Unstructured},
+    B256,
+};
 use alloy_rlp::{Decodable, Encodable};
-use arbitrary::Unstructured;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -30,9 +33,9 @@ pub struct BlobTransactionSidecar {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl arbitrary::Arbitrary<'static> for BlobTransactionSidecar {
-    fn arbitrary(u: &mut Unstructured<'static>) -> arbitrary::Result<Self> {
-        let num_blobs: usize = u.arbitrary()?;
+impl<'a> Arbitrary<'a> for BlobTransactionSidecar {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let num_blobs = u.int_in_range(1..=crate::eip4844::MAX_BLOBS_PER_BLOCK)?;
         let mut blobs = Vec::with_capacity(num_blobs);
         for _ in 0..num_blobs {
             blobs.push(Blob::arbitrary(u)?);
@@ -304,6 +307,7 @@ mod tests {
                 Bytes48::default(),
             ],
         };
+
         let s = serde_json::to_string(&blob).unwrap();
         let deserialized: BlobTransactionSidecar = serde_json::from_str(&s).unwrap();
         assert_eq!(blob, deserialized);

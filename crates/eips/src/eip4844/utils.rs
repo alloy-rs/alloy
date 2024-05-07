@@ -2,7 +2,7 @@
 //! [`SidecarCoder`].
 //!
 //! [`SidecarCoder`]: crate::SidecarCoder
-use alloy_eips::eip4844::USABLE_BITS_PER_FIELD_ELEMENT;
+use crate::eip4844::USABLE_BITS_PER_FIELD_ELEMENT;
 
 /// Determine whether a slice of bytes can be contained in a field element.
 pub const fn fits_in_fe(data: &[u8]) -> bool {
@@ -52,7 +52,7 @@ impl AsRef<[u8]> for WholeFe<'_> {
 
 #[cfg(test)]
 mod test {
-    use alloy_eips::eip4844::{FIELD_ELEMENTS_PER_BLOB, USABLE_BYTES_PER_BLOB};
+    use crate::eip4844::{FIELD_ELEMENTS_PER_BLOB, USABLE_BYTES_PER_BLOB};
 
     use super::*;
     #[test]
