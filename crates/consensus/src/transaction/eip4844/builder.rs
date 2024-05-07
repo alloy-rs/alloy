@@ -299,6 +299,20 @@ impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     }
 }
 
+impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
+    /// Builds an arbitrary realization for BlobTransactionSidecar.
+    pub fn build_arbitrary(&self) -> crate::BlobTransactionSidecar {
+        let blobs: Vec<Blob> =
+            arbitrary::Arbitrary::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap();
+        let commitments: Vec<crate::Bytes48> =
+            arbitrary::Arbitrary::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap();
+        let proofs: Vec<crate::Bytes48> =
+            arbitrary::Arbitrary::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap();
+
+        crate::BlobTransactionSidecar { blobs, commitments, proofs }
+    }
+}
+
 impl<T: SidecarCoder> SidecarBuilder<T> {
     /// Instantiate a new builder with the provided coder and capacity. This
     /// capacity is measured in blobs, each of which is 128 KiB.
