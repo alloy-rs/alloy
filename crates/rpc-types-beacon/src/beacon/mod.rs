@@ -10,6 +10,7 @@ pub mod constants;
 pub mod events;
 pub mod header;
 pub mod payload;
+pub mod sidecar;
 pub mod withdrawals;
 
 /// BLS signature type
