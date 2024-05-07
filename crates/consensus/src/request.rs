@@ -35,12 +35,12 @@ impl From<WithdrawalRequest> for Request {
 
 impl Request {
     /// Whether this is a [`DepositRequest`].
-    pub fn is_deposit_request(&self) -> bool {
+    pub const fn is_deposit_request(&self) -> bool {
         matches!(self, Self::DepositRequest(_))
     }
 
     /// Whether this is a [`WithdrawalRequest`].
-    pub fn is_withdrawal_request(&self) -> bool {
+    pub const fn is_withdrawal_request(&self) -> bool {
         matches!(self, Self::WithdrawalRequest(_))
     }
 
