@@ -42,3 +42,5 @@ pub mod eip6110;
 pub mod merge;
 
 pub mod eip7002;
+
+pub mod eip7685;
