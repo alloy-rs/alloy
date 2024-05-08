@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// A signer capable of signing any transaction for the Ethereum network.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EthereumSigner {
     default: Address,
     secp_signers: BTreeMap<Address, Arc<dyn TxSigner<Signature> + Send + Sync>>,
@@ -36,7 +36,7 @@ impl EthereumSigner {
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
     {
-        let mut this = Self { default: Default::default(), secp_signers: BTreeMap::new() };
+        let mut this = Self::default();
         this.register_default_signer(signer);
         this
     }

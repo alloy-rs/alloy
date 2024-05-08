@@ -78,48 +78,48 @@ mod tests {
     #[test]
     fn serde_headers_response() {
         let s = r#"{
-  "execution_optimistic": false,
-  "finalized": false,
-  "data": [
-    {
-      "root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-      "canonical": true,
-      "header": {
-        "message": {
-          "slot": "1",
-          "proposer_index": "1",
-          "parent_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-          "state_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-          "body_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"
-        },
-        "signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
-      }
-    }
-  ]
-}"#;
+            "execution_optimistic": false,
+            "finalized": false,
+            "data": [
+                {
+                    "root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                    "canonical": true,
+                    "header": {
+                        "message": {
+                            "slot": "1",
+                            "proposer_index": "1",
+                            "parent_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                            "state_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                            "body_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"
+                        },
+                        "signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
+                    }
+                }
+            ]
+        }"#;
         let _header_response: HeadersResponse = serde_json::from_str(s).unwrap();
     }
 
     #[test]
     fn serde_header_response() {
         let s = r#"{
-  "execution_optimistic": false,
-  "finalized": false,
-  "data": {
-    "root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-    "canonical": true,
-    "header": {
-      "message": {
-        "slot": "1",
-        "proposer_index": "1",
-        "parent_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-        "state_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
-        "body_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"
-      },
-      "signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
-    }
-  }
-}"#;
+            "execution_optimistic": false,
+            "finalized": false,
+            "data": {
+                "root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                "canonical": true,
+                "header": {
+                    "message": {
+                        "slot": "1",
+                        "proposer_index": "1",
+                        "parent_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                        "state_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2",
+                        "body_root": "0xcf8e0d4e9587369b2301d0790347320302cc0943d5a1884560367e8208d920f2"
+                    },
+                    "signature": "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505"
+                }
+            }
+        }"#;
         let _header_response: HeaderResponse = serde_json::from_str(s).unwrap();
     }
 }

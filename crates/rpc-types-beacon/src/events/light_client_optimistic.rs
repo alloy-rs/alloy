@@ -1,4 +1,4 @@
-use crate::beacon::header::BeaconBlockHeader;
+use crate::header::BeaconBlockHeader;
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
