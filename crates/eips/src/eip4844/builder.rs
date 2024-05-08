@@ -13,6 +13,7 @@ use crate::eip4844::{
 #[cfg(feature = "kzg")]
 use crate::eip4844::env_settings::EnvKzgSettings;
 use crate::eip4844::Bytes48;
+#[cfg(feature = "arbitrary")]
 use alloy_primitives::private::arbitrary::{Arbitrary, Unstructured};
 use core::cmp;
 
@@ -283,6 +284,7 @@ where
     }
 }
 
+#[cfg(feature = "arbitrary")]
 impl<'a, T: Arbitrary<'a> + Clone> SidecarBuilder<T> {
     /// Builds an arbitrary realization for BlobTransactionSidecar.
     pub fn build_arbitrary(&self) -> BlobTransactionSidecar {

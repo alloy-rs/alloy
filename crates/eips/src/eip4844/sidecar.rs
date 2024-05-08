@@ -3,11 +3,9 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloy_primitives::{
-    bytes::BufMut,
-    private::arbitrary::{Arbitrary, Result, Unstructured},
-    B256,
-};
+#[cfg(feature = "arbitrary")]
+use alloy_primitives::private::arbitrary::{Arbitrary, Result, Unstructured};
+use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
 #[cfg(not(feature = "std"))]
@@ -32,6 +30,7 @@ pub struct BlobTransactionSidecar {
     pub proofs: Vec<Bytes48>,
 }
 
+#[cfg(feature = "arbitrary")]
 impl<'a> Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
         let num_blobs = u.int_in_range(1..=crate::eip4844::MAX_BLOBS_PER_BLOCK)?;
