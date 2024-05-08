@@ -32,6 +32,7 @@ alloy-pubsub = { workspace = true, default-features = false, optional = true }
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
 alloy-rpc-client = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types-beacon = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types-engine = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types-trace = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types = { workspace = true, default-features = false, optional = true }
@@ -118,6 +119,7 @@ rpc-client-ws = ["rpc", "alloy-rpc-client?/ws"]
 rpc-client-ipc = ["rpc", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc"]
 rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
+rpc-types-beacon = ["rpc-types", "dep:alloy-rpc-types-beacon"]
 rpc-types-engine = ["rpc-types", "dep:alloy-rpc-types-engine"]
 rpc-types-json = [
     "alloy-rpc-types?/jsonrpsee-types",

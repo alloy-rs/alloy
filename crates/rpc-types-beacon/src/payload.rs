@@ -10,7 +10,7 @@
 
 #![allow(missing_docs)]
 
-use crate::beacon::{withdrawals::BeaconWithdrawal, BlsPublicKey};
+use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
 use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{

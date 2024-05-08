@@ -1,4 +1,4 @@
-use crate::beacon::header::Header;
+use crate::header::Header;
 use alloy_eips::eip4844::{Blob, Bytes48};
 use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
