@@ -11,6 +11,15 @@ use std::task;
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 
+/// A [`hyper`] HTTP client.
+pub type HyperClient = hyper_util::client::legacy::Client<
+    hyper_util::client::legacy::connect::HttpConnector,
+    http_body_util::Full<::hyper::body::Bytes>,
+>;
+
+/// An [`Http`] transport using [`hyper`].
+pub type HyperTransport = Http<HyperClient>;
+
 impl<C, B> Http<Client<C, Full<B>>>
 where
     C: Connect + Clone + Send + Sync + 'static,
