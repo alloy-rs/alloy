@@ -3,6 +3,7 @@ use alloy_eips::eip4844::{Blob, BlobTransactionSidecar, Bytes48};
 use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
+use std::vec::IntoIter;
 
 /// Bundle of blobs for a given block
 #[serde_as]
@@ -15,7 +16,7 @@ pub struct BeaconBlobBundle {
 /// Yields an iterator for BlobData
 impl IntoIterator for BeaconBlobBundle {
     type Item = BlobData;
-    type IntoIter = std::vec::IntoIter<BlobData>;
+    type IntoIter = IntoIter<BlobData>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
@@ -24,7 +25,7 @@ impl IntoIterator for BeaconBlobBundle {
 
 /// Intermediate type for BlobTransactionSidecar matching
 pub struct SidecarIterator {
-    pub iter: std::vec::IntoIter<BlobData>,
+    pub iter: IntoIter<BlobData>,
 }
 
 impl SidecarIterator {
