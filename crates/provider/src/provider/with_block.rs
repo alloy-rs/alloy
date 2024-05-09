@@ -52,6 +52,7 @@ where
 
 /// A future for [`RpcWithBlock`]. Simple wrapper around [`RpcCall`].
 #[derive(Debug, Clone)]
+#[pin_project::pin_project]
 pub struct RpcWithBlockFut<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
@@ -68,58 +69,69 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone + Unpin,
+    Map: Fn(Resp) -> Output + Clone,
 {
     fn poll_preparing(
-        mut self: std::pin::Pin<&mut Self>,
+        self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Output>> {
-        let fut = {
-            let States::Preparing { method, client, params, block_id, map } = &self.as_ref().state
-            else {
-                unreachable!("bad state")
-            };
+        let this = self.project();
+        match this.state {
+            States::Preparing { client, method, params, block_id, map } => {
+                let mut fut = {
+                    // make sure the client still exists
+                    let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone)
+                    {
+                        Ok(client) => client,
+                        Err(e) => return Poll::Ready(Err(e)),
+                    };
 
-            // serialize the params, appending the block id
-            let ser = serde_json::to_value(params).map_err(RpcError::ser_err);
-            let mut ser = match ser {
-                Ok(ser) => ser,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
-            let block_id = serde_json::to_value(block_id).map_err(RpcError::ser_err);
-            let block_id = match block_id {
-                Ok(block_id) => block_id,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
+                    // serialize the params
+                    let ser = serde_json::to_value(params).map_err(RpcError::ser_err);
+                    let mut ser = match ser {
+                        Ok(ser) => ser,
+                        Err(e) => return Poll::Ready(Err(e)),
+                    };
 
-            if let serde_json::Value::Array(ref mut arr) = ser {
-                arr.push(block_id);
-            } else if let serde_json::Value::Null = ser {
-                ser = serde_json::Value::Array(vec![block_id]);
-            } else {
-                ser = serde_json::Value::Array(vec![ser, block_id]);
+                    // serialize the block id
+                    let block_id = serde_json::to_value(block_id).map_err(RpcError::ser_err);
+                    let block_id = match block_id {
+                        Ok(block_id) => block_id,
+                        Err(e) => return Poll::Ready(Err(e)),
+                    };
+
+                    // append the block id to the params
+                    if let serde_json::Value::Array(ref mut arr) = ser {
+                        arr.push(block_id);
+                    } else if let serde_json::Value::Null = ser {
+                        ser = serde_json::Value::Array(vec![block_id]);
+                    } else {
+                        ser = serde_json::Value::Array(vec![ser, block_id]);
+                    }
+
+                    // create the call
+                    client.request(method.clone(), ser).map_resp(map.clone())
+                };
+                match fut.poll_unpin(cx) {
+                    Poll::Ready(value) => Poll::Ready(value),
+                    Poll::Pending => {
+                        *this.state = States::Running(fut);
+                        Poll::Pending
+                    }
+                }
             }
-
-            let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-                Ok(client) => client,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
-
-            client.request(method.clone(), ser).map_resp(map.clone())
-        };
-        self.state = States::Running(fut);
-        self.poll_running(cx)
+            _ => unreachable!("bad state"),
+        }
     }
 
     fn poll_running(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Output>> {
-        let Self { state: States::Running(call) } = self.get_mut() else {
-            unreachable!("bad state")
-        };
-
-        call.poll_unpin(cx)
+        match self.project().state {
+            States::Running(call) => call.poll_unpin(cx),
+            _ => unreachable!("bad state"),
+        }
     }
 }
 
@@ -129,7 +141,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone + Unpin,
+    Map: Fn(Resp) -> Output + Clone,
 {
     type Output = TransportResult<Output>;
 
@@ -222,7 +234,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone + Unpin,
+    Map: Fn(Resp) -> Output + Clone,
 {
     type Output = TransportResult<Output>;
 

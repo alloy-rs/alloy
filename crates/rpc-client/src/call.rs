@@ -211,7 +211,7 @@ where
         map: NewMap,
     ) -> RpcCall<Conn, Params, Resp, NewOutput, NewMap>
     where
-        NewMap: Fn(Resp) -> NewOutput + Unpin,
+        NewMap: Fn(Resp) -> NewOutput,
     {
         RpcCall { state: self.state, map, _pd: PhantomData }
     }
@@ -308,7 +308,7 @@ where
     Params: RpcParam + 'a,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Send + 'a + Unpin,
+    Map: Fn(Resp) -> Output + Send + 'a,
 {
     /// Convert this future into a boxed, pinned future, erasing its type.
     pub fn boxed(self) -> RpcFut<'a, Output> {
@@ -322,16 +322,13 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Unpin,
+    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         trace!(?self.state, "polling RpcCall");
-
         let this = self.project();
-
-        // ugly
         this.state.poll(cx).map(try_deserialize_ok).map(|r| r.map(this.map))
     }
 }
