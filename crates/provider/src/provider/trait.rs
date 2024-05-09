@@ -1196,7 +1196,17 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    async fn gets_transaction_by_hash_not_found() {
+        init_tracing();
+
+        let provider = ProviderBuilder::new().on_anvil();
+        let tx_hash = b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95");
+        let tx = provider.get_transaction_by_hash(tx_hash).await.expect("fail to fetch tx");
+
+        assert!(tx.is_none());
+    }
+
+    #[tokio::test]
     async fn gets_transaction_by_hash() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
