@@ -15,21 +15,28 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_transport::utils::guess_local_url;
-use url::Url;
-
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-mod hyper;
-
-/// A [`hyper`](::hyper) HTTP client.
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-pub type HyperClient = hyper_util::client::legacy::Client<
-    hyper_util::client::legacy::connect::HttpConnector,
-    http_body_util::Full<::hyper::body::Bytes>,
->;
+#[cfg(feature = "reqwest")]
+mod reqwest_transport;
+#[cfg(feature = "reqwest")]
+#[doc(inline)]
+pub use reqwest_transport::*;
 
 #[cfg(feature = "reqwest")]
-mod reqwest;
+pub use reqwest;
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+mod hyper_transport;
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[doc(inline)]
+pub use hyper_transport::*;
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+pub use hyper;
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+pub use hyper_util;
+
+use alloy_transport::utils::guess_local_url;
+use url::Url;
 
 /// An Http transport.
 ///
