@@ -565,7 +565,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> TransportResult<N::TransactionResponse> {
+    ) -> TransportResult<Option<N::TransactionResponse>> {
         self.client().request("eth_getTransactionByHash", (hash,)).await
     }
 
@@ -1205,7 +1205,8 @@ mod tests {
                 "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
             ))
             .await
-            .unwrap();
+            .expect("fail to fetch tx")
+            .expect("tx not finalized");
         assert_eq!(
             tx.block_hash.unwrap(),
             b256!("b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3")
