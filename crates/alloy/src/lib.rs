@@ -66,7 +66,7 @@ macro_rules! sol {
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
 #[cfg(feature = "reqwest")]
-use reqwest as _;
+pub use reqwest;
 
 #[cfg(feature = "hyper")]
 use hyper as _;
