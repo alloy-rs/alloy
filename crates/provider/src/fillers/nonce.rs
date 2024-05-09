@@ -151,12 +151,20 @@ mod tests {
 
         let pending = provider.send_transaction(tx.clone()).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
-        let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("fail to fetch tx").expect("tx didn't finalize");
+        let mined_tx = provider
+            .get_transaction_by_hash(tx_hash)
+            .await
+            .expect("fail to fetch tx")
+            .expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce, 0);
 
         let pending = provider.send_transaction(tx).await.unwrap();
         let tx_hash = pending.watch().await.unwrap();
-        let mined_tx = provider.get_transaction_by_hash(tx_hash).await.expect("fail to fetch tx").expect("tx didn't finalize");
+        let mined_tx = provider
+            .get_transaction_by_hash(tx_hash)
+            .await
+            .expect("fail to fetch tx")
+            .expect("tx didn't finalize");
         assert_eq!(mined_tx.nonce, 1);
     }
 }
