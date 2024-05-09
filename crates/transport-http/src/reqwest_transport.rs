@@ -6,10 +6,10 @@ use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
 
-/// Rexported from [`reqwest`](::reqwest).
+/// Rexported from [`reqwest`].
 pub use reqwest::Client;
 
-/// An [`Http`] transport using [`reqwest`](::reqwest).
+/// An [`Http`] transport using [`reqwest`].
 pub type ReqwestTransport = Http<Client>;
 
 impl Http<Client> {
