@@ -19,6 +19,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
+    Invalid,
     Preparing {
         client: WeakClient<T>,
         method: Cow<'static, str>,
@@ -38,6 +39,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Invalid => f.debug_tuple("Invalid").finish(),
             Self::Preparing { client, method, params, block_id, .. } => f
                 .debug_struct("Preparing")
                 .field("client", client)
@@ -69,14 +71,16 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     fn poll_preparing(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Output>> {
         let this = self.project();
-        match this.state {
+        let state = std::mem::replace(this.state, States::Invalid);
+
+        match state {
             States::Preparing { client, method, params, block_id, map } => {
                 let mut fut = {
                     // make sure the client still exists
@@ -110,7 +114,7 @@ where
                     }
 
                     // create the call
-                    client.request(method.clone(), ser).map_resp(map.clone())
+                    client.request(method.clone(), ser).map_resp(map)
                 };
                 // poll the call immediately
                 match fut.poll_unpin(cx) {
@@ -142,15 +146,17 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if matches!(self.state, States::Preparing { .. }) {
             self.poll_preparing(cx)
-        } else {
+        } else if matches!(self.state, States::Running { .. }) {
             self.poll_running(cx)
+        } else {
+            panic!("bad state")
         }
     }
 }
@@ -235,7 +241,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
