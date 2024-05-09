@@ -12,6 +12,7 @@ pub struct BeaconBlobBundle {
     pub data: Vec<BlobData>,
 }
 
+/// Yields an iterator for BlobData
 impl IntoIterator for BeaconBlobBundle {
     type Item = BlobData;
     type IntoIter = std::vec::IntoIter<BlobData>;
@@ -21,6 +22,7 @@ impl IntoIterator for BeaconBlobBundle {
     }
 }
 
+/// Intermediate type for BlobTransactionSidecar matching
 pub struct SidecarIterator {
     pub iter: std::vec::IntoIter<BlobData>,
 }
@@ -30,12 +32,13 @@ impl SidecarIterator {
         SidecarIterator { iter: bundle.into_iter() }
     }
 
+    /// Returns a BlobTransactionSidecar of len num_hashes.
     pub fn next_sidecar(&mut self, num_hashes: usize) -> Option<BlobTransactionSidecar> {
         let mut blobs = Vec::with_capacity(num_hashes);
         let mut commitments = Vec::with_capacity(num_hashes);
         let mut proofs = Vec::with_capacity(num_hashes);
         for _ in 0..num_hashes {
-            let next = self.iter.next()?; // Consumes an element from the iterator
+            let next = self.iter.next()?;
             blobs.push(*next.blob);
             commitments.push(next.kzg_commitment);
             proofs.push(next.kzg_proof);
