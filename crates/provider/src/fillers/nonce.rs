@@ -154,8 +154,8 @@ mod tests {
         let mined_tx = provider
             .get_transaction_by_hash(tx_hash)
             .await
-            .expect("fail to fetch tx")
-            .expect("tx didn't finalize");
+            .expect("failed to fetch tx")
+            .expect("tx not included");
         assert_eq!(mined_tx.nonce, 0);
 
         let pending = provider.send_transaction(tx).await.unwrap();

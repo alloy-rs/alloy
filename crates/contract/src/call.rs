@@ -721,8 +721,8 @@ mod tests {
         let transaction = provider
             .get_transaction_by_hash(transaction_hash)
             .await
-            .expect("fail to fetch tx")
-            .expect("not tx not finalized");
+            .expect("failed to fetch tx")
+            .expect("tx not included");
         assert_eq!(
             transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
             max_fee_per_gas.to(),

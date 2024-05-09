@@ -1201,7 +1201,7 @@ mod tests {
 
         let provider = ProviderBuilder::new().on_anvil();
         let tx_hash = b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95");
-        let tx = provider.get_transaction_by_hash(tx_hash).await.expect("fail to fetch tx");
+        let tx = provider.get_transaction_by_hash(tx_hash).await.expect("failed to fetch tx");
 
         assert!(tx.is_none());
     }
@@ -1217,12 +1217,12 @@ mod tests {
             .value(U256::ZERO)
             .input(bytes!("deadbeef").into());
 
-        let tx_hash = *provider.send_transaction(req).await.expect("fail to send tx").tx_hash();
+        let tx_hash = *provider.send_transaction(req).await.expect("failed to send tx").tx_hash();
 
         let tx = provider
             .get_transaction_by_hash(tx_hash)
             .await
-            .expect("fail to fetch tx")
+            .expect("failed to fetch tx")
             .expect("tx not included");
         assert_eq!(tx.input, bytes!("deadbeef"));
     }
