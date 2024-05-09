@@ -928,7 +928,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
-    use crate::ProviderBuilder;
+    use crate::{ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
@@ -1209,19 +1209,22 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+
+        let req = TransactionRequest::default()
+            .from(provider.default_signer_address())
+            .to(Address::repeat_byte(5))
+            .value(U256::ZERO)
+            .input(bytes!("deadbeef").into());
+
+        let tx_hash = *provider.send_transaction(req).await.expect("fail to send tx").tx_hash();
+
         let tx = provider
-            .get_transaction_by_hash(b256!(
-                "5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95"
-            ))
+            .get_transaction_by_hash(tx_hash)
             .await
             .expect("fail to fetch tx")
-            .expect("tx not finalized");
-        assert_eq!(
-            tx.block_hash.unwrap(),
-            b256!("b20e6f35d4b46b3c4cd72152faec7143da851a0dc281d390bdd50f58bfbdb5d3")
-        );
-        assert_eq!(tx.block_number.unwrap(), 4571819);
+            .expect("tx not included");
+        assert_eq!(tx.input, bytes!("deadbeef"));
     }
 
     #[tokio::test]
