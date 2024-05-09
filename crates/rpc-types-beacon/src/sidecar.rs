@@ -1,5 +1,5 @@
 use crate::header::Header;
-use alloy_eips::eip4844::{Blob, Bytes48};
+use alloy_eips::eip4844::{Blob, BlobTransactionSidecar, Bytes48};
 use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -10,6 +10,38 @@ use serde_with::{serde_as, DisplayFromStr};
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
     pub data: Vec<BlobData>,
+}
+
+impl IntoIterator for BeaconBlobBundle {
+    type Item = BlobData;
+    type IntoIter = std::vec::IntoIter<BlobData>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
+    }
+}
+
+pub struct SidecarIterator {
+    pub iter: std::vec::IntoIter<BlobData>,
+}
+
+impl SidecarIterator {
+    pub fn new(bundle: BeaconBlobBundle) -> Self {
+        SidecarIterator { iter: bundle.into_iter() }
+    }
+
+    pub fn next_sidecar(&mut self, num_hashes: usize) -> Option<BlobTransactionSidecar> {
+        let mut blobs = Vec::with_capacity(num_hashes);
+        let mut commitments = Vec::with_capacity(num_hashes);
+        let mut proofs = Vec::with_capacity(num_hashes);
+        for _ in 0..num_hashes {
+            let next = self.iter.next()?; // Consumes an element from the iterator
+            blobs.push(*next.blob);
+            commitments.push(next.kzg_commitment);
+            proofs.push(next.kzg_proof);
+        }
+        Some(BlobTransactionSidecar { blobs, commitments, proofs })
+    }
 }
 
 /// Individual Blob data that belongs to a 4844 transaction.
@@ -32,7 +64,7 @@ pub struct BlobData {
     pub kzg_commitment_inclusion_proof: Vec<B256>,
 }
 
-// Helper function to deserialize boxed blobs
+/// Helper function to deserialize boxed blobs
 fn deserialize_blob<'de, D>(deserializer: D) -> Result<Box<Blob>, D::Error>
 where
     D: serde::de::Deserializer<'de>,
@@ -48,7 +80,7 @@ where
 mod tests {
     use super::*;
 
-    // Should deserialise json containing 6 blobs
+    /// Should deserialise json containing 6 blobs
     #[test]
     fn serde_sidecar_bundle() {
         let s = include_str!("examples/sidecar.json");
