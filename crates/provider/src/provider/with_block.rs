@@ -112,6 +112,7 @@ where
                     // create the call
                     client.request(method.clone(), ser).map_resp(map.clone())
                 };
+                // poll the call immediately
                 match fut.poll_unpin(cx) {
                     Poll::Ready(value) => Poll::Ready(value),
                     Poll::Pending => {
