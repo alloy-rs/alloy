@@ -19,7 +19,7 @@ use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///
-/// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
+/// [`BlobTransactionSidecar`]: crate::eip4844::BlobTransactionSidecar
 #[derive(Clone, Debug)]
 pub struct PartialSidecar {
     /// The blobs in the sidecar.
@@ -266,7 +266,7 @@ impl SidecarCoder for SimpleCoder {
 /// which is then split into blobs. It delays KZG commitments and proofs
 /// until all data is ready.
 ///
-/// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
+/// [`BlobTransactionSidecar`]: crate::eip4844::BlobTransactionSidecar
 #[derive(Clone, Debug)]
 pub struct SidecarBuilder<T = SimpleCoder> {
     /// The blob array we will code data into
