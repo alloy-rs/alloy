@@ -41,21 +41,13 @@ pub struct Transaction {
     #[serde(with = "alloy_serde::num::u64_via_ruint")]
     pub nonce: u64,
     /// Block hash
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub block_hash: Option<B256>,
     /// Block number
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
     pub block_number: Option<u64>,
     /// Transaction Index
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
