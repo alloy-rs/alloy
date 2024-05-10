@@ -56,7 +56,7 @@ pub struct FeeHistory {
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
-        // with = "alloy_serde::num::u128_vec_via_ruint"
+        with = "alloy_serde::num::u128_vec_via_ruint"
     )]
     pub base_fee_per_blob_gas: Vec<u128>,
     /// An array of block blob gas used ratios. These are calculated as the ratio of gasUsed and
