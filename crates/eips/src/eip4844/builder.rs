@@ -6,13 +6,17 @@ use c_kzg::{KzgCommitment, KzgProof};
 use alloc::vec::Vec;
 
 use crate::eip4844::{
-    utils::WholeFe, BlobTransactionSidecar, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
     MAX_BLOBS_PER_BLOCK,
 };
 
+#[cfg(feature = "arbitrary")]
+use crate::eip4844::BlobTransactionSidecar;
+#[cfg(feature = "kzg")]
+use crate::eip4844::Bytes48;
 #[cfg(feature = "kzg")]
 use crate::eip4844::env_settings::EnvKzgSettings;
-use crate::eip4844::Bytes48;
+#[cfg(feature = "kzg")]
 use core::mem;
 #[cfg(feature = "arbitrary")]
 use alloy_primitives::private::arbitrary::{Arbitrary, Unstructured};
