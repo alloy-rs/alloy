@@ -10,7 +10,7 @@ use std::vec::IntoIter;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
-    pub data: Vec<BlobData>,
+    data: Vec<BlobData>,
 }
 
 /// Yields an iterator for BlobData
@@ -24,8 +24,17 @@ impl IntoIterator for BeaconBlobBundle {
 }
 
 /// Intermediate type for BlobTransactionSidecar matching
+#[derive(Debug, Clone)]
 pub struct SidecarIterator {
     pub iter: IntoIter<BlobData>,
+}
+
+impl Iterator for SidecarIterator {
+    type Item = BlobData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
 }
 
 impl SidecarIterator {
@@ -39,7 +48,7 @@ impl SidecarIterator {
         let mut commitments = Vec::with_capacity(num_hashes);
         let mut proofs = Vec::with_capacity(num_hashes);
         for _ in 0..num_hashes {
-            let next = self.iter.next()?;
+            let next = self.next()?;
             blobs.push(*next.blob);
             commitments.push(next.kzg_commitment);
             proofs.push(next.kzg_proof);
