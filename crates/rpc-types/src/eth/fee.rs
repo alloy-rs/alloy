@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_fee_history_serde() {
         let sample = r#"{"baseFeePerGas":["0x342770c0","0x2da282a8"],"gasUsedRatio":[0.0],"baseFeePerBlobGas":["0x0","0x0"],"blobGasUsedRatio":[0.0],"oldestBlock":"0x1"}"#;
-        let fee_history: FeeHistory = serde_json::from_str(&sample).unwrap();
+        let fee_history: FeeHistory = serde_json::from_str(sample).unwrap();
         let expected = FeeHistory {
             base_fee_per_blob_gas: vec![0, 0],
             base_fee_per_gas: vec![875000000, 765625000],
