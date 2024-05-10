@@ -27,6 +27,7 @@ pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 mod receipt;
 pub use receipt::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt};
 
+/// Transaction types
 pub mod transaction;
 pub use transaction::{
     SignableTransaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType, TypedTransaction,
