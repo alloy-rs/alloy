@@ -537,13 +537,6 @@ fn serialize_string_storage_map_opt<S: Serializer>(
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GethTraceBlockResponse {
-    pub tx_hash : TxHash,
-    pub result: GethTrace,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
