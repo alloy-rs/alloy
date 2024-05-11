@@ -272,89 +272,89 @@ impl BlockId {
     /// Returns the block hash if it is [BlockId::Hash]
     pub const fn as_block_hash(&self) -> Option<B256> {
         match self {
-            BlockId::Hash(hash) => Some(hash.block_hash),
-            BlockId::Number(_) => None,
+            Self::Hash(hash) => Some(hash.block_hash),
+            Self::Number(_) => None,
         }
     }
 
     /// Returns true if this is [BlockNumberOrTag::Latest]
     pub const fn is_latest(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Latest))
+        matches!(self, Self::Number(BlockNumberOrTag::Latest))
     }
 
     /// Returns true if this is [BlockNumberOrTag::Pending]
     pub const fn is_pending(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Pending))
+        matches!(self, Self::Number(BlockNumberOrTag::Pending))
     }
 
     /// Returns true if this is [BlockNumberOrTag::Safe]
     pub const fn is_safe(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Safe))
+        matches!(self, Self::Number(BlockNumberOrTag::Safe))
     }
 
     /// Returns true if this is [BlockNumberOrTag::Finalized]
     pub const fn is_finalized(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Finalized))
+        matches!(self, Self::Number(BlockNumberOrTag::Finalized))
     }
 
     /// Returns true if this is [BlockNumberOrTag::Earliest]
     pub const fn is_earliest(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Earliest))
+        matches!(self, Self::Number(BlockNumberOrTag::Earliest))
     }
 
     /// Returns true if this is [BlockNumberOrTag::Number]
     pub const fn is_number(&self) -> bool {
-        matches!(self, BlockId::Number(BlockNumberOrTag::Number(_)))
+        matches!(self, Self::Number(BlockNumberOrTag::Number(_)))
     }
     /// Returns true if this is [BlockId::Hash]
     pub const fn is_hash(&self) -> bool {
-        matches!(self, BlockId::Hash(_))
+        matches!(self, Self::Hash(_))
     }
 
     /// Creates a new "pending" tag instance.
     pub const fn pending() -> Self {
-        BlockId::Number(BlockNumberOrTag::Pending)
+        Self::Number(BlockNumberOrTag::Pending)
     }
 
     /// Creates a new "latest" tag instance.
     pub const fn latest() -> Self {
-        BlockId::Number(BlockNumberOrTag::Latest)
+        Self::Number(BlockNumberOrTag::Latest)
     }
 
     /// Creates a new "earliest" tag instance.
     pub const fn earliest() -> Self {
-        BlockId::Number(BlockNumberOrTag::Earliest)
+        Self::Number(BlockNumberOrTag::Earliest)
     }
 
     /// Creates a new "finalized" tag instance.
     pub const fn finalized() -> Self {
-        BlockId::Number(BlockNumberOrTag::Finalized)
+        Self::Number(BlockNumberOrTag::Finalized)
     }
 
     /// Creates a new "safe" tag instance.
     pub const fn safe() -> Self {
-        BlockId::Number(BlockNumberOrTag::Safe)
+        Self::Number(BlockNumberOrTag::Safe)
     }
 
     /// Creates a new block number instance.
     pub const fn number(num: u64) -> Self {
-        BlockId::Number(BlockNumberOrTag::Number(num))
+        Self::Number(BlockNumberOrTag::Number(num))
     }
 
     /// Create a new block hash instance.
     pub const fn hash(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
+        Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 
     /// Create a new block hash instance that requires the block to be canonical.
     pub const fn hash_canonical(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
+        Self::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
     }
 }
 
 impl Default for BlockId {
     fn default() -> Self {
-        BlockId::Number(BlockNumberOrTag::Latest)
+        Self::Number(BlockNumberOrTag::Latest)
     }
 }
 
@@ -372,19 +372,19 @@ impl From<U64> for BlockId {
 
 impl From<BlockNumberOrTag> for BlockId {
     fn from(num: BlockNumberOrTag) -> Self {
-        BlockId::Number(num)
+        Self::Number(num)
     }
 }
 
 impl From<B256> for BlockId {
     fn from(block_hash: B256) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash, require_canonical: None })
+        Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 }
 
 impl From<(B256, Option<bool>)> for BlockId {
     fn from(hash_can: (B256, Option<bool>)) -> Self {
-        BlockId::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
+        Self::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
     }
 }
 
@@ -395,7 +395,7 @@ impl Serialize for BlockId {
         S: Serializer,
     {
         match self {
-            BlockId::Hash(RpcBlockHash { block_hash, require_canonical }) => {
+            Self::Hash(RpcBlockHash { block_hash, require_canonical }) => {
                 let mut s = serializer.serialize_struct("BlockIdEip1898", 1)?;
                 s.serialize_field("blockHash", block_hash)?;
                 if let Some(require_canonical) = require_canonical {
@@ -403,7 +403,7 @@ impl Serialize for BlockId {
                 }
                 s.end()
             }
-            BlockId::Number(num) => num.serialize(serializer),
+            Self::Number(num) => num.serialize(serializer),
         }
     }
 }
@@ -622,21 +622,21 @@ impl BlockHashOrNumber {
     #[inline]
     pub const fn as_number(self) -> Option<u64> {
         match self {
-            BlockHashOrNumber::Hash(_) => None,
-            BlockHashOrNumber::Number(num) => Some(num),
+            Self::Hash(_) => None,
+            Self::Number(num) => Some(num),
         }
     }
 }
 
 impl From<B256> for BlockHashOrNumber {
     fn from(value: B256) -> Self {
-        BlockHashOrNumber::Hash(value)
+        Self::Hash(value)
     }
 }
 
 impl From<u64> for BlockHashOrNumber {
     fn from(value: u64) -> Self {
-        BlockHashOrNumber::Number(value)
+        Self::Number(value)
     }
 }
 

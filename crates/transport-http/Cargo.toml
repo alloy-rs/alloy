@@ -20,6 +20,7 @@ serde_json = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
 
 reqwest = { workspace = true, features = ["json"], optional = true }
+tracing = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 http-body-util = { workspace = true, optional = true }
@@ -28,7 +29,7 @@ hyper-util = { workspace = true, features = ["full"], optional = true }
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
-reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower"]
+reqwest = ["dep:reqwest", "dep:alloy-json-rpc", "dep:serde_json", "dep:tower", "dep:tracing"]
 hyper = [
     "dep:hyper",
     "dep:hyper-util",
@@ -36,6 +37,7 @@ hyper = [
     "dep:alloy-json-rpc",
     "dep:serde_json",
     "dep:tower",
+    "dep:tracing"
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]

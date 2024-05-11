@@ -12,6 +12,8 @@ use coins_ledger::{
 use futures_util::lock::Mutex;
 
 #[cfg(feature = "eip712")]
+use alloy_dyn_abi::TypedData;
+#[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
 /// A Ledger Ethereum signer.
@@ -71,7 +73,17 @@ impl Signer for LedgerSigner {
         payload: &T,
         domain: &Eip712Domain,
     ) -> Result<Signature> {
-        self.sign_typed_data_(payload, domain).await.map_err(alloy_signer::Error::other)
+        self.sign_typed_data_(&payload.eip712_hash_struct(), domain)
+            .await
+            .map_err(alloy_signer::Error::other)
+    }
+
+    #[cfg(feature = "eip712")]
+    #[inline]
+    async fn sign_dynamic_typed_data(&self, payload: &TypedData) -> Result<Signature> {
+        self.sign_typed_data_(&payload.hash_struct()?, &payload.domain)
+            .await
+            .map_err(alloy_signer::Error::other)
     }
 
     #[inline]
@@ -192,9 +204,9 @@ impl LedgerSigner {
     }
 
     #[cfg(feature = "eip712")]
-    async fn sign_typed_data_<T: SolStruct>(
+    async fn sign_typed_data_(
         &self,
-        payload: &T,
+        hash_struct: &B256,
         domain: &Eip712Domain,
     ) -> Result<Signature, LedgerError> {
         // See comment for v1.6.0 requirement
@@ -210,7 +222,7 @@ impl LedgerSigner {
 
         let mut data = Self::path_to_bytes(&self.derivation);
         data.extend_from_slice(domain.separator().as_slice());
-        data.extend_from_slice(payload.eip712_hash_struct().as_slice());
+        data.extend_from_slice(hash_struct.as_slice());
 
         self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
     }

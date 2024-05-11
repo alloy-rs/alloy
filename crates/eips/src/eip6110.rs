@@ -14,14 +14,14 @@ pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
     address!("00000000219ab540356cbb839cbe05303d7705fa");
 
 /// This structure maps onto the deposit object from [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, RlpEncodable, RlpDecodable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-pub struct DepositReceipt {
+pub struct DepositRequest {
     /// Validator public key
     pub pubkey: FixedBytes<48>,
     /// Withdrawal credentials

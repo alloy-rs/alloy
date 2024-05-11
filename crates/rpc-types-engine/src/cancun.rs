@@ -43,6 +43,11 @@ impl MaybeCancunPayloadFields {
     pub fn versioned_hashes(&self) -> Option<&Vec<B256>> {
         self.fields.as_ref().map(|fields| &fields.versioned_hashes)
     }
+
+    /// Returns a reference to the inner fields.
+    pub const fn as_ref(&self) -> Option<&CancunPayloadFields> {
+        self.fields.as_ref()
+    }
 }
 
 impl From<CancunPayloadFields> for MaybeCancunPayloadFields {

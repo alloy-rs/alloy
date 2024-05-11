@@ -14,6 +14,18 @@ feature-parity in Alloy. No action is currently needed from devs.
 [telegram-badge]: https://img.shields.io/endpoint?color=neon&style=for-the-badge&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fethers_rs
 [telegram-url]: https://t.me/ethers_rs
 
+## Installation
+
+Currently, Alloy is not hosted on [crates.io](https://crates.io), the Rust package registry.
+
+To incorporate Alloy into your project, you will need to specify the GitHub repository as the source. This can be achieved by executing the following command in your terminal:
+
+```sh
+cargo add alloy --git https://github.com/alloy-rs/alloy
+```
+
+After incorporating Alloy, you may wish to utilize specific features of the crate. These features can be enabled through modifications in your project's `Cargo.toml` file. A comprehensive list of available features can be found at [this GitHub link](https://github.com/alloy-rs/alloy/blob/35cbf35164f31d2de1b84b2a8a9986e5b9b1560f/crates/alloy/Cargo.toml#L89). 
+
 ## Overview
 
 This repository contains the following crates:

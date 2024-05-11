@@ -16,6 +16,8 @@ alloy-primitives = { workspace = true, features = ["rlp"], default-features = fa
 alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
 alloy-serde.workspace = true
 
+sha2 = { workspace = true, default-features = false }
+
 # serde
 serde = { workspace = true, default-features = false, optional = true }
 

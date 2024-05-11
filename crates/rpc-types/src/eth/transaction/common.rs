@@ -19,9 +19,17 @@ pub struct TransactionInfo {
     pub base_fee: Option<u128>,
 }
 
+impl TransactionInfo {
+    /// Returns a new [`TransactionInfo`] with the provided base fee.
+    pub const fn with_base_fee(mut self, base_fee: u128) -> Self {
+        self.base_fee = Some(base_fee);
+        self
+    }
+}
+
 impl From<&Transaction> for TransactionInfo {
     fn from(tx: &Transaction) -> Self {
-        TransactionInfo {
+        Self {
             hash: Some(tx.hash),
             index: tx.transaction_index,
             block_hash: tx.block_hash,

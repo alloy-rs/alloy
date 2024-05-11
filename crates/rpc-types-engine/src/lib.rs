@@ -21,7 +21,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 mod cancun;
-mod exit;
 mod forkchoice;
 mod identification;
 mod jwt;
@@ -30,12 +29,14 @@ pub mod payload;
 mod transition;
 
 pub use self::{
-    cancun::*, exit::*, forkchoice::*, identification::*, jwt::*, optimism::*, payload::*,
-    transition::*,
+    cancun::*, forkchoice::*, identification::*, jwt::*, optimism::*, payload::*, transition::*,
 };
 
 #[doc(inline)]
-pub use alloy_eips::eip6110::DepositReceipt;
+pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;
+
+#[doc(inline)]
+pub use alloy_eips::eip7002::WithdrawalRequest as WithdrawalRequestV1;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
 pub const CAPABILITIES: [&str; 12] = [
