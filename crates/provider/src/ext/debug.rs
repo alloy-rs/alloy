@@ -1,9 +1,11 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{BlockNumber, TxHash, B256};
+use alloy_primitives::{TxHash, B256};
 use alloy_rpc_types::{BlockNumberOrTag, TransactionRequest};
-use alloy_rpc_types_trace::geth::{GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, GethTraceBlockResponse};
+use alloy_rpc_types_trace::geth::{
+    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
+};
 use alloy_transport::{Transport, TransportResult};
 
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
@@ -35,12 +37,14 @@ pub trait DebugApi<N, T>: Send + Sync {
     ///
     /// # Note
     ///
+    /// https://github.com/ethereum/go-ethereum/blob/44a50c9f96386f44a8682d51cf7500044f6cbaea/eth/tracers/api.go#L448
+    ///
     /// Not all nodes support this call.
     async fn debug_trace_block_by_hash(
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTraceBlockResponse>>;
+    ) -> TransportResult<Vec<TraceResult>>;
 
     /// Same as `debug_trace_block_by_hash` but block is specified by number.
     ///
@@ -48,12 +52,14 @@ pub trait DebugApi<N, T>: Send + Sync {
     ///
     /// # Note
     ///
+    /// https://github.com/ethereum/go-ethereum/blob/44a50c9f96386f44a8682d51cf7500044f6cbaea/eth/tracers/api.go#L438
+    ///
     /// Not all nodes support this call.
     async fn debug_trace_block_by_number(
         &self,
         block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTraceBlockResponse>>;
+    ) -> TransportResult<Vec<TraceResult>>;
 
     /// Executes the given transaction without publishing it like `eth_call` and returns the trace
     /// of the execution.
@@ -109,7 +115,7 @@ where
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTraceBlockResponse>> {
+    ) -> TransportResult<Vec<TraceResult>> {
         self.client().request("debug_traceBlockByHash", (block, trace_options)).await
     }
 
@@ -117,7 +123,7 @@ where
         &self,
         block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTraceBlockResponse>> {
+    ) -> TransportResult<Vec<TraceResult>> {
         self.client().request("debug_traceBlockByNumber", (block, trace_options)).await
     }
 
