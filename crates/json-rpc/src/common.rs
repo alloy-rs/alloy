@@ -111,15 +111,15 @@ impl Ord for Id {
         // strings < null
         // null == null
         match (self, other) {
-            (Id::Number(a), Id::Number(b)) => a.cmp(b),
-            (Id::Number(_), _) => std::cmp::Ordering::Less,
+            (Self::Number(a), Self::Number(b)) => a.cmp(b),
+            (Self::Number(_), _) => std::cmp::Ordering::Less,
 
-            (Id::String(_), Id::Number(_)) => std::cmp::Ordering::Greater,
-            (Id::String(a), Id::String(b)) => a.cmp(b),
-            (Id::String(_), Id::None) => std::cmp::Ordering::Less,
+            (Self::String(_), Self::Number(_)) => std::cmp::Ordering::Greater,
+            (Self::String(a), Self::String(b)) => a.cmp(b),
+            (Self::String(_), Self::None) => std::cmp::Ordering::Less,
 
-            (Id::None, Id::None) => std::cmp::Ordering::Equal,
-            (Id::None, _) => std::cmp::Ordering::Greater,
+            (Self::None, Self::None) => std::cmp::Ordering::Equal,
+            (Self::None, _) => std::cmp::Ordering::Greater,
         }
     }
 }

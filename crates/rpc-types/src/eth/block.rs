@@ -450,9 +450,9 @@ pub enum BlockTransactionsKind {
 impl From<bool> for BlockTransactionsKind {
     fn from(is_full: bool) -> Self {
         if is_full {
-            BlockTransactionsKind::Full
+            Self::Full
         } else {
-            BlockTransactionsKind::Hashes
+            Self::Hashes
         }
     }
 }
@@ -473,7 +473,7 @@ pub type RichBlock = Rich<Block>;
 
 impl From<Block> for RichBlock {
     fn from(block: Block) -> Self {
-        Rich { inner: block, extra_info: Default::default() }
+        Self { inner: block, extra_info: Default::default() }
     }
 }
 
@@ -482,7 +482,7 @@ pub type RichHeader = Rich<Header>;
 
 impl From<Header> for RichHeader {
     fn from(header: Header) -> Self {
-        Rich { inner: header, extra_info: Default::default() }
+        Self { inner: header, extra_info: Default::default() }
     }
 }
 

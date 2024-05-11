@@ -64,7 +64,7 @@ where
 
     /// Instantiate a new `LocalUsageError` from a custom error.
     pub fn local_usage(err: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::LocalUsageError(Box::new(err))
+        Self::LocalUsageError(err.into())
     }
 
     /// Instantiate a new `LocalUsageError` from a custom error message.
