@@ -20,11 +20,11 @@ futures.workspace = true
 pin-project.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-tokio-util = { workspace = true, features = ["io", "compat"] }
+tokio-util = { workspace = true, features = ["io"] }
 tracing.workspace = true
 
 bytes = "1.5.0"
-interprocess = { version = "1.2.1", features = ["tokio", "tokio_support"] }
+interprocess = { version = "2", features = ["tokio"] }
 serde = { workspace = true, optional = true }
 tempfile = { workspace = true, optional = true }
 

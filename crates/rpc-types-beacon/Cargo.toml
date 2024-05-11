@@ -1,0 +1,22 @@
+[package]
+name = "alloy-rpc-types-beacon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+# ethereum
+alloy-eips = { workspace = true, features = ["serde"] }
+alloy-rpc-types-engine.workspace = true
+alloy-primitives.workspace = true
+
+serde.workspace = true
+serde_with.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

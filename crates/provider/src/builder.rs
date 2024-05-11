@@ -79,7 +79,7 @@ pub struct Stack<Inner, Outer> {
 impl<Inner, Outer> Stack<Inner, Outer> {
     /// Create a new `Stack`.
     pub const fn new(inner: Inner, outer: Outer) -> Self {
-        Stack { inner, outer }
+        Self { inner, outer }
     }
 }
 
@@ -116,13 +116,13 @@ pub struct ProviderBuilder<L, F, N = Ethereum> {
 impl ProviderBuilder<Identity, Identity, Ethereum> {
     /// Create a new [`ProviderBuilder`].
     pub const fn new() -> Self {
-        ProviderBuilder { layer: Identity, filler: Identity, network: PhantomData }
+        Self { layer: Identity, filler: Identity, network: PhantomData }
     }
 }
 
 impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     fn default() -> Self {
-        ProviderBuilder { layer: Identity, filler: Identity, network: PhantomData }
+        Self { layer: Identity, filler: Identity, network: PhantomData }
     }
 }
 

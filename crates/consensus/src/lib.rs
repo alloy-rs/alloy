@@ -27,6 +27,9 @@ pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 mod receipt;
 pub use receipt::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt};
 
+mod request;
+pub use request::Request;
+
 mod transaction;
 pub use transaction::{
     eip4844_utils, Blob, BlobTransactionSidecar, Bytes48, SidecarBuilder, SidecarCoder,

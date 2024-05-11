@@ -5,57 +5,22 @@ pub mod utils;
 
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 
-use alloy_eips::{
-    eip2930::AccessList,
-    eip4844::{BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF, DATA_GAS_PER_BLOB},
-};
-use alloy_primitives::{
-    keccak256, Address, Bytes, ChainId, FixedBytes, Signature, TxKind, B256, U256,
-};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
-use sha2::{Digest, Sha256};
+
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobTransactionSidecar;
+
+#[cfg(feature = "kzg")]
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobTransactionValidationError;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-#[cfg(not(feature = "kzg"))]
 pub use alloy_eips::eip4844::{Blob, Bytes48};
-
-#[cfg(feature = "kzg")]
-use c_kzg::{KzgCommitment, KzgProof, KzgSettings};
-#[cfg(feature = "kzg")]
-use std::ops::Deref;
-
-#[cfg(feature = "kzg")]
-pub use c_kzg::{Blob, Bytes48};
-
-/// An error that can occur when validating a [TxEip4844Variant].
-#[derive(Debug, thiserror::Error)]
-#[cfg(feature = "kzg")]
-pub enum BlobTransactionValidationError {
-    /// Proof validation failed.
-    #[error("invalid KZG proof")]
-    InvalidProof,
-    /// An error returned by [`c_kzg`].
-    #[error("KZG error: {0:?}")]
-    KZGError(#[from] c_kzg::Error),
-    /// The inner transaction is not a blob transaction.
-    #[error("unable to verify proof for non blob transaction: {0}")]
-    NotBlobTransaction(u8),
-    /// Using a standalone [TxEip4844] instead of the [TxEip4844WithSidecar] variant, which
-    /// includes the sidecar for validation.
-    #[error("eip4844 tx variant without sidecar being used for verification. Please use the TxEip4844WithSidecar variant, which includes the sidecar")]
-    MissingSidecar,
-    /// The versioned hash is incorrect.
-    #[error("wrong versioned hash: have {have}, expected {expected}")]
-    WrongVersionedHash {
-        /// The versioned hash we got
-        have: B256,
-        /// The versioned hash we expected
-        expected: B256,
-    },
-}
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -126,7 +91,7 @@ impl TxEip4844Variant {
     #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
             TxEip4844Variant::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
@@ -429,8 +394,8 @@ impl TxEip4844 {
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
-    /// Takes as input the [KzgSettings], which should contain the parameters derived from the
-    /// KZG trusted setup.
+    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
+    /// derived from the KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
     /// commitments, and proofs. Each blob data element is verified against its commitment and
@@ -443,47 +408,9 @@ impl TxEip4844 {
     pub fn validate_blob(
         &self,
         sidecar: &BlobTransactionSidecar,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
-        // Ensure the versioned hashes and commitments have the same length.
-        if self.blob_versioned_hashes.len() != sidecar.commitments.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "There are {} versioned commitment hashes and {} commitments",
-                self.blob_versioned_hashes.len(),
-                sidecar.commitments.len()
-            ))
-            .into());
-        }
-
-        // calculate versioned hashes by zipping & iterating
-        for (versioned_hash, commitment) in
-            self.blob_versioned_hashes.iter().zip(sidecar.commitments.iter())
-        {
-            let commitment = KzgCommitment::from(*commitment.deref());
-
-            // calculate & verify versioned hash
-            let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
-            if *versioned_hash != calculated_versioned_hash {
-                return Err(BlobTransactionValidationError::WrongVersionedHash {
-                    have: *versioned_hash,
-                    expected: calculated_versioned_hash,
-                });
-            }
-        }
-
-        let res = KzgProof::verify_blob_kzg_proof_batch(
-            sidecar.blobs.as_slice(),
-            sidecar.commitments.as_slice(),
-            sidecar.proofs.as_slice(),
-            proof_settings,
-        )
-        .map_err(BlobTransactionValidationError::KZGError)?;
-
-        if res {
-            Ok(())
-        } else {
-            Err(BlobTransactionValidationError::InvalidProof)
-        }
+        sidecar.validate(&self.blob_versioned_hashes, proof_settings)
     }
 
     /// Decodes the inner [TxEip4844Variant] fields from RLP bytes.
@@ -798,7 +725,7 @@ impl TxEip4844WithSidecar {
     #[cfg(feature = "kzg")]
     pub fn validate_blob(
         &self,
-        proof_settings: &KzgSettings,
+        proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         self.tx.validate_blob(&self.sidecar, proof_settings)
     }
@@ -859,7 +786,7 @@ impl TxEip4844WithSidecar {
         // now write the fields
         self.tx.encode_fields(out);
         signature.write_rlp_vrs(out);
-        self.sidecar.encode_inner(out);
+        self.sidecar.encode(out);
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
@@ -884,7 +811,7 @@ impl TxEip4844WithSidecar {
         let inner_tx = TxEip4844::decode_signed_fields(buf)?;
 
         // decode the sidecar
-        let sidecar = BlobTransactionSidecar::decode_inner(buf)?;
+        let sidecar = BlobTransactionSidecar::decode(buf)?;
 
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -972,154 +899,16 @@ impl Transaction for TxEip4844WithSidecar {
     }
 }
 
-/// This represents a set of blobs, and its corresponding commitments and proofs.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[repr(C)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BlobTransactionSidecar {
-    /// The blob data.
-    pub blobs: Vec<Blob>,
-    /// The blob commitments.
-    pub commitments: Vec<Bytes48>,
-    /// The blob proofs.
-    pub proofs: Vec<Bytes48>,
-}
-
-impl BlobTransactionSidecar {
-    /// Constructs a new [BlobTransactionSidecar] from a set of blobs, commitments, and proofs.
-    pub fn new(blobs: Vec<Blob>, commitments: Vec<Bytes48>, proofs: Vec<Bytes48>) -> Self {
-        Self { blobs, commitments, proofs }
-    }
-
-    /// Returns an iterator over the versioned hashes of the commitments.
-    pub fn versioned_hashes(&self) -> impl Iterator<Item = B256> + '_ {
-        self.commitments.iter().map(|c| kzg_to_versioned_hash(c.as_slice()))
-    }
-
-    /// Returns the versioned hash for the blob at the given index, if it
-    /// exists.
-    pub fn versioned_hash_for_blob(&self, blob_index: usize) -> Option<B256> {
-        self.commitments.get(blob_index).map(|c| kzg_to_versioned_hash(c.as_slice()))
-    }
-
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
-    ///
-    /// This encodes the fields in the following order:
-    /// - `blobs`
-    /// - `commitments`
-    /// - `proofs`
-    #[inline]
-    pub(crate) fn encode_inner(&self, out: &mut dyn BufMut) {
-        BlobTransactionSidecarRlp::wrap_ref(self).encode(out);
-    }
-
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
-    ///
-    /// This decodes the fields in the following order:
-    /// - `blobs`
-    /// - `commitments`
-    /// - `proofs`
-    pub(crate) fn decode_inner(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(BlobTransactionSidecarRlp::decode(buf)?.unwrap())
-    }
-
-    /// Outputs the RLP length of the [BlobTransactionSidecar] fields, without a RLP header.
-    pub fn fields_len(&self) -> usize {
-        BlobTransactionSidecarRlp::wrap_ref(self).fields_len()
-    }
-
-    /// Calculates a size heuristic for the in-memory size of the [BlobTransactionSidecar].
-    #[inline]
-    pub fn size(&self) -> usize {
-        self.blobs.len() * BYTES_PER_BLOB + // blobs
-        self.commitments.len() * BYTES_PER_COMMITMENT + //   commitments
-        self.proofs.len() * BYTES_PER_PROOF // proofs
-    }
-}
-
-impl Encodable for BlobTransactionSidecar {
-    /// Encodes the inner [BlobTransactionSidecar] fields as RLP bytes, without a RLP header.
-    fn encode(&self, s: &mut dyn BufMut) {
-        self.encode_inner(s);
-    }
-
-    fn length(&self) -> usize {
-        self.fields_len()
-    }
-}
-
-impl Decodable for BlobTransactionSidecar {
-    /// Decodes the inner [BlobTransactionSidecar] fields from RLP bytes, without a RLP header.
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::decode_inner(buf)
-    }
-}
-
-// Wrapper for c-kzg rlp
-#[repr(C)]
-struct BlobTransactionSidecarRlp {
-    blobs: Vec<FixedBytes<BYTES_PER_BLOB>>,
-    commitments: Vec<FixedBytes<BYTES_PER_COMMITMENT>>,
-    proofs: Vec<FixedBytes<BYTES_PER_PROOF>>,
-}
-
-const _: [(); mem::size_of::<BlobTransactionSidecar>()] =
-    [(); mem::size_of::<BlobTransactionSidecarRlp>()];
-
-impl BlobTransactionSidecarRlp {
-    const fn wrap_ref(other: &BlobTransactionSidecar) -> &Self {
-        // SAFETY: Same repr and size
-        unsafe { &*(other as *const BlobTransactionSidecar).cast::<Self>() }
-    }
-
-    fn unwrap(self) -> BlobTransactionSidecar {
-        // SAFETY: Same repr and size
-        unsafe { mem::transmute(self) }
-    }
-
-    fn encode(&self, out: &mut dyn BufMut) {
-        // Encode the blobs, commitments, and proofs
-        self.blobs.encode(out);
-        self.commitments.encode(out);
-        self.proofs.encode(out);
-    }
-
-    fn fields_len(&self) -> usize {
-        self.blobs.length() + self.commitments.length() + self.proofs.length()
-    }
-
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self {
-            blobs: Decodable::decode(buf)?,
-            commitments: Decodable::decode(buf)?,
-            proofs: Decodable::decode(buf)?,
-        })
-    }
-}
-
-/// Calculates the versioned hash for a KzgCommitment
-///
-/// Specified in [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844#header-extension)
-pub(crate) fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
-    debug_assert_eq!(commitment.len(), 48, "commitment length is not 48");
-    let mut res = Sha256::digest(commitment);
-    res[0] = alloy_eips::eip4844::VERSIONED_HASH_VERSION_KZG;
-    B256::new(res.into())
-}
-
 #[cfg(test)]
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{SignableTransaction, TxEip4844Variant, TxEnvelope};
-    use alloy_eips::eip2930::AccessList;
+    use alloy_eips::{
+        eip2930::AccessList,
+        eip4844::{Blob, Bytes48},
+    };
     use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
-
-    #[cfg(not(feature = "kzg"))]
-    use alloy_eips::eip4844::{Blob, Bytes48};
-
-    #[cfg(feature = "kzg")]
-    use c_kzg::{Blob, Bytes48};
 
     #[test]
     fn different_sidecar_same_hash() {

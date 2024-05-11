@@ -26,6 +26,18 @@ pub enum PubSubItem {
     Notification(EthNotification),
 }
 
+impl From<Response> for PubSubItem {
+    fn from(response: Response) -> Self {
+        PubSubItem::Response(response)
+    }
+}
+
+impl From<EthNotification> for PubSubItem {
+    fn from(notification: EthNotification) -> Self {
+        PubSubItem::Notification(notification)
+    }
+}
+
 impl<'de> Deserialize<'de> for PubSubItem {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -94,7 +106,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
                             )
                         })?;
 
-                    Ok(PubSubItem::Response(Response { id, payload }))
+                    Ok(Response { id, payload }.into())
                 } else {
                     // Notifications cannot have an error.
                     if error.is_some() {

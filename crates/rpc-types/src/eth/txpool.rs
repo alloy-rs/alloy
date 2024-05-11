@@ -192,6 +192,8 @@ mod tests {
   "pending": {
     "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a": {
       "29": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a",
         "gas": "0x2af9e",
         "gasPrice": "0x218711a00",
@@ -201,6 +203,7 @@ mod tests {
         "input": "0x5ae401dc00000000000000000000000000000000000000000000000000000000636c757700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e404e45aaf000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000863b56a3c1f0f1be8bc4f8b7bd78f57a000000000000000000000000000000000000000000000000000000007781df4000000000000000000000000000000000000000000000006c240454bf9c87cd84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x1d",
         "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -212,6 +215,8 @@ mod tests {
     },
     "0x000042429c09de5881f05a0c2a068222f4f5b091": {
       "38": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x000042429c09de5881f05a0c2a068222f4f5b091",
         "gas": "0x61a80",
         "gasPrice": "0x2540be400",
@@ -219,6 +224,7 @@ mod tests {
         "input": "0x27dc297e800332e506f28f49a13c1edf087bdd6482d6cb3abdf2a4c455642aef1e98fc240000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002d7b22444149223a313439332e37342c2254555344223a313438392e36362c2255534443223a313439322e34387d00000000000000000000000000000000000000",
         "nonce": "0x26",
         "to": "0xabd279febe00c93fb0c9e683c6919ec4f107241f",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x0",
         "chainId": "0x1",
@@ -229,6 +235,8 @@ mod tests {
     },
     "0x000fab888651fbceb55de230493562159ead0340": {
       "12": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x000fab888651fbceb55de230493562159ead0340",
         "gas": "0x12fed",
         "gasPrice": "0x1a13b8600",
@@ -238,6 +246,7 @@ mod tests {
         "input": "0xa9059cbb00000000000000000000000050272a56ef9aff7238e8b40347da62e87c1f69e200000000000000000000000000000000000000000000000000000000428d3dfc",
         "nonce": "0xc",
         "to": "0x8e8d6ab093905c400d583efd37fbeeb1ee1c0c39",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -251,6 +260,8 @@ mod tests {
   "queued": {
     "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf": {
       "143": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf",
         "gas": "0x33c3b",
         "gasPrice": "0x218711a00",
@@ -260,6 +271,7 @@ mod tests {
         "input": "0x03a9ea6d00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000f2ff840000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000041d0c4694374d7893d63605625687be2f01028a5b49eca00f72901e773ad8ba7906e58d43e114a28353efaf8abd6a2675de83a3a07af579b8b268e6b714376610d1c00000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x8f",
         "to": "0xfbddadd80fe7bda00b901fbaf73803f2238ae655",
+        "transactionIndex": null,
         "value": "0x1f58a57c1794eb",
         "type": "0x2",
         "accessList": [],
@@ -271,6 +283,8 @@ mod tests {
     },
     "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd": {
       "1": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7918",
         "gasPrice": "0x12e531724e",
@@ -280,6 +294,7 @@ mod tests {
         "input": "0x",
         "nonce": "0x1",
         "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -289,6 +304,8 @@ mod tests {
         "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a"
       },
       "4": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7530",
         "gasPrice": "0x1919617600",
@@ -298,6 +315,7 @@ mod tests {
         "input": "0x",
         "nonce": "0x4",
         "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],
@@ -309,6 +327,8 @@ mod tests {
     },
     "0x02666081cfb787de3562efbbca5f0fe890e927f1": {
       "44": {
+        "blockHash": null,
+        "blockNumber": null,
         "from": "0x02666081cfb787de3562efbbca5f0fe890e927f1",
         "gas": "0x16404",
         "gasPrice": "0x4bad00695",
@@ -318,6 +338,7 @@ mod tests {
         "input": "0x095ea7b300000000000000000000000029fbd00940df70cfc5dad3f2370686991e2bbf5cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "nonce": "0x2c",
         "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
         "accessList": [],

@@ -83,7 +83,7 @@ pub struct Header {
     #[serde(default, with = "alloy_serde::num::u64_via_ruint")]
     pub timestamp: u64,
     /// Total difficulty
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,
     /// Extra data
     pub extra_data: Bytes,
@@ -98,10 +98,10 @@ pub struct Header {
     ///
     /// See also <https://eips.ethereum.org/EIPS/eip-4399>
     /// And <https://github.com/ethereum/execution-apis/issues/328>
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mix_hash: Option<B256>,
     /// Nonce
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
     #[serde(
@@ -111,7 +111,7 @@ pub struct Header {
     )]
     pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals_root: Option<B256>,
     /// Blob gas used
     #[serde(
@@ -127,9 +127,12 @@ pub struct Header {
         with = "alloy_serde::num::u128_opt_via_ruint"
     )]
     pub excess_blob_gas: Option<u128>,
-    /// Parent beacon block root
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// EIP-4788 parent beacon block root
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+    /// EIP-7685 requests root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requests_root: Option<B256>,
 }
 
 impl Header {
@@ -620,6 +623,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
@@ -662,6 +666,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
@@ -704,6 +709,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
+                requests_root: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),

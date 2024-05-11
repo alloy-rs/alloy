@@ -22,21 +22,13 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Transaction Hash.
     pub transaction_hash: B256,
     /// Index within the block.
-    #[serde(
-        default,
-        with = "alloy_serde::u64_opt_via_ruint",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
     pub transaction_index: Option<u64>,
     /// Hash of the block this transaction was included within.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
-    #[serde(
-        default,
-        with = "alloy_serde::u64_opt_via_ruint",
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
     #[serde(with = "alloy_serde::u128_via_ruint")]

@@ -1,7 +1,13 @@
-use std::{
-    ffi::{CString, OsString},
-    path::PathBuf,
-};
+use interprocess::local_socket as ls;
+use std::io;
+
+pub(crate) fn to_name(path: &std::ffi::OsStr) -> io::Result<ls::Name<'_>> {
+    if cfg!(windows) && !path.as_encoded_bytes().starts_with(br"\\.\pipe\") {
+        ls::ToNsName::to_ns_name::<ls::GenericNamespaced>(path)
+    } else {
+        ls::ToFsName::to_fs_name::<ls::GenericFilePath>(path)
+    }
+}
 
 /// An IPC Connection object.
 #[derive(Clone, Debug)]
@@ -21,7 +27,7 @@ impl<T> IpcConnect<T> {
 }
 
 macro_rules! impl_connect {
-    ($target:ty) => {
+    ($target:ty => | $inner:ident | $map:expr) => {
         impl From<$target> for IpcConnect<$target> {
             fn from(inner: $target) -> Self {
                 Self { inner }
@@ -42,7 +48,10 @@ macro_rules! impl_connect {
             async fn connect(
                 &self,
             ) -> Result<alloy_pubsub::ConnectionHandle, alloy_transport::TransportError> {
-                crate::IpcBackend::connect(&self.inner)
+                let $inner = &self.inner;
+                let inner = $map;
+                let name = to_name(inner).map_err(alloy_transport::TransportErrorKind::custom)?;
+                crate::IpcBackend::connect(name)
                     .await
                     .map_err(alloy_transport::TransportErrorKind::custom)
             }
@@ -50,7 +59,12 @@ macro_rules! impl_connect {
     };
 }
 
-impl_connect!(OsString);
-impl_connect!(CString);
-impl_connect!(PathBuf);
-impl_connect!(String);
+impl_connect!(std::ffi::OsString => |s| s.as_os_str());
+impl_connect!(std::path::PathBuf => |s| s.as_os_str());
+impl_connect!(String => |s| s.as_ref());
+
+#[cfg(unix)]
+impl_connect!(std::ffi::CString => |s| {
+    use std::os::unix::ffi::OsStrExt;
+    std::ffi::OsStr::from_bytes(s.to_bytes())
+});

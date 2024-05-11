@@ -56,7 +56,7 @@ where
 {
     /// Create a new [`EthCall`].
     pub const fn new_raw(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
-        EthCall::new(inner, &RAW_CODER)
+        Self::new(inner, &RAW_CODER)
     }
 }
 
@@ -98,7 +98,7 @@ where
     N: Network,
 {
     fn from(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
-        EthCall { inner, decoder: &RAW_CODER }
+        Self { inner, decoder: &RAW_CODER }
     }
 }
 
