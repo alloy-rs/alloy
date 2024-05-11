@@ -591,8 +591,38 @@ impl From<Option<Bytes>> for TransactionInput {
 }
 
 impl From<Transaction> for TransactionRequest {
-    fn from(tx: Transaction) -> TransactionRequest {
-        tx.into_request()
+    /// Converts [Transaction] into [TransactionRequest].
+    ///
+    /// During this conversion data for [TransactionRequest::sidecar] is not populated as it is not
+    /// part of [Transaction].
+    fn from(tx: Transaction) -> Self {
+        let gas_price = match (tx.gas_price, tx.max_fee_per_gas) {
+            (Some(gas_price), None) => Some(gas_price),
+            // EIP-1559 transactions include deprecated `gasPrice` field displaying gas used by
+            // transaction.
+            // Setting this field for resulted tx request will result in it being invalid
+            (_, Some(_)) => None,
+            // unreachable
+            (None, None) => None,
+        };
+
+        Self {
+            from: Some(tx.from),
+            to: tx.to.map(TxKind::Call),
+            gas: Some(tx.gas),
+            gas_price,
+            value: Some(tx.value),
+            input: tx.input.into(),
+            nonce: Some(tx.nonce),
+            chain_id: tx.chain_id,
+            access_list: tx.access_list,
+            transaction_type: tx.transaction_type,
+            max_fee_per_gas: tx.max_fee_per_gas,
+            max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
+            max_fee_per_blob_gas: tx.max_fee_per_blob_gas,
+            blob_versioned_hashes: tx.blob_versioned_hashes,
+            sidecar: None,
+        }
     }
 }
 
