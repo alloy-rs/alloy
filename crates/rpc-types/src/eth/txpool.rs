@@ -78,7 +78,7 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
 
 /// Implement the `Deserialize` trait for `TxpoolInspectSummary` struct.
 impl<'de> Deserialize<'de> for TxpoolInspectSummary {
-    fn deserialize<D>(deserializer: D) -> Result<TxpoolInspectSummary, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

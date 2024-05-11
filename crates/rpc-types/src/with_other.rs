@@ -51,7 +51,7 @@ impl<T> DerefMut for WithOtherFields<T> {
 
 impl<T: Default> Default for WithOtherFields<T> {
     fn default() -> Self {
-        WithOtherFields::new(T::default())
+        Self::new(T::default())
     }
 }
 
@@ -83,7 +83,7 @@ where
             }
         }
 
-        Ok(WithOtherFields { inner: helper.inner, other: helper.other })
+        Ok(Self { inner: helper.inner, other: helper.other })
     }
 }
 
