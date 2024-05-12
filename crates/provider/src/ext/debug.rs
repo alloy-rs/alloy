@@ -52,8 +52,6 @@ pub trait DebugApi<N, T>: Send + Sync {
     ///
     /// # Note
     ///
-    /// https://github.com/ethereum/go-ethereum/blob/44a50c9f96386f44a8682d51cf7500044f6cbaea/eth/tracers/api.go#L438
-    ///
     /// Not all nodes support this call.
     async fn debug_trace_block_by_number(
         &self,
