@@ -692,6 +692,13 @@ impl Decodable for TxEip4844 {
     }
 }
 
+impl From<TxEip4844WithSidecar> for TxEip4844 {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
+    fn from(tx_with_sidecar: TxEip4844WithSidecar) -> Self {
+        tx_with_sidecar.tx
+    }
+}
+
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
 /// A transaction with blob hashes and max blob fee, which also includes the
@@ -743,11 +750,6 @@ impl TxEip4844WithSidecar {
     /// Get access to the inner sidecar [BlobTransactionSidecar].
     pub const fn sidecar(&self) -> &BlobTransactionSidecar {
         &self.sidecar
-    }
-
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
-    pub fn into_tx(self) -> TxEip4844 {
-        self.tx
     }
 
     /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
