@@ -958,8 +958,7 @@ mod tests {
         "cancunTime": 0,
         "pragueTime": 1,
         "terminalTotalDifficulty": 0,
-        "terminalTotalDifficultyPassed": true,
-        "ethash": {}
+        "terminalTotalDifficultyPassed": true
       },
       "nonce": "0x0",
       "timestamp": "0x0",
