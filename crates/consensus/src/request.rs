@@ -3,7 +3,7 @@ use alloy_eips::{
     eip7002::WithdrawalRequest,
     eip7685::{Decodable7685, Eip7685Error, Encodable7685},
 };
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum execution layer requests.
 ///
@@ -95,7 +95,7 @@ impl Encodable for Request {
 
 impl Decodable for Request {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let bytes = <Vec<u8> as Decodable>::decode(buf)?;
-        Ok(Self::decode_7685(&mut bytes.as_slice())?)
+        let mut data = Header::decode_bytes(buf, true)?;
+        Ok(Self::decode_7685(&mut data)?)
     }
 }
