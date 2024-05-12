@@ -16,8 +16,6 @@ use crate::eip4844::BlobTransactionSidecar;
 use crate::eip4844::Bytes48;
 #[cfg(feature = "kzg")]
 use crate::eip4844::env_settings::EnvKzgSettings;
-#[cfg(feature = "kzg")]
-use core::mem;
 #[cfg(feature = "arbitrary")]
 use alloy_primitives::private::arbitrary::{Arbitrary, Unstructured};
 use core::cmp;
@@ -377,15 +375,15 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
             // SAFETY: same size
-            let blob = unsafe { mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
             let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
             let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
 
             // SAFETY: same size
             unsafe {
                 commitments
-                    .push(mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
-                proofs.push(mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
             }
         }
 
