@@ -990,6 +990,7 @@ mod tests {
                 berlin_block: Some(0),
                 london_block: Some(0),
                 arrow_glacier_block: Some(0),
+                gray_glacier_block: Some(0),
                 dao_fork_block: None,
                 dao_fork_support: false,
                 shanghai_time: Some(0),
