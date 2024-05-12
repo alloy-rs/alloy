@@ -128,18 +128,14 @@ impl From<Signed<TxEip4844Variant>> for TxEnvelope {
 impl From<Signed<TxEip4844>> for TxEnvelope {
     fn from(v: Signed<TxEip4844>) -> Self {
         let (tx, signature, hash) = v.into_parts();
-        Self::Eip4844(Signed::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash))
+        Self::Eip4844(Signed::new_unchecked(tx.into(), signature, hash))
     }
 }
 
 impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
     fn from(v: Signed<TxEip4844WithSidecar>) -> Self {
         let (tx, signature, hash) = v.into_parts();
-        Self::Eip4844(Signed::new_unchecked(
-            TxEip4844Variant::TxEip4844WithSidecar(tx),
-            signature,
-            hash,
-        ))
+        Self::Eip4844(Signed::new_unchecked(tx.into(), signature, hash))
     }
 }
 

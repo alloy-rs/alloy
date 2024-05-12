@@ -267,7 +267,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         let tx: Signed<TxEip4844> = tx.try_into()?;
         let (inner, signature, _) = tx.into_parts();
-        let tx = TxEip4844Variant::TxEip4844(inner);
+        let tx: TxEip4844Variant = inner.into();
 
         Ok(tx.into_signed(signature))
     }
