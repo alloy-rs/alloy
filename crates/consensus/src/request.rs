@@ -86,3 +86,16 @@ impl Decodable7685 for Request {
         })
     }
 }
+
+impl Encodable for Request {
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.encoded_7685().encode(out)
+    }
+}
+
+impl Decodable for Request {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let bytes = <Vec<u8> as Decodable>::decode(buf)?;
+        Ok(Self::decode_7685(&mut bytes.as_slice())?)
+    }
+}
