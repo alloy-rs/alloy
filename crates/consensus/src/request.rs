@@ -11,6 +11,7 @@ use alloy_rlp::{Decodable, Encodable, Header};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Request {
     /// An [EIP-6110] deposit request.
     ///
