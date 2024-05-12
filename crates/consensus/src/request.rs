@@ -95,7 +95,7 @@ impl Encodable for Request {
 
 impl Decodable for Request {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let mut data = Header::decode_bytes(buf, true)?;
+        let mut data = Header::decode_bytes(buf, false)?;
         Ok(Self::decode_7685(&mut data)?)
     }
 }
