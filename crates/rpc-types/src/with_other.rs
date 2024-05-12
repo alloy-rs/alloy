@@ -19,7 +19,7 @@ pub struct WithOtherFields<T> {
 impl<T> WithOtherFields<T> {
     /// Create a new `Extra`.
     pub fn new(inner: T) -> Self {
-        Self { inner, other: OtherFields::default() }
+        Self { inner, other: Default::default() }
     }
 }
 

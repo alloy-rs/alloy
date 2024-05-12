@@ -36,10 +36,10 @@ impl From<TxType> for u8 {
 impl fmt::Display for TxType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TxType::Legacy => write!(f, "Legacy"),
-            TxType::Eip2930 => write!(f, "EIP-2930"),
-            TxType::Eip1559 => write!(f, "EIP-1559"),
-            TxType::Eip4844 => write!(f, "EIP-4844"),
+            Self::Legacy => write!(f, "Legacy"),
+            Self::Eip2930 => write!(f, "EIP-2930"),
+            Self::Eip1559 => write!(f, "EIP-1559"),
+            Self::Eip4844 => write!(f, "EIP-4844"),
         }
     }
 }
@@ -56,10 +56,10 @@ impl TryFrom<u8> for TxType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Ok(match value {
-            0 => TxType::Legacy,
-            1 => TxType::Eip2930,
-            2 => TxType::Eip1559,
-            3 => TxType::Eip4844,
+            0 => Self::Legacy,
+            1 => Self::Eip2930,
+            2 => Self::Eip1559,
+            3 => Self::Eip4844,
             _ => return Err(Eip2718Error::UnexpectedType(value)),
         })
     }
@@ -255,9 +255,9 @@ impl Decodable for TxEnvelope {
 impl Decodable2718 for TxEnvelope {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
-            TxType::Eip2930 => Ok(Self::Eip2930(TxEip2930::decode_signed_fields(buf)?)),
-            TxType::Eip1559 => Ok(Self::Eip1559(TxEip1559::decode_signed_fields(buf)?)),
-            TxType::Eip4844 => Ok(Self::Eip4844(TxEip4844Variant::decode_signed_fields(buf)?)),
+            TxType::Eip2930 => Ok(TxEip2930::decode_signed_fields(buf)?.into()),
+            TxType::Eip1559 => Ok(TxEip1559::decode_signed_fields(buf)?.into()),
+            TxType::Eip4844 => Ok(TxEip4844Variant::decode_signed_fields(buf)?.into()),
             TxType::Legacy => {
                 Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
             }
@@ -265,7 +265,7 @@ impl Decodable2718 for TxEnvelope {
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(TxEnvelope::Legacy(TxLegacy::decode_signed_fields(buf)?))
+        Ok(TxLegacy::decode_signed_fields(buf)?.into())
     }
 }
 
@@ -273,9 +273,9 @@ impl Encodable2718 for TxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
             Self::Legacy(_) => None,
-            Self::Eip2930(_) => Some(TxType::Eip2930 as u8),
-            Self::Eip1559(_) => Some(TxType::Eip1559 as u8),
-            Self::Eip4844(_) => Some(TxType::Eip4844 as u8),
+            Self::Eip2930(_) => Some(TxType::Eip2930.into()),
+            Self::Eip1559(_) => Some(TxType::Eip1559.into()),
+            Self::Eip4844(_) => Some(TxType::Eip4844.into()),
         }
     }
 
