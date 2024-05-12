@@ -2,7 +2,7 @@ use crate::{CallDecoder, Error, EthCall, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
@@ -289,6 +289,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
         }
     }
 
+    /// Sets the `chain_id` field in the transaction to the provided value
+    pub fn chain_id(mut self, chain_id: ChainId) -> Self {
+        self.request.set_chain_id(chain_id);
+        self
+    }
+
     /// Sets the `from` field in the transaction to the provided value.
     pub fn from(mut self, from: Address) -> Self {
         self.request.set_from(from);
@@ -341,6 +347,12 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Sets the `max_priority_fee_per_gas` in the transaction to the provide value
     pub fn max_priority_fee_per_gas(mut self, max_priority_fee_per_gas: u128) -> Self {
         self.request.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
+        self
+    }
+
+    /// Sets the `max_fee_per_blob_gas` in the transaction to the provided value
+    pub fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+        self.request.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
         self
     }
 
@@ -597,6 +609,16 @@ mod tests {
     }
 
     #[test]
+    fn change_chain_id() {
+        let call_builder = build_call_builder().chain_id(1337);
+        assert_eq!(
+            call_builder.request.chain_id.expect("chain_id should be set"),
+            1337,
+            "chain_id of request should be '1337'"
+        );
+    }
+
+    #[test]
     fn change_max_fee_per_gas() {
         let call_builder = build_call_builder().max_fee_per_gas(42);
         assert_eq!(
@@ -616,6 +638,16 @@ mod tests {
                 .expect("max_priority_fee_per_gas should be set"),
             45,
             "max_priority_fee_per_gas of request should be '45'"
+        );
+    }
+
+    #[test]
+    fn change_max_fee_per_blob_gas() {
+        let call_builder = build_call_builder().max_fee_per_blob_gas(50);
+        assert_eq!(
+            call_builder.request.max_fee_per_blob_gas.expect("max_fee_per_blob_gas should be set"),
+            50,
+            "max_fee_per_blob_gas of request should be '50'"
         );
     }
 
