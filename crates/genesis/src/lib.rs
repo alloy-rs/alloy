@@ -404,6 +404,13 @@ pub struct ChainConfig {
     )]
     pub cancun_time: Option<u64>,
 
+    /// Prague switch time (None = no fork, 0 = already on prague).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_opt_via_ruint::deserialize"
+    )]
+    pub prague_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
