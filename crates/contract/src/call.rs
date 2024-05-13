@@ -406,7 +406,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request, self.block).await.map_err(Into::into)
+        self.provider.estimate_gas(&self.request).block_id(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.

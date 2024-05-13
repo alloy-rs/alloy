@@ -103,8 +103,7 @@ impl NonceFiller {
             }
             None => {
                 // initialize the nonce if we haven't seen this account before
-                let initial_nonce =
-                    provider.get_transaction_count(from, Default::default()).await?;
+                let initial_nonce = provider.get_transaction_count(from).await?;
                 *nonce = Some(initial_nonce);
                 Ok(initial_nonce)
             }
