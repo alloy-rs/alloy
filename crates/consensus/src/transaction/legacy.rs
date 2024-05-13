@@ -185,7 +185,7 @@ impl TxLegacy {
     /// Decode the RLP fields of the transaction, without decoding an RLP
     /// header.
     pub(crate) fn decode_fields(data: &mut &[u8]) -> Result<Self> {
-        Ok(TxLegacy {
+        Ok(Self {
             nonce: Decodable::decode(data)?,
             gas_price: Decodable::decode(data)?,
             gas_limit: Decodable::decode(data)?,
