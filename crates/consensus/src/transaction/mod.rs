@@ -59,6 +59,11 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 /// types, or in other networks. For example, in Optimism, the deposit transaction signature is the
 /// unit type `()`.
 pub trait SignableTransaction<Signature>: Transaction {
+    /// True if the transaction uses EIP-155 signatures.
+    fn use_eip155(&self) -> bool {
+        false
+    }
+
     /// Sets `chain_id`.
     ///
     /// Prefer [`set_chain_id_checked`](Self::set_chain_id_checked).

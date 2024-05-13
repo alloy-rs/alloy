@@ -228,6 +228,10 @@ impl Transaction for TxLegacy {
 }
 
 impl SignableTransaction<Signature> for TxLegacy {
+    fn use_eip155(&self) -> bool {
+        self.chain_id.is_some()
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = Some(chain_id);
     }
