@@ -1,4 +1,4 @@
-use crate::{BlobsBundleV1, ExecutionPayloadV3, PayloadAttributes};
+use crate::{BlobsBundleV1, ExecutionPayloadV3, ExecutionPayloadV4, PayloadAttributes};
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +31,27 @@ pub struct OptimismPayloadAttributes {
 pub struct OptimismExecutionPayloadEnvelopeV3 {
     /// Execution payload V3
     pub execution_payload: ExecutionPayloadV3,
+    /// The expected value to be received by the feeRecipient in wei
+    pub block_value: U256,
+    /// The blobs, commitments, and proofs associated with the executed payload.
+    pub blobs_bundle: BlobsBundleV1,
+    /// Introduced in V3, this represents a suggestion from the execution layer if the payload
+    /// should be used instead of an externally provided one.
+    pub should_override_builder: bool,
+    /// Ecotone parent beacon block root
+    pub parent_beacon_block_root: B256,
+}
+
+/// This structure maps for the return value of `engine_getPayload` of the beacon chain spec, for
+/// V4.
+///
+/// See also:
+/// [Optimism execution payload envelope v4] <https://github.com/ethereum-optimism/specs/blob/main/specs/protocol/exec-engine.md#engine_getpayloadv4>
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptimismExecutionPayloadEnvelopeV4 {
+    /// Execution payload V4
+    pub execution_payload: ExecutionPayloadV4,
     /// The expected value to be received by the feeRecipient in wei
     pub block_value: U256,
     /// The blobs, commitments, and proofs associated with the executed payload.
