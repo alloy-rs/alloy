@@ -253,10 +253,6 @@ impl Transaction for TxEip2930 {
 }
 
 impl SignableTransaction<Signature> for TxEip2930 {
-    fn tx_type(&self) -> TxType {
-        TxType::Eip2930
-    }
-
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
     }

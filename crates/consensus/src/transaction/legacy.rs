@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{SignableTransaction, Signed, Transaction};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
@@ -228,8 +228,8 @@ impl Transaction for TxLegacy {
 }
 
 impl SignableTransaction<Signature> for TxLegacy {
-    fn tx_type(&self) -> crate::TxType {
-        TxType::Legacy
+    fn use_eip155(&self) -> bool {
+        self.chain_id.is_some()
     }
 
     fn set_chain_id(&mut self, chain_id: ChainId) {

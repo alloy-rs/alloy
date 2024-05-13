@@ -15,7 +15,7 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_consensus::{SignableTransaction, TxType};
+use alloy_consensus::SignableTransaction;
 use alloy_network::{TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
