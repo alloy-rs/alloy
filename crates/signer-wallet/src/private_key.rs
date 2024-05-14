@@ -296,7 +296,7 @@ mod tests {
             bar: U256::from(20u64),
             fizz: b"fizz".to_vec(),
             buzz: keccak256("buzz"),
-            far: String::from("space"),
+            far: "space".into(),
             out: Address::ZERO,
         };
         let wallet = Wallet::random();

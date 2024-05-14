@@ -130,7 +130,7 @@ impl Genesis {
         // proposer signature. Because the genesis does not have a proposer signature, it will be
         // populated with zeros.
         let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
-        let extra_data = Bytes::from(extra_data_bytes);
+        let extra_data = extra_data_bytes.into();
 
         Genesis {
             config,
@@ -603,7 +603,7 @@ mod tests {
         let new_alloc_account = GenesisAccount {
             nonce: Some(1),
             balance: U256::from(1),
-            code: Some(Bytes::from(b"code")),
+            code: Some(b"code".into()),
             storage: Some(BTreeMap::default()),
             private_key: None,
         };
@@ -633,7 +633,7 @@ mod tests {
 
         let nonce = Some(1);
         let balance = U256::from(33);
-        let code = Some(Bytes::from(b"code"));
+        let code = Some(b"code".into());
         let root = hex!("9474ddfcea39c5a690d2744103e39d1ff1b03d18db10fc147d970ad24699395a").into();
         let value = hex!("58eb8294d9bb16832a9dabfcb270fff99ab8ee1d8764e4f3d9fdf59ec1dee469").into();
         let mut map = BTreeMap::default();

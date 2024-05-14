@@ -283,7 +283,7 @@ impl<T: SidecarCoder + Default> SidecarBuilder<T> {
     /// preallocate a specific number of blobs, use
     /// [`SidecarBuilder::with_capacity`].
     pub fn new() -> Self {
-        Self::from_coder(T::default())
+        T::default().into()
     }
 
     /// Create a new builder from a slice of data by calling
@@ -304,16 +304,6 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     /// capacity is measured in blobs, each of which is 128 KiB.
     pub fn from_coder_and_capacity(coder: T, capacity: usize) -> Self {
         Self { inner: PartialSidecar::with_capacity(capacity), coder }
-    }
-
-    /// Instantiate a new builder with the provided coder.
-    ///
-    /// This is equivalent to calling
-    /// [`SidecarBuilder::from_coder_and_capacity`] with a capacity of 1.
-    /// If you want to preallocate a specific number of blobs, use
-    /// [`SidecarBuilder::from_coder_and_capacity`].
-    pub fn from_coder(coder: T) -> Self {
-        Self::from_coder_and_capacity(coder, 1)
     }
 
     /// Calculate the length of bytes used by field elements in the builder.
@@ -386,6 +376,18 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     /// Take the blobs from the builder, without committing them to a KZG proof.
     pub fn take(self) -> Vec<Blob> {
         self.inner.blobs
+    }
+}
+
+impl<T: SidecarCoder> From<T> for SidecarBuilder<T> {
+    /// Instantiate a new builder with the provided coder.
+    ///
+    /// This is equivalent to calling
+    /// [`SidecarBuilder::from_coder_and_capacity`] with a capacity of 1.
+    /// If you want to preallocate a specific number of blobs, use
+    /// [`SidecarBuilder::from_coder_and_capacity`].
+    fn from(coder: T) -> Self {
+        Self::from_coder_and_capacity(coder, 1)
     }
 }
 

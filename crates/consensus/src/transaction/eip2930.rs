@@ -310,7 +310,7 @@ impl Decodable for TxEip2930 {
 mod tests {
     use super::TxEip2930;
     use crate::{SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, Bytes, Signature, TxKind, U256};
+    use alloy_primitives::{Address, Signature, TxKind, U256};
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
@@ -323,7 +323,7 @@ mod tests {
             gas_limit: 2,
             to: TxKind::Create,
             value: U256::from(3_u64),
-            input: Bytes::from(vec![1, 2]),
+            input: vec![1, 2].into(),
             access_list: Default::default(),
         };
         let signature = Signature::test_signature();
@@ -344,7 +344,7 @@ mod tests {
             gas_limit: 2,
             to: Address::default().into(),
             value: U256::from(3_u64),
-            input: Bytes::from(vec![1, 2]),
+            input: vec![1, 2].into(),
             access_list: Default::default(),
         };
 
