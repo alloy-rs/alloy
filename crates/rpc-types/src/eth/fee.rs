@@ -139,4 +139,10 @@ mod tests {
         assert_eq!(fee_history, expected);
         assert_eq!(serde_json::to_string(&fee_history).unwrap(), sample);
     }
+
+    #[test]
+    fn test_fee_history_serde_2() {
+        let json = r#"{"baseFeePerBlobGas":["0xc0","0xb2","0xab","0x98","0x9e","0x92","0xa4","0xb9","0xd0","0xea","0xfd"],"baseFeePerGas":["0x4cb8cf181","0x53075988e","0x4fb92ee18","0x45c209055","0x4e790dca2","0x58462e84e","0x5b7659f4e","0x5d66ea3aa","0x6283c6e45","0x5ecf0e1e5","0x5da59cf89"],"blobGasUsedRatio":[0.16666666666666666,0.3333333333333333,0,0.6666666666666666,0.16666666666666666,1,1,1,1,0.8333333333333334],"gasUsedRatio":[0.8288135,0.3407616666666667,0,0.9997232,0.999601,0.6444664333333333,0.5848306333333333,0.7189564,0.34952733333333336,0.4509799666666667],"oldestBlock":"0x59f94f","reward":[["0x59682f00"],["0x59682f00"],["0x0"],["0x59682f00"],["0x59682f00"],["0x3b9aca00"],["0x59682f00"],["0x59682f00"],["0x3b9aca00"],["0x59682f00"]]}"#;
+        let _actual = serde_json::from_str::<FeeHistory>(json).unwrap();
+    }
 }
