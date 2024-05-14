@@ -6,16 +6,15 @@ use c_kzg::{KzgCommitment, KzgProof};
 use alloc::vec::Vec;
 
 use crate::eip4844::{
-    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB,
-    MAX_BLOBS_PER_BLOCK,
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK,
 };
 
-#[cfg(any(feature="kzg", feature = "arbitrary"))]
+#[cfg(feature = "kzg")]
+use crate::eip4844::env_settings::EnvKzgSettings;
+#[cfg(any(feature = "kzg", feature = "arbitrary"))]
 use crate::eip4844::BlobTransactionSidecar;
 #[cfg(feature = "kzg")]
 use crate::eip4844::Bytes48;
-#[cfg(feature = "kzg")]
-use crate::eip4844::env_settings::EnvKzgSettings;
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
@@ -289,7 +288,10 @@ where
 impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
     /// Builds an arbitrary realization for BlobTransactionSidecar.
     pub fn build_arbitrary(&self) -> BlobTransactionSidecar {
-        <BlobTransactionSidecar as arbitrary::Arbitrary>::arbitrary(&mut arbitrary::Unstructured::new(&[])).unwrap()
+        <BlobTransactionSidecar as arbitrary::Arbitrary>::arbitrary(
+            &mut arbitrary::Unstructured::new(&[]),
+        )
+        .unwrap()
     }
 }
 
