@@ -127,7 +127,7 @@ impl Genesis {
         // proposer signature. Because the genesis does not have a proposer signature, it will be
         // populated with zeros.
         let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
-        let extra_data = Bytes::from(extra_data_bytes);
+        let extra_data = extra_data_bytes.into();
 
         Genesis {
             config,
@@ -404,6 +404,13 @@ pub struct ChainConfig {
     )]
     pub cancun_time: Option<u64>,
 
+    /// Prague switch time (None = no fork, 0 = already on prague).
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "u64_opt_via_ruint::deserialize"
+    )]
+    pub prague_time: Option<u64>,
+
     /// Total difficulty reached that triggers the merge consensus upgrade.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -426,6 +433,10 @@ pub struct ChainConfig {
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
     pub extra_fields: BTreeMap<String, serde_json::Value>,
+
+    /// The deposit contract address
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deposit_contract_address: Option<Address>,
 }
 
 impl ChainConfig {
@@ -593,7 +604,7 @@ mod tests {
         let new_alloc_account = GenesisAccount {
             nonce: Some(1),
             balance: U256::from(1),
-            code: Some(Bytes::from(b"code")),
+            code: Some(b"code".into()),
             storage: Some(BTreeMap::default()),
             private_key: None,
         };
@@ -623,7 +634,7 @@ mod tests {
 
         let nonce = Some(1);
         let balance = U256::from(33);
-        let code = Some(Bytes::from(b"code"));
+        let code = Some(b"code".into());
         let root = hex!("9474ddfcea39c5a690d2744103e39d1ff1b03d18db10fc147d970ad24699395a").into();
         let value = hex!("58eb8294d9bb16832a9dabfcb270fff99ab8ee1d8764e4f3d9fdf59ec1dee469").into();
         let mut map = BTreeMap::default();
@@ -925,6 +936,160 @@ mod tests {
     "#;
 
         let _genesis: Genesis = serde_json::from_str(geth_genesis).unwrap();
+    }
+
+    #[test]
+    fn parse_deposit_contract_address() {
+        let genesis = r#"
+    {
+      "config": {
+        "chainId": 1337,
+        "homesteadBlock": 0,
+        "eip150Block": 0,
+        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "byzantiumBlock": 0,
+        "constantinopleBlock": 0,
+        "petersburgBlock": 0,
+        "istanbulBlock": 0,
+        "muirGlacierBlock": 0,
+        "berlinBlock": 0,
+        "londonBlock": 0,
+        "arrowGlacierBlock": 0,
+        "grayGlacierBlock": 0,
+        "shanghaiTime": 0,
+        "cancunTime": 0,
+        "pragueTime": 1,
+        "terminalTotalDifficulty": 0,
+        "depositContractAddress": "0x0000000000000000000000000000000000000000",
+        "terminalTotalDifficultyPassed": true
+      },
+      "nonce": "0x0",
+      "timestamp": "0x0",
+      "extraData": "0x",
+      "gasLimit": "0x4c4b40",
+      "difficulty": "0x1",
+      "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "coinbase": "0x0000000000000000000000000000000000000000"
+    }
+    "#;
+
+        let got_genesis: Genesis = serde_json::from_str(genesis).unwrap();
+        let expected_genesis = Genesis {
+            config: ChainConfig {
+                chain_id: 1337,
+                eip150_hash: Some(
+                    hex!("0000000000000000000000000000000000000000000000000000000000000000").into(),
+                ),
+                homestead_block: Some(0),
+                eip150_block: Some(0),
+                eip155_block: Some(0),
+                eip158_block: Some(0),
+                byzantium_block: Some(0),
+                constantinople_block: Some(0),
+                petersburg_block: Some(0),
+                istanbul_block: Some(0),
+                muir_glacier_block: Some(0),
+                berlin_block: Some(0),
+                london_block: Some(0),
+                arrow_glacier_block: Some(0),
+                gray_glacier_block: Some(0),
+                dao_fork_block: None,
+                dao_fork_support: false,
+                shanghai_time: Some(0),
+                cancun_time: Some(0),
+                prague_time: Some(1),
+                terminal_total_difficulty: Some(U256::ZERO),
+                terminal_total_difficulty_passed: true,
+                deposit_contract_address: Some(Address::ZERO),
+                ..Default::default()
+            },
+            nonce: 0,
+            timestamp: 0,
+            extra_data: Bytes::new(),
+            gas_limit: 0x4c4b40,
+            difficulty: U256::from(1),
+            ..Default::default()
+        };
+
+        assert_eq!(expected_genesis, got_genesis);
+    }
+
+    #[test]
+    fn parse_prague_time() {
+        let genesis = r#"
+    {
+      "config": {
+        "chainId": 1337,
+        "homesteadBlock": 0,
+        "eip150Block": 0,
+        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "eip155Block": 0,
+        "eip158Block": 0,
+        "byzantiumBlock": 0,
+        "constantinopleBlock": 0,
+        "petersburgBlock": 0,
+        "istanbulBlock": 0,
+        "muirGlacierBlock": 0,
+        "berlinBlock": 0,
+        "londonBlock": 0,
+        "arrowGlacierBlock": 0,
+        "grayGlacierBlock": 0,
+        "shanghaiTime": 0,
+        "cancunTime": 0,
+        "pragueTime": 1,
+        "terminalTotalDifficulty": 0,
+        "terminalTotalDifficultyPassed": true
+      },
+      "nonce": "0x0",
+      "timestamp": "0x0",
+      "extraData": "0x",
+      "gasLimit": "0x4c4b40",
+      "difficulty": "0x1",
+      "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "coinbase": "0x0000000000000000000000000000000000000000"
+    }
+    "#;
+
+        let got_genesis: Genesis = serde_json::from_str(genesis).unwrap();
+        let expected_genesis = Genesis {
+            config: ChainConfig {
+                chain_id: 1337,
+                eip150_hash: Some(
+                    hex!("0000000000000000000000000000000000000000000000000000000000000000").into(),
+                ),
+                homestead_block: Some(0),
+                eip150_block: Some(0),
+                eip155_block: Some(0),
+                eip158_block: Some(0),
+                byzantium_block: Some(0),
+                constantinople_block: Some(0),
+                petersburg_block: Some(0),
+                istanbul_block: Some(0),
+                muir_glacier_block: Some(0),
+                berlin_block: Some(0),
+                london_block: Some(0),
+                arrow_glacier_block: Some(0),
+                gray_glacier_block: Some(0),
+                dao_fork_block: None,
+                dao_fork_support: false,
+                shanghai_time: Some(0),
+                cancun_time: Some(0),
+                prague_time: Some(1),
+                terminal_total_difficulty: Some(U256::ZERO),
+                terminal_total_difficulty_passed: true,
+                ..Default::default()
+            },
+            nonce: 0,
+            timestamp: 0,
+            extra_data: Bytes::new(),
+            gas_limit: 0x4c4b40,
+            difficulty: U256::from(1),
+            ..Default::default()
+        };
+
+        assert_eq!(expected_genesis, got_genesis);
     }
 
     #[test]
@@ -1270,6 +1435,7 @@ mod tests {
                     constantinople_block: Some(0),
                     petersburg_block: Some(0),
                     istanbul_block: Some(0),
+                    deposit_contract_address: None,
                     ..Default::default()
                 },
             };

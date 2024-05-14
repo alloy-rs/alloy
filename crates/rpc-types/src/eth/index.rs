@@ -24,7 +24,7 @@ impl From<Index> for U256 {
 
 impl From<usize> for Index {
     fn from(idx: usize) -> Self {
-        Index(idx)
+        Self(idx)
     }
 }
 
@@ -38,7 +38,7 @@ impl Serialize for Index {
 }
 
 impl<'a> Deserialize<'a> for Index {
-    fn deserialize<D>(deserializer: D) -> Result<Index, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'a>,
     {

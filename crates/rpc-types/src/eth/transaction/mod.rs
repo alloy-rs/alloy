@@ -42,21 +42,13 @@ pub struct Transaction {
     #[serde(with = "alloy_serde::num::u64_via_ruint")]
     pub nonce: u64,
     /// Block hash
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub block_hash: Option<B256>,
     /// Block number
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
     pub block_number: Option<u64>,
     /// Transaction Index
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
@@ -276,7 +268,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         let tx: Signed<TxEip4844> = tx.try_into()?;
         let (inner, signature, _) = tx.into_parts();
-        let tx = TxEip4844Variant::TxEip4844(inner);
+        let tx: TxEip4844Variant = inner.into();
 
         Ok(tx.into_signed(signature))
     }
@@ -322,7 +314,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -360,7 +352,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -393,13 +385,13 @@ mod tests {
             from: Address::with_last_byte(6),
             value: U256::from(8),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             ..Default::default()
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);

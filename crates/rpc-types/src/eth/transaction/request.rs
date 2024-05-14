@@ -591,20 +591,19 @@ impl From<Option<Bytes>> for TransactionInput {
 }
 
 impl From<Transaction> for TransactionRequest {
-    fn from(tx: Transaction) -> TransactionRequest {
+    fn from(tx: Transaction) -> Self {
         tx.into_request()
     }
 }
 
 impl From<TxLegacy> for TransactionRequest {
-    fn from(tx: TxLegacy) -> TransactionRequest {
-        TransactionRequest {
-            from: None,
+    fn from(tx: TxLegacy) -> Self {
+        Self {
             to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
-            input: TransactionInput::from(tx.input),
+            input: tx.input.into(),
             nonce: Some(tx.nonce),
             chain_id: tx.chain_id,
             transaction_type: Some(0),
@@ -614,14 +613,13 @@ impl From<TxLegacy> for TransactionRequest {
 }
 
 impl From<TxEip2930> for TransactionRequest {
-    fn from(tx: TxEip2930) -> TransactionRequest {
-        TransactionRequest {
-            from: None,
+    fn from(tx: TxEip2930) -> Self {
+        Self {
             to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             gas_price: Some(tx.gas_price),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
-            input: TransactionInput::from(tx.input),
+            input: tx.input.into(),
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
@@ -632,15 +630,14 @@ impl From<TxEip2930> for TransactionRequest {
 }
 
 impl From<TxEip1559> for TransactionRequest {
-    fn from(tx: TxEip1559) -> TransactionRequest {
-        TransactionRequest {
-            from: None,
+    fn from(tx: TxEip1559) -> Self {
+        Self {
             to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
             gas: Some(tx.gas_limit),
             value: Some(tx.value),
-            input: TransactionInput::from(tx.input),
+            input: tx.input.into(),
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
@@ -651,16 +648,15 @@ impl From<TxEip1559> for TransactionRequest {
 }
 
 impl From<TxEip4844> for TransactionRequest {
-    fn from(tx: TxEip4844) -> TransactionRequest {
-        TransactionRequest {
-            from: None,
+    fn from(tx: TxEip4844) -> Self {
+        Self {
             to: Some(tx.to.into()),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
             value: Some(tx.value),
-            input: TransactionInput::from(tx.input),
+            input: tx.input.into(),
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
@@ -672,18 +668,17 @@ impl From<TxEip4844> for TransactionRequest {
 }
 
 impl From<TxEip4844WithSidecar> for TransactionRequest {
-    fn from(tx: TxEip4844WithSidecar) -> TransactionRequest {
+    fn from(tx: TxEip4844WithSidecar) -> Self {
         let sidecar = tx.sidecar;
         let tx = tx.tx;
-        TransactionRequest {
-            from: None,
+        Self {
             to: Some(tx.to.into()),
             max_fee_per_blob_gas: Some(tx.max_fee_per_blob_gas),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
             value: Some(tx.value),
-            input: TransactionInput::from(tx.input),
+            input: tx.input.into(),
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
@@ -696,7 +691,7 @@ impl From<TxEip4844WithSidecar> for TransactionRequest {
 }
 
 impl From<TxEip4844Variant> for TransactionRequest {
-    fn from(tx: TxEip4844Variant) -> TransactionRequest {
+    fn from(tx: TxEip4844Variant) -> Self {
         match tx {
             TxEip4844Variant::TxEip4844(tx) => tx.into(),
             TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.into(),
@@ -705,7 +700,7 @@ impl From<TxEip4844Variant> for TransactionRequest {
 }
 
 impl From<TypedTransaction> for TransactionRequest {
-    fn from(tx: TypedTransaction) -> TransactionRequest {
+    fn from(tx: TypedTransaction) -> Self {
         match tx {
             TypedTransaction::Legacy(tx) => tx.into(),
             TypedTransaction::Eip2930(tx) => tx.into(),
@@ -716,7 +711,7 @@ impl From<TypedTransaction> for TransactionRequest {
 }
 
 impl From<TxEnvelope> for TransactionRequest {
-    fn from(envelope: TxEnvelope) -> TransactionRequest {
+    fn from(envelope: TxEnvelope) -> Self {
         match envelope {
             TxEnvelope::Legacy(tx) => {
                 #[cfg(feature = "k256")]

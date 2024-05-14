@@ -666,7 +666,7 @@ impl Geth {
 fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
     let mut key = Cow::from(key);
     if !key.ends_with('=') {
-        key = Cow::from(format!("{}=", key));
+        key = format!("{}=", key).into();
     }
     line.find(key.as_ref()).map(|pos| {
         let start = pos + key.len();

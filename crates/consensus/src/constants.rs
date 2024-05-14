@@ -1,5 +1,5 @@
 //! Ethereum protocol-related constants
-use alloy_primitives::{address, b256, Address, B256};
+use alloy_primitives::{b256, B256};
 
 /// The first four bytes of the call data for a function call specifies the function to be called.
 pub const SELECTOR_LEN: usize = 4;
@@ -67,6 +67,3 @@ pub const EMPTY_TRANSACTIONS: B256 = EMPTY_ROOT_HASH;
 
 /// Withdrawals root of empty withdrawals set.
 pub const EMPTY_WITHDRAWALS: B256 = EMPTY_ROOT_HASH;
-
-/// The address for the beacon roots contract defined in EIP-4788.
-pub const BEACON_ROOTS_ADDRESS: Address = address!("000F3df6D732807Ef1319fB7B8bB8522d0Beac02");

@@ -3,13 +3,19 @@ use alloy_eips::{
     eip7002::WithdrawalRequest,
     eip7685::{Decodable7685, Eip7685Error, Encodable7685},
 };
-use alloy_rlp::{Decodable, Encodable};
+use alloy_rlp::{Decodable, Encodable, Header};
 
 /// Ethereum execution layer requests.
 ///
 /// See also [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum Request {
     /// An [EIP-6110] deposit request.
     ///
@@ -84,5 +90,18 @@ impl Decodable7685 for Request {
             1 => Self::WithdrawalRequest(WithdrawalRequest::decode(buf)?),
             ty => return Err(Eip7685Error::UnexpectedType(ty)),
         })
+    }
+}
+
+impl Encodable for Request {
+    fn encode(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.encoded_7685().encode(out)
+    }
+}
+
+impl Decodable for Request {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let mut data = Header::decode_bytes(buf, false)?;
+        Ok(Self::decode_7685(&mut data)?)
     }
 }

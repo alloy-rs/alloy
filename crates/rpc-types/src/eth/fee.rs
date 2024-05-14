@@ -56,7 +56,7 @@ pub struct FeeHistory {
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
-        // with = "alloy_serde::num::u128_vec_via_ruint"
+        with = "alloy_serde::num::u128_vec_via_ruint"
     )]
     pub base_fee_per_blob_gas: Vec<u128>,
     /// An array of block blob gas used ratios. These are calculated as the ratio of gasUsed and
@@ -114,5 +114,35 @@ impl FeeHistory {
                 **fee != 0
             })
             .copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use similar_asserts::assert_eq;
+
+    use crate::FeeHistory;
+
+    #[test]
+    fn test_fee_history_serde() {
+        let sample = r#"{"baseFeePerGas":["0x342770c0","0x2da282a8"],"gasUsedRatio":[0.0],"baseFeePerBlobGas":["0x0","0x0"],"blobGasUsedRatio":[0.0],"oldestBlock":"0x1"}"#;
+        let fee_history: FeeHistory = serde_json::from_str(sample).unwrap();
+        let expected = FeeHistory {
+            base_fee_per_blob_gas: vec![0, 0],
+            base_fee_per_gas: vec![875000000, 765625000],
+            blob_gas_used_ratio: vec![0.0],
+            gas_used_ratio: vec![0.0],
+            oldest_block: 1,
+            reward: None,
+        };
+
+        assert_eq!(fee_history, expected);
+        assert_eq!(serde_json::to_string(&fee_history).unwrap(), sample);
+    }
+
+    #[test]
+    fn test_fee_history_serde_2() {
+        let json = r#"{"baseFeePerBlobGas":["0xc0","0xb2","0xab","0x98","0x9e","0x92","0xa4","0xb9","0xd0","0xea","0xfd"],"baseFeePerGas":["0x4cb8cf181","0x53075988e","0x4fb92ee18","0x45c209055","0x4e790dca2","0x58462e84e","0x5b7659f4e","0x5d66ea3aa","0x6283c6e45","0x5ecf0e1e5","0x5da59cf89"],"blobGasUsedRatio":[0.16666666666666666,0.3333333333333333,0,0.6666666666666666,0.16666666666666666,1,1,1,1,0.8333333333333334],"gasUsedRatio":[0.8288135,0.3407616666666667,0,0.9997232,0.999601,0.6444664333333333,0.5848306333333333,0.7189564,0.34952733333333336,0.4509799666666667],"oldestBlock":"0x59f94f","reward":[["0x59682f00"],["0x59682f00"],["0x0"],["0x59682f00"],["0x59682f00"],["0x3b9aca00"],["0x59682f00"],["0x59682f00"],["0x3b9aca00"],["0x59682f00"]]}"#;
+        let _actual = serde_json::from_str::<FeeHistory>(json).unwrap();
     }
 }

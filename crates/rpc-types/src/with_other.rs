@@ -19,7 +19,7 @@ pub struct WithOtherFields<T> {
 impl<T> WithOtherFields<T> {
     /// Create a new `Extra`.
     pub fn new(inner: T) -> Self {
-        Self { inner, other: OtherFields::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -51,7 +51,7 @@ impl<T> DerefMut for WithOtherFields<T> {
 
 impl<T: Default> Default for WithOtherFields<T> {
     fn default() -> Self {
-        WithOtherFields::new(T::default())
+        Self::new(T::default())
     }
 }
 
@@ -83,7 +83,7 @@ where
             }
         }
 
-        Ok(WithOtherFields { inner: helper.inner, other: helper.other })
+        Ok(Self { inner: helper.inner, other: helper.other })
     }
 }
 

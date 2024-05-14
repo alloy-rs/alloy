@@ -33,7 +33,7 @@ impl Serialize for Work {
 }
 
 impl<'a> Deserialize<'a> for Work {
-    fn deserialize<D>(deserializer: D) -> Result<Work, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'a>,
     {

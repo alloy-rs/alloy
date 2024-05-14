@@ -63,6 +63,13 @@ where
     }
 }
 
+impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
+    /// Consume the structure, returning only the receipt
+    fn from(receipt_with_bloom: ReceiptWithBloom<T>) -> Self {
+        receipt_with_bloom.receipt
+    }
+}
+
 /// [`Receipt`] with calculated bloom filter.
 ///
 /// This convenience type allows us to lazily calculate the bloom filter for a
@@ -137,14 +144,8 @@ impl<T: Encodable> ReceiptWithBloom<T> {
 
 impl<T> ReceiptWithBloom<T> {
     /// Create new [ReceiptWithBloom]
-    pub const fn new(receipt: Receipt<T>, bloom: Bloom) -> Self {
-        Self { receipt, logs_bloom: bloom }
-    }
-
-    /// Consume the structure, returning only the receipt
-    #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn into_receipt(self) -> Receipt<T> {
-        self.receipt
+    pub const fn new(receipt: Receipt<T>, logs_bloom: Bloom) -> Self {
+        Self { receipt, logs_bloom }
     }
 
     /// Consume the structure, returning the receipt and the bloom filter

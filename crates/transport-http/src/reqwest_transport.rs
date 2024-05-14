@@ -6,7 +6,13 @@ use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
 
-impl Http<reqwest::Client> {
+/// Rexported from [`reqwest`].
+pub use reqwest::Client;
+
+/// An [`Http`] transport using [`reqwest`].
+pub type ReqwestTransport = Http<Client>;
+
+impl Http<Client> {
     /// Create a new [`Http`] transport.
     pub fn new(url: Url) -> Self {
         Self { client: Default::default(), url }

@@ -22,11 +22,11 @@ impl EthRpcErrorCode {
     /// Returns the error code as `i32`
     pub const fn code(&self) -> i32 {
         match *self {
-            EthRpcErrorCode::TransactionRejected => -32003,
-            EthRpcErrorCode::ExecutionError => 3,
-            EthRpcErrorCode::InvalidInput => -32000,
-            EthRpcErrorCode::ResourceNotFound => -32001,
-            EthRpcErrorCode::UnknownBlock => -39001,
+            Self::TransactionRejected => -32003,
+            Self::ExecutionError => 3,
+            Self::InvalidInput => -32000,
+            Self::ResourceNotFound => -32001,
+            Self::UnknownBlock => -39001,
         }
     }
 }
