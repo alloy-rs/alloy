@@ -31,6 +31,8 @@ pub mod eip2718;
 
 pub mod eip2930;
 
+pub mod eip2935;
+
 pub mod eip4788;
 
 pub mod eip4895;
