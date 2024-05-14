@@ -75,9 +75,6 @@ pub struct Genesis {
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_opt_via_ruint")]
     pub number: Option<u64>,
-    /// The deposit contract address
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub deposit_contract_address: Option<Address>,
 }
 
 impl Genesis {
@@ -436,6 +433,10 @@ pub struct ChainConfig {
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
     pub extra_fields: BTreeMap<String, serde_json::Value>,
+
+    /// The deposit contract address
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deposit_contract_address: Option<Address>,
 }
 
 impl ChainConfig {
@@ -961,6 +962,7 @@ mod tests {
         "cancunTime": 0,
         "pragueTime": 1,
         "terminalTotalDifficulty": 0,
+        "depositContractAddress": "0x0000000000000000000000000000000000000000",
         "terminalTotalDifficultyPassed": true
       },
       "nonce": "0x0",
@@ -969,8 +971,7 @@ mod tests {
       "gasLimit": "0x4c4b40",
       "difficulty": "0x1",
       "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-      "coinbase": "0x0000000000000000000000000000000000000000",
-      "depositContractAddress": "0x0000000000000000000000000000000000000000"
+      "coinbase": "0x0000000000000000000000000000000000000000"
     }
     "#;
 
@@ -1001,6 +1002,7 @@ mod tests {
                 prague_time: Some(1),
                 terminal_total_difficulty: Some(U256::ZERO),
                 terminal_total_difficulty_passed: true,
+                deposit_contract_address: Some(Address::ZERO),
                 ..Default::default()
             },
             nonce: 0,
@@ -1008,7 +1010,6 @@ mod tests {
             extra_data: Bytes::new(),
             gas_limit: 0x4c4b40,
             difficulty: U256::from(1),
-            deposit_contract_address: Some(Address::ZERO),
             ..Default::default()
         };
 
@@ -1333,7 +1334,6 @@ mod tests {
                 excess_blob_gas: None,
                 blob_gas_used: None,
                 number: None,
-                deposit_contract_address: None,
                 alloc: BTreeMap::from_iter(vec![
                 (
                     Address::from_str("0xdbdbdb2cbd23b783741e8d7fcf51e459b497e4a6").unwrap(),
@@ -1435,6 +1435,7 @@ mod tests {
                     constantinople_block: Some(0),
                     petersburg_block: Some(0),
                     istanbul_block: Some(0),
+                    deposit_contract_address: None,
                     ..Default::default()
                 },
             };
