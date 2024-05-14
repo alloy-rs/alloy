@@ -416,7 +416,7 @@ mod tests {
             gas_limit: 5,
             to: Address::left_padding_from(&[6]).into(),
             value: U256::from(7_u64),
-            input: Bytes::from(vec![8]),
+            input: vec![8].into(),
             access_list: Default::default(),
         };
         test_encode_decode_roundtrip(tx);
@@ -431,7 +431,7 @@ mod tests {
             gas_limit: 4,
             to: Address::left_padding_from(&[5]).into(),
             value: U256::from(6_u64),
-            input: Bytes::from(vec![7]),
+            input: vec![7].into(),
             access_list: AccessList(vec![AccessListItem {
                 address: Address::left_padding_from(&[8]),
                 storage_keys: vec![B256::left_padding_from(&[9])],
@@ -452,7 +452,7 @@ mod tests {
                 gas_limit: 5,
                 to: Address::left_padding_from(&[6]).into(),
                 value: U256::from(7_u64),
-                input: Bytes::from(vec![8]),
+                input: vec![8].into(),
                 access_list: Default::default(),
             }
             .into_signed(signature),

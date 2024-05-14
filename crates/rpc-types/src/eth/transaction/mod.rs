@@ -313,7 +313,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -351,7 +351,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -384,7 +384,7 @@ mod tests {
             from: Address::with_last_byte(6),
             value: U256::from(8),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             ..Default::default()
         };
         let serialized = serde_json::to_string(&transaction).unwrap();

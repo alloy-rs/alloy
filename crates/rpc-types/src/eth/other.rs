@@ -158,7 +158,7 @@ impl arbitrary::Arbitrary<'_> for OtherFields {
                 match u.int_in_range(0..=3)? {
                     0 => serde_json::Value::Null,
                     1 => serde_json::Value::Bool(u.arbitrary()?),
-                    2 => serde_json::Value::Number(serde_json::Number::from(u.arbitrary::<u64>()?)),
+                    2 => serde_json::Value::Number(u.arbitrary::<u64>()?.into()),
                     3 => serde_json::Value::String(u.arbitrary()?),
                     _ => unreachable!(),
                 },

@@ -897,10 +897,7 @@ impl Transaction for TxEip4844WithSidecar {
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{SignableTransaction, TxEip4844Variant, TxEnvelope};
-    use alloy_eips::{
-        eip2930::AccessList,
-        eip4844::{Blob, Bytes48},
-    };
+    use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
@@ -922,9 +919,9 @@ mod tests {
             input: Default::default(),
         };
         let sidecar = BlobTransactionSidecar {
-            blobs: vec![Blob::from([2; 131072])],
-            commitments: vec![Bytes48::from([3; 48])],
-            proofs: vec![Bytes48::from([4; 48])],
+            blobs: vec![[2; 131072].into()],
+            commitments: vec![[3; 48].into()],
+            proofs: vec![[4; 48].into()],
         };
         let mut tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature();
@@ -934,9 +931,9 @@ mod tests {
 
         // change the sidecar, adding a single (blob, commitment, proof) pair
         tx.sidecar = BlobTransactionSidecar {
-            blobs: vec![Blob::from([1; 131072])],
-            commitments: vec![Bytes48::from([1; 48])],
-            proofs: vec![Bytes48::from([1; 48])],
+            blobs: vec![[1; 131072].into()],
+            commitments: vec![[1; 48].into()],
+            proofs: vec![[1; 48].into()],
         };
 
         // turn this transaction into_signed

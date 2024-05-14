@@ -165,7 +165,7 @@ impl LedgerSigner {
             let address_str = &result[offset + 1..offset + 1 + result[offset] as usize];
             let mut address = [0; 20];
             address.copy_from_slice(&hex::decode(address_str)?);
-            Address::from(address)
+            address.into()
         };
         debug!(?address, "Received address from device");
         Ok(address)

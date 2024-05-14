@@ -35,7 +35,7 @@ pub trait TxReceipt<T = Log> {
 mod tests {
     use super::*;
     use alloy_eips::eip2718::Encodable2718;
-    use alloy_primitives::{address, b256, bytes, hex, Bytes, LogData};
+    use alloy_primitives::{address, b256, bytes, hex, LogData};
     use alloy_rlp::{Decodable, Encodable};
 
     // Test vector from: https://eips.ethereum.org/EIPS/eip-2481
@@ -111,7 +111,7 @@ mod tests {
                         vec![b256!(
                             "c69dc3d7ebff79e41f525be431d5cd3cc08f80eaf0f7819054a726eeb7086eb9"
                         )],
-                        Bytes::from(vec![1; 0xffffff]),
+                        vec![1; 0xffffff].into(),
                     ),
                 },
                 Log {
@@ -120,7 +120,7 @@ mod tests {
                         vec![b256!(
                             "8cca58667b1e9ffa004720ac99a3d61a138181963b294d270d91c53d36402ae2"
                         )],
-                        Bytes::from(vec![1; 0xffffff]),
+                        vec![1; 0xffffff].into(),
                     ),
                 },
             ],

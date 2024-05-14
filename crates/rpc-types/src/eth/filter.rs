@@ -37,7 +37,7 @@ pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        FilterSet(HashSet::from([src]))
+        FilterSet([src].into())
     }
 }
 
@@ -67,14 +67,14 @@ impl<T: Eq + Hash> From<ValueOrArray<T>> for FilterSet<T> {
 impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     fn from(src: ValueOrArray<Option<T>>) -> Self {
         match src {
-            ValueOrArray::Value(None) => FilterSet(HashSet::new()),
+            ValueOrArray::Value(None) => FilterSet(Default::default()),
             ValueOrArray::Value(Some(val)) => val.into(),
             ValueOrArray::Array(arr) => {
                 // If the array contains at least one `null` (ie. None), as it's considered
                 // a "wildcard" value, the whole filter should be treated as matching everything,
                 // thus is empty.
                 if arr.iter().contains(&None) {
-                    FilterSet(HashSet::new())
+                    FilterSet(Default::default())
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
                     arr.into_iter().flatten().collect::<Vec<T>>().into()
