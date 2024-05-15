@@ -329,6 +329,18 @@ impl GethDebugTracingOptions {
         self
     }
 
+    /// Configures a [CallConfig]
+    pub fn with_call_config(mut self, config: CallConfig) -> Self {
+        self.tracer_config = config.into();
+        self
+    }
+
+    /// Configures a [PreStateConfig]
+    pub fn with_prestate_config(mut self, config: PreStateConfig) -> Self {
+        self.tracer_config = config.into();
+        self
+    }
+
     /// Sets the tracer config
     pub fn with_config<T>(mut self, config: T) -> Self
     where
