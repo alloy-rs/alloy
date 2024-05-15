@@ -58,14 +58,14 @@ pub struct ExecutionPayloadHeader {
     #[serde_as(as = "DisplayFromStr")]
     pub block_number: String,
     #[serde_as(as = "DisplayFromStr")]
-    pub gas_limit: u64,
+    pub gas_limit: u128,
     #[serde_as(as = "DisplayFromStr")]
-    pub gas_used: u64,
+    pub gas_used: u128,
     #[serde_as(as = "DisplayFromStr")]
     pub timestamp: u64,
     pub extra_data: Bytes,
     #[serde_as(as = "DisplayFromStr")]
-    pub base_fee_per_gas: U256,
+    pub base_fee_per_gas: u128,
     pub block_hash: B256,
     pub transactions_root: B256,
 }
@@ -217,14 +217,14 @@ struct BeaconExecutionPayloadV1<'a> {
     #[serde_as(as = "DisplayFromStr")]
     block_number: u64,
     #[serde_as(as = "DisplayFromStr")]
-    gas_limit: u64,
+    gas_limit: u128,
     #[serde_as(as = "DisplayFromStr")]
-    gas_used: u64,
+    gas_used: u128,
     #[serde_as(as = "DisplayFromStr")]
     timestamp: u64,
     extra_data: Cow<'a, Bytes>,
     #[serde_as(as = "DisplayFromStr")]
-    base_fee_per_gas: U256,
+    base_fee_per_gas: u128,
     block_hash: Cow<'a, B256>,
     transactions: Cow<'a, Vec<Bytes>>,
 }
@@ -390,9 +390,9 @@ struct BeaconExecutionPayloadV3<'a> {
     #[serde(flatten)]
     payload_inner: BeaconExecutionPayloadV2<'a>,
     #[serde_as(as = "DisplayFromStr")]
-    blob_gas_used: u64,
+    blob_gas_used: u128,
     #[serde_as(as = "DisplayFromStr")]
-    excess_blob_gas: u64,
+    excess_blob_gas: u128,
 }
 
 impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {

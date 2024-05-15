@@ -158,18 +158,19 @@ pub struct ExecutionPayloadV1 {
     #[serde(with = "alloy_serde::u64_via_ruint")]
     pub block_number: u64,
     /// The gas limit of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
-    pub gas_limit: u64,
+    #[serde(with = "alloy_serde::u128_via_ruint")]
+    pub gas_limit: u128,
     /// The gas used of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
-    pub gas_used: u64,
+    #[serde(with = "alloy_serde::u128_via_ruint")]
+    pub gas_used: u128,
     /// The timestamp of the block.
     #[serde(with = "alloy_serde::u64_via_ruint")]
     pub timestamp: u64,
     /// The extra data of the block.
     pub extra_data: Bytes,
     /// The base fee per gas of the block.
-    pub base_fee_per_gas: U256,
+    #[serde(with = "alloy_serde::u128_via_ruint")]
+    pub base_fee_per_gas: u128,
     /// The block hash of the block.
     pub block_hash: B256,
     /// The transactions of the block.
@@ -299,14 +300,14 @@ pub struct ExecutionPayloadV3 {
     #[serde(flatten)]
     pub payload_inner: ExecutionPayloadV2,
 
-    /// Array of hex [`u64`] representing blob gas used, enabled with V3
+    /// Array of hex [`u128`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
-    pub blob_gas_used: u64,
-    /// Array of hex[`u64`] representing excess blob gas, enabled with V3
+    #[serde(with = "alloy_serde::u128_via_ruint")]
+    pub blob_gas_used: u128,
+    /// Array of hex[`u128`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
-    pub excess_blob_gas: u64,
+    #[serde(with = "alloy_serde::u128_via_ruint")]
+    pub excess_blob_gas: u128,
 }
 
 impl ExecutionPayloadV3 {
