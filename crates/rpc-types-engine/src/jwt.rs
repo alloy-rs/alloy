@@ -4,7 +4,7 @@ use alloy_primitives::hex;
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
-use rand::random;
+use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path, str::FromStr, time::Duration};
 use thiserror::Error;
@@ -135,7 +135,7 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
-    pub fn try_create(fpath: &Path) -> Result<Self, JwtError> {
+    pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
             // Create parent directory
             fs::create_dir_all(dir)?
@@ -183,7 +183,7 @@ impl JwtSecret {
 
     /// Generates a random [`JwtSecret`] containing a hex-encoded 256 bit secret key.
     pub fn random() -> Self {
-        let random_bytes: [u8; 32] = random();
+        let random_bytes: [u8; 32] = rand::thread_rng().gen();
         let secret = hex::encode(random_bytes);
         JwtSecret::from_hex(secret).unwrap()
     }
