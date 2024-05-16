@@ -1,5 +1,6 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_primitives::B256;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
