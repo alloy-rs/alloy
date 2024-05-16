@@ -6,8 +6,7 @@ use jsonwebtoken::{
 };
 use rand::random;
 use serde::{Deserialize, Serialize};
-use std::{fs, str::FromStr, time::Duration};
-use std::path::Path;
+use std::{fs, path::Path, str::FromStr, time::Duration};
 use thiserror::Error;
 
 /// Errors returned by the [`JwtSecret`]
@@ -215,8 +214,8 @@ impl FromStr for JwtSecret {
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
     use super::*;
+    use assert_matches::assert_matches;
     use jsonwebtoken::{encode, EncodingKey, Header};
     use std::time::{SystemTime, UNIX_EPOCH};
     use tempfile::tempdir;
@@ -408,7 +407,7 @@ mod tests {
     fn provided_file_not_exists() {
         let fpath = Path::new("secret3.hex");
         let result = JwtSecret::from_file(fpath);
-        assert_matches!(result,Err(JwtError::IOError(_)));
+        assert_matches!(result, Err(JwtError::IOError(_)));
         assert!(!exists(fpath));
     }
 
@@ -442,5 +441,4 @@ mod tests {
     fn delete(path: &Path) {
         fs::remove_file(path).unwrap();
     }
-
 }
