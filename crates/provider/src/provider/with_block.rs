@@ -229,6 +229,48 @@ where
         self.block_id = block_id;
         self
     }
+
+    /// Set the block id to "pending".
+    pub fn pending(self) -> Self {
+        self.block_id(BlockId::pending())
+    }
+
+    /// Set the block id to "latest".
+    pub fn latest(self) -> Self {
+        self.block_id(BlockId::latest())
+    }
+
+    /// Set the block id to "earliest".
+    pub fn earliest(self) -> Self {
+        self.block_id(BlockId::earliest())
+    }
+
+    /// Set the block id to "finalized".
+    pub fn finalized(self) -> Self {
+        self.block_id(BlockId::finalized())
+    }
+
+    /// Set the block id to "safe".
+    pub fn safe(self) -> Self {
+        self.block_id(BlockId::safe())
+    }
+
+    /// Set the block id to a specific height.
+    pub fn number(self, number: u64) -> Self {
+        self.block_id(BlockId::number(number))
+    }
+
+    /// Set the block id to a specific hash, without requiring the hash be part
+    /// of the canonical chain.
+    pub fn hash(self, hash: B256) -> Self {
+        self.block_id(BlockId::hash(hash))
+    }
+
+    /// Set the block id to a specific hash and require the hash be part of the
+    /// canonical chain.
+    pub fn hash_canonical(self, hash: B256) -> Self {
+        self.block_id(BlockId::hash_canonical(hash))
+    }
 }
 
 impl<T, Params, Resp, Output, Map> IntoFuture for RpcWithBlock<T, Params, Resp, Output, Map>
