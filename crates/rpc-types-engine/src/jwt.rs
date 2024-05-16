@@ -4,9 +4,14 @@ use alloy_primitives::hex;
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
-use rand::{random, Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path, str::FromStr, time::Duration};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::Duration,
+};
 use thiserror::Error;
 
 /// Errors returned by the [`JwtSecret`]
@@ -37,9 +42,32 @@ pub enum JwtError {
     #[error("JWT decoding error: {0}")]
     JwtDecodingError(String),
 
-    /// An I/O error occurred during JWT operations.
-    #[error(transparent)]
-    IOError(#[from] std::io::Error),
+    /// Error variant for failed directory creation operation with additional path context.
+    #[error("failed to create dir {path:?}: {source}")]
+    CreateDir {
+        /// The source `io::Error`.
+        source: io::Error,
+        /// The path related to the operation.
+        path: PathBuf,
+    },
+
+    /// Error variant for failed read operation with additional path context.
+    #[error("failed to read from {path:?}: {source}")]
+    Read {
+        /// The source `io::Error`.
+        source: io::Error,
+        /// The path related to the operation.
+        path: PathBuf,
+    },
+
+    /// Error variant for failed write operation with additional path context.
+    #[error("failed to write to {path:?}: {source}")]
+    Write {
+        /// The source `io::Error`.
+        source: io::Error,
+        /// The path related to the operation.
+        path: PathBuf,
+    },
 }
 
 /// Length of the hex-encoded 256 bit secret key.
@@ -128,7 +156,8 @@ impl JwtSecret {
     /// I/O or secret validation errors might occur during read operations in the form of
     /// a [`JwtError`].
     pub fn from_file(fpath: &Path) -> Result<Self, JwtError> {
-        let hex = fs::read_to_string(fpath)?;
+        let hex = fs::read_to_string(fpath)
+            .map_err(|err| JwtError::Read { source: err, path: fpath.into() })?;
         let secret = JwtSecret::from_hex(hex)?;
         Ok(secret)
     }
@@ -138,13 +167,14 @@ impl JwtSecret {
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
             // Create parent directory
-            fs::create_dir_all(dir)?
+            fs::create_dir_all(dir)
+                .map_err(|err| JwtError::CreateDir { source: err, path: fpath.into() })?
         }
 
         let secret = JwtSecret::random();
         let bytes = &secret.0;
         let hex = hex::encode(bytes);
-        fs::write(fpath, hex)?;
+        fs::write(fpath, hex).map_err(|err| JwtError::Write { source: err, path: fpath.into() })?;
         Ok(secret)
     }
 
@@ -369,27 +399,27 @@ mod tests {
     #[test]
     fn ephemeral_secret_created() {
         let fpath: &Path = Path::new("secret0.hex");
-        assert!(not_exists(fpath));
-        JwtSecret::try_create(fpath).expect("A secret file should be created");
-        assert!(exists(fpath));
-        delete(fpath);
+        assert!(!fs::metadata(fpath).is_ok());
+        JwtSecret::try_create_random(fpath).expect("A secret file should be created");
+        assert!(fs::metadata(fpath).is_ok());
+        fs::remove_file(fpath).unwrap();
     }
 
     #[test]
     fn valid_secret_provided() {
         let fpath = Path::new("secret1.hex");
-        assert!(not_exists(fpath));
+        assert!(!fs::metadata(fpath).is_ok());
 
         let secret = JwtSecret::random();
-        write(fpath, &hex(&secret));
+        fs::write(fpath, &hex(&secret)).unwrap();
 
         match JwtSecret::from_file(fpath) {
             Ok(gen_secret) => {
-                delete(fpath);
+                fs::remove_file(fpath).unwrap();
                 assert_eq!(hex(&gen_secret), hex(&secret));
             }
             Err(_) => {
-                delete(fpath);
+                fs::remove_file(fpath).unwrap();
             }
         }
     }
@@ -397,48 +427,32 @@ mod tests {
     #[test]
     fn invalid_hex_provided() {
         let fpath = Path::new("secret2.hex");
-        write(fpath, "invalid hex");
+        fs::write(fpath, "invalid hex").unwrap();
         let result = JwtSecret::from_file(fpath);
         assert!(result.is_err());
-        delete(fpath);
+        fs::remove_file(fpath).unwrap();
     }
 
     #[test]
     fn provided_file_not_exists() {
         let fpath = Path::new("secret3.hex");
         let result = JwtSecret::from_file(fpath);
-        assert_matches!(result, Err(JwtError::IOError(_)));
-        assert!(!exists(fpath));
+        assert_matches!(result, Err(JwtError::Read {source: _,path }) if path == fpath.to_path_buf());
+        assert!(!fs::metadata(fpath).is_ok());
     }
 
     #[test]
     fn provided_file_is_a_directory() {
         let dir = tempdir().unwrap();
         let result = JwtSecret::from_file(dir.path());
-        assert_matches!(result, Err(JwtError::IOError(_)));
-    }
-
-    fn write(path: &Path, s: &str) {
-        fs::write(path, s).unwrap();
+        assert_matches!(result, Err(JwtError::Read {source: _,path}) if path == dir.into_path());
     }
 
     fn to_u64(time: SystemTime) -> u64 {
         time.duration_since(UNIX_EPOCH).unwrap().as_secs()
     }
 
-    fn not_exists(path: &Path) -> bool {
-        !exists(path)
-    }
-
-    fn exists(path: &Path) -> bool {
-        fs::metadata(path).is_ok()
-    }
-
     fn hex(secret: &JwtSecret) -> String {
         hex::encode(secret.0)
-    }
-
-    fn delete(path: &Path) {
-        fs::remove_file(path).unwrap();
     }
 }
