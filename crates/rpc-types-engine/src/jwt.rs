@@ -38,6 +38,10 @@ pub enum JwtError {
     #[error("IAT (issued-at) claim is not within ±60 seconds from the current time")]
     InvalidIssuanceTimestamp,
 
+    /// The Authorization header is missing or invalid in the context of JWT validation.
+    #[error("Authorization header is missing or invalid")]
+    MissingOrInvalidAuthorizationHeader,
+
     /// An error occurred during JWT decoding.
     #[error("JWT decoding error: {0}")]
     JwtDecodingError(String),
