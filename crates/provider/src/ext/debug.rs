@@ -1,10 +1,10 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{BlockNumber, TxHash, B256};
+use alloy_primitives::{TxHash, B256};
 use alloy_rpc_types::{BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
-    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace,
+    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -42,7 +42,7 @@ pub trait DebugApi<N, T>: Send + Sync {
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>>;
+    ) -> TransportResult<Vec<TraceResult>>;
 
     /// Same as `debug_trace_block_by_hash` but block is specified by number.
     ///
@@ -53,9 +53,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_block_by_number(
         &self,
-        block: BlockNumber,
+        block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>>;
+    ) -> TransportResult<Vec<TraceResult>>;
 
     /// Executes the given transaction without publishing it like `eth_call` and returns the trace
     /// of the execution.
@@ -111,15 +111,15 @@ where
         &self,
         block: B256,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>> {
+    ) -> TransportResult<Vec<TraceResult>> {
         self.client().request("debug_traceBlockByHash", (block, trace_options)).await
     }
 
     async fn debug_trace_block_by_number(
         &self,
-        block: BlockNumber,
+        block: BlockNumberOrTag,
         trace_options: GethDebugTracingOptions,
-    ) -> TransportResult<Vec<GethTrace>> {
+    ) -> TransportResult<Vec<TraceResult>> {
         self.client().request("debug_traceBlockByNumber", (block, trace_options)).await
     }
 

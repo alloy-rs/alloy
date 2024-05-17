@@ -37,7 +37,7 @@ pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        FilterSet(HashSet::from([src]))
+        FilterSet([src].into())
     }
 }
 
@@ -67,14 +67,14 @@ impl<T: Eq + Hash> From<ValueOrArray<T>> for FilterSet<T> {
 impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     fn from(src: ValueOrArray<Option<T>>) -> Self {
         match src {
-            ValueOrArray::Value(None) => FilterSet(HashSet::new()),
+            ValueOrArray::Value(None) => FilterSet(Default::default()),
             ValueOrArray::Value(Some(val)) => val.into(),
             ValueOrArray::Array(arr) => {
                 // If the array contains at least one `null` (ie. None), as it's considered
                 // a "wildcard" value, the whole filter should be treated as matching everything,
                 // thus is empty.
                 if arr.iter().contains(&None) {
-                    FilterSet(HashSet::new())
+                    FilterSet(Default::default())
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
                     arr.into_iter().flatten().collect::<Vec<T>>().into()
@@ -945,13 +945,13 @@ pub enum FilterId {
 
 impl From<u64> for FilterId {
     fn from(num: u64) -> Self {
-        FilterId::Num(num)
+        Self::Num(num)
     }
 }
 
 impl From<String> for FilterId {
     fn from(str: String) -> Self {
-        FilterId::Str(str)
+        Self::Str(str)
     }
 }
 
@@ -998,8 +998,8 @@ impl Serialize for PendingTransactionFilterKind {
         S: Serializer,
     {
         match self {
-            PendingTransactionFilterKind::Hashes => false.serialize(serializer),
-            PendingTransactionFilterKind::Full => true.serialize(serializer),
+            Self::Hashes => false.serialize(serializer),
+            Self::Full => true.serialize(serializer),
         }
     }
 }
@@ -1008,14 +1008,14 @@ impl<'a> Deserialize<'a> for PendingTransactionFilterKind {
     /// Deserializes a boolean value into `PendingTransactionFilterKind`:
     /// - `false` becomes `Hashes`
     /// - `true` becomes `Full`
-    fn deserialize<D>(deserializer: D) -> Result<PendingTransactionFilterKind, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'a>,
     {
         let val = Option::<bool>::deserialize(deserializer)?;
         match val {
-            Some(true) => Ok(PendingTransactionFilterKind::Full),
-            _ => Ok(PendingTransactionFilterKind::Hashes),
+            Some(true) => Ok(Self::Full),
+            _ => Ok(Self::Hashes),
         }
     }
 }

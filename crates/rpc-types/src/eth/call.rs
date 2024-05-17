@@ -59,14 +59,14 @@ pub enum TransactionIndex {
 impl TransactionIndex {
     /// Returns true if this is the all variant
     pub const fn is_all(&self) -> bool {
-        matches!(self, TransactionIndex::All)
+        matches!(self, Self::All)
     }
 
     /// Returns the index if this is the index variant
     pub const fn index(&self) -> Option<usize> {
         match self {
-            TransactionIndex::All => None,
-            TransactionIndex::Index(idx) => Some(*idx),
+            Self::All => None,
+            Self::Index(idx) => Some(*idx),
         }
     }
 }
@@ -77,8 +77,8 @@ impl Serialize for TransactionIndex {
         S: Serializer,
     {
         match self {
-            TransactionIndex::All => serializer.serialize_i8(-1),
-            TransactionIndex::Index(idx) => idx.serialize(serializer),
+            Self::All => serializer.serialize_i8(-1),
+            Self::Index(idx) => idx.serialize(serializer),
         }
     }
 }
@@ -89,12 +89,12 @@ impl<'de> Deserialize<'de> for TransactionIndex {
         D: Deserializer<'de>,
     {
         match isize::deserialize(deserializer)? {
-            -1 => Ok(TransactionIndex::All),
+            -1 => Ok(Self::All),
             idx if idx < -1 => Err(serde::de::Error::custom(format!(
                 "Invalid transaction index, expected -1 or positive integer, got {}",
                 idx
             ))),
-            idx => Ok(TransactionIndex::Index(idx as usize)),
+            idx => Ok(Self::Index(idx as usize)),
         }
     }
 }

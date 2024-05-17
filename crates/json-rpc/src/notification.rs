@@ -28,13 +28,13 @@ pub enum PubSubItem {
 
 impl From<Response> for PubSubItem {
     fn from(response: Response) -> Self {
-        PubSubItem::Response(response)
+        Self::Response(response)
     }
 }
 
 impl From<EthNotification> for PubSubItem {
     fn from(notification: EthNotification) -> Self {
-        PubSubItem::Notification(notification)
+        Self::Notification(notification)
     }
 }
 

@@ -3,7 +3,7 @@
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
-    SendableTx,
+    RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -12,7 +12,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
+use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
     FeeHistory, Filter, FilterChanges, Log, SyncStatus,
@@ -26,6 +26,9 @@ use std::borrow::Cow;
 ///
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
+
+/// List of trace calls for use with [`Provider::trace_call_many`]
+pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
 
 // todo: adjust docs
 // todo: reorder
@@ -419,18 +422,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Get the last block number available.
-    async fn get_block_number(&self) -> TransportResult<BlockNumber> {
-        self.client().request("eth_blockNumber", ()).await.map(|num: U64| num.to::<u64>())
+    fn get_block_number(&self) -> RpcCall<T, (), U64, BlockNumber> {
+        self.client().request("eth_blockNumber", ()).map_resp(crate::utils::convert_u64)
     }
 
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
-    async fn get_transaction_count(&self, address: Address, tag: BlockId) -> TransportResult<u64> {
-        self.client()
-            .request("eth_getTransactionCount", (address, tag))
-            .await
-            .map(|count: U64| count.to::<u64>())
+    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
+        RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
+            .map_resp(crate::utils::convert_u64)
     }
 
     /// Get a block by its number.
@@ -510,8 +511,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    async fn get_balance(&self, address: Address, tag: BlockId) -> TransportResult<U256> {
-        self.client().request("eth_getBalance", (address, tag)).await
+    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
+        RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -537,28 +538,27 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the chain ID.
-    async fn get_chain_id(&self) -> TransportResult<u64> {
-        self.client().request("eth_chainId", ()).await.map(|id: U64| id.to::<u64>())
+    fn get_chain_id(&self) -> RpcCall<T, (), U64, u64> {
+        self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64)
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    async fn get_net_version(&self) -> TransportResult<u64> {
-        self.client().request("net_version", ()).await.map(|id: U64| id.to::<u64>())
+    fn get_net_version(&self) -> RpcCall<T, (), U64, u64> {
+        self.client().request("net_version", ()).map_resp(crate::utils::convert_u64)
     }
 
     /// Gets the specified storage value from [Address].
-    async fn get_storage_at(
+    fn get_storage_at(
         &self,
         address: Address,
         key: U256,
-        tag: BlockId,
-    ) -> TransportResult<StorageValue> {
-        self.client().request("eth_getStorageAt", (address, key, tag)).await
+    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+        RpcWithBlock::new(self.weak_client(), "eth_getStorageAt", (address, key))
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    async fn get_code_at(&self, address: Address, tag: BlockId) -> TransportResult<Bytes> {
-        self.client().request("eth_getCode", (address, tag)).await
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+        RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
     /// Gets a transaction by its [TxHash].
@@ -581,8 +581,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    async fn get_gas_price(&self) -> TransportResult<u128> {
-        self.client().request("eth_gasPrice", ()).await.map(|price: U128| price.to::<u128>())
+    fn get_gas_price(&self) -> RpcCall<T, (), U128, u128> {
+        self.client().request("eth_gasPrice", ()).map_resp(crate::utils::convert_u128)
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
@@ -706,15 +706,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Estimate the gas needed for a transaction.
-    async fn estimate_gas(
+    fn estimate_gas<'a>(
         &self,
-        tx: &N::TransactionRequest,
-        block: BlockId,
-    ) -> TransportResult<u128> {
-        self.client()
-            .request("eth_estimateGas", (tx, block))
-            .await
-            .map(|gas: U128| gas.to::<u128>())
+        tx: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, U128, u128> {
+        RpcWithBlock::new(self.weak_client(), "eth_estimateGas", tx)
+            .map_resp(crate::utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -757,24 +754,22 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Get the account and storage values of the specified account including the merkle proofs.
     ///
     /// This call can be used to verify that the data has not been tampered with.
-    async fn get_proof(
+    fn get_proof(
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-        block: BlockId,
-    ) -> TransportResult<EIP1186AccountProofResponse> {
-        self.client().request("eth_getProof", (address, keys, block)).await
+    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        RpcWithBlock::new(self.weak_client(), "eth_getProof", (address, keys))
     }
 
     /// Create an [EIP-2930] access list.
     ///
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
-    async fn create_access_list(
+    fn create_access_list<'a>(
         &self,
-        request: &N::TransactionRequest,
-        block: BlockId,
-    ) -> TransportResult<AccessListWithGasUsed> {
-        self.client().request("eth_createAccessList", (request, block)).await
+        request: &'a N::TransactionRequest,
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+        RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
     /// Executes the given transaction and returns a number of possible traces.
@@ -782,13 +777,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
-        request: &N::TransactionRequest,
-        trace_type: &[TraceType],
-        block: BlockId,
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_call", (request, trace_type, block)).await
+        request: &'a N::TransactionRequest,
+        trace_type: &'b [TraceType],
+    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults> {
+        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
     }
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
@@ -799,12 +793,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
-        request: &[(N::TransactionRequest, Vec<TraceType>)],
-        block: BlockId,
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_callMany", (request, block)).await
+        request: TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
+        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
     // todo: move to extension trait
@@ -1092,10 +1085,7 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let count = provider
-            .get_transaction_count(
-                address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"),
-                BlockNumberOrTag::Latest.into(),
-            )
+            .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
             .await
             .unwrap();
         assert_eq!(count, 0);
@@ -1183,7 +1173,7 @@ mod tests {
         // Set the code
         let addr = Address::with_last_byte(16);
         provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider.get_code_at(addr, BlockId::default()).await.unwrap();
+        let _code = provider.get_code_at(addr).await.unwrap();
     }
 
     #[tokio::test]
@@ -1191,7 +1181,7 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let addr = Address::with_last_byte(16);
-        let storage = provider.get_storage_at(addr, U256::ZERO, BlockId::default()).await.unwrap();
+        let storage = provider.get_storage_at(addr, U256::ZERO).await.unwrap();
         assert_eq!(storage, U256::ZERO);
     }
 

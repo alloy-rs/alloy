@@ -53,7 +53,7 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
         if gas_price_split.len() != 2 {
             return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
         }
-        let addr = match addr_split[0] {
+        let to = match addr_split[0] {
             "" => None,
             "0x" => None,
             "contract creation" => None,
@@ -65,7 +65,7 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
         let gas = u128::from_str(gas_split[0]).map_err(de::Error::custom)?;
         let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
-        Ok(TxpoolInspectSummary { to: addr, value, gas, gas_price })
+        Ok(TxpoolInspectSummary { to, value, gas, gas_price })
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
@@ -78,7 +78,7 @@ impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
 
 /// Implement the `Deserialize` trait for `TxpoolInspectSummary` struct.
 impl<'de> Deserialize<'de> for TxpoolInspectSummary {
-    fn deserialize<D>(deserializer: D) -> Result<TxpoolInspectSummary, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

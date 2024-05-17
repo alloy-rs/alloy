@@ -10,6 +10,12 @@ use alloy_rlp::{Decodable, Encodable};
 /// See also [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum Request {
     /// An [EIP-6110] deposit request.
     ///

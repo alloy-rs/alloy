@@ -160,25 +160,27 @@ where
 /// requests with different `Param` types, while the `RpcCall` may do so lazily.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[pin_project::pin_project]
-#[derive(Debug)]
-pub struct RpcCall<Conn, Params, Resp>
+#[derive(Clone)]
+pub struct RpcCall<Conn, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     Conn: Transport + Clone,
     Params: RpcParam,
+    Map: Fn(Resp) -> Output,
 {
     #[pin]
     state: CallState<Params, Conn>,
-    _pd: PhantomData<fn() -> Resp>,
+    map: Map,
+    _pd: core::marker::PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<Conn, Params, Resp> Clone for RpcCall<Conn, Params, Resp>
+impl<Conn, Params, Resp, Output, Map> core::fmt::Debug for RpcCall<Conn, Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
     Params: RpcParam,
-    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
 {
-    fn clone(&self) -> Self {
-        Self { state: self.state.clone(), _pd: PhantomData }
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RpcCall").field("state", &self.state).finish()
     }
 }
 
@@ -189,7 +191,29 @@ where
 {
     #[doc(hidden)]
     pub fn new(req: Request<Params>, connection: Conn) -> Self {
-        Self { state: CallState::Prepared { request: Some(req), connection }, _pd: PhantomData }
+        Self {
+            state: CallState::Prepared { request: Some(req), connection },
+            map: std::convert::identity,
+            _pd: PhantomData,
+        }
+    }
+}
+
+impl<Conn, Params, Resp, Output, Map> RpcCall<Conn, Params, Resp, Output, Map>
+where
+    Conn: Transport + Clone,
+    Params: RpcParam,
+    Map: Fn(Resp) -> Output,
+{
+    /// Set a function to map the response into a different type.
+    pub fn map_resp<NewOutput, NewMap>(
+        self,
+        map: NewMap,
+    ) -> RpcCall<Conn, Params, Resp, NewOutput, NewMap>
+    where
+        NewMap: Fn(Resp) -> NewOutput,
+    {
+        RpcCall { state: self.state, map, _pd: PhantomData }
     }
 
     /// Returns `true` if the request is a subscription.
@@ -253,47 +277,58 @@ where
     }
 }
 
-impl<Conn, Params, Resp> RpcCall<Conn, &Params, Resp>
+impl<Conn, Params, Resp, Output, Map> RpcCall<Conn, &Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
     Params: RpcParam + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
     ///
     /// # Panics
     ///
     /// Panics if called after the request has been sent.
-    pub fn into_owned_params(self) -> RpcCall<Conn, Params, Resp> {
+    pub fn into_owned_params(self) -> RpcCall<Conn, Params, Resp, Output, Map> {
         let CallState::Prepared { request, connection } = self.state else {
             panic!("Cannot get params after request has been sent");
         };
         let request = request.expect("no request in prepared").into_owned_params();
-        RpcCall::new(request, connection)
+
+        RpcCall {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        }
     }
 }
 
-impl<'a, Conn, Params, Resp> RpcCall<Conn, Params, Resp>
+impl<'a, Conn, Params, Resp, Output, Map> RpcCall<Conn, Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
     Params: RpcParam + 'a,
     Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output + Send + 'a,
 {
     /// Convert this future into a boxed, pinned future, erasing its type.
-    pub fn boxed(self) -> RpcFut<'a, Resp> {
+    pub fn boxed(self) -> RpcFut<'a, Output> {
         Box::pin(self)
     }
 }
 
-impl<Conn, Params, Resp> Future for RpcCall<Conn, Params, Resp>
+impl<Conn, Params, Resp, Output, Map> Future for RpcCall<Conn, Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
 {
-    type Output = TransportResult<Resp>;
+    type Output = TransportResult<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         trace!(?self.state, "polling RpcCall");
-        self.project().state.poll(cx).map(try_deserialize_ok)
+        let this = self.project();
+        this.state.poll(cx).map(try_deserialize_ok).map(|r| r.map(this.map))
     }
 }

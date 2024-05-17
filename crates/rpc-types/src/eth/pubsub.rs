@@ -54,11 +54,11 @@ impl Serialize for SubscriptionResult {
         S: Serializer,
     {
         match *self {
-            SubscriptionResult::Header(ref header) => header.serialize(serializer),
-            SubscriptionResult::Log(ref log) => log.serialize(serializer),
-            SubscriptionResult::TransactionHash(ref hash) => hash.serialize(serializer),
-            SubscriptionResult::FullTransaction(ref tx) => tx.serialize(serializer),
-            SubscriptionResult::SyncState(ref sync) => sync.serialize(serializer),
+            Self::Header(ref header) => header.serialize(serializer),
+            Self::Log(ref log) => log.serialize(serializer),
+            Self::TransactionHash(ref hash) => hash.serialize(serializer),
+            Self::FullTransaction(ref tx) => tx.serialize(serializer),
+            Self::SyncState(ref sync) => sync.serialize(serializer),
         }
     }
 }
@@ -114,13 +114,13 @@ impl Params {
     /// Returns true if it's a bool parameter.
     #[inline]
     pub const fn is_bool(&self) -> bool {
-        matches!(self, Params::Bool(_))
+        matches!(self, Self::Bool(_))
     }
 
     /// Returns true if it's a log parameter.
     #[inline]
     pub const fn is_logs(&self) -> bool {
-        matches!(self, Params::Logs(_))
+        matches!(self, Self::Logs(_))
     }
 }
 
@@ -130,30 +130,30 @@ impl Serialize for Params {
         S: Serializer,
     {
         match self {
-            Params::None => (&[] as &[serde_json::Value]).serialize(serializer),
-            Params::Logs(logs) => logs.serialize(serializer),
-            Params::Bool(full) => full.serialize(serializer),
+            Self::None => (&[] as &[serde_json::Value]).serialize(serializer),
+            Self::Logs(logs) => logs.serialize(serializer),
+            Self::Bool(full) => full.serialize(serializer),
         }
     }
 }
 
 impl<'a> Deserialize<'a> for Params {
-    fn deserialize<D>(deserializer: D) -> Result<Params, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'a>,
     {
         let v = serde_json::Value::deserialize(deserializer)?;
 
         if v.is_null() {
-            return Ok(Params::None);
+            return Ok(Self::None);
         }
 
         if let Some(val) = v.as_bool() {
-            return Ok(Params::Bool(val));
+            return Ok(Self::Bool(val));
         }
 
         serde_json::from_value(v)
-            .map(|f| Params::Logs(Box::new(f)))
+            .map(|f| Self::Logs(Box::new(f)))
             .map_err(|e| D::Error::custom(format!("Invalid Pub-Sub parameters: {e}")))
     }
 }

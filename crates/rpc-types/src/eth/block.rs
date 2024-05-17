@@ -176,7 +176,7 @@ pub enum BlockTransactions<T = Transaction> {
 
 impl<T> Default for BlockTransactions<T> {
     fn default() -> Self {
-        BlockTransactions::Hashes(Vec::default())
+        Self::Hashes(Vec::default())
     }
 }
 
@@ -232,9 +232,9 @@ impl<T> BlockTransactions<T> {
     #[inline]
     pub fn len(&self) -> usize {
         match self {
-            BlockTransactions::Hashes(h) => h.len(),
-            BlockTransactions::Full(f) => f.len(),
-            BlockTransactions::Uncle => 0,
+            Self::Hashes(h) => h.len(),
+            Self::Full(f) => f.len(),
+            Self::Uncle => 0,
         }
     }
 
@@ -283,13 +283,13 @@ impl BlockTransactions<Transaction> {
 
 impl From<Vec<B256>> for BlockTransactions {
     fn from(hashes: Vec<B256>) -> Self {
-        BlockTransactions::Hashes(hashes)
+        Self::Hashes(hashes)
     }
 }
 
 impl<T> From<Vec<T>> for BlockTransactions<T> {
     fn from(transactions: Vec<T>) -> Self {
-        BlockTransactions::Full(transactions)
+        Self::Full(transactions)
     }
 }
 
@@ -439,9 +439,10 @@ impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a, Transaction>
 ///
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum BlockTransactionsKind {
     /// Only include hashes: [BlockTransactions::Hashes]
+    #[default]
     Hashes,
     /// Include full transaction objects: [BlockTransactions::Full]
     Full,
@@ -450,9 +451,9 @@ pub enum BlockTransactionsKind {
 impl From<bool> for BlockTransactionsKind {
     fn from(is_full: bool) -> Self {
         if is_full {
-            BlockTransactionsKind::Full
+            Self::Full
         } else {
-            BlockTransactionsKind::Hashes
+            Self::Hashes
         }
     }
 }
@@ -472,8 +473,8 @@ pub enum BlockError {
 pub type RichBlock = Rich<Block>;
 
 impl From<Block> for RichBlock {
-    fn from(block: Block) -> Self {
-        Rich { inner: block, extra_info: Default::default() }
+    fn from(inner: Block) -> Self {
+        Self { inner, extra_info: Default::default() }
     }
 }
 
@@ -481,8 +482,8 @@ impl From<Block> for RichBlock {
 pub type RichHeader = Rich<Header>;
 
 impl From<Header> for RichHeader {
-    fn from(header: Header) -> Self {
-        Rich { inner: header, extra_info: Default::default() }
+    fn from(inner: Header) -> Self {
+        Self { inner, extra_info: Default::default() }
     }
 }
 
@@ -612,8 +613,8 @@ mod tests {
                 number: Some(9),
                 gas_used: 10,
                 gas_limit: 11,
-                extra_data: Bytes::from(vec![1, 2, 3]),
-                logs_bloom: Bloom::default(),
+                extra_data: vec![1, 2, 3].into(),
+                logs_bloom: Default::default(),
                 timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
@@ -655,8 +656,8 @@ mod tests {
                 number: Some(9),
                 gas_used: 10,
                 gas_limit: 11,
-                extra_data: Bytes::from(vec![1, 2, 3]),
-                logs_bloom: Bloom::default(),
+                extra_data: vec![1, 2, 3].into(),
+                logs_bloom: Default::default(),
                 timestamp: 12,
                 difficulty: U256::from(13),
                 total_difficulty: Some(U256::from(100000)),
@@ -698,7 +699,7 @@ mod tests {
                 number: Some(9),
                 gas_used: 10,
                 gas_limit: 11,
-                extra_data: Bytes::from(vec![1, 2, 3]),
+                extra_data: vec![1, 2, 3].into(),
                 logs_bloom: Bloom::default(),
                 timestamp: 12,
                 difficulty: U256::from(13),

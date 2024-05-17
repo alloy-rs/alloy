@@ -185,7 +185,7 @@ impl TxLegacy {
     /// Decode the RLP fields of the transaction, without decoding an RLP
     /// header.
     pub(crate) fn decode_fields(data: &mut &[u8]) -> Result<Self> {
-        Ok(TxLegacy {
+        Ok(Self {
             nonce: Decodable::decode(data)?,
             gas_price: Decodable::decode(data)?,
             gas_limit: Decodable::decode(data)?,
@@ -228,6 +228,10 @@ impl Transaction for TxLegacy {
 }
 
 impl SignableTransaction<Signature> for TxLegacy {
+    fn use_eip155(&self) -> bool {
+        self.chain_id.is_some()
+    }
+
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = Some(chain_id);
     }

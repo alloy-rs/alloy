@@ -79,45 +79,45 @@ impl BlockNumberOrTag {
     /// Returns the numeric block number if explicitly set
     pub const fn as_number(&self) -> Option<u64> {
         match *self {
-            BlockNumberOrTag::Number(num) => Some(num),
+            Self::Number(num) => Some(num),
             _ => None,
         }
     }
 
     /// Returns `true` if a numeric block number is set
     pub const fn is_number(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Number(_))
+        matches!(self, Self::Number(_))
     }
 
     /// Returns `true` if it's "latest"
     pub const fn is_latest(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Latest)
+        matches!(self, Self::Latest)
     }
 
     /// Returns `true` if it's "finalized"
     pub const fn is_finalized(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Finalized)
+        matches!(self, Self::Finalized)
     }
 
     /// Returns `true` if it's "safe"
     pub const fn is_safe(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Safe)
+        matches!(self, Self::Safe)
     }
 
     /// Returns `true` if it's "pending"
     pub const fn is_pending(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Pending)
+        matches!(self, Self::Pending)
     }
 
     /// Returns `true` if it's "earliest"
     pub const fn is_earliest(&self) -> bool {
-        matches!(self, BlockNumberOrTag::Earliest)
+        matches!(self, Self::Earliest)
     }
 }
 
 impl From<u64> for BlockNumberOrTag {
     fn from(num: u64) -> Self {
-        BlockNumberOrTag::Number(num)
+        Self::Number(num)
     }
 }
 
@@ -134,12 +134,12 @@ impl Serialize for BlockNumberOrTag {
         S: Serializer,
     {
         match *self {
-            BlockNumberOrTag::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
-            BlockNumberOrTag::Latest => serializer.serialize_str("latest"),
-            BlockNumberOrTag::Finalized => serializer.serialize_str("finalized"),
-            BlockNumberOrTag::Safe => serializer.serialize_str("safe"),
-            BlockNumberOrTag::Earliest => serializer.serialize_str("earliest"),
-            BlockNumberOrTag::Pending => serializer.serialize_str("pending"),
+            Self::Number(x) => serializer.serialize_str(&format!("0x{x:x}")),
+            Self::Latest => serializer.serialize_str("latest"),
+            Self::Finalized => serializer.serialize_str("finalized"),
+            Self::Safe => serializer.serialize_str("safe"),
+            Self::Earliest => serializer.serialize_str("earliest"),
+            Self::Pending => serializer.serialize_str("pending"),
         }
     }
 }
@@ -168,7 +168,7 @@ impl FromStr for BlockNumberOrTag {
             _number => {
                 if let Some(hex_val) = s.strip_prefix("0x") {
                     let number = u64::from_str_radix(hex_val, 16);
-                    BlockNumberOrTag::Number(number?)
+                    Self::Number(number?)
                 } else {
                     return Err(HexStringMissingPrefixError::default().into());
                 }
@@ -181,12 +181,12 @@ impl FromStr for BlockNumberOrTag {
 impl fmt::Display for BlockNumberOrTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlockNumberOrTag::Number(x) => write!(f, "0x{x:x}"),
-            BlockNumberOrTag::Latest => f.write_str("latest"),
-            BlockNumberOrTag::Finalized => f.write_str("finalized"),
-            BlockNumberOrTag::Safe => f.write_str("safe"),
-            BlockNumberOrTag::Earliest => f.write_str("earliest"),
-            BlockNumberOrTag::Pending => f.write_str("pending"),
+            Self::Number(x) => write!(f, "0x{x:x}"),
+            Self::Latest => f.write_str("latest"),
+            Self::Finalized => f.write_str("finalized"),
+            Self::Safe => f.write_str("safe"),
+            Self::Earliest => f.write_str("earliest"),
+            Self::Pending => f.write_str("pending"),
         }
     }
 }
@@ -207,9 +207,9 @@ pub enum ParseBlockNumberError {
 impl std::error::Error for ParseBlockNumberError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            ParseBlockNumberError::ParseIntErr(err) => std::error::Error::source(err),
-            ParseBlockNumberError::ParseErr(err) => std::error::Error::source(err),
-            ParseBlockNumberError::MissingPrefix(err) => std::error::Error::source(err),
+            Self::ParseIntErr(err) => std::error::Error::source(err),
+            Self::ParseErr(err) => std::error::Error::source(err),
+            Self::MissingPrefix(err) => std::error::Error::source(err),
         }
     }
 }

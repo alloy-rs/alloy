@@ -40,7 +40,7 @@ pub enum TxEip4844Variant {
 
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
-    fn deserialize<D>(deserializer: D) -> Result<TxEip4844Variant, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -55,32 +55,28 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
         let tx = TxEip4844SerdeHelper::deserialize(deserializer)?;
 
         if let Some(sidecar) = tx.sidecar {
-            Ok(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar::from_tx_and_sidecar(
-                tx.tx, sidecar,
-            )))
+            Ok(TxEip4844WithSidecar::from_tx_and_sidecar(tx.tx, sidecar).into())
         } else {
-            Ok(TxEip4844Variant::TxEip4844(tx.tx))
+            Ok(tx.tx.into())
         }
     }
 }
 
 impl From<TxEip4844WithSidecar> for TxEip4844Variant {
     fn from(tx: TxEip4844WithSidecar) -> Self {
-        TxEip4844Variant::TxEip4844WithSidecar(tx)
+        Self::TxEip4844WithSidecar(tx)
     }
 }
 
 impl From<TxEip4844> for TxEip4844Variant {
     fn from(tx: TxEip4844) -> Self {
-        TxEip4844Variant::TxEip4844(tx)
+        Self::TxEip4844(tx)
     }
 }
 
 impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
     fn from((tx, sidecar): (TxEip4844, BlobTransactionSidecar)) -> Self {
-        TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar::from_tx_and_sidecar(
-            tx, sidecar,
-        ))
+        TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar).into()
     }
 }
 
@@ -94,8 +90,8 @@ impl TxEip4844Variant {
         proof_settings: &c_kzg::KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
-            TxEip4844Variant::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
+            Self::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
+            Self::TxEip4844WithSidecar(tx) => tx.validate_blob(proof_settings),
         }
     }
 
@@ -107,8 +103,8 @@ impl TxEip4844Variant {
     /// Get access to the inner tx [TxEip4844].
     pub const fn tx(&self) -> &TxEip4844 {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx(),
+            Self::TxEip4844(tx) => tx,
+            Self::TxEip4844WithSidecar(tx) => tx.tx(),
         }
     }
 
@@ -116,8 +112,8 @@ impl TxEip4844Variant {
     #[doc(hidden)]
     pub fn fields_len(&self) -> usize {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.fields_len(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().fields_len(),
+            Self::TxEip4844(tx) => tx.fields_len(),
+            Self::TxEip4844WithSidecar(tx) => tx.tx().fields_len(),
         }
     }
 
@@ -135,8 +131,8 @@ impl TxEip4844Variant {
         with_header: bool,
     ) {
         let payload_length = match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+            Self::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
+            Self::TxEip4844WithSidecar(tx) => {
                 let payload_length = tx.tx().fields_len() + signature.rlp_vrs_len();
                 let inner_header = Header { list: true, payload_length };
                 inner_header.length() + payload_length + tx.sidecar().fields_len()
@@ -155,10 +151,10 @@ impl TxEip4844Variant {
         out.put_u8(self.tx_type() as u8);
 
         match self {
-            TxEip4844Variant::TxEip4844(tx) => {
+            Self::TxEip4844(tx) => {
                 tx.encode_with_signature_fields(signature, out);
             }
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => {
+            Self::TxEip4844WithSidecar(tx) => {
                 tx.encode_with_signature_fields(signature, out);
             }
         }
@@ -187,33 +183,29 @@ impl TxEip4844Variant {
         if header.list {
             let tx = TxEip4844WithSidecar::decode_signed_fields(buf)?;
             let (tx, signature, hash) = tx.into_parts();
-            return Ok(Signed::new_unchecked(
-                TxEip4844Variant::TxEip4844WithSidecar(tx),
-                signature,
-                hash,
-            ));
+            return Ok(Signed::new_unchecked(tx.into(), signature, hash));
         }
 
         // Since there is not a second list header, this is a historical 4844 transaction without a
         // sidecar.
         let tx = TxEip4844::decode_signed_fields(buf)?;
         let (tx, signature, hash) = tx.into_parts();
-        Ok(Signed::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash))
+        Ok(Signed::new_unchecked(tx.into(), signature, hash))
     }
 }
 
 impl Transaction for TxEip4844Variant {
     fn chain_id(&self) -> Option<ChainId> {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => Some(tx.chain_id),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => Some(tx.tx().chain_id),
+            Self::TxEip4844(tx) => Some(tx.chain_id),
+            Self::TxEip4844WithSidecar(tx) => Some(tx.tx().chain_id),
         }
     }
 
     fn gas_limit(&self) -> u128 {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.gas_limit,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
+            Self::TxEip4844(tx) => tx.gas_limit,
+            Self::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
         }
     }
 
@@ -223,30 +215,30 @@ impl Transaction for TxEip4844Variant {
 
     fn input(&self) -> &[u8] {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.input.as_ref(),
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
+            Self::TxEip4844(tx) => tx.input.as_ref(),
+            Self::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
         }
     }
 
     fn nonce(&self) -> u64 {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.nonce,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx().nonce,
+            Self::TxEip4844(tx) => tx.nonce,
+            Self::TxEip4844WithSidecar(tx) => tx.tx().nonce,
         }
     }
 
     fn to(&self) -> TxKind {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.to,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.to,
+            Self::TxEip4844(tx) => tx.to,
+            Self::TxEip4844WithSidecar(tx) => tx.tx.to,
         }
         .into()
     }
 
     fn value(&self) -> U256 {
         match self {
-            TxEip4844Variant::TxEip4844(tx) => tx.value,
-            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx.value,
+            Self::TxEip4844(tx) => tx.value,
+            Self::TxEip4844WithSidecar(tx) => tx.tx.value,
         }
     }
 }
@@ -254,10 +246,10 @@ impl Transaction for TxEip4844Variant {
 impl SignableTransaction<Signature> for TxEip4844Variant {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         match self {
-            TxEip4844Variant::TxEip4844(ref mut inner) => {
+            Self::TxEip4844(ref mut inner) => {
                 inner.chain_id = chain_id;
             }
-            TxEip4844Variant::TxEip4844WithSidecar(ref mut inner) => {
+            Self::TxEip4844WithSidecar(ref mut inner) => {
                 inner.tx.chain_id = chain_id;
             }
         }
@@ -692,6 +684,13 @@ impl Decodable for TxEip4844 {
     }
 }
 
+impl From<TxEip4844WithSidecar> for TxEip4844 {
+    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
+    fn from(tx_with_sidecar: TxEip4844WithSidecar) -> Self {
+        tx_with_sidecar.tx
+    }
+}
+
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
 /// A transaction with blob hashes and max blob fee, which also includes the
@@ -743,11 +742,6 @@ impl TxEip4844WithSidecar {
     /// Get access to the inner sidecar [BlobTransactionSidecar].
     pub const fn sidecar(&self) -> &BlobTransactionSidecar {
         &self.sidecar
-    }
-
-    /// Consumes the [TxEip4844WithSidecar] and returns the inner [TxEip4844].
-    pub fn into_tx(self) -> TxEip4844 {
-        self.tx
     }
 
     /// Consumes the [TxEip4844WithSidecar] and returns the inner sidecar [BlobTransactionSidecar].
@@ -903,10 +897,7 @@ impl Transaction for TxEip4844WithSidecar {
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{SignableTransaction, TxEip4844Variant, TxEnvelope};
-    use alloy_eips::{
-        eip2930::AccessList,
-        eip4844::{Blob, Bytes48},
-    };
+    use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
@@ -928,9 +919,9 @@ mod tests {
             input: Default::default(),
         };
         let sidecar = BlobTransactionSidecar {
-            blobs: vec![Blob::from([2; 131072])],
-            commitments: vec![Bytes48::from([3; 48])],
-            proofs: vec![Bytes48::from([4; 48])],
+            blobs: vec![[2; 131072].into()],
+            commitments: vec![[3; 48].into()],
+            proofs: vec![[4; 48].into()],
         };
         let mut tx = TxEip4844WithSidecar { tx, sidecar };
         let signature = Signature::test_signature();
@@ -940,9 +931,9 @@ mod tests {
 
         // change the sidecar, adding a single (blob, commitment, proof) pair
         tx.sidecar = BlobTransactionSidecar {
-            blobs: vec![Blob::from([1; 131072])],
-            commitments: vec![Bytes48::from([1; 48])],
-            proofs: vec![Bytes48::from([1; 48])],
+            blobs: vec![[1; 131072].into()],
+            commitments: vec![[1; 48].into()],
+            proofs: vec![[1; 48].into()],
         };
 
         // turn this transaction into_signed

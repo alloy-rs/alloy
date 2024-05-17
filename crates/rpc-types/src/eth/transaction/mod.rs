@@ -231,7 +231,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
         let tx: Signed<TxEip4844> = tx.try_into()?;
         let (inner, signature, _) = tx.into_parts();
-        let tx = TxEip4844Variant::TxEip4844(inner);
+        let tx: TxEip4844Variant = inner.into();
 
         Ok(tx.into_signed(signature))
     }
@@ -277,7 +277,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -315,7 +315,7 @@ mod tests {
             value: U256::from(8),
             gas_price: Some(9),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             signature: Some(Signature {
                 v: U256::from(14),
                 r: U256::from(14),
@@ -348,7 +348,7 @@ mod tests {
             from: Address::with_last_byte(6),
             value: U256::from(8),
             gas: 10,
-            input: Bytes::from(vec![11, 12, 13]),
+            input: vec![11, 12, 13].into(),
             ..Default::default()
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
