@@ -890,10 +890,7 @@ impl Transaction for TxEip4844WithSidecar {
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
     use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
-    use alloy_eips::{
-        eip2930::AccessList,
-        eip4844::{Blob, Bytes48},
-    };
+    use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};
 
