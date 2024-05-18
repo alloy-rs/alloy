@@ -17,6 +17,7 @@ pub mod constants;
 pub mod events;
 pub mod header;
 pub mod payload;
+pub mod relay;
 pub mod sidecar;
 pub mod withdrawals;
 

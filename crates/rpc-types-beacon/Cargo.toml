@@ -15,8 +15,22 @@ alloy-eips = { workspace = true, features = ["serde"] }
 alloy-rpc-types-engine.workspace = true
 alloy-primitives.workspace = true
 
+# ssz
+ethereum_ssz_derive = { workspace = true, optional = true }
+ethereum_ssz = { workspace = true, optional = true }
+
 serde.workspace = true
 serde_with.workspace = true
 
+thiserror.workspace = true
+
 [dev-dependencies]
 serde_json.workspace = true
+
+[features]
+ssz = [
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+    "alloy-rpc-types-engine/ssz",
+]
