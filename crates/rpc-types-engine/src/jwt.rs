@@ -46,7 +46,7 @@ pub enum JwtError {
     #[error("JWT decoding error: {0}")]
     JwtDecodingError(String),
 
-    /// Error variant for failed directory creation operation with additional path context.
+    /// An error occurred while creating a directory to store the JWT.
     #[error("failed to create dir {path:?}: {source}")]
     CreateDir {
         /// The source `io::Error`.
@@ -55,7 +55,7 @@ pub enum JwtError {
         path: PathBuf,
     },
 
-    /// Error variant for failed read operation with additional path context.
+    /// An error occurred while reading the JWT from a file.
     #[error("failed to read from {path:?}: {source}")]
     Read {
         /// The source `io::Error`.
@@ -64,7 +64,7 @@ pub enum JwtError {
         path: PathBuf,
     },
 
-    /// Error variant for failed write operation with additional path context.
+    /// An error occurred while writing the JWT to a file.
     #[error("failed to write to {path:?}: {source}")]
     Write {
         /// The source `io::Error`.
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn ephemeral_secret_created() {
         let fpath: &Path = Path::new("secret0.hex");
-        assert!(!fs::metadata(fpath).is_ok());
+        assert!(fs::metadata(fpath).is_err());
         JwtSecret::try_create_random(fpath).expect("A secret file should be created");
         assert!(fs::metadata(fpath).is_ok());
         fs::remove_file(fpath).unwrap();
@@ -412,10 +412,10 @@ mod tests {
     #[test]
     fn valid_secret_provided() {
         let fpath = Path::new("secret1.hex");
-        assert!(!fs::metadata(fpath).is_ok());
+        assert!(fs::metadata(fpath).is_err());
 
         let secret = JwtSecret::random();
-        fs::write(fpath, &hex(&secret)).unwrap();
+        fs::write(fpath, hex(&secret)).unwrap();
 
         match JwtSecret::from_file(fpath) {
             Ok(gen_secret) => {
@@ -442,7 +442,7 @@ mod tests {
         let fpath = Path::new("secret3.hex");
         let result = JwtSecret::from_file(fpath);
         assert_matches!(result, Err(JwtError::Read {source: _,path }) if path == fpath.to_path_buf());
-        assert!(!fs::metadata(fpath).is_ok());
+        assert!(fs::metadata(fpath).is_err());
     }
 
     #[test]
