@@ -14,8 +14,8 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
-    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListWithGasUsed, AccountResponse, Block, BlockId, BlockNumberOrTag,
+    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
@@ -572,6 +572,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Retrieves a [`Vec<Log>`] with the given [Filter].
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         self.client().request("eth_getLogs", (filter,)).await
+    }
+
+    /// Retrieves account information ([AccountResponse]) for the given [Address] at the particular
+    /// [BlockId].
+    async fn get_account(
+        &self,
+        address: Address,
+        block: BlockId,
+    ) -> TransportResult<Option<AccountResponse>> {
+        self.client().request("eth_getAccount", (address, block)).await
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
