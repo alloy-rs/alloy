@@ -52,8 +52,8 @@ impl ExecutionPayloadFieldV2 {
     /// Returns the inner [ExecutionPayloadV1]
     pub fn into_v1_payload(self) -> ExecutionPayloadV1 {
         match self {
-            ExecutionPayloadFieldV2::V1(payload) => payload,
-            ExecutionPayloadFieldV2::V2(payload) => payload.payload_inner,
+            Self::V1(payload) => payload,
+            Self::V2(payload) => payload.payload_inner,
         }
     }
 }
@@ -474,8 +474,7 @@ struct BlobsBundleV1Ssz {
 
 #[cfg(feature = "ssz")]
 impl BlobsBundleV1Ssz {
-    const _ASSERT: [(); std::mem::size_of::<BlobsBundleV1>()] =
-        [(); std::mem::size_of::<BlobsBundleV1Ssz>()];
+    const _ASSERT: [(); std::mem::size_of::<BlobsBundleV1>()] = [(); std::mem::size_of::<Self>()];
 
     const fn wrap_ref(other: &BlobsBundleV1) -> &Self {
         // SAFETY: Same repr and size
@@ -484,7 +483,10 @@ impl BlobsBundleV1Ssz {
 
     fn unwrap(self) -> BlobsBundleV1 {
         // SAFETY: Same repr and size
-        unsafe { std::mem::transmute(self) }
+        #[allow(clippy::transmute_undefined_repr)]
+        unsafe {
+            std::mem::transmute(self)
+        }
     }
 }
 
@@ -598,84 +600,84 @@ impl ExecutionPayload {
     /// Returns a reference to the V1 payload.
     pub const fn as_v1(&self) -> &ExecutionPayloadV1 {
         match self {
-            ExecutionPayload::V1(payload) => payload,
-            ExecutionPayload::V2(payload) => &payload.payload_inner,
-            ExecutionPayload::V3(payload) => &payload.payload_inner.payload_inner,
-            ExecutionPayload::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
+            Self::V1(payload) => payload,
+            Self::V2(payload) => &payload.payload_inner,
+            Self::V3(payload) => &payload.payload_inner.payload_inner,
+            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
     /// Returns a mutable reference to the V1 payload.
     pub fn as_v1_mut(&mut self) -> &mut ExecutionPayloadV1 {
         match self {
-            ExecutionPayload::V1(payload) => payload,
-            ExecutionPayload::V2(payload) => &mut payload.payload_inner,
-            ExecutionPayload::V3(payload) => &mut payload.payload_inner.payload_inner,
-            ExecutionPayload::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
+            Self::V1(payload) => payload,
+            Self::V2(payload) => &mut payload.payload_inner,
+            Self::V3(payload) => &mut payload.payload_inner.payload_inner,
+            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
     /// Consumes the payload and returns the V1 payload.
     pub fn into_v1(self) -> ExecutionPayloadV1 {
         match self {
-            ExecutionPayload::V1(payload) => payload,
-            ExecutionPayload::V2(payload) => payload.payload_inner,
-            ExecutionPayload::V3(payload) => payload.payload_inner.payload_inner,
-            ExecutionPayload::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
+            Self::V1(payload) => payload,
+            Self::V2(payload) => payload.payload_inner,
+            Self::V3(payload) => payload.payload_inner.payload_inner,
+            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
     /// Returns a reference to the V2 payload, if any.
     pub const fn as_v2(&self) -> Option<&ExecutionPayloadV2> {
         match self {
-            ExecutionPayload::V1(_) => None,
-            ExecutionPayload::V2(payload) => Some(payload),
-            ExecutionPayload::V3(payload) => Some(&payload.payload_inner),
-            ExecutionPayload::V4(payload) => Some(&payload.payload_inner.payload_inner),
+            Self::V1(_) => None,
+            Self::V2(payload) => Some(payload),
+            Self::V3(payload) => Some(&payload.payload_inner),
+            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
     pub fn as_v2_mut(&mut self) -> Option<&mut ExecutionPayloadV2> {
         match self {
-            ExecutionPayload::V1(_) => None,
-            ExecutionPayload::V2(payload) => Some(payload),
-            ExecutionPayload::V3(payload) => Some(&mut payload.payload_inner),
-            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
+            Self::V1(_) => None,
+            Self::V2(payload) => Some(payload),
+            Self::V3(payload) => Some(&mut payload.payload_inner),
+            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
     /// Returns a reference to the V2 payload, if any.
     pub const fn as_v3(&self) -> Option<&ExecutionPayloadV3> {
         match self {
-            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
-            ExecutionPayload::V3(payload) => Some(payload),
-            ExecutionPayload::V4(payload) => Some(&payload.payload_inner),
+            Self::V1(_) | Self::V2(_) => None,
+            Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
     /// Returns a mutable reference to the V2 payload, if any.
     pub fn as_v3_mut(&mut self) -> Option<&mut ExecutionPayloadV3> {
         match self {
-            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) => None,
-            ExecutionPayload::V3(payload) => Some(payload),
-            ExecutionPayload::V4(payload) => Some(&mut payload.payload_inner),
+            Self::V1(_) | Self::V2(_) => None,
+            Self::V3(payload) => Some(payload),
+            Self::V4(payload) => Some(&mut payload.payload_inner),
         }
     }
 
     /// Returns a reference to the V4 payload, if any.
     pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
         match self {
-            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
-            ExecutionPayload::V4(payload) => Some(payload),
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
         }
     }
 
     /// Returns a mutable reference to the V4 payload, if any.
     pub fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
         match self {
-            ExecutionPayload::V1(_) | ExecutionPayload::V2(_) | ExecutionPayload::V3(_) => None,
-            ExecutionPayload::V4(payload) => Some(payload),
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+            Self::V4(payload) => Some(payload),
         }
     }
 
@@ -826,13 +828,13 @@ impl PayloadError {
     /// Returns `true` if the error is caused by a block hash mismatch.
     #[inline]
     pub const fn is_block_hash_mismatch(&self) -> bool {
-        matches!(self, PayloadError::BlockHash { .. })
+        matches!(self, Self::BlockHash { .. })
     }
 
     /// Returns `true` if the error is caused by invalid block hashes (Cancun).
     #[inline]
     pub const fn is_invalid_versioned_hashes(&self) -> bool {
-        matches!(self, PayloadError::InvalidVersionedHashes)
+        matches!(self, Self::InvalidVersionedHashes)
     }
 }
 
@@ -947,7 +949,7 @@ impl Serialize for PayloadStatus {
 
 impl From<PayloadError> for PayloadStatusEnum {
     fn from(error: PayloadError) -> Self {
-        PayloadStatusEnum::Invalid { validation_error: error.to_string() }
+        Self::Invalid { validation_error: error.to_string() }
     }
 }
 
@@ -983,41 +985,41 @@ impl PayloadStatusEnum {
     /// Returns the string representation of the payload status.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            PayloadStatusEnum::Valid => "VALID",
-            PayloadStatusEnum::Invalid { .. } => "INVALID",
-            PayloadStatusEnum::Syncing => "SYNCING",
-            PayloadStatusEnum::Accepted => "ACCEPTED",
+            Self::Valid => "VALID",
+            Self::Invalid { .. } => "INVALID",
+            Self::Syncing => "SYNCING",
+            Self::Accepted => "ACCEPTED",
         }
     }
 
     /// Returns the validation error if the payload status is invalid.
     pub fn validation_error(&self) -> Option<&str> {
         match self {
-            PayloadStatusEnum::Invalid { validation_error } => Some(validation_error),
+            Self::Invalid { validation_error } => Some(validation_error),
             _ => None,
         }
     }
 
     /// Returns true if the payload status is syncing.
     pub const fn is_syncing(&self) -> bool {
-        matches!(self, PayloadStatusEnum::Syncing)
+        matches!(self, Self::Syncing)
     }
 
     /// Returns true if the payload status is valid.
     pub const fn is_valid(&self) -> bool {
-        matches!(self, PayloadStatusEnum::Valid)
+        matches!(self, Self::Valid)
     }
 
     /// Returns true if the payload status is invalid.
     pub const fn is_invalid(&self) -> bool {
-        matches!(self, PayloadStatusEnum::Invalid { .. })
+        matches!(self, Self::Invalid { .. })
     }
 }
 
 impl fmt::Display for PayloadStatusEnum {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PayloadStatusEnum::Invalid { validation_error } => {
+            Self::Invalid { validation_error } => {
                 f.write_str(self.as_str())?;
                 f.write_str(": ")?;
                 f.write_str(validation_error.as_str())

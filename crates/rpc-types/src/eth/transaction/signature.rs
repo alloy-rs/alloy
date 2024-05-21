@@ -71,7 +71,7 @@ impl TryFrom<Signature> for alloy_primitives::Signature {
         } else {
             value.v.to::<u64>().try_into()?
         };
-        alloy_primitives::Signature::from_rs_and_parity(value.r, value.s, parity)
+        Self::from_rs_and_parity(value.r, value.s, parity)
     }
 }
 

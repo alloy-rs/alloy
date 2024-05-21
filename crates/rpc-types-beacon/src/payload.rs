@@ -247,7 +247,7 @@ impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
             block_hash,
             transactions,
         } = payload;
-        ExecutionPayloadV1 {
+        Self {
             parent_hash: parent_hash.into_owned(),
             fee_recipient: fee_recipient.into_owned(),
             state_root: state_root.into_owned(),
@@ -344,7 +344,7 @@ struct BeaconExecutionPayloadV2<'a> {
 impl<'a> From<BeaconExecutionPayloadV2<'a>> for ExecutionPayloadV2 {
     fn from(payload: BeaconExecutionPayloadV2<'a>) -> Self {
         let BeaconExecutionPayloadV2 { payload_inner, withdrawals } = payload;
-        ExecutionPayloadV2 { payload_inner: payload_inner.into(), withdrawals }
+        Self { payload_inner: payload_inner.into(), withdrawals }
     }
 }
 
@@ -398,7 +398,7 @@ struct BeaconExecutionPayloadV3<'a> {
 impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {
     fn from(payload: BeaconExecutionPayloadV3<'a>) -> Self {
         let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas } = payload;
-        ExecutionPayloadV3 { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
+        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
     }
 }
 
@@ -452,7 +452,7 @@ impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
         let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } =
             payload;
-        ExecutionPayloadV4 {
+        Self {
             payload_inner: payload_inner.into(),
             deposit_requests,
             withdrawal_requests,
@@ -537,16 +537,16 @@ impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
     fn from(payload: BeaconExecutionPayload<'a>) -> Self {
         match payload {
             BeaconExecutionPayload::V1(payload) => {
-                ExecutionPayload::V1(ExecutionPayloadV1::from(payload))
+                Self::V1(ExecutionPayloadV1::from(payload))
             }
             BeaconExecutionPayload::V2(payload) => {
-                ExecutionPayload::V2(ExecutionPayloadV2::from(payload))
+                Self::V2(ExecutionPayloadV2::from(payload))
             }
             BeaconExecutionPayload::V3(payload) => {
-                ExecutionPayload::V3(ExecutionPayloadV3::from(payload))
+                Self::V3(ExecutionPayloadV3::from(payload))
             }
             BeaconExecutionPayload::V4(payload) => {
-                ExecutionPayload::V4(ExecutionPayloadV4::from(payload))
+                Self::V4(ExecutionPayloadV4::from(payload))
             }
         }
     }

@@ -95,10 +95,10 @@ pub enum SubscriptionItem<T> {
 impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
     fn from(value: Box<RawValue>) -> Self {
         if let Ok(item) = serde_json::from_str(value.get()) {
-            SubscriptionItem::Item(item)
+            Self::Item(item)
         } else {
             trace!(value = value.get(), "Received unexpected value in subscription.");
-            SubscriptionItem::Other(value)
+            Self::Other(value)
         }
     }
 }

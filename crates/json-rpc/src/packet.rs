@@ -34,8 +34,8 @@ impl Serialize for RequestPacket {
         S: serde::Serializer,
     {
         match self {
-            RequestPacket::Single(single) => single.serialize(serializer),
-            RequestPacket::Batch(batch) => batch.serialize(serializer),
+            Self::Single(single) => single.serialize(serializer),
+            Self::Batch(batch) => batch.serialize(serializer),
         }
     }
 }
@@ -49,22 +49,22 @@ impl RequestPacket {
     /// Serialize the packet as a boxed [`RawValue`].
     pub fn serialize(self) -> serde_json::Result<Box<RawValue>> {
         match self {
-            RequestPacket::Single(single) => Ok(single.take_request()),
-            RequestPacket::Batch(batch) => serde_json::value::to_raw_value(&batch),
+            Self::Single(single) => Ok(single.take_request()),
+            Self::Batch(batch) => serde_json::value::to_raw_value(&batch),
         }
     }
 
     /// Get the request IDs of all subscription requests in the packet.
     pub fn subscription_request_ids(&self) -> HashSet<&Id> {
         match self {
-            RequestPacket::Single(single) => {
+            Self::Single(single) => {
                 let mut hs = HashSet::with_capacity(1);
                 if single.method() == "eth_subscribe" {
                     hs.insert(single.id());
                 }
                 hs
             }
-            RequestPacket::Batch(batch) => batch
+            Self::Batch(batch) => batch
                 .iter()
                 .filter(|req| req.method() == "eth_subscribe")
                 .map(|req| req.id())
@@ -222,8 +222,8 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// For batch responses, this returns `true` if __all__ responses are successful.
     pub fn is_success(&self) -> bool {
         match self {
-            ResponsePacket::Single(single) => single.is_success(),
-            ResponsePacket::Batch(batch) => batch.iter().all(|res| res.is_success()),
+            Self::Single(single) => single.is_success(),
+            Self::Batch(batch) => batch.iter().all(|res| res.is_success()),
         }
     }
 
@@ -232,8 +232,8 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// For batch responses, this returns `true` there's at least one error response.
     pub fn is_error(&self) -> bool {
         match self {
-            ResponsePacket::Single(single) => single.is_error(),
-            ResponsePacket::Batch(batch) => batch.iter().any(|res| res.is_error()),
+            Self::Single(single) => single.is_error(),
+            Self::Batch(batch) => batch.iter().any(|res| res.is_error()),
         }
     }
 
@@ -247,8 +247,8 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
     /// Returns an iterator over the [ErrorPayload]s in the response.
     pub fn iter_errors(&self) -> impl Iterator<Item = &ErrorPayload<ErrData>> + '_ {
         match self {
-            ResponsePacket::Single(single) => ResponsePacketErrorsIter::Single(Some(single)),
-            ResponsePacket::Batch(batch) => ResponsePacketErrorsIter::Batch(batch.iter()),
+            Self::Single(single) => ResponsePacketErrorsIter::Single(Some(single)),
+            Self::Batch(batch) => ResponsePacketErrorsIter::Batch(batch.iter()),
         }
     }
 

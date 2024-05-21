@@ -18,7 +18,7 @@ pub struct BloomFilter(Vec<Bloom>);
 
 impl From<Vec<Bloom>> for BloomFilter {
     fn from(src: Vec<Bloom>) -> Self {
-        BloomFilter(src)
+        Self(src)
     }
 }
 
@@ -37,7 +37,7 @@ pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        FilterSet([src].into())
+        Self([src].into())
     }
 }
 
@@ -51,7 +51,7 @@ impl<T: Eq + Hash> Hash for FilterSet<T> {
 
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        FilterSet(HashSet::from_iter(src.into_iter().map(Into::into)))
+        Self(HashSet::from_iter(src.into_iter().map(Into::into)))
     }
 }
 
@@ -67,14 +67,14 @@ impl<T: Eq + Hash> From<ValueOrArray<T>> for FilterSet<T> {
 impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     fn from(src: ValueOrArray<Option<T>>) -> Self {
         match src {
-            ValueOrArray::Value(None) => FilterSet(Default::default()),
+            ValueOrArray::Value(None) => Self(Default::default()),
             ValueOrArray::Value(Some(val)) => val.into(),
             ValueOrArray::Array(arr) => {
                 // If the array contains at least one `null` (ie. None), as it's considered
                 // a "wildcard" value, the whole filter should be treated as matching everything,
                 // thus is empty.
                 if arr.iter().contains(&None) {
-                    FilterSet(Default::default())
+                    Self(Default::default())
                 } else {
                     // Otherwise, we flatten the array, knowing there are no `None` values
                     arr.into_iter().flatten().collect::<Vec<T>>().into()
@@ -149,26 +149,26 @@ impl FilterBlockOption {
     /// Returns the `fromBlock` value, if any
     pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
-            FilterBlockOption::Range { to_block, .. } => to_block.as_ref(),
-            FilterBlockOption::AtBlockHash(_) => None,
+            Self::Range { to_block, .. } => to_block.as_ref(),
+            Self::AtBlockHash(_) => None,
         }
     }
 
     /// Returns the `toBlock` value, if any
     pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
-            FilterBlockOption::Range { from_block, .. } => from_block.as_ref(),
-            FilterBlockOption::AtBlockHash(_) => None,
+            Self::Range { from_block, .. } => from_block.as_ref(),
+            Self::AtBlockHash(_) => None,
         }
     }
 
     /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
     pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
-            FilterBlockOption::Range { from_block, to_block } => {
+            Self::Range { from_block, to_block } => {
                 (from_block.as_ref(), to_block.as_ref())
             }
-            FilterBlockOption::AtBlockHash(_) => (None, None),
+            Self::AtBlockHash(_) => (None, None),
         }
     }
 }
@@ -176,7 +176,7 @@ impl FilterBlockOption {
 impl From<BlockNumberOrTag> for FilterBlockOption {
     fn from(block: BlockNumberOrTag) -> Self {
         let block = Some(block);
-        FilterBlockOption::Range { from_block: block, to_block: block }
+        Self::Range { from_block: block, to_block: block }
     }
 }
 
@@ -196,33 +196,33 @@ impl<T: Into<BlockNumberOrTag>> From<Range<T>> for FilterBlockOption {
     fn from(r: Range<T>) -> Self {
         let from_block = Some(r.start.into());
         let to_block = Some(r.end.into());
-        FilterBlockOption::Range { from_block, to_block }
+        Self::Range { from_block, to_block }
     }
 }
 
 impl<T: Into<BlockNumberOrTag>> From<RangeTo<T>> for FilterBlockOption {
     fn from(r: RangeTo<T>) -> Self {
         let to_block = Some(r.end.into());
-        FilterBlockOption::Range { from_block: Some(BlockNumberOrTag::Earliest), to_block }
+        Self::Range { from_block: Some(BlockNumberOrTag::Earliest), to_block }
     }
 }
 
 impl<T: Into<BlockNumberOrTag>> From<RangeFrom<T>> for FilterBlockOption {
     fn from(r: RangeFrom<T>) -> Self {
         let from_block = Some(r.start.into());
-        FilterBlockOption::Range { from_block, to_block: Some(BlockNumberOrTag::Latest) }
+        Self::Range { from_block, to_block: Some(BlockNumberOrTag::Latest) }
     }
 }
 
 impl From<B256> for FilterBlockOption {
     fn from(hash: B256) -> Self {
-        FilterBlockOption::AtBlockHash(hash)
+        Self::AtBlockHash(hash)
     }
 }
 
 impl Default for FilterBlockOption {
     fn default() -> Self {
-        FilterBlockOption::Range { from_block: None, to_block: None }
+        Self::Range { from_block: None, to_block: None }
     }
 }
 
@@ -231,24 +231,24 @@ impl FilterBlockOption {
     #[must_use]
     pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
         let to_block =
-            if let FilterBlockOption::Range { to_block, .. } = self { *to_block } else { None };
+            if let Self::Range { to_block, .. } = self { *to_block } else { None };
 
-        FilterBlockOption::Range { from_block: Some(block), to_block }
+        Self::Range { from_block: Some(block), to_block }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
     pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
         let from_block =
-            if let FilterBlockOption::Range { from_block, .. } = self { *from_block } else { None };
+            if let Self::Range { from_block, .. } = self { *from_block } else { None };
 
-        FilterBlockOption::Range { from_block, to_block: Some(block) }
+        Self::Range { from_block, to_block: Some(block) }
     }
 
     /// Pins the block hash this filter should target.
     #[must_use]
     pub const fn set_hash(&self, hash: B256) -> Self {
-        FilterBlockOption::AtBlockHash(hash)
+        Self::AtBlockHash(hash)
     }
 }
 
@@ -652,19 +652,19 @@ pub enum ValueOrArray<T> {
 
 impl From<Address> for ValueOrArray<Address> {
     fn from(src: Address) -> Self {
-        ValueOrArray::Value(src)
+        Self::Value(src)
     }
 }
 
 impl From<Vec<Address>> for ValueOrArray<Address> {
     fn from(src: Vec<Address>) -> Self {
-        ValueOrArray::Array(src)
+        Self::Array(src)
     }
 }
 
 impl From<Vec<B256>> for ValueOrArray<B256> {
     fn from(src: Vec<B256>) -> Self {
-        ValueOrArray::Array(src)
+        Self::Array(src)
     }
 }
 
@@ -677,8 +677,8 @@ where
         S: Serializer,
     {
         match self {
-            ValueOrArray::Value(inner) => inner.serialize(serializer),
-            ValueOrArray::Array(inner) => inner.serialize(serializer),
+            Self::Value(inner) => inner.serialize(serializer),
+            Self::Array(inner) => inner.serialize(serializer),
         }
     }
 }
@@ -687,14 +687,14 @@ impl<'a, T> Deserialize<'a> for ValueOrArray<T>
 where
     T: DeserializeOwned,
 {
-    fn deserialize<D>(deserializer: D) -> Result<ValueOrArray<T>, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'a>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
 
         if value.is_null() {
-            return Ok(ValueOrArray::Array(Vec::new()));
+            return Ok(Self::Array(Vec::new()));
         }
 
         #[derive(Deserialize)]
@@ -707,8 +707,8 @@ where
         match serde_json::from_value::<Variadic<T>>(value).map_err(|err| {
             serde::de::Error::custom(format!("Invalid variadic value or array type: {err}"))
         })? {
-            Variadic::Value(val) => Ok(ValueOrArray::Value(val)),
-            Variadic::Array(arr) => Ok(ValueOrArray::Array(arr)),
+            Variadic::Value(val) => Ok(Self::Value(val)),
+            Variadic::Array(arr) => Ok(Self::Array(arr)),
         }
     }
 }
@@ -725,7 +725,7 @@ impl FilteredParams {
     /// for matching
     pub fn new(filter: Option<Filter>) -> Self {
         if let Some(filter) = filter {
-            FilteredParams { filter: Some(filter) }
+            Self { filter: Some(filter) }
         } else {
             Default::default()
         }
@@ -864,19 +864,19 @@ pub enum FilterChanges<T = Transaction> {
 
 impl From<Vec<RpcLog>> for FilterChanges {
     fn from(logs: Vec<RpcLog>) -> Self {
-        FilterChanges::Logs(logs)
+        Self::Logs(logs)
     }
 }
 
 impl From<Vec<B256>> for FilterChanges {
     fn from(hashes: Vec<B256>) -> Self {
-        FilterChanges::Hashes(hashes)
+        Self::Hashes(hashes)
     }
 }
 
 impl From<Vec<Transaction>> for FilterChanges {
     fn from(transactions: Vec<Transaction>) -> Self {
-        FilterChanges::Transactions(transactions)
+        Self::Transactions(transactions)
     }
 }
 
@@ -908,23 +908,23 @@ impl<'de> Deserialize<'de> for FilterChanges {
         let changes = match changes {
             Changes::Logs(vals) => {
                 if vals.is_empty() {
-                    FilterChanges::Empty
+                    Self::Empty
                 } else {
-                    FilterChanges::Logs(vals)
+                    Self::Logs(vals)
                 }
             }
             Changes::Hashes(vals) => {
                 if vals.is_empty() {
-                    FilterChanges::Empty
+                    Self::Empty
                 } else {
-                    FilterChanges::Hashes(vals)
+                    Self::Hashes(vals)
                 }
             }
             Changes::Transactions(vals) => {
                 if vals.is_empty() {
-                    FilterChanges::Empty
+                    Self::Empty
                 } else {
-                    FilterChanges::Transactions(vals)
+                    Self::Transactions(vals)
                 }
             }
         };

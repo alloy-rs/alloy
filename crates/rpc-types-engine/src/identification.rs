@@ -37,36 +37,36 @@ impl ClientCode {
     /// Returns the client identifier as str.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            ClientCode::BU => "BU",
-            ClientCode::EJ => "EJ",
-            ClientCode::EG => "EG",
-            ClientCode::GE => "GE",
-            ClientCode::GR => "GR",
-            ClientCode::LH => "LH",
-            ClientCode::LS => "LS",
-            ClientCode::NM => "NM",
-            ClientCode::NB => "NB",
-            ClientCode::TK => "TK",
-            ClientCode::PM => "PM",
-            ClientCode::RH => "RH",
+            Self::BU => "BU",
+            Self::EJ => "EJ",
+            Self::EG => "EG",
+            Self::GE => "GE",
+            Self::GR => "GR",
+            Self::LH => "LH",
+            Self::LS => "LS",
+            Self::NM => "NM",
+            Self::NB => "NB",
+            Self::TK => "TK",
+            Self::PM => "PM",
+            Self::RH => "RH",
         }
     }
 
     /// Returns the human readable client name for the given code.
     pub const fn client_name(&self) -> &'static str {
         match self {
-            ClientCode::BU => "Besu",
-            ClientCode::EJ => "EthereumJS",
-            ClientCode::EG => "Erigon",
-            ClientCode::GE => "Geth",
-            ClientCode::GR => "Grandine",
-            ClientCode::LH => "Lighthouse",
-            ClientCode::LS => "Lodestar",
-            ClientCode::NM => "Nethermind",
-            ClientCode::NB => "Nimbus",
-            ClientCode::TK => "Teku",
-            ClientCode::PM => "Prysm",
-            ClientCode::RH => "Reth",
+            Self::BU => "Besu",
+            Self::EJ => "EthereumJS",
+            Self::EG => "Erigon",
+            Self::GE => "Geth",
+            Self::GR => "Grandine",
+            Self::LH => "Lighthouse",
+            Self::LS => "Lodestar",
+            Self::NM => "Nethermind",
+            Self::NB => "Nimbus",
+            Self::TK => "Teku",
+            Self::PM => "Prysm",
+            Self::RH => "Reth",
         }
     }
 }
@@ -76,18 +76,18 @@ impl FromStr for ClientCode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "BU" => Ok(ClientCode::BU),
-            "EJ" => Ok(ClientCode::EJ),
-            "EG" => Ok(ClientCode::EG),
-            "GE" => Ok(ClientCode::GE),
-            "GR" => Ok(ClientCode::GR),
-            "LH" => Ok(ClientCode::LH),
-            "LS" => Ok(ClientCode::LS),
-            "NM" => Ok(ClientCode::NM),
-            "NB" => Ok(ClientCode::NB),
-            "TK" => Ok(ClientCode::TK),
-            "PM" => Ok(ClientCode::PM),
-            "RH" => Ok(ClientCode::RH),
+            "BU" => Ok(Self::BU),
+            "EJ" => Ok(Self::EJ),
+            "EG" => Ok(Self::EG),
+            "GE" => Ok(Self::GE),
+            "GR" => Ok(Self::GR),
+            "LH" => Ok(Self::LH),
+            "LS" => Ok(Self::LS),
+            "NM" => Ok(Self::NM),
+            "NB" => Ok(Self::NB),
+            "TK" => Ok(Self::TK),
+            "PM" => Ok(Self::PM),
+            "RH" => Ok(Self::RH),
             s => Err(s.to_string()),
         }
     }

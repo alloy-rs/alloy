@@ -18,7 +18,7 @@ impl From<Index> for usize {
 
 impl From<Index> for U256 {
     fn from(idx: Index) -> Self {
-        U256::from(idx.0)
+        Self::from(idx.0)
     }
 }
 

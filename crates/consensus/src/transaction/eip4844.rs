@@ -811,11 +811,7 @@ impl TxEip4844WithSidecar {
 
         // create unchecked signed tx because these checks should have happened during construction
         // of `Signed<TxEip4844>` in `TxEip4844::decode_signed_fields`
-        Ok(Signed::new_unchecked(
-            TxEip4844WithSidecar::from_tx_and_sidecar(tx, sidecar),
-            signature,
-            hash,
-        ))
+        Ok(Signed::new_unchecked(Self::from_tx_and_sidecar(tx, sidecar), signature, hash))
     }
 }
 
@@ -895,6 +891,7 @@ mod tests {
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
+    #[allow(clippy::large_stack_frames)]
     fn different_sidecar_same_hash() {
         // this should make sure that the hash calculated for the `into_signed` conversion does not
         // change if the sidecar is different

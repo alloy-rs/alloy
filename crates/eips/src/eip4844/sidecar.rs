@@ -32,6 +32,7 @@ pub struct BlobTransactionSidecar {
 }
 
 #[cfg(feature = "arbitrary")]
+#[allow(clippy::large_stack_frames)]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
@@ -47,7 +48,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
             proofs.push(Bytes48::arbitrary(u)?);
         }
 
-        Ok(BlobTransactionSidecar { blobs, commitments, proofs })
+        Ok(Self { blobs, commitments, proofs })
     }
 }
 
@@ -247,11 +248,11 @@ pub enum BlobTransactionValidationError {
 impl std::error::Error for BlobTransactionValidationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            BlobTransactionValidationError::InvalidProof { .. } => None,
-            BlobTransactionValidationError::KZGError(source) => Some(source),
-            BlobTransactionValidationError::NotBlobTransaction { .. } => None,
-            BlobTransactionValidationError::MissingSidecar { .. } => None,
-            BlobTransactionValidationError::WrongVersionedHash { .. } => None,
+            Self::InvalidProof { .. } => None,
+            Self::KZGError(source) => Some(source),
+            Self::NotBlobTransaction { .. } => None,
+            Self::MissingSidecar { .. } => None,
+            Self::WrongVersionedHash { .. } => None,
         }
     }
 }
@@ -260,17 +261,17 @@ impl std::error::Error for BlobTransactionValidationError {
 impl core::fmt::Display for BlobTransactionValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            BlobTransactionValidationError::InvalidProof => f.write_str("invalid KZG proof"),
-            BlobTransactionValidationError::KZGError(err) => {
+            Self::InvalidProof => f.write_str("invalid KZG proof"),
+            Self::KZGError(err) => {
                 write!(f, "KZG error: {:?}", err)
             }
-            BlobTransactionValidationError::NotBlobTransaction(err) => {
+            Self::NotBlobTransaction(err) => {
                 write!(f, "unable to verify proof for non blob transaction: {}", err)
             }
-            BlobTransactionValidationError::MissingSidecar => {
+            Self::MissingSidecar => {
                 f.write_str("eip4844 tx variant without sidecar being used for verification.")
             }
-            BlobTransactionValidationError::WrongVersionedHash { have, expected } => {
+            Self::WrongVersionedHash { have, expected } => {
                 write!(f, "wrong versioned hash: have {}, expected {}", have, expected)
             }
         }
@@ -280,7 +281,7 @@ impl core::fmt::Display for BlobTransactionValidationError {
 #[cfg(feature = "kzg")]
 impl From<c_kzg::Error> for BlobTransactionValidationError {
     fn from(source: c_kzg::Error) -> Self {
-        BlobTransactionValidationError::KZGError(source)
+        Self::KZGError(source)
     }
 }
 
@@ -290,6 +291,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
+    #[allow(clippy::large_stack_frames)]
     fn deserialize_blob() {
         let blob = BlobTransactionSidecar {
             blobs: vec![Blob::default(), Blob::default(), Blob::default(), Blob::default()],

@@ -29,8 +29,8 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     /// Returns the hash of the transaction that was traced.
     pub const fn tx_hash(&self) -> Option<TxHash> {
         *match self {
-            TraceResult::Success { tx_hash, .. } => tx_hash,
-            TraceResult::Error { tx_hash, .. } => tx_hash,
+            Self::Success { tx_hash, .. } => tx_hash,
+            Self::Error { tx_hash, .. } => tx_hash,
         }
     }
 }

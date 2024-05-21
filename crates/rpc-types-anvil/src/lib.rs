@@ -47,9 +47,9 @@ impl<'de> serde::Deserialize<'de> for Forking {
         }
         let f = match ForkingVariants::deserialize(deserializer)? {
             ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
-                Forking { json_rpc_url, block_number }
+                Self { json_rpc_url, block_number }
             }
-            ForkingVariants::Tagged(f) => Forking {
+            ForkingVariants::Tagged(f) => Self {
                 json_rpc_url: f.forking.json_rpc_url,
                 block_number: f.forking.block_number,
             },
@@ -160,7 +160,7 @@ pub enum MineOptions {
 
 impl Default for MineOptions {
     fn default() -> Self {
-        MineOptions::Options { timestamp: None, blocks: None }
+        Self::Options { timestamp: None, blocks: None }
     }
 }
 

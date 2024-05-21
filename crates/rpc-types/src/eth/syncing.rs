@@ -121,11 +121,11 @@ impl<'de> Deserialize<'de> for SyncStatus {
         }
 
         match Syncing::deserialize(deserializer)? {
-            Syncing::None(false) => Ok(SyncStatus::None),
+            Syncing::None(false) => Ok(Self::None),
             Syncing::None(true) => Err(serde::de::Error::custom(
                 "eth_syncing returned `true` that is undefined value.",
             )),
-            Syncing::IsSyncing(sync) => Ok(SyncStatus::Info(sync)),
+            Syncing::IsSyncing(sync) => Ok(Self::Info(sync)),
         }
     }
 }
@@ -136,8 +136,8 @@ impl Serialize for SyncStatus {
         S: Serializer,
     {
         match self {
-            SyncStatus::Info(info) => info.serialize(serializer),
-            SyncStatus::None => serializer.serialize_bool(false),
+            Self::Info(info) => info.serialize(serializer),
+            Self::None => serializer.serialize_bool(false),
         }
     }
 }

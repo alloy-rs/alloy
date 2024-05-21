@@ -47,7 +47,7 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Fallible conversion to the successful payload.
     pub const fn as_success(&self) -> Option<&Payload> {
         match self {
-            ResponsePayload::Success(payload) => Some(payload),
+            Self::Success(payload) => Some(payload),
             _ => None,
         }
     }
@@ -55,19 +55,19 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Fallible conversion to the error object.
     pub const fn as_error(&self) -> Option<&ErrorPayload<ErrData>> {
         match self {
-            ResponsePayload::Failure(payload) => Some(payload),
+            Self::Failure(payload) => Some(payload),
             _ => None,
         }
     }
 
     /// Returns `true` if the response payload is a success.
     pub const fn is_success(&self) -> bool {
-        matches!(self, ResponsePayload::Success(_))
+        matches!(self, Self::Success(_))
     }
 
     /// Returns `true` if the response payload is an error.
     pub const fn is_error(&self) -> bool {
-        matches!(self, ResponsePayload::Failure(_))
+        matches!(self, Self::Failure(_))
     }
 }
 
@@ -98,13 +98,13 @@ where
         self,
     ) -> Result<ResponsePayload<T, ErrData>, Self> {
         match self {
-            ResponsePayload::Success(ref payload) => {
+            Self::Success(ref payload) => {
                 match serde_json::from_str(payload.as_ref().get()) {
                     Ok(payload) => Ok(ResponsePayload::Success(payload)),
                     Err(_) => Err(self),
                 }
             }
-            ResponsePayload::Failure(e) => Ok(ResponsePayload::Failure(e)),
+            Self::Failure(e) => Ok(ResponsePayload::Failure(e)),
         }
     }
 }
@@ -135,11 +135,11 @@ where
         self,
     ) -> Result<ResponsePayload<Payload, T>, Self> {
         match self {
-            ResponsePayload::Failure(err) => match err.deser_data() {
+            Self::Failure(err) => match err.deser_data() {
                 Ok(deser) => Ok(ResponsePayload::Failure(deser)),
-                Err(err) => Err(ResponsePayload::Failure(err)),
+                Err(err) => Err(Self::Failure(err)),
             },
-            ResponsePayload::Success(payload) => Ok(ResponsePayload::Success(payload)),
+            Self::Success(payload) => Ok(ResponsePayload::Success(payload)),
         }
     }
 }

@@ -43,7 +43,7 @@ impl<T, P, N> ContractInstance<T, P, N> {
 
     /// Returns a new contract instance at `address`.
     #[inline]
-    pub fn at(mut self, address: Address) -> ContractInstance<T, P, N> {
+    pub fn at(mut self, address: Address) -> Self {
         self.set_address(address);
         self
     }

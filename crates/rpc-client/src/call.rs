@@ -77,7 +77,7 @@ where
             };
 
             if let Err(e) = task::ready!(Service::<RequestPacket>::poll_ready(connection, cx)) {
-                self.set(CallState::Complete);
+                self.set(Self::Complete);
                 return Ready(RpcResult::Err(e));
             }
 
@@ -92,13 +92,13 @@ where
                 }
                 Err(err) => {
                     trace!(?err, "failed to serialize request");
-                    self.set(CallState::Complete);
+                    self.set(Self::Complete);
                     return Ready(RpcResult::Err(TransportError::ser_err(err)));
                 }
             }
         };
 
-        self.set(CallState::AwaitingResponse { fut });
+        self.set(Self::AwaitingResponse { fut });
         cx.waker().wake_by_ref();
 
         task::Poll::Pending
@@ -128,11 +128,11 @@ where
     type Output = TransportResult<Box<RawValue>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        if matches!(*self.as_mut(), CallState::Prepared { .. }) {
+        if matches!(*self.as_mut(), Self::Prepared { .. }) {
             return self.poll_prepared(cx);
         }
 
-        if matches!(*self.as_mut(), CallState::AwaitingResponse { .. }) {
+        if matches!(*self.as_mut(), Self::AwaitingResponse { .. }) {
             return self.poll_awaiting(cx);
         }
 

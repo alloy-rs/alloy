@@ -48,8 +48,8 @@ impl Authorization {
 impl fmt::Display for Authorization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Authorization::Basic(_) => write!(f, "Basic"),
-            Authorization::Bearer(_) => write!(f, "Bearer"),
+            Self::Basic(_) => write!(f, "Basic"),
+            Self::Bearer(_) => write!(f, "Bearer"),
         }
     }
 }

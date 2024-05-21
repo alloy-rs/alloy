@@ -73,7 +73,7 @@ impl Genesis {
     /// and funds the given address with max coins.
     ///
     /// Enables all hard forks up to London at genesis.
-    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Genesis {
+    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
         // set up a clique config with an instant sealing period and short (8 block) epoch
         let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
 
@@ -120,7 +120,7 @@ impl Genesis {
         let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
         let extra_data = extra_data_bytes.into();
 
-        Genesis {
+        Self {
             config,
             alloc,
             difficulty: U256::from(1),

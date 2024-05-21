@@ -23,19 +23,19 @@ pub enum PreStateFrame {
 impl PreStateFrame {
     /// Returns true if this trace was requested without diffmode.
     pub const fn is_default(&self) -> bool {
-        matches!(self, PreStateFrame::Default(_))
+        matches!(self, Self::Default(_))
     }
 
     /// Returns true if this trace was requested with diffmode.
     pub const fn is_diff(&self) -> bool {
-        matches!(self, PreStateFrame::Diff(_))
+        matches!(self, Self::Diff(_))
     }
 
     /// Returns the account states after the transaction is executed if this trace was requested
     /// without diffmode.
     pub const fn as_default(&self) -> Option<&PreStateMode> {
         match self {
-            PreStateFrame::Default(mode) => Some(mode),
+            Self::Default(mode) => Some(mode),
             _ => None,
         }
     }
@@ -44,7 +44,7 @@ impl PreStateFrame {
     /// requested with diffmode.
     pub const fn as_diff(&self) -> Option<&DiffMode> {
         match self {
-            PreStateFrame::Diff(mode) => Some(mode),
+            Self::Diff(mode) => Some(mode),
             _ => None,
         }
     }
@@ -116,12 +116,12 @@ pub enum DiffStateKind {
 impl DiffStateKind {
     /// Returns true if this is the pre state of the [DiffMode]
     pub const fn is_pre(&self) -> bool {
-        matches!(self, DiffStateKind::Pre)
+        matches!(self, Self::Pre)
     }
 
     /// Returns true if this is the post state of the [DiffMode]
     pub const fn is_post(&self) -> bool {
-        matches!(self, DiffStateKind::Post)
+        matches!(self, Self::Post)
     }
 }
 
@@ -160,7 +160,7 @@ impl AccountState {
     /// Removes balance,nonce or code if they match the given account info.
     ///
     /// This is useful for comparing pre vs post state and only keep changed values in post state.
-    pub fn remove_matching_account_info(&mut self, other: &AccountState) {
+    pub fn remove_matching_account_info(&mut self, other: &Self) {
         if self.balance == other.balance {
             self.balance = None;
         }
@@ -188,17 +188,17 @@ pub enum AccountChangeKind {
 impl AccountChangeKind {
     /// Returns true if the account was created
     pub const fn is_created(&self) -> bool {
-        matches!(self, AccountChangeKind::Create)
+        matches!(self, Self::Create)
     }
 
     /// Returns true the account was modified
     pub const fn is_modified(&self) -> bool {
-        matches!(self, AccountChangeKind::Modify)
+        matches!(self, Self::Modify)
     }
 
     /// Returns true the account was modified
     pub const fn is_selfdestruct(&self) -> bool {
-        matches!(self, AccountChangeKind::SelfDestruct)
+        matches!(self, Self::SelfDestruct)
     }
 }
 

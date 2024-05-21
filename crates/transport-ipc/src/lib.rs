@@ -41,7 +41,7 @@ impl IpcBackend {
     async fn connect(name: Name<'_>) -> Result<alloy_pubsub::ConnectionHandle> {
         let stream = LocalSocketStream::connect(name).await?;
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
-        let backend = IpcBackend { stream, interface };
+        let backend = Self { stream, interface };
         backend.spawn();
         Ok(handle)
     }

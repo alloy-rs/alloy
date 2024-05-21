@@ -261,7 +261,7 @@ mod tests {
             .with_blob_sidecar(BlobTransactionSidecar::default())
             .with_access_list(AccessList::default());
 
-        let error = request.clone().build_unsigned().unwrap_err();
+        let error = request.build_unsigned().unwrap_err();
 
         assert!(matches!(error.1, TransactionBuilderError::InvalidTransactionRequest(_, _)));
     }
@@ -270,7 +270,7 @@ mod tests {
     fn test_invalid_legacy_fields() {
         let request = TransactionRequest::default().with_gas_price(0);
 
-        let error = request.clone().build_unsigned().unwrap_err();
+        let error = request.build_unsigned().unwrap_err();
 
         let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
@@ -287,7 +287,7 @@ mod tests {
     fn test_invalid_1559_fields() {
         let request = TransactionRequest::default();
 
-        let error = request.clone().build_unsigned().unwrap_err();
+        let error = request.build_unsigned().unwrap_err();
 
         let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
@@ -308,7 +308,7 @@ mod tests {
             .with_access_list(AccessList::default())
             .with_gas_price(Default::default());
 
-        let error = request.clone().build_unsigned().unwrap_err();
+        let error = request.build_unsigned().unwrap_err();
 
         let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")
@@ -326,7 +326,7 @@ mod tests {
         let request =
             TransactionRequest::default().with_blob_sidecar(BlobTransactionSidecar::default());
 
-        let error = request.clone().build_unsigned().unwrap_err();
+        let error = request.build_unsigned().unwrap_err();
 
         let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
             panic!("wrong variant")

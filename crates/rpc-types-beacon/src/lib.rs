@@ -12,13 +12,25 @@
 use alloy_primitives::FixedBytes;
 use constants::{BLS_PUBLIC_KEY_BYTES_LEN, BLS_SIGNATURE_BYTES_LEN};
 
+/// Constants used in the Beacon API.
 pub mod constants;
+
 /// Beacon API events support.
 pub mod events;
+
+/// Types and functions related to the beacon block header.
 pub mod header;
+
+/// Types and functions related to the beacon block payload.
 pub mod payload;
+
+/// Types and functions related to the relay mechanism.
 pub mod relay;
+
+/// Types and functions related to the sidecar.
 pub mod sidecar;
+
+/// Types and functions related to withdrawals.
 pub mod withdrawals;
 
 /// BLS signature type

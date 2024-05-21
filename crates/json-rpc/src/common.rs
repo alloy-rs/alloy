@@ -35,9 +35,9 @@ pub enum Id {
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Id::Number(n) => write!(f, "{n}"),
-            Id::String(s) => f.write_str(s),
-            Id::None => f.write_str("null"),
+            Self::Number(n) => write!(f, "{n}"),
+            Self::String(s) => f.write_str(s),
+            Self::None => f.write_str("null"),
         }
     }
 }
@@ -45,9 +45,9 @@ impl Display for Id {
 impl Serialize for Id {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Id::Number(n) => serializer.serialize_u64(*n),
-            Id::String(s) => serializer.serialize_str(s),
-            Id::None => serializer.serialize_none(),
+            Self::Number(n) => serializer.serialize_u64(*n),
+            Self::String(s) => serializer.serialize_str(s),
+            Self::None => serializer.serialize_none(),
         }
     }
 }
@@ -127,23 +127,23 @@ impl Ord for Id {
 impl Id {
     /// Returns `true` if the ID is a number.
     pub const fn is_number(&self) -> bool {
-        matches!(self, Id::Number(_))
+        matches!(self, Self::Number(_))
     }
 
     /// Returns `true` if the ID is a string.
     pub const fn is_string(&self) -> bool {
-        matches!(self, Id::String(_))
+        matches!(self, Self::String(_))
     }
 
     /// Returns `true` if the ID is `None`.
     pub const fn is_none(&self) -> bool {
-        matches!(self, Id::None)
+        matches!(self, Self::None)
     }
 
     /// Returns the ID as a number, if it is one.
     pub const fn as_number(&self) -> Option<u64> {
         match self {
-            Id::Number(n) => Some(*n),
+            Self::Number(n) => Some(*n),
             _ => None,
         }
     }
@@ -151,7 +151,7 @@ impl Id {
     /// Returns the ID as a string, if it is one.
     pub fn as_string(&self) -> Option<&str> {
         match self {
-            Id::String(s) => Some(s),
+            Self::String(s) => Some(s),
             _ => None,
         }
     }

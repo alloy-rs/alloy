@@ -29,7 +29,7 @@ pub enum TxType {
 
 impl From<TxType> for u8 {
     fn from(value: TxType) -> Self {
-        value as u8
+        value as Self
     }
 }
 
@@ -146,30 +146,30 @@ impl TxEnvelope {
         &self,
     ) -> Result<alloy_primitives::Address, alloy_primitives::SignatureError> {
         match self {
-            TxEnvelope::Legacy(tx) => tx.recover_signer(),
-            TxEnvelope::Eip2930(tx) => tx.recover_signer(),
-            TxEnvelope::Eip1559(tx) => tx.recover_signer(),
-            TxEnvelope::Eip4844(tx) => tx.recover_signer(),
+            Self::Legacy(tx) => tx.recover_signer(),
+            Self::Eip2930(tx) => tx.recover_signer(),
+            Self::Eip1559(tx) => tx.recover_signer(),
+            Self::Eip4844(tx) => tx.recover_signer(),
         }
     }
 
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256 {
         match self {
-            TxEnvelope::Legacy(tx) => tx.signature_hash(),
-            TxEnvelope::Eip2930(tx) => tx.signature_hash(),
-            TxEnvelope::Eip1559(tx) => tx.signature_hash(),
-            TxEnvelope::Eip4844(tx) => tx.signature_hash(),
+            Self::Legacy(tx) => tx.signature_hash(),
+            Self::Eip2930(tx) => tx.signature_hash(),
+            Self::Eip1559(tx) => tx.signature_hash(),
+            Self::Eip4844(tx) => tx.signature_hash(),
         }
     }
 
     /// Return the hash of the inner Signed
     pub const fn tx_hash(&self) -> &B256 {
         match self {
-            TxEnvelope::Legacy(tx) => tx.hash(),
-            TxEnvelope::Eip2930(tx) => tx.hash(),
-            TxEnvelope::Eip1559(tx) => tx.hash(),
-            TxEnvelope::Eip4844(tx) => tx.hash(),
+            Self::Legacy(tx) => tx.hash(),
+            Self::Eip2930(tx) => tx.hash(),
+            Self::Eip1559(tx) => tx.hash(),
+            Self::Eip4844(tx) => tx.hash(),
         }
     }
 
@@ -282,14 +282,14 @@ impl Encodable2718 for TxEnvelope {
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
             // Legacy transactions have no difference between network and 2718
-            TxEnvelope::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
-            TxEnvelope::Eip2930(tx) => {
+            Self::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
+            Self::Eip2930(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
-            TxEnvelope::Eip1559(tx) => {
+            Self::Eip1559(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
-            TxEnvelope::Eip4844(tx) => {
+            Self::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
         }

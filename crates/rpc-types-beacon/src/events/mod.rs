@@ -10,24 +10,41 @@ use light_client_optimistic::LightClientOptimisticData;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
+/// Module for handling attestation-related functionality and events.
 pub mod attestation;
+
+/// Module for handling light client finality-related functionality and events.
 pub mod light_client_finality;
+
+/// Module for handling light client optimistic-related functionality and events.
 pub mod light_client_optimistic;
 
 /// Topic variant for the eventstream API
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BeaconNodeEventTopic {
+    /// The topic for payload attributes events.
     PayloadAttributes,
+    /// The topic for head events.
     Head,
+    /// The topic for block events.
     Block,
+    /// The topic for attestation events.
     Attestation,
+    /// The topic for voluntary exit events.
     VoluntaryExit,
+    /// The topic for BLS to execution change events.
     BlsToExecutionChange,
+    /// The topic for finalized checkpoint events.
     FinalizedCheckpoint,
+    /// The topic for chain reorganization events.
     ChainReorg,
+    /// The topic for contribution and proof events.
     ContributionAndProof,
+    /// The topic for light client finality update events.
     LightClientFinalityUpdate,
+    /// The topic for light client optimistic update events.
     LightClientOptimisticUpdate,
+    /// The topic for blob sidecar events.
     BlobSidecar,
 }
 
@@ -35,18 +52,18 @@ impl BeaconNodeEventTopic {
     /// Returns the identifier value for the eventstream query
     pub fn query_value(&self) -> &'static str {
         match self {
-            BeaconNodeEventTopic::PayloadAttributes => "payload_attributes",
-            BeaconNodeEventTopic::Head => "head",
-            BeaconNodeEventTopic::Block => "block",
-            BeaconNodeEventTopic::Attestation => "attestation",
-            BeaconNodeEventTopic::VoluntaryExit => "voluntary_exit",
-            BeaconNodeEventTopic::BlsToExecutionChange => "bls_to_execution_change",
-            BeaconNodeEventTopic::FinalizedCheckpoint => "finalized_checkpoint",
-            BeaconNodeEventTopic::ChainReorg => "chain_reorg",
-            BeaconNodeEventTopic::ContributionAndProof => "contribution_and_proof",
-            BeaconNodeEventTopic::LightClientFinalityUpdate => "light_client_finality_update",
-            BeaconNodeEventTopic::LightClientOptimisticUpdate => "light_client_optimistic_update",
-            BeaconNodeEventTopic::BlobSidecar => "blob_sidecar",
+            Self::PayloadAttributes => "payload_attributes",
+            Self::Head => "head",
+            Self::Block => "block",
+            Self::Attestation => "attestation",
+            Self::VoluntaryExit => "voluntary_exit",
+            Self::BlsToExecutionChange => "bls_to_execution_change",
+            Self::FinalizedCheckpoint => "finalized_checkpoint",
+            Self::ChainReorg => "chain_reorg",
+            Self::ContributionAndProof => "contribution_and_proof",
+            Self::LightClientFinalityUpdate => "light_client_finality_update",
+            Self::LightClientOptimisticUpdate => "light_client_optimistic_update",
+            Self::BlobSidecar => "blob_sidecar",
         }
     }
 }
@@ -67,20 +84,27 @@ pub struct PayloadAttributesEvent {
 /// Event for the `Head` topic of the beacon API node event stream.
 ///
 /// The node has finished processing, resulting in a new head. previous_duty_dependent_root is
-/// \`get_block_root_at_slot(state, compute_start_slot_at_epoch(epoch - 1) - 1)\` and
-/// current_duty_dependent_root is \`get_block_root_at_slot(state,
+/// `get_block_root_at_slot(state, compute_start_slot_at_epoch(epoch - 1) - 1)` and
+/// current_duty_dependent_root is `get_block_root_at_slot(state,
 /// compute_start_slot_at_epoch(epoch)
-/// - 1)\`. Both dependent roots use the genesis block root in the case of underflow.
+/// - 1)`. Both dependent roots use the genesis block root in the case of underflow.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HeadEvent {
+    /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub slot: u64,
+    /// The block associated with the event.
     pub block: B256,
+    /// The state associated with the event.
     pub state: B256,
+    /// A flag indicating if an epoch transition occurred.
     pub epoch_transition: bool,
+    /// The previous duty dependent root.
     pub previous_duty_dependent_root: B256,
+    /// The current duty dependent root.
     pub current_duty_dependent_root: B256,
+    /// A flag indicating optimistic execution.
     pub execution_optimistic: bool,
 }
 
@@ -90,9 +114,12 @@ pub struct HeadEvent {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockEvent {
+    /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub slot: u64,
+    /// The received block.
     pub block: B256,
+    /// A flag indicating optimistic execution.
     pub execution_optimistic: bool,
 }
 
@@ -102,8 +129,11 @@ pub struct BlockEvent {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationEvent {
+    /// The aggregation bits of the attestation.
     pub aggregation_bits: Bytes,
+    /// The signature of the attestation.
     pub signature: Bytes,
+    /// The attestation data.
     pub data: AttestationData,
 }
 
@@ -112,15 +142,20 @@ pub struct AttestationEvent {
 /// The node has received a valid voluntary exit (from P2P or API)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoluntaryExitEvent {
+    /// The voluntary exit message.
     pub message: VoluntaryExitMessage,
+    /// The signature of the voluntary exit.
     pub signature: Bytes,
 }
 
+/// Represents a voluntary exit message in the beacon chain.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VoluntaryExitMessage {
+    /// The epoch of the voluntary exit, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub epoch: u64,
+    /// The validator index of the voluntary exit, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub validator_index: u64,
 }
@@ -130,16 +165,22 @@ pub struct VoluntaryExitMessage {
 /// The node has received a BLS to execution change (from P2P or API)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlsToExecutionChangeEvent {
+    /// The BLS to execution change message.
     pub message: BlsToExecutionChangeMessage,
+    /// The signature of the BLS to execution change.
     pub signature: Bytes,
 }
 
+/// Represents a BLS to Execution change message in the beacon chain.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlsToExecutionChangeMessage {
+    /// The validator index of the change message, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub validator_index: u64,
+    /// The BLS public key of the change message.
     pub from_bls_pubkey: String,
+    /// The execution address after the change.
     pub to_execution_address: Address,
 }
 
@@ -149,10 +190,14 @@ pub struct BlsToExecutionChangeMessage {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalizedCheckpointEvent {
+    /// The block associated with the event.
     pub block: B256,
+    /// The state associated with the event.
     pub state: B256,
+    /// The epoch of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub epoch: u64,
+    /// A flag indicating optimistic execution.
     pub execution_optimistic: bool,
 }
 
@@ -162,16 +207,24 @@ pub struct FinalizedCheckpointEvent {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainReorgEvent {
+    /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub slot: u64,
+    /// The depth of the reorganization.
     #[serde_as(as = "DisplayFromStr")]
     pub depth: u64,
+    /// The old head block root.
     pub old_head_block: B256,
+    /// The new head block root.
     pub new_head_block: B256,
+    /// The old head state.
     pub old_head_state: B256,
+    /// The new head state.
     pub new_head_state: B256,
+    /// The epoch of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub epoch: u64,
+    /// A flag indicating optimistic execution.
     pub execution_optimistic: bool,
 }
 
@@ -180,28 +233,40 @@ pub struct ChainReorgEvent {
 /// The node has received a valid sync committee SignedContributionAndProof (from P2P or API)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContributionAndProofEvent {
+    /// The contribution and proof message.
     pub message: ContributionAndProofMessage,
+    /// The signature of the message.
     pub signature: Bytes,
 }
 
+/// Represents a signed contribution and proof message in the beacon chain.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContributionAndProofMessage {
+    /// The aggregator index, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub aggregator_index: u64,
+    /// The contribution.
     pub contribution: Contribution,
+    /// The selection proof.
     pub selection_proof: Bytes,
 }
 
+/// Represents a contribution in the beacon chain.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Contribution {
+    /// The slot number of the contribution, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub slot: u64,
+    /// The beacon block root.
     pub beacon_block_root: B256,
+    /// The subcommittee index, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub subcommittee_index: u64,
+    /// The aggregation bits.
     pub aggregation_bits: Bytes,
+    /// The signature.
     pub signature: Bytes,
 }
 
@@ -210,7 +275,9 @@ pub struct Contribution {
 /// The node's latest known `LightClientFinalityUpdate` has been updated
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LightClientFinalityUpdateEvent {
+    /// The version of the event.
     pub version: String,
+    /// The data associated with the event.
     pub data: LightClientFinalityData,
 }
 
@@ -219,7 +286,9 @@ pub struct LightClientFinalityUpdateEvent {
 /// The node's latest known `LightClientOptimisticUpdate` has been updated
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LightClientOptimisticUpdateEvent {
+    /// The version of the event.
     pub version: String,
+    /// The data associated with the event.
     pub data: LightClientOptimisticData,
 }
 
@@ -230,12 +299,17 @@ pub struct LightClientOptimisticUpdateEvent {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlobSidecarEvent {
+    /// The root of the block associated with the event.
     pub block_root: B256,
+    /// The index of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub index: u64,
+    /// The slot number of the event, serialized as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub slot: u64,
+    /// The KZG commitment of the event.
     pub kzg_commitment: Bytes,
+    /// The versioned hash of the event.
     pub versioned_hash: B256,
 }
 
