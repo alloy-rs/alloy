@@ -11,6 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-network.workspace = true
 alloy-provider.workspace = true

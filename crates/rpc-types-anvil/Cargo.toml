@@ -11,6 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-serde.workspace = true

@@ -11,6 +11,9 @@ authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 # ethereum
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
