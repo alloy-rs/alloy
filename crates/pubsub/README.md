@@ -23,7 +23,7 @@ The PubSub system here consists of 3 logical parts:
 - The **backend** is an actively running connection to the server. Users
   should NEVER instantiate a backend directly. Instead, they should use
   [`PubSubConnect::into_service`] for some connection object. Backends
-  are responsible for managing the connection to the server,accepting user
+  are responsible for managing the connection to the server, accepting user
   requests from the **service** and forwarding server responses to the
   **service**.
 
