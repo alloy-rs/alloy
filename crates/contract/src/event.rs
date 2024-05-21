@@ -46,8 +46,7 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event
 
 impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, P, E, N> {
     /// Creates a new event with the provided provider and filter.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn new(provider: P, filter: Filter) -> Self {
+    pub const fn new(provider: P, filter: Filter) -> Self {
         Self { provider, filter, _phantom: PhantomData }
     }
 

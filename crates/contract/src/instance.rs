@@ -101,7 +101,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P,
     }
 
     /// Returns an [`Event`] builder with the provided filter.
-    pub fn event<E: SolEvent>(&self, filter: Filter) -> Event<T, &P, E, N> {
+    pub const fn event<E: SolEvent>(&self, filter: Filter) -> Event<T, &P, E, N> {
         Event::new(&self.provider, filter)
     }
 }
