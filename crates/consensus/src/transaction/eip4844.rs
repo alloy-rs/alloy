@@ -1,8 +1,3 @@
-mod builder;
-pub use builder::{SidecarBuilder, SidecarCoder, SimpleCoder};
-
-pub mod utils;
-
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
@@ -19,8 +14,6 @@ pub use alloy_eips::eip4844::BlobTransactionValidationError;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-
-pub use alloy_eips::eip4844::{Blob, Bytes48};
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///
@@ -896,7 +889,7 @@ impl Transaction for TxEip4844WithSidecar {
 #[cfg(test)]
 mod tests {
     use super::{BlobTransactionSidecar, TxEip4844, TxEip4844WithSidecar};
-    use crate::{SignableTransaction, TxEip4844Variant, TxEnvelope};
+    use crate::{transaction::eip4844::TxEip4844Variant, SignableTransaction, TxEnvelope};
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, bytes, Signature, U256};
     use alloy_rlp::{Decodable, Encodable};

@@ -22,8 +22,6 @@ c-kzg = { workspace = true, features = ["serde"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-proptest = { workspace = true, optional = true }
-proptest-derive = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -47,8 +45,6 @@ kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
     "std",
     "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
     "alloy-eips/arbitrary",
 ]
 serde = [

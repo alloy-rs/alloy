@@ -9,6 +9,10 @@ pub mod env_settings;
 #[cfg(feature = "kzg")]
 pub mod trusted_setup_points;
 
+/// Builder and utils for the [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
+pub mod builder;
+pub mod utils;
+
 /// Contains sidecar related types
 mod sidecar;
 pub use sidecar::*;

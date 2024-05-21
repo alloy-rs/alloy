@@ -48,10 +48,4 @@ std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std", "c-kzg?/std", "onc
 serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
 kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
-arbitrary = [
-    "std",
-    "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
-    "alloy-primitives/arbitrary",
-]
+arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]

@@ -6,6 +6,9 @@ use crate::eip4844::{
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
+#[cfg(feature = "arbitrary")]
+use crate::eip4844::MAX_BLOBS_PER_BLOCK;
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -15,10 +18,6 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     #[cfg_attr(
@@ -30,6 +29,26 @@ pub struct BlobTransactionSidecar {
     pub commitments: Vec<Bytes48>,
     /// The blob proofs.
     pub proofs: Vec<Bytes48>,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
+        let mut blobs = Vec::with_capacity(num_blobs);
+        for _ in 0..num_blobs {
+            blobs.push(Blob::arbitrary(u)?);
+        }
+
+        let mut commitments = Vec::with_capacity(num_blobs);
+        let mut proofs = Vec::with_capacity(num_blobs);
+        for _ in 0..num_blobs {
+            commitments.push(Bytes48::arbitrary(u)?);
+            proofs.push(Bytes48::arbitrary(u)?);
+        }
+
+        Ok(BlobTransactionSidecar { blobs, commitments, proofs })
+    }
 }
 
 impl BlobTransactionSidecar {
@@ -287,6 +306,7 @@ mod tests {
                 Bytes48::default(),
             ],
         };
+
         let s = serde_json::to_string(&blob).unwrap();
         let deserialized: BlobTransactionSidecar = serde_json::from_str(&s).unwrap();
         assert_eq!(blob, deserialized);

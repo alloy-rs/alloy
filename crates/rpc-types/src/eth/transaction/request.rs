@@ -2,8 +2,8 @@
 
 use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
-    TxType, TypedTransaction,
+    transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+    TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
