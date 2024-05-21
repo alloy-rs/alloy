@@ -113,10 +113,8 @@ functional guidelines of the Alloy project.
 Pull Requests are the way concrete changes are made to the code, documentation,
 and dependencies in the Alloy repository.
 
-Even tiny pull requests (e.g., one character pull request fixing a typo in API
-documentation) are greatly appreciated. Before making a large change, it is
-usually a good idea to first open an issue describing the change to solicit
-feedback and guidance. This will increase the likelihood of the PR getting
+Before making a large change, it is  usually a good idea to first open an issue describing the change to solicit feedback and guidance. 
+This will increase the likelihood of the PR getting
 merged.
 
 When opening a PR **please select the "Allow Edits From Maintainers" option**.
