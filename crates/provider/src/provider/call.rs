@@ -5,11 +5,21 @@ use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
-use std::{borrow::Cow, future::Future, task::Poll};
+use std::{
+    borrow::Cow,
+    future::Future,
+    task::Poll::{self, Ready},
+};
 
-/// States for the [`EthCallFut`] future.
+type RunningFut<'req, 'state, T, N> = RpcCall<
+    T,
+    (&'req <N as Network>::TransactionRequest, BlockId, Option<Cow<'state, StateOverride>>),
+    Bytes,
+>;
+
+/// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Debug, Clone)]
-enum States<'req, 'state, T, N>
+pub enum EthCallFut<'req, 'state, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -20,17 +30,8 @@ where
         overrides: Option<&'state StateOverride>,
         block: Option<BlockId>,
     },
-    Running(RpcCall<T, (&'req N::TransactionRequest, BlockId, Cow<'state, StateOverride>), Bytes>),
-}
-
-/// Future for [`EthCall`]. Simple wrapper around [`RpcCall`].
-#[derive(Debug, Clone)]
-pub struct EthCallFut<'req, 'state, T, N>
-where
-    T: Transport + Clone,
-    N: Network,
-{
-    state: States<'req, 'state, T, N>,
+    Running(RunningFut<'req, 'state, T, N>),
+    Polling,
 }
 
 impl<'req, 'state, T, N> EthCallFut<'req, 'state, T, N>
@@ -38,40 +39,47 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    fn poll_preparing(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<TransportResult<Bytes>> {
-        let fut = {
-            let States::Preparing { client, data, overrides, block } = &self.as_ref().state else {
-                unreachable!("bad state")
-            };
-
-            let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-                Ok(client) => client,
-                Err(e) => return std::task::Poll::Ready(Err(e)),
-            };
-
-            let overrides = match overrides {
-                Some(overrides) => Cow::Borrowed(*overrides),
-                None => Cow::Owned(StateOverride::default()),
-            };
-            client.request("eth_call", (*data, block.unwrap_or_default(), overrides))
-        };
-
-        self.state = States::Running(fut);
-        self.poll_running(cx)
+    /// Returns `true` if the future is in the preparing state.
+    const fn is_preparing(&self) -> bool {
+        matches!(self, Self::Preparing { .. })
     }
 
-    fn poll_running(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<TransportResult<Bytes>> {
-        let Self { state: States::Running(call) } = self.get_mut() else {
+    /// Returns `true` if the future is in the running state.
+    const fn is_running(&self) -> bool {
+        matches!(self, Self::Running(..))
+    }
+
+    fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Bytes>> {
+        let Self::Preparing { client, data, overrides, block } =
+            std::mem::replace(self, Self::Polling)
+        else {
             unreachable!("bad state")
         };
 
-        call.poll_unpin(cx)
+        let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
+            Ok(client) => client,
+            Err(e) => return Ready(Err(e)),
+        };
+
+        let overrides = overrides.map(Cow::Borrowed);
+
+        let fut = client.request("eth_call", (data, block.unwrap_or_default(), overrides));
+
+        *self = Self::Running(fut);
+        self.poll_running(cx)
+    }
+
+    fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Bytes>> {
+        let Self::Running(mut call) = std::mem::replace(self, Self::Polling) else {
+            unreachable!("bad state")
+        };
+
+        if let Ready(res) = call.poll_unpin(cx) {
+            Ready(res)
+        } else {
+            *self = Self::Running(call);
+            Poll::Pending
+        }
     }
 }
 
@@ -86,10 +94,13 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        if matches!(self.state, States::Preparing { .. }) {
-            self.poll_preparing(cx)
+        let this = self.get_mut();
+        if this.is_preparing() {
+            this.poll_preparing(cx)
+        } else if this.is_running() {
+            this.poll_running(cx)
         } else {
-            self.poll_running(cx)
+            panic!("unexpected state")
         }
     }
 }
@@ -153,13 +164,11 @@ where
     type IntoFuture = EthCallFut<'req, 'state, T, N>;
 
     fn into_future(self) -> Self::IntoFuture {
-        let state = States::Preparing {
+        EthCallFut::Preparing {
             client: self.client,
             data: self.data,
             overrides: self.overrides,
             block: self.block,
-        };
-
-        EthCallFut { state }
+        }
     }
 }
