@@ -133,15 +133,13 @@ where
     N: Network,
 {
     /// Set the state overrides for this call.
-    #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn overrides(mut self, overrides: &'state StateOverride) -> Self {
+    pub const fn overrides(mut self, overrides: &'state StateOverride) -> Self {
         self.overrides = Some(overrides);
         self
     }
 
     /// Set the block to use for this call.
-    #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn block(mut self, block: BlockId) -> Self {
+    pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
     }
