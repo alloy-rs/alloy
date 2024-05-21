@@ -5,6 +5,7 @@ use crate::{
     EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
     RpcWithBlock, SendableTx,
 };
+use alloy_chains::Chain;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
@@ -537,9 +538,22 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("web3_clientVersion", ()).await
     }
 
-    /// Gets the chain ID.
-    fn get_chain_id(&self) -> RpcCall<T, (), U64, u64> {
-        self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64)
+    /// Gets the chain ID. Sets the client's poll interval (if default)
+    /// to match the average block time for this chain.
+    async fn get_chain_id(&self) -> TransportResult<u64> {
+        self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64).await.and_then(
+            |chain_id| {
+                let client = self.client();
+                if !client.is_custom_poll_interval() && !client.is_local() {
+                    let poll_interval = match Chain::from_id(chain_id).average_blocktime_hint() {
+                        Some(avg_block_time) => avg_block_time,
+                        None => client.poll_interval(),
+                    };
+                    client.set_poll_interval(poll_interval.as_millis() as u64);
+                }
+                Ok(chain_id)
+            },
+        )
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
