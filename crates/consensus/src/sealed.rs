@@ -26,7 +26,6 @@ impl<T> Sealed<T> {
     }
 
     /// Decompose into parts.
-    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_parts(self) -> (T, B256) {
         (self.inner, self.seal)
     }
