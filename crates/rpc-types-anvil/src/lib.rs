@@ -49,10 +49,9 @@ impl<'de> serde::Deserialize<'de> for Forking {
             ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
                 Self { json_rpc_url, block_number }
             }
-            ForkingVariants::Tagged(f) => Self {
-                json_rpc_url: f.forking.json_rpc_url,
-                block_number: f.forking.block_number,
-            },
+            ForkingVariants::Tagged(f) => {
+                Self { json_rpc_url: f.forking.json_rpc_url, block_number: f.forking.block_number }
+            }
         };
         Ok(f)
     }

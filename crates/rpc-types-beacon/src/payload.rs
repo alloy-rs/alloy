@@ -452,11 +452,7 @@ impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
         let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } =
             payload;
-        Self {
-            payload_inner: payload_inner.into(),
-            deposit_requests,
-            withdrawal_requests,
-        }
+        Self { payload_inner: payload_inner.into(), deposit_requests, withdrawal_requests }
     }
 }
 
@@ -536,18 +532,10 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
 impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
     fn from(payload: BeaconExecutionPayload<'a>) -> Self {
         match payload {
-            BeaconExecutionPayload::V1(payload) => {
-                Self::V1(ExecutionPayloadV1::from(payload))
-            }
-            BeaconExecutionPayload::V2(payload) => {
-                Self::V2(ExecutionPayloadV2::from(payload))
-            }
-            BeaconExecutionPayload::V3(payload) => {
-                Self::V3(ExecutionPayloadV3::from(payload))
-            }
-            BeaconExecutionPayload::V4(payload) => {
-                Self::V4(ExecutionPayloadV4::from(payload))
-            }
+            BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
+            BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
+            BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
+            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
         }
     }
 }

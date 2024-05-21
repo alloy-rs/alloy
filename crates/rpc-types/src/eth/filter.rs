@@ -165,9 +165,7 @@ impl FilterBlockOption {
     /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
     pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
-            Self::Range { from_block, to_block } => {
-                (from_block.as_ref(), to_block.as_ref())
-            }
+            Self::Range { from_block, to_block } => (from_block.as_ref(), to_block.as_ref()),
             Self::AtBlockHash(_) => (None, None),
         }
     }
@@ -230,8 +228,7 @@ impl FilterBlockOption {
     /// Sets the block number this range filter should start at.
     #[must_use]
     pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
-        let to_block =
-            if let Self::Range { to_block, .. } = self { *to_block } else { None };
+        let to_block = if let Self::Range { to_block, .. } = self { *to_block } else { None };
 
         Self::Range { from_block: Some(block), to_block }
     }
@@ -239,8 +236,7 @@ impl FilterBlockOption {
     /// Sets the block number this range filter should end at.
     #[must_use]
     pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
-        let from_block =
-            if let Self::Range { from_block, .. } = self { *from_block } else { None };
+        let from_block = if let Self::Range { from_block, .. } = self { *from_block } else { None };
 
         Self::Range { from_block, to_block: Some(block) }
     }

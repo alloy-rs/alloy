@@ -11,7 +11,7 @@ use rand::{CryptoRng, Rng};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
-use {std::path::Path};
+use std::path::Path;
 
 impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a [`SigningKey`].
