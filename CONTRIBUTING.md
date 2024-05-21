@@ -47,6 +47,11 @@ For any issue, there are fundamentally three ways an individual can contribute:
 **Anybody can participate in any stage of contribution**. We urge you to
 participate in the discussion around bugs and participate in reviewing PRs.
 
+### Contributions Related to Spelling and Grammar
+
+At this time, we will not be accepting contributions that only fix spelling or grammatical errors in documentation, code or
+elsewhere.
+
 ### Asking for General Help
 
 If you have reviewed existing documentation and still have questions or are
