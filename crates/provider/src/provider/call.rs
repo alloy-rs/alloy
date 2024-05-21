@@ -70,16 +70,9 @@ where
     }
 
     fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Bytes>> {
-        let Self::Running(mut call) = std::mem::replace(self, Self::Polling) else {
-            unreachable!("bad state")
-        };
+        let Self::Running(ref mut call) = self else { unreachable!("bad state") };
 
-        if let Ready(res) = call.poll_unpin(cx) {
-            Ready(res)
-        } else {
-            *self = Self::Running(call);
-            Poll::Pending
-        }
+        call.poll_unpin(cx)
     }
 }
 
