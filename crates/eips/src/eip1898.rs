@@ -487,8 +487,7 @@ impl<'de> Deserialize<'de> for BlockId {
                     Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
                 } else {
                     Err(serde::de::Error::custom(
-                        "Expected `blockNumber` or `blockHash` with `requireCanonical`
-                optionally",
+                        "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
                     ))
                 }
             }
