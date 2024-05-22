@@ -8,8 +8,6 @@
 //!
 //! See also <https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/beacon-chain.md#executionpayload>
 
-#![allow(missing_docs)]
-
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
 use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
@@ -26,22 +24,37 @@ use std::borrow::Cow;
 /// See also <https://ethereum.github.io/builder-specs/#/Builder/getHeader>
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GetExecutionPayloadHeaderResponse {
+    /// The version of the response.
     pub version: String,
+    /// The data associated with the execution payload header.
     pub data: ExecutionPayloadHeaderData,
 }
 
+/// Data structure representing the header data of an execution payload.
+///
+/// This structure is used to hold the core elements of an execution payload header,
+/// including the message and signature components.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeaderData {
+    /// The message of the execution payload header.
     pub message: ExecutionPayloadHeaderMessage,
+    /// The signature of the execution payload header.
     pub signature: Bytes,
 }
 
+/// Message structure within the header of an execution payload.
+///
+/// This structure contains detailed information about the execution payload,
+/// including the header, value, and public key associated with the payload.
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeaderMessage {
+    /// The header of the execution payload.
     pub header: ExecutionPayloadHeader,
+    /// The value of the execution payload, represented as a `U256`.
     #[serde_as(as = "DisplayFromStr")]
     pub value: U256,
+    /// The public key associated with the execution payload.
     pub pubkey: BlsPublicKey,
 }
 
@@ -49,24 +62,38 @@ pub struct ExecutionPayloadHeaderMessage {
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeader {
+    /// The parent hash of the execution payload.
     pub parent_hash: B256,
+    /// The fee recipient address of the execution payload.
     pub fee_recipient: Address,
+    /// The state root of the execution payload.
     pub state_root: B256,
+    /// The receipts root of the execution payload.
     pub receipts_root: B256,
+    /// The logs bloom filter of the execution payload.
     pub logs_bloom: Bloom,
+    /// The previous Randao value of the execution payload.
     pub prev_randao: B256,
+    /// The block number of the execution payload, represented as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub block_number: String,
+    /// The gas limit of the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub gas_limit: u64,
+    /// The gas used by the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub gas_used: u64,
+    /// The timestamp of the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub timestamp: u64,
+    /// The extra data of the execution payload.
     pub extra_data: Bytes,
+    /// The base fee per gas of the execution payload, represented as a `U256`.
     #[serde_as(as = "DisplayFromStr")]
     pub base_fee_per_gas: U256,
+    /// The block hash of the execution payload.
     pub block_hash: B256,
+    /// The transactions root of the execution payload.
     pub transactions_root: B256,
 }
 
@@ -577,6 +604,8 @@ impl<'de> DeserializeAs<'de, ExecutionPayload> for BeaconExecutionPayload<'de> {
     }
 }
 
+/// Module providing serialization and deserialization support for the beacon API payload
+/// attributes.
 pub mod beacon_payload {
     use super::*;
 

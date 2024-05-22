@@ -891,7 +891,6 @@ mod tests {
     use alloy_rlp::{Decodable, Encodable};
 
     #[test]
-    #[allow(clippy::large_stack_frames)]
     fn different_sidecar_same_hash() {
         // this should make sure that the hash calculated for the `into_signed` conversion does not
         // change if the sidecar is different

@@ -149,7 +149,6 @@ impl<T> ReceiptWithBloom<T> {
     }
 
     /// Consume the structure, returning the receipt and the bloom filter
-    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn into_components(self) -> (Receipt<T>, Bloom) {
         (self.receipt, self.logs_bloom)
     }

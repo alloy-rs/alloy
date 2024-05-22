@@ -13,7 +13,6 @@ use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
 /// An enum over the different types of gas fillable.
-#[allow(unreachable_pub)]
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasFillable {

@@ -918,7 +918,6 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 }
 
 #[cfg(test)]
-#[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};

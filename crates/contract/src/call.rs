@@ -534,17 +534,12 @@ impl<T, P, D: CallDecoder, N: Network> std::fmt::Debug for CallBuilder<T, P, D, 
 }
 
 #[cfg(test)]
-#[allow(unused_imports)]
 mod tests {
     use super::*;
-    use alloy_network::Ethereum;
-    use alloy_node_bindings::{Anvil, AnvilInstance};
     use alloy_primitives::{address, b256, bytes, hex, utils::parse_units, B256};
     use alloy_provider::{
-        layers::AnvilProvider, Provider, ProviderBuilder, ReqwestProvider, RootProvider,
-        WalletProvider,
+        layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
     };
-    use alloy_rpc_client::RpcClient;
     use alloy_rpc_types::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;

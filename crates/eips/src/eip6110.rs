@@ -4,8 +4,6 @@
 //!
 //! Provides validator deposits as a list of deposit operations added to the Execution Layer block.
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use alloy_primitives::{address, Address, FixedBytes, B256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 

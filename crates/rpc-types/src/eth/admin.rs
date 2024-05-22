@@ -100,7 +100,6 @@ pub struct PeerProtocolInfo {
 /// still completing the handshake for the protocol.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-#[allow(missing_copy_implementations)]
 pub enum EthPeerInfo {
     /// The `eth` sub-protocol metadata known about the host peer.
     Info(EthInfo),
@@ -125,7 +124,6 @@ pub struct EthInfo {
 /// still completing the handshake for the protocol.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-#[allow(missing_copy_implementations)]
 pub enum SnapPeerInfo {
     /// The `snap` sub-protocol metadata known about the host peer.
     Info(SnapInfo),

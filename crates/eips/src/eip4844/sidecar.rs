@@ -32,7 +32,6 @@ pub struct BlobTransactionSidecar {
 }
 
 #[cfg(feature = "arbitrary")]
-#[allow(clippy::large_stack_frames)]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
@@ -291,7 +290,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "serde")]
-    #[allow(clippy::large_stack_frames)]
     fn deserialize_blob() {
         let blob = BlobTransactionSidecar {
             blobs: vec![Blob::default(), Blob::default(), Blob::default(), Blob::default()],

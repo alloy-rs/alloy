@@ -483,10 +483,7 @@ impl BlobsBundleV1Ssz {
 
     fn unwrap(self) -> BlobsBundleV1 {
         // SAFETY: Same repr and size
-        #[allow(clippy::transmute_undefined_repr)]
-        unsafe {
-            std::mem::transmute(self)
-        }
+        unsafe { std::mem::transmute(self) }
     }
 }
 

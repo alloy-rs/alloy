@@ -2,8 +2,6 @@
 //!
 //! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 

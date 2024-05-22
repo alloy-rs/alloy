@@ -720,7 +720,6 @@ impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        #[allow(unused_imports)]
         use alloc::string::ToString;
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
