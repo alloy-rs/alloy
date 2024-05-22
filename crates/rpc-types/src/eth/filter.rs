@@ -623,11 +623,10 @@ impl<'de> Deserialize<'de> for Filter {
                     topics[idx] = topic.map(|t| t.into()).unwrap_or_default();
                 }
 
-                let block_option = if let Some(block_hash) = block_hash {
-                    FilterBlockOption::AtBlockHash(block_hash)
-                } else {
-                    FilterBlockOption::Range { from_block, to_block }
-                };
+                let block_option = block_hash
+                    .map_or(FilterBlockOption::Range { from_block, to_block }, |block_hash| {
+                        FilterBlockOption::AtBlockHash(block_hash)
+                    });
 
                 Ok(Filter { block_option, address, topics })
             }
@@ -720,11 +719,7 @@ impl FilteredParams {
     /// Creates a new wrapper type for a [Filter], if any with flattened topics, that can be used
     /// for matching
     pub fn new(filter: Option<Filter>) -> Self {
-        if let Some(filter) = filter {
-            Self { filter: Some(filter) }
-        } else {
-            Default::default()
-        }
+        filter.map_or_else(Default::default, |filter| Self { filter: Some(filter) })
     }
 
     /// Returns the [BloomFilter] for the given address

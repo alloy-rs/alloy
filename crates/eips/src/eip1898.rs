@@ -480,13 +480,15 @@ impl<'de> Deserialize<'de> for BlockId {
                     }
                 }
 
+                #[allow(clippy::option_if_let_else)]
                 if let Some(number) = number {
                     Ok(BlockId::Number(number))
                 } else if let Some(block_hash) = block_hash {
                     Ok(BlockId::Hash(RpcBlockHash { block_hash, require_canonical }))
                 } else {
                     Err(serde::de::Error::custom(
-                        "Expected `blockNumber` or `blockHash` with `requireCanonical` optionally",
+                        "Expected `blockNumber` or `blockHash` with `requireCanonical`
+                optionally",
                     ))
                 }
             }

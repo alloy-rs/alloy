@@ -206,54 +206,54 @@ pub struct ProposerPayloadsDeliveredQuery {
 
 impl ProposerPayloadsDeliveredQuery {
     /// Sets the specific slot
-    pub fn slot(mut self, slot: u64) -> Self {
+    pub const fn slot(mut self, slot: u64) -> Self {
         self.slot = Some(slot);
         self
     }
 
     /// Sets the maximum number of entries (200 max)
-    pub fn limit(mut self, limit: u64) -> Self {
+    pub const fn limit(mut self, limit: u64) -> Self {
         self.limit = Some(limit);
         self
     }
 
     /// Sets the specific blockhash
-    pub fn block_hash(mut self, block_hash: B256) -> Self {
+    pub const fn block_hash(mut self, block_hash: B256) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
 
     /// Sets the specific EL block number
-    pub fn block_number(mut self, block_number: u64) -> Self {
+    pub const fn block_number(mut self, block_number: u64) -> Self {
         self.block_number = Some(block_number);
         self
     }
 
     /// Sets the proposer public key
-    pub fn proposer_pubkey(mut self, proposer_pubkey: BlsPublicKey) -> Self {
+    pub const fn proposer_pubkey(mut self, proposer_pubkey: BlsPublicKey) -> Self {
         self.proposer_pubkey = Some(proposer_pubkey);
         self
     }
 
     /// Sets the builder public key
-    pub fn builder_pubkey(mut self, builder_pubkey: BlsPublicKey) -> Self {
+    pub const fn builder_pubkey(mut self, builder_pubkey: BlsPublicKey) -> Self {
         self.builder_pubkey = Some(builder_pubkey);
         self
     }
 
     /// Configures how to order results
-    pub fn order_by(mut self, order_by: OrderBy) -> Self {
+    pub const fn order_by(mut self, order_by: OrderBy) -> Self {
         self.order_by = Some(order_by);
         self
     }
 
     /// Order results by descending value (highest value first)
-    pub fn order_by_desc(self) -> Self {
+    pub const fn order_by_desc(self) -> Self {
         self.order_by(OrderBy::Desc)
     }
 
     /// Order results by ascending value (lowest value first)
-    pub fn order_by_asc(self) -> Self {
+    pub const fn order_by_asc(self) -> Self {
         self.order_by(OrderBy::Asc)
     }
 }
@@ -299,31 +299,31 @@ pub struct BuilderBlocksReceivedQuery {
 
 impl BuilderBlocksReceivedQuery {
     /// Sets the specific slot
-    pub fn slot(mut self, slot: u64) -> Self {
+    pub const fn slot(mut self, slot: u64) -> Self {
         self.slot = Some(slot);
         self
     }
 
     /// Sets the maximum number of entries (200 max)
-    pub fn limit(mut self, limit: u64) -> Self {
+    pub const fn limit(mut self, limit: u64) -> Self {
         self.limit = Some(limit);
         self
     }
 
     /// Sets the specific blockhash
-    pub fn block_hash(mut self, block_hash: B256) -> Self {
+    pub const fn block_hash(mut self, block_hash: B256) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
 
     /// Sets the specific EL block number
-    pub fn block_number(mut self, block_number: u64) -> Self {
+    pub const fn block_number(mut self, block_number: u64) -> Self {
         self.block_number = Some(block_number);
         self
     }
 
     /// Sets the specific builder public key
-    pub fn builder_pubkey(mut self, builder_pubkey: BlsPublicKey) -> Self {
+    pub const fn builder_pubkey(mut self, builder_pubkey: BlsPublicKey) -> Self {
         self.builder_pubkey = Some(builder_pubkey);
         self
     }

@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(builder.len(), expected_fe * 32);
 
         // consume 2 more
-        builder.ingest("hello".as_bytes());
+        builder.ingest(b"hello");
         assert_eq!(builder.len(), expected_fe * 32 + 64);
     }
 }

@@ -98,10 +98,8 @@ where
         self,
     ) -> Result<ResponsePayload<T, ErrData>, Self> {
         match self {
-            Self::Success(ref payload) => match serde_json::from_str(payload.as_ref().get()) {
-                Ok(payload) => Ok(ResponsePayload::Success(payload)),
-                Err(_) => Err(self),
-            },
+            Self::Success(ref payload) => serde_json::from_str(payload.as_ref().get())
+                .map_or_else(|_| Err(self), |payload| Ok(ResponsePayload::Success(payload))),
             Self::Failure(e) => Ok(ResponsePayload::Failure(e)),
         }
     }

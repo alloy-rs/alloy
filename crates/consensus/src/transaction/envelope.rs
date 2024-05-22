@@ -545,7 +545,7 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip_eip4844() {
-        use crate::BlobTransactionSidecar;
+        
 
         let tx = TxEip4844Variant::TxEip4844(TxEip4844 {
             chain_id: 1,
@@ -582,7 +582,7 @@ mod tests {
                 blob_versioned_hashes: vec![B256::random()],
                 max_fee_per_blob_gas: 0,
             },
-            sidecar: BlobTransactionSidecar { ..Default::default() },
+            sidecar: Default::default(),
         });
         test_serde_roundtrip(tx);
     }

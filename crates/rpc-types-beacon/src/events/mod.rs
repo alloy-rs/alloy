@@ -50,7 +50,7 @@ pub enum BeaconNodeEventTopic {
 
 impl BeaconNodeEventTopic {
     /// Returns the identifier value for the eventstream query
-    pub fn query_value(&self) -> &'static str {
+    pub const fn query_value(&self) -> &'static str {
         match self {
             Self::PayloadAttributes => "payload_attributes",
             Self::Head => "head",
@@ -315,7 +315,7 @@ pub struct BlobSidecarEvent {
 
 impl PayloadAttributesEvent {
     /// Returns the payload attributes
-    pub fn attributes(&self) -> &PayloadAttributes {
+    pub const fn attributes(&self) -> &PayloadAttributes {
         &self.data.payload_attributes
     }
 }

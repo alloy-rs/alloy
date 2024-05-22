@@ -150,10 +150,8 @@ impl Encodable for ReceiptEnvelope {
 
 impl Decodable for ReceiptEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        match Self::network_decode(buf) {
-            Ok(t) => Ok(t),
-            Err(_) => Err(alloy_rlp::Error::Custom("Unexpected type")),
-        }
+        Self::network_decode(buf)
+            .map_or_else(|_| Err(alloy_rlp::Error::Custom("Unexpected type")), Ok)
     }
 }
 
