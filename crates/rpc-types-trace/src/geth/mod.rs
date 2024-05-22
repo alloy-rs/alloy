@@ -270,19 +270,19 @@ impl From<serde_json::Value> for GethDebugTracerConfig {
 
 impl From<CallConfig> for GethDebugTracerConfig {
     fn from(value: CallConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 
 impl From<PreStateConfig> for GethDebugTracerConfig {
     fn from(value: PreStateConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 
 impl From<MuxConfig> for GethDebugTracerConfig {
     fn from(value: MuxConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 
