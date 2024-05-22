@@ -545,8 +545,6 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde_roundtrip_eip4844() {
-        
-
         let tx = TxEip4844Variant::TxEip4844(TxEip4844 {
             chain_id: 1,
             nonce: 100,
