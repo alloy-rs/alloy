@@ -228,20 +228,17 @@ impl SerializedRequest {
     }
 
     /// Consume the serialized request, returning the underlying [`RawValue`].
-    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn into_serialized(self) -> Box<RawValue> {
         self.request
     }
 
     /// Consumes the serialized request, returning the underlying
     /// [`RequestMeta`] and the [`RawValue`].
-    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn decompose(self) -> (RequestMeta, Box<RawValue>) {
         (self.meta, self.request)
     }
 
     /// Take the serialized request, consuming the [`SerializedRequest`].
-    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn take_request(self) -> Box<RawValue> {
         self.request
     }

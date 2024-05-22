@@ -336,7 +336,6 @@ impl Filter {
     }
 
     /// Sets the from block number
-    #[allow(clippy::wrong_self_convention)]
     #[must_use]
     pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
         self.block_option = self.block_option.set_from_block(block.into());
@@ -344,7 +343,6 @@ impl Filter {
     }
 
     /// Sets the to block number
-    #[allow(clippy::wrong_self_convention)]
     #[must_use]
     pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
         self.block_option = self.block_option.set_to_block(block.into());

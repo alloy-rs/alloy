@@ -225,8 +225,7 @@ where
     }
 
     /// Set the block id.
-    #[allow(clippy::missing_const_for_fn)] // false positive
-    pub fn block_id(mut self, block_id: BlockId) -> Self {
+    pub const fn block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = block_id;
         self
     }
