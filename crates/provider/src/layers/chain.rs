@@ -14,7 +14,7 @@ pub struct ChainLayer(NamedChain);
 
 impl ChainLayer {
     /// Get the chain's average blocktime, if applicable.
-    pub fn average_blocktime_hint(&self) -> Option<Duration> {
+    pub const fn average_blocktime_hint(&self) -> Option<Duration> {
         self.0.average_blocktime_hint()
     }
 }
