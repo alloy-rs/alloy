@@ -6,7 +6,7 @@ use std::{
     borrow::Cow,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
     time::Duration,
@@ -82,7 +82,7 @@ impl<T> RpcClient<T> {
         &self.0
     }
 
-    /// Sets custom poll interval for the client in milliseconds.
+    /// Sets the poll interval for the client in milliseconds.
     ///
     /// Note: This will only set the poll interval for the client if it is the only reference to the
     /// inner client. If the reference is held by many, then it will not update the poll interval.
@@ -163,8 +163,6 @@ pub struct RpcClientInner<T> {
     pub(crate) id: AtomicU64,
     /// The poll interval for the client in milliseconds.
     pub(crate) poll_interval: AtomicU64,
-    /// `true` if the poll interval is custom.
-    pub(crate) is_custom_poll_interval: AtomicBool,
 }
 
 impl<T> RpcClientInner<T> {
@@ -179,24 +177,17 @@ impl<T> RpcClientInner<T> {
             is_local,
             id: AtomicU64::new(0),
             poll_interval: if is_local { AtomicU64::new(250) } else { AtomicU64::new(7000) },
-            is_custom_poll_interval: AtomicBool::new(false),
         }
     }
 
-    /// Returns the poll interval (milliseconds) for the client.
+    /// Returns the default poll interval (milliseconds) for the client.
     pub fn poll_interval(&self) -> Duration {
         Duration::from_millis(self.poll_interval.load(Ordering::Relaxed))
     }
 
-    /// Set custom poll interval for the client in milliseconds.
+    /// Set the poll interval for the client in milliseconds.
     pub fn set_poll_interval(&self, poll_interval: u64) {
         self.poll_interval.store(poll_interval, Ordering::Relaxed);
-        self.is_custom_poll_interval.store(true, Ordering::Relaxed);
-    }
-
-    /// Returns `true` if the poll interval is custom.
-    pub fn is_custom_poll_interval(&self) -> bool {
-        self.is_custom_poll_interval.load(Ordering::Relaxed)
     }
 
     /// Returns a reference to the underlying transport.
@@ -296,7 +287,6 @@ impl<T: Transport + Clone> RpcClientInner<T> {
             is_local: self.is_local,
             id: self.id,
             poll_interval: self.poll_interval,
-            is_custom_poll_interval: self.is_custom_poll_interval,
         }
     }
 }
@@ -356,7 +346,7 @@ mod tests {
     fn test_client_with_poll_interval() {
         let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
             .with_poll_interval(5000);
+        // let client = client;
         assert_eq!(client.poll_interval(), Duration::from_millis(5000));
-        assert!(client.is_custom_poll_interval());
     }
 }
