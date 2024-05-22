@@ -61,18 +61,11 @@ mod tests {
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
         let prestate_config = PreStateConfig { diff_mode: Some(true) };
 
-        opts.tracing_options.tracer_config = serde_json::to_value(MuxConfig(HashMap::from([
+        opts.tracing_options.tracer_config = MuxConfig(HashMap::from([
             (GethDebugBuiltInTracerType::FourByteTracer, None),
-            (
-                GethDebugBuiltInTracerType::CallTracer,
-                Some(GethDebugTracerConfig(serde_json::to_value(call_config).unwrap())),
-            ),
-            (
-                GethDebugBuiltInTracerType::PreStateTracer,
-                Some(GethDebugTracerConfig(serde_json::to_value(prestate_config).unwrap())),
-            ),
-        ])))
-        .unwrap()
+            (GethDebugBuiltInTracerType::CallTracer, Some(call_config.into())),
+            (GethDebugBuiltInTracerType::PreStateTracer, Some(prestate_config.into())),
+        ]))
         .into();
 
         assert_eq!(
