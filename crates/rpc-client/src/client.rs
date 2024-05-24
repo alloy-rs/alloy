@@ -86,7 +86,7 @@ impl<T> RpcClient<T> {
     ///
     /// Note: This will only set the poll interval for the client if it is the only reference to the
     /// inner client. If the reference is held by many, then it will not update the poll interval.
-    pub fn with_poll_interval(self, poll_interval: u64) -> Self {
+    pub fn with_poll_interval(self, poll_interval: Duration) -> Self {
         self.inner().set_poll_interval(poll_interval);
         self
     }
@@ -185,9 +185,10 @@ impl<T> RpcClientInner<T> {
         Duration::from_millis(self.poll_interval.load(Ordering::Relaxed))
     }
 
-    /// Set the poll interval for the client in milliseconds.
-    pub fn set_poll_interval(&self, poll_interval: u64) {
-        self.poll_interval.store(poll_interval, Ordering::Relaxed);
+    /// Set the poll interval for the client in milliseconds. Default:
+    /// 7s for remote and 250ms for local transports.
+    pub fn set_poll_interval(&self, poll_interval: Duration) {
+        self.poll_interval.store(poll_interval.as_millis() as u64, Ordering::Relaxed);
     }
 
     /// Returns a reference to the underlying transport.
@@ -344,9 +345,9 @@ mod tests {
 
     #[test]
     fn test_client_with_poll_interval() {
+        let poll_interval = Duration::from_millis(5_000);
         let client = RpcClient::new_http(reqwest::Url::parse("http://localhost").unwrap())
-            .with_poll_interval(5000);
-        // let client = client;
-        assert_eq!(client.poll_interval(), Duration::from_millis(5000));
+            .with_poll_interval(poll_interval);
+        assert_eq!(client.poll_interval(), poll_interval);
     }
 }
