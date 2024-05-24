@@ -2,6 +2,8 @@
 //!
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
+#![allow(unknown_lints, non_local_definitions)]
+
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
