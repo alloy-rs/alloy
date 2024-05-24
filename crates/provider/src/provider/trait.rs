@@ -922,9 +922,11 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
+    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
+    use alloy_sol_types::SolValue;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1337,5 +1339,17 @@ mod tests {
 
         let count = provider.get_uncle_count(0.into()).await.unwrap();
         assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn call_mainnet() {
+        init_tracing();
+        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
+        let req = TransactionRequest::default()
+            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
+            .with_input(bytes!("06fdde03")); // `name()`
+        let result = provider.call(&req).await.unwrap();
+        assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
     }
 }
