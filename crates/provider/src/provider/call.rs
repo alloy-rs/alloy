@@ -5,21 +5,41 @@ use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
-use std::{
-    borrow::Cow,
-    future::Future,
-    task::Poll::{self, Ready},
-};
+use serde::ser::SerializeSeq;
+use std::{future::Future, task::Poll};
 
-type RunningFut<'req, 'state, T, N> = RpcCall<
-    T,
-    (&'req <N as Network>::TransactionRequest, BlockId, Option<Cow<'state, StateOverride>>),
-    Bytes,
->;
+type RunningFut<'req, 'state, T, N> = RpcCall<T, EthCallParams<'req, 'state, N>, Bytes>;
+
+#[derive(Clone, Debug)]
+struct EthCallParams<'req, 'state, N: Network> {
+    data: &'req N::TransactionRequest,
+    block: BlockId,
+    overrides: Option<&'state StateOverride>,
+}
+
+impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let len = if self.overrides.is_some() { 3 } else { 2 };
+        let mut seq = serializer.serialize_seq(Some(len))?;
+        seq.serialize_element(&self.data)?;
+        seq.serialize_element(&self.block)?;
+        if let Some(overrides) = self.overrides {
+            seq.serialize_element(overrides)?;
+        }
+        seq.end()
+    }
+}
 
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
-#[derive(Debug, Clone)]
-pub enum EthCallFut<'req, 'state, T, N>
+#[derive(Clone, Debug)]
+#[doc(hidden)] // Not public API.
+pub struct EthCallFut<'req, 'state, T, N>(EthCallFutInner<'req, 'state, T, N>)
+where
+    T: Transport + Clone,
+    N: Network;
+
+#[derive(Clone, Debug)]
+enum EthCallFutInner<'req, 'state, T, N: Network>
 where
     T: Transport + Clone,
     N: Network,
@@ -34,7 +54,7 @@ where
     Polling,
 }
 
-impl<'req, 'state, T, N> EthCallFut<'req, 'state, T, N>
+impl<'req, 'state, T, N> EthCallFutInner<'req, 'state, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -58,12 +78,12 @@ where
 
         let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
             Ok(client) => client,
-            Err(e) => return Ready(Err(e)),
+            Err(e) => return Poll::Ready(Err(e)),
         };
 
-        let overrides = overrides.map(Cow::Borrowed);
+        let params = EthCallParams { data, block: block.unwrap_or_default(), overrides };
 
-        let fut = client.request("eth_call", (data, block.unwrap_or_default(), overrides));
+        let fut = client.request("eth_call", params);
 
         *self = Self::Running(fut);
         self.poll_running(cx)
@@ -87,7 +107,7 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let this = self.get_mut();
+        let this = &mut self.get_mut().0;
         if this.is_preparing() {
             this.poll_preparing(cx)
         } else if this.is_running() {
@@ -155,11 +175,11 @@ where
     type IntoFuture = EthCallFut<'req, 'state, T, N>;
 
     fn into_future(self) -> Self::IntoFuture {
-        EthCallFut::Preparing {
+        EthCallFut(EthCallFutInner::Preparing {
             client: self.client,
             data: self.data,
             overrides: self.overrides,
             block: self.block,
-        }
+        })
     }
 }
