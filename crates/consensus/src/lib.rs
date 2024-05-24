@@ -27,21 +27,18 @@ pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 mod receipt;
 pub use receipt::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt};
 
-/// Transaction types
 pub mod transaction;
+#[cfg(feature = "kzg")]
+pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
-    SignableTransaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType, TypedTransaction,
+    SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
+    TxEip4844WithSidecar, TxEnvelope, TxLegacy, TxType, TypedTransaction,
 };
 
 pub use alloy_eips::eip4844::{
     builder::{SidecarBuilder, SidecarCoder, SimpleCoder},
     utils, Blob, BlobTransactionSidecar, Bytes48,
 };
-
-pub use crate::transaction::Transaction;
-
-#[cfg(feature = "kzg")]
-pub use transaction::BlobTransactionValidationError;
 
 #[cfg(feature = "kzg")]
 pub use alloy_eips::eip4844::env_settings::EnvKzgSettings;

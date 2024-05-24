@@ -1,3 +1,5 @@
+//! Transaction types.
+
 use crate::Signed;
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
