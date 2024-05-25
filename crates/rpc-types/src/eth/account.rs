@@ -41,20 +41,6 @@ pub struct EIP1186AccountProofResponse {
     pub storage_proof: Vec<EIP1186StorageProof>,
 }
 
-/// Response for `eth_getAccount`
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountResponse {
-    /// The account's balance.
-    pub balance: U256,
-    /// The hash of the code of the account.
-    pub code_hash: B256,
-    /// The account's nonce.
-    pub nonce: U64,
-    /// The hash of the storage account data.
-    pub storage_root: B256,
-}
-
 /// Extended account information (used by `parity_allAccountInfo`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExtAccountInfo {

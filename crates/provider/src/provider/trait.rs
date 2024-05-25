@@ -14,8 +14,8 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types::{
-    AccessListWithGasUsed, AccountResponse, Block, BlockId, BlockNumberOrTag,
-    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
+    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
@@ -574,9 +574,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getLogs", (filter,)).await
     }
 
-    /// Retrieves account information ([AccountResponse]) for the given [Address] at the particular
-    /// [BlockId].
-    async fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, AccountResponse> {
+    /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
+    /// at the particular [BlockId].
+    async fn get_account(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
