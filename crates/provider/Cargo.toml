@@ -28,25 +28,28 @@ alloy-pubsub = { workspace = true, optional = true }
 alloy-transport.workspace = true
 alloy-primitives.workspace = true
 
+alloy-chains.workspace = true
 async-stream = "0.3"
 async-trait.workspace = true
 auto_impl.workspace = true
 dashmap = "5.5"
+futures-utils-wasm.workspace = true
 futures.workspace = true
 lru = "0.12"
+pin-project.workspace = true
 reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
+serde.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
-futures-utils-wasm.workspace = true
-pin-project.workspace = true
 
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
+alloy-sol-types.workspace = true
 alloy-signer.workspace = true
 alloy-signer-wallet.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }

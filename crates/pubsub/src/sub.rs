@@ -133,7 +133,6 @@ impl<T> Subscription<T> {
     }
 
     /// Convert the subscription into its inner [`RawSubscription`].
-    #[allow(clippy::missing_const_for_fn)] // erroneous lint
     pub fn into_raw(self) -> RawSubscription {
         self.inner
     }

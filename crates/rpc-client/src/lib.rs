@@ -19,7 +19,7 @@
 extern crate tracing;
 
 mod batch;
-pub use batch::BatchRequest;
+pub use batch::{BatchRequest, Waiter};
 
 mod builder;
 pub use builder::ClientBuilder;

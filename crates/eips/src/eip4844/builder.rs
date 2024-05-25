@@ -1,17 +1,25 @@
-use alloy_eips::eip4844::Blob;
+use crate::eip4844::Blob;
 #[cfg(feature = "kzg")]
 use c_kzg::{KzgCommitment, KzgProof};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use super::utils::WholeFe;
-use alloy_eips::eip4844::{BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK};
+use crate::eip4844::{
+    utils::WholeFe, BYTES_PER_BLOB, FIELD_ELEMENTS_PER_BLOB, MAX_BLOBS_PER_BLOCK,
+};
+
+#[cfg(feature = "kzg")]
+use crate::eip4844::env_settings::EnvKzgSettings;
+#[cfg(any(feature = "kzg", feature = "arbitrary"))]
+use crate::eip4844::BlobTransactionSidecar;
+#[cfg(feature = "kzg")]
+use crate::eip4844::Bytes48;
 use core::cmp;
 
 /// A builder for creating a [`BlobTransactionSidecar`].
 ///
-/// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
+/// [`BlobTransactionSidecar`]: crate::eip4844::BlobTransactionSidecar
 #[derive(Clone, Debug)]
 pub struct PartialSidecar {
     /// The blobs in the sidecar.
@@ -258,7 +266,7 @@ impl SidecarCoder for SimpleCoder {
 /// which is then split into blobs. It delays KZG commitments and proofs
 /// until all data is ready.
 ///
-/// [`BlobTransactionSidecar`]: crate::BlobTransactionSidecar
+/// [`BlobTransactionSidecar`]: crate::eip4844::BlobTransactionSidecar
 #[derive(Clone, Debug)]
 pub struct SidecarBuilder<T = SimpleCoder> {
     /// The blob array we will code data into
@@ -273,6 +281,17 @@ where
 {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a, T: arbitrary::Arbitrary<'a> + Clone> SidecarBuilder<T> {
+    /// Builds an arbitrary realization for BlobTransactionSidecar.
+    pub fn build_arbitrary(&self) -> BlobTransactionSidecar {
+        <BlobTransactionSidecar as arbitrary::Arbitrary>::arbitrary(
+            &mut arbitrary::Unstructured::new(&[]),
+        )
+        .unwrap()
     }
 }
 
@@ -341,36 +360,31 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     pub fn build_with_settings(
         self,
         settings: &c_kzg::KzgSettings,
-    ) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
+    ) -> Result<BlobTransactionSidecar, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
         for blob in self.inner.blobs.iter() {
             // SAFETY: same size
-            let blob = unsafe { std::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
+            let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
             let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
             let proof = KzgProof::compute_blob_kzg_proof(blob, &commitment.to_bytes(), settings)?;
 
             // SAFETY: same size
             unsafe {
-                commitments.push(
-                    std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
-                        commitment.to_bytes(),
-                    ),
-                );
-                proofs.push(std::mem::transmute::<c_kzg::Bytes48, alloy_eips::eip4844::Bytes48>(
-                    proof.to_bytes(),
-                ));
+                commitments
+                    .push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(commitment.to_bytes()));
+                proofs.push(core::mem::transmute::<c_kzg::Bytes48, Bytes48>(proof.to_bytes()));
             }
         }
 
-        Ok(crate::BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
+        Ok(BlobTransactionSidecar::new(self.inner.blobs, commitments, proofs))
     }
 
     /// Build the sidecar from the data, with default (Ethereum Mainnet)
     /// settings.
     #[cfg(feature = "kzg")]
-    pub fn build(self) -> Result<crate::BlobTransactionSidecar, c_kzg::Error> {
-        self.build_with_settings(crate::EnvKzgSettings::Default.get())
+    pub fn build(self) -> Result<BlobTransactionSidecar, c_kzg::Error> {
+        self.build_with_settings(EnvKzgSettings::Default.get())
     }
 
     /// Take the blobs from the builder, without committing them to a KZG proof.
@@ -408,7 +422,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_eips::eip4844::USABLE_BYTES_PER_BLOB;
+    use crate::eip4844::USABLE_BYTES_PER_BLOB;
 
     #[test]
     fn ingestion_strategy() {

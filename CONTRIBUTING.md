@@ -47,6 +47,11 @@ For any issue, there are fundamentally three ways an individual can contribute:
 **Anybody can participate in any stage of contribution**. We urge you to
 participate in the discussion around bugs and participate in reviewing PRs.
 
+### Contributions Related to Spelling and Grammar
+
+At this time, we will not be accepting contributions that only fix spelling or grammatical errors in documentation, code or
+elsewhere.
+
 ### Asking for General Help
 
 If you have reviewed existing documentation and still have questions or are
@@ -108,10 +113,8 @@ functional guidelines of the Alloy project.
 Pull Requests are the way concrete changes are made to the code, documentation,
 and dependencies in the Alloy repository.
 
-Even tiny pull requests (e.g., one character pull request fixing a typo in API
-documentation) are greatly appreciated. Before making a large change, it is
-usually a good idea to first open an issue describing the change to solicit
-feedback and guidance. This will increase the likelihood of the PR getting
+Before making a large change, it is  usually a good idea to first open an issue describing the change to solicit feedback and guidance. 
+This will increase the likelihood of the PR getting
 merged.
 
 When opening a PR **please select the "Allow Edits From Maintainers" option**.

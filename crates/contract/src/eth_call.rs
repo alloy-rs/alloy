@@ -22,7 +22,7 @@ mod private {
 
 /// An [`alloy_provider::EthCall`] with an abi decoder.
 #[must_use = "EthCall must be awaited to execute the call"]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct EthCall<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,
@@ -67,7 +67,6 @@ where
     D: CallDecoder,
 {
     /// Swap the decoder for this call.
-    #[allow(clippy::missing_const_for_fn)] // false positive
     pub fn with_decoder<'new_coder, E>(
         self,
         decoder: &'new_coder E,
@@ -121,7 +120,7 @@ where
 /// Future for the [`EthCall`] type. This future wraps an RPC call with an abi
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct EthCallFut<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,

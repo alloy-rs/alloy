@@ -21,7 +21,6 @@ pub mod optimism;
 pub use optimism::OptimismTransactionReceiptFields;
 
 mod receipt;
-pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 
 pub mod request;
@@ -29,6 +28,8 @@ pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
 pub use signature::{Parity, Signature};
+
+pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -5,6 +5,7 @@ use crate::{
     provider::SendableTx,
     Provider, RootProvider,
 };
+use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
@@ -214,6 +215,18 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// ```
     pub fn network<Net: Network>(self) -> ProviderBuilder<L, F, Net> {
         ProviderBuilder { layer: self.layer, filler: self.filler, network: PhantomData }
+    }
+
+    /// Add a chain layer to the stack being built. The layer will set
+    /// the client's poll interval based on the average block time for this chain.
+    ///
+    /// Does nothing to the client with a local transport.
+    pub fn with_chain(
+        self,
+        chain: NamedChain,
+    ) -> ProviderBuilder<Stack<crate::layers::ChainLayer, L>, F, N> {
+        let chain_layer = crate::layers::ChainLayer::from(chain);
+        self.layer(chain_layer)
     }
 
     /// Finish the layer stack by providing a root [`Provider`], outputting

@@ -46,8 +46,7 @@ impl<'a, T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event
 
 impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, P, E, N> {
     /// Creates a new event with the provided provider and filter.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn new(provider: P, filter: Filter) -> Self {
+    pub const fn new(provider: P, filter: Filter) -> Self {
         Self { provider, filter, _phantom: PhantomData }
     }
 
@@ -282,10 +281,10 @@ mod tests {
         let all = event.query().await.unwrap();
         assert_eq!(all.len(), 0);
 
-        #[cfg(feature = "ws")]
+        #[cfg(feature = "pubsub")]
         {
-            let provider = alloy_provider::ProviderBuilder::default()
-                .on_ws(anvil.ws_endpoint())
+            let provider = alloy_provider::ProviderBuilder::new()
+                .on_builtin(&anvil.ws_endpoint())
                 .await
                 .unwrap();
 
@@ -304,8 +303,8 @@ mod tests {
                 stream_log.topics().first().unwrap().0
             );
             assert_eq!(stream_event, expected_event);
-            assert_eq!(stream_log.address, *contract.address());
-            assert_eq!(stream_log.block_number, Some(U256::from(3)));
+            assert_eq!(stream_log.address(), *contract.address());
+            assert_eq!(stream_log.block_number, Some(4));
 
             // send the request to emit the wrong event
             contract

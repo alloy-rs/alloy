@@ -294,7 +294,7 @@ mod tests {
         let foo_bar = FooBar {
             foo: I256::try_from(10u64).unwrap(),
             bar: U256::from(20u64),
-            fizz: b"fizz".to_vec(),
+            fizz: b"fizz".to_vec().into(),
             buzz: keccak256("buzz"),
             far: "space".into(),
             out: Address::ZERO,

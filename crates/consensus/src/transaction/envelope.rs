@@ -1,11 +1,11 @@
 use core::fmt;
 
-use crate::{
-    Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxLegacy,
-};
+use crate::{Signed, TxEip1559, TxEip2930, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
 use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, Header};
+
+use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
 /// [2930].
