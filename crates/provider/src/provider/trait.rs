@@ -576,12 +576,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Retrieves account information ([AccountResponse]) for the given [Address] at the particular
     /// [BlockId].
-    async fn get_account(
-        &self,
-        address: Address,
-        block: BlockId,
-    ) -> TransportResult<Option<AccountResponse>> {
-        self.client().request("eth_getAccount", (address, block)).await
+    async fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, AccountResponse> {
+        RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
