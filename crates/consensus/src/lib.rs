@@ -19,6 +19,9 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+mod account;
+pub use account::Account;
+
 pub mod constants;
 
 mod header;

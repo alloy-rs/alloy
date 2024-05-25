@@ -13,6 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 alloy-eips.workspace = true
+alloy-consensus.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
@@ -45,7 +46,6 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-consensus = { workspace = true, features = ["std"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true

@@ -574,6 +574,15 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getLogs", (filter,)).await
     }
 
+    /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
+    /// at the particular [BlockId].
+    async fn get_account(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+        RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
+    }
+
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
     async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
