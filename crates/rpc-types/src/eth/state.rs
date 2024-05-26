@@ -23,11 +23,11 @@ pub struct AccountOverride {
     /// Fake key-value mapping to override all slots in the account storage before executing the
     /// call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state: Option<HashMap<B256, U256>>,
+    pub state: Option<HashMap<B256, B256>>,
     /// Fake key-value mapping to override individual slots in the account storage before executing
     /// the call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state_diff: Option<HashMap<B256, U256>>,
+    pub state_diff: Option<HashMap<B256, B256>>,
 }
 
 #[cfg(test)]
@@ -85,6 +85,7 @@ mod tests {
             state_override.get(&address!("0000000000000000000000000000000000000124")).unwrap();
         assert!(acc.code.is_some());
     }
+
     #[test]
     fn test_state_override_state_diff() {
         let s = r#"{
@@ -94,7 +95,7 @@ mod tests {
                 },
                 "0xdAC17F958D2ee523a2206206994597C13D831ec7": {
                     "stateDiff": {
-                        "0xede27e4e7f3676edbf125879f17a896d6507958df3d57bda6219f1880cae8a41": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                        "0xede27e4e7f3676edbf125879f17a896d6507958df3d57bda6219f1880cae8a41": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
                     }
                 }
             }"#;
