@@ -17,7 +17,6 @@
 
 #[cfg(feature = "reqwest")]
 mod reqwest_transport;
-use std::marker::PhantomData;
 
 #[cfg(feature = "reqwest")]
 #[doc(inline)]
@@ -37,7 +36,8 @@ pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
 
-use alloy_transport::{utils::guess_local_url, TransportConnect};
+use alloy_transport::utils::guess_local_url;
+use core::{marker::PhantomData, str::FromStr};
 use url::Url;
 
 /// Connection details for an HTTP transport.
@@ -47,6 +47,26 @@ pub struct HttpConnect<T> {
     /// The URL to connect to.
     url: Url,
     _pd: PhantomData<T>,
+}
+
+impl<T> HttpConnect<T> {
+    /// Create a new [`HttpConnect`] with the given URL.
+    pub const fn new(url: Url) -> Self {
+        Self { url, _pd: PhantomData }
+    }
+
+    /// Get a reference to the URL.
+    pub const fn url(&self) -> &Url {
+        &self.url
+    }
+}
+
+impl<T> FromStr for HttpConnect<T> {
+    type Err = url::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self::new(s.parse()?))
+    }
 }
 
 /// An Http transport.
