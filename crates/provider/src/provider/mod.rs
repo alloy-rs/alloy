@@ -1,5 +1,8 @@
-mod call;
-pub use call::EthCall;
+mod eth_call;
+pub use eth_call::EthCall;
+
+mod prov_call;
+pub use prov_call::ProviderCall;
 
 mod root;
 pub use root::RootProvider;

@@ -28,20 +28,21 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
+mod chain;
+
 pub mod ext;
 
 pub mod fillers;
-pub mod layers;
-
-mod chain;
 
 mod heart;
 pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
 
+pub mod layers;
+
 mod provider;
 pub use provider::{
-    EthCall, FilterPollerBuilder, Provider, RootProvider, RpcWithBlock, SendableTx, TraceCallList,
-    WalletProvider,
+    EthCall, FilterPollerBuilder, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    TraceCallList, WalletProvider,
 };
 
 pub mod utils;

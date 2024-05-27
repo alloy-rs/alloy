@@ -4,7 +4,8 @@ use alloy_json_rpc::{
     RpcReturn, SerializedRequest,
 };
 use alloy_transport::{Transport, TransportError, TransportErrorKind, TransportResult};
-use futures::channel::oneshot;
+use futures::FutureExt;
+use pin_project::pin_project;
 use serde_json::value::RawValue;
 use std::{
     borrow::Cow,
@@ -12,8 +13,12 @@ use std::{
     future::{Future, IntoFuture},
     marker::PhantomData,
     pin::Pin,
-    task::{self, ready, Poll},
+    task::{
+        self, ready,
+        Poll::{self, Ready},
+    },
 };
+use tokio::sync::oneshot;
 
 pub(crate) type Channel = oneshot::Sender<TransportResult<Box<RawValue>>>;
 pub(crate) type ChannelMap = HashMap<Id, Channel>;
@@ -35,29 +40,48 @@ pub struct BatchRequest<'a, T> {
 
 /// Awaits a single response for a request that has been included in a batch.
 #[must_use = "A Waiter does nothing unless the corresponding BatchRequest is sent via `send_batch` and `.await`, AND the Waiter is awaited."]
+#[pin_project]
 #[derive(Debug)]
-pub struct Waiter<Resp> {
+pub struct Waiter<Resp, Output = Resp, Map = fn(Resp) -> Output> {
+    #[pin]
     rx: oneshot::Receiver<TransportResult<Box<RawValue>>>,
-    _resp: PhantomData<fn() -> Resp>,
+    map: Option<Map>,
+    _resp: PhantomData<fn() -> (Output, Resp)>,
+}
+
+impl<Resp, Output, Map> Waiter<Resp, Output, Map> {
+    /// Maps the response to a new type.
+    pub fn map_resp<NewOutput, NewMap>(self, map: NewMap) -> Waiter<Resp, NewOutput, NewMap>
+    where
+        NewMap: FnOnce(Resp) -> NewOutput,
+    {
+        Waiter { rx: self.rx, map: Some(map), _resp: PhantomData }
+    }
 }
 
 impl<Resp> From<oneshot::Receiver<TransportResult<Box<RawValue>>>> for Waiter<Resp> {
     fn from(rx: oneshot::Receiver<TransportResult<Box<RawValue>>>) -> Self {
-        Self { rx, _resp: PhantomData }
+        Self { rx, map: Some(std::convert::identity), _resp: PhantomData }
     }
 }
 
-impl<Resp> std::future::Future for Waiter<Resp>
+impl<Resp, Output, Map> std::future::Future for Waiter<Resp, Output, Map>
 where
     Resp: RpcReturn,
+    Map: FnOnce(Resp) -> Output,
 {
-    type Output = TransportResult<Resp>;
+    type Output = TransportResult<Output>;
 
-    fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
-        Pin::new(&mut self.rx).poll(cx).map(|resp| match resp {
-            Ok(resp) => try_deserialize_ok(resp),
-            Err(e) => Err(TransportErrorKind::custom(e)),
-        })
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        match ready!(this.rx.poll_unpin(cx)) {
+            Ok(resp) => {
+                let resp: Result<Resp, _> = try_deserialize_ok(resp);
+                Ready(resp.map(this.map.take().expect("polled after completion")))
+            }
+            Err(e) => Poll::Ready(Err(TransportErrorKind::custom(e))),
+        }
     }
 }
 
