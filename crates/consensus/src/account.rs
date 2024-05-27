@@ -64,6 +64,6 @@ impl Decodable for Account {
             });
         }
 
-        Ok(Account { balance, code_hash, nonce, storage_root })
+        Ok(Self { balance, code_hash, nonce, storage_root })
     }
 }
