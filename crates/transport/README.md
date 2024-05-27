@@ -9,53 +9,25 @@ This crate handles RPC connection and request management. It builds an
 futures for simple and batch RPC requests as well as a unified `TransportError`
 type.
 
-[alloy-provider]: ../provider/
+Typically, this crate should not be used directly. Most EVM users will want to
+use the [alloy-provider] crate, which provides a high-level API for interacting
+with JSON-RPC servers that provide the standard Ethereum RPC endpoints, or the
+[alloy-rpc-client] crate, which provides a low-level JSON-RPC API without the
+specific Ethereum endpoints.
+
+[alloy-provider]: https://alloy-rs.github.io/alloy/alloy_provider/index.html
 [tower `Service`]: https://docs.rs/tower/latest/tower/trait.Service.html
 
-## Usage
+### Transports
 
-Usage of this crate typically means instantiating an `RpcClient<T>` over some
-`Transport`. The RPC client can then be used to make requests to the RPC
-server. Requests are captured as `RpcCall` futures, which can be polled to
-completion.
+Alloy maintains the following transports:
 
-For example, to make a simple request:
+- [alloy-transport-http]: JSON-RPC via HTTP.
+- [alloy-transport-ws]: JSON-RPC via Websocket, supports pubsub via
+    [alloy-pubsub].
+- [alloy-transport-ipc]: JSON-RPC via IPC, supports pubsub via [alloy-pubsub].
 
-```rust,ignore
-// Instantiate a new client over a transport.
-let client: RpcClient<reqwest::Http> = "https://mainnet.infura.io/v3/...".parse().unwrap();
-
-// Prepare a request to the server.
-let request = client.request("eth_blockNumber", ());
-
-// Poll the request to completion.
-let block_number = request.await.unwrap();
-```
-
-Batch requests are also supported:
-
-```rust,ignore
-// Instantiate a new client over a transport.
-let client: RpcClient<reqwest::Http> = "https://mainnet.infura.io/v3/...".parse().unwrap();
-
-// Prepare a batch request to the server.
-let batch = client.new_batch();
-
-// Batches serialize params immediately. So we need to handle the result when
-// adding calls.
-let block_number_fut = batch.add_call("eth_blockNumber", ()).unwrap();
-let balance_fut = batch.add_call("eth_getBalance", address).unwrap();
-
-// Make sure to send the batch!
-batch.send().await.unwrap();
-
-// After the batch is complete, we can get the results.
-// Note that requests may error separately!
-let block_number = block_number_fut.await.unwrap();
-let balance = balance_fut.await.unwrap();
-```
-
-### Features
-
-- `reqwest`: Enables the `reqwest` transport implementation.
-- `hyper`: Enables the `hyper` transport implementation (not available in WASM).
+[alloy-transport-http]: https://alloy-rs.github.io/alloy/alloy_transport_http/index.html
+[alloy-transport-ws]: https://alloy-rs.github.io/alloy/alloy_transport_ws/index.html
+[alloy-transport-ipc]: https://alloy-rs.github.io/alloy/alloy_transport_ipc/index.html
+[alloy-pubsub]: https://alloy-rs.github.io/alloy/alloy_pubsub/index.html

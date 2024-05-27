@@ -574,6 +574,15 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getLogs", (filter,)).await
     }
 
+    /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
+    /// at the particular [BlockId].
+    async fn get_account(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+        RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
+    }
+
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
     async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
@@ -921,9 +930,11 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
+    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
+    use alloy_sol_types::SolValue;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1336,5 +1347,22 @@ mod tests {
 
         let count = provider.get_uncle_count(0.into()).await.unwrap();
         assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    #[cfg(any(
+        feature = "reqwest-default-tls",
+        feature = "reqwest-rustls-tls",
+        feature = "reqwest-native-tls",
+    ))]
+    async fn call_mainnet() {
+        init_tracing();
+        let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
+        let provider = ProviderBuilder::new().on_http(url.parse().unwrap());
+        let req = TransactionRequest::default()
+            .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
+            .with_input(bytes!("06fdde03")); // `name()`
+        let result = provider.call(&req).await.unwrap();
+        assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
     }
 }

@@ -6,9 +6,9 @@ use std::{fmt, net::SocketAddr};
 /// Use to inject username and password or an auth token into requests
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Authorization {
-    /// HTTP Basic Auth
+    /// [RC7617](https://datatracker.ietf.org/doc/html/rfc7617) HTTP Basic Auth
     Basic(String),
-    /// Bearer Auth
+    /// [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750) Bearer Auth
     Bearer(String),
 }
 
@@ -39,7 +39,7 @@ impl Authorization {
         Self::authority(format!("{username}:{password}"))
     }
 
-    /// Instantiate a new bearer auth.
+    /// Instantiate a new bearer auth from the given token.
     pub fn bearer(token: impl Into<String>) -> Self {
         Self::Bearer(token.into())
     }
@@ -48,8 +48,8 @@ impl Authorization {
 impl fmt::Display for Authorization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Basic(_) => write!(f, "Basic"),
-            Self::Bearer(_) => write!(f, "Bearer"),
+            Self::Basic(auth) => write!(f, "Basic {auth}"),
+            Self::Bearer(auth) => write!(f, "Bearer {auth}"),
         }
     }
 }

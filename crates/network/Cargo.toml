@@ -23,6 +23,7 @@ alloy-rpc-types.workspace = true
 alloy-signer.workspace = true
 alloy-sol-types.workspace = true
 
+auto_impl.workspace = true
 async-trait.workspace = true
 futures-utils-wasm.workspace = true
 thiserror.workspace = true

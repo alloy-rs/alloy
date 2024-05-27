@@ -10,7 +10,7 @@
 extern crate tracing;
 
 mod batch;
-pub use batch::BatchRequest;
+pub use batch::{BatchRequest, Waiter};
 
 mod builder;
 pub use builder::ClientBuilder;
@@ -32,3 +32,7 @@ pub use alloy_transport_ws::WsConnect;
 
 #[cfg(all(feature = "ipc", not(target_arch = "wasm32")))]
 pub use alloy_transport_ipc::IpcConnect;
+
+/// A client using a [`reqwest`] HTTP transport.
+#[cfg(feature = "reqwest")]
+pub type ReqwestClient = RpcClient<alloy_transport_http::ReqwestTransport>;

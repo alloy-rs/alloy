@@ -20,7 +20,9 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-trezor-client = { version = "=0.1.3", default-features = false, features = ["ethereum"] }
+trezor-client = { version = "=0.1.3", default-features = false, features = [
+    "ethereum",
+] }
 
 async-trait.workspace = true
 semver.workspace = true
@@ -28,4 +30,5 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+alloy-rpc-types.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

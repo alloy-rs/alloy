@@ -62,64 +62,6 @@ where
     }
 }
 
-impl<Params, Conn> CallState<Params, Conn>
-where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-{
-    fn poll_prepared(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-    ) -> task::Poll<<Self as Future>::Output> {
-        let fut = {
-            let CallStateProj::Prepared { connection, request } = self.as_mut().project() else {
-                unreachable!("Called poll_prepared in incorrect state")
-            };
-
-            if let Err(e) = task::ready!(Service::<RequestPacket>::poll_ready(connection, cx)) {
-                self.set(Self::Complete);
-                return Ready(RpcResult::Err(e));
-            }
-
-            let request = request.take().expect("no request");
-            debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
-            trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
-            let request = request.serialize();
-            match request {
-                Ok(request) => {
-                    trace!(request=%request.serialized(), "serialized request");
-                    connection.call(request.into())
-                }
-                Err(err) => {
-                    trace!(?err, "failed to serialize request");
-                    self.set(Self::Complete);
-                    return Ready(RpcResult::Err(TransportError::ser_err(err)));
-                }
-            }
-        };
-
-        self.set(Self::AwaitingResponse { fut });
-        cx.waker().wake_by_ref();
-
-        task::Poll::Pending
-    }
-
-    fn poll_awaiting(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-    ) -> task::Poll<<Self as Future>::Output> {
-        let CallStateProj::AwaitingResponse { fut } = self.as_mut().project() else {
-            unreachable!("Called poll_awaiting in incorrect state")
-        };
-
-        match task::ready!(fut.poll(cx)) {
-            Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
-            Err(e) => Ready(RpcResult::Err(e)),
-            _ => panic!("received batch response from single request"),
-        }
-    }
-}
-
 impl<Params, Conn> Future for CallState<Params, Conn>
 where
     Conn: Transport + Clone,
@@ -128,15 +70,47 @@ where
     type Output = TransportResult<Box<RawValue>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        if matches!(*self.as_mut(), Self::Prepared { .. }) {
-            return self.poll_prepared(cx);
-        }
+        loop {
+            match self.as_mut().project() {
+                CallStateProj::Prepared { connection, request } => {
+                    if let Err(e) =
+                        task::ready!(Service::<RequestPacket>::poll_ready(connection, cx))
+                    {
+                        self.set(CallState::Complete);
+                        return Ready(RpcResult::Err(e));
+                    }
 
-        if matches!(*self.as_mut(), Self::AwaitingResponse { .. }) {
-            return self.poll_awaiting(cx);
+                    let request = request.take().expect("no request");
+                    debug!(method=%request.meta.method, id=%request.meta.id, "sending request");
+                    trace!(params_ty=%std::any::type_name::<Params>(), ?request, "full request");
+                    let request = request.serialize();
+                    let fut = match request {
+                        Ok(request) => {
+                            trace!(request=%request.serialized(), "serialized request");
+                            connection.call(request.into())
+                        }
+                        Err(err) => {
+                            trace!(?err, "failed to serialize request");
+                            self.set(CallState::Complete);
+                            return Ready(RpcResult::Err(TransportError::ser_err(err)));
+                        }
+                    };
+                    self.set(CallState::AwaitingResponse { fut });
+                }
+                CallStateProj::AwaitingResponse { fut } => {
+                    let res = match task::ready!(fut.poll(cx)) {
+                        Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
+                        Err(e) => Ready(RpcResult::Err(e)),
+                        _ => panic!("received batch response from single request"),
+                    };
+                    self.set(CallState::Complete);
+                    return res;
+                }
+                CallStateProj::Complete => {
+                    panic!("Polled after completion");
+                }
+            }
         }
-
-        panic!("Polled in bad state");
     }
 }
 

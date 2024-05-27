@@ -36,14 +36,20 @@ coins-bip39 = { version = "0.8.7", default-features = false, features = [
 ], optional = true }
 
 # yubi
-yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
+yubihsm = { version = "0.42", features = [
+    "secp256k1",
+    "http",
+    "usb",
+], optional = true }
 
 [dev-dependencies]
-serde.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-sol-types.workspace = true
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true
+serde.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
@@ -55,3 +61,5 @@ keystore = ["dep:eth-keystore", "dep:elliptic-curve"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
+
+eip712 = ["alloy-signer/eip712"]
