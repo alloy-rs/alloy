@@ -76,7 +76,7 @@ where
                     if let Err(e) =
                         task::ready!(Service::<RequestPacket>::poll_ready(connection, cx))
                     {
-                        self.set(CallState::Complete);
+                        self.set(Self::Complete);
                         return Ready(RpcResult::Err(e));
                     }
 
@@ -91,11 +91,11 @@ where
                         }
                         Err(err) => {
                             trace!(?err, "failed to serialize request");
-                            self.set(CallState::Complete);
+                            self.set(Self::Complete);
                             return Ready(RpcResult::Err(TransportError::ser_err(err)));
                         }
                     };
-                    self.set(CallState::AwaitingResponse { fut });
+                    self.set(Self::AwaitingResponse { fut });
                 }
                 CallStateProj::AwaitingResponse { fut } => {
                     let res = match task::ready!(fut.poll(cx)) {
@@ -103,7 +103,7 @@ where
                         Err(e) => Ready(RpcResult::Err(e)),
                         _ => panic!("received batch response from single request"),
                     };
-                    self.set(CallState::Complete);
+                    self.set(Self::Complete);
                     return res;
                 }
                 CallStateProj::Complete => {
