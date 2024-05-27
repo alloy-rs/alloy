@@ -5,16 +5,7 @@
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
-#![warn(
-    missing_copy_implementations,
-    missing_debug_implementations,
-    missing_docs,
-    unreachable_pub,
-    clippy::missing_const_for_fn,
-    rustdoc::all
-)]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -82,7 +73,7 @@ impl Genesis {
     /// and funds the given address with max coins.
     ///
     /// Enables all hard forks up to London at genesis.
-    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Genesis {
+    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
         // set up a clique config with an instant sealing period and short (8 block) epoch
         let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
 
@@ -129,7 +120,7 @@ impl Genesis {
         let extra_data_bytes = [&[0u8; 32][..], signer_addr.as_slice(), &[0u8; 65][..]].concat();
         let extra_data = extra_data_bytes.into();
 
-        Genesis {
+        Self {
             config,
             alloc,
             difficulty: U256::from(1),

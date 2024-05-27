@@ -3,15 +3,12 @@
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
-#![allow(missing_docs)]
-
 use alloy_primitives::{Address, Bloom, Bytes, U256};
 use alloy_rpc_types::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(missing_copy_implementations)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationType {
     /// Operation Transfer
     OpTransfer = 0,
@@ -24,22 +21,32 @@ pub enum OperationType {
 }
 
 /// Custom struct for otterscan `getInternalOperations` RPC response
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InternalOperation {
+    /// The type of the internal operation.
     pub r#type: OperationType,
+    /// The address from which the operation originated.
     pub from: Address,
+    /// The address to which the operation is directed.
     pub to: Address,
+    /// The value transferred in the operation.
     pub value: U256,
 }
 
 /// Custom struct for otterscan `traceTransaction` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceEntry {
+    /// The type of trace entry.
     pub r#type: String,
+    /// The depth of the trace entry.
     pub depth: u32,
+    /// The address from which the trace originated.
     pub from: Address,
+    /// The address to which the trace is directed.
     pub to: Address,
+    /// The value transferred in the trace.
     pub value: U256,
+    /// The input data for the trace.
     pub input: Bytes,
 }
 
@@ -48,8 +55,11 @@ pub struct TraceEntry {
 #[allow(missing_copy_implementations)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalIssuance {
+    /// The block reward issued.
     pub block_reward: U256,
+    /// The uncle reward issued.
     pub uncle_reward: U256,
+    /// The total issuance amount.
     pub issuance: U256,
 }
 
@@ -57,8 +67,10 @@ pub struct InternalIssuance {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsBlock {
+    /// The block information.
     #[serde(flatten)]
     pub block: Block,
+    /// The number of transactions in the block.
     pub transaction_count: usize,
 }
 
@@ -72,8 +84,11 @@ impl From<Block> for OtsBlock {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockDetails {
+    /// The block information with transaction count.
     pub block: OtsBlock,
+    /// The issuance information for the block.
     pub issuance: InternalIssuance,
+    /// The total fees for the block.
     pub total_fees: U256,
 }
 
@@ -96,6 +111,7 @@ pub struct OtsTransactionReceipt {
     /// Note: the otterscan API sets all log fields to null.
     #[serde(flatten)]
     pub receipt: TransactionReceipt<OtsReceipt>,
+    /// The timestamp of the transaction.
     #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
     pub timestamp: Option<u64>,
 }
@@ -104,21 +120,21 @@ pub struct OtsTransactionReceipt {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OtsReceipt {
-    /// If transaction is executed successfully.
+    /// If the transaction is executed successfully.
     ///
     /// This is the `statusCode`
     #[serde(with = "alloy_serde::quantity_bool")]
     pub status: bool,
-    /// Gas used
+    /// The cumulative gas used.
     #[serde(with = "alloy_serde::u64_via_ruint")]
     pub cumulative_gas_used: u64,
-    /// Log send from contracts.
+    /// The logs sent from contracts.
     ///
-    /// Note: this is set to null,
+    /// Note: this is set to null.
     pub logs: Option<Vec<alloy_primitives::Log>>,
     /// The bloom filter.
     ///
-    /// Note: this is set to null
+    /// Note: this is set to null.
     pub logs_bloom: Option<Bloom>,
     /// The transaction type.
     #[serde(with = "alloy_serde::num::u8_via_ruint")]
@@ -128,25 +144,33 @@ pub struct OtsReceipt {
 /// Custom struct for otterscan `getBlockTransactions` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OtsBlockTransactions {
+    /// The full block information with transaction count.
     pub fullblock: OtsBlock,
+    /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
 }
 
-/// Custom struct for otterscan `searchTransactionsAfter`and `searchTransactionsBefore` RPC
+/// Custom struct for otterscan `searchTransactionsAfter` and `searchTransactionsBefore` RPC
 /// responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionsWithReceipts {
+    /// The list of transactions.
     pub txs: Vec<Transaction>,
+    /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
+    /// Indicates if this is the first page of results.
     pub first_page: bool,
+    /// Indicates if this is the last page of results.
     pub last_page: bool,
 }
 
 /// Custom struct for otterscan `getContractCreator` RPC responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
+    /// The transaction used to create the contract.
     pub tx: Transaction,
+    /// The address of the contract creator.
     pub creator: Address,
 }
 

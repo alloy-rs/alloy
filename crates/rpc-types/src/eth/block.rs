@@ -1,7 +1,5 @@
 //! Block RPC types.
 
-#![allow(unknown_lints, non_local_definitions)]
-
 use crate::{other::OtherFields, Transaction, Withdrawal};
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,

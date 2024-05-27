@@ -13,7 +13,6 @@ use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
 /// An enum over the different types of gas fillable.
-#[allow(unreachable_pub)]
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasFillable {
@@ -77,17 +76,15 @@ impl GasFiller {
         T: Transport + Clone,
         N: Network,
     {
-        let gas_price_fut = if let Some(gas_price) = tx.gas_price() {
-            async move { Ok(gas_price) }.left_future()
-        } else {
-            provider.get_gas_price().right_future()
-        };
+        let gas_price_fut = tx.gas_price().map_or_else(
+            || provider.get_gas_price().right_future(),
+            |gas_price| async move { Ok(gas_price) }.left_future(),
+        );
 
-        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
-            async move { Ok(gas_limit) }.left_future()
-        } else {
-            provider.estimate_gas(tx).into_future().right_future()
-        };
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
 
         let (gas_price, gas_limit) = futures::try_join!(gas_price_fut, gas_limit_fut)?;
 
@@ -104,11 +101,10 @@ impl GasFiller {
         T: Transport + Clone,
         N: Network,
     {
-        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
-            async move { Ok(gas_limit) }.left_future()
-        } else {
-            provider.estimate_gas(tx).into_future().right_future()
-        };
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
             (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
@@ -134,11 +130,10 @@ impl GasFiller {
         T: Transport + Clone,
         N: Network,
     {
-        let gas_limit_fut = if let Some(gas_limit) = tx.gas_limit() {
-            async move { Ok(gas_limit) }.left_future()
-        } else {
-            provider.estimate_gas(tx).into_future().right_future()
-        };
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
 
         let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
             (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
@@ -149,21 +144,21 @@ impl GasFiller {
             provider.estimate_eip1559_fees(None).right_future()
         };
 
-        let max_fee_per_blob_gas_fut = if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas()
-        {
-            async move { Ok(max_fee_per_blob_gas) }.left_future()
-        } else {
-            async {
-                provider
-                    .get_block_by_number(BlockNumberOrTag::Latest, false)
-                    .await?
-                    .ok_or(RpcError::NullResp)?
-                    .header
-                    .next_block_blob_fee()
-                    .ok_or(RpcError::UnsupportedFeature("eip4844"))
-            }
-            .right_future()
-        };
+        let max_fee_per_blob_gas_fut = tx.max_fee_per_blob_gas().map_or_else(
+            || {
+                async {
+                    provider
+                        .get_block_by_number(BlockNumberOrTag::Latest, false)
+                        .await?
+                        .ok_or(RpcError::NullResp)?
+                        .header
+                        .next_block_blob_fee()
+                        .ok_or(RpcError::UnsupportedFeature("eip4844"))
+                }
+                .right_future()
+            },
+            |max_fee_per_blob_gas| async move { Ok(max_fee_per_blob_gas) }.left_future(),
+        );
 
         let (gas_limit, estimate, max_fee_per_blob_gas) =
             futures::try_join!(gas_limit_fut, eip1559_fees_fut, max_fee_per_blob_gas_fut)?;

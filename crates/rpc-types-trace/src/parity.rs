@@ -103,22 +103,22 @@ impl<T> Delta<T> {
 
     /// Returns true if the value is unchanged
     pub const fn is_unchanged(&self) -> bool {
-        matches!(self, Delta::Unchanged)
+        matches!(self, Self::Unchanged)
     }
 
     /// Returns true if the value is added
     pub const fn is_added(&self) -> bool {
-        matches!(self, Delta::Added(_))
+        matches!(self, Self::Added(_))
     }
 
     /// Returns true if the value is removed
     pub const fn is_removed(&self) -> bool {
-        matches!(self, Delta::Removed(_))
+        matches!(self, Self::Removed(_))
     }
 
     /// Returns true if the value is changed
     pub const fn is_changed(&self) -> bool {
-        matches!(self, Delta::Changed(_))
+        matches!(self, Self::Changed(_))
     }
 }
 
@@ -175,30 +175,30 @@ pub enum Action {
 impl Action {
     /// Returns true if this is a call action
     pub const fn is_call(&self) -> bool {
-        matches!(self, Action::Call(_))
+        matches!(self, Self::Call(_))
     }
 
     /// Returns true if this is a create action
     pub const fn is_create(&self) -> bool {
-        matches!(self, Action::Create(_))
+        matches!(self, Self::Create(_))
     }
 
     /// Returns true if this is a selfdestruct action
     pub const fn is_selfdestruct(&self) -> bool {
-        matches!(self, Action::Selfdestruct(_))
+        matches!(self, Self::Selfdestruct(_))
     }
     /// Returns true if this is a reward action
     pub const fn is_reward(&self) -> bool {
-        matches!(self, Action::Reward(_))
+        matches!(self, Self::Reward(_))
     }
 
     /// Returns what kind of action this is
     pub const fn kind(&self) -> ActionType {
         match self {
-            Action::Call(_) => ActionType::Call,
-            Action::Create(_) => ActionType::Create,
-            Action::Selfdestruct(_) => ActionType::Selfdestruct,
-            Action::Reward(_) => ActionType::Reward,
+            Self::Call(_) => ActionType::Call,
+            Self::Create(_) => ActionType::Create,
+            Self::Selfdestruct(_) => ActionType::Selfdestruct,
+            Self::Reward(_) => ActionType::Reward,
         }
     }
 }
@@ -343,16 +343,16 @@ impl TraceOutput {
     /// Returns the gas used by this trace.
     pub const fn gas_used(&self) -> U64 {
         match self {
-            TraceOutput::Call(call) => call.gas_used,
-            TraceOutput::Create(create) => create.gas_used,
+            Self::Call(call) => call.gas_used,
+            Self::Create(create) => create.gas_used,
         }
     }
 
     /// Sets the gas used by this trace.
     pub fn set_gas_used(&mut self, gas_used: u64) {
         match self {
-            TraceOutput::Call(call) => call.gas_used = U64::from(gas_used),
-            TraceOutput::Create(create) => create.gas_used = U64::from(gas_used),
+            Self::Call(call) => call.gas_used = U64::from(gas_used),
+            Self::Create(create) => create.gas_used = U64::from(gas_used),
         }
     }
 }

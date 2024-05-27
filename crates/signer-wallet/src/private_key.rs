@@ -11,7 +11,7 @@ use rand::{CryptoRng, Rng};
 use std::str::FromStr;
 
 #[cfg(feature = "keystore")]
-use {elliptic_curve::rand_core, std::path::Path};
+use std::path::Path;
 
 impl Wallet<SigningKey> {
     /// Creates a new Wallet instance from a [`SigningKey`].
@@ -101,7 +101,7 @@ impl Wallet<SigningKey> {
     ) -> Result<(Self, String), WalletError>
     where
         P: AsRef<Path>,
-        R: Rng + CryptoRng + rand_core::CryptoRng,
+        R: Rng + CryptoRng,
         S: AsRef<[u8]>,
     {
         let (secret, uuid) = eth_keystore::new(dir, rng, password, name)?;

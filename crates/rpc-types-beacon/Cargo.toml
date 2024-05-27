@@ -9,6 +9,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 # ethereum
 alloy-eips = { workspace = true, features = ["serde"] }

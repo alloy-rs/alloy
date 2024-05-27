@@ -5,7 +5,6 @@ use alloy_rpc_types::admin::{NodeInfo, PeerInfo};
 use alloy_transport::{Transport, TransportResult};
 
 /// Admin namespace rpc interface that gives access to several non-standard RPC methods.
-#[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait AdminApi<N, T>: Send + Sync {

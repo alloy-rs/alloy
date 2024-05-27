@@ -58,12 +58,12 @@ pub struct GethInstance {
 
 impl GethInstance {
     /// Returns the port of this instance
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.port
     }
 
     /// Returns the p2p port of this instance
-    pub fn p2p_port(&self) -> Option<u16> {
+    pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
     }
 
@@ -79,11 +79,7 @@ impl GethInstance {
 
     /// Returns the IPC endpoint of this instance
     pub fn ipc_endpoint(&self) -> String {
-        if let Some(ipc) = self.ipc.clone() {
-            ipc.display().to_string()
-        } else {
-            "geth.ipc".to_string()
-        }
+        self.ipc.clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
     /// Returns the HTTP endpoint url of this instance
@@ -97,18 +93,18 @@ impl GethInstance {
     }
 
     /// Returns the path to this instances' data directory
-    pub fn data_dir(&self) -> &Option<PathBuf> {
+    pub const fn data_dir(&self) -> &Option<PathBuf> {
         &self.data_dir
     }
 
     /// Returns the genesis configuration used to configure this instance
-    pub fn genesis(&self) -> &Option<Genesis> {
+    pub const fn genesis(&self) -> &Option<Genesis> {
         &self.genesis
     }
 
     /// Returns the private key used to configure clique on this instance
     #[deprecated = "clique support was removed in geth >=1.14"]
-    pub fn clique_private_key(&self) -> &Option<SigningKey> {
+    pub const fn clique_private_key(&self) -> &Option<SigningKey> {
         &self.clique_private_key
     }
 
@@ -284,7 +280,7 @@ impl Geth {
     }
 
     /// Returns whether the node is launched in Clique consensus mode.
-    pub fn is_clique(&self) -> bool {
+    pub const fn is_clique(&self) -> bool {
         self.clique_private_key.is_some()
     }
 
@@ -343,25 +339,25 @@ impl Geth {
     ///
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
-    pub fn block_time(mut self, block_time: u64) -> Self {
+    pub const fn block_time(mut self, block_time: u64) -> Self {
         self.mode = GethMode::Dev(DevOptions { block_time: Some(block_time) });
         self
     }
 
     /// Sets the chain id for the geth instance.
-    pub fn chain_id(mut self, chain_id: u64) -> Self {
+    pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
     }
 
     /// Allow geth to unlock accounts when rpc apis are open.
-    pub fn insecure_unlock(mut self) -> Self {
+    pub const fn insecure_unlock(mut self) -> Self {
         self.insecure_unlock = true;
         self
     }
 
     /// Enable IPC for the geth instance.
-    pub fn enable_ipc(mut self) -> Self {
+    pub const fn enable_ipc(mut self) -> Self {
         self.ipc_enabled = true;
         self
     }
@@ -409,7 +405,7 @@ impl Geth {
     }
 
     /// Sets the port for authenticated RPC connections.
-    pub fn authrpc_port(mut self, port: u16) -> Self {
+    pub const fn authrpc_port(mut self, port: u16) -> Self {
         self.authrpc_port = Some(port);
         self
     }
@@ -426,11 +422,11 @@ impl Geth {
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
     pub fn try_spawn(mut self) -> Result<GethInstance, GethError> {
-        let bin_path = match self.program.as_ref() {
-            Some(bin) => bin.as_os_str(),
-            None => GETH.as_ref(),
-        }
-        .to_os_string();
+        let bin_path = self
+            .program
+            .as_ref()
+            .map_or_else(|| GETH.as_ref(), |bin| bin.as_os_str())
+            .to_os_string();
         let mut cmd = Command::new(&bin_path);
         // geth uses stderr for its logs
         cmd.stderr(Stdio::piped());

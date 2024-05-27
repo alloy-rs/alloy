@@ -8,8 +8,6 @@
 //!
 //! See also <https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/beacon-chain.md#executionpayload>
 
-#![allow(missing_docs)]
-
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
 use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
@@ -26,22 +24,37 @@ use std::borrow::Cow;
 /// See also <https://ethereum.github.io/builder-specs/#/Builder/getHeader>
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GetExecutionPayloadHeaderResponse {
+    /// The version of the response.
     pub version: String,
+    /// The data associated with the execution payload header.
     pub data: ExecutionPayloadHeaderData,
 }
 
+/// Data structure representing the header data of an execution payload.
+///
+/// This structure is used to hold the core elements of an execution payload header,
+/// including the message and signature components.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeaderData {
+    /// The message of the execution payload header.
     pub message: ExecutionPayloadHeaderMessage,
+    /// The signature of the execution payload header.
     pub signature: Bytes,
 }
 
+/// Message structure within the header of an execution payload.
+///
+/// This structure contains detailed information about the execution payload,
+/// including the header, value, and public key associated with the payload.
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeaderMessage {
+    /// The header of the execution payload.
     pub header: ExecutionPayloadHeader,
+    /// The value of the execution payload, represented as a `U256`.
     #[serde_as(as = "DisplayFromStr")]
     pub value: U256,
+    /// The public key associated with the execution payload.
     pub pubkey: BlsPublicKey,
 }
 
@@ -49,24 +62,38 @@ pub struct ExecutionPayloadHeaderMessage {
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionPayloadHeader {
+    /// The parent hash of the execution payload.
     pub parent_hash: B256,
+    /// The fee recipient address of the execution payload.
     pub fee_recipient: Address,
+    /// The state root of the execution payload.
     pub state_root: B256,
+    /// The receipts root of the execution payload.
     pub receipts_root: B256,
+    /// The logs bloom filter of the execution payload.
     pub logs_bloom: Bloom,
+    /// The previous Randao value of the execution payload.
     pub prev_randao: B256,
+    /// The block number of the execution payload, represented as a string.
     #[serde_as(as = "DisplayFromStr")]
     pub block_number: String,
+    /// The gas limit of the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub gas_limit: u64,
+    /// The gas used by the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub gas_used: u64,
+    /// The timestamp of the execution payload, represented as a `u64`.
     #[serde_as(as = "DisplayFromStr")]
     pub timestamp: u64,
+    /// The extra data of the execution payload.
     pub extra_data: Bytes,
+    /// The base fee per gas of the execution payload, represented as a `U256`.
     #[serde_as(as = "DisplayFromStr")]
     pub base_fee_per_gas: U256,
+    /// The block hash of the execution payload.
     pub block_hash: B256,
+    /// The transactions root of the execution payload.
     pub transactions_root: B256,
 }
 
@@ -247,7 +274,7 @@ impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
             block_hash,
             transactions,
         } = payload;
-        ExecutionPayloadV1 {
+        Self {
             parent_hash: parent_hash.into_owned(),
             fee_recipient: fee_recipient.into_owned(),
             state_root: state_root.into_owned(),
@@ -344,7 +371,7 @@ struct BeaconExecutionPayloadV2<'a> {
 impl<'a> From<BeaconExecutionPayloadV2<'a>> for ExecutionPayloadV2 {
     fn from(payload: BeaconExecutionPayloadV2<'a>) -> Self {
         let BeaconExecutionPayloadV2 { payload_inner, withdrawals } = payload;
-        ExecutionPayloadV2 { payload_inner: payload_inner.into(), withdrawals }
+        Self { payload_inner: payload_inner.into(), withdrawals }
     }
 }
 
@@ -398,7 +425,7 @@ struct BeaconExecutionPayloadV3<'a> {
 impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {
     fn from(payload: BeaconExecutionPayloadV3<'a>) -> Self {
         let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas } = payload;
-        ExecutionPayloadV3 { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
+        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
     }
 }
 
@@ -452,11 +479,7 @@ impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
         let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } =
             payload;
-        ExecutionPayloadV4 {
-            payload_inner: payload_inner.into(),
-            deposit_requests,
-            withdrawal_requests,
-        }
+        Self { payload_inner: payload_inner.into(), deposit_requests, withdrawal_requests }
     }
 }
 
@@ -536,18 +559,10 @@ impl<'de> Deserialize<'de> for BeaconExecutionPayload<'de> {
 impl<'a> From<BeaconExecutionPayload<'a>> for ExecutionPayload {
     fn from(payload: BeaconExecutionPayload<'a>) -> Self {
         match payload {
-            BeaconExecutionPayload::V1(payload) => {
-                ExecutionPayload::V1(ExecutionPayloadV1::from(payload))
-            }
-            BeaconExecutionPayload::V2(payload) => {
-                ExecutionPayload::V2(ExecutionPayloadV2::from(payload))
-            }
-            BeaconExecutionPayload::V3(payload) => {
-                ExecutionPayload::V3(ExecutionPayloadV3::from(payload))
-            }
-            BeaconExecutionPayload::V4(payload) => {
-                ExecutionPayload::V4(ExecutionPayloadV4::from(payload))
-            }
+            BeaconExecutionPayload::V1(payload) => Self::V1(ExecutionPayloadV1::from(payload)),
+            BeaconExecutionPayload::V2(payload) => Self::V2(ExecutionPayloadV2::from(payload)),
+            BeaconExecutionPayload::V3(payload) => Self::V3(ExecutionPayloadV3::from(payload)),
+            BeaconExecutionPayload::V4(payload) => Self::V4(ExecutionPayloadV4::from(payload)),
         }
     }
 }
@@ -589,6 +604,8 @@ impl<'de> DeserializeAs<'de, ExecutionPayload> for BeaconExecutionPayload<'de> {
     }
 }
 
+/// Module providing serialization and deserialization support for the beacon API payload
+/// attributes.
 pub mod beacon_payload {
     use super::*;
 

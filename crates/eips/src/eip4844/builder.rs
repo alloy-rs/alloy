@@ -307,7 +307,7 @@ impl<T: SidecarCoder + Default> SidecarBuilder<T> {
 
     /// Create a new builder from a slice of data by calling
     /// [`SidecarBuilder::from_coder_and_data`]
-    pub fn from_slice(data: &[u8]) -> SidecarBuilder<T> {
+    pub fn from_slice(data: &[u8]) -> Self {
         Self::from_coder_and_data(T::default(), data)
     }
 
@@ -339,7 +339,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     }
 
     /// Create a new builder from a slice of data.
-    pub fn from_coder_and_data(coder: T, data: &[u8]) -> SidecarBuilder<T> {
+    pub fn from_coder_and_data(coder: T, data: &[u8]) -> Self {
         let required_fe = coder.required_fe(data);
         let mut this = Self::from_coder_and_capacity(
             coder,
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(builder.len(), expected_fe * 32);
 
         // consume 2 more
-        builder.ingest("hello".as_bytes());
+        builder.ingest(b"hello");
         assert_eq!(builder.len(), expected_fe * 32 + 64);
     }
 }

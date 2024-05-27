@@ -903,7 +903,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
     #[inline]
-    fn root(&self) -> &RootProvider<T, N> {
+    fn root(&self) -> &Self {
         self
     }
 
@@ -927,7 +927,6 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 }
 
 #[cfg(test)]
-#[allow(clippy::missing_const_for_fn)]
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};

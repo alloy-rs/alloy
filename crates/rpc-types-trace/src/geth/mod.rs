@@ -125,37 +125,37 @@ pub enum GethTrace {
 
 impl From<DefaultFrame> for GethTrace {
     fn from(value: DefaultFrame) -> Self {
-        GethTrace::Default(value)
+        Self::Default(value)
     }
 }
 
 impl From<FourByteFrame> for GethTrace {
     fn from(value: FourByteFrame) -> Self {
-        GethTrace::FourByteTracer(value)
+        Self::FourByteTracer(value)
     }
 }
 
 impl From<CallFrame> for GethTrace {
     fn from(value: CallFrame) -> Self {
-        GethTrace::CallTracer(value)
+        Self::CallTracer(value)
     }
 }
 
 impl From<PreStateFrame> for GethTrace {
     fn from(value: PreStateFrame) -> Self {
-        GethTrace::PreStateTracer(value)
+        Self::PreStateTracer(value)
     }
 }
 
 impl From<NoopFrame> for GethTrace {
     fn from(value: NoopFrame) -> Self {
-        GethTrace::NoopTracer(value)
+        Self::NoopTracer(value)
     }
 }
 
 impl From<MuxFrame> for GethTrace {
     fn from(value: MuxFrame) -> Self {
-        GethTrace::MuxTracer(value)
+        Self::MuxTracer(value)
     }
 }
 
@@ -207,7 +207,7 @@ pub enum GethDebugTracerType {
 
 impl From<GethDebugBuiltInTracerType> for GethDebugTracerType {
     fn from(value: GethDebugBuiltInTracerType) -> Self {
-        GethDebugTracerType::BuiltInTracer(value)
+        Self::BuiltInTracer(value)
     }
 }
 
@@ -264,25 +264,25 @@ impl GethDebugTracerConfig {
 
 impl From<serde_json::Value> for GethDebugTracerConfig {
     fn from(value: serde_json::Value) -> Self {
-        GethDebugTracerConfig(value)
+        Self(value)
     }
 }
 
 impl From<CallConfig> for GethDebugTracerConfig {
     fn from(value: CallConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 
 impl From<PreStateConfig> for GethDebugTracerConfig {
     fn from(value: PreStateConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 
 impl From<MuxConfig> for GethDebugTracerConfig {
     fn from(value: MuxConfig) -> Self {
-        GethDebugTracerConfig(serde_json::to_value(value).expect("is serializable"))
+        Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
 

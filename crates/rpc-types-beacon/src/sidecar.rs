@@ -26,6 +26,7 @@ impl IntoIterator for BeaconBlobBundle {
 /// Intermediate type for BlobTransactionSidecar matching
 #[derive(Debug, Clone)]
 pub struct SidecarIterator {
+    /// The internal iterator over [`BlobData`].
     pub iter: IntoIter<BlobData>,
 }
 
@@ -38,8 +39,9 @@ impl Iterator for SidecarIterator {
 }
 
 impl SidecarIterator {
+    /// Creates a new [`SidecarIterator`] from a given [`BeaconBlobBundle`].
     pub fn new(bundle: BeaconBlobBundle) -> Self {
-        SidecarIterator { iter: bundle.into_iter() }
+        Self { iter: bundle.into_iter() }
     }
 
     /// Returns a BlobTransactionSidecar of len num_hashes.

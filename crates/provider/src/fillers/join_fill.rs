@@ -129,7 +129,7 @@ where
     T: alloy_transport::Transport + Clone,
     N: Network,
 {
-    type Provider = FillProvider<JoinFill<L, R>, P, T, N>;
+    type Provider = FillProvider<Self, P, T, N>;
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
     }

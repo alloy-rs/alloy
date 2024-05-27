@@ -195,7 +195,7 @@ impl GcpSigner {
         client: Client,
         key_specifier: KeySpecifier,
         chain_id: Option<u64>,
-    ) -> Result<GcpSigner, GcpSignerError> {
+    ) -> Result<Self, GcpSignerError> {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;
         let pubkey = decode_pubkey(resp)?;

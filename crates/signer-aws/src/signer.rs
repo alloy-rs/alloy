@@ -143,7 +143,7 @@ impl AwsSigner {
         kms: Client,
         key_id: String,
         chain_id: Option<ChainId>,
-    ) -> Result<AwsSigner, AwsSignerError> {
+    ) -> Result<Self, AwsSignerError> {
         let resp = request_get_pubkey(&kms, key_id.clone()).await?;
         let pubkey = decode_pubkey(resp)?;
         let address = alloy_signer::utils::public_key_to_address(&pubkey);

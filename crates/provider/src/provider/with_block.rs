@@ -109,7 +109,7 @@ where
             // append the block id to the params
             if let serde_json::Value::Array(ref mut arr) = ser {
                 arr.push(block_id);
-            } else if let serde_json::Value::Null = ser {
+            } else if ser.is_null() {
                 ser = serde_json::Value::Array(vec![block_id]);
             } else {
                 ser = serde_json::Value::Array(vec![ser, block_id]);

@@ -65,7 +65,7 @@ impl From<JsonStorageKey> for String {
         if bytes.is_empty() {
             return "0x0".to_string();
         }
-        let mut hex = String::with_capacity(2 + bytes.len() * 2);
+        let mut hex = Self::with_capacity(2 + bytes.len() * 2);
         hex.push_str("0x");
         for byte in bytes {
             write!(hex, "{:02x}", byte).unwrap();

@@ -11,6 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 # core
 alloy-core = { workspace = true, default-features = false }

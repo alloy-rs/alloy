@@ -114,10 +114,8 @@ pub mod u128_opt_via_ruint {
     where
         D: Deserializer<'de>,
     {
-        match Option::<U128>::deserialize(deserializer)? {
-            Some(val) => Ok(Some(val.to())),
-            None => Ok(None),
-        }
+        (Option::<U128>::deserialize(deserializer)?)
+            .map_or_else(|| Ok(None), |val| Ok(Some(val.to())))
     }
 
     /// Serializes `Option<u128>` as hex string
@@ -167,12 +165,14 @@ pub mod u128_vec_vec_opt_via_ruint {
     where
         D: Deserializer<'de>,
     {
-        match Option::<Vec<Vec<U128>>>::deserialize(deserializer)? {
-            Some(vec) => Ok(Some(
-                vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
-            )),
-            None => Ok(None),
-        }
+        (Option::<Vec<Vec<U128>>>::deserialize(deserializer)?).map_or_else(
+            || Ok(None),
+            |vec| {
+                Ok(Some(
+                    vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
+                ))
+            },
+        )
     }
 
     /// Serializes u128 as hex string

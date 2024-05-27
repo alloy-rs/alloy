@@ -93,11 +93,8 @@ impl Serialize for TxpoolInspectSummary {
     where
         S: serde::Serializer,
     {
-        let formatted_to = if let Some(to) = self.to {
-            format!("{to:?}")
-        } else {
-            "contract creation".to_string()
-        };
+        let formatted_to =
+            self.to.map_or_else(|| "contract creation".to_string(), |to| format!("{to:?}"));
         let formatted = format!(
             "{}: {} wei + {} gas × {} wei",
             formatted_to, self.value, self.gas, self.gas_price

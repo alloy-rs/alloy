@@ -39,7 +39,6 @@ pub struct MnemonicBuilder<W: Wordlist> {
 
 /// Error produced by the mnemonic wallet module
 #[derive(Debug, Error)]
-#[allow(missing_copy_implementations)]
 pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was expected but not found.
     #[error("expected phrase not found")]

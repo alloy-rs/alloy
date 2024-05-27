@@ -30,7 +30,7 @@ pub struct AnvilInstance {
 
 impl AnvilInstance {
     /// Returns a reference to the child process.
-    pub fn child(&self) -> &Child {
+    pub const fn child(&self) -> &Child {
         &self.child
     }
 
@@ -50,7 +50,7 @@ impl AnvilInstance {
     }
 
     /// Returns the port of this instance
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.port
     }
 
@@ -206,7 +206,7 @@ impl Anvil {
     }
 
     /// Sets the chain_id the `anvil` instance will use.
-    pub fn chain_id(mut self, chain_id: u64) -> Self {
+    pub const fn chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = Some(chain_id);
         self
     }
@@ -218,14 +218,14 @@ impl Anvil {
     }
 
     /// Sets the block-time in seconds which will be used when the `anvil` instance is launched.
-    pub fn block_time(mut self, block_time: u64) -> Self {
+    pub const fn block_time(mut self, block_time: u64) -> Self {
         self.block_time = Some(block_time as f64);
         self
     }
 
     /// Sets the block-time in sub-seconds which will be used when the `anvil` instance is launched.
     /// Older versions of `anvil` do not support sub-second block times.
-    pub fn block_time_f64(mut self, block_time: f64) -> Self {
+    pub const fn block_time_f64(mut self, block_time: f64) -> Self {
         self.block_time = Some(block_time);
         self
     }
@@ -233,7 +233,7 @@ impl Anvil {
     /// Sets the `fork-block-number` which will be used in addition to [`Self::fork`].
     ///
     /// **Note:** if set, then this requires `fork` to be set as well
-    pub fn fork_block_number(mut self, fork_block_number: u64) -> Self {
+    pub const fn fork_block_number(mut self, fork_block_number: u64) -> Self {
         self.fork_block_number = Some(fork_block_number);
         self
     }
@@ -266,7 +266,7 @@ impl Anvil {
     }
 
     /// Sets the timeout which will be used when the `anvil` instance is launched.
-    pub fn timeout(mut self, timeout: u64) -> Self {
+    pub const fn timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
     }
@@ -283,11 +283,7 @@ impl Anvil {
 
     /// Consumes the builder and spawns `anvil`. If spawning fails, returns an error.
     pub fn try_spawn(self) -> Result<AnvilInstance, AnvilError> {
-        let mut cmd = if let Some(ref prg) = self.program {
-            Command::new(prg)
-        } else {
-            Command::new("anvil")
-        };
+        let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
         let mut port = self.port.unwrap_or_default();
         cmd.arg("-p").arg(port.to_string());

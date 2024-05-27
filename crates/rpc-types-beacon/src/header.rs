@@ -48,8 +48,9 @@ pub struct HeaderData {
 /// [BeaconBlockHeader] with a signature.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Header {
-    /// The `BeaconBlockHeader` object from the CL spec.
+    /// The [`BeaconBlockHeader`] object from the CL spec.
     pub message: BeaconBlockHeader,
+    /// The signature associated with the [`BeaconBlockHeader`].
     pub signature: Bytes,
 }
 

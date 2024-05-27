@@ -3,8 +3,6 @@ use std::num::TryFromIntError;
 /// Error variants when converting from [crate::Transaction] to [alloy_consensus::Signed]
 /// transaction.
 #[derive(Debug, thiserror::Error)]
-#[allow(missing_copy_implementations)]
-#[allow(missing_docs)]
 pub enum ConversionError {
     /// Error during EIP-2718 transaction coding.
     #[error(transparent)]

@@ -17,13 +17,13 @@ pub struct BaseFeeParams {
 
 impl BaseFeeParams {
     /// Create a new BaseFeeParams
-    pub const fn new(max_change_denominator: u128, elasticity_multiplier: u128) -> BaseFeeParams {
-        BaseFeeParams { max_change_denominator, elasticity_multiplier }
+    pub const fn new(max_change_denominator: u128, elasticity_multiplier: u128) -> Self {
+        Self { max_change_denominator, elasticity_multiplier }
     }
 
     /// Get the base fee parameters for Ethereum mainnet
-    pub const fn ethereum() -> BaseFeeParams {
-        BaseFeeParams {
+    pub const fn ethereum() -> Self {
+        Self {
             max_change_denominator: DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR as u128,
             elasticity_multiplier: DEFAULT_ELASTICITY_MULTIPLIER as u128,
         }

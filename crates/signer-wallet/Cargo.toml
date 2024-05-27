@@ -11,6 +11,9 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true

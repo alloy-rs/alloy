@@ -1,9 +1,7 @@
+use alloc::boxed::Box;
 use alloy_primitives::hex;
 use core::fmt;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
-
-#[allow(unused_imports)]
-use alloc::boxed::Box;
 
 pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
 
@@ -14,7 +12,7 @@ pub const NUM_G1_POINTS: usize = 4096;
 pub const NUM_G2_POINTS: usize = 65;
 
 /// A newtype over list of G1 point from kzg trusted setup.
-#[derive(Clone, Debug, PartialEq, AsRef, AsMut, Deref, DerefMut)]
+#[derive(Clone, Debug, PartialEq, Eq, AsRef, AsMut, Deref, DerefMut)]
 #[repr(transparent)]
 pub struct G1Points(pub [[u8; BYTES_PER_G1_POINT]; NUM_G1_POINTS]);
 

@@ -59,7 +59,7 @@ impl<'de, T> Deserialize<'de> for WithOtherFields<T>
 where
     T: Deserialize<'de> + Serialize,
 {
-    fn deserialize<D>(deserializer: D) -> Result<WithOtherFields<T>, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {

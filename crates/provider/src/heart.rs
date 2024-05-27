@@ -217,7 +217,6 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Clone, Debug)]
-#[allow(missing_copy_implementations)]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
     tx_hash: B256,
@@ -351,7 +350,6 @@ impl Future for PendingTransaction {
 #[derive(Clone, Debug)]
 pub(crate) struct HeartbeatHandle {
     tx: mpsc::Sender<TxWatcher>,
-    #[allow(dead_code)]
     latest: watch::Receiver<Option<Block>>,
 }
 

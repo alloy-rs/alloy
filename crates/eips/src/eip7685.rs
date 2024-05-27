@@ -47,11 +47,9 @@ impl From<Eip7685Error> for alloy_rlp::Error {
     fn from(err: Eip7685Error) -> Self {
         match err {
             Eip7685Error::RlpError(err) => err,
-            Eip7685Error::MissingType => {
-                alloy_rlp::Error::Custom("eip7685 decoding failed: missing type")
-            }
+            Eip7685Error::MissingType => Self::Custom("eip7685 decoding failed: missing type"),
             Eip7685Error::UnexpectedType(_) => {
-                alloy_rlp::Error::Custom("eip7685 decoding failed: unexpected type")
+                Self::Custom("eip7685 decoding failed: unexpected type")
             }
         }
     }

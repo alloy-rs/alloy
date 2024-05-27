@@ -22,9 +22,9 @@ pub enum DerivationType {
 impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            DerivationType::Legacy(index) => write!(f, "m/44'/60'/0'/{index}"),
-            DerivationType::LedgerLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
-            DerivationType::Other(inner) => f.write_str(inner),
+            Self::Legacy(index) => write!(f, "m/44'/60'/0'/{index}"),
+            Self::LedgerLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
+            Self::Other(inner) => f.write_str(inner),
         }
     }
 }
@@ -76,11 +76,11 @@ pub(crate) enum INS {
 impl fmt::Display for INS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            INS::GET_PUBLIC_KEY => write!(f, "GET_PUBLIC_KEY"),
-            INS::SIGN => write!(f, "SIGN"),
-            INS::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
-            INS::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
-            INS::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
+            Self::GET_PUBLIC_KEY => write!(f, "GET_PUBLIC_KEY"),
+            Self::SIGN => write!(f, "SIGN"),
+            Self::GET_APP_CONFIGURATION => write!(f, "GET_APP_CONFIGURATION"),
+            Self::SIGN_PERSONAL_MESSAGE => write!(f, "SIGN_PERSONAL_MESSAGE"),
+            Self::SIGN_ETH_EIP_712 => write!(f, "SIGN_ETH_EIP_712"),
         }
     }
 }

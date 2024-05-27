@@ -18,7 +18,7 @@ impl From<Index> for usize {
 
 impl From<Index> for U256 {
     fn from(idx: Index) -> Self {
-        U256::from(idx.0)
+        Self::from(idx.0)
     }
 }
 
@@ -62,16 +62,18 @@ impl<'a> Deserialize<'a> for Index {
             where
                 E: Error,
             {
-                if let Some(val) = value.strip_prefix("0x") {
-                    usize::from_str_radix(val, 16).map(Index).map_err(|e| {
-                        Error::custom(format!("Failed to parse hex encoded index value: {e}"))
-                    })
-                } else {
-                    value
-                        .parse::<usize>()
-                        .map(Index)
-                        .map_err(|e| Error::custom(format!("Failed to parse numeric index: {e}")))
-                }
+                value.strip_prefix("0x").map_or_else(
+                    || {
+                        value.parse::<usize>().map(Index).map_err(|e| {
+                            Error::custom(format!("Failed to parse numeric index: {e}"))
+                        })
+                    },
+                    |val| {
+                        usize::from_str_radix(val, 16).map(Index).map_err(|e| {
+                            Error::custom(format!("Failed to parse hex encoded index value: {e}"))
+                        })
+                    },
+                )
             }
 
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>

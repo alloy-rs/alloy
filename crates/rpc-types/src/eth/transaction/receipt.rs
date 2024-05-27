@@ -1,5 +1,3 @@
-#![allow(unknown_lints, non_local_definitions)]
-
 use crate::{Log, WithOtherFields};
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256};

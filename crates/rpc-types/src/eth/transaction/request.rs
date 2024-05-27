@@ -717,7 +717,7 @@ impl From<TxEnvelope> for TransactionRequest {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: TransactionRequest = tx.strip_signature().into();
+                    let tx: Self = tx.strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -734,7 +734,7 @@ impl From<TxEnvelope> for TransactionRequest {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: TransactionRequest = tx.strip_signature().into();
+                    let tx: Self = tx.strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -751,7 +751,7 @@ impl From<TxEnvelope> for TransactionRequest {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: TransactionRequest = tx.strip_signature().into();
+                    let tx: Self = tx.strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -768,7 +768,7 @@ impl From<TxEnvelope> for TransactionRequest {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: TransactionRequest = tx.strip_signature().into();
+                    let tx: Self = tx.strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {

@@ -3,16 +3,7 @@
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
     html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
 )]
-#![warn(
-    missing_copy_implementations,
-    missing_debug_implementations,
-    missing_docs,
-    unreachable_pub,
-    clippy::missing_const_for_fn,
-    rustdoc::all
-)]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_primitives::{TxHash, B256, U256};
@@ -56,12 +47,11 @@ impl<'de> serde::Deserialize<'de> for Forking {
         }
         let f = match ForkingVariants::deserialize(deserializer)? {
             ForkingVariants::Fork(ForkOpts { json_rpc_url, block_number }) => {
-                Forking { json_rpc_url, block_number }
+                Self { json_rpc_url, block_number }
             }
-            ForkingVariants::Tagged(f) => Forking {
-                json_rpc_url: f.forking.json_rpc_url,
-                block_number: f.forking.block_number,
-            },
+            ForkingVariants::Tagged(f) => {
+                Self { json_rpc_url: f.forking.json_rpc_url, block_number: f.forking.block_number }
+            }
         };
         Ok(f)
     }
@@ -169,7 +159,7 @@ pub enum MineOptions {
 
 impl Default for MineOptions {
     fn default() -> Self {
-        MineOptions::Options { timestamp: None, blocks: None }
+        Self::Options { timestamp: None, blocks: None }
     }
 }
 

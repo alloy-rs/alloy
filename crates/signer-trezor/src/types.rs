@@ -21,8 +21,8 @@ pub enum DerivationType {
 impl fmt::Display for DerivationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            DerivationType::TrezorLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
-            DerivationType::Other(inner) => f.write_str(inner),
+            Self::TrezorLive(index) => write!(f, "m/44'/60'/{index}'/0/0"),
+            Self::Other(inner) => f.write_str(inner),
         }
     }
 }
@@ -56,6 +56,6 @@ pub enum TrezorError {
 
 impl From<TrezorError> for alloy_signer::Error {
     fn from(error: TrezorError) -> Self {
-        alloy_signer::Error::other(error)
+        Self::other(error)
     }
 }

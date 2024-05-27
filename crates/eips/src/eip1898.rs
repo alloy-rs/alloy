@@ -482,6 +482,7 @@ impl<'de> Deserialize<'de> for BlockId {
                     }
                 }
 
+                #[allow(clippy::option_if_let_else)]
                 if let Some(number) = number {
                     Ok(BlockId::Number(number))
                 } else if let Some(block_hash) = block_hash {
@@ -520,8 +521,8 @@ impl Display for ParseBlockIdError {
 impl std::error::Error for ParseBlockIdError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            ParseBlockIdError::ParseIntError(err) => std::error::Error::source(err),
-            ParseBlockIdError::FromHexError(err) => std::error::Error::source(err),
+            Self::ParseIntError(err) => std::error::Error::source(err),
+            Self::FromHexError(err) => std::error::Error::source(err),
         }
     }
 }
@@ -554,7 +555,7 @@ impl FromStr for BlockId {
             _ => s
                 .parse::<u64>()
                 .map_err(ParseBlockIdError::ParseIntError)
-                .map(|n| BlockId::Number(n.into())),
+                .map(|n| Self::Number(n.into())),
         }
     }
 }
@@ -720,7 +721,6 @@ impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        #[allow(unused_imports)]
         use alloc::string::ToString;
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),

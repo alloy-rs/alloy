@@ -263,11 +263,7 @@ impl SerializedRequest {
     /// This partially deserializes the request, and should be avoided if
     /// possible.
     pub fn params_hash(&self) -> B256 {
-        if let Some(params) = self.params() {
-            keccak256(params.get())
-        } else {
-            keccak256("")
-        }
+        self.params().map_or_else(|| keccak256(""), |params| keccak256(params.get()))
     }
 }
 
