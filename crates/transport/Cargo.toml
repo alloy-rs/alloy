@@ -27,7 +27,10 @@ tower.workspace = true
 url.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = "0.4"
+wasm-bindgen-futures = { version = "0.4", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.features]
+wasm-bindgen = ["dep:wasm-bindgen-futures"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt"] }
