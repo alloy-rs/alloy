@@ -1,6 +1,6 @@
-use alloy_primitives::{B256, U256};
+use alloy_primitives::{Keccak256, B256, U256};
 use alloy_rlp::{Decodable, Encodable, Header as RlpHeader};
-
+use std::sync::OnceLock;
 /// Represents an Account in the account trie.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -65,5 +65,36 @@ impl Decodable for Account {
         }
 
         Ok(Self { balance, code_hash, nonce, storage_root })
+    }
+}
+
+impl Account {
+    /// compute  hash as committed to in the MPT trie with memo
+    pub fn trie_hash(&self) -> B256 {
+        static TRIE_HASH: OnceLock<B256> = OnceLock::new();
+        *TRIE_HASH.get_or_init(|| {
+            let encoded = self.encode_to_vec();
+            let mut hasher = Keccak256::new();
+            hasher.update(&encoded);
+            let result = hasher.finalize();
+            result
+        })
+    }
+
+    /// compute  hash as committed to in the MPT trie without memo
+    pub fn trie_hash_slow(&self) -> B256 {
+        let mut buf = vec![];
+        self.encode(&mut buf);
+        let mut hasher = Keccak256::new();
+        hasher.update(&buf);
+        let result = hasher.finalize();
+        result
+    }
+
+    /// encode  to a Vec<u8>
+    fn encode_to_vec(&self) -> Vec<u8> {
+        let mut out = vec![];
+        self.encode(&mut out);
+        out
     }
 }
