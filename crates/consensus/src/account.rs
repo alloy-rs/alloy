@@ -1,6 +1,8 @@
 use alloy_primitives::{Keccak256, B256, U256};
 use alloy_rlp::{Encodable, RlpDecodable, RlpEncodable};
 
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
 /// Represents an Account in the account trie.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, RlpDecodable, RlpEncodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
