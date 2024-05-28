@@ -7,7 +7,10 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{
-    collections::HashSet,
+    collections::{
+        hash_set::{IntoIter, Iter},
+        HashSet,
+    },
     hash::Hash,
     ops::{Range, RangeFrom, RangeTo},
 };
@@ -84,6 +87,15 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     }
 }
 
+impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl<T: Eq + Hash> FilterSet<T> {
     /// Returns whether the filter is empty
     pub fn is_empty(&self) -> bool {
@@ -94,6 +106,12 @@ impl<T: Eq + Hash> FilterSet<T> {
     /// any value matches. Otherwise, the filter must include the value
     pub fn matches(&self, value: &T) -> bool {
         self.is_empty() || self.0.contains(value)
+    }
+
+    /// Returns an iterator over the underlying HashSet. Values are visited
+    /// in an arbitrary order.
+    pub fn iter(&self) -> Iter<'_, T> {
+        self.0.iter()
     }
 }
 
