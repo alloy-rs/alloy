@@ -114,7 +114,7 @@ impl Claims {
     }
 
     /// Checks if the `iat` claim is within the allowed range from the current time.
-    fn is_within_time_window(&self) -> bool {
+    pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
     }
