@@ -6,7 +6,6 @@ use std::sync::OnceLock;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Account {
     /// The account's nonce.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
