@@ -18,6 +18,7 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(proptest_derive::Arbitrary))]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     #[cfg_attr(
@@ -31,7 +32,7 @@ pub struct BlobTransactionSidecar {
     pub proofs: Vec<Bytes48>,
 }
 
-#[cfg(feature = "arbitrary")]
+#[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for BlobTransactionSidecar {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let num_blobs = u.int_in_range(1..=MAX_BLOBS_PER_BLOCK)?;
@@ -287,6 +288,7 @@ impl From<c_kzg::Error> for BlobTransactionValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arbitrary::Arbitrary;
 
     #[test]
     #[cfg(feature = "serde")]
@@ -310,5 +312,11 @@ mod tests {
         let s = serde_json::to_string(&blob).unwrap();
         let deserialized: BlobTransactionSidecar = serde_json::from_str(&s).unwrap();
         assert_eq!(blob, deserialized);
+    }
+
+    #[test]
+    fn test_arbitrary_blob() {
+        let mut unstructured = arbitrary::Unstructured::new(b"unstructured blob");
+        let _blob = BlobTransactionSidecar::arbitrary(&mut unstructured).unwrap();
     }
 }
