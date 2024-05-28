@@ -96,6 +96,12 @@ impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
     }
 }
 
+impl<T: Eq + Hash> FromIterator<T> for FilterSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(HashSet::from_iter(iter))
+    }
+}
+
 impl<T: Eq + Hash> FilterSet<T> {
     /// Returns whether the filter is empty
     pub fn is_empty(&self) -> bool {
