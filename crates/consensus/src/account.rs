@@ -76,8 +76,7 @@ impl Account {
             let encoded = self.encode_to_vec();
             let mut hasher = Keccak256::new();
             hasher.update(&encoded);
-            let result = hasher.finalize();
-            result
+            hasher.finalize()
         })
     }
 
@@ -87,11 +86,10 @@ impl Account {
         self.encode(&mut buf);
         let mut hasher = Keccak256::new();
         hasher.update(&buf);
-        let result = hasher.finalize();
-        result
+        hasher.finalize()
     }
 
-    /// encode  to a Vec<u8>
+    /// encode  to a `Vec<u8>`
     fn encode_to_vec(&self) -> Vec<u8> {
         let mut out = vec![];
         self.encode(&mut out);
