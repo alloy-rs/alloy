@@ -696,7 +696,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N> {
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
@@ -714,13 +714,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             .await
     }
 
-    /// Estimate the gas needed for a transaction.
-    fn estimate_gas<'a>(
+    /// This function returns an [`EthCall`] which can be used to get a gas estimate,
+    /// or to add [`StateOverride`] or a [`BlockId`]. If no overrides
+    /// or block ID is provided, the gas estimate will be computed for the latest block
+    /// with the current state.
+    ///
+    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride\
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides for eth_estimateGas.
+    fn estimate_gas<'req>(
         &self,
-        tx: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, U128, u128> {
-        RpcWithBlock::new(self.weak_client(), "eth_estimateGas", tx)
-            .map_resp(crate::utils::convert_u128)
+        tx: &'req N::TransactionRequest,
+    ) -> EthCall<'req, 'static, T, N, U128, u128> {
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
