@@ -57,9 +57,9 @@ impl Log<LogData> {
         self.inner.topics()
     }
 
-    /// Getter for the topic0 field, the event signature.
-    pub fn event_signature(&self) -> B256 {
-        self.inner.topics()[0]
+    /// Getter for the topic0 field.
+    pub fn topic0(&self) -> Option<&B256> {
+        self.inner.topics().get(0)
     }
 
     /// Get the topic list, mutably. This gives access to the internal
