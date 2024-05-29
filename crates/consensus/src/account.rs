@@ -1,4 +1,4 @@
-use alloy_primitives::{Keccak256, B256, U256};
+use alloy_primitives::{keccak256, B256, U256};
 use alloy_rlp::{Encodable, RlpDecodable, RlpEncodable};
 
 #[cfg(not(feature = "std"))]
@@ -21,12 +21,10 @@ pub struct Account {
 }
 
 impl Account {
-    /// compute  hash as committed to in the MPT trie without memoizing
+    /// Compute  hash as committed to in the MPT trie without memoizing.
     pub fn trie_hash_slow(&self) -> B256 {
         let mut buf = vec![];
         self.encode(&mut buf);
-        let mut hasher = Keccak256::new();
-        hasher.update(&buf);
-        hasher.finalize()
+        keccak256(buf)
     }
 }
