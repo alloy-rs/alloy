@@ -21,7 +21,7 @@ pub struct Account {
 }
 
 impl Account {
-    /// compute  hash as committed to in the MPT trie without memoizing
+    /// Compute  hash as committed to in the MPT trie without memoizing.
     pub fn trie_hash_slow(&self) -> B256 {
         let mut buf = vec![];
         self.encode(&mut buf);
