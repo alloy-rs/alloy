@@ -57,6 +57,11 @@ impl Log<LogData> {
         self.inner.topics()
     }
 
+    /// Getter for the topic0 field, the event signature.
+    pub fn event_signature(&self) -> B256 {
+        self.inner.topics()[0]
+    }
+
     /// Get the topic list, mutably. This gives access to the internal
     /// array, without allowing extension of that array. Shortcut for
     /// [`LogData::topics_mut`]
