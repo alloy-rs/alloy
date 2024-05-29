@@ -6,10 +6,10 @@ use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{future::Future, task::Poll};
-use std::marker::PhantomData;
+use std::{future::Future, marker::PhantomData, task::Poll};
 
-type RunningFut<'req, 'state, T, N, Resp, Output, Map> = RpcCall<T, EthCallParams<'req, 'state, N>, Resp, Output, Map, >;
+type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
+    RpcCall<T, EthCallParams<'req, 'state, N>, Resp, Output, Map>;
 
 #[derive(Clone, Debug)]
 struct EthCallParams<'req, 'state, N: Network> {
@@ -34,13 +34,15 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Clone, Debug)]
 #[doc(hidden)] // Not public API.
-pub struct EthCallFut<'req, 'state, T, N, Resp, Output, Map>(EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>)
+#[pin_project::pin_project]
+pub struct EthCallFut<'req, 'state, T, N, Resp, Output, Map>(
+    EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>,
+)
 where
     T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output;
-
 
 #[derive(Clone, Debug)]
 enum EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>
@@ -108,7 +110,7 @@ where
 }
 
 impl<'req, 'state, T, N, Resp, Output, Map> Future
-for EthCallFut<'req, 'state, T, N, Resp, Output, Map>
+    for EthCallFut<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -226,7 +228,7 @@ where
 }
 
 impl<'req, 'state, T, N, Resp, Output, Map> std::future::IntoFuture
-for EthCall<'req, 'state, T, N, Resp, Output, Map>
+    for EthCall<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
