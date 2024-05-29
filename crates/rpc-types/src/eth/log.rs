@@ -59,7 +59,7 @@ impl Log<LogData> {
 
     /// Getter for the topic0 field.
     pub fn topic0(&self) -> Option<&B256> {
-        self.inner.topics().get(0)
+        self.inner.topics().first()
     }
 
     /// Get the topic list, mutably. This gives access to the internal
