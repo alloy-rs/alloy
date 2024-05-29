@@ -58,6 +58,7 @@ impl Log<LogData> {
     }
 
     /// Getter for the topic0 field.
+    #[doc(alias = "event_signature")]
     pub fn topic0(&self) -> Option<&B256> {
         self.inner.topics().first()
     }
