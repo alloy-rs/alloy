@@ -102,7 +102,7 @@ pub trait EngineApi<N, T>: Send + Sync {
     ///
     /// Note:
     /// > Provider software MAY stop the corresponding build process after serving this call.
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2>;
+    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -218,7 +218,7 @@ where
         self.client().request("engine_getPayloadV2", (payload_id,)).await
     }
 
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2> {
+    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3> {
         self.client().request("engine_getPayloadV3", (payload_id,)).await
     }
 
