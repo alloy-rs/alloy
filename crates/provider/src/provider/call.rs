@@ -199,10 +199,13 @@ where
     Map: Fn(Resp) -> Output,
 {
     /// Map the response to a different type.
-    pub fn map_resp<NewOutput, NewMap: Fn(Resp) -> NewOutput>(
+    pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
-    ) -> EthCall<'req, 'state, T, N, Resp, NewOutput, NewMap> {
+    ) -> EthCall<'req, 'state, T, N, Resp, NewOutput, NewMap>
+        where
+            NewMap: Fn(Resp) -> NewOutput,
+    {
         EthCall {
             client: self.client,
             data: self.data,

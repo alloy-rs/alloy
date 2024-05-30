@@ -719,7 +719,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// or block ID is provided, the gas estimate will be computed for the latest block
     /// with the current state.
     ///
-    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride\
+    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
     ///
     /// # Note
     ///
