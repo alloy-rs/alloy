@@ -203,8 +203,8 @@ where
         self,
         map: NewMap,
     ) -> EthCall<'req, 'state, T, N, Resp, NewOutput, NewMap>
-        where
-            NewMap: Fn(Resp) -> NewOutput,
+    where
+        NewMap: Fn(Resp) -> NewOutput,
     {
         EthCall {
             client: self.client,
