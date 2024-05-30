@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine};
 use std::{fmt, net::SocketAddr};
 
-/// Basic or bearer authentication in http or websocket transport
+/// Basic, bearer or raw authentication in http or websocket transport
 ///
 /// Use to inject username and password or an auth token into requests
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -10,6 +10,8 @@ pub enum Authorization {
     Basic(String),
     /// [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750) Bearer Auth
     Bearer(String),
+    /// Raw auth string
+    Raw(String),
 }
 
 impl Authorization {
@@ -43,6 +45,11 @@ impl Authorization {
     pub fn bearer(token: impl Into<String>) -> Self {
         Self::Bearer(token.into())
     }
+
+    /// Instantiate a new raw auth from the given token.
+    pub fn raw(token: impl Into<String>) -> Self {
+        Self::Raw(token.into())
+    }
 }
 
 impl fmt::Display for Authorization {
@@ -50,6 +57,7 @@ impl fmt::Display for Authorization {
         match self {
             Self::Basic(auth) => write!(f, "Basic {auth}"),
             Self::Bearer(auth) => write!(f, "Bearer {auth}"),
+            Self::Raw(auth) => write!(f, "{auth}"),
         }
     }
 }
