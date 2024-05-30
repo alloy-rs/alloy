@@ -5,6 +5,7 @@ use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
     TxType, TypedTransaction,
 };
+use alloy_eips::eip7702::AuthorizationList;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -77,6 +78,10 @@ pub struct TransactionRequest {
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub access_list: Option<AccessList>,
+    /// An EIP-7702 authorization list. See [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)
+    /// for more information.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<AuthorizationList>,
     /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
     #[serde(
         default,

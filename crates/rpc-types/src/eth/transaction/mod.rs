@@ -9,7 +9,10 @@ use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
-pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
+pub use alloy_eips::{
+    eip2930::{AccessList, AccessListItem, AccessListWithGasUsed},
+    eip7702::{Authorization, AuthorizationList},
+};
 
 mod common;
 pub use common::TransactionInfo;
@@ -108,6 +111,13 @@ pub struct Transaction {
     /// Pre-pay to warm storage access.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_list: Option<AccessList>,
+    /// EIP7702
+    ///
+    /// The code of the signer of each authorization list item will be
+    /// set to the code referenced by the address included for the
+    /// duration of the transaction
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<AuthorizationList>,
     /// EIP2718
     ///
     /// Transaction type,
@@ -165,6 +175,7 @@ impl Transaction {
             max_fee_per_gas: self.max_fee_per_gas,
             max_priority_fee_per_gas: self.max_priority_fee_per_gas,
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,
+            authorization_list: self.authorization_list,
             blob_versioned_hashes: self.blob_versioned_hashes,
             sidecar: None,
         }
@@ -323,6 +334,7 @@ mod tests {
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
+            authorization_list: None,
             transaction_type: Some(20),
             max_fee_per_gas: Some(21),
             max_priority_fee_per_gas: Some(22),
@@ -361,6 +373,7 @@ mod tests {
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
+            authorization_list: None,
             transaction_type: Some(20),
             max_fee_per_gas: Some(21),
             max_priority_fee_per_gas: Some(22),
