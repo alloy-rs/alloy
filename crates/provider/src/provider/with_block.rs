@@ -206,7 +206,17 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    /// Map the response.
+    /// Map the response to a different type. This is usable for converting
+    /// the response to a more usable type, e.g. changing `U64` to `u64`.
+    ///
+    /// ## Note
+    ///
+    /// Carefully review the rust documentation on [fn pointers] before passing
+    /// them to this function. Unless the pointer is specifically coerced to a
+    /// `fn(_) -> _`, the `NewMap` will be inferred as that function's unique
+    /// type. This can lead to confusing error messages.
+    ///
+    /// [fn pointers]: https://doc.rust-lang.org/std/primitive.fn.html#creating-function-pointers
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
