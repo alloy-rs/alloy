@@ -1,9 +1,10 @@
 use alloy_network::Network;
 use alloy_primitives::{BlockHash, B256};
 use alloy_rpc_types_engine::{
-    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ExecutionPayloadV1,
-    ExecutionPayloadV2, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
-    PayloadId, PayloadStatus,
+    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV2,
+    ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId,
+    PayloadStatus,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -93,7 +94,10 @@ pub trait EngineApi<N, T>: Send + Sync {
     ///
     /// Note:
     /// > Provider software MAY stop the corresponding build process after serving this call.
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2>;
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2>;
 
     /// Retrieves an executionpayload from a previously started build process, as specified for the
     /// Cancun fork.
@@ -102,7 +106,10 @@ pub trait EngineApi<N, T>: Send + Sync {
     ///
     /// Note:
     /// > Provider software MAY stop the corresponding build process after serving this call.
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3>;
+    async fn get_payload_v3(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -214,11 +221,17 @@ where
         self.client().request("engine_getPayloadV1", (payload_id,)).await
     }
 
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2> {
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2> {
         self.client().request("engine_getPayloadV2", (payload_id,)).await
     }
 
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3> {
+    async fn get_payload_v3(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3> {
         self.client().request("engine_getPayloadV3", (payload_id,)).await
     }
 
