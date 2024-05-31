@@ -2,8 +2,8 @@
 
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
-    RpcWithBlock, SendableTx,
+    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, ProviderCall,
+    RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -12,7 +12,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
+use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
 use alloy_rpc_types::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
     FeeHistory, Filter, FilterChanges, Log, SyncStatus,
@@ -422,8 +422,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Get the last block number available.
-    fn get_block_number(&self) -> RpcCall<T, (), U64, BlockNumber> {
-        self.client().request("eth_blockNumber", ()).map_resp(crate::utils::convert_u64)
+    fn get_block_number(&self) -> ProviderCall<T, (), U64, BlockNumber> {
+        self.client()
+            .request("eth_blockNumber", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
@@ -538,13 +541,19 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the chain ID.
-    fn get_chain_id(&self) -> RpcCall<T, (), U64, u64> {
-        self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64)
+    fn get_chain_id(&self) -> ProviderCall<T, (), U64, u64> {
+        self.client()
+            .request("eth_chainId", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    fn get_net_version(&self) -> RpcCall<T, (), U64, u64> {
-        self.client().request("net_version", ()).map_resp(crate::utils::convert_u64)
+    fn get_net_version(&self) -> ProviderCall<T, (), U64, u64> {
+        self.client()
+            .request("net_version", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /// Gets the specified storage value from [Address].
@@ -590,8 +599,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    fn get_gas_price(&self) -> RpcCall<T, (), U128, u128> {
-        self.client().request("eth_gasPrice", ()).map_resp(crate::utils::convert_u128)
+    fn get_gas_price(&self) -> ProviderCall<T, (), U128, u128> {
+        self.client()
+            .request("eth_gasPrice", ())
+            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
+            .into()
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
