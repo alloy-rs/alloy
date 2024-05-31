@@ -55,6 +55,14 @@ impl<T: Default> Default for WithOtherFields<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for WithOtherFields<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.other == other.other
+    }
+}
+
+impl<T: Eq> Eq for WithOtherFields<T> {}
+
 impl<'de, T> Deserialize<'de> for WithOtherFields<T>
 where
     T: Deserialize<'de> + Serialize,
