@@ -1,14 +1,15 @@
 use alloy_eips::BlockId;
+use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
-use alloy_primitives::Bytes;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{future::Future, task::Poll};
+use std::{future::Future, marker::PhantomData, task::Poll};
 
-type RunningFut<'req, 'state, T, N> = RpcCall<T, EthCallParams<'req, 'state, N>, Bytes>;
+type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
+    RpcCall<T, EthCallParams<'req, 'state, N>, Resp, Output, Map>;
 
 #[derive(Clone, Debug)]
 struct EthCallParams<'req, 'state, N: Network> {
@@ -33,31 +34,43 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Clone, Debug)]
 #[doc(hidden)] // Not public API.
-pub struct EthCallFut<'req, 'state, T, N>(EthCallFutInner<'req, 'state, T, N>)
-where
-    T: Transport + Clone,
-    N: Network;
-
-#[derive(Clone, Debug)]
-enum EthCallFutInner<'req, 'state, T, N: Network>
+#[pin_project::pin_project]
+pub struct EthCallFut<'req, 'state, T, N, Resp, Output, Map>(
+    EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>,
+)
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output;
+
+#[derive(Clone, Debug)]
+enum EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    N: Network,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
 {
     Preparing {
         client: WeakClient<T>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'state StateOverride>,
         block: Option<BlockId>,
+        method: &'static str,
+        map: Map,
     },
-    Running(RunningFut<'req, 'state, T, N>),
+    Running(RunningFut<'req, 'state, T, N, Resp, Output, Map>),
     Polling,
 }
 
-impl<'req, 'state, T, N> EthCallFutInner<'req, 'state, T, N>
+impl<'req, 'state, T, N, Resp, Output, Map> EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
 {
     /// Returns `true` if the future is in the preparing state.
     const fn is_preparing(&self) -> bool {
@@ -69,8 +82,8 @@ where
         matches!(self, Self::Running(..))
     }
 
-    fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Bytes>> {
-        let Self::Preparing { client, data, overrides, block } =
+    fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
+        let Self::Preparing { client, data, overrides, block, method, map } =
             std::mem::replace(self, Self::Polling)
         else {
             unreachable!("bad state")
@@ -83,25 +96,29 @@ where
 
         let params = EthCallParams { data, block: block.unwrap_or_default(), overrides };
 
-        let fut = client.request("eth_call", params);
+        let fut = client.request(method, params).map_resp(map);
 
         *self = Self::Running(fut);
         self.poll_running(cx)
     }
 
-    fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Bytes>> {
+    fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
         let Self::Running(ref mut call) = self else { unreachable!("bad state") };
 
         call.poll_unpin(cx)
     }
 }
 
-impl<'req, 'state, T, N> Future for EthCallFut<'req, 'state, T, N>
+impl<'req, 'state, T, N, Resp, Output, Map> Future
+    for EthCallFut<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
 {
-    type Output = TransportResult<Bytes>;
+    type Output = TransportResult<Output>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -124,34 +141,82 @@ where
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Debug, Clone)]
-pub struct EthCall<'req, 'state, T, N>
+pub struct EthCall<'req, 'state, T, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
 {
     client: WeakClient<T>,
 
     data: &'req N::TransactionRequest,
     overrides: Option<&'state StateOverride>,
     block: Option<BlockId>,
+    method: &'static str,
+    map: Map,
+    _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<'req, T, N> EthCall<'req, 'static, T, N>
+impl<'req, T, N, Resp> EthCall<'req, 'static, T, N, Resp>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
 {
     /// Create a new CallBuilder.
     pub const fn new(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
-        Self { client, data, overrides: None, block: None }
+        Self {
+            client,
+            data,
+            overrides: None,
+            block: None,
+            method: "eth_call",
+            map: std::convert::identity,
+            _pd: PhantomData,
+        }
+    }
+
+    /// Create new EthCall for gas estimates.
+    pub const fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+        Self {
+            client,
+            data,
+            overrides: None,
+            block: None,
+            method: "eth_estimateGas",
+            map: std::convert::identity,
+            _pd: PhantomData,
+        }
     }
 }
 
-impl<'req, 'state, T, N> EthCall<'req, 'state, T, N>
+impl<'req, 'state, T, N, Resp, Output, Map> EthCall<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
 {
+    /// Map the response to a different type.
+    pub fn map_resp<NewOutput, NewMap>(
+        self,
+        map: NewMap,
+    ) -> EthCall<'req, 'state, T, N, Resp, NewOutput, NewMap>
+    where
+        NewMap: Fn(Resp) -> NewOutput,
+    {
+        EthCall {
+            client: self.client,
+            data: self.data,
+            overrides: self.overrides,
+            block: self.block,
+            method: self.method,
+            map,
+            _pd: PhantomData,
+        }
+    }
+
     /// Set the state overrides for this call.
     pub const fn overrides(mut self, overrides: &'state StateOverride) -> Self {
         self.overrides = Some(overrides);
@@ -165,14 +230,18 @@ where
     }
 }
 
-impl<'req, 'state, T, N> std::future::IntoFuture for EthCall<'req, 'state, T, N>
+impl<'req, 'state, T, N, Resp, Output, Map> std::future::IntoFuture
+    for EthCall<'req, 'state, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
 {
-    type Output = TransportResult<Bytes>;
+    type Output = TransportResult<Output>;
 
-    type IntoFuture = EthCallFut<'req, 'state, T, N>;
+    type IntoFuture = EthCallFut<'req, 'state, T, N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut(EthCallFutInner::Preparing {
@@ -180,6 +249,8 @@ where
             data: self.data,
             overrides: self.overrides,
             block: self.block,
+            method: self.method,
+            map: self.map,
         })
     }
 }

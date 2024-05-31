@@ -29,7 +29,7 @@ where
     N: Network,
     D: CallDecoder,
 {
-    inner: alloy_provider::EthCall<'req, 'state, T, N>,
+    inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>,
 
     decoder: &'coder D,
 }
@@ -42,7 +42,7 @@ where
 {
     /// Create a new [`EthCall`].
     pub const fn new(
-        inner: alloy_provider::EthCall<'req, 'state, T, N>,
+        inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>,
         decoder: &'coder D,
     ) -> Self {
         Self { inner, decoder }
@@ -55,7 +55,7 @@ where
     N: Network,
 {
     /// Create a new [`EthCall`].
-    pub const fn new_raw(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
+    pub const fn new_raw(inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>) -> Self {
         Self::new(inner, &RAW_CODER)
     }
 }
@@ -90,13 +90,13 @@ where
     }
 }
 
-impl<'req, 'state, T, N> From<alloy_provider::EthCall<'req, 'state, T, N>>
+impl<'req, 'state, T, N> From<alloy_provider::EthCall<'req, 'state, T, N, Bytes>>
     for EthCall<'req, 'state, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
-    fn from(inner: alloy_provider::EthCall<'req, 'state, T, N>) -> Self {
+    fn from(inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>) -> Self {
         Self { inner, decoder: &RAW_CODER }
     }
 }
@@ -127,7 +127,7 @@ where
     N: Network,
     D: CallDecoder,
 {
-    inner: <alloy_provider::EthCall<'req, 'state, T, N> as IntoFuture>::IntoFuture,
+    inner: <alloy_provider::EthCall<'req, 'state, T, N, Bytes> as IntoFuture>::IntoFuture,
     decoder: &'coder D,
 }
 
