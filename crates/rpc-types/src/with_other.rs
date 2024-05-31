@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct WithOtherFields<T> {
     /// The inner struct.
     #[serde(flatten)]
@@ -54,14 +54,6 @@ impl<T: Default> Default for WithOtherFields<T> {
         Self::new(T::default())
     }
 }
-
-impl<T: PartialEq> PartialEq for WithOtherFields<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.inner == other.inner && self.other == other.other
-    }
-}
-
-impl<T: Eq> Eq for WithOtherFields<T> {}
 
 impl<'de, T> Deserialize<'de> for WithOtherFields<T>
 where
