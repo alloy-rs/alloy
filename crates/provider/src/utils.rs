@@ -27,7 +27,7 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let mut rewards =
         rewards.iter().filter_map(|r| r.first()).filter(|r| **r > 0_u128).collect::<Vec<_>>();
     if rewards.is_empty() {
-        return 0_u128;
+        return EIP1559_MIN_PRIORITY_FEE;
     }
 
     rewards.sort_unstable();
