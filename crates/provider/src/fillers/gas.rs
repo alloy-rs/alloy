@@ -273,7 +273,7 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        assert_eq!(tx.effective_gas_price, 0x3b9aca00);
+        assert_eq!(tx.effective_gas_price, 0x3b9aca01);
         assert_eq!(tx.gas_used, 0x5208);
     }
 
