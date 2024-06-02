@@ -86,9 +86,9 @@ mod tests {
 
         let rewards = vec![vec![0_u128], vec![0_u128], vec![0_u128]];
 
-        assert_eq!(super::estimate_priority_fee(&rewards), 0_u128);
+        assert_eq!(super::estimate_priority_fee(&rewards), EIP1559_MIN_PRIORITY_FEE);
 
-        assert_eq!(super::estimate_priority_fee(&[]), 0_u128);
+        assert_eq!(super::estimate_priority_fee(&[]), EIP1559_MIN_PRIORITY_FEE);
     }
 
     #[test]
