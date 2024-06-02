@@ -8,6 +8,8 @@ pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
 pub const EIP1559_BASE_FEE_MULTIPLIER: u128 = 2;
 /// The default percentile of gas premiums that are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
+/// The minimum priority fee to provide.
+pub const EIP1559_MIN_PRIORITY_FEE: u128 = 1;
 
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
@@ -25,19 +27,17 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let mut rewards =
         rewards.iter().filter_map(|r| r.first()).filter(|r| **r > 0_u128).collect::<Vec<_>>();
     if rewards.is_empty() {
-        return 0_u128;
+        return EIP1559_MIN_PRIORITY_FEE;
     }
 
     rewards.sort_unstable();
 
-    // Return the median.
     let n = rewards.len();
 
-    if n % 2 == 0 {
-        (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2
-    } else {
-        *rewards[n / 2]
-    }
+    let median =
+        if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
+
+    std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
 
 /// The default EIP-1559 fee estimator which is based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56)
@@ -86,9 +86,9 @@ mod tests {
 
         let rewards = vec![vec![0_u128], vec![0_u128], vec![0_u128]];
 
-        assert_eq!(super::estimate_priority_fee(&rewards), 0_u128);
+        assert_eq!(super::estimate_priority_fee(&rewards), EIP1559_MIN_PRIORITY_FEE);
 
-        assert_eq!(super::estimate_priority_fee(&[]), 0_u128);
+        assert_eq!(super::estimate_priority_fee(&[]), EIP1559_MIN_PRIORITY_FEE);
     }
 
     #[test]
