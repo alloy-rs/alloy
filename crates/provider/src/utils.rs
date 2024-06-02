@@ -34,11 +34,8 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
 
     let n = rewards.len();
 
-    let median = if n % 2 == 0 {
-        (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2
-    } else {
-        *rewards[n / 2]
-    };
+    let median =
+        if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
 
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
