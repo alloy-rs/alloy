@@ -123,6 +123,12 @@ pub enum GethTrace {
     JS(serde_json::Value),
 }
 
+impl Default for GethTrace {
+    fn default() -> Self {
+        GethTrace::Default(DefaultFrame::default())
+    }
+}
+
 impl From<DefaultFrame> for GethTrace {
     fn from(value: DefaultFrame) -> Self {
         Self::Default(value)
