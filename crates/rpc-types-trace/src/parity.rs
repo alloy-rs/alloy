@@ -174,7 +174,7 @@ pub enum Action {
 
 impl Default for Action {
     fn default() -> Self {
-        Action::Call(CallAction::default())
+        Self::Call(CallAction::default())
     }
 }
 
