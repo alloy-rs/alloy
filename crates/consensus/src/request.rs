@@ -1,3 +1,5 @@
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use alloy_eips::{
     eip6110::DepositRequest,
     eip7002::WithdrawalRequest,
