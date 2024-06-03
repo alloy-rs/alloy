@@ -35,6 +35,21 @@ impl From<TxEnvelope> for WithOtherFields<TransactionRequest> {
     }
 }
 
+/// Convert a generic type WithOtherFields<T> to a WithOtherFields<TransactionRequest>
+pub trait IntoTransactionRequest {
+    /// Convert a generic type WithOtherFields<T> to a WithOtherFields<TransactionRequest>
+    fn into_transaction_request(self) -> WithOtherFields<TransactionRequest>;
+}
+
+impl<T> IntoTransactionRequest for WithOtherFields<T>
+where
+    T: Into<TransactionRequest>,
+{
+    fn into_transaction_request(self) -> WithOtherFields<TransactionRequest> {
+        WithOtherFields::new(self.inner.into())
+    }
+}
+
 impl<T> Deref for WithOtherFields<T> {
     type Target = T;
 
