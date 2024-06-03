@@ -944,11 +944,9 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
-    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
-    use alloy_sol_types::SolValue;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1370,6 +1368,9 @@ mod tests {
         feature = "reqwest-native-tls",
     ))]
     async fn call_mainnet() {
+        use alloy_network::TransactionBuilder;
+        use alloy_sol_types::SolValue;
+
         init_tracing();
         let url = "https://eth-mainnet.alchemyapi.io/v2/jGiK5vwDfC3F4r0bqukm-W2GqgdrxdSr";
         let provider = ProviderBuilder::new().on_http(url.parse().unwrap());

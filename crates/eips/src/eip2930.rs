@@ -2,6 +2,8 @@
 //!
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 

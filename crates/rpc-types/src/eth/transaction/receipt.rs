@@ -1,3 +1,5 @@
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use crate::{Log, WithOtherFields};
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256};
