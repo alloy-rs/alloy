@@ -172,6 +172,12 @@ pub enum Action {
     Reward(RewardAction),
 }
 
+impl Default for Action {
+    fn default() -> Self {
+        Action::Call(CallAction::default())
+    }
+}
+
 impl Action {
     /// Returns true if this is a call action
     pub const fn is_call(&self) -> bool {
@@ -240,7 +246,7 @@ pub enum CallType {
 }
 
 /// Represents a certain [CallType] of a _call_ or message transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CallAction {
     /// Address of the sending account.
@@ -358,7 +364,7 @@ impl TraceOutput {
 }
 
 /// A parity style trace of a transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionTrace {
     /// Represents what kind of trace this is
