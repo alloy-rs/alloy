@@ -30,7 +30,7 @@ pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;
 pub use alloy_eips::eip7002::WithdrawalRequest as WithdrawalRequestV1;
 
 /// The list of all supported Engine capabilities available over the engine endpoint.
-pub const CAPABILITIES: [&str; 12] = [
+pub const CAPABILITIES: [&str; 14] = [
     "engine_forkchoiceUpdatedV1",
     "engine_forkchoiceUpdatedV2",
     "engine_forkchoiceUpdatedV3",
@@ -38,9 +38,11 @@ pub const CAPABILITIES: [&str; 12] = [
     "engine_getPayloadV1",
     "engine_getPayloadV2",
     "engine_getPayloadV3",
+    "engine_getPayloadV4",
     "engine_newPayloadV1",
     "engine_newPayloadV2",
     "engine_newPayloadV3",
+    "engine_newPayloadV4",
     "engine_getPayloadBodiesByHashV1",
     "engine_getPayloadBodiesByRangeV1",
 ];
