@@ -125,7 +125,7 @@ pub enum GethTrace {
 
 impl Default for GethTrace {
     fn default() -> Self {
-        GethTrace::Default(DefaultFrame::default())
+        Self::Default(DefaultFrame::default())
     }
 }
 
