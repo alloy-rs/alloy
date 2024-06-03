@@ -95,7 +95,7 @@ mod tests {
         assert!(success_result.is_success());
         assert!(!success_result.is_error());
         assert_eq!(success_result.tx_hash(), tx_hash);
-        assert_eq!(success_result.result(), Some(&OkResult { message: "Success".to_string() }));
+        assert_eq!(success_result.success(), Some(&OkResult { message: "Success".to_string() }));
         assert_eq!(success_result.error(), None);
 
         let error_result: TraceResult<OkResult, ErrResult> =
@@ -104,7 +104,7 @@ mod tests {
         assert!(!error_result.is_success());
         assert!(error_result.is_error());
         assert_eq!(error_result.tx_hash(), tx_hash);
-        assert_eq!(error_result.result(), None);
+        assert_eq!(error_result.success(), None);
         assert_eq!(error_result.error(), Some(&ErrResult { code: 404 }));
     }
 }
