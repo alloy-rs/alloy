@@ -905,6 +905,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<Box<RawValue>> {
         self.client().request(method, params).await
     }
+
+    /// Creates a new [`TransactionRequest`](alloy_network::Network).
+    #[inline]
+    fn transaction_request(&self) -> N::TransactionRequest {
+        Default::default()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
