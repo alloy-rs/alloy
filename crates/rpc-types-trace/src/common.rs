@@ -35,7 +35,7 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     }
 
     /// Returns a reference to the result if it is a success variant.
-    pub const fn result(&self) -> Option<&Ok> {
+    pub const fn success(&self) -> Option<&Ok> {
         match self {
             Self::Success { result, .. } => Some(result),
             Self::Error { .. } => None,
