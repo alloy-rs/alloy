@@ -35,7 +35,7 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     }
 
     /// Returns a reference to the result if it is a success variant.
-    pub fn result(&self) -> Option<&Ok> {
+    pub const fn result(&self) -> Option<&Ok> {
         match self {
             Self::Success { result, .. } => Some(result),
             Self::Error { .. } => None,
@@ -43,7 +43,7 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     }
 
     /// Returns a reference to the error if it is an error variant.
-    pub fn error(&self) -> Option<&Err> {
+    pub const fn error(&self) -> Option<&Err> {
         match self {
             Self::Error { error, .. } => Some(error),
             Self::Success { .. } => None,
@@ -51,22 +51,22 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     }
 
     /// Checks if the result is a success.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         matches!(self, Self::Success { .. })
     }
 
     /// Checks if the result is an error.
-    pub fn is_error(&self) -> bool {
+    pub const fn is_error(&self) -> bool {
         matches!(self, Self::Error { .. })
     }
 
     /// Creates a new success trace result.
-    pub fn new_success(result: Ok, tx_hash: Option<TxHash>) -> Self {
+    pub const fn new_success(result: Ok, tx_hash: Option<TxHash>) -> Self {
         Self::Success { result, tx_hash }
     }
 
     /// Creates a new error trace result.
-    pub fn new_error(error: Err, tx_hash: Option<TxHash>) -> Self {
+    pub const fn new_error(error: Err, tx_hash: Option<TxHash>) -> Self {
         Self::Error { error, tx_hash }
     }
 }
