@@ -25,7 +25,6 @@ all = "warn"
 missing_const_for_fn = "warn"
 use_self = "warn"
 option_if_let_else = "warn"
-nursery = "warn"
 
 [workspace.metadata.docs.rs]
 all-features = true
