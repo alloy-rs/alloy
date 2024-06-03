@@ -906,7 +906,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request(method, params).await
     }
 
-    /// Creates a new [TransactionRequest](alloy_network::Network).
+    /// Creates a new [`TransactionRequest`](alloy_network::Network).
     #[inline]
     fn transaction_request(&self) -> N::TransactionRequest {
         Default::default()
