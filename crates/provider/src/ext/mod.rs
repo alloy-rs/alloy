@@ -11,5 +11,8 @@ pub use engine::EngineApi;
 mod debug;
 pub use debug::DebugApi;
 
+mod trace;
+pub use trace::{TraceApi, TraceCallList};
+
 mod txpool;
 pub use txpool::TxPoolApi;

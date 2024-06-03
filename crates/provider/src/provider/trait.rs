@@ -17,7 +17,6 @@ use alloy_rpc_types::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
     FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
@@ -26,9 +25,6 @@ use std::borrow::Cow;
 ///
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
-
-/// List of trace calls for use with [`Provider::trace_call_many`]
-pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
 
 // todo: adjust docs
 // todo: reorder
@@ -789,56 +785,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
-    /// Executes the given transaction and returns a number of possible traces.
-    ///
-    /// # Note
-    ///
-    /// Not all nodes support this call.
-    fn trace_call<'a, 'b>(
-        &self,
-        request: &'a N::TransactionRequest,
-        trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults> {
-        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
-    }
-
-    /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
-    /// on top of the given block with all `n - 1` transaction applied first.
-    ///
-    /// Allows tracing dependent transactions.
-    ///
-    /// # Note
-    ///
-    /// Not all nodes support this call.
-    fn trace_call_many<'a>(
-        &self,
-        request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
-        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
-    }
-
-    // todo: move to extension trait
-    /// Parity trace transaction.
-    async fn trace_transaction(
-        &self,
-        hash: TxHash,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.client().request("trace_transaction", (hash,)).await
-    }
-
-    // todo: move to extension trait
-    /// Trace all transactions in the given block.
-    ///
-    /// # Note
-    ///
-    /// Not all nodes support this call.
-    async fn trace_block(
-        &self,
-        block: BlockNumberOrTag,
-    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.client().request("trace_block", (block,)).await
-    }
-
     /* ------------------------------------------ anvil ----------------------------------------- */
 
     /// Set the bytecode of a given account.
@@ -1303,14 +1249,6 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
         assert!(receipts.is_some());
-    }
-
-    #[tokio::test]
-    async fn gets_block_traces() {
-        init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
-        let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
-        assert_eq!(traces.len(), 0);
     }
 
     #[tokio::test]
