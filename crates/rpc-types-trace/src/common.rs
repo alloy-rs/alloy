@@ -33,4 +33,78 @@ impl<Ok, Err> TraceResult<Ok, Err> {
             Self::Error { tx_hash, .. } => tx_hash,
         }
     }
+
+    /// Returns a reference to the result if it is a success variant.
+    pub fn result(&self) -> Option<&Ok> {
+        match self {
+            Self::Success { result, .. } => Some(result),
+            Self::Error { .. } => None,
+        }
+    }
+
+    /// Returns a reference to the error if it is an error variant.
+    pub fn error(&self) -> Option<&Err> {
+        match self {
+            Self::Error { error, .. } => Some(error),
+            Self::Success { .. } => None,
+        }
+    }
+
+    /// Checks if the result is a success.
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success { .. })
+    }
+
+    /// Checks if the result is an error.
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error { .. })
+    }
+
+    /// Creates a new success trace result.
+    pub fn new_success(result: Ok, tx_hash: Option<TxHash>) -> Self {
+        Self::Success { result, tx_hash }
+    }
+
+    /// Creates a new error trace result.
+    pub fn new_error(error: Err, tx_hash: Option<TxHash>) -> Self {
+        Self::Error { error, tx_hash }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct OkResult {
+        message: String,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+    struct ErrResult {
+        code: i32,
+    }
+
+    #[test]
+    fn test_trace_result_getters() {
+        let tx_hash = Some(TxHash::ZERO);
+
+        let success_result: TraceResult<OkResult, ErrResult> =
+            TraceResult::new_success(OkResult { message: "Success".to_string() }, tx_hash);
+
+        assert!(success_result.is_success());
+        assert!(!success_result.is_error());
+        assert_eq!(success_result.tx_hash(), tx_hash);
+        assert_eq!(success_result.result(), Some(&OkResult { message: "Success".to_string() }));
+        assert_eq!(success_result.error(), None);
+
+        let error_result: TraceResult<OkResult, ErrResult> =
+            TraceResult::new_error(ErrResult { code: 404 }, tx_hash);
+
+        assert!(!error_result.is_success());
+        assert!(error_result.is_error());
+        assert_eq!(error_result.tx_hash(), tx_hash);
+        assert_eq!(error_result.result(), None);
+        assert_eq!(error_result.error(), Some(&ErrResult { code: 404 }));
+    }
 }
