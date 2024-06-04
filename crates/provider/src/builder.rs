@@ -1,6 +1,7 @@
 use crate::{
     fillers::{
-        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerFiller, TxFiller,
+        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
+        SignerFiller, TxFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -10,10 +11,6 @@ use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
-
-/// The recommended filler.
-type RecommendFiller =
-    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
@@ -130,7 +127,7 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
-    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendFiller, N> {
+    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendedFiller, N> {
         self.filler(GasFiller).filler(NonceFiller::default()).filler(ChainIdFiller::default())
     }
 

@@ -22,7 +22,8 @@ mod join_fill;
 pub use join_fill::JoinFill;
 
 use crate::{
-    provider::SendableTx, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
+    provider::SendableTx, Identity, PendingTransactionBuilder, Provider, ProviderLayer,
+    RootProvider,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Ethereum, Network};
@@ -30,6 +31,11 @@ use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use std::marker::PhantomData;
+
+/// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
+/// management, and chain-id fetching.
+pub type RecommendedFiller =
+    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
