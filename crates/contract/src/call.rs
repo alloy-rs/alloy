@@ -131,6 +131,20 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     transport: PhantomData<T>,
 }
 
+impl<T, P, D, N> CallBuilder<T, P, D, N>
+where
+    T: Transport + Clone,
+    P: Provider<T, N>,
+    D: CallDecoder + Send + Sync + Unpin,
+    N: Network,
+    Self: 'static,
+{
+    /// Retrieves a reference to the transaction request.
+    pub fn request(&self) -> &N::TransactionRequest {
+        &self.request
+    }
+}
+
 // See [`ContractInstance`].
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
     pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
