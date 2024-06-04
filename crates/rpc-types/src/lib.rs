@@ -16,4 +16,4 @@ pub use alloy_serde as serde_helpers;
 pub use eth::*;
 
 mod with_other;
-pub use with_other::{IntoTransactionRequest, WithOtherFields};
+pub use with_other::WithOtherFields;
