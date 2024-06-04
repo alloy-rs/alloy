@@ -23,6 +23,16 @@ impl<T> WithOtherFields<T> {
     }
 }
 
+impl<T> WithOtherFields<T>
+where
+    T: Into<TransactionRequest>,
+{
+    /// Convert a generic type `WithOtherFields<T>` to a `WithOtherFields<TransactionRequest>`
+    pub fn into_transaction_request(self) -> WithOtherFields<TransactionRequest> {
+        WithOtherFields::new(self.inner.into())
+    }
+}
+
 impl From<TypedTransaction> for WithOtherFields<TransactionRequest> {
     fn from(tx: TypedTransaction) -> Self {
         Self::new(tx.into())
