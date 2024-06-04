@@ -93,18 +93,18 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     }
 
     /// Returns the transaction hash.
-    pub const fn tx_hash(&self) -> &B256 {
-        self.config.tx_hash()
+    pub const fn transaction_hash(&self) -> &B256 {
+        self.config.transaction_hash()
     }
 
     /// Sets the transaction hash.
-    pub fn set_tx_hash(&mut self, tx_hash: B256) {
-        self.config.set_tx_hash(tx_hash);
+    pub fn set_transaction_hash(&mut self, transaction_hash: B256) {
+        self.config.set_transaction_hash(transaction_hash);
     }
 
     /// Sets the transaction hash.
-    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
-        self.config.tx_hash = tx_hash;
+    pub const fn with_transaction_hash(mut self, transaction_hash: B256) -> Self {
+        self.config.transaction_hash = transaction_hash;
         self
     }
 
@@ -180,7 +180,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`watch`](Self::watch) for watching the transaction without fetching the receipt.
     pub async fn get_receipt(self) -> TransportResult<N::ReceiptResponse> {
-        let hash = self.config.tx_hash;
+        let hash = self.config.transaction_hash;
         let mut pending_tx = self.provider.watch_pending_transaction(self.config).await?;
 
         // FIXME: this is a hotfix to prevent a race condition where the heartbeat would miss the
@@ -219,7 +219,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
 #[derive(Clone, Debug)]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
-    tx_hash: B256,
+    transaction_hash: B256,
 
     /// Require a number of confirmations.
     required_confirmations: u64,
@@ -230,23 +230,23 @@ pub struct PendingTransactionConfig {
 
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
-    pub const fn new(tx_hash: B256) -> Self {
-        Self { tx_hash, required_confirmations: 1, timeout: None }
+    pub const fn new(transaction_hash: B256) -> Self {
+        Self { transaction_hash, required_confirmations: 1, timeout: None }
     }
 
     /// Returns the transaction hash.
-    pub const fn tx_hash(&self) -> &B256 {
-        &self.tx_hash
+    pub const fn transaction_hash(&self) -> &B256 {
+        &self.transaction_hash
     }
 
     /// Sets the transaction hash.
-    pub fn set_tx_hash(&mut self, tx_hash: B256) {
-        self.tx_hash = tx_hash;
+    pub fn set_transaction_hash(&mut self, transaction_hash: B256) {
+        self.transaction_hash = transaction_hash;
     }
 
     /// Sets the transaction hash.
-    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
-        self.tx_hash = tx_hash;
+    pub const fn with_transaction_hash(mut self, transaction_hash: B256) -> Self {
+        self.transaction_hash = transaction_hash;
         self
     }
 
@@ -302,7 +302,7 @@ struct TxWatcher {
 impl TxWatcher {
     /// Notify the waiter.
     fn notify(self) {
-        debug!(tx=%self.config.tx_hash, "notifying");
+        debug!(tx=%self.config.transaction_hash, "notifying");
         let _ = self.tx.send(());
     }
 }
@@ -314,7 +314,7 @@ impl TxWatcher {
 /// times in the network.
 pub struct PendingTransaction {
     /// The transaction hash.
-    pub(crate) tx_hash: B256,
+    pub(crate) transaction_hash: B256,
     /// The receiver for the notification.
     // TODO: send a receipt?
     pub(crate) rx: oneshot::Receiver<()>,
@@ -322,14 +322,16 @@ pub struct PendingTransaction {
 
 impl fmt::Debug for PendingTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PendingTransaction").field("tx_hash", &self.tx_hash).finish()
+        f.debug_struct("PendingTransaction")
+            .field("transaction_hash", &self.transaction_hash)
+            .finish()
     }
 }
 
 impl PendingTransaction {
     /// Returns this transaction's hash.
-    pub const fn tx_hash(&self) -> &B256 {
-        &self.tx_hash
+    pub const fn transaction_hash(&self) -> &B256 {
+        &self.transaction_hash
     }
 }
 
@@ -340,9 +342,9 @@ impl Future for PendingTransaction {
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        self.rx
-            .poll_unpin(cx)
-            .map(|res| res.map(|()| self.tx_hash).map_err(|_| TransportErrorKind::backend_gone()))
+        self.rx.poll_unpin(cx).map(|res| {
+            res.map(|()| self.transaction_hash).map_err(|_| TransportErrorKind::backend_gone())
+        })
     }
 }
 
@@ -360,9 +362,9 @@ impl HeartbeatHandle {
         config: PendingTransactionConfig,
     ) -> Result<PendingTransaction, PendingTransactionConfig> {
         let (tx, rx) = oneshot::channel();
-        let tx_hash = config.tx_hash;
+        let transaction_hash = config.transaction_hash;
         match self.tx.send(TxWatcher { config, tx }).await {
-            Ok(()) => Ok(PendingTransaction { tx_hash, rx }),
+            Ok(()) => Ok(PendingTransaction { transaction_hash, rx }),
             Err(e) => Err(e.0.config),
         }
     }
@@ -438,12 +440,12 @@ impl<S> Heartbeat<S> {
     /// potentially adding it to our `reap_at` list.
     fn handle_watch_ix(&mut self, to_watch: TxWatcher) {
         // Start watching for the transaction.
-        debug!(tx=%to_watch.config.tx_hash, "watching");
+        debug!(tx=%to_watch.config.transaction_hash, "watching");
         trace!(?to_watch.config);
         if let Some(timeout) = to_watch.config.timeout {
-            self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
+            self.reap_at.insert(Instant::now() + timeout, to_watch.config.transaction_hash);
         }
-        self.unconfirmed.insert(to_watch.config.tx_hash, to_watch);
+        self.unconfirmed.insert(to_watch.config.transaction_hash, to_watch);
     }
 
     /// Handle a new block by checking if any of the transactions we're
@@ -464,7 +466,7 @@ impl<S> Heartbeat<S> {
                 continue;
             }
             // Otherwise add it to the waiting list.
-            debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+            debug!(tx=%watcher.config.transaction_hash, %block_height, confirmations, "adding to waiting list");
             self.waiting_confs.entry(*block_height + confirmations - 1).or_default().push(watcher);
         }
 

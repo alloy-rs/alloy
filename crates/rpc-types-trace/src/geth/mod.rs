@@ -647,7 +647,7 @@ mod tests {
             "txHash": "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"
         }"#;
         let result: TraceResult = serde_json::from_str(s).unwrap();
-        let hash = result.tx_hash().unwrap();
+        let hash = result.transaction_hash().unwrap();
         assert_eq!(
             hash,
             "0x7cc741c553d4098f319c894d9db208999ca49ee1b5c53f6a9992e687cbffb69e"

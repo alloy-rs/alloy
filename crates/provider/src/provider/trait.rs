@@ -1021,12 +1021,12 @@ mod tests {
         };
 
         let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
-        let hash1 = *builder.tx_hash();
+        let hash1 = *builder.transaction_hash();
         let hash2 = builder.watch().await.expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
 
         let builder = provider.send_transaction(tx).await.expect("failed to send tx");
-        let hash1 = *builder.tx_hash();
+        let hash1 = *builder.transaction_hash();
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
         assert_eq!(hash1, hash2);
@@ -1175,7 +1175,8 @@ mod tests {
             .value(U256::ZERO)
             .input(bytes!("deadbeef").into());
 
-        let tx_hash = *provider.send_transaction(req).await.expect("failed to send tx").tx_hash();
+        let tx_hash =
+            *provider.send_transaction(req).await.expect("failed to send tx").transaction_hash();
 
         let tx = provider
             .get_transaction_by_hash(tx_hash)
@@ -1262,7 +1263,7 @@ mod tests {
             )
             .await.unwrap();
         assert_eq!(
-            pending.tx_hash().to_string(),
+            pending.transaction_hash().to_string(),
             "0x9dae5cf33694a02e8a7d5de3fe31e9d05ca0ba6e9180efac4ab20a06c9e598a3"
         );
     }

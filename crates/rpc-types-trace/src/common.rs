@@ -11,26 +11,26 @@ pub enum TraceResult<Ok, Err> {
     Success {
         /// Trace results produced by the tracer
         result: Ok,
-        /// transaction hash
+        /// Transaction hash
         #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
-        tx_hash: Option<TxHash>,
+        transaction_hash: Option<TxHash>,
     },
     /// Untagged error variant
     Error {
         /// Trace failure produced by the tracer
         error: Err,
-        /// transaction hash
+        /// Transaction hash
         #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
-        tx_hash: Option<TxHash>,
+        transaction_hash: Option<TxHash>,
     },
 }
 
 impl<Ok, Err> TraceResult<Ok, Err> {
     /// Returns the hash of the transaction that was traced.
-    pub const fn tx_hash(&self) -> Option<TxHash> {
+    pub const fn transaction_hash(&self) -> Option<TxHash> {
         *match self {
-            Self::Success { tx_hash, .. } => tx_hash,
-            Self::Error { tx_hash, .. } => tx_hash,
+            Self::Success { transaction_hash, .. } => transaction_hash,
+            Self::Error { transaction_hash, .. } => transaction_hash,
         }
     }
 
@@ -61,13 +61,13 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     }
 
     /// Creates a new success trace result.
-    pub const fn new_success(result: Ok, tx_hash: Option<TxHash>) -> Self {
-        Self::Success { result, tx_hash }
+    pub const fn new_success(result: Ok, transaction_hash: Option<TxHash>) -> Self {
+        Self::Success { result, transaction_hash }
     }
 
     /// Creates a new error trace result.
-    pub const fn new_error(error: Err, tx_hash: Option<TxHash>) -> Self {
-        Self::Error { error, tx_hash }
+    pub const fn new_error(error: Err, transaction_hash: Option<TxHash>) -> Self {
+        Self::Error { error, transaction_hash }
     }
 }
 
@@ -94,7 +94,7 @@ mod tests {
 
         assert!(success_result.is_success());
         assert!(!success_result.is_error());
-        assert_eq!(success_result.tx_hash(), tx_hash);
+        assert_eq!(success_result.transaction_hash(), tx_hash);
         assert_eq!(success_result.success(), Some(&OkResult { message: "Success".to_string() }));
         assert_eq!(success_result.error(), None);
 
@@ -103,7 +103,7 @@ mod tests {
 
         assert!(!error_result.is_success());
         assert!(error_result.is_error());
-        assert_eq!(error_result.tx_hash(), tx_hash);
+        assert_eq!(error_result.transaction_hash(), tx_hash);
         assert_eq!(error_result.success(), None);
         assert_eq!(error_result.error(), Some(&ErrResult { code: 404 }));
     }

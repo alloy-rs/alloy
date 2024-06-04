@@ -124,14 +124,14 @@ mod tests {
         };
 
         let builder = provider.send_transaction(tx).await.unwrap();
-        let node_hash = *builder.tx_hash();
+        let node_hash = *builder.transaction_hash();
         assert_eq!(
             node_hash,
             b256!("eb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64")
         );
 
         let pending = builder.register().await.unwrap();
-        let local_hash = *pending.tx_hash();
+        let local_hash = *pending.transaction_hash();
         assert_eq!(local_hash, node_hash);
 
         let local_hash2 = pending.await.unwrap();
