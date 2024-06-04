@@ -140,7 +140,10 @@ where
     Self: 'static,
 {
     /// Retrieves a reference to the transaction request.
-    pub fn request(&self) -> &N::TransactionRequest {
+    pub const fn request(&self) -> impl AsRef<N::TransactionRequest> + '_
+    where
+        <N as Network>::TransactionRequest: AsRef<<N as Network>::TransactionRequest>,
+    {
         &self.request
     }
 }
