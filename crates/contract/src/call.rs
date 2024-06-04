@@ -131,19 +131,8 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     transport: PhantomData<T>,
 }
 
-impl<T, P, D, N> CallBuilder<T, P, D, N>
-where
-    T: Transport + Clone,
-    P: Provider<T, N>,
-    D: CallDecoder + Send + Sync + Unpin,
-    N: Network,
-    Self: 'static,
-{
-    /// Retrieves a reference to the transaction request.
-    pub const fn request(&self) -> impl AsRef<N::TransactionRequest> + '_
-    where
-        <N as Network>::TransactionRequest: AsRef<<N as Network>::TransactionRequest>,
-    {
+impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+    fn as_ref(&self) -> &N::TransactionRequest {
         &self.request
     }
 }
