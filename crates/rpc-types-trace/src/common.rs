@@ -87,23 +87,23 @@ mod tests {
 
     #[test]
     fn test_trace_result_getters() {
-        let tx_hash = Some(TxHash::ZERO);
+        let transaction_hash = Some(TxHash::ZERO);
 
         let success_result: TraceResult<OkResult, ErrResult> =
-            TraceResult::new_success(OkResult { message: "Success".to_string() }, tx_hash);
+            TraceResult::new_success(OkResult { message: "Success".to_string() }, transaction_hash);
 
         assert!(success_result.is_success());
         assert!(!success_result.is_error());
-        assert_eq!(success_result.transaction_hash(), tx_hash);
+        assert_eq!(success_result.transaction_hash(), transaction_hash);
         assert_eq!(success_result.success(), Some(&OkResult { message: "Success".to_string() }));
         assert_eq!(success_result.error(), None);
 
         let error_result: TraceResult<OkResult, ErrResult> =
-            TraceResult::new_error(ErrResult { code: 404 }, tx_hash);
+            TraceResult::new_error(ErrResult { code: 404 }, transaction_hash);
 
         assert!(!error_result.is_success());
         assert!(error_result.is_error());
-        assert_eq!(error_result.transaction_hash(), tx_hash);
+        assert_eq!(error_result.transaction_hash(), transaction_hash);
         assert_eq!(error_result.success(), None);
         assert_eq!(error_result.error(), Some(&ErrResult { code: 404 }));
     }

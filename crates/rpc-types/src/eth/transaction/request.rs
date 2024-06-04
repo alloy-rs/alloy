@@ -489,13 +489,13 @@ impl TransactionRequest {
 
     /// Build an [`TypedTransaction`]
     pub fn build_typed_tx(self) -> Result<TypedTransaction, Self> {
-        let tx_type = self.buildable_type();
+        let transaction_type = self.buildable_type();
 
-        if tx_type.is_none() {
+        if transaction_type.is_none() {
             return Err(self);
         }
 
-        Ok(match tx_type.expect("checked") {
+        Ok(match transaction_type.expect("checked") {
             TxType::Legacy => self.build_legacy().into(),
             TxType::Eip2930 => self.build_2930().into(),
             TxType::Eip1559 => self.build_1559().into(),

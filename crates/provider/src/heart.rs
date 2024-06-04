@@ -34,7 +34,7 @@ use tokio::{
 /// // Register the pending transaction with the provider.
 /// let pending_tx = builder.register().await?;
 /// // Wait for the transaction to be confirmed 2 times.
-/// let tx_hash = pending_tx.await?;
+/// let transaction_hash = pending_tx.await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -42,7 +42,7 @@ use tokio::{
 /// This can also be more concisely written using `watch`:
 /// ```no_run
 /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-/// let tx_hash = provider.send_transaction(tx)
+/// let transaction_hash = provider.send_transaction(tx)
 ///     .await?
 ///     .with_required_confirmations(2)
 ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
@@ -60,8 +60,8 @@ pub struct PendingTransactionBuilder<'a, T, N> {
 
 impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: &'a RootProvider<T, N>, tx_hash: B256) -> Self {
-        Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
+    pub const fn new(provider: &'a RootProvider<T, N>, transaction_hash: B256) -> Self {
+        Self::from_config(provider, PendingTransactionConfig::new(transaction_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
@@ -429,9 +429,9 @@ impl<S> Heartbeat<S> {
         let to_keep = self.reap_at.split_off(&now);
         let to_reap = std::mem::replace(&mut self.reap_at, to_keep);
 
-        for tx_hash in to_reap.values() {
-            if self.unconfirmed.remove(tx_hash).is_some() {
-                debug!(tx=%tx_hash, "reaped");
+        for transaction_hash in to_reap.values() {
+            if self.unconfirmed.remove(transaction_hash).is_some() {
+                debug!(tx=%transaction_hash, "reaped");
             }
         }
     }
@@ -456,8 +456,10 @@ impl<S> Heartbeat<S> {
         let Some(block_height) = &block.header.number else { return };
 
         // Check if we are watching for any of the transactions in this block.
-        let to_check =
-            block.transactions.hashes().filter_map(|tx_hash| self.unconfirmed.remove(tx_hash));
+        let to_check = block
+            .transactions
+            .hashes()
+            .filter_map(|transaction_hash| self.unconfirmed.remove(transaction_hash));
         for watcher in to_check {
             // If `confirmations` is not more than 1 we can notify the watcher immediately.
             let confirmations = watcher.config.required_confirmations;

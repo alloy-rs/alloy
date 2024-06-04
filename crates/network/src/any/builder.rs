@@ -142,10 +142,13 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     }
 
     fn build_unsigned(self) -> BuildResult<<AnyNetwork as Network>::UnsignedTx, AnyNetwork> {
-        if let Err((tx_type, missing)) = self.missing_keys() {
+        if let Err((transaction_type, missing)) = self.missing_keys() {
             return Err((
                 self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type.into(), missing),
+                TransactionBuilderError::InvalidTransactionRequest(
+                    transaction_type.into(),
+                    missing,
+                ),
             ));
         }
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))

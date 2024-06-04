@@ -130,8 +130,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// let sub = provider.subscribe_pending_transactions().await?;
     /// let mut stream = sub.into_stream().take(5);
-    /// while let Some(tx_hash) = stream.next().await {
-    ///    println!("new pending transaction hash: {tx_hash}");
+    /// while let Some(transaction_hash) = stream.next().await {
+    ///    println!("new pending transaction hash: {transaction_hash}");
     /// }
     /// # Ok(())
     /// # }
@@ -287,8 +287,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// let poller = provider.watch_pending_transactions().await?;
     /// let mut stream = poller.into_stream().flat_map(futures::stream::iter).take(5);
-    /// while let Some(tx_hash) = stream.next().await {
-    ///    println!("new pending transaction hash: {tx_hash}");
+    /// while let Some(transaction_hash) = stream.next().await {
+    ///    println!("new pending transaction hash: {transaction_hash}");
     /// }
     /// # Ok(())
     /// # }
@@ -451,7 +451,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// ```no_run
     /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
-    /// let tx_hash = provider.send_transaction(tx)
+    /// let transaction_hash = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
     ///     .with_timeout(Some(std::time::Duration::from_secs(60)))
@@ -483,8 +483,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         match tx {
             SendableTx::Builder(mut tx) => {
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
-                let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
-                Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+                let transaction_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
+                Ok(PendingTransactionBuilder::new(self.root(), transaction_hash))
             }
             SendableTx::Envelope(tx) => {
                 let mut encoded_tx = vec![];
@@ -502,8 +502,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         encoded_tx: &[u8],
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         let rlp_hex = hex::encode_prefixed(encoded_tx);
-        let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
-        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+        let transaction_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
+        Ok(PendingTransactionBuilder::new(self.root(), transaction_hash))
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
@@ -1158,8 +1158,10 @@ mod tests {
         init_tracing();
 
         let provider = ProviderBuilder::new().on_anvil();
-        let tx_hash = b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95");
-        let tx = provider.get_transaction_by_hash(tx_hash).await.expect("failed to fetch tx");
+        let transaction_hash =
+            b256!("5c03fab9114ceb98994b43892ade87ddfd9ae7e8f293935c3bd29d435dc9fd95");
+        let tx =
+            provider.get_transaction_by_hash(transaction_hash).await.expect("failed to fetch tx");
 
         assert!(tx.is_none());
     }
@@ -1175,11 +1177,11 @@ mod tests {
             .value(U256::ZERO)
             .input(bytes!("deadbeef").into());
 
-        let tx_hash =
+        let transaction_hash =
             *provider.send_transaction(req).await.expect("failed to send tx").transaction_hash();
 
         let tx = provider
-            .get_transaction_by_hash(tx_hash)
+            .get_transaction_by_hash(transaction_hash)
             .await
             .expect("failed to fetch tx")
             .expect("tx not included");

@@ -162,10 +162,10 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
-        if let Err((tx_type, missing)) = self.missing_keys() {
+        if let Err((transaction_type, missing)) = self.missing_keys() {
             return Err((
                 self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
+                TransactionBuilderError::InvalidTransactionRequest(transaction_type, missing),
             ));
         }
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
@@ -272,11 +272,13 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(transaction_type, errors)) =
+            error
+        else {
             panic!("wrong variant")
         };
 
-        assert_eq!(tx_type, TxType::Legacy);
+        assert_eq!(transaction_type, TxType::Legacy);
         assert_eq!(errors.len(), 3);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
@@ -289,11 +291,13 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(transaction_type, errors)) =
+            error
+        else {
             panic!("wrong variant")
         };
 
-        assert_eq!(tx_type, TxType::Eip1559);
+        assert_eq!(transaction_type, TxType::Eip1559);
         assert_eq!(errors.len(), 5);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
@@ -310,11 +314,13 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(transaction_type, errors)) =
+            error
+        else {
             panic!("wrong variant")
         };
 
-        assert_eq!(tx_type, TxType::Eip2930);
+        assert_eq!(transaction_type, TxType::Eip2930);
         assert_eq!(errors.len(), 3);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
@@ -328,11 +334,13 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let (_, TransactionBuilderError::InvalidTransactionRequest(transaction_type, errors)) =
+            error
+        else {
             panic!("wrong variant")
         };
 
-        assert_eq!(tx_type, TxType::Eip4844);
+        assert_eq!(transaction_type, TxType::Eip4844);
         assert_eq!(errors.len(), 7);
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"nonce"));
