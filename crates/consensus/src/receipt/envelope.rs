@@ -40,7 +40,7 @@ pub enum ReceiptEnvelope<T = Log> {
 
 impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,

@@ -87,7 +87,7 @@ impl TransactionReceipt {
 
     /// Returns the transaction type.
     pub const fn transaction_type(&self) -> TxType {
-        self.inner.tx_type()
+        self.inner.transaction_type()
     }
 
     /// Calculates the address that will be created by the transaction, if any.

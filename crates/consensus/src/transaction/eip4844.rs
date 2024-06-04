@@ -89,7 +89,7 @@ impl TxEip4844Variant {
     }
 
     /// Get the transaction type.
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         TxType::Eip4844
     }
 
@@ -112,10 +112,11 @@ impl TxEip4844Variant {
 
     /// Encodes the [TxEip4844Variant] fields as RLP, with a tx type. If `with_header` is `false`,
     /// the following will be encoded:
-    /// `tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs])`
+    /// `transaction_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs])`
     ///
     /// If `with_header` is `true`, the following will be encoded:
-    /// `rlp(tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs]))`
+    /// `rlp(transaction_type (0x03) || rlp([transaction_payload_body, blobs, commitments,
+    /// proofs]))`
     #[doc(hidden)]
     pub fn encode_with_signature(
         &self,
@@ -141,7 +142,7 @@ impl TxEip4844Variant {
             }
             .encode(out);
         }
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
 
         match self {
             Self::TxEip4844(tx) => {
@@ -525,7 +526,7 @@ impl TxEip4844 {
             }
             .encode(out);
         }
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         self.encode_with_signature_fields(signature, out);
     }
 
@@ -572,19 +573,19 @@ impl TxEip4844 {
     }
 
     /// Get transaction type
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         TxType::Eip4844
     }
 
     /// Encodes the EIP-4844 transaction in RLP for signing.
     ///
     /// This encodes the transaction as:
-    /// `tx_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, to,
-    /// value, input, access_list, max_fee_per_blob_gas, blob_versioned_hashes)`
+    /// `transaction_type || rlp(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas,
+    /// gas_limit, to, value, input, access_list, max_fee_per_blob_gas, blob_versioned_hashes)`
     ///
     /// Note that there is no rlp header before the transaction type byte.
     pub fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         Header { list: true, payload_length: self.fields_len() }.encode(out);
         self.encode_fields(out);
     }
@@ -723,8 +724,8 @@ impl TxEip4844WithSidecar {
     }
 
     /// Get the transaction type.
-    pub const fn tx_type(&self) -> TxType {
-        self.tx.tx_type()
+    pub const fn transaction_type(&self) -> TxType {
+        self.tx.transaction_type()
     }
 
     /// Get access to the inner tx [TxEip4844].

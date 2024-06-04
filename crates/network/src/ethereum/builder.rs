@@ -147,11 +147,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         common && (legacy || eip2930 || eip1559 || eip4844)
     }
 
-    fn output_tx_type(&self) -> TxType {
+    fn output_transaction_type(&self) -> TxType {
         self.preferred_type()
     }
 
-    fn output_tx_type_checked(&self) -> Option<TxType> {
+    fn output_transaction_type_checked(&self) -> Option<TxType> {
         self.buildable_type()
     }
 

@@ -292,7 +292,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Check if all necessary keys are present to build the currently-preferred
     /// transaction type, returning a list of missing keys.
     fn complete_preferred(&self) -> Result<(), Vec<&'static str>> {
-        self.complete_type(self.output_tx_type())
+        self.complete_type(self.output_transaction_type())
     }
 
     /// Assert that the builder prefers a certain transaction type. This does
@@ -300,7 +300,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// `dbg_assert_eq!` to check the builder status, and will have no affect
     /// in release builds.
     fn assert_preferred(&self, ty: N::TxType) {
-        debug_assert_eq!(self.output_tx_type(), ty);
+        debug_assert_eq!(self.output_transaction_type(), ty);
     }
 
     /// Assert that the builder prefers a certain transaction type. This does
@@ -322,11 +322,11 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
-    fn output_tx_type(&self) -> N::TxType;
+    fn output_transaction_type(&self) -> N::TxType;
 
     /// Returns the transaction type that this builder will build. `None` if
     /// the builder is not ready to build.
-    fn output_tx_type_checked(&self) -> Option<N::TxType>;
+    fn output_transaction_type_checked(&self) -> Option<N::TxType>;
 
     /// Trim any conflicting keys and populate any computed fields (like blob
     /// hashes).

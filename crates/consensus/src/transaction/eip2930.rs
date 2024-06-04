@@ -170,7 +170,7 @@ impl TxEip2930 {
             }
             .encode(out);
         }
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         self.encode_with_signature_fields(signature, out);
     }
 
@@ -217,7 +217,7 @@ impl TxEip2930 {
     }
 
     /// Get transaction type.
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         TxType::Eip2930
     }
 }
@@ -258,7 +258,7 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         Header { list: true, payload_length: self.fields_len() }.encode(out);
         self.encode_fields(out);
     }

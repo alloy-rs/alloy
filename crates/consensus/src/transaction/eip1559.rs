@@ -192,7 +192,7 @@ impl TxEip1559 {
             }
             .encode(out);
         }
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         self.encode_with_signature_fields(signature, out);
     }
 
@@ -239,7 +239,7 @@ impl TxEip1559 {
     }
 
     /// Get transaction type
-    pub(crate) const fn tx_type(&self) -> TxType {
+    pub(crate) const fn transaction_type(&self) -> TxType {
         TxType::Eip1559
     }
 
@@ -294,7 +294,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(self.transaction_type() as u8);
         self.encode(out)
     }
 

@@ -78,7 +78,7 @@ impl From<TxEnvelope> for TypedTransaction {
 
 impl TypedTransaction {
     /// Return the [`TxType`] of the inner txn.
-    pub const fn tx_type(&self) -> TxType {
+    pub const fn transaction_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
             Self::Eip2930(_) => TxType::Eip2930,
