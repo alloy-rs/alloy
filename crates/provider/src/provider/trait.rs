@@ -785,13 +785,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
-    /* ------------------------------------------ anvil ----------------------------------------- */
-
-    /// Set the bytecode of a given account.
-    async fn set_code(&self, address: Address, code: &str) -> TransportResult<()> {
-        self.client().request("anvil_setCode", (address, code)).await
-    }
-
     /* ---------------------------------------- raw calls --------------------------------------- */
 
     /// Sends a raw JSON-RPC request.
@@ -889,7 +882,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, WalletProvider};
+    use crate::{ext::AnvilApi, ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
@@ -1135,12 +1128,12 @@ mod tests {
 
     #[tokio::test]
     #[cfg(feature = "anvil")]
-    async fn gets_code_at() {
+    async fn anvil_gets_code_at() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         // Set the code
         let addr = Address::with_last_byte(16);
-        provider.set_code(addr, "0xbeef").await.unwrap();
+        provider.anvil_set_code(addr, Bytes::from("0xbeef")).await.unwrap();
         let _code = provider.get_code_at(addr).await.unwrap();
     }
 
