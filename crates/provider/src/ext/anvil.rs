@@ -2,7 +2,10 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
-use alloy_rpc_types::{Block, TransactionRequest, WithOtherFields};
+use alloy_rpc_types::{
+    anvil::{AnvilMetadata, EvmMineOptions, Forking, NodeInfo},
+    Block, TransactionRequest, WithOtherFields,
+};
 use alloy_transport::{Transport, TransportResult};
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
@@ -318,134 +321,3 @@ where
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
     }
 }
-
-// /* ------------------------------------------ anvil ----------------------------------------- */
-// // TODO: feature gate based on `anvil` feature?
-
-// /// Send transactions impersonating specific account and contract addresses.
-// async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()> {
-//     self.client().request("anvil_impersonateAccount", (address,)).await
-// }
-
-// /// Stops impersonating an account if previously set with `anvil_impersonateAccount`.
-// async fn anvil_stop_impersonating_account(&self, address: Address) -> TransportResult<()> {
-//     self.client().request("anvil_stopImpersonatingAccount", (address,)).await
-// }
-
-// /// If set to true will make every account impersonated.
-// async fn anvil_auto_impersonate_account(&self, enabled: bool) -> TransportResult<()> {
-//     self.client().request("anvil_autoImpersonateAccount", (enabled,)).await
-// }
-
-// /// Returns true if auto mining is enabled, and false.
-// async fn anvil_get_auto_mine(&self) -> TransportResult<bool> {
-//     self.client().request("anvil_getAutoMine", ()).await
-// }
-
-// /// Enables or disables, based on the single boolean argument, the automatic mining of new
-// /// blocks with each new transaction submitted to the network.
-// async fn anvil_set_auto_mine(&self, enabled: bool) -> TransportResult<()> {
-//     self.client().request("anvil_setAutoMine", (enabled,)).await
-// }
-
-// /// Mines a series of blocks.
-// async fn anvil_mine(
-//     &self,
-//     num_blocks: Option<U256>,
-//     interval: Option<U256>,
-// ) -> TransportResult<()> {
-//     self.client().request("anvil_mine", (num_blocks, interval)).await
-// }
-
-// /// Sets the mining behavior to interval with the given interval (seconds).
-// async fn anvil_set_interval_mining(&self, secs: u64) -> TransportResult<()> {
-//     self.client().request("evm_setIntervalMining", (secs,)).await
-// }
-
-// /// Removes transactions from the pool.
-// async fn anvil_drop_transaction(&self, tx_hash: B256) -> TransportResult<Option<B256>> {
-//     self.client().request("anvil_dropTransaction", (tx_hash,)).await
-// }
-
-// /// Removes all transactions from the pool
-// async fn anvil_drop_all_transactions(&self) -> TransportResult<()> {
-//     self.client().request("anvil_dropAllTransactions", ()).await
-// }
-
-// /// Reset the fork to a fresh forked state, and optionally update the fork config.
-// ///
-// /// If `forking` is `None` then this will disable forking entirely.
-// // async fn anvil_reset(&self, forking: Option<Forking>) -> TransportResult<()> {
-// //     self.client().request("anvil_reset", (forking,)).await
-// // }
-
-// /// Sets the chain ID.
-// async fn anvil_set_chain_id(&self, chain_id: u64) -> TransportResult<()> {
-//     self.client().request("anvil_setChainId", (chain_id,)).await
-// }
-
-// /// Modifies the balance of an account.
-// async fn anvil_set_balance(&self, address: Address, balance: U256) -> TransportResult<()> {
-//     self.client().request("anvil_setBalance", (address, balance)).await
-// }
-
-// /// Sets the code of a contract.
-// async fn anvil_set_code(&self, address: Address, code: Bytes) -> TransportResult<()> {
-//     self.client().request("anvil_setCode", (address, code)).await
-// }
-
-// /// Writes a single slot of the account's storage.
-// async fn anvil_set_storage_at(
-//     &self,
-//     address: Address,
-//     slot: U256,
-//     val: B256,
-// ) -> TransportResult<()> {
-//     self.client().request("anvil_setStorageAt", (address, slot, val)).await
-// }
-
-// /// Enable or disable logging.
-// async fn anvil_set_logging(&self, enable: bool) -> TransportResult<()> {
-//     self.client().request("anvil_setLogging", (enable,)).await
-// }
-
-// /// Set the minimum gas price for the node.
-// async fn anvil_set_min_gas_price(&self, gas: U256) -> TransportResult<()> {
-//     self.client().request("anvil_setMinGasPrice", (gas,)).await
-// }
-
-// /// Sets the base fee of the next block.
-// async fn anvil_set_next_block_base_fee_per_gas(&self, basefee: U256) -> TransportResult<()> {
-//     self.client().request("anvil_setNextBlockBaseFeePerGas", (basefee,)).await
-// }
-
-// /// Sets the coinbase address.
-// async fn anvil_set_coinbase(&self, address: Address) -> TransportResult<()> {
-//     self.client().request("anvil_setCoinbase", (address,)).await
-// }
-
-// /// Create a buffer that represents all state on the chain, which can be loaded to separate
-// /// process by calling `anvil_loadState`
-// async fn anvil_dump_state(&self) -> TransportResult<Bytes> {
-//     self.client().request("anvil_dumpState", ()).await
-// }
-
-// /// Append chain state buffer to current chain. Will overwrite any conflicting addresses or
-// /// storage.
-// async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool> {
-//     self.client().request("anvil_loadState", (buf,)).await
-// }
-
-// /// Retrieves the Anvil node configuration params.
-// async fn anvil_node_info(&self) -> TransportResult<NodeInfo> {
-//     self.client().request("anvil_nodeInfo", ()).await
-// }
-
-// /// Retrieves metadata about the Anvil instance.
-// async fn anvil_metadata(&self) -> TransportResult<AnvilMetadata> {
-//     self.client().request("anvil_metadata", ()).await
-// }
-
-// // async fn anvil_remove_pool_transactions(&self, address: Address) -> TransportResult<()> {
-// //     self.client().request("anvil_removePoolTransactions", (address,)).await
-// // }
