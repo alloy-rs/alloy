@@ -2,10 +2,8 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
-use alloy_rpc_types::{
-    anvil::{AnvilMetadata, EvmMineOptions, Forking, NodeInfo},
-    Block, TransactionRequest, WithOtherFields,
-};
+use alloy_rpc_types::{Block, TransactionRequest, WithOtherFields};
+use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
 use alloy_transport::{Transport, TransportResult};
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
@@ -93,7 +91,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_node_info(&self) -> TransportResult<NodeInfo>;
 
     /// Retrieves metadata about the Anvil instance.
-    async fn anvil_metadata(&self) -> TransportResult<AnvilMetadata>;
+    async fn anvil_metadata(&self) -> TransportResult<Metadata>;
 
     /// Removes all transactions from the pool for a specific address.
     async fn anvil_remove_pool_transactions(&self, address: Address) -> TransportResult<()>;
@@ -126,11 +124,11 @@ pub trait AnvilApi<N, T>: Send + Sync {
 
     /// Mine blocks, instantly.
     /// This will mine the blocks regardless of the configured mining mode.
-    async fn evm_mine(&self, opts: Option<EvmMineOptions>) -> TransportResult<String>;
+    async fn evm_mine(&self, opts: Option<MineOptions>) -> TransportResult<String>;
 
     /// Mine blocks, instantly and return the mined blocks.
     /// This will mine the blocks regardless of the configured mining mode.
-    async fn evm_mine_detailed(&self, opts: Option<EvmMineOptions>) -> TransportResult<Vec<Block>>;
+    async fn evm_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>>;
 
     /// Sets the reported block number.
     async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()>;
@@ -254,7 +252,7 @@ where
         self.client().request("anvil_nodeInfo", ()).await
     }
 
-    async fn anvil_metadata(&self) -> TransportResult<AnvilMetadata> {
+    async fn anvil_metadata(&self) -> TransportResult<Metadata> {
         self.client().request("anvil_metadata", ()).await
     }
 
@@ -294,11 +292,11 @@ where
         self.client().request("evm_removeBlockTimestampInterval", ()).await
     }
 
-    async fn evm_mine(&self, opts: Option<EvmMineOptions>) -> TransportResult<String> {
+    async fn evm_mine(&self, opts: Option<MineOptions>) -> TransportResult<String> {
         self.client().request("evm_mine", (opts,)).await
     }
 
-    async fn evm_mine_detailed(&self, opts: Option<EvmMineOptions>) -> TransportResult<Vec<Block>> {
+    async fn evm_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>> {
         self.client().request("evm_mineDetailed", (opts,)).await
     }
 

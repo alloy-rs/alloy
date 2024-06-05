@@ -8,8 +8,6 @@ pub use account::*;
 pub mod admin;
 pub use admin::NodeInfo;
 
-pub mod anvil;
-
 mod block;
 pub use block::*;
 
