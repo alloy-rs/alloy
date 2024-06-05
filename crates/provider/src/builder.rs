@@ -345,7 +345,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
 // Enabled when the `anvil` feature is enabled, or when both in test and the
 // `reqwest` feature is enabled.
-#[cfg(any(test, feature = "anvil"))]
+#[cfg(any(test, feature = "anvil-node"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport.
     pub fn on_anvil(self) -> F::Provider

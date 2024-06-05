@@ -882,7 +882,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ext::AnvilApi, ProviderBuilder, WalletProvider};
+    use crate::{ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types::request::TransactionRequest;
@@ -1127,7 +1127,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "anvil")]
+    #[cfg(feature = "anvil-api")]
     async fn anvil_gets_code_at() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
