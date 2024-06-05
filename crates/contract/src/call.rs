@@ -131,6 +131,12 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     transport: PhantomData<T>,
 }
 
+impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+    fn as_ref(&self) -> &N::TransactionRequest {
+        &self.request
+    }
+}
+
 // See [`ContractInstance`].
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
     pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
