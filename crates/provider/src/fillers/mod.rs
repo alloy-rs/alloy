@@ -20,6 +20,7 @@ pub use gas::GasFiller;
 
 mod join_fill;
 pub use join_fill::JoinFill;
+use tracing::error;
 
 use crate::{
     provider::SendableTx, Identity, PendingTransactionBuilder, Provider, ProviderLayer,
@@ -258,9 +259,12 @@ where
 
             count += 1;
             if count >= 20 {
-                panic!(
-                    "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
+                const ERROR: &str = "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing this message.";
+                error!(
+                    ?tx, ?self.filler,
+                    ERROR
                 );
+                panic!("{}, {:?}, {:?}", ERROR, &tx, &self.filler);
             }
         }
         Ok(tx)
