@@ -160,6 +160,10 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
         self.status(tx).is_finished()
     }
 
+    /// Performs any synchoronous filling. This will always be called before
+    /// `prepare`.
+    fn fill_sync(&self, tx: &mut SendableTx<N>);
+
     /// Prepares fillable properties, potentially by making an RPC request.
     fn prepare<P, T>(
         &self,
@@ -249,7 +253,9 @@ where
     where
         N::TxEnvelope: Clone,
     {
-        self.filler.prepare_and_fill(self, SendableTx::Builder(tx)).await
+        let mut tx = SendableTx::Builder(tx);
+        self.filler.fill_sync(&mut tx);
+        self.filler.prepare_and_fill(self, tx).await
     }
 }
 

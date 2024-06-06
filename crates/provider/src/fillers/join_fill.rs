@@ -106,6 +106,11 @@ where
         try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
 
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        self.left.fill_sync(tx);
+        self.right.fill_sync(tx);
+    }
+
     async fn fill(
         &self,
         to_fill: Self::Fillable,
