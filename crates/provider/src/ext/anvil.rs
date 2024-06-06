@@ -839,7 +839,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_evm_mine() {
+    async fn test_evm_mine_single_block() {
         let provider = ProviderBuilder::new().on_anvil();
 
         let start_num = provider.get_block_number().await.unwrap();
@@ -849,39 +849,64 @@ mod tests {
             let num = provider.get_block_number().await.unwrap();
             assert_eq!(num, start_num + idx as u64 + 1);
         }
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
     }
 
-    // TODO: Fix this test, only a single block is being mined.
+    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
     // #[tokio::test]
-    // async fn test_anvil_mine_detailed() {
+    // async fn test_evm_mine_with_configuration() {
     //     let provider = ProviderBuilder::new().on_anvil();
 
-    //     provider.anvil_set_auto_mine(false).await.unwrap();
+    //     let start_num = provider.get_block_number().await.unwrap();
+
+    //     provider
+    //         .evm_mine(Some(MineOptions::Options { timestamp: Some(100), blocks: Some(10) }))
+    //         .await
+    //         .unwrap();
+
+    //     let num = provider.get_block_number().await.unwrap();
+    //     assert_eq!(num, start_num + 10);
+    // }
+
+    #[tokio::test]
+    async fn test_anvil_mine_detailed_single_block() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let start_num = provider.get_block_number().await.unwrap();
+
+        for (idx, _) in std::iter::repeat(()).take(10).enumerate() {
+            provider.anvil_mine_detailed(None).await.unwrap();
+            let num = provider.get_block_number().await.unwrap();
+            assert_eq!(num, start_num + idx as u64 + 1);
+        }
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, start_num + 10);
+    }
+
+    // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
+    // #[tokio::test]
+    // async fn test_anvil_mine_detailed_with_configuration() {
+    //     let provider = ProviderBuilder::new().on_anvil();
 
     //     let start_num = provider.get_block_number().await.unwrap();
 
     //     let blocks = provider
     //         .anvil_mine_detailed(Some(MineOptions::Options {
     //             timestamp: Some(100),
-    //             blocks: Some(100),
+    //             blocks: Some(10),
     //         }))
     //         .await
     //         .unwrap();
 
-    //     assert_eq!(blocks.len(), 100);
-    //     assert_eq!(blocks[0].header.number.unwrap(), start_num + 101);
-    // }
-
-    // TODO: `anvil_setBlock` is not implemented in the Anvil API.
-    // #[tokio::test]
-    // async fn test_anvil_set_block() {
-    //     let provider = ProviderBuilder::new().on_anvil();
-
-    //     let block_number = U256::from(1337);
-    //     provider.anvil_set_block(block_number).await.unwrap();
-
     //     let num = provider.get_block_number().await.unwrap();
-    //     assert_eq!(num, block_number.to::<u64>());
+    //     assert_eq!(num, start_num + 10);
+
+    //     for (idx, block) in blocks.iter().enumerate() {
+    //         assert_eq!(block.header.number, Some(start_num + idx as u64 + 1));
+    //     }
     // }
 
     #[tokio::test]
