@@ -12,6 +12,7 @@ use alloy_transport::{Transport, TransportResult};
 pub trait AnvilApi<N, T>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
+    // - anvil_set_block: Not implemented correctly in the Anvil RPC API.
 
     /// Send transactions impersonating specific account and contract addresses.
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()>;
@@ -134,7 +135,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>>;
 
     /// Sets the reported block number.
-    async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()>;
+    // async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()>;
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
@@ -299,9 +300,9 @@ where
         self.client().request("evm_mine_detailed", (opts,)).await
     }
 
-    async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()> {
-        self.client().request("anvil_setBlock", (block_number,)).await
-    }
+    // async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()> {
+    //     self.client().request("anvil_setBlock", (block_number,)).await
+    // }
 
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()> {
         self.client().request("anvil_setRpcUrl", (url,)).await
@@ -883,16 +884,17 @@ mod tests {
     //     assert_eq!(blocks[0].header.number.unwrap(), start_num + 101);
     // }
 
-    #[tokio::test]
-    async fn test_anvil_set_block() {
-        let provider = ProviderBuilder::new().on_anvil();
+    // TODO: `anvil_setBlock` is not implemented in the Anvil API.
+    // #[tokio::test]
+    // async fn test_anvil_set_block() {
+    //     let provider = ProviderBuilder::new().on_anvil();
 
-        let block_number = U256::from(1337);
-        provider.anvil_set_block(block_number).await.unwrap();
+    //     let block_number = U256::from(1337);
+    //     provider.anvil_set_block(block_number).await.unwrap();
 
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(num, block_number.to::<u64>());
-    }
+    //     let num = provider.get_block_number().await.unwrap();
+    //     assert_eq!(num, block_number.to::<u64>());
+    // }
 
     #[tokio::test]
     async fn test_anvil_set_rpc_url() {
