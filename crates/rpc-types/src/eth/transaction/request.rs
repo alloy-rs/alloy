@@ -85,6 +85,7 @@ pub struct TransactionRequest {
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u8_opt_via_ruint"
     )]
+    #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -103,6 +104,7 @@ impl TransactionRequest {
     }
 
     /// Sets the transactions type for the transactions.
+    #[doc(alias = "tx_type")]
     pub const fn transaction_type(mut self, transaction_type: u8) -> Self {
         self.transaction_type = Some(transaction_type);
         self

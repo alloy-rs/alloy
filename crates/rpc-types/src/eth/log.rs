@@ -29,9 +29,11 @@ pub struct Log<T = LogData> {
     )]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<B256>,
     /// Index of the Transaction in the block
     #[serde(with = "alloy_serde::u64_opt_via_ruint")]
+    #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Log Index in Block
     #[serde(with = "alloy_serde::u64_opt_via_ruint")]

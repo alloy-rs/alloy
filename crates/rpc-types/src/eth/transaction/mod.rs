@@ -121,6 +121,7 @@ pub struct Transaction {
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u8_opt_via_ruint"
     )]
+    #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
 
     /// Arbitrary extra fields.
