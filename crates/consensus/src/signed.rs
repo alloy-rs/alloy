@@ -6,6 +6,7 @@ use alloy_primitives::{Signature, B256};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]
+    #[doc(alias = "transaction")]
     tx: T,
     #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,

@@ -15,6 +15,7 @@ use alloy_rlp::{Decodable, Encodable};
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[doc(alias = "AnyTransactionReceiptEnvelope", alias = "AnyTxReceiptEnvelope")]
 pub struct AnyReceiptEnvelope<T = Log> {
     /// The receipt envelope.
     #[cfg_attr(feature = "serde", serde(flatten))]

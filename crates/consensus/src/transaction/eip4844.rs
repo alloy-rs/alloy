@@ -41,6 +41,7 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
         #[derive(serde::Deserialize)]
         struct TxEip4844SerdeHelper {
             #[serde(flatten)]
+            #[doc(alias = "transaction")]
             tx: TxEip4844,
             #[serde(flatten)]
             sidecar: Option<BlobTransactionSidecar>,
@@ -705,6 +706,7 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 pub struct TxEip4844WithSidecar {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
+    #[doc(alias = "transaction")]
     pub tx: TxEip4844,
     /// The sidecar.
     #[cfg_attr(feature = "serde", serde(flatten))]

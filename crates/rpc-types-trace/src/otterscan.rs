@@ -157,6 +157,7 @@ pub struct OtsBlockTransactions {
 #[doc(alias = "TxWithReceipts")]
 pub struct TransactionsWithReceipts {
     /// The list of transactions.
+    #[doc(alias = "transactions")]
     pub txs: Vec<Transaction>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
@@ -170,6 +171,7 @@ pub struct TransactionsWithReceipts {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     /// The transaction used to create the contract.
+    #[doc(alias = "transaction")]
     pub tx: Transaction,
     /// The address of the contract creator.
     pub creator: Address,

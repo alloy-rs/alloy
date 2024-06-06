@@ -12,6 +12,7 @@ use alloc::vec::Vec;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
 pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
@@ -79,6 +80,7 @@ impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "TransactionReceiptWithBloom", alias = "TxReceiptWithBloom")]
 pub struct ReceiptWithBloom<T = Log> {
     #[cfg_attr(feature = "serde", serde(flatten))]
     /// The receipt.

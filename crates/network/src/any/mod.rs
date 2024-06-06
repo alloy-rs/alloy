@@ -10,6 +10,7 @@ use alloy_rpc_types::{
 mod builder;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[doc(alias = "AnyTransactionType")]
 pub struct AnyTxType(u8);
 
 impl fmt::Display for AnyTxType {
