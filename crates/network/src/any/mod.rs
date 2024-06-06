@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::{Network, ReceiptResponse};
+use crate::{Network, ReceiptResponse, TransactionResponse};
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
 use alloy_rpc_types::{
@@ -79,5 +79,27 @@ impl Network for AnyNetwork {
 impl ReceiptResponse for AnyTransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+}
+
+impl TransactionResponse for WithOtherFields<Transaction> {
+    fn tx_hash(&self) -> alloy_primitives::B256 {
+        self.hash
+    }
+
+    fn from(&self) -> alloy_primitives::Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<alloy_primitives::Address> {
+        self.to
+    }
+
+    fn value(&self) -> alloy_primitives::U256 {
+        self.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.gas
     }
 }
