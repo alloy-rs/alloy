@@ -8,9 +8,9 @@ use serde::{
 };
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-/// Transaction summary as found in the TxPool Inspection property.
+/// Transaction summary as found in the Txpool Inspection property.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TxPoolInspectSummary {
+pub struct TxpoolInspectSummary {
     /// Recipient (None when contract creation)
     pub to: Option<Address>,
     /// Transferred value
@@ -21,13 +21,13 @@ pub struct TxPoolInspectSummary {
     pub gas_price: u128,
 }
 
-/// Visitor struct for TxPoolInspectSummary.
-struct TxPoolInspectSummaryVisitor;
+/// Visitor struct for TxpoolInspectSummary.
+struct TxpoolInspectSummaryVisitor;
 
 /// Walk through the deserializer to parse a txpool inspection summary into the
-/// `TxPoolInspectSummary` struct.
-impl<'de> Visitor<'de> for TxPoolInspectSummaryVisitor {
-    type Value = TxPoolInspectSummary;
+/// `TxpoolInspectSummary` struct.
+impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
+    type Value = TxpoolInspectSummary;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("to: value wei + gasLimit gas × gas_price wei")
@@ -39,19 +39,19 @@ impl<'de> Visitor<'de> for TxPoolInspectSummaryVisitor {
     {
         let addr_split: Vec<&str> = value.split(": ").collect();
         if addr_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxPoolInspectSummary: to"));
+            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: to"));
         }
         let value_split: Vec<&str> = addr_split[1].split(" wei + ").collect();
         if value_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxPoolInspectSummary: gasLimit"));
+            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gasLimit"));
         }
         let gas_split: Vec<&str> = value_split[1].split(" gas × ").collect();
         if gas_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxPoolInspectSummary: gas"));
+            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas"));
         }
         let gas_price_split: Vec<&str> = gas_split[1].split(" wei").collect();
         if gas_price_split.len() != 2 {
-            return Err(de::Error::custom("invalid format for TxPoolInspectSummary: gas_price"));
+            return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
         }
         let to = match addr_split[0] {
             "" => None,
@@ -65,7 +65,7 @@ impl<'de> Visitor<'de> for TxPoolInspectSummaryVisitor {
         let gas = u128::from_str(gas_split[0]).map_err(de::Error::custom)?;
         let gas_price = u128::from_str(gas_price_split[0]).map_err(de::Error::custom)?;
 
-        Ok(TxPoolInspectSummary { to, value, gas, gas_price })
+        Ok(TxpoolInspectSummary { to, value, gas, gas_price })
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
@@ -76,19 +76,19 @@ impl<'de> Visitor<'de> for TxPoolInspectSummaryVisitor {
     }
 }
 
-/// Implement the `Deserialize` trait for `TxPoolInspectSummary` struct.
-impl<'de> Deserialize<'de> for TxPoolInspectSummary {
+/// Implement the `Deserialize` trait for `TxpoolInspectSummary` struct.
+impl<'de> Deserialize<'de> for TxpoolInspectSummary {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(TxPoolInspectSummaryVisitor)
+        deserializer.deserialize_str(TxpoolInspectSummaryVisitor)
     }
 }
 
-/// Implement the `Serialize` trait for `TxPoolInspectSummary` struct so that the
+/// Implement the `Serialize` trait for `TxpoolInspectSummary` struct so that the
 /// format matches the one from geth.
-impl Serialize for TxPoolInspectSummary {
+impl Serialize for TxpoolInspectSummary {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -111,17 +111,17 @@ impl Serialize for TxPoolInspectSummary {
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxPoolContent {
+pub struct TxpoolContent {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, Transaction>>,
     /// queued tx
     pub queued: BTreeMap<Address, BTreeMap<String, Transaction>>,
 }
 
-impl TxPoolContent {
+impl TxpoolContent {
     /// Removes the transactions from the given sender
-    pub fn remove_from(&mut self, sender: &Address) -> TxPoolContentFrom {
-        TxPoolContentFrom {
+    pub fn remove_from(&mut self, sender: &Address) -> TxpoolContentFrom {
+        TxpoolContentFrom {
             pending: self.pending.remove(sender).unwrap_or_default(),
             queued: self.queued.remove(sender).unwrap_or_default(),
         }
@@ -130,11 +130,11 @@ impl TxPoolContent {
 
 /// Transaction Pool Content From
 ///
-/// Same as [TxPoolContent] but for a specific address.
+/// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxPoolContentFrom {
+pub struct TxpoolContentFrom {
     /// pending tx
     pub pending: BTreeMap<String, Transaction>,
     /// queued tx
@@ -151,11 +151,11 @@ pub struct TxPoolContentFrom {
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect) for more details
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxPoolInspect {
+pub struct TxpoolInspect {
     /// pending tx
-    pub pending: BTreeMap<Address, BTreeMap<String, TxPoolInspectSummary>>,
+    pub pending: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
     /// queued tx
-    pub queued: BTreeMap<Address, BTreeMap<String, TxPoolInspectSummary>>,
+    pub queued: BTreeMap<Address, BTreeMap<String, TxpoolInspectSummary>>,
 }
 
 /// Transaction Pool Status
@@ -166,7 +166,7 @@ pub struct TxPoolInspect {
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_status) for more details
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TxPoolStatus {
+pub struct TxpoolStatus {
     /// number of pending tx
     #[serde(with = "alloy_serde::num::u64_via_ruint")]
     pub pending: u64,
@@ -347,13 +347,13 @@ mod tests {
     }
   }
 }"#;
-        let deserialized: TxPoolContent = serde_json::from_str(txpool_content_json).unwrap();
+        let deserialized: TxpoolContent = serde_json::from_str(txpool_content_json).unwrap();
         let serialized: String = serde_json::to_string_pretty(&deserialized).unwrap();
 
         let origin: serde_json::Value = serde_json::from_str(txpool_content_json).unwrap();
         let serialized_value = serde_json::to_value(deserialized.clone()).unwrap();
         assert_eq!(origin, serialized_value);
-        assert_eq!(deserialized, serde_json::from_str::<TxPoolContent>(&serialized).unwrap());
+        assert_eq!(deserialized, serde_json::from_str::<TxpoolContent>(&serialized).unwrap());
     }
 
     #[test]
@@ -384,11 +384,11 @@ mod tests {
     }
   }
 }"#;
-        let deserialized: TxPoolInspect = serde_json::from_str(txpool_inspect_json).unwrap();
+        let deserialized: TxpoolInspect = serde_json::from_str(txpool_inspect_json).unwrap();
         assert_eq!(deserialized, expected_txpool_inspect());
 
         let serialized = serde_json::to_string(&deserialized).unwrap();
-        let deserialized2: TxPoolInspect = serde_json::from_str(&serialized).unwrap();
+        let deserialized2: TxpoolInspect = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized2, deserialized);
     }
 
@@ -399,17 +399,17 @@ mod tests {
   "pending": "0x23",
   "queued": "0x20"
 }"#;
-        let deserialized: TxPoolStatus = serde_json::from_str(txpool_status_json).unwrap();
+        let deserialized: TxpoolStatus = serde_json::from_str(txpool_status_json).unwrap();
         let serialized: String = serde_json::to_string_pretty(&deserialized).unwrap();
         assert_eq!(txpool_status_json.trim(), serialized);
     }
 
-    fn expected_txpool_inspect() -> TxPoolInspect {
+    fn expected_txpool_inspect() -> TxpoolInspect {
         let mut pending_map = BTreeMap::new();
         let mut pending_map_inner = BTreeMap::new();
         pending_map_inner.insert(
             "124930".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("000000000000000000000000000000000000007E").unwrap()),
                 value: U256::from(0u128),
                 gas: 100187u128,
@@ -423,7 +423,7 @@ mod tests {
         pending_map_inner.clear();
         pending_map_inner.insert(
             "252350".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
                 gas: 65792u128,
@@ -432,7 +432,7 @@ mod tests {
         );
         pending_map_inner.insert(
             "252351".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
                 gas: 65792u128,
@@ -441,7 +441,7 @@ mod tests {
         );
         pending_map_inner.insert(
             "252352".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
                 gas: 65780u128,
@@ -450,7 +450,7 @@ mod tests {
         );
         pending_map_inner.insert(
             "252353".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("d10e3Be2bc8f959Bc8C41CF65F60dE721cF89ADF").unwrap()),
                 value: U256::from(0u128),
                 gas: 65780u128,
@@ -464,7 +464,7 @@ mod tests {
         pending_map_inner.clear();
         pending_map_inner.insert(
             "40".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: None,
                 value: U256::from(0u128),
                 gas: 612412u128,
@@ -479,7 +479,7 @@ mod tests {
         let mut queued_map_inner = BTreeMap::new();
         queued_map_inner.insert(
             "7".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("3479BE69e07E838D9738a301Bb0c89e8EA2Bef4a").unwrap()),
                 value: U256::from(1000000000000000u128),
                 gas: 21000u128,
@@ -488,7 +488,7 @@ mod tests {
         );
         queued_map_inner.insert(
             "8".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(1000000000000000u128),
                 gas: 21000u128,
@@ -502,7 +502,7 @@ mod tests {
         queued_map_inner.clear();
         queued_map_inner.insert(
             "3".to_string(),
-            TxPoolInspectSummary {
+            TxpoolInspectSummary {
                 to: Some(Address::from_str("73Aaf691bc33fe38f86260338EF88f9897eCaa4F").unwrap()),
                 value: U256::from(10000000000000000u128),
                 gas: 21000u128,
@@ -514,6 +514,6 @@ mod tests {
             queued_map_inner,
         );
 
-        TxPoolInspect { pending: pending_map, queued: queued_map }
+        TxpoolInspect { pending: pending_map, queued: queued_map }
     }
 }
