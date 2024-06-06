@@ -119,10 +119,7 @@ url = "2.5"
 derive_more = "0.99.17"
 
 ## serde
-serde = { version = "1.0", default-features = false, features = [
-    "derive",
-    "alloc",
-] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = "3.3.0"
 
