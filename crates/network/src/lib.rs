@@ -9,7 +9,7 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -34,6 +34,12 @@ pub use alloy_eips::eip2718;
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
     fn contract_address(&self) -> Option<Address>;
+}
+
+/// Transaction Response
+pub trait TransactionResponse {
+    /// Hash of the transaction
+    fn hash(&self) -> B256;
 }
 
 /// Captures type info for network-specific RPC requests/responses.
@@ -82,7 +88,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + From<Self::UnsignedTx>;
 
     /// The JSON body of a transaction response.
-    type TransactionResponse: RpcObject;
+    type TransactionResponse: RpcObject + TransactionResponse;
 
     /// The JSON body of a transaction receipt.
     type ReceiptResponse: RpcObject + ReceiptResponse;

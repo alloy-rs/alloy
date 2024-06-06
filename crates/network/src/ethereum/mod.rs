@@ -1,4 +1,4 @@
-use crate::{Network, ReceiptResponse};
+use crate::{Network, ReceiptResponse, TransactionResponse};
 
 mod builder;
 
@@ -34,5 +34,11 @@ impl Network for Ethereum {
 impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+}
+
+impl TransactionResponse for alloy_rpc_types::Transaction {
+    fn hash(&self) -> alloy_primitives::B256 {
+        self.hash
     }
 }
