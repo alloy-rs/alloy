@@ -12,7 +12,7 @@ use alloy_transport::{Transport, TransportResult};
 pub trait AnvilApi<N, T>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
-    // - anvil_set_block: Not implemented correctly in the Anvil RPC API.
+    // - anvil_set_block: Not implemented / wired correctly in the Anvil RPC API.
 
     /// Send transactions impersonating specific account and contract addresses.
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()>;
@@ -133,9 +133,6 @@ pub trait AnvilApi<N, T>: Send + Sync {
     /// Mine blocks, instantly and return the mined blocks.
     /// This will mine the blocks regardless of the configured mining mode.
     async fn anvil_mine_detailed(&self, opts: Option<MineOptions>) -> TransportResult<Vec<Block>>;
-
-    /// Sets the reported block number.
-    // async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()>;
 
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
@@ -300,10 +297,6 @@ where
         self.client().request("evm_mine_detailed", (opts,)).await
     }
 
-    // async fn anvil_set_block(&self, block_number: U256) -> TransportResult<()> {
-    //     self.client().request("anvil_setBlock", (block_number,)).await
-    // }
-
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()> {
         self.client().request("anvil_setRpcUrl", (url,)).await
     }
@@ -320,7 +313,7 @@ where
 mod tests {
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    // use alloy_node_bindings::Anvil;
+    // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
 
     use crate::ProviderBuilder;
     use alloy_primitives::B256;
@@ -336,7 +329,6 @@ mod tests {
         let val = U256::from(1337);
         let funding = U256::from(1e18 as u64);
 
-        // Fund the impersonated account.
         provider.anvil_set_balance(impersonate, funding).await.unwrap();
 
         let balance = provider.get_balance(impersonate).await.unwrap();
@@ -373,7 +365,6 @@ mod tests {
         let val = U256::from(1337);
         let funding = U256::from(1e18 as u64);
 
-        // Fund the impersonated account.
         provider.anvil_set_balance(impersonate, funding).await.unwrap();
 
         let balance = provider.get_balance(impersonate).await.unwrap();
@@ -399,7 +390,6 @@ mod tests {
         let res = provider.send_transaction(tx).await;
         res.unwrap_err();
 
-        // Explicitly impersonated accounts get returned by `eth_accounts`
         provider.anvil_impersonate_account(impersonate).await.unwrap();
         assert!(provider.get_accounts().await.unwrap().contains(&impersonate));
     }
@@ -798,7 +788,6 @@ mod tests {
         let block_gas_limit = U256::from(1337);
         assert!(provider.anvil_set_block_gas_limit(block_gas_limit).await.unwrap());
 
-        // Mine a new block, and check the new block gas limit.
         provider.evm_mine(None).await.unwrap();
 
         let latest_block =
@@ -849,7 +838,6 @@ mod tests {
         assert_eq!(latest_block.header.timestamp, start_timestamp);
     }
 
-    // Tests: evm_mine
     #[tokio::test]
     async fn test_evm_mine() {
         let provider = ProviderBuilder::new().on_anvil();
