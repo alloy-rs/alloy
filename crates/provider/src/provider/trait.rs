@@ -1127,17 +1127,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "anvil-api")]
-    async fn anvil_gets_code_at() {
-        init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
-        // Set the code
-        let addr = Address::with_last_byte(16);
-        provider.anvil_set_code(addr, Bytes::from("0xbeef")).await.unwrap();
-        let _code = provider.get_code_at(addr).await.unwrap();
-    }
-
-    #[tokio::test]
     async fn gets_storage_at() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();

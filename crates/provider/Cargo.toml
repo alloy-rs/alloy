@@ -79,5 +79,10 @@ reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
 reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
 reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
 anvil-api = ["dep:alloy-rpc-types-anvil"]
-anvil-node = ["reqwest", "dep:alloy-node-bindings", "dep:alloy-signer-wallet"]
+anvil-node = [
+    "anvil-api",
+    "reqwest",
+    "dep:alloy-node-bindings",
+    "dep:alloy-signer-wallet",
+]
 engine-api = ["dep:alloy-rpc-types-engine"]
