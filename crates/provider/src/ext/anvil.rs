@@ -10,6 +10,9 @@ use alloy_transport::{Transport, TransportResult};
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait AnvilApi<N, T>: Send + Sync {
+    // Not implemented:
+    // - anvil_enable_traces: Not implemented in the Anvil RPC API.
+
     /// Send transactions impersonating specific account and contract addresses.
     async fn anvil_impersonate_account(&self, address: Address) -> TransportResult<()>;
 
@@ -136,10 +139,6 @@ pub trait AnvilApi<N, T>: Send + Sync {
     /// Sets the backend rpc url.
     async fn anvil_set_rpc_url(&self, url: String) -> TransportResult<()>;
 
-    /// Turn on call traces for transactions that are returned to the user when they execute a
-    /// transaction (instead of just transaction hash / receipt).
-    async fn anvil_enable_traces(&self) -> TransportResult<()>;
-
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
         &self,
@@ -168,11 +167,11 @@ where
     }
 
     async fn anvil_get_auto_mine(&self) -> TransportResult<bool> {
-        self.client().request("anvil_getAutoMine", ()).await
+        self.client().request("anvil_getAutomine", ()).await
     }
 
     async fn anvil_set_auto_mine(&self, enabled: bool) -> TransportResult<()> {
-        self.client().request("anvil_setAutoMine", (enabled,)).await
+        self.client().request("anvil_setAutomine", (enabled,)).await
     }
 
     async fn anvil_mine(
@@ -308,10 +307,6 @@ where
         self.client().request("anvil_setRpcUrl", (url,)).await
     }
 
-    async fn anvil_enable_traces(&self) -> TransportResult<()> {
-        self.client().request("anvil_enableTraces", ()).await
-    }
-
     async fn eth_send_unsigned_transaction(
         &self,
         request: WithOtherFields<TransactionRequest>,
@@ -329,7 +324,7 @@ mod tests {
 
     use super::*;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_impersonate_account_anvil_stop_impersonating_account() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -366,7 +361,7 @@ mod tests {
         res.unwrap_err();
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_auto_impersonate_account() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -406,62 +401,172 @@ mod tests {
         assert!(provider.get_accounts().await.unwrap().contains(&impersonate));
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_get_auto_mine() {}
+    #[tokio::test]
+    async fn test_anvil_get_auto_mine_anvil_set_auto_mine() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_auto_mine() {}
+        provider.anvil_set_auto_mine(false).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_mine() {}
+        let enabled = provider.anvil_get_auto_mine().await.unwrap();
+        assert!(!enabled);
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_interval_mining() {}
+        provider.anvil_set_auto_mine(true).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_drop_transaction() {}
+        let enabled = provider.anvil_get_auto_mine().await.unwrap();
+        assert!(enabled);
+    }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_drop_all_transactions() {}
+    #[tokio::test]
+    async fn test_anvil_mine() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_reset() {}
+        let start_num = provider.get_block_number().await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_chain_id() {}
+        provider.anvil_mine(Some(U256::from(10)), None).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_balance() {}
+        let num = provider.get_block_number().await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
+        assert_eq!(num, start_num + 10);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_interval_mining() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        provider.anvil_set_interval_mining(1).await.unwrap();
+
+        let start_num = provider.get_block_number().await.unwrap();
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        let num = provider.get_block_number().await.unwrap();
+
+        assert_eq!(num, start_num + 2);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_drop_transaction() {
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
+
+        provider.anvil_set_auto_mine(false).await.unwrap();
+
+        let alice = provider.get_accounts().await.unwrap()[0];
+        let bob = provider.get_accounts().await.unwrap()[1];
+        let chain_id = provider.get_chain_id().await.unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_nonce(0)
+            .with_chain_id(chain_id)
+            .with_value(U256::from(100))
+            .with_gas_limit(21_000)
+            .with_max_priority_fee_per_gas(1_000_000_000)
+            .with_max_fee_per_gas(20_000_000_000);
+
+        let tx_hash =
+            provider.send_transaction(tx).await.unwrap().register().await.unwrap().tx_hash;
+
+        let res = provider.anvil_drop_transaction(tx_hash).await.unwrap();
+
+        assert_eq!(res, Some(tx_hash));
+    }
+
+    #[tokio::test]
+    async fn test_anvil_drop_all_transactions() {
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
+
+        provider.anvil_set_auto_mine(false).await.unwrap();
+
+        let alice = provider.get_accounts().await.unwrap()[0];
+        let bob = provider.get_accounts().await.unwrap()[1];
+        let chain_id = provider.get_chain_id().await.unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_nonce(0)
+            .with_chain_id(chain_id)
+            .with_value(U256::from(100))
+            .with_gas_limit(21_000)
+            .with_max_priority_fee_per_gas(1_000_000_000)
+            .with_max_fee_per_gas(20_000_000_000);
+
+        let _ = provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
+
+        let tx = tx.clone().with_nonce(1);
+
+        let _ = provider.send_transaction(tx).await.unwrap().register().await.unwrap();
+
+        provider.anvil_drop_all_transactions().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_reset() {
+        // let provider = ProviderBuilder::new().on_anvil();
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_chain_id() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let chain_id = 1337;
+        provider.anvil_set_chain_id(chain_id).await.unwrap();
+
+        let new_chain_id = provider.get_chain_id().await.unwrap();
+        assert_eq!(new_chain_id, chain_id);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_balance() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let address = Address::random();
+        let balance = U256::from(1337);
+        provider.anvil_set_balance(address, balance).await.unwrap();
+
+        let new_balance = provider.get_balance(address).await.unwrap();
+        assert_eq!(new_balance, balance);
+    }
+
+    #[tokio::test]
     async fn test_anvil_set_code() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let address = Address::with_last_byte(16);
+        let address = Address::random();
         provider.anvil_set_code(address, Bytes::from("0xbeef")).await.unwrap();
 
         let code = provider.get_code_at(address).await.unwrap();
         assert_eq!(code, Bytes::from("0xbeef"));
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_nonce() {}
+    #[tokio::test]
+    async fn test_anvil_set_nonce() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
+        let address = Address::random();
+        let nonce = U256::from(1337);
+        provider.anvil_set_nonce(address, nonce).await.unwrap();
+
+        let new_nonce = provider.get_transaction_count(address).await.unwrap();
+        assert_eq!(new_nonce, nonce.to::<u64>());
+    }
+
+    #[tokio::test]
     async fn test_anvil_set_storage_at() {
         // let provider = ProviderBuilder::new().on_anvil();
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_set_logging() {}
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_set_min_gas_price() {}
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_set_next_block_base_fee_per_gas() {}
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_set_coinbase() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -476,37 +581,126 @@ mod tests {
         assert_eq!(block.header.miner, coinbase);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_dump_state() {}
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_load_state() {}
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_node_info() {}
+    #[tokio::test]
+    async fn test_anvil_node_info() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_metadata() {}
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_remove_pool_transactions() {}
+        provider.evm_mine(None).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
+        let node_info = provider.anvil_node_info().await.unwrap();
+
+        assert_eq!(node_info.current_block_number, latest_block.header.number.unwrap() + 1);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_metadata() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let client_version = provider.get_client_version().await.unwrap();
+        let chain_id = provider.get_chain_id().await.unwrap();
+
+        let metadata = provider.anvil_metadata().await.unwrap();
+
+        assert_eq!(metadata.client_version, client_version);
+        assert_eq!(metadata.chain_id, chain_id);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_remove_pool_transactions() {
+        let provider = ProviderBuilder::new().on_anvil_with_signer();
+
+        provider.anvil_set_auto_mine(false).await.unwrap();
+
+        let alice = provider.get_accounts().await.unwrap()[0];
+        let bob = provider.get_accounts().await.unwrap()[1];
+        let chain_id = provider.get_chain_id().await.unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_nonce(0)
+            .with_chain_id(chain_id)
+            .with_value(U256::from(100))
+            .with_gas_limit(21_000)
+            .with_max_priority_fee_per_gas(1_000_000_000)
+            .with_max_fee_per_gas(20_000_000_000);
+
+        let _ = provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
+
+        let tx = tx.clone().with_nonce(1);
+
+        let _ = provider.send_transaction(tx).await.unwrap().register().await.unwrap();
+
+        provider.anvil_remove_pool_transactions(alice).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn test_anvil_snapshot() {}
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_anvil_revert() {}
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_increase_time() {}
+    #[tokio::test]
+    async fn test_anvil_increase_time() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_next_block_timestamp() {}
+        let timestamp = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .await
+            .unwrap()
+            .unwrap()
+            .header
+            .timestamp;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_time() {}
+        let seconds = provider.anvil_increase_time(U256::from(1337)).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
+        assert_eq!(timestamp as i64 + seconds, timestamp as i64 + 1337 as i64);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_next_block_timestamp() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        // Get the current timestamp, and set the next block timestamp.
+        let timestamp = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .await
+            .unwrap()
+            .unwrap()
+            .header
+            .timestamp;
+
+        provider.anvil_set_next_block_timestamp(timestamp + 1337).await.unwrap();
+
+        // Mine a new block, and check the new block timestamp.
+        let _ = provider.evm_mine(None).await;
+
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+        assert_eq!(latest_block.header.timestamp, timestamp + 1337);
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_time() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        provider.anvil_set_time(0).await.unwrap();
+
+        let seconds = provider.anvil_set_time(1001).await.unwrap();
+
+        assert_eq!(seconds, 1);
+    }
+
+    #[tokio::test]
     async fn test_anvil_set_block_gas_limit() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -521,14 +715,53 @@ mod tests {
         assert_eq!(block_gas_limit.to::<u128>(), latest_block.header.gas_limit);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_block_timestamp_interval() {}
+    #[tokio::test]
+    async fn test_anvil_set_block_timestamp_interval_anvil_remove_block_timestamp_interval() {
+        let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_remove_block_timestamp_interval() {}
+        provider.anvil_set_block_timestamp_interval(1).await.unwrap();
+
+        let start_timestamp = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .await
+            .unwrap()
+            .unwrap()
+            .header
+            .timestamp;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        // Mine a new block, and check the new block timestamp.
+        provider.evm_mine(None).await.unwrap();
+
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+
+        assert_eq!(latest_block.header.timestamp, start_timestamp + 1);
+
+        provider.anvil_remove_block_timestamp_interval().await.unwrap();
+
+        // Mine a new block, and check the new block timestamp.
+        provider.evm_mine(None).await.unwrap();
+
+        let start_timestamp = provider
+            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .await
+            .unwrap()
+            .unwrap()
+            .header
+            .timestamp;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+        let latest_block =
+            provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
+
+        assert_eq!(latest_block.header.timestamp, start_timestamp);
+    }
 
     // Tests: evm_mine
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_evm_mine() {
         let provider = ProviderBuilder::new().on_anvil();
 
@@ -541,18 +774,71 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_mine_detailed() {}
+    // TODO: Fix this test
+    // #[tokio::test]
+    // async fn test_anvil_mine_detailed() {
+    //     let provider = ProviderBuilder::new().on_anvil();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_block() {}
+    //     provider.anvil_set_auto_mine(false).await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_set_rpc_url() {}
+    //     let start_num = provider.get_block_number().await.unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_anvil_enable_traces() {}
+    //     let blocks = provider
+    //         .anvil_mine_detailed(Some(MineOptions::Options {
+    //             timestamp: Some(100),
+    //             blocks: Some(100),
+    //         }))
+    //         .await
+    //         .unwrap();
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_eth_send_unsigned_transaction() {}
+    //     assert_eq!(blocks.len(), 100);
+    //     assert_eq!(blocks[0].header.number.unwrap(), start_num + 101);
+    // }
+
+    #[tokio::test]
+    async fn test_anvil_set_block() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let block_number = U256::from(1337);
+        provider.anvil_set_block(block_number).await.unwrap();
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(num, block_number.to::<u64>());
+    }
+
+    #[tokio::test]
+    async fn test_anvil_set_rpc_url() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let url = "https://example.com".to_string();
+        provider.anvil_set_rpc_url(url.clone()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_eth_send_unsigned_transaction() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let alice = Address::random();
+        let bob = Address::random();
+        let chain_id = provider.get_chain_id().await.unwrap();
+
+        provider.anvil_set_balance(alice, U256::from(1e18 as u64)).await.unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_nonce(0)
+            .with_chain_id(chain_id)
+            .with_value(U256::from(100))
+            .with_gas_limit(21_000)
+            .with_max_priority_fee_per_gas(1_000_000_000)
+            .with_max_fee_per_gas(20_000_000_000);
+
+        let tx_hash =
+            provider.eth_send_unsigned_transaction(WithOtherFields::new(tx)).await.unwrap();
+
+        let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
+        assert_eq!(res.from, alice);
+        assert_eq!(res.to, Some(bob));
+    }
 }
