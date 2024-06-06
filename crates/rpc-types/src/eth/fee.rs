@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Internal struct to calculate reward percentiles
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[doc(alias = "TransactionGasAndReward")]
 pub struct TxGasAndReward {
     /// Gas used by the transaction
     pub gas_used: u64,

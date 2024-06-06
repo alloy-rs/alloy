@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
@@ -127,6 +128,7 @@ impl<T> TransactionReceipt<T> {
 }
 
 /// Alias for a catch-all receipt type.
+#[doc(alias = "AnyTxReceipt")]
 pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 #[cfg(test)]

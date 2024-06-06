@@ -38,6 +38,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -197,6 +198,7 @@ impl LedgerSigner {
     /// Signs an Ethereum transaction's RLP bytes (requires confirmation on the ledger).
     ///
     /// Note that this does not apply EIP-155.
+    #[doc(alias = "sign_transaction_rlp")]
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(tx_rlp);

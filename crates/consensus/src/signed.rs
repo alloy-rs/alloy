@@ -14,6 +14,7 @@ pub struct Signed<T, Sig = Signature> {
 
 impl<T, Sig> Signed<T, Sig> {
     /// Returns a reference to the transaction.
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
     }
@@ -24,6 +25,7 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns a reference to the transaction hash.
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
     pub const fn hash(&self) -> &B256 {
         &self.hash
     }

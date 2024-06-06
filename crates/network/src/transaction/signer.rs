@@ -32,6 +32,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
 
     /// Asynchronously sign an unsigned transaction, with a specified
     /// credential.
+    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,
@@ -39,6 +40,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     ) -> alloy_signer::Result<N::TxEnvelope>;
 
     /// Asynchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx")]
     fn sign_transaction(
         &self,
         tx: N::UnsignedTx,
@@ -80,6 +82,7 @@ pub trait TxSigner<Signature> {
     fn address(&self) -> Address;
 
     /// Asynchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -107,6 +110,7 @@ pub trait TxSignerSync<Signature> {
     fn address(&self) -> Address;
 
     /// Synchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx_sync")]
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,

@@ -366,6 +366,7 @@ impl TraceOutput {
 /// A parity style trace of a transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxTrace")]
 pub struct TransactionTrace {
     /// Represents what kind of trace this is
     #[serde(flatten)]

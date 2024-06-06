@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 /// This structure contains configurable settings of the transition process.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxConfiguration")]
 pub struct TransitionConfiguration {
     /// Maps on the TERMINAL_TOTAL_DIFFICULTY parameter of EIP-3675
     pub terminal_total_difficulty: U256,

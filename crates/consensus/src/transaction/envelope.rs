@@ -16,6 +16,7 @@ use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSide
 /// [4844]: https://eips.ethereum.org/EIPS/eip-4844
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[doc(alias = "TransactionType")]
 pub enum TxType {
     /// Legacy transaction type.
     Legacy = 0,
@@ -79,6 +80,7 @@ impl TryFrom<u8> for TxType {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[doc(alias = "TransactionEnvelope")]
 #[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
@@ -164,6 +166,7 @@ impl TxEnvelope {
     }
 
     /// Return the hash of the inner Signed
+    #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &B256 {
         match self {
             Self::Legacy(tx) => tx.hash(),
@@ -174,6 +177,7 @@ impl TxEnvelope {
     }
 
     /// Return the [`TxType`] of the inner txn.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,

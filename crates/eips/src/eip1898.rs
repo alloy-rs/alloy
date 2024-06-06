@@ -36,6 +36,7 @@ pub struct RpcBlockHash {
 
 impl RpcBlockHash {
     /// Returns an [RpcBlockHash] from a [B256].
+    #[doc(alias = "from_block_hash")]
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
         Self { block_hash, require_canonical }
     }

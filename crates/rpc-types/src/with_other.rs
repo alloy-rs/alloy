@@ -28,6 +28,7 @@ where
     T: Into<TransactionRequest>,
 {
     /// Convert a generic type `WithOtherFields<T>` to a `WithOtherFields<TransactionRequest>`
+    #[doc(alias = "into_tx_request")]
     pub fn into_transaction_request(self) -> WithOtherFields<TransactionRequest> {
         WithOtherFields::new(self.inner.into())
     }

@@ -80,6 +80,7 @@ impl EthereumSigner {
         self.secp_signers.get(&address).cloned()
     }
 
+    #[doc(alias = "sign_tx_inner")]
     async fn sign_transaction_inner(
         &self,
         sender: Address,
@@ -112,6 +113,7 @@ where
         self.secp_signers.keys().copied()
     }
 
+    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,

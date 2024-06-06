@@ -154,6 +154,7 @@ pub struct OtsBlockTransactions {
 /// responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxWithReceipts")]
 pub struct TransactionsWithReceipts {
     /// The list of transactions.
     pub txs: Vec<Transaction>,

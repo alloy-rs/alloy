@@ -216,6 +216,7 @@ impl<T> BlockTransactions<T> {
     /// Returns an iterator over the transactions (if any). This will be empty
     /// if the block is an uncle or if the transaction list contains only
     /// hashes.
+    #[doc(alias = "transactions")]
     pub fn txns(&self) -> impl Iterator<Item = &T> {
         self.as_transactions().map(|txs| txs.iter()).unwrap_or_else(|| [].iter())
     }

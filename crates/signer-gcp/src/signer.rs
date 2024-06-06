@@ -153,6 +153,7 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
