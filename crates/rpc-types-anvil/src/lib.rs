@@ -148,7 +148,6 @@ pub enum MineOptions {
         /// The timestamp the block should be mined with
         #[serde(with = "alloy_serde::u64_opt_via_ruint")]
         timestamp: Option<u64>,
-        #[serde(with = "alloy_serde::u64_opt_via_ruint")]
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
         blocks: Option<u64>,
