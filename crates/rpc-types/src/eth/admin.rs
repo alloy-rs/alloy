@@ -1,4 +1,4 @@
-//! Types for the `admin` api
+//! Types for the `admin` API.
 
 use alloy_genesis::ChainConfig;
 use alloy_primitives::{B256, U256};
