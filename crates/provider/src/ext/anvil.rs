@@ -337,7 +337,7 @@ mod tests {
         let funding = U256::from(1e18 as u64);
 
         // Fund the impersonated account.
-        let _ = provider.anvil_set_balance(impersonate, funding).await.unwrap();
+        provider.anvil_set_balance(impersonate, funding).await.unwrap();
 
         let balance = provider.get_balance(impersonate).await.unwrap();
         assert_eq!(balance, funding);
@@ -347,7 +347,7 @@ mod tests {
         let res = provider.send_transaction(tx.clone()).await;
         res.unwrap_err();
 
-        let _ = provider.anvil_impersonate_account(impersonate).await.unwrap();
+        provider.anvil_impersonate_account(impersonate).await.unwrap();
         assert!(provider.get_accounts().await.unwrap().contains(&impersonate));
 
         let res = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
@@ -359,7 +359,7 @@ mod tests {
         let balance = provider.get_balance(to).await.unwrap();
         assert_eq!(balance, val);
 
-        let _ = provider.anvil_stop_impersonating_account(impersonate).await.unwrap();
+        provider.anvil_stop_impersonating_account(impersonate).await.unwrap();
         let res = provider.send_transaction(tx).await;
         res.unwrap_err();
     }
@@ -374,7 +374,7 @@ mod tests {
         let funding = U256::from(1e18 as u64);
 
         // Fund the impersonated account.
-        let _ = provider.anvil_set_balance(impersonate, funding).await.unwrap();
+        provider.anvil_set_balance(impersonate, funding).await.unwrap();
 
         let balance = provider.get_balance(impersonate).await.unwrap();
         assert_eq!(balance, funding);
@@ -384,7 +384,7 @@ mod tests {
         let res = provider.send_transaction(tx.clone()).await;
         res.unwrap_err();
 
-        let _ = provider.anvil_auto_impersonate_account(true).await.unwrap();
+        provider.anvil_auto_impersonate_account(true).await.unwrap();
 
         let res = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
         assert_eq!(res.from, impersonate);
@@ -408,12 +408,12 @@ mod tests {
     async fn test_anvil_get_auto_mine_set_auto_mine() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let _ = provider.anvil_set_auto_mine(false).await.unwrap();
+        provider.anvil_set_auto_mine(false).await.unwrap();
 
         let enabled = provider.anvil_get_auto_mine().await.unwrap();
         assert!(!enabled);
 
-        let _ = provider.anvil_set_auto_mine(true).await.unwrap();
+        provider.anvil_set_auto_mine(true).await.unwrap();
 
         let enabled = provider.anvil_get_auto_mine().await.unwrap();
         assert!(enabled);
@@ -425,7 +425,7 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        let _ = provider.anvil_mine(Some(U256::from(10)), None).await.unwrap();
+        provider.anvil_mine(Some(U256::from(10)), None).await.unwrap();
 
         let num = provider.get_block_number().await.unwrap();
 
@@ -436,7 +436,7 @@ mod tests {
     async fn test_anvil_set_interval_mining() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let _ = provider.anvil_set_interval_mining(1).await.unwrap();
+        provider.anvil_set_interval_mining(1).await.unwrap();
 
         let start_num = provider.get_block_number().await.unwrap();
 
@@ -451,7 +451,7 @@ mod tests {
     async fn test_anvil_drop_transaction() {
         let provider = ProviderBuilder::new().on_anvil_with_signer();
 
-        let _ = provider.anvil_set_auto_mine(false).await.unwrap();
+        provider.anvil_set_auto_mine(false).await.unwrap();
 
         let alice = provider.get_accounts().await.unwrap()[0];
         let bob = provider.get_accounts().await.unwrap()[1];
@@ -479,7 +479,7 @@ mod tests {
     async fn test_anvil_drop_all_transactions() {
         let provider = ProviderBuilder::new().on_anvil_with_signer();
 
-        let _ = provider.anvil_set_auto_mine(false).await.unwrap();
+        provider.anvil_set_auto_mine(false).await.unwrap();
 
         let alice = provider.get_accounts().await.unwrap()[0];
         let bob = provider.get_accounts().await.unwrap()[1];
@@ -495,11 +495,11 @@ mod tests {
             .with_max_priority_fee_per_gas(1_000_000_000)
             .with_max_fee_per_gas(20_000_000_000);
 
-        let _ = provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
+        provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
 
         let tx = tx.clone().with_nonce(1);
 
-        let _ = provider.send_transaction(tx).await.unwrap().register().await.unwrap();
+        provider.send_transaction(tx).await.unwrap().register().await.unwrap();
 
         provider.anvil_drop_all_transactions().await.unwrap();
     }
@@ -516,7 +516,7 @@ mod tests {
     //     let chain_id = provider.get_chain_id().await.unwrap();
     //     assert_eq!(chain_id, 777);
 
-    //     let _ = provider
+    //     provider
     //         .anvil_reset(Some(Forking {
     //             json_rpc_url: Some(fork2.endpoint_url().to_string()),
     //             block_number: Some(0),
@@ -533,7 +533,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let chain_id = 1337;
-        let _ = provider.anvil_set_chain_id(chain_id).await.unwrap();
+        provider.anvil_set_chain_id(chain_id).await.unwrap();
 
         let new_chain_id = provider.get_chain_id().await.unwrap();
         assert_eq!(new_chain_id, chain_id);
@@ -545,7 +545,7 @@ mod tests {
 
         let address = Address::random();
         let balance = U256::from(1337);
-        let _ = provider.anvil_set_balance(address, balance).await.unwrap();
+        provider.anvil_set_balance(address, balance).await.unwrap();
 
         let new_balance = provider.get_balance(address).await.unwrap();
         assert_eq!(new_balance, balance);
@@ -556,7 +556,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let address = Address::random();
-        let _ = provider.anvil_set_code(address, Bytes::from("0xbeef")).await.unwrap();
+        provider.anvil_set_code(address, Bytes::from("0xbeef")).await.unwrap();
 
         let code = provider.get_code_at(address).await.unwrap();
         assert_eq!(code, Bytes::from("0xbeef"));
@@ -568,7 +568,7 @@ mod tests {
 
         let address = Address::random();
         let nonce = U256::from(1337);
-        let _ = provider.anvil_set_nonce(address, nonce).await.unwrap();
+        provider.anvil_set_nonce(address, nonce).await.unwrap();
 
         let new_nonce = provider.get_transaction_count(address).await.unwrap();
         assert_eq!(new_nonce, nonce.to::<u64>());
@@ -581,7 +581,7 @@ mod tests {
         let address = Address::random();
         let slot = U256::from(1337);
         let val = B256::from(U256::from(1337));
-        let _ = provider.anvil_set_storage_at(address, slot, val).await.unwrap();
+        provider.anvil_set_storage_at(address, slot, val).await.unwrap();
 
         let storage = provider.get_storage_at(address, slot).await.unwrap();
         assert_eq!(B256::from(storage), val);
@@ -591,7 +591,7 @@ mod tests {
     async fn test_anvil_set_logging() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let _ = provider.anvil_set_logging(true).await.unwrap();
+        provider.anvil_set_logging(true).await.unwrap();
     }
 
     #[tokio::test]
@@ -613,9 +613,9 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let basefee = U256::from(1337);
-        let _ = provider.anvil_set_next_block_base_fee_per_gas(basefee).await.unwrap();
+        provider.anvil_set_next_block_base_fee_per_gas(basefee).await.unwrap();
 
-        let _ = provider.evm_mine(None).await;
+        provider.evm_mine(None).await.unwrap();
 
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
@@ -628,9 +628,9 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let coinbase = Address::random();
-        let _ = provider.anvil_set_coinbase(coinbase).await.unwrap();
+        provider.anvil_set_coinbase(coinbase).await.unwrap();
 
-        let _ = provider.evm_mine(None).await;
+        provider.evm_mine(None).await.unwrap();
 
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
@@ -657,7 +657,7 @@ mod tests {
         let latest_block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
 
-        let _ = provider.evm_mine(None).await.unwrap();
+        provider.evm_mine(None).await.unwrap();
 
         let node_info = provider.anvil_node_info().await.unwrap();
 
@@ -681,7 +681,7 @@ mod tests {
     async fn test_anvil_remove_pool_transactions() {
         let provider = ProviderBuilder::new().on_anvil_with_signer();
 
-        let _ = provider.anvil_set_auto_mine(false).await.unwrap();
+        provider.anvil_set_auto_mine(false).await.unwrap();
 
         let alice = provider.get_accounts().await.unwrap()[0];
         let bob = provider.get_accounts().await.unwrap()[1];
@@ -697,11 +697,11 @@ mod tests {
             .with_max_priority_fee_per_gas(1_000_000_000)
             .with_max_fee_per_gas(20_000_000_000);
 
-        let _ = provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
+        provider.send_transaction(tx.clone()).await.unwrap().register().await.unwrap();
 
         let tx = tx.clone().with_nonce(1);
 
-        let _ = provider.send_transaction(tx).await.unwrap().register().await.unwrap();
+        provider.send_transaction(tx).await.unwrap().register().await.unwrap();
 
         provider.anvil_remove_pool_transactions(alice).await.unwrap();
     }
@@ -726,11 +726,11 @@ mod tests {
             .with_max_priority_fee_per_gas(1_000_000_000)
             .with_max_fee_per_gas(20_000_000_000);
 
-        let _ = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
+        provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
 
         let tx = tx.clone().with_nonce(1);
 
-        let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+        provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
         let tx_count = provider.get_transaction_count(alice).await.unwrap();
         assert_eq!(tx_count, 2);
@@ -756,7 +756,7 @@ mod tests {
 
         let seconds = provider.anvil_increase_time(U256::from(1337)).await.unwrap();
 
-        assert_eq!(timestamp as i64 + seconds, timestamp as i64 + 1337 as i64);
+        assert_eq!(timestamp as i64 + seconds, timestamp as i64 + 1337_i64);
     }
 
     #[tokio::test]
@@ -771,9 +771,9 @@ mod tests {
             .header
             .timestamp;
 
-        let _ = provider.anvil_set_next_block_timestamp(timestamp + 1337).await.unwrap();
+        provider.anvil_set_next_block_timestamp(timestamp + 1337).await.unwrap();
 
-        let _ = provider.evm_mine(None).await;
+        provider.evm_mine(None).await.unwrap();
 
         let latest_block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
@@ -784,7 +784,7 @@ mod tests {
     async fn test_anvil_set_time() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let _ = provider.anvil_set_time(0).await.unwrap();
+        provider.anvil_set_time(0).await.unwrap();
 
         let seconds = provider.anvil_set_time(1001).await.unwrap();
 
@@ -799,7 +799,7 @@ mod tests {
         assert!(provider.anvil_set_block_gas_limit(block_gas_limit).await.unwrap());
 
         // Mine a new block, and check the new block gas limit.
-        let _ = provider.evm_mine(None).await;
+        provider.evm_mine(None).await.unwrap();
 
         let latest_block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
@@ -810,7 +810,7 @@ mod tests {
     async fn test_anvil_set_block_timestamp_interval_anvil_remove_block_timestamp_interval() {
         let provider = ProviderBuilder::new().on_anvil();
 
-        let _ = provider.anvil_set_block_timestamp_interval(1).await.unwrap();
+        provider.anvil_set_block_timestamp_interval(1).await.unwrap();
 
         let start_timestamp = provider
             .get_block_by_number(BlockNumberOrTag::Latest, false)
@@ -901,7 +901,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
 
         let url = "https://example.com".to_string();
-        let _ = provider.anvil_set_rpc_url(url.clone()).await.unwrap();
+        provider.anvil_set_rpc_url(url.clone()).await.unwrap();
     }
 
     #[tokio::test]
