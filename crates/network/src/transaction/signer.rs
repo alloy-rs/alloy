@@ -77,6 +77,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&, &mut, Box, Rc, Arc)]
+#[doc(alias = "TransactionSigner")]
 pub trait TxSigner<Signature> {
     /// Get the address of the signer.
     fn address(&self) -> Address;
@@ -105,6 +106,7 @@ pub trait TxSigner<Signature> {
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 /// [`ChainId`]: alloy_primitives::ChainId
 #[auto_impl(&, &mut, Box, Rc, Arc)]
+#[doc(alias = "TransactionSignerSync")]
 pub trait TxSignerSync<Signature> {
     /// Get the address of the signer.
     fn address(&self) -> Address;

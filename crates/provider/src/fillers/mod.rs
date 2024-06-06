@@ -127,6 +127,7 @@ impl FillerControlFlow {
 /// [`TxFiller::status`] should return [`FillerControlFlow::Ready`].
 /// - **Finished**: The filler has filled in all properties that it can fill.
 /// [`TxFiller::status`] should return [`FillerControlFlow::Finished`].
+#[doc(alias = "TransactionFiller")]
 pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug {
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
