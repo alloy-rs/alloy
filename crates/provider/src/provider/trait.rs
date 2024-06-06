@@ -437,7 +437,19 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        self.client().request("eth_getBlockByNumber", (number, hydrate)).await
+        let block = self
+            .client()
+            .request::<_, Option<Block>>("eth_getBlockByNumber", (number, hydrate))
+            .await?
+            .map(|mut block| {
+                if !hydrate {
+                    // this ensures an empty response for `Hashes` has the expected form
+                    // this is required because deserializing [] is ambiguous
+                    block.transactions.convert_to_hashes();
+                }
+                block
+            });
+        Ok(block)
     }
 
     /// Broadcasts a transaction to the network.
@@ -525,7 +537,20 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         hash: BlockHash,
         full: bool,
     ) -> TransportResult<Option<Block>> {
-        self.client().request("eth_getBlockByHash", (hash, full)).await
+        let block = self
+            .client()
+            .request::<_, Option<Block>>("eth_getBlockByHash", (hash, full))
+            .await?
+            .map(|mut block| {
+                if !full {
+                    // this ensures an empty response for `Hashes` has the expected form
+                    // this is required because deserializing [] is ambiguous
+                    block.transactions.convert_to_hashes();
+                }
+                block
+            });
+
+        Ok(block)
     }
 
     /// Gets the client version of the chain client().
@@ -1299,5 +1324,14 @@ mod tests {
             .with_input(bytes!("06fdde03")); // `name()`
         let result = provider.call(&req).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
+    }
+
+    #[tokio::test]
+    async fn test_empty_transactions() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let block = provider.get_block_by_number(0.into(), false).await.unwrap().unwrap();
+        assert!(block.transactions.is_hashes());
     }
 }
