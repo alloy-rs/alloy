@@ -389,6 +389,7 @@ pub struct TransactionTrace {
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "LocalizedTxTrace")]
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
