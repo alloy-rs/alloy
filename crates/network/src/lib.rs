@@ -43,7 +43,7 @@ pub trait ReceiptResponse {
 /// [`Transaction`]: alloy_consensus::Transaction
 pub trait TransactionResponse {
     /// Hash of the transaction
-    fn hash(&self) -> B256;
+    fn tx_hash(&self) -> B256;
 }
 
 /// Captures type info for network-specific RPC requests/responses.

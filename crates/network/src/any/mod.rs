@@ -83,7 +83,7 @@ impl ReceiptResponse for AnyTransactionReceipt {
 }
 
 impl TransactionResponse for WithOtherFields<Transaction> {
-    fn hash(&self) -> alloy_primitives::B256 {
+    fn tx_hash(&self) -> alloy_primitives::B256 {
         self.hash
     }
 }
