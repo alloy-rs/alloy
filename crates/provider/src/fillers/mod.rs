@@ -249,14 +249,26 @@ where
         self.filler.join_with(other).layer(self.inner)
     }
 
+    async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+        let mut count = 0;
+
+        while self.filler.continue_filling(&tx) {
+            self.filler.fill_sync(&mut tx);
+            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
+
+            count += 1;
+            if count >= 20 {
+                panic!(
+                    "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
+                );
+            }
+        }
+        Ok(tx)
+    }
+
     /// Fills the transaction request, using the configured fillers
-    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>>
-    where
-        N::TxEnvelope: Clone,
-    {
-        let mut tx = SendableTx::Builder(tx);
-        self.filler.fill_sync(&mut tx);
-        self.filler.prepare_and_fill(self, tx).await
+    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
+        self.fill_inner(SendableTx::Builder(tx)).await
     }
 }
 
@@ -277,18 +289,7 @@ where
         &self,
         mut tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        let mut count = 0;
-
-        while self.filler.continue_filling(&tx) {
-            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
-
-            count += 1;
-            if count >= 20 {
-                panic!(
-                    "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
-                );
-            }
-        }
+        tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {
