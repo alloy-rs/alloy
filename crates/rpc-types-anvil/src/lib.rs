@@ -71,6 +71,7 @@ pub struct NodeInfo {
     /// The enabled hardfork
     pub hard_fork: String,
     /// How transactions are ordered for mining
+    #[doc(alias = "tx_order")]
     pub transaction_order: String,
     /// Info about the node's block environment
     pub environment: NodeEnvironment,

@@ -71,6 +71,7 @@ pub struct OtsBlock {
     #[serde(flatten)]
     pub block: Block,
     /// The number of transactions in the block.
+    #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
