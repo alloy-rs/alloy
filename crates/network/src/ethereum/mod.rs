@@ -41,4 +41,20 @@ impl TransactionResponse for alloy_rpc_types::Transaction {
     fn tx_hash(&self) -> alloy_primitives::B256 {
         self.hash
     }
+
+    fn from(&self) -> alloy_primitives::Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<alloy_primitives::Address> {
+        self.to
+    }
+
+    fn value(&self) -> alloy_primitives::U256 {
+        self.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.gas
+    }
 }
