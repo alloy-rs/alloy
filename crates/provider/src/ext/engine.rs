@@ -9,7 +9,7 @@ use alloy_transport::{Transport, TransportResult};
 
 use crate::Provider;
 
-/// Extension trait that gives access to engine api RPC methods.
+/// Extension trait that gives access to engine API RPC methods.
 ///
 /// Note:
 /// > The provider should use a JWT authentication layer.
@@ -147,7 +147,7 @@ pub trait EngineApi<N, T>: Send + Sync {
         client_version: ClientVersionV1,
     ) -> TransportResult<Vec<ClientVersionV1>>;
 
-    /// Returns the list of Engine api methods supported by the execution layer client software.
+    /// Returns the list of Engine API methods supported by the execution layer client software.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/common.md#capabilities>
     async fn exchange_capabilities(

@@ -16,9 +16,9 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Forking {
-    /// The URL of the JSON-RPC endpoint to fork from
+    /// The URL of the JSON-RPC endpoint to fork from.
     pub json_rpc_url: Option<String>,
-    /// The block number to fork from
+    /// The block number to fork from.
     pub block_number: Option<u64>,
 }
 

@@ -822,13 +822,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
-    /* ------------------------------------------ anvil ----------------------------------------- */
-
-    /// Set the bytecode of a given account.
-    async fn set_code(&self, address: Address, code: &str) -> TransportResult<()> {
-        self.client().request("anvil_setCode", (address, code)).await
-    }
-
     /* ---------------------------------------- raw calls --------------------------------------- */
 
     /// Sends a raw JSON-RPC request.
@@ -1169,17 +1162,6 @@ mod tests {
 
         let chain_id = provider.get_net_version().await.unwrap();
         assert_eq!(chain_id, dev_chain_id);
-    }
-
-    #[tokio::test]
-    #[cfg(feature = "anvil")]
-    async fn gets_code_at() {
-        init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
-        // Set the code
-        let addr = Address::with_last_byte(16);
-        provider.set_code(addr, "0xbeef").await.unwrap();
-        let _code = provider.get_code_at(addr).await.unwrap();
     }
 
     #[tokio::test]

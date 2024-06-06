@@ -3,6 +3,11 @@
 mod admin;
 pub use admin::AdminApi;
 
+#[cfg(feature = "anvil-api")]
+mod anvil;
+#[cfg(feature = "anvil-api")]
+pub use anvil::AnvilApi;
+
 #[cfg(feature = "engine-api")]
 mod engine;
 #[cfg(feature = "engine-api")]
