@@ -37,6 +37,10 @@ pub trait ReceiptResponse {
 }
 
 /// Transaction Response
+///
+/// This is distinct from [`Transaction`], since this is a JSON-RPC response.
+///
+/// [`Transaction`]: alloy_consensus::Transaction
 pub trait TransactionResponse {
     /// Hash of the transaction
     fn hash(&self) -> B256;
