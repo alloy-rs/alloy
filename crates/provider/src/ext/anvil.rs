@@ -927,6 +927,8 @@ mod tests {
         let tx_hash =
             provider.eth_send_unsigned_transaction(WithOtherFields::new(tx)).await.unwrap();
 
+        provider.evm_mine(None).await.unwrap();
+
         let res = provider.get_transaction_receipt(tx_hash).await.unwrap().unwrap();
         assert_eq!(res.from, alice);
         assert_eq!(res.to, Some(bob));
