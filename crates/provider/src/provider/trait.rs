@@ -14,8 +14,8 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
-    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, BlockTransactionsKind,
+    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
@@ -524,10 +524,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
-    async fn get_block(&self, id: BlockId, full: bool) -> TransportResult<Option<Block>> {
+    async fn get_block(
+        &self,
+        id: BlockId,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<Block>> {
         match id {
-            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), full).await,
-            BlockId::Number(number) => self.get_block_by_number(number, full).await,
+            BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
+            BlockId::Number(number) => {
+                let full = matches!(kind, BlockTransactionsKind::Full);
+                self.get_block_by_number(number, full).await
+            }
         }
     }
 
@@ -535,8 +542,13 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_block_by_hash(
         &self,
         hash: BlockHash,
-        full: bool,
+        kind: BlockTransactionsKind,
     ) -> TransportResult<Option<Block>> {
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
+
         let block = self
             .client()
             .request::<_, Option<Block>>("eth_getBlockByHash", (hash, full))
@@ -1092,7 +1104,8 @@ mod tests {
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
         let hash = block.header.hash.unwrap();
-        let block = provider.get_block_by_hash(hash, true).await.unwrap().unwrap();
+        let block =
+            provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
         assert_eq!(block.header.hash.unwrap(), hash);
     }
 

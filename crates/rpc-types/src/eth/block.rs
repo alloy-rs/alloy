@@ -456,6 +456,15 @@ impl From<bool> for BlockTransactionsKind {
     }
 }
 
+impl From<BlockTransactionsKind> for bool {
+    fn from(kind: BlockTransactionsKind) -> Self {
+        match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        }
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
