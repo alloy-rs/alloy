@@ -312,6 +312,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Apply a function to the builder, returning the modified builder.
+    fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
     /// True if the builder contains all necessary information to be submitted
     /// to the `eth_sendTransaction` endpoint.
     fn can_submit(&self) -> bool;
