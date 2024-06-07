@@ -94,7 +94,7 @@ pub struct NodeEnvironment {
 }
 
 /// The node's fork configuration.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeForkConfig {
     /// URL of the forked network
