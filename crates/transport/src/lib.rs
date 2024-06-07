@@ -26,6 +26,8 @@ pub use r#trait::Transport;
 pub use alloy_json_rpc::{RpcError, RpcResult};
 pub use futures_utils_wasm::{impl_future, BoxFuture};
 
+mod layers;
+
 /// Misc. utilities for building transports.
 pub mod utils;
 
