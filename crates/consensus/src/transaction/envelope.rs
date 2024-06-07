@@ -165,7 +165,7 @@ impl TxEnvelope {
         }
     }
 
-    /// Return the hash of the inner Signed
+    /// Return the hash of the inner Signed.
     #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &B256 {
         match self {

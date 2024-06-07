@@ -134,7 +134,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().output_tx_type().into()
     }
 
-    #[doc(alias = "output_transaction_type")]
+    #[doc(alias = "output_transaction_type_checked")]
     fn output_tx_type_checked(&self) -> Option<<AnyNetwork as Network>::TxType> {
         self.deref().output_tx_type_checked().map(Into::into)
     }

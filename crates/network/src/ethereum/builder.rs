@@ -152,7 +152,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.preferred_type()
     }
 
-    #[doc(alias = "output_transaction_type")]
+    #[doc(alias = "output_transaction_type_checked")]
     fn output_tx_type_checked(&self) -> Option<TxType> {
         self.buildable_type()
     }

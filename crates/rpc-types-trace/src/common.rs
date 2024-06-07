@@ -12,11 +12,8 @@ pub enum TraceResult<Ok, Err> {
         /// Trace results produced by the tracer
         result: Ok,
         /// transaction hash
-        #[serde(
-            skip_serializing_if = "Option::is_none",
-            rename = "txHash",
-            alias = "transaction_hash"
-        )]
+        #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
+        #[doc(alias = "transaction_hash")]
         tx_hash: Option<TxHash>,
     },
     /// Untagged error variant
@@ -24,11 +21,8 @@ pub enum TraceResult<Ok, Err> {
         /// Trace failure produced by the tracer
         error: Err,
         /// transaction hash
-        #[serde(
-            skip_serializing_if = "Option::is_none",
-            rename = "txHash",
-            alias = "transaction_hash"
-        )]
+        #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
+        #[doc(alias = "transaction_hash")]
         tx_hash: Option<TxHash>,
     },
 }

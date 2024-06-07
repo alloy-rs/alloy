@@ -10,6 +10,7 @@ pub struct Signed<T, Sig = Signature> {
     tx: T,
     #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
     hash: B256,
 }
 

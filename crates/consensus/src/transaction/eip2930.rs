@@ -217,7 +217,7 @@ impl TxEip2930 {
         Ok(signed)
     }
 
-    /// Get transaction type
+    /// Get transaction type.
     #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip2930
