@@ -48,7 +48,7 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 /// The provider supports EIP-1559 fee estimation and transaction building. We generally assume
 /// that EIP-1559 is supported by the client and will proactively use it by default. If the client
 /// does not support EIP-1559, we fall back to legacy transaction building. We acknowledge that this
-/// means EIP-1559 has a privileged status in comparison to other hardforks.
+/// means EIP-1559 has a privileged status in comparison to other transaction types.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
