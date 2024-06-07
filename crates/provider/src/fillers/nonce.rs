@@ -58,6 +58,8 @@ impl<N: Network> TxFiller<N> for NonceFiller {
         FillerControlFlow::Ready
     }
 
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
     async fn prepare<P, T>(
         &self,
         provider: &P,

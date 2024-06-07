@@ -37,6 +37,8 @@ where
         FillerControlFlow::Finished
     }
 
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
     async fn prepare<P, T>(
         &self,
         _provider: &P,

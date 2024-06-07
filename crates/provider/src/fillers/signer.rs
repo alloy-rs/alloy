@@ -68,6 +68,14 @@ where
         }
     }
 
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        if let Some(builder) = tx.as_mut_builder() {
+            if builder.from().is_none() {
+                builder.set_from(self.signer.default_signer_address());
+            }
+        }
+    }
+
     async fn prepare<P, T>(
         &self,
         _provider: &P,
@@ -85,17 +93,10 @@ where
         _fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        let mut builder = match tx {
+        let builder = match tx {
             SendableTx::Builder(builder) => builder,
             _ => return Ok(tx),
         };
-
-        if builder.from().is_none() {
-            builder.set_from(self.signer.default_signer_address());
-            if !builder.can_build() {
-                return Ok(SendableTx::Builder(builder));
-            }
-        }
 
         let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
 

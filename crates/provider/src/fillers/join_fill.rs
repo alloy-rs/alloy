@@ -94,6 +94,11 @@ where
         self.left.status(tx).absorb(self.right.status(tx))
     }
 
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        self.left.fill_sync(tx);
+        self.right.fill_sync(tx);
+    }
+
     async fn prepare<P, T>(
         &self,
         provider: &P,

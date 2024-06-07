@@ -63,6 +63,16 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         }
     }
 
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        if let Some(chain_id) = self.0.get() {
+            if let Some(builder) = tx.as_mut_builder() {
+                if builder.chain_id().is_none() {
+                    builder.set_chain_id(*chain_id)
+                }
+            };
+        }
+    }
+
     async fn prepare<P, T>(
         &self,
         provider: &P,
@@ -76,22 +86,17 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
             Some(chain_id) => Ok(chain_id),
             None => {
                 let chain_id = provider.get_chain_id().await?;
-                let chain_id = *self.0.get_or_init(|| chain_id);
-                Ok(chain_id)
+                Ok(*self.0.get_or_init(|| chain_id))
             }
         }
     }
 
     async fn fill(
         &self,
-        fillable: Self::Fillable,
+        _fillable: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        if let Some(builder) = tx.as_mut_builder() {
-            if builder.chain_id().is_none() {
-                builder.set_chain_id(fillable)
-            }
-        };
+        self.fill_sync(&mut tx);
         Ok(tx)
     }
 }
