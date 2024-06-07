@@ -22,7 +22,7 @@ pub use alloy_rpc_types_beacon as beacon;
 pub use alloy_rpc_types_engine as engine;
 
 #[cfg(feature = "rpc-types-eth")]
-pub use alloy_rpc_types_eth as eth;
+pub use alloy_rpc_types_eth::*;
 
 #[cfg(feature = "rpc-types-trace")]
 pub use alloy_rpc_types_trace as trace;
