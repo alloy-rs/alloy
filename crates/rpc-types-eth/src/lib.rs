@@ -47,3 +47,6 @@ pub mod txpool;
 
 mod work;
 pub use work::Work;
+
+pub mod with_other;
+pub use with_other::WithOtherFields;
