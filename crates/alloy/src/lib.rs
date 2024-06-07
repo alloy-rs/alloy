@@ -141,7 +141,7 @@ pub mod rpc {
 
         #[cfg(feature = "rpc-types-eth")]
         #[doc(inline)]
-        pub use alloy_rpc_types as eth;
+        pub use alloy_rpc_types_eth as eth;
 
         #[cfg(feature = "rpc-types-trace")]
         #[doc(inline)]

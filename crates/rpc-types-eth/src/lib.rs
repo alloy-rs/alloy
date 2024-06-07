@@ -45,8 +45,5 @@ pub use transaction::*;
 
 pub mod txpool;
 
-pub mod with_other;
-pub use with_other::WithOtherFields;
-
 mod work;
 pub use work::Work;

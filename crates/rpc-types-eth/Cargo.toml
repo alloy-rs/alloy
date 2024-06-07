@@ -28,6 +28,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
 
+# arbitrary
+arbitrary = { version = "1.3", features = ["derive"], optional = true }
+proptest = { version = "1.4", optional = true }
+proptest-derive = { version = "0.4", optional = true }
+
 # jsonrpsee
 alloy-sol-types.workspace = true
 
@@ -43,3 +48,12 @@ proptest.workspace = true
 proptest-derive.workspace = true
 rand.workspace = true
 similar-asserts.workspace = true
+
+[features]
+arbitrary = [
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+    "alloy-eips/arbitrary",
+]

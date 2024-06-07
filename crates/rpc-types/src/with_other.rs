@@ -1,7 +1,7 @@
 //! Wrapper allowing to catch all fields missing while deserialize.
 
-use crate::{other::OtherFields, TransactionRequest};
 use alloy_consensus::{TxEnvelope, TypedTransaction};
+use alloy_rpc_types_eth::{other::OtherFields, TransactionRequest};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};

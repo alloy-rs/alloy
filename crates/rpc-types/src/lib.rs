@@ -10,8 +10,10 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-#[cfg(feature = "serde")]
 pub use alloy_serde as serde_helpers;
+
+pub mod with_other;
+pub use with_other::WithOtherFields;
 
 #[cfg(feature = "rpc-types-anvil")]
 pub use alloy_rpc_types_anvil as anvil;
