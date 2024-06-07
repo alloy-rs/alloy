@@ -80,13 +80,7 @@ impl Default for Eip658Value {
 impl serde::Serialize for Eip658Value {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::Eip658(status) => {
-                if serializer.is_human_readable() {
-                    serializer.serialize_str(if *status { "0x1" } else { "0x" })
-                } else {
-                    serializer.serialize_bool(*status)
-                }
-            }
+            Self::Eip658(status) => alloy_serde::quantity_bool::serialize(status, serializer),
             Self::PostState(state) => state.serialize(serializer),
         }
     }
