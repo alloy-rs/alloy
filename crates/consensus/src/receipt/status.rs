@@ -1,5 +1,5 @@
 use alloy_primitives::B256;
-use alloy_rlp::{BufMut, Decodable, Encodable, Error, Header};
+use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -35,7 +35,7 @@ impl Eip658Value {
 
     /// Returns true if the transaction was a post-[EIP-658] transaction.
     pub const fn is_eip658(&self) -> bool {
-        matches!(self, Self::PostState(_))
+        !matches!(self, Self::PostState(_))
     }
 
     /// Fallibly convert to the post state.
@@ -167,8 +167,9 @@ impl Decodable for Eip658Value {
         let h = Header::decode(buf)?;
 
         match h.payload_length {
+            0 => Ok(Self::Eip658(false)),
             1 => {
-                let status = bool::decode(buf)?;
+                let status = buf.get_u8() != 0;
                 Ok(Self::Eip658(status))
             }
             32 => {
