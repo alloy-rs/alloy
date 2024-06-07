@@ -164,13 +164,52 @@ impl Decodable for Eip658Value {
             0 => Ok(Self::Eip658(false)),
             1 => {
                 let status = buf.get_u8() != 0;
-                Ok(Self::Eip658(status))
+                Ok(status.into())
             }
             32 => {
-                let state = B256::decode(buf)?;
-                Ok(Self::PostState(state))
+                if buf.remaining() < 32 {
+                    return Err(Error::InputTooShort);
+                }
+                let mut state = B256::default();
+                buf.copy_to_slice(state.as_mut_slice());
+                Ok(state.into())
             }
             _ => Err(Error::UnexpectedLength),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn rlp_sanity() {
+        let mut buf = Vec::new();
+        let status = Eip658Value::Eip658(true);
+        status.encode(&mut buf);
+        assert_eq!(Eip658Value::decode(&mut buf.as_slice()), Ok(status));
+
+        let mut buf = Vec::new();
+        let state = Eip658Value::PostState(B256::default());
+        state.encode(&mut buf);
+        assert_eq!(Eip658Value::decode(&mut buf.as_slice()), Ok(state));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_sanity() {
+        let status: Eip658Value = true.into();
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, r#""0x1""#);
+        assert_eq!(serde_json::from_str::<Eip658Value>(&json).unwrap(), status);
+
+        let state: Eip658Value = false.into();
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, r#""0x0""#);
+
+        let state: Eip658Value = B256::repeat_byte(1).into();
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, r#""0x0101010101010101010101010101010101010101010101010101010101010101""#);
     }
 }
