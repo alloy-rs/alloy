@@ -2,7 +2,7 @@
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
-use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
+use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 

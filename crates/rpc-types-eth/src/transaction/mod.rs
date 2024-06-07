@@ -1,11 +1,11 @@
 //! RPC types for transactions
 
-use crate::eth::other::OtherFields;
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
 use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
+use alloy_rpc_types::other::OtherFields;
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;

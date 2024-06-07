@@ -15,53 +15,8 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
-# ethereum
-alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
-alloy-serde.workspace = true
-alloy-genesis.workspace = true
-
-alloy-consensus = { workspace = true, features = ["std", "serde"] }
-alloy-eips = { workspace = true, features = ["std", "serde"] }
-
-itertools.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-thiserror.workspace = true
-
-
-# arbitrary
-arbitrary = { version = "1.3", features = ["derive"], optional = true }
-proptest = { version = "1.4", optional = true }
-proptest-derive = { version = "0.4", optional = true }
-
-# jsonrpsee
-jsonrpsee-types = { version = "0.22", optional = true }
-alloy-sol-types.workspace = true
-
-[features]
-arbitrary = [
-    "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
-    "alloy-primitives/arbitrary",
-    "alloy-eips/arbitrary",
-]
-jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
-k256 = ["alloy-consensus/k256"]
-
-[dev-dependencies]
-alloy-primitives = { workspace = true, features = [
-    "rand",
-    "rlp",
-    "serde",
-    "arbitrary",
-] }
-alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
-
-arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
-rand.workspace = true
-similar-asserts.workspace = true
+alloy-rpc-types-anvil.workspace = true
+alloy-rpc-types-beacon.workspace = true
+alloy-rpc-types-engine.workspace = true
+alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-trace.workspace = true

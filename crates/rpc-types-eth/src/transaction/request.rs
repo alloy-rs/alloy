@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
+use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
     TxType, TypedTransaction,
@@ -800,8 +800,8 @@ pub struct TransactionInputError;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::WithOtherFields;
     use alloy_primitives::b256;
+    use alloy_rpc_types::WithOtherFields;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]

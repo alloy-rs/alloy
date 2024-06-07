@@ -30,5 +30,5 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-alloy-rpc-types.workspace = true
+alloy-rpc-types-eth.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -1,6 +1,6 @@
 [package]
-name = "alloy-rpc-types-trace"
-description = "Ethereum RPC trace types"
+name = "alloy-rpc-types-eth"
+description = "Ethereum RPC-related types"
 
 version.workspace = true
 edition.workspace = true
@@ -15,12 +15,21 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-rpc-types-eth.workspace = true
+alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
+alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
+alloy-genesis.workspace = true
 
-serde.workspace = true
+alloy-consensus = { workspace = true, features = ["std", "serde"] }
+alloy-eips = { workspace = true, features = ["std", "serde"] }
+
+itertools.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+thiserror.workspace = true
+
+# jsonrpsee
+alloy-sol-types.workspace = true
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -29,7 +38,6 @@ alloy-primitives = { workspace = true, features = [
     "serde",
     "arbitrary",
 ] }
-
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
 proptest-derive.workspace = true

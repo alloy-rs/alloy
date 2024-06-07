@@ -1,4 +1,4 @@
-use crate::{eth::log::Log as RpcLog, BlockNumberOrTag, Transaction};
+use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
 use alloy_primitives::{keccak256, Address, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
 use serde::{
