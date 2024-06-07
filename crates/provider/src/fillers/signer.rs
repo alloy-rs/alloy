@@ -15,7 +15,7 @@ use super::{FillerControlFlow, TxFiller};
 ///
 /// ```
 /// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
-/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
@@ -109,7 +109,7 @@ where
 mod tests {
     use crate::{Provider, ProviderBuilder};
     use alloy_primitives::{address, b256, U256};
-    use alloy_rpc_types::TransactionRequest;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn poc() {

@@ -1,9 +1,8 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use crate::Log;
+use crate::{Log, WithOtherFields};
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256};
-use alloy_rpc_types::WithOtherFields;
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
@@ -138,6 +137,7 @@ pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEn
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::TransactionReceipt;
     use alloy_consensus::{Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;

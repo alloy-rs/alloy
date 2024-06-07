@@ -15,8 +15,25 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
-alloy-rpc-types-anvil.workspace = true
-alloy-rpc-types-beacon.workspace = true
-alloy-rpc-types-engine.workspace = true
-alloy-rpc-types-eth.workspace = true
-alloy-rpc-types-trace.workspace = true
+alloy-serde = { workspace = true, optional = true }
+alloy-rpc-types-beacon = { workspace = true, optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true }
+alloy-rpc-types-anvil = { workspace = true, optional = true }
+alloy-rpc-types-eth = { workspace = true, optional = true }
+alloy-rpc-types-trace = { workspace = true, optional = true }
+
+[features]
+default = [
+    "serde",
+    "rpc-types-anvil",
+    "rpc-types-beacon",
+    "rpc-types-engine",
+    "rpc-types-eth",
+    "rpc-types-trace",
+]
+serde = ["alloy-serde"]
+rpc-types-anvil = ["alloy-rpc-types-anvil"]
+rpc-types-beacon = ["alloy-rpc-types-beacon"]
+rpc-types-engine = ["alloy-rpc-types-engine"]
+rpc-types-eth = ["alloy-rpc-types-eth"]
+rpc-types-trace = ["alloy-rpc-types-trace"]

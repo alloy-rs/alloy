@@ -800,8 +800,8 @@ pub struct TransactionInputError;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::WithOtherFields;
     use alloy_primitives::b256;
-    use alloy_rpc_types::WithOtherFields;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]

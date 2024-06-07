@@ -1,3 +1,5 @@
+//! Wrapper allowing to catch all fields missing while deserialize.
+
 use crate::{other::OtherFields, TransactionRequest};
 use alloy_consensus::{TxEnvelope, TypedTransaction};
 use serde::{Deserialize, Serialize};

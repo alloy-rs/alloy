@@ -2,7 +2,7 @@
 
 use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
-use alloy_rpc_types::{state::StateOverride, BlockOverrides};
+use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, time::Duration};
 
