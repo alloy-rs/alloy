@@ -16,7 +16,7 @@ pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
-    #[cfg_attr(feature = "serde", serde(alias = "name"))]
+    #[cfg_attr(feature = "serde", serde(alias = "root"))]
     pub status: Eip658Value,
     /// Gas used
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
