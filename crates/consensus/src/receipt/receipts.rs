@@ -248,3 +248,31 @@ where
         Ok(Self { receipt: Receipt::<T>::arbitrary(u)?, logs_bloom: Bloom::arbitrary(u)? })
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[cfg(feature = "serde")]
+    #[test]
+    fn root_vs_status() {
+        let receipt = super::Receipt::<()> {
+            status: super::Eip658Value::Eip658(true),
+            cumulative_gas_used: 0,
+            logs: Vec::new(),
+        };
+
+        let json = serde_json::to_string(&receipt).unwrap();
+        assert_eq!(json, r#"{"status":"0x1","cumulativeGasUsed":"0x0","logs":[]}"#);
+
+        let receipt = super::Receipt::<()> {
+            status: super::Eip658Value::PostState(Default::default()),
+            cumulative_gas_used: 0,
+            logs: Vec::new(),
+        };
+
+        let json = serde_json::to_string(&receipt).unwrap();
+        assert_eq!(
+            json,
+            r#"{"root":"0x0000000000000000000000000000000000000000000000000000000000000000","cumulativeGasUsed":"0x0","logs":[]}"#
+        );
+    }
+}
