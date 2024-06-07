@@ -42,6 +42,14 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 ///
 /// For a polling alternatives available over HTTP, use the `watch_*` methods. However, be aware
 /// that polling increases RPC usage drastically.
+///
+/// # EIP-1559
+///
+/// The provider supports EIP-1559 fee estimation and transaction building. We generally assume
+/// that EIP-1559 is supported by the client and will proactively use it by default. If the client
+/// does not support EIP-1559, we fall back to legacy transaction building. We acknowledge that this
+/// means EIP-1559 has a priviledged position in relation to other hardforks, but we believe this is
+/// the most user-friendly experience.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -790,8 +798,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             )
             .await?;
 
-        // if the base fee of the Latest block is 0 then we need check if the latest block even has
-        // a base fee/supports EIP1559
+        // If the base fee of the Latest block is 0 then we need check if the latest block even has
+        // a base fee/supports EIP1559.
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
             Some(base_fee) if (base_fee != 0) => base_fee,
             _ => {
