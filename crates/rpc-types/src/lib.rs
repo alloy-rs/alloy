@@ -12,17 +12,17 @@
 
 pub use alloy_serde as serde_helpers;
 
-#[cfg(feature = "rpc-types-anvil")]
+#[cfg(feature = "anvil")]
 pub use alloy_rpc_types_anvil as anvil;
 
-#[cfg(feature = "rpc-types-beacon")]
+#[cfg(feature = "beacon")]
 pub use alloy_rpc_types_beacon as beacon;
 
-#[cfg(feature = "rpc-types-engine")]
+#[cfg(feature = "engine")]
 pub use alloy_rpc_types_engine as engine;
 
-#[cfg(feature = "rpc-types-eth")]
+#[cfg(feature = "eth")]
 pub use alloy_rpc_types_eth::*;
 
-#[cfg(feature = "rpc-types-trace")]
+#[cfg(feature = "trace")]
 pub use alloy_rpc_types_trace as trace;
