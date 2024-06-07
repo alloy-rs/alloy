@@ -2,8 +2,9 @@ use alloy_network::Network;
 use alloy_primitives::{BlockHash, B256};
 use alloy_rpc_types_engine::{
     ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
-    ExecutionPayloadEnvelopeV3, ExecutionPayloadInputV2, ExecutionPayloadV1, ExecutionPayloadV3,
-    ForkchoiceState, ForkchoiceUpdated, PayloadAttributes, PayloadId, PayloadStatus,
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
+    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
+    PayloadId, PayloadStatus,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -37,6 +38,16 @@ pub trait EngineApi<N, T>: Send + Sync {
     async fn new_payload_v3(
         &self,
         payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+    ) -> TransportResult<PayloadStatus>;
+
+    /// Sends the given payload to the execution layer client, as specified for the Prague fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/03911ffc053b8b806123f1fc237184b0092a485a/src/engine/prague.md#engine_newpayloadv4>
+    async fn new_payload_v4(
+        &self,
+        payload: ExecutionPayloadV4,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
     ) -> TransportResult<PayloadStatus>;
@@ -109,6 +120,18 @@ pub trait EngineApi<N, T>: Send + Sync {
         &self,
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV3>;
+
+    /// Returns the most recent version of the payload that is available in the corresponding
+    /// payload build process at the time of receiving this call.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#engine_getpayloadv4>
+    ///
+    /// Note:
+    /// > Provider software MAY stop the corresponding build process after serving this call.
+    async fn get_payload_v4(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -186,6 +209,17 @@ where
             .await
     }
 
+    async fn new_payload_v4(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request("engine_newPayloadV4", (payload, versioned_hashes, parent_beacon_block_root))
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -232,6 +266,13 @@ where
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV3> {
         self.client().request("engine_getPayloadV3", (payload_id,)).await
+    }
+
+    async fn get_payload_v4(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
+        self.client().request("engine_getPayloadV4", (payload_id,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(
