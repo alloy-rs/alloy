@@ -34,6 +34,9 @@ pub use alloy_eips::eip2718;
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
     fn contract_address(&self) -> Option<Address>;
+
+    /// Status of the transaction.
+    fn status(&self) -> bool;
 }
 
 /// Transaction Response
