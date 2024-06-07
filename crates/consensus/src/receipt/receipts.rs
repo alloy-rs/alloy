@@ -1,15 +1,14 @@
-use core::borrow::Borrow;
-
-use super::TxReceipt;
-use alloy_primitives::{Bloom, Log};
+use crate::receipt::{Eip658Value, TxReceipt};
+use alloy_primitives::{Bloom, Log, U128};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
+use core::borrow::Borrow;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TransactionReceipt", alias = "TxReceipt")]
@@ -17,13 +16,38 @@ pub struct Receipt<T = Log> {
     /// If transaction is executed successfully.
     ///
     /// This is the `statusCode`
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity_bool"))]
-    pub status: bool,
+    #[cfg_attr(feature = "serde", serde(alias = "name"))]
+    pub status: Eip658Value,
     /// Gas used
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
     pub cumulative_gas_used: u128,
     /// Log send from contracts.
     pub logs: Vec<T>,
+}
+
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for Receipt<T>
+where
+    T: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let mut s = serializer.serialize_struct("Receipt", 3)?;
+
+        // If the status is EIP-658, serialize the status field.
+        // Otherwise, serialize the root field.
+        let key = if self.status.is_eip658() { "status" } else { "root" };
+        s.serialize_field(key, &self.status)?;
+
+        s.serialize_field("cumulativeGasUsed", &U128::from(self.cumulative_gas_used))?;
+        s.serialize_field("logs", &self.logs)?;
+
+        s.end()
+    }
 }
 
 impl<T> Receipt<T>
@@ -47,8 +71,12 @@ impl<T> TxReceipt<T> for Receipt<T>
 where
     T: Borrow<Log>,
 {
+    fn status_or_post_state(&self) -> &Eip658Value {
+        &self.status
+    }
+
     fn status(&self) -> bool {
-        self.status
+        self.status.coerce_status()
     }
 
     fn bloom(&self) -> Bloom {
@@ -90,8 +118,12 @@ pub struct ReceiptWithBloom<T = Log> {
 }
 
 impl<T> TxReceipt<T> for ReceiptWithBloom<T> {
+    fn status_or_post_state(&self) -> &Eip658Value {
+        &self.receipt.status
+    }
+
     fn status(&self) -> bool {
-        self.receipt.status
+        matches!(self.receipt.status, Eip658Value::Eip658(true) | Eip658Value::PostState(_))
     }
 
     fn bloom(&self) -> Bloom {
