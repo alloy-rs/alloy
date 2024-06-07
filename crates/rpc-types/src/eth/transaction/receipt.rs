@@ -83,7 +83,7 @@ impl TransactionReceipt {
             ReceiptEnvelope::Eip1559(receipt)
             | ReceiptEnvelope::Eip2930(receipt)
             | ReceiptEnvelope::Eip4844(receipt)
-            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status,
+            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
             _ => false,
         }
     }
@@ -137,7 +137,7 @@ pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEn
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloy_consensus::{Receipt, ReceiptWithBloom};
+    use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;
     use rand::Rng;
@@ -167,7 +167,11 @@ mod test {
         assert!(matches!(
             receipt.inner,
             ReceiptEnvelope::Eip1559(ReceiptWithBloom {
-                receipt: Receipt { status: true, cumulative_gas_used: EXPECTED_CGU, .. },
+                receipt: Receipt {
+                    status: Eip658Value::Eip658(true),
+                    cumulative_gas_used: EXPECTED_CGU,
+                    ..
+                },
                 logs_bloom: EXPECTED_BLOOM
             })
         ));

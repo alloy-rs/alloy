@@ -9,10 +9,36 @@ pub use envelope::ReceiptEnvelope;
 mod receipts;
 pub use receipts::{Receipt, ReceiptWithBloom};
 
+mod status;
+pub use status::Eip658Value;
+
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
 pub trait TxReceipt<T = Log> {
-    /// Returns true if the transaction was successful.
+    /// Returns the status or post state of the transaction.
+    ///
+    /// ## Note
+    ///
+    /// Use this method instead of [`TxReceipt::status`] when the transaction
+    /// is pre-[EIP-658].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
+    fn status_or_post_state(&self) -> &Eip658Value;
+
+    /// Returns true if the transaction was successful OR if the transaction is
+    /// pre-[EIP-658]. Results for transactions before [EIP-658] are not
+    /// reliable.
+    ///
+    /// ## Note
+    ///
+    /// Caution must be taken when using this method for deep-historical
+    /// receipts, as it may not accurately reflect the status of the
+    /// transaction. The transaction status is not knowable from the receipt
+    /// for transactions before [EIP-658].
+    ///
+    /// This can be handled using [`TxReceipt::status_or_post_state`].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     fn status(&self) -> bool;
 
     /// Returns the bloom filter for the logs in the receipt. This operation
@@ -59,7 +85,7 @@ mod tests {
                             bytes!("0100ff"),
                         ),
                     }],
-                    status: false,
+                    status: false.into(),
                 },
                 logs_bloom: [0; 256].into(),
             });
@@ -91,7 +117,7 @@ mod tests {
                             bytes!("0100ff"),
                         ),
                     }],
-                    status: false,
+                    status: false.into(),
                 },
                 logs_bloom: [0; 256].into(),
             };
@@ -104,7 +130,7 @@ mod tests {
     fn gigantic_receipt() {
         let receipt = Receipt {
             cumulative_gas_used: 16747627,
-            status: true,
+            status: true.into(),
             logs: vec![
                 Log {
                     address: address!("4bf56695415f725e43c3e04354b604bcfb6dfb6e"),
