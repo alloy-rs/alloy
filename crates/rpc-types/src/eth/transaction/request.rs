@@ -12,6 +12,7 @@ use std::hash::Hash;
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxRequest")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,6 +85,7 @@ pub struct TransactionRequest {
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u8_opt_via_ruint"
     )]
+    #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,6 +104,7 @@ impl TransactionRequest {
     }
 
     /// Sets the transactions type for the transactions.
+    #[doc(alias = "tx_type")]
     pub const fn transaction_type(mut self, transaction_type: u8) -> Self {
         self.transaction_type = Some(transaction_type);
         self
@@ -512,6 +515,7 @@ impl TransactionRequest {
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[doc(alias = "TxInput")]
 pub struct TransactionInput {
     /// Transaction data
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -789,6 +793,7 @@ impl From<TxEnvelope> for TransactionRequest {
 /// Error thrown when both `data` and `input` fields are set and not equal.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
 

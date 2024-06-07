@@ -6,14 +6,17 @@ use alloy_primitives::{Signature, B256};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]
+    #[doc(alias = "transaction")]
     tx: T,
     #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
     hash: B256,
 }
 
 impl<T, Sig> Signed<T, Sig> {
     /// Returns a reference to the transaction.
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &T {
         &self.tx
     }
@@ -24,6 +27,7 @@ impl<T, Sig> Signed<T, Sig> {
     }
 
     /// Returns a reference to the transaction hash.
+    #[doc(alias = "tx_hash", alias = "transaction_hash")]
     pub const fn hash(&self) -> &B256 {
         &self.hash
     }

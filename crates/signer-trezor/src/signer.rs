@@ -72,6 +72,7 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -158,6 +159,7 @@ impl TrezorSigner {
     /// Signs an Ethereum transaction (requires confirmation on the Trezor).
     ///
     /// Does not apply EIP-155.
+    #[doc(alias = "sign_transaction_inner")]
     async fn sign_tx_inner(
         &self,
         tx: &dyn SignableTransaction<Signature>,

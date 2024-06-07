@@ -50,6 +50,7 @@ impl<N: Network> TransactionBuilderError<N> {
 ///
 /// Transaction builders should be able to construct all available transaction types on a given
 /// network.
+#[doc(alias = "TxBuilder")]
 pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
@@ -330,10 +331,12 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
+    #[doc(alias = "output_transaction_type")]
     fn output_tx_type(&self) -> N::TxType;
 
     /// Returns the transaction type that this builder will build. `None` if
     /// the builder is not ready to build.
+    #[doc(alias = "output_transaction_type_checked")]
     fn output_tx_type_checked(&self) -> Option<N::TxType>;
 
     /// Trim any conflicting keys and populate any computed fields (like blob

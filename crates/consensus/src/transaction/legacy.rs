@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "LegacyTransaction", alias = "TransactionLegacy", alias = "LegacyTx")]
 pub struct TxLegacy {
     /// Added as EIP-155: Simple replay attack protection
     #[cfg_attr(

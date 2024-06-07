@@ -38,6 +38,7 @@ impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
 }
 
 impl TransactionResponse for alloy_rpc_types::Transaction {
+    #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> alloy_primitives::B256 {
         self.hash
     }

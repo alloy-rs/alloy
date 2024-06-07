@@ -267,6 +267,7 @@ impl FilterBlockOption {
 
     /// Pins the block hash this filter should target.
     #[must_use]
+    #[doc(alias = "set_block_hash")]
     pub const fn set_hash(&self, hash: B256) -> Self {
         Self::AtBlockHash(hash)
     }

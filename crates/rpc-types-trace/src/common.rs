@@ -13,6 +13,7 @@ pub enum TraceResult<Ok, Err> {
         result: Ok,
         /// transaction hash
         #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
+        #[doc(alias = "transaction_hash")]
         tx_hash: Option<TxHash>,
     },
     /// Untagged error variant
@@ -21,12 +22,14 @@ pub enum TraceResult<Ok, Err> {
         error: Err,
         /// transaction hash
         #[serde(skip_serializing_if = "Option::is_none", rename = "txHash")]
+        #[doc(alias = "transaction_hash")]
         tx_hash: Option<TxHash>,
     },
 }
 
 impl<Ok, Err> TraceResult<Ok, Err> {
     /// Returns the hash of the transaction that was traced.
+    #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> Option<TxHash> {
         *match self {
             Self::Success { tx_hash, .. } => tx_hash,

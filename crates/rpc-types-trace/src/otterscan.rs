@@ -71,6 +71,7 @@ pub struct OtsBlock {
     #[serde(flatten)]
     pub block: Block,
     /// The number of transactions in the block.
+    #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
@@ -154,8 +155,10 @@ pub struct OtsBlockTransactions {
 /// responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxWithReceipts")]
 pub struct TransactionsWithReceipts {
     /// The list of transactions.
+    #[doc(alias = "transactions")]
     pub txs: Vec<Transaction>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
@@ -169,6 +172,7 @@ pub struct TransactionsWithReceipts {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     /// The transaction used to create the contract.
+    #[doc(alias = "transaction")]
     pub tx: Transaction,
     /// The address of the contract creator.
     pub creator: Address,

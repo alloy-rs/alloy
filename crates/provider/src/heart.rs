@@ -53,6 +53,7 @@ use tokio::{
 /// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
+#[doc(alias = "PendingTxBuilder")]
 pub struct PendingTransactionBuilder<'a, T, N> {
     config: PendingTransactionConfig,
     provider: &'a RootProvider<T, N>,
@@ -93,16 +94,19 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     }
 
     /// Returns the transaction hash.
+    #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &B256 {
         self.config.tx_hash()
     }
 
     /// Sets the transaction hash.
+    #[doc(alias = "set_transaction_hash")]
     pub fn set_tx_hash(&mut self, tx_hash: B256) {
         self.config.set_tx_hash(tx_hash);
     }
 
     /// Sets the transaction hash.
+    #[doc(alias = "with_transaction_hash")]
     pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
         self.config.tx_hash = tx_hash;
         self
@@ -217,8 +221,10 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Clone, Debug)]
+#[doc(alias = "PendingTxConfig", alias = "TxPendingConfig")]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
+    #[doc(alias = "transaction_hash")]
     tx_hash: B256,
 
     /// Require a number of confirmations.
@@ -235,16 +241,19 @@ impl PendingTransactionConfig {
     }
 
     /// Returns the transaction hash.
+    #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &B256 {
         &self.tx_hash
     }
 
     /// Sets the transaction hash.
+    #[doc(alias = "set_transaction_hash")]
     pub fn set_tx_hash(&mut self, tx_hash: B256) {
         self.tx_hash = tx_hash;
     }
 
     /// Sets the transaction hash.
+    #[doc(alias = "with_transaction_hash")]
     pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
         self.tx_hash = tx_hash;
         self
@@ -294,6 +303,7 @@ impl PendingTransactionConfig {
     }
 }
 
+#[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
     tx: oneshot::Sender<()>,
@@ -312,8 +322,10 @@ impl TxWatcher {
 /// This struct is a future created by [`PendingTransactionBuilder`] that resolves to the
 /// transaction hash once the underlying transaction has been confirmed the specified number of
 /// times in the network.
+#[doc(alias = "PendingTx", alias = "TxPending")]
 pub struct PendingTransaction {
     /// The transaction hash.
+    #[doc(alias = "transaction_hash")]
     pub(crate) tx_hash: B256,
     /// The receiver for the notification.
     // TODO: send a receipt?
@@ -328,6 +340,7 @@ impl fmt::Debug for PendingTransaction {
 
 impl PendingTransaction {
     /// Returns this transaction's hash.
+    #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &B256 {
         &self.tx_hash
     }
@@ -355,6 +368,7 @@ pub(crate) struct HeartbeatHandle {
 
 impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
+    #[doc(alias = "watch_transaction")]
     pub(crate) async fn watch_tx(
         &self,
         config: PendingTransactionConfig,

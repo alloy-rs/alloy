@@ -15,14 +15,17 @@ use serde::{Deserialize, Serialize};
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
     pub inner: T,
     /// Transaction Hash.
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
     /// Index within the block.
     #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
+    #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Hash of the block this transaction was included within.
     #[serde(default)]
@@ -86,6 +89,7 @@ impl TransactionReceipt {
     }
 
     /// Returns the transaction type.
+    #[doc(alias = "tx_type")]
     pub const fn transaction_type(&self) -> TxType {
         self.inner.tx_type()
     }
@@ -127,6 +131,7 @@ impl<T> TransactionReceipt<T> {
 }
 
 /// Alias for a catch-all receipt type.
+#[doc(alias = "AnyTxReceipt")]
 pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 #[cfg(test)]

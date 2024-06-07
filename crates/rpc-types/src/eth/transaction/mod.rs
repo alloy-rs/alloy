@@ -35,6 +35,7 @@ pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptW
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "Tx")]
 pub struct Transaction {
     /// Hash
     pub hash: B256,
@@ -120,6 +121,7 @@ pub struct Transaction {
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::num::u8_opt_via_ruint"
     )]
+    #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
 
     /// Arbitrary extra fields.

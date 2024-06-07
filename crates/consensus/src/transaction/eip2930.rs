@@ -11,6 +11,7 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "Eip2930Transaction", alias = "TransactionEip2930", alias = "Eip2930Tx")]
 pub struct TxEip2930 {
     /// Added as EIP-pub 155: Simple replay attack protection
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
@@ -217,6 +218,7 @@ impl TxEip2930 {
     }
 
     /// Get transaction type.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip2930
     }

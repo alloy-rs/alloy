@@ -24,6 +24,7 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
+#[doc(alias = "Eip4844TransactionVariant")]
 pub enum TxEip4844Variant {
     /// A standalone transaction with blob hashes and max blob fee.
     TxEip4844(TxEip4844),
@@ -40,6 +41,7 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
         #[derive(serde::Deserialize)]
         struct TxEip4844SerdeHelper {
             #[serde(flatten)]
+            #[doc(alias = "transaction")]
             tx: TxEip4844,
             #[serde(flatten)]
             sidecar: Option<BlobTransactionSidecar>,
@@ -89,11 +91,13 @@ impl TxEip4844Variant {
     }
 
     /// Get the transaction type.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip4844
     }
 
     /// Get access to the inner tx [TxEip4844].
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &TxEip4844 {
         match self {
             Self::TxEip4844(tx) => tx,
@@ -283,6 +287,7 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "Eip4844Transaction", alias = "TransactionEip4844", alias = "Eip4844Tx")]
 pub struct TxEip4844 {
     /// Added as EIP-pub 155: Simple replay attack protection
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
@@ -571,7 +576,8 @@ impl TxEip4844 {
         Ok(signed)
     }
 
-    /// Get transaction type
+    /// Get transaction type.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip4844
     }
@@ -696,9 +702,11 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]
 pub struct TxEip4844WithSidecar {
     /// The actual transaction.
     #[cfg_attr(feature = "serde", serde(flatten))]
+    #[doc(alias = "transaction")]
     pub tx: TxEip4844,
     /// The sidecar.
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -707,6 +715,7 @@ pub struct TxEip4844WithSidecar {
 
 impl TxEip4844WithSidecar {
     /// Constructs a new [TxEip4844WithSidecar] from a [TxEip4844] and a [BlobTransactionSidecar].
+    #[doc(alias = "from_transaction_and_sidecar")]
     pub const fn from_tx_and_sidecar(tx: TxEip4844, sidecar: BlobTransactionSidecar) -> Self {
         Self { tx, sidecar }
     }
@@ -723,11 +732,13 @@ impl TxEip4844WithSidecar {
     }
 
     /// Get the transaction type.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         self.tx.tx_type()
     }
 
     /// Get access to the inner tx [TxEip4844].
+    #[doc(alias = "transaction")]
     pub const fn tx(&self) -> &TxEip4844 {
         &self.tx
     }

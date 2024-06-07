@@ -61,6 +61,7 @@ pub struct TraceResultsWithTransactionHash {
     #[serde(flatten)]
     pub full_trace: TraceResults,
     /// Hash of the traced transaction.
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
 }
 
@@ -366,6 +367,7 @@ impl TraceOutput {
 /// A parity style trace of a transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxTrace")]
 pub struct TransactionTrace {
     /// Represents what kind of trace this is
     #[serde(flatten)]
@@ -387,6 +389,7 @@ pub struct TransactionTrace {
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "LocalizedTxTrace")]
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
@@ -400,8 +403,10 @@ pub struct LocalizedTransactionTrace {
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
     pub block_number: Option<u64>,
     /// Hash of the transaction
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<B256>,
     /// Transaction index within the block, None if pending.
+    #[doc(alias = "tx_position")]
     pub transaction_position: Option<u64>,
 }
 

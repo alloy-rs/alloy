@@ -170,6 +170,7 @@ where
         self.address
     }
 
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -186,6 +187,7 @@ where
         self.address
     }
 
+    #[doc(alias = "sign_tx_sync")]
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
