@@ -23,8 +23,22 @@ alloy-rpc-types-eth = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 
 [features]
+default = ["rpc-types-eth"]
 rpc-types-anvil = ["alloy-rpc-types-anvil"]
 rpc-types-beacon = ["alloy-rpc-types-beacon"]
 rpc-types-engine = ["alloy-rpc-types-engine"]
 rpc-types-eth = ["alloy-rpc-types-eth"]
 rpc-types-trace = ["alloy-rpc-types-trace"]
+
+arbitrary = ["alloy-rpc-types-eth?/arbitrary"]
+jsonrpsee-types = [
+    "alloy-rpc-types-eth?/jsonrpsee-types",
+    "alloy-rpc-types-engine?/jsonrpsee-types",
+]
+ssz = [
+    "alloy-rpc-types-beacon?/ssz",
+    "alloy-rpc-types-engine?/ssz",
+    "alloy-rpc-types-eth?/ssz",
+]
+k256 = ["alloy-rpc-types-eth?/k256"]
+kzg = ["alloy-rpc-types-engine?/kzg"]

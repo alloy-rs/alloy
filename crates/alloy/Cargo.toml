@@ -35,6 +35,7 @@ alloy-pubsub = { workspace = true, default-features = false, optional = true }
 # rpc
 alloy-json-rpc = { workspace = true, default-features = false, optional = true }
 alloy-rpc-client = { workspace = true, default-features = false, optional = true }
+alloy-rpc-types = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types-anvil = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types-eth = { workspace = true, default-features = false, optional = true }
 alloy-rpc-types-beacon = { workspace = true, default-features = false, optional = true }
@@ -174,6 +175,8 @@ rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "alloy-serde"]
 ssz = [
     "alloy-core/ssz",
+    "alloy-rpc-types?/ssz",
+    "alloy-rpc-types-beacon?/ssz",
     "alloy-rpc-types-engine?/ssz",
     "alloy-rpc-types-eth?/ssz",
 ]
@@ -183,7 +186,13 @@ arbitrary = [
     "alloy-eips?/arbitrary",
     "alloy-rpc-types-eth?/arbitrary",
 ]
-k256 = ["alloy-core/k256", "alloy-consensus?/k256", "alloy-network?/k256"]
+k256 = [
+    "alloy-core/k256",
+    "alloy-consensus?/k256",
+    "alloy-network?/k256",
+    "alloy-rpc-types?/k256",
+    "alloy-rpc-types-eth?/k256",
+]
 kzg = ["alloy-consensus?/kzg"]
 eip712 = [
     "alloy-core/eip712",
