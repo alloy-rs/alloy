@@ -3,12 +3,13 @@
 //! This is defined as a "hex encoded unsigned integer", with a special case of 0 being `0x0`.
 //!
 //! A regex for this format is: `^0x([1-9a-f]+[0-9a-f]*|0)$`.
+//!
+//! This is only valid for human-readable [`serde`] implementations.
+//! For non-human-readable implementations, the format is unspecified.
+//! Currently, it is uses a fixed-width big-endian byte-array.
 
 use private::ConvertRuint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-#[allow(deprecated)]
-pub use crate::num::u128_vec_vec_opt_via_ruint;
 
 /// Serializes a primitive number as a "quantity" hex string.
 pub fn serialize<T, S>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
@@ -88,7 +89,7 @@ pub mod vec {
     }
 }
 
-/// Private implementation details of the [`quantity`] module.
+/// Private implementation details of the [`quantity`](self) module.
 mod private {
     #[doc(hidden)]
     pub trait ConvertRuint: Copy + Sized {
