@@ -168,10 +168,10 @@ pub struct TxpoolInspect {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolStatus {
     /// number of pending tx
-    #[serde(with = "alloy_serde::num::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub pending: u64,
     /// number of queued tx
-    #[serde(with = "alloy_serde::num::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub queued: u64,
 }
 
