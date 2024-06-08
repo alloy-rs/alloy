@@ -454,8 +454,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Broadcasts a transaction to the network.
     ///
-    /// Returns a type that can be used to configure how and when to await the
-    /// transaction's confirmation.
+    /// Returns a [`PendingTransactionBuilder`] which can be used to configure
+    /// how and when to await the transaction's confirmation.
     ///
     /// # Examples
     ///
@@ -479,7 +479,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
+    /// Broadcasts a transaction envelope to the network.
     ///
+    /// Returns a [`PendingTransactionBuilder`] which can be used to configure
+    /// how and when to await the transaction's confirmation.
+    async fn send_tx_envelope(
+        &self,
+        tx: N::TxEnvelope,
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        self.send_transaction_internal(SendableTx::Envelope(tx)).await
+    }
+
     /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
