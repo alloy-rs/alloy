@@ -19,7 +19,7 @@ pub struct Receipt<T = Log> {
     #[cfg_attr(feature = "serde", serde(alias = "root"))]
     pub status: Eip658Value,
     /// Gas used
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub cumulative_gas_used: u128,
     /// Log send from contracts.
     pub logs: Vec<T>,
