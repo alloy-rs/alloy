@@ -6,7 +6,7 @@
 //!
 //! This is only valid for human-readable [`serde`] implementations.
 //! For non-human-readable implementations, the format is unspecified.
-//! Currently, it is uses a fixed-width big-endian byte-array.
+//! Currently, it uses a fixed-width big-endian byte-array.
 
 use private::ConvertRuint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
