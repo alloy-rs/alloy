@@ -42,19 +42,19 @@ impl RpcBlockHash {
     }
 }
 
-impl From<BlockHash> for RpcBlockHash {
+impl From<B256> for RpcBlockHash {
     fn from(value: B256) -> Self {
         Self::from_hash(value, None)
     }
 }
 
-impl From<RpcBlockHash> for BlockHash {
+impl From<RpcBlockHash> for B256 {
     fn from(value: RpcBlockHash) -> Self {
         value.block_hash
     }
 }
 
-impl AsRef<BlockHash> for RpcBlockHash {
+impl AsRef<B256> for RpcBlockHash {
     fn as_ref(&self) -> &B256 {
         &self.block_hash
     }
@@ -361,8 +361,8 @@ impl Default for BlockId {
     }
 }
 
-impl From<u64> for BlockId {
-    fn from(num: u64) -> Self {
+impl From<BlockNumber> for BlockId {
+    fn from(num: BlockNumber) -> Self {
         BlockNumberOrTag::Number(num).into()
     }
 }
@@ -614,9 +614,9 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 )]
 pub enum BlockHashOrNumber {
     /// A block hash
-    Hash(BlockHash),
+    Hash(B256),
     /// A block number
-    Number(BlockNumber),
+    Number(u64),
 }
 
 // === impl BlockHashOrNumber ===

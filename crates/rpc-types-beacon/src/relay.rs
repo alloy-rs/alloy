@@ -3,7 +3,7 @@
 //! See also <https://flashbots.github.io/relay-specs/>
 
 use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, BlockHash, B256, U256};
+use alloy_primitives::{Address, BlockHash, BlockNumber, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
@@ -66,7 +66,7 @@ pub struct BidTrace {
     /// The parent hash of the block.
     pub parent_hash: B256,
     /// The hash of the block.
-    pub block_hash: B256,
+    pub block_hash: BlockHash,
     /// The public key of the builder.
     pub builder_pubkey: BlsPublicKey,
     /// The public key of the proposer.
@@ -192,7 +192,7 @@ pub struct ProposerPayloadsDeliveredQuery {
     pub block_hash: Option<BlockHash>,
     /// Search for a specific EL block number
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_number: Option<u64>,
+    pub block_number: Option<BlockNumber>,
     /// Filter results by a proposer public key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proposer_pubkey: Option<BlsPublicKey>,
@@ -341,9 +341,9 @@ pub mod error {
         #[error("incorrect ParentHash {actual}, expected {expected}")]
         IncorrectParentHash {
             /// The expected parent hash
-            expected: BlockHash,
+            expected: B256,
             /// The actual parent hash
-            actual: BlockHash,
+            actual: B256,
         },
         /// Thrown if block hash mismatches
         #[error("incorrect BlockHash {actual}, expected {expected}")]
