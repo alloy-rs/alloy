@@ -318,7 +318,6 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(feature = "arbitrary")]
     fn test_arbitrary_blob() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured blob");
         let _blob = BlobTransactionSidecar::arbitrary(&mut unstructured).unwrap();
