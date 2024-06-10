@@ -1,4 +1,5 @@
 /// Serde serialization and deserialization for [`bool`] as `0x0` or `0x1`.
+#[deprecated = "use `quantity::bool` instead"]
 pub mod quantity_bool {
     use alloy_primitives::aliases::U1;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};

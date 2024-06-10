@@ -31,7 +31,7 @@ impl<'de> serde::Deserialize<'de> for Forking {
         #[serde(rename_all = "camelCase")]
         struct ForkOpts {
             json_rpc_url: Option<String>,
-            #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             block_number: Option<u64>,
         }
 
@@ -62,7 +62,7 @@ impl<'de> serde::Deserialize<'de> for Forking {
 #[serde(rename_all = "camelCase")]
 pub struct NodeInfo {
     /// The current block number
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub current_block_number: u64,
     /// The current block timestamp
     pub current_block_timestamp: u64,
@@ -94,7 +94,7 @@ pub struct NodeEnvironment {
 }
 
 /// The node's fork configuration.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeForkConfig {
     /// URL of the forked network
@@ -147,14 +147,14 @@ pub enum MineOptions {
     /// The options for mining
     Options {
         /// The timestamp the block should be mined with
-        #[serde(with = "alloy_serde::u64_opt_via_ruint")]
+        #[serde(with = "alloy_serde::quantity::opt")]
         timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
         blocks: Option<u64>,
     },
     /// The timestamp the block should be mined with
-    #[serde(with = "alloy_serde::u64_opt_via_ruint")]
+    #[serde(with = "alloy_serde::quantity::opt")]
     Timestamp(Option<u64>),
 }
 

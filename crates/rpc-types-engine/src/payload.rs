@@ -155,16 +155,16 @@ pub struct ExecutionPayloadV1 {
     /// The previous randao of the block.
     pub prev_randao: B256,
     /// The block number.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub block_number: u64,
     /// The gas limit of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_limit: u64,
     /// The gas used of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The timestamp of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// The extra data of the block.
     pub extra_data: Bytes,
@@ -301,11 +301,11 @@ pub struct ExecutionPayloadV3 {
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub excess_blob_gas: u64,
 }
 
@@ -854,7 +854,7 @@ pub struct ExecutionPayloadBodyV1 {
 #[serde(rename_all = "camelCase")]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// Value for the `prevRandao` field of the new payload
     pub prev_randao: B256,
