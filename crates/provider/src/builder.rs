@@ -8,6 +8,7 @@ use crate::{
 };
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
+use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
@@ -160,7 +161,7 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// that the provider reports via [`Provider::get_chain_id`].
     pub fn with_chain_id(
         self,
-        chain_id: u64,
+        chain_id: ChainId,
     ) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
         self.filler(ChainIdFiller::new(Some(chain_id)))
     }

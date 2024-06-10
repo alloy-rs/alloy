@@ -273,7 +273,7 @@ pub enum BlockId {
 
 impl BlockId {
     /// Returns the block hash if it is [BlockId::Hash]
-    pub const fn as_block_hash(&self) -> Option<B256> {
+    pub const fn as_block_hash(&self) -> Option<BlockHash> {
         match self {
             Self::Hash(hash) => Some(hash.block_hash),
             Self::Number(_) => None,
@@ -345,12 +345,12 @@ impl BlockId {
     }
 
     /// Create a new block hash instance.
-    pub const fn hash(block_hash: B256) -> Self {
+    pub const fn hash(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 
     /// Create a new block hash instance that requires the block to be canonical.
-    pub const fn hash_canonical(block_hash: B256) -> Self {
+    pub const fn hash_canonical(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
     }
 }
@@ -379,14 +379,14 @@ impl From<BlockNumberOrTag> for BlockId {
     }
 }
 
-impl From<B256> for BlockId {
-    fn from(block_hash: B256) -> Self {
+impl From<BlockHash> for BlockId {
+    fn from(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 }
 
-impl From<(B256, Option<bool>)> for BlockId {
-    fn from(hash_can: (B256, Option<bool>)) -> Self {
+impl From<(BlockHash, Option<bool>)> for BlockId {
+    fn from(hash_can: (BlockHash, Option<bool>)) -> Self {
         Self::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
     }
 }
@@ -614,9 +614,9 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 )]
 pub enum BlockHashOrNumber {
     /// A block hash
-    Hash(B256),
+    Hash(BlockHash),
     /// A block number
-    Number(u64),
+    Number(BlockNumber),
 }
 
 // === impl BlockHashOrNumber ===

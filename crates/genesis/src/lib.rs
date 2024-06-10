@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt};
 use serde::{Deserialize, Serialize};
 
@@ -68,7 +68,7 @@ impl Genesis {
     /// and funds the given address with max coins.
     ///
     /// Enables all hard forks up to London at genesis.
-    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
+    pub fn clique_genesis(chain_id: ChainId, signer_addr: Address) -> Self {
         // set up a clique config with an instant sealing period and short (8 block) epoch
         let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
 
@@ -262,7 +262,7 @@ impl GenesisAccount {
 pub struct ChainConfig {
     /// The network's chain ID.
     #[serde(default = "mainnet_id")]
-    pub chain_id: u64,
+    pub chain_id: ChainId,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
     #[serde(

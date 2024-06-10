@@ -1,4 +1,4 @@
-use alloy_primitives::hex;
+use alloy_primitives::{hex, ChainId};
 use k256::ecdsa;
 use std::fmt;
 use thiserror::Error;
@@ -13,12 +13,14 @@ pub enum Error {
     #[error("operation `{0}` is not supported by the signer")]
     UnsupportedOperation(UnsupportedSignerOperation),
     /// Mismatch between provided transaction chain ID and signer chain ID.
-    #[error("transaction-provided chain ID ({tx}) does not match the signer's ({signer})")]
+    #[error(
+        "transaction-provided chain ID ({tx}) does not match the signer's chain ID ({signer})"
+    )]
     TransactionChainIdMismatch {
         /// The signer's chain ID.
-        signer: u64,
+        signer: ChainId,
         /// The chain ID provided by the transaction.
-        tx: u64,
+        tx: ChainId,
     },
     /// [`alloy_dyn_abi`] error.
     #[error(transparent)]

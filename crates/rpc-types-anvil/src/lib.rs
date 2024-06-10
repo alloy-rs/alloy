@@ -6,7 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{TxHash, B256, U256};
+use alloy_primitives::{BlockHash, BlockNumber, ChainId, TxHash, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
@@ -19,7 +19,7 @@ pub struct Forking {
     /// The URL of the JSON-RPC endpoint to fork from.
     pub json_rpc_url: Option<String>,
     /// The block number to fork from.
-    pub block_number: Option<u64>,
+    pub block_number: Option<BlockNumber>,
 }
 
 impl<'de> serde::Deserialize<'de> for Forking {
@@ -32,7 +32,7 @@ impl<'de> serde::Deserialize<'de> for Forking {
         struct ForkOpts {
             json_rpc_url: Option<String>,
             #[serde(default, with = "alloy_serde::quantity::opt")]
-            block_number: Option<u64>,
+            block_number: Option<BlockNumber>,
         }
 
         #[derive(serde::Deserialize)]
@@ -63,11 +63,11 @@ impl<'de> serde::Deserialize<'de> for Forking {
 pub struct NodeInfo {
     /// The current block number
     #[serde(with = "alloy_serde::quantity")]
-    pub current_block_number: u64,
+    pub current_block_number: BlockNumber,
     /// The current block timestamp
     pub current_block_timestamp: u64,
     /// The current block hash
-    pub current_block_hash: B256,
+    pub current_block_hash: BlockHash,
     /// The enabled hardfork
     pub hard_fork: String,
     /// How transactions are ordered for mining
@@ -86,7 +86,7 @@ pub struct NodeEnvironment {
     /// Base fee of the current block
     pub base_fee: U256,
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Configured block gas limit
     pub gas_limit: U256,
     /// Configured gas price
@@ -100,7 +100,7 @@ pub struct NodeForkConfig {
     /// URL of the forked network
     pub fork_url: Option<String>,
     /// Block number of the forked network
-    pub fork_block_number: Option<u64>,
+    pub fork_block_number: Option<BlockNumber>,
     /// Retry backoff for requests
     pub fork_retry_backoff: Option<u128>,
 }
@@ -114,13 +114,13 @@ pub struct Metadata {
     /// client version
     pub client_version: String,
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Unique instance id
     pub instance_id: B256,
     /// Latest block number
-    pub latest_block_number: u64,
+    pub latest_block_number: BlockNumber,
     /// Latest block hash
-    pub latest_block_hash: B256,
+    pub latest_block_hash: BlockHash,
     /// Forked network info
     pub forked_network: Option<ForkedNetwork>,
     /// Snapshots of the chain
@@ -133,9 +133,9 @@ pub struct Metadata {
 #[serde(rename_all = "camelCase")]
 pub struct ForkedNetwork {
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Block number of the forked chain
-    pub fork_block_number: u64,
+    pub fork_block_number: BlockNumber,
     /// Block hash of the forked chain
     pub fork_block_hash: TxHash,
 }

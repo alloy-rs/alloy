@@ -347,7 +347,7 @@ impl PendingTransaction {
 }
 
 impl Future for PendingTransaction {
-    type Output = TransportResult<B256>;
+    type Output = TransportResult<TxHash>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,

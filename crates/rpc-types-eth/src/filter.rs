@@ -1,5 +1,5 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
-use alloy_primitives::{keccak256, Address, Bloom, BloomInput, B256, U256, U64};
+use alloy_primitives::{keccak256, Address, BlockHash, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
@@ -166,7 +166,7 @@ pub enum FilterBlockOption {
         to_block: Option<BlockNumberOrTag>,
     },
     /// The hash of the block if the filter only targets a single block
-    AtBlockHash(B256),
+    AtBlockHash(BlockHash),
 }
 
 impl FilterBlockOption {
