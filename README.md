@@ -41,9 +41,13 @@ This repository contains the following crates:
 - [`alloy-provider`] - Interface with an Ethereum blockchain
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
-- [`alloy-rpc-types`] - Ethereum JSON-RPC types
+- [`alloy-rpc-types`] - Meta-crate for all Ethereum JSON-RPC types
+  - [`alloy-rpc-types-anvil`] - RPC types for the Anvil development node.
+  - [`alloy-rpc-types-beacon`] - Ethereum RPC-related types for the Beacon API.
   - [`alloy-rpc-types-engine`] - Ethereum execution-consensus layer (engine) API RPC types
+  - [`alloy-rpc-types-eth`] - Ethereum RPC-related types for Alloy.
   - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
+- [`alloy-serde`] - Serde related helpers for Alloy.
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
@@ -56,6 +60,7 @@ This repository contains the following crates:
   - [`alloy-transport-ws`] - WS transport implementation
 
 [`alloy`]: https://github.com/alloy-rs/alloy/tree/main/crates/alloy
+[`alloy-core`]: https://docs.rs/alloy-core
 [`alloy-consensus`]: https://github.com/alloy-rs/alloy/tree/main/crates/consensus
 [`alloy-contract`]: https://github.com/alloy-rs/alloy/tree/main/crates/contract
 [`alloy-eips`]: https://github.com/alloy-rs/alloy/tree/main/crates/eips
@@ -66,9 +71,13 @@ This repository contains the following crates:
 [`alloy-provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider
 [`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub
 [`alloy-rpc-client`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-client
-[`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
-[`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
 [`alloy-rpc-types`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types
+[`alloy-rpc-types-anvil`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-anvil
+[`alloy-rpc-types-beacon`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon
+[`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
+[`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
+[`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
+[`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
 [`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
 [`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
 [`alloy-signer-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp
@@ -79,7 +88,6 @@ This repository contains the following crates:
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
-[`alloy-core`]: https://docs.rs/alloy-core
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms
