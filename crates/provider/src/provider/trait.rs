@@ -2,8 +2,8 @@
 
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
-    RpcWithBlock, SendableTx,
+    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -50,6 +50,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 {
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<T, N>;
+
+    /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
+    fn builder() -> ProviderBuilder<Identity, Identity, N>
+    where
+        Self: Sized,
+    {
+        ProviderBuilder::default()
+    }
 
     /// Returns the RPC client used to send requests.
     ///
@@ -936,6 +944,15 @@ mod tests {
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
+    }
+
+    #[tokio::test]
+    async fn test_provider_builder() {
+        init_tracing();
+        let provider =
+            RootProvider::<BoxTransport, Ethereum>::builder().with_recommended_fillers().on_anvil();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[cfg(feature = "reqwest")]
