@@ -28,7 +28,7 @@ impl From<Vec<Bloom>> for BloomFilter {
 impl BloomFilter {
     /// Returns whether the given bloom matches the list of Blooms in the current filter.
     /// If the filter is empty (the list is empty), then any bloom matches
-    /// Otherwise, there must be at least one matche for the BloomFilter to match.
+    /// Otherwise, there must be at least one match for the BloomFilter to match.
     pub fn matches(&self, bloom: Bloom) -> bool {
         self.0.is_empty() || self.0.iter().any(|a| bloom.contains(a))
     }

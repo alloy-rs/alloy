@@ -6,7 +6,7 @@ Alloy is a rewrite of [`ethers-rs`] from the ground up, with exciting new
 features, high performance, and excellent [docs](https://alloy-rs.github.io/alloy/).
 
 [`ethers-rs`] will continue to be maintained until we have achieved
-feature-parity in Alloy. No action is currently needed from devs.
+feature-parity in Alloy. No action is currently needed from developers.
 
 [![Telegram chat][telegram-badge]][telegram-url]
 
@@ -117,7 +117,7 @@ Thanks for your help improving the project! We are so happy to have you! We have
 Alloy project.
 
 Pull requests will not be merged unless CI passes, so please ensure that your
-contribution follows the linting rules and passes clippy.
+contribution follows the linting rules and passes Clippy.
 
 ## Note on `no_std`
 

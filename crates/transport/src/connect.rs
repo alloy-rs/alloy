@@ -31,7 +31,7 @@ pub trait TransportConnect: Sized + Send + Sync + 'static {
 /// without knowing the exact type of the transport.
 ///
 /// This trait is separate from `TransportConnect`` to hide the associated type
-/// in when this trait is a trai object. It is intended to allow creation of
+/// in when this trait is a trait object. It is intended to allow creation of
 /// several unlike transports or clients at once. E.g.
 /// in something like `Vec<&dyn BoxTransportConnect>.
 pub trait BoxTransportConnect {

@@ -71,7 +71,7 @@ impl TryFrom<u8> for TxType {
 /// # Note:
 ///
 /// This enum distinguishes between tagged and untagged legacy transactions, as
-/// the in-protocol merkle tree may commit to EITHER 0-prefixed or raw.
+/// the in-protocol Merkle tree may commit to EITHER 0-prefixed or raw.
 /// Therefore we must ensure that encoding returns the precise byte-array that
 /// was decoded, preserving the presence or absence of the `TransactionType`
 /// flag.
