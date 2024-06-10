@@ -95,7 +95,7 @@ where
 mod tests {
     use super::*;
 
-    /// Should deserialise json containing 6 blobs
+    /// Should deserialize json containing 6 blobs
     #[test]
     fn serde_sidecar_bundle() {
         let s = include_str!("examples/sidecar.json");

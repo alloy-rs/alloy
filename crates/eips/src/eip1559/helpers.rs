@@ -4,7 +4,7 @@ use crate::eip1559::BaseFeeParams;
 ///
 /// This function calculates the base fee for the next block according to the rules defined in the
 /// EIP-1559. EIP-1559 introduces a new transaction pricing mechanism that includes a
-/// fixed-per-block network fee that is burned and dynamically adjusts block sizes to handlez
+/// fixed-per-block network fee that is burned and dynamically adjusts block sizes to handles
 /// transient congestion.
 ///
 /// For each block, the base fee per gas is determined by the gas used in the parent block and the

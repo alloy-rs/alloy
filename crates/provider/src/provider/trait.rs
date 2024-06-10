@@ -33,15 +33,34 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 ///
 /// # Subscriptions
 ///
-/// **IMPORTANT:** this is currently only available when `T` is `PubSubFrontend` or `BoxedClient`
-/// over `PubSubFrontend` due to an internal limitation. This means that layering transports will
-/// always disable subscription support. See [issue #296](https://github.com/alloy-rs/alloy/issues/296).
+/// **IMPORTANT:** this is currently only available when `T` is
+/// `PubSubFrontend` or `BoxedClient` over `PubSubFrontend` due to an internal
+/// limitation. This means that layering transports will always disable
+/// subscription support. See
+/// [issue #296](https://github.com/alloy-rs/alloy/issues/296).
 ///
-/// The provider supports `pubsub` subscriptions to new block headers and pending transactions. This
-/// is only available on `pubsub` clients, such as Websockets or IPC.
+/// The provider supports `pubsub` subscriptions to new block headers and
+/// pending transactions. This is only available on `pubsub` clients, such as
+/// Websockets or IPC.
 ///
-/// For a polling alternatives available over HTTP, use the `watch_*` methods. However, be aware
-/// that polling increases RPC usage drastically.
+/// For a polling alternatives available over HTTP, use the `watch_*` methods.
+/// However, be aware that polling increases RPC usage drastically.
+///
+/// ## Special treatment of EIP-1559
+///
+/// While many RPC features are encapsulated by traits like [`DebugApi`],
+/// EIP-1559 fee estimation is generally assumed to be on by default. We
+/// generally assume that EIP-1559 is supported by the client and will
+/// proactively use it by default.
+///
+/// As a result, the provider supports EIP-1559 fee estimation the ethereum
+/// [`TransactionBuilder`] will use it by default. We acknowledge that this
+/// means EIP-1559 has a privileged status in comparison to other transaction
+/// types. Networks that DO NOT support EIP-1559 should create their own
+/// [`TransactionBuilder`] and Fillers to change this behavior.
+///
+/// [`TransactionBuilder`]: alloy_network::TransactionBuilder
+/// [`DebugApi`]: crate::ext::DebugApi
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -656,7 +675,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -688,7 +707,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -726,7 +745,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -761,7 +780,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
