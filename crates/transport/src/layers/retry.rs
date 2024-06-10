@@ -1,5 +1,5 @@
 use crate::{
-    error::{HTTPError, TransportError, TransportErrorKind},
+    error::{TransportError, TransportErrorKind},
     TransportFut,
 };
 use alloy_json_rpc::{ErrorPayload, RequestPacket, ResponsePacket};
@@ -47,9 +47,9 @@ impl RetryBackoffLayer {
     }
 }
 
-#[derive(Debug, Clone)]
 /// [RateLimitRetryPolicy] implements [RetryPolicy] to determine whether to retry depending on the
 /// err.
+#[derive(Debug, Clone)]
 pub struct RateLimitRetryPolicy;
 
 /// [RetryPolicy] defines logic for which [TransportError] instances should
@@ -67,13 +67,13 @@ impl RetryPolicy for RateLimitRetryPolicy {
         match error {
             // There was a transport-level error. This is either a non-retryable error,
             // or a server error that should be retried.
-            TransportError::Transport(err) => should_retry_transport_level_error(err),
+            TransportError::Transport(err) => err.is_retry_err(),
             // The transport could not serialize the error itself. The request was malformed from
             // the start.
             TransportError::SerError(_) => false,
             TransportError::DeserError { text, .. } => {
                 if let Ok(resp) = serde_json::from_str::<ErrorPayload>(text) {
-                    return should_retry_json_rpc_error(&resp);
+                    return resp.is_retry_err();
                 }
 
                 // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
@@ -84,12 +84,12 @@ impl RetryPolicy for RateLimitRetryPolicy {
                 }
 
                 if let Ok(resp) = serde_json::from_str::<Resp>(text) {
-                    return should_retry_json_rpc_error(&resp.error);
+                    return resp.error.is_retry_err();
                 }
 
                 false
             }
-            TransportError::ErrorResp(err) => should_retry_json_rpc_error(err),
+            TransportError::ErrorResp(err) => err.is_retry_err(),
             TransportError::NullResp => true,
             TransportError::UnsupportedFeature(_) => false,
             TransportError::LocalUsageError(_) => false,
@@ -273,30 +273,4 @@ fn compute_unit_offset_in_secs(
     } else {
         0
     }
-}
-
-/// Analyzes the [TransportErrorKind] and decides if the request should be retried based on the
-/// variant.
-fn should_retry_transport_level_error(error: &TransportErrorKind) -> bool {
-    match error {
-        // Missing batch response errors can be retried.
-        TransportErrorKind::MissingBatchResponse(_) => true,
-        TransportErrorKind::Custom(err) => {
-            // currently http error responses are not standard in alloy
-            let msg = err.to_string();
-            msg.contains("429 Too Many Requests")
-        }
-        TransportErrorKind::HttpError(http_err) => http_err.is_retry_err(),
-
-        // If the backend is gone, or there's a completely custom error, we should assume it's not
-        // retryable.
-        _ => false,
-    }
-}
-
-/// Analyzes the [ErrorPayload] and decides if the request should be retried based on the
-/// error code or the message.
-fn should_retry_json_rpc_error(error: &ErrorPayload) -> bool {
-    let http_err: HTTPError = error.into();
-    http_err.is_retry_err()
 }

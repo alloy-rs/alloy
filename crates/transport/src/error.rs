@@ -1,4 +1,4 @@
-use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
+use alloy_json_rpc::{Id, RpcError, RpcResult};
 use serde_json::value::RawValue;
 use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
@@ -33,7 +33,7 @@ pub enum TransportErrorKind {
 
     /// HTTP Error with code and body
     #[error("{0}")]
-    HttpError(#[from] HTTPError),
+    HttpError(#[from] HttpError),
 
     /// Custom error.
     #[error("{0}")]
@@ -73,46 +73,60 @@ impl TransportErrorKind {
     }
 
     /// Instantiate a new `TrasnportError::HttpError`.
-    pub const fn http_error(status: i64, body: String) -> TransportError {
-        RpcError::Transport(Self::HttpError(HTTPError { status, body }))
+    pub const fn http_error(status: u16, body: String) -> TransportError {
+        RpcError::Transport(Self::HttpError(HttpError { status, body }))
+    }
+
+    /// Analyzes the [TransportErrorKind] and decides if the request should be retried based on the
+    /// variant.
+    pub fn is_retry_err(&self) -> bool {
+        match self {
+            // Missing batch response errors can be retried.
+            Self::MissingBatchResponse(_) => true,
+            Self::Custom(err) => {
+                // currently http error responses are not standard in alloy
+                let msg = err.to_string();
+                msg.contains("429 Too Many Requests")
+            }
+            Self::HttpError(http_err) => http_err.is_rate_limit_err(),
+
+            // If the backend is gone, or there's a completely custom error, we should assume it's
+            // not retryable.
+            _ => false,
+        }
     }
 }
 
-/// Type for holding HTTP errors such as 429 or -32005 by the RPC provider.
+/// Type for holding HTTP errors such as 429 rate limit error.
 #[derive(Debug, thiserror::Error)]
 #[error("HTTP error {status} with body: {body}")]
-pub struct HTTPError {
-    pub status: i64,
+pub struct HttpError {
+    pub status: u16,
     pub body: String,
 }
 
-impl HTTPError {
+impl HttpError {
     /// Analyzes the `status` and `body` to determine whether the request should be retried.
-    pub fn is_retry_err(&self) -> bool {
+    pub fn is_rate_limit_err(&self) -> bool {
         // alchemy throws it this way
         if self.status == 429 {
             return true;
         }
 
-        // This is an infura error code for `exceeded project rate limit`
-        if self.status == -32005 {
-            return true;
-        }
-
         // alternative alchemy error for specific IPs
-        if self.status == -32016 && self.body.contains("rate limit") {
+        if self.body.contains("rate limit") {
             return true;
         }
 
         // quick node error `"credits limited to 6000/sec"`
         // <https://github.com/foundry-rs/foundry/pull/6712#issuecomment-1951441240>
-        if self.status == -32012 && self.body.contains("credits") {
+        if self.body.contains("credits") {
             return true;
         }
 
         // quick node rate limit error: `100/second request limit reached - reduce calls per second
         // or upgrade your account at quicknode.com` <https://github.com/foundry-rs/foundry/issues/4894>
-        if self.status == -32007 && self.body.contains("request limit reached") {
+        if self.body.contains("request limit reached") {
             return true;
         }
 
@@ -129,11 +143,5 @@ impl HTTPError {
                     || msg.contains("request limit")
             }
         }
-    }
-}
-
-impl From<&ErrorPayload> for HTTPError {
-    fn from(value: &ErrorPayload) -> Self {
-        Self { status: value.code, body: value.message.clone() }
     }
 }
