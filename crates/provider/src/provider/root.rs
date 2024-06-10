@@ -37,7 +37,7 @@ impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
     }
 }
 
-/// Helper function to directly access [`ProviderBuilder`](crate::ProviderBuilder) with minimal
+/// Helper function to directly access [`ProviderBuilder`] with minimal
 /// generics.
 pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
     ProviderBuilder::default()
