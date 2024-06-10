@@ -235,7 +235,7 @@ where
                     default_backoff = ?next_backoff, ?backoff_hint, "backing off due to rate
                     limit");
 
-                    std::thread::sleep(total_backoff);
+                    tokio::time::sleep(total_backoff).await;
                 } else {
                     if timeout_retries < this.max_timeout_retries {
                         timeout_retries += 1;

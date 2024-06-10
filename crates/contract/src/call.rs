@@ -718,7 +718,7 @@ mod tests {
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
         let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert!(result._0);
+        assert!(result.myState);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(
