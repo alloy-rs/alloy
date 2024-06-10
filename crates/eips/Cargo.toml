@@ -15,18 +15,14 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = [
-    "rlp",
-], default-features = false }
-alloy-rlp = { workspace = true, features = [
-    "derive",
-], default-features = false }
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
 alloy-serde.workspace = true
 
-sha2 = { workspace = true, default-features = false }
+sha2.workspace = true
 
 # serde
-serde = { workspace = true, default-features = false, optional = true }
+serde = { workspace = true, optional = true }
 
 # kzg
 derive_more = { workspace = true, optional = true }
@@ -49,8 +45,8 @@ alloy-primitives = { workspace = true, features = [
     "arbitrary",
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
+proptest.workspace = true
+proptest-derive.workspace = true
 serde_json.workspace = true
 
 [features]
