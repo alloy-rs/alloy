@@ -937,7 +937,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, WalletProvider};
+    use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types_eth::request::TransactionRequest;
@@ -951,6 +951,14 @@ mod tests {
         init_tracing();
         let provider =
             RootProvider::<BoxTransport, Ethereum>::builder().with_recommended_fillers().on_anvil();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn test_builder_helper_fn() {
+        init_tracing();
+        let provider = builder().with_recommended_fillers().on_anvil();
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
