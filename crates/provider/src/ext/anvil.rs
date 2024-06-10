@@ -2,8 +2,8 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
-use alloy_rpc_types::{Block, TransactionRequest, WithOtherFields};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
+use alloy_rpc_types_eth::{Block, TransactionRequest, WithOtherFields};
 use alloy_transport::{Transport, TransportResult};
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.

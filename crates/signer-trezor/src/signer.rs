@@ -94,7 +94,7 @@ impl TrezorSigner {
             address: Address::ZERO,
             session_id: vec![],
         };
-        signer.initate_session()?;
+        signer.initiate_session()?;
         signer.address = signer.get_address_with_path(&derivation).await?;
         Ok(signer)
     }
@@ -117,7 +117,7 @@ impl TrezorSigner {
         Ok(())
     }
 
-    fn initate_session(&mut self) -> Result<(), TrezorError> {
+    fn initiate_session(&mut self) -> Result<(), TrezorError> {
         let mut client = trezor_client::unique(false)?;
         client.init_device(None)?;
 
@@ -284,7 +284,7 @@ mod tests {
     use super::*;
     use alloy_network::{EthereumSigner, TransactionBuilder};
     use alloy_primitives::{address, b256};
-    use alloy_rpc_types::{AccessList, AccessListItem, TransactionRequest};
+    use alloy_rpc_types_eth::{AccessList, AccessListItem, TransactionRequest};
 
     #[tokio::test]
     #[ignore]

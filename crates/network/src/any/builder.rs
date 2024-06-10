@@ -2,7 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::Bytes;
-use alloy_rpc_types::{AccessList, TransactionRequest, WithOtherFields};
+use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
 

@@ -13,7 +13,7 @@ use alloy_primitives::{
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
-use alloy_rpc_types::{
+use alloy_rpc_types_eth::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, BlockTransactionsKind,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
@@ -33,15 +33,34 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 ///
 /// # Subscriptions
 ///
-/// **IMPORTANT:** this is currently only available when `T` is `PubSubFrontend` or `BoxedClient`
-/// over `PubSubFrontend` due to an internal limitation. This means that layering transports will
-/// always disable subscription support. See [issue #296](https://github.com/alloy-rs/alloy/issues/296).
+/// **IMPORTANT:** this is currently only available when `T` is
+/// `PubSubFrontend` or `BoxedClient` over `PubSubFrontend` due to an internal
+/// limitation. This means that layering transports will always disable
+/// subscription support. See
+/// [issue #296](https://github.com/alloy-rs/alloy/issues/296).
 ///
-/// The provider supports `pubsub` subscriptions to new block headers and pending transactions. This
-/// is only available on `pubsub` clients, such as Websockets or IPC.
+/// The provider supports `pubsub` subscriptions to new block headers and
+/// pending transactions. This is only available on `pubsub` clients, such as
+/// Websockets or IPC.
 ///
-/// For a polling alternatives available over HTTP, use the `watch_*` methods. However, be aware
-/// that polling increases RPC usage drastically.
+/// For a polling alternatives available over HTTP, use the `watch_*` methods.
+/// However, be aware that polling increases RPC usage drastically.
+///
+/// ## Special treatment of EIP-1559
+///
+/// While many RPC features are encapsulated by traits like [`DebugApi`],
+/// EIP-1559 fee estimation is generally assumed to be on by default. We
+/// generally assume that EIP-1559 is supported by the client and will
+/// proactively use it by default.
+///
+/// As a result, the provider supports EIP-1559 fee estimation the ethereum
+/// [`TransactionBuilder`] will use it by default. We acknowledge that this
+/// means EIP-1559 has a privileged status in comparison to other transaction
+/// types. Networks that DO NOT support EIP-1559 should create their own
+/// [`TransactionBuilder`] and Fillers to change this behavior.
+///
+/// [`TransactionBuilder`]: alloy_network::TransactionBuilder
+/// [`DebugApi`]: crate::ext::DebugApi
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
@@ -83,7 +102,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -115,7 +134,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -153,7 +172,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -188,7 +207,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -202,7 +221,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     /// use alloy_primitives::keccak256;
-    /// use alloy_rpc_types::Filter;
+    /// use alloy_rpc_types_eth::Filter;
     ///
     /// let signature = keccak256("Transfer(address,address,uint256)".as_bytes());
     ///
@@ -344,7 +363,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_primitives::{address, b256};
-    /// use alloy_rpc_types::Filter;
+    /// use alloy_rpc_types_eth::Filter;
     /// use futures::StreamExt;
     ///
     /// let address = address!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48");
@@ -454,15 +473,15 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Broadcasts a transaction to the network.
     ///
-    /// Returns a type that can be used to configure how and when to await the
-    /// transaction's confirmation.
+    /// Returns a [`PendingTransactionBuilder`] which can be used to configure
+    /// how and when to await the transaction's confirmation.
     ///
     /// # Examples
     ///
     /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
     /// let tx_hash = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
@@ -479,8 +498,18 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
+    /// Broadcasts a transaction envelope to the network.
     ///
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// Returns a [`PendingTransactionBuilder`] which can be used to configure
+    /// how and when to await the transaction's confirmation.
+    async fn send_tx_envelope(
+        &self,
+        tx: N::TxEnvelope,
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        self.send_transaction_internal(SendableTx::Envelope(tx)).await
+    }
+
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///
@@ -700,20 +729,20 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// or block ID is provided, the call will be executed on the latest block
     /// with the current state.
     ///
-    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
+    /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
     /// ## Example
     ///
     /// ```
     /// # use alloy_provider::Provider;
     /// # use alloy_eips::BlockId;
-    /// # use alloy_rpc_types::state::StateOverride;
+    /// # use alloy_rpc_types_eth::state::StateOverride;
     /// # use alloy_transport::BoxTransport;
     /// # async fn example<P: Provider<BoxTransport>>(
     /// #    provider: P,
     /// #    my_overrides: StateOverride
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
-    /// # let tx = alloy_rpc_types::transaction::TransactionRequest::default();
+    /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
     /// let output = provider.call(&tx).await?;
     /// // Execute a call with a block ID.
@@ -752,7 +781,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// or block ID is provided, the gas estimate will be computed for the latest block
     /// with the current state.
     ///
-    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
+    /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
     /// # Note
     ///
@@ -780,8 +809,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             )
             .await?;
 
-        // if the base fee of the Latest block is 0 then we need check if the latest block even has
-        // a base fee/supports EIP1559
+        // If the base fee of the Latest block is 0 then we need check if the latest block even has
+        // a base fee/supports EIP1559.
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
             Some(base_fee) if (base_fee != 0) => base_fee,
             _ => {
@@ -801,7 +830,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         ))
     }
 
-    /// Get the account and storage values of the specified account including the merkle proofs.
+    /// Get the account and storage values of the specified account including the Merkle proofs.
     ///
     /// This call can be used to verify that the data has not been tampered with.
     fn get_proof(
@@ -830,7 +859,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_rpc_types::BlockNumberOrTag;
+    /// use alloy_rpc_types_eth::BlockNumberOrTag;
     ///
     /// // No parameters: `()`
     /// let block_number = provider.raw_request("eth_blockNumber".into(), ()).await?;
@@ -858,7 +887,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_rpc_types::BlockNumberOrTag;
+    /// use alloy_rpc_types_eth::BlockNumberOrTag;
     ///
     /// // No parameters: `()`
     /// let params = serde_json::value::to_raw_value(&())?;
@@ -922,7 +951,7 @@ mod tests {
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
-    use alloy_rpc_types::request::TransactionRequest;
+    use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();

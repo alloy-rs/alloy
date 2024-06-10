@@ -69,7 +69,7 @@ impl Http<Client> {
                     ));
                 }
 
-                // Deser a Box<RawValue> from the body. If deser fails, return
+                // Deserialize a Box<RawValue> from the body. If deserialization fails, return
                 // the body as a string in the error. The conversion to String
                 // is lossy and may not cover all the bytes in the body.
                 serde_json::from_slice(&body)

@@ -16,15 +16,19 @@ mod bool;
 pub use self::bool::*;
 
 /// Helpers for dealing with numbers.
+#[cfg_attr(not(test), deprecated = "use `quantity::{self, opt, vec}` instead")]
 pub mod num;
-pub use self::num::*;
+#[allow(deprecated)]
+pub use num::*;
+
+pub mod quantity;
 
 /// Storage related helpers.
 pub mod storage;
-pub use self::storage::JsonStorageKey;
+pub use storage::JsonStorageKey;
 
 pub mod ttd;
-pub use self::ttd::*;
+pub use ttd::*;
 
 use alloc::format;
 use serde::Serializer;

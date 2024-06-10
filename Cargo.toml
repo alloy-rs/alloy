@@ -42,6 +42,7 @@ alloy-node-bindings = { version = "0.1.0", default-features = false, path = "cra
 alloy-provider = { version = "0.1.0", default-features = false, path = "crates/provider" }
 alloy-pubsub = { version = "0.1.0", default-features = false, path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", default-features = false, path = "crates/rpc-client" }
+alloy-rpc-types-eth = { version = "0.1.0", default-features = false, path = "crates/rpc-types-eth" }
 alloy-rpc-types-engine = { version = "0.1.0", default-features = false, path = "crates/rpc-types-engine" }
 alloy-rpc-types-anvil = { version = "0.1.0", default-features = false, path = "crates/rpc-types-anvil" }
 alloy-rpc-types-beacon = { version = "0.1.0", default-features = false, path = "crates/rpc-types-beacon" }
@@ -61,11 +62,11 @@ alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crat
 
 test-utils = { version = "0.1.0", default-features = false, path = "crates/internal-test-utils", package = "alloy-internal-test-utils" }
 
-alloy-core = { version = "0.7.2", default-features = false }
-alloy-dyn-abi = { version = "0.7.2", default-features = false }
-alloy-json-abi = { version = "0.7.2", default-features = false }
-alloy-primitives = { version = "0.7.2", default-features = false }
-alloy-sol-types = { version = "0.7.2", default-features = false }
+alloy-core = { version = "0.7.6", default-features = false }
+alloy-dyn-abi = { version = "0.7.6", default-features = false }
+alloy-json-abi = { version = "0.7.6", default-features = false }
+alloy-primitives = { version = "0.7.6", default-features = false }
+alloy-sol-types = { version = "0.7.6", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 
@@ -119,7 +120,10 @@ url = "2.5"
 derive_more = "0.99.17"
 
 ## serde
-serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde = { version = "1.0", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = "3.3.0"
 

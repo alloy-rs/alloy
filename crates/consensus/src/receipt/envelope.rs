@@ -6,7 +6,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol merkle tree may commit to EITHER 0-prefixed or raw. Therefore
+/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
 /// we must ensure that encoding returns the precise byte-array that was
 /// decoded, preserving the presence or absence of the `TransactionType` flag.
 ///
@@ -58,7 +58,7 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns the success status of the receipt's transaction.
     pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
@@ -96,8 +96,12 @@ impl<T> ReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
+    fn status_or_post_state(&self) -> &crate::Eip658Value {
+        &self.as_receipt().unwrap().status
+    }
+
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Return the receipt's bloom.

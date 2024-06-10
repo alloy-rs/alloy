@@ -3,7 +3,7 @@ use crate::{
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types::{request::TransactionRequest, AccessList};
+use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
@@ -186,7 +186,7 @@ mod tests {
     use crate::{TransactionBuilder, TransactionBuilderError};
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_primitives::Address;
-    use alloy_rpc_types::{AccessList, TransactionRequest};
+    use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 
     #[test]
     fn from_eip1559_to_tx_req() {

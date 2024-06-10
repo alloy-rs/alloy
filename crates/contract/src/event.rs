@@ -2,7 +2,7 @@ use crate::Error;
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, LogData};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
-use alloy_rpc_types::{Filter, Log};
+use alloy_rpc_types_eth::{Filter, Log};
 use alloy_sol_types::SolEvent;
 use alloy_transport::{Transport, TransportResult};
 use futures::Stream;

@@ -1,6 +1,5 @@
 //! `trace_filter` types and support
 use alloy_primitives::Address;
-use alloy_serde::num::u64_opt_via_ruint;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -10,10 +9,10 @@ use std::collections::HashSet;
 #[serde(rename_all = "camelCase")]
 pub struct TraceFilter {
     /// From block
-    #[serde(with = "u64_opt_via_ruint")]
+    #[serde(with = "alloy_serde::quantity::opt")]
     pub from_block: Option<u64>,
     /// To block
-    #[serde(with = "u64_opt_via_ruint")]
+    #[serde(with = "alloy_serde::quantity::opt")]
     pub to_block: Option<u64>,
     /// From address
     #[serde(default)]

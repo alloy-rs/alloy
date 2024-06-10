@@ -69,16 +69,16 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
     /// Gas Limit
-    #[serde(default, with = "alloy_serde::num::u128_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
     /// Gas Used
-    #[serde(default, with = "alloy_serde::num::u128_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity")]
     pub gas_used: u128,
     /// Timestamp
-    #[serde(default, with = "alloy_serde::num::u64_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// Total difficulty
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,28 +102,16 @@ pub struct Header {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals_root: Option<B256>,
     /// Blob gas used
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub blob_gas_used: Option<u128>,
     /// Excess blob gas
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub excess_blob_gas: Option<u128>,
     /// EIP-4788 parent beacon block root
     #[serde(default, skip_serializing_if = "Option::is_none")]

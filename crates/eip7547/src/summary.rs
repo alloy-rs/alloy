@@ -3,7 +3,6 @@
 
 use alloy_primitives::{Address, B256};
 use alloy_rpc_types_engine::PayloadStatusEnum;
-use alloy_serde::u64_via_ruint;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::fmt;
 
@@ -83,7 +82,7 @@ pub struct InclusionListSummaryEntryV1 {
     /// The address of the inclusion list entry.
     pub address: Address,
     /// The nonce of the inclusion list entry.
-    #[serde(with = "u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub nonce: u64,
 }
 
@@ -108,10 +107,10 @@ impl fmt::Display for InclusionListSummaryEntryV1 {
 #[serde(rename_all = "camelCase")]
 pub struct InclusionListSummaryV1 {
     /// The slot of the inclusion list summary.
-    #[serde(with = "u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub slot: u64,
     /// The proposer index of the inclusion list summary.
-    #[serde(with = "u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub proposer_index: u64,
     /// The parent hash of the inclusion list summary.
     pub parent_hash: B256,

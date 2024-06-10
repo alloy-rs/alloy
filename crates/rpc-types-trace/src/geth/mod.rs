@@ -2,7 +2,7 @@
 
 use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
-use alloy_rpc_types::{state::StateOverride, BlockOverrides};
+use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, time::Duration};
 
@@ -357,7 +357,7 @@ impl GethDebugTracingOptions {
     }
 }
 
-/// Default tracing options for the struct looger.
+/// Default tracing options for the struct logger.
 ///
 /// These are all known general purpose tracer options that may or not be supported by a given
 /// tracer. For example, the `enableReturnData` option is a noop on regular
@@ -373,7 +373,7 @@ pub struct GethDefaultTracingOptions {
     /// This is the opposite of `enable_memory`.
     ///
     /// Note: memory capture used to be enabled by default on geth, but has since been flipped <https://github.com/ethereum/go-ethereum/pull/23558> and is now disabled by default.
-    /// However, at the time of writing this, erigon still defaults to enabled and supports the
+    /// However, at the time of writing this, Erigon still defaults to enabled and supports the
     /// `disableMemory` option. So we keep this option for compatibility, but if it's missing
     /// OR `enableMemory` is present `enableMemory` takes precedence.
     ///
