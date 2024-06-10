@@ -117,7 +117,7 @@ Thanks for your help improving the project! We are so happy to have you! We have
 Alloy project.
 
 Pull requests will not be merged unless CI passes, so please ensure that your
-contribution follows the linting rules and passes Clippy.
+contribution follows the linting rules and passes clippy.
 
 ## Note on `no_std`
 
