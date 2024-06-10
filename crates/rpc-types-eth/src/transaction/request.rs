@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
+use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
     TxType, TypedTransaction,

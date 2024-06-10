@@ -2,7 +2,7 @@ use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types::AccessList;
+use alloy_rpc_types_eth::AccessList;
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 

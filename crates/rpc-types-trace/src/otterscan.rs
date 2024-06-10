@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, U256};
-use alloy_rpc_types::{Block, Rich, Transaction, TransactionReceipt};
+use alloy_rpc_types_eth::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct

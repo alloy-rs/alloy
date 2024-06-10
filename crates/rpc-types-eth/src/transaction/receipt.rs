@@ -129,6 +129,7 @@ pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEn
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::TransactionReceipt;
     use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;

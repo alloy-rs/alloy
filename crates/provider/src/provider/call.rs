@@ -2,7 +2,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_rpc_client::{RpcCall, WeakClient};
-use alloy_rpc_types::state::StateOverride;
+use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;

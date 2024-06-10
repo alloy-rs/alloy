@@ -23,8 +23,8 @@ alloy-node-bindings = { workspace = true, optional = true }
 alloy-signer-wallet = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-anvil = { workspace = true, optional = true }
+alloy-rpc-types-eth.workspace = true
 alloy-rpc-types-trace.workspace = true
-alloy-rpc-types.workspace = true
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }

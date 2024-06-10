@@ -22,22 +22,22 @@ impl Network for Ethereum {
 
     type Header = alloy_consensus::Header;
 
-    type TransactionRequest = alloy_rpc_types::transaction::TransactionRequest;
+    type TransactionRequest = alloy_rpc_types_eth::transaction::TransactionRequest;
 
-    type TransactionResponse = alloy_rpc_types::Transaction;
+    type TransactionResponse = alloy_rpc_types_eth::Transaction;
 
-    type ReceiptResponse = alloy_rpc_types::TransactionReceipt;
+    type ReceiptResponse = alloy_rpc_types_eth::TransactionReceipt;
 
-    type HeaderResponse = alloy_rpc_types::Header;
+    type HeaderResponse = alloy_rpc_types_eth::Header;
 }
 
-impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
+impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
     }
 }
 
-impl TransactionResponse for alloy_rpc_types::Transaction {
+impl TransactionResponse for alloy_rpc_types_eth::Transaction {
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> alloy_primitives::B256 {
         self.hash

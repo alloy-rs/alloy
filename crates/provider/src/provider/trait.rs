@@ -13,7 +13,7 @@ use alloy_primitives::{
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
-use alloy_rpc_types::{
+use alloy_rpc_types_eth::{
     AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, BlockTransactionsKind,
     EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
@@ -202,7 +202,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use futures::StreamExt;
     /// use alloy_primitives::keccak256;
-    /// use alloy_rpc_types::Filter;
+    /// use alloy_rpc_types_eth::Filter;
     ///
     /// let signature = keccak256("Transfer(address,address,uint256)".as_bytes());
     ///
@@ -344,7 +344,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_primitives::{address, b256};
-    /// use alloy_rpc_types::Filter;
+    /// use alloy_rpc_types_eth::Filter;
     /// use futures::StreamExt;
     ///
     /// let address = address!("a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48");
@@ -462,7 +462,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// See [`PendingTransactionBuilder`](crate::PendingTransactionBuilder) for more examples.
     ///
     /// ```no_run
-    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+    /// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
     /// let tx_hash = provider.send_transaction(tx)
     ///     .await?
     ///     .with_required_confirmations(2)
@@ -710,20 +710,20 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// or block ID is provided, the call will be executed on the latest block
     /// with the current state.
     ///
-    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
+    /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
     /// ## Example
     ///
     /// ```
     /// # use alloy_provider::Provider;
     /// # use alloy_eips::BlockId;
-    /// # use alloy_rpc_types::state::StateOverride;
+    /// # use alloy_rpc_types_eth::state::StateOverride;
     /// # use alloy_transport::BoxTransport;
     /// # async fn example<P: Provider<BoxTransport>>(
     /// #    provider: P,
     /// #    my_overrides: StateOverride
     /// # ) -> Result<(), Box<dyn std::error::Error>> {
-    /// # let tx = alloy_rpc_types::transaction::TransactionRequest::default();
+    /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
     /// let output = provider.call(&tx).await?;
     /// // Execute a call with a block ID.
@@ -762,7 +762,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// or block ID is provided, the gas estimate will be computed for the latest block
     /// with the current state.
     ///
-    /// [`StateOverride`]: alloy_rpc_types::state::StateOverride
+    /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
     /// # Note
     ///
@@ -840,7 +840,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_rpc_types::BlockNumberOrTag;
+    /// use alloy_rpc_types_eth::BlockNumberOrTag;
     ///
     /// // No parameters: `()`
     /// let block_number = provider.raw_request("eth_blockNumber".into(), ()).await?;
@@ -868,7 +868,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_rpc_types::BlockNumberOrTag;
+    /// use alloy_rpc_types_eth::BlockNumberOrTag;
     ///
     /// // No parameters: `()`
     /// let params = serde_json::value::to_raw_value(&())?;
@@ -932,7 +932,7 @@ mod tests {
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
-    use alloy_rpc_types::request::TransactionRequest;
+    use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();

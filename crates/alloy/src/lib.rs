@@ -126,27 +126,8 @@ pub mod rpc {
 
     /// Ethereum JSON-RPC type definitions.
     #[cfg(feature = "rpc-types")]
-    pub mod types {
-        #[cfg(feature = "rpc-types-anvil")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_anvil as anvil;
-
-        #[cfg(feature = "rpc-types-beacon")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_beacon as beacon;
-
-        #[cfg(feature = "rpc-types-engine")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_engine as engine;
-
-        #[cfg(feature = "rpc-types-eth")]
-        #[doc(inline)]
-        pub use alloy_rpc_types as eth;
-
-        #[cfg(feature = "rpc-types-trace")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_trace as trace;
-    }
+    #[doc(inline)]
+    pub use alloy_rpc_types as types;
 }
 
 #[cfg(feature = "serde")]

@@ -4,7 +4,7 @@ use alloy_json_abi::{Function, JsonAbi};
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{Address, Selector};
 use alloy_provider::Provider;
-use alloy_rpc_types::Filter;
+use alloy_rpc_types_eth::Filter;
 use alloy_sol_types::SolEvent;
 use alloy_transport::Transport;
 use std::marker::PhantomData;

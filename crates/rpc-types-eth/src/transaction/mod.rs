@@ -1,6 +1,6 @@
 //! RPC types for transactions
 
-use crate::eth::other::OtherFields;
+use crate::other::OtherFields;
 use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
