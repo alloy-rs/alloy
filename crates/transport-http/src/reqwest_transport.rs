@@ -63,10 +63,10 @@ impl Http<Client> {
                 trace!(body = %String::from_utf8_lossy(&body), "response body");
 
                 if status != reqwest::StatusCode::OK {
-                    return Err(TransportErrorKind::custom_str(&format!(
-                        "HTTP error {status} with body: {}",
-                        String::from_utf8_lossy(&body)
-                    )));
+                    return Err(TransportErrorKind::http_error(
+                        status.as_u16() as i64,
+                        String::from_utf8_lossy(&body).to_string(),
+                    ));
                 }
 
                 // Deser a Box<RawValue> from the body. If deser fails, return

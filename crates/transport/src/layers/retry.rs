@@ -1,5 +1,5 @@
 use crate::{
-    error::{TransportError, TransportErrorKind},
+    error::{HTTPError, TransportError, TransportErrorKind},
     TransportFut,
 };
 use alloy_json_rpc::{ErrorPayload, RequestPacket, ResponsePacket};
@@ -10,9 +10,9 @@ use std::{
         Arc,
     },
     task::{Context, Poll},
-    time::Duration,
 };
 use tower::{Layer, Service};
+use tracing::trace;
 
 /// A Transport Layer that is responsible for retrying requests based on the
 /// error type. See [`TransportError`].
@@ -48,7 +48,7 @@ impl RetryBackoffLayer {
 }
 
 #[derive(Debug, Clone)]
-pub struct RateLimitRetryPolicy;
+pub(crate) struct RateLimitRetryPolicy;
 
 /// [RetryPolicy] defines logic for which [TransportError] instances should
 /// the client retry the request and try to recover from.
@@ -131,7 +131,7 @@ impl<S> Layer<S> for RetryBackoffLayer {
     }
 }
 
-/// An Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
+/// A Tower Service used by the RetryBackoffLayer that is responsible for retrying requests based
 /// on the error type. See [TransportError] and [RateLimitRetryPolicy].
 #[derive(Debug, Clone)]
 pub struct RetryBackoffService<S> {
@@ -151,7 +151,6 @@ pub struct RetryBackoffService<S> {
     requests_enqueued: Arc<AtomicU32>,
 }
 
-// impl tower service
 impl<S> Service<RequestPacket> for RetryBackoffService<S>
 where
     S: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>
@@ -173,7 +172,6 @@ where
     fn call(&mut self, request: RequestPacket) -> Self::Future {
         let inner = self.inner.clone();
         let this = self.clone();
-        let policy = self.policy.clone();
         let mut inner = std::mem::replace(&mut self.inner, inner);
         Box::pin(async move {
             let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
@@ -201,7 +199,7 @@ where
                     if rate_limit_retry_number > this.max_rate_limit_retries {
                         return Err(TransportErrorKind::custom_str("Max retries exceeded"));
                     }
-                    // tracing!("retrying request due to {:?}", err);
+                    trace!("retrying request due to {:?}", err);
 
                     let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
 
@@ -231,9 +229,9 @@ where
                     let total_backoff = next_backoff
                         + std::time::Duration::from_secs(seconds_to_wait_for_compute_budget);
 
-                    // trace!(?total_backoff, budget_backoff = ?seconds_to_wait_for_compute_budget,
-                    // default_backoff = ?next_backoff, ?backoff_hint, "backing off due to rate
-                    // limit");
+                    trace!(?total_backoff, budget_backoff = ?seconds_to_wait_for_compute_budget,
+                    default_backoff = ?next_backoff, ?backoff_hint, "backing off due to rate
+                    limit");
 
                     tokio::time::sleep(total_backoff).await;
                 } else {
@@ -286,6 +284,7 @@ fn should_retry_transport_level_error(error: &TransportErrorKind) -> bool {
             let msg = err.to_string();
             msg.contains("429 Too Many Requests")
         }
+        TransportErrorKind::HttpError(http_err) => http_err.is_retry_err(),
 
         // If the backend is gone, or there's a completely custom error, we should assume it's not
         // retryable.
@@ -296,45 +295,6 @@ fn should_retry_transport_level_error(error: &TransportErrorKind) -> bool {
 /// Analyzes the [ErrorPayload] and decides if the request should be retried based on the
 /// error code or the message.
 fn should_retry_json_rpc_error(error: &ErrorPayload) -> bool {
-    let ErrorPayload { code, message, .. } = error;
-    // alchemy throws it this way
-    if *code == 429 {
-        return true;
-    }
-
-    // This is an infura error code for `exceeded project rate limit`
-    if *code == -32005 {
-        return true;
-    }
-
-    // alternative alchemy error for specific IPs
-    if *code == -32016 && message.contains("rate limit") {
-        return true;
-    }
-
-    // quick node error `"credits limited to 6000/sec"`
-    // <https://github.com/foundry-rs/foundry/pull/6712#issuecomment-1951441240>
-    if *code == -32012 && message.contains("credits") {
-        return true;
-    }
-
-    // quick node rate limit error: `100/second request limit reached - reduce calls per second or
-    // upgrade your account at quicknode.com` <https://github.com/foundry-rs/foundry/issues/4894>
-    if *code == -32007 && message.contains("request limit reached") {
-        return true;
-    }
-
-    match message.as_str() {
-        // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
-        "header not found" => true,
-        // also thrown by infura if out of budget for the day and ratelimited
-        "daily request count exceeded, request rate limited" => true,
-        msg => {
-            msg.contains("rate limit")
-                || msg.contains("rate exceeded")
-                || msg.contains("too many requests")
-                || msg.contains("credits limited")
-                || msg.contains("request limit")
-        }
-    }
+    let http_err: HTTPError = error.into();
+    http_err.is_retry_err()
 }
