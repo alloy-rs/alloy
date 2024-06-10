@@ -2,7 +2,7 @@ use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
     Transaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType,
 };
-use alloy_primitives::TxKind;
+use alloy_primitives::{aliases::TxNonce, TxKind};
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
 ///
@@ -151,7 +151,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn nonce(&self) -> u64 {
+    fn nonce(&self) -> TxNonce {
         match self {
             Self::Legacy(tx) => tx.nonce(),
             Self::Eip2930(tx) => tx.nonce(),

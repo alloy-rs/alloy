@@ -203,14 +203,14 @@ impl From<BlockNumberOrTag> for FilterBlockOption {
 }
 
 impl From<U64> for FilterBlockOption {
-    fn from(block: U64) -> Self {
-        BlockNumberOrTag::from(block).into()
+    fn from(block_number: U64) -> Self {
+        BlockNumberOrTag::from(block_number).into()
     }
 }
 
 impl From<u64> for FilterBlockOption {
-    fn from(block: u64) -> Self {
-        BlockNumberOrTag::from(block).into()
+    fn from(block_number: u64) -> Self {
+        BlockNumberOrTag::from(block_number).into()
     }
 }
 

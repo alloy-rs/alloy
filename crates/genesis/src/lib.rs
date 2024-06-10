@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
+use alloy_primitives::{aliases::BlockTimestamp, Address, BlockNumber, Bytes, ChainId, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt};
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct Genesis {
     pub nonce: u64,
     /// The genesis header timestamp.
     #[serde(with = "alloy_serde::quantity")]
-    pub timestamp: u64,
+    pub timestamp: BlockTimestamp,
     /// The genesis header extra data.
     pub extra_data: Bytes,
     /// The genesis header gas limit.
@@ -60,7 +60,7 @@ pub struct Genesis {
     pub blob_gas_used: Option<u128>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub number: Option<u64>,
+    pub number: Option<BlockNumber>,
 }
 
 impl Genesis {

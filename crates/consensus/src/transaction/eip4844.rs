@@ -1,7 +1,9 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{
+    aliases::TxNonce, keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256,
+};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -217,7 +219,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn nonce(&self) -> u64 {
+    fn nonce(&self) -> TxNonce {
         match self {
             Self::TxEip4844(tx) => tx.nonce,
             Self::TxEip4844WithSidecar(tx) => tx.tx().nonce,
@@ -294,7 +296,7 @@ pub struct TxEip4844 {
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub nonce: u64,
+    pub nonce: TxNonce,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
@@ -472,7 +474,7 @@ impl TxEip4844 {
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
+        mem::size_of::<TxNonce>() + // nonce
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
@@ -645,7 +647,7 @@ impl Transaction for TxEip4844 {
         Some(self.chain_id)
     }
 
-    fn nonce(&self) -> u64 {
+    fn nonce(&self) -> TxNonce {
         self.nonce
     }
 
@@ -868,16 +870,16 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.chain_id()
     }
 
+    fn nonce(&self) -> TxNonce {
+        self.tx.nonce()
+    }
+
     fn gas_limit(&self) -> u128 {
         self.tx.gas_limit()
     }
 
     fn gas_price(&self) -> Option<u128> {
         self.tx.gas_price()
-    }
-
-    fn nonce(&self) -> u64 {
-        self.tx.nonce()
     }
 
     fn to(&self) -> TxKind {

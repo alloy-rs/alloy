@@ -1,7 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
+use alloy_primitives::{aliases::BlockTimestamp, Address, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
 use alloy_rpc_types_eth::{Block, TransactionRequest, WithOtherFields};
 use alloy_transport::{Transport, TransportResult};
@@ -111,11 +111,14 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64>;
 
     /// Similar to `evm_increaseTime` but takes the exact timestamp that you want in the next block.
-    async fn anvil_set_next_block_timestamp(&self, seconds: u64) -> TransportResult<()>;
+    async fn anvil_set_next_block_timestamp(
+        &self,
+        timestamp: BlockTimestamp,
+    ) -> TransportResult<()>;
 
     /// Sets the specific timestamp and returns the number of seconds between the given timestamp
     /// and the current time.
-    async fn anvil_set_time(&self, timestamp: u64) -> TransportResult<u64>;
+    async fn anvil_set_time(&self, timestamp: BlockTimestamp) -> TransportResult<u64>;
 
     /// Set the next block gas limit.
     async fn anvil_set_block_gas_limit(&self, gas_limit: U256) -> TransportResult<bool>;

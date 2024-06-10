@@ -1,6 +1,8 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use alloy_primitives::{BlockHash, BlockNumber, LogData, TxHash, TxIndex, B256};
+use alloy_primitives::{
+    aliases::BlockTimestamp, BlockHash, BlockNumber, LogData, TxHash, TxIndex, B256,
+};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
@@ -23,7 +25,7 @@ pub struct Log<T = LogData> {
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>
     #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
-    pub block_timestamp: Option<u64>,
+    pub block_timestamp: Option<BlockTimestamp>,
     /// Transaction Hash
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,

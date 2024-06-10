@@ -1,7 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
-use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use alloy_primitives::{aliases::TxNonce, keccak256, ChainId, TxKind, B256, U256};
 use core::any;
 
 #[cfg(not(feature = "std"))]
@@ -36,8 +36,17 @@ pub use typed::TypedTransaction;
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
-    /// Get `data`.
-    fn input(&self) -> &[u8];
+    /// Get `chain_id`.
+    fn chain_id(&self) -> Option<ChainId>;
+
+    /// Get `nonce`.
+    fn nonce(&self) -> TxNonce;
+
+    /// Get `gas_limit`.
+    fn gas_limit(&self) -> u128;
+
+    /// Get `gas_price`.
+    fn gas_price(&self) -> Option<u128>;
 
     /// Get `to`.
     fn to(&self) -> TxKind;
@@ -45,17 +54,8 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `value`.
     fn value(&self) -> U256;
 
-    /// Get `chain_id`.
-    fn chain_id(&self) -> Option<ChainId>;
-
-    /// Get `nonce`.
-    fn nonce(&self) -> u64;
-
-    /// Get `gas_limit`.
-    fn gas_limit(&self) -> u128;
-
-    /// Get `gas_price`.
-    fn gas_price(&self) -> Option<u128>;
+    /// Get `data`.
+    fn input(&self) -> &[u8];
 }
 
 /// A signable transaction.

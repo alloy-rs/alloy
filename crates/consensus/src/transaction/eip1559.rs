@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{aliases::TxNonce, keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -18,7 +18,7 @@ pub struct TxEip1559 {
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub nonce: u64,
+    pub nonce: TxNonce,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
@@ -249,7 +249,7 @@ impl TxEip1559 {
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<u64>() + // nonce
+        mem::size_of::<TxNonce>() + // nonce
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
@@ -261,8 +261,20 @@ impl TxEip1559 {
 }
 
 impl Transaction for TxEip1559 {
-    fn input(&self) -> &[u8] {
-        &self.input
+    fn chain_id(&self) -> Option<ChainId> {
+        Some(self.chain_id)
+    }
+
+    fn nonce(&self) -> TxNonce {
+        self.nonce
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.gas_limit
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        None
     }
 
     fn to(&self) -> TxKind {
@@ -273,20 +285,8 @@ impl Transaction for TxEip1559 {
         self.value
     }
 
-    fn chain_id(&self) -> Option<ChainId> {
-        Some(self.chain_id)
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
-
-    fn gas_limit(&self) -> u128 {
-        self.gas_limit
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        None
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 

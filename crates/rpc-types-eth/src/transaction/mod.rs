@@ -6,7 +6,8 @@ use alloy_consensus::{
     TxLegacy, TxType,
 };
 use alloy_primitives::{
-    Address, BlockHash, BlockNumber, Bytes, ChainId, TxHash, TxIndex, TxKind, B256, U256,
+    aliases::TxNonce, Address, BlockHash, BlockNumber, Bytes, ChainId, TxHash, TxIndex, TxKind,
+    B256, U256,
 };
 use serde::{Deserialize, Serialize};
 
@@ -43,7 +44,7 @@ pub struct Transaction {
     pub hash: TxHash,
     /// Nonce
     #[serde(with = "alloy_serde::quantity")]
-    pub nonce: u64,
+    pub nonce: TxNonce,
     /// Block hash
     #[serde(default)]
     pub block_hash: Option<BlockHash>,

@@ -1,5 +1,5 @@
 use crate::{SignableTransaction, Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{aliases::TxNonce, keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -198,8 +198,20 @@ impl TxLegacy {
 }
 
 impl Transaction for TxLegacy {
-    fn input(&self) -> &[u8] {
-        &self.input
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+
+    fn nonce(&self) -> TxNonce {
+        self.nonce
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.gas_limit
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        Some(self.gas_price)
     }
 
     fn to(&self) -> TxKind {
@@ -210,20 +222,8 @@ impl Transaction for TxLegacy {
         self.value
     }
 
-    fn chain_id(&self) -> Option<ChainId> {
-        self.chain_id
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
-    }
-
-    fn gas_limit(&self) -> u128 {
-        self.gas_limit
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        Some(self.gas_price)
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 

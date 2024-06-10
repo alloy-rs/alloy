@@ -119,14 +119,14 @@ impl BlockNumberOrTag {
 }
 
 impl From<u64> for BlockNumberOrTag {
-    fn from(num: u64) -> Self {
-        Self::Number(num)
+    fn from(block_number: u64) -> Self {
+        Self::Number(block_number)
     }
 }
 
 impl From<U64> for BlockNumberOrTag {
-    fn from(num: U64) -> Self {
-        num.to::<u64>().into()
+    fn from(block_number: U64) -> Self {
+        block_number.to::<u64>().into()
     }
 }
 

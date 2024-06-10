@@ -2,7 +2,7 @@ use crate::{
     BuildResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{aliases::TxNonce, Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
@@ -14,11 +14,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.chain_id = Some(chain_id);
     }
 
-    fn nonce(&self) -> Option<u64> {
+    fn nonce(&self) -> Option<TxNonce> {
         self.nonce
     }
 
-    fn set_nonce(&mut self, nonce: u64) {
+    fn set_nonce(&mut self, nonce: TxNonce) {
         self.nonce = Some(nonce);
     }
 

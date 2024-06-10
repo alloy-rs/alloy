@@ -1,7 +1,7 @@
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{aliases::TxNonce, Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::AccessList;
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
@@ -65,13 +65,13 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the nonce for the transaction.
-    fn nonce(&self) -> Option<u64>;
+    fn nonce(&self) -> Option<TxNonce>;
 
     /// Set the nonce for the transaction.
-    fn set_nonce(&mut self, nonce: u64);
+    fn set_nonce(&mut self, nonce: TxNonce);
 
     /// Builder-pattern method for setting the nonce.
-    fn with_nonce(mut self, nonce: u64) -> Self {
+    fn with_nonce(mut self, nonce: TxNonce) -> Self {
         self.set_nonce(nonce);
         self
     }
@@ -101,16 +101,16 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the kind of transaction.
-    fn kind(&self) -> Option<alloy_primitives::TxKind>;
+    fn kind(&self) -> Option<TxKind>;
 
     /// Clear the kind of transaction.
     fn clear_kind(&mut self);
 
     /// Set the kind of transaction.
-    fn set_kind(&mut self, kind: alloy_primitives::TxKind);
+    fn set_kind(&mut self, kind: TxKind);
 
     /// Builder-pattern method for setting the kind of transaction.
-    fn with_kind(mut self, kind: alloy_primitives::TxKind) -> Self {
+    fn with_kind(mut self, kind: TxKind) -> Self {
         self.set_kind(kind);
         self
     }
