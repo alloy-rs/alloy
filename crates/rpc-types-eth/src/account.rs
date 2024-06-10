@@ -1,4 +1,4 @@
-use alloy_primitives::{aliases::TxNonce, Address, Bytes, B256, B512, U256};
+use alloy_primitives::{Address, Bytes, B256, B512, U256, U64};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +32,7 @@ pub struct EIP1186AccountProofResponse {
     /// The hash of the code of the account.
     pub code_hash: B256,
     /// The account nonce.
-    pub nonce: TxNonce,
+    pub nonce: U64,
     /// The hash of the storage of the account.
     pub storage_hash: B256,
     /// The account proof.
