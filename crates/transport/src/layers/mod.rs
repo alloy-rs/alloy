@@ -3,4 +3,4 @@
 mod retry;
 
 /// RetryBackoffLayer
-pub use retry::{RetryBackoffLayer, RetryBackoffService, RetryPolicy};
+pub use retry::{RateLimitRetryPolicy, RetryBackoffLayer, RetryBackoffService, RetryPolicy};

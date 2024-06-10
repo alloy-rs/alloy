@@ -32,7 +32,7 @@ pub struct RetryBackoffLayer {
 
 impl RetryBackoffLayer {
     /// Creates a new retry layer with the given parameters.
-    pub fn new(
+    pub const fn new(
         max_rate_limit_retries: u32,
         max_timeout_retries: u32,
         initial_backoff: u64,
@@ -48,7 +48,9 @@ impl RetryBackoffLayer {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RateLimitRetryPolicy;
+/// [RateLimitRetryPolicy] implements [RetryPolicy] to determine whether to retry depending on the
+/// err.
+pub struct RateLimitRetryPolicy;
 
 /// [RetryPolicy] defines logic for which [TransportError] instances should
 /// the client retry the request and try to recover from.
@@ -233,7 +235,7 @@ where
                     default_backoff = ?next_backoff, ?backoff_hint, "backing off due to rate
                     limit");
 
-                    tokio::time::sleep(total_backoff).await;
+                    std::thread::sleep(total_backoff);
                 } else {
                     if timeout_retries < this.max_timeout_retries {
                         timeout_retries += 1;
