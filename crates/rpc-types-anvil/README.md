@@ -1,3 +1,3 @@
 # alloy-rpc-types-anvil
 
-RPC types for Anvil, Hardhat, and Ganache dev nodes. 
+RPC types for the Anvil development node.

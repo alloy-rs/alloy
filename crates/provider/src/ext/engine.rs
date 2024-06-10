@@ -85,7 +85,7 @@ pub trait EngineApi<N, T>: Send + Sync {
         payload_attributes: Option<PayloadAttributes>,
     ) -> TransportResult<ForkchoiceUpdated>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Paris fork.
     ///
     /// Caution: This should not return the `withdrawals` field
@@ -96,7 +96,7 @@ pub trait EngineApi<N, T>: Send + Sync {
     /// > Provider software MAY stop the corresponding build process after serving this call.
     async fn get_payload_v1(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV1>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Shanghai fork.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#engine_getpayloadv2>
@@ -108,7 +108,7 @@ pub trait EngineApi<N, T>: Send + Sync {
         payload_id: PayloadId,
     ) -> TransportResult<ExecutionPayloadEnvelopeV2>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Cancun fork.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#engine_getpayloadv3>

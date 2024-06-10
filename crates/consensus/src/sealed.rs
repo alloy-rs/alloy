@@ -49,7 +49,7 @@ impl<T> Sealed<T> {
     }
 }
 
-/// Sealeable objects.
+/// Sealable objects.
 pub trait Sealable: Sized {
     /// Calculate the seal hash, this may be slow.
     fn hash(&self) -> B256;

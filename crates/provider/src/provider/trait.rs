@@ -38,7 +38,7 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 /// always disable subscription support. See [issue #296](https://github.com/alloy-rs/alloy/issues/296).
 ///
 /// The provider supports `pubsub` subscriptions to new block headers and pending transactions. This
-/// is only available on `pubsub` clients, such as Websockets or IPC.
+/// is only available on `pubsub` clients, such as WebSockets or IPC.
 ///
 /// For a polling alternatives available over HTTP, use the `watch_*` methods. However, be aware
 /// that polling increases RPC usage drastically.
@@ -83,7 +83,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -115,7 +115,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -153,7 +153,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -188,7 +188,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// # Errors
     ///
-    /// This method is only available on `pubsub` clients, such as Websockets or IPC, and will
+    /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
     /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
     /// client does not support it.
     ///
@@ -490,7 +490,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///
@@ -811,7 +811,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         ))
     }
 
-    /// Get the account and storage values of the specified account including the merkle proofs.
+    /// Get the account and storage values of the specified account including the Merkle proofs.
     ///
     /// This call can be used to verify that the data has not been tampered with.
     fn get_proof(

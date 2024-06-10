@@ -131,7 +131,7 @@ impl GethInstance {
             line.clear();
             err_reader.read_line(&mut line).map_err(GethInstanceError::ReadLineError)?;
 
-            // geth ids are trunated
+            // geth ids are truncated
             let truncated_id = hex::encode(&id.0[..8]);
             if line.contains("Adding p2p peer") && line.contains(&truncated_id) {
                 return Ok(());
