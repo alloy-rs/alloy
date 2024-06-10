@@ -8,7 +8,7 @@ use crate::eip4844::{
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
-#[cfg(feature = "arbitrary")]
+#[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
 #[cfg(not(feature = "std"))]
@@ -318,6 +318,7 @@ mod tests {
     }
 
     #[test]
+    // #[cfg(feature = "arbitrary")]
     fn test_arbitrary_blob() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured blob");
         let _blob = BlobTransactionSidecar::arbitrary(&mut unstructured).unwrap();

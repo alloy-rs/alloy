@@ -164,7 +164,7 @@ pub struct AccessListWithGasUsed {
     pub gas_used: U256,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 
