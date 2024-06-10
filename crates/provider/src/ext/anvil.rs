@@ -41,7 +41,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_set_interval_mining(&self, secs: u64) -> TransportResult<()>;
 
     /// Removes transactions from the pool.
-    async fn anvil_drop_transaction(&self, tx_hash: B256) -> TransportResult<Option<B256>>;
+    async fn anvil_drop_transaction(&self, tx_hash: TxHash) -> TransportResult<Option<TxHash>>;
 
     /// Removes all transactions from the pool.
     async fn anvil_drop_all_transactions(&self) -> TransportResult<()>;
@@ -184,7 +184,7 @@ where
         self.client().request("anvil_setIntervalMining", (secs,)).await
     }
 
-    async fn anvil_drop_transaction(&self, tx_hash: B256) -> TransportResult<Option<B256>> {
+    async fn anvil_drop_transaction(&self, tx_hash: TxHash) -> TransportResult<Option<TxHash>> {
         self.client().request("anvil_dropTransaction", (tx_hash,)).await
     }
 

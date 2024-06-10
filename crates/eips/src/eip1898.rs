@@ -29,7 +29,7 @@ use serde::{
 #[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
 pub struct RpcBlockHash {
     /// A block hash
-    pub block_hash: B256,
+    pub block_hash: BlockHash,
     /// Whether the block must be a canonical block
     pub require_canonical: Option<bool>,
 }
@@ -42,19 +42,19 @@ impl RpcBlockHash {
     }
 }
 
-impl From<B256> for RpcBlockHash {
+impl From<BlockHash> for RpcBlockHash {
     fn from(value: B256) -> Self {
         Self::from_hash(value, None)
     }
 }
 
-impl From<RpcBlockHash> for B256 {
+impl From<RpcBlockHash> for BlockHash {
     fn from(value: RpcBlockHash) -> Self {
         value.block_hash
     }
 }
 
-impl AsRef<B256> for RpcBlockHash {
+impl AsRef<BlockHash> for RpcBlockHash {
     fn as_ref(&self) -> &B256 {
         &self.block_hash
     }

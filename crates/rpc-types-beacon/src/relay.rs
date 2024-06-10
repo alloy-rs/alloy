@@ -3,7 +3,7 @@
 //! See also <https://flashbots.github.io/relay-specs/>
 
 use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, BlockHash, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
@@ -189,7 +189,7 @@ pub struct ProposerPayloadsDeliveredQuery {
     pub limit: Option<u64>,
     /// Search for a specific blockhash
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_hash: Option<B256>,
+    pub block_hash: Option<BlockHash>,
     /// Search for a specific EL block number
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_number: Option<u64>,
@@ -218,7 +218,7 @@ impl ProposerPayloadsDeliveredQuery {
     }
 
     /// Sets the specific blockhash
-    pub const fn block_hash(mut self, block_hash: B256) -> Self {
+    pub const fn block_hash(mut self, block_hash: BlockHash) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
@@ -288,7 +288,7 @@ pub struct BuilderBlocksReceivedQuery {
     pub limit: Option<u64>,
     /// Search for a specific blockhash
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_hash: Option<B256>,
+    pub block_hash: Option<BlockHash>,
     /// Search for a specific EL block number
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_number: Option<u64>,
@@ -311,7 +311,7 @@ impl BuilderBlocksReceivedQuery {
     }
 
     /// Sets the specific blockhash
-    pub const fn block_hash(mut self, block_hash: B256) -> Self {
+    pub const fn block_hash(mut self, block_hash: BlockHash) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
@@ -341,17 +341,17 @@ pub mod error {
         #[error("incorrect ParentHash {actual}, expected {expected}")]
         IncorrectParentHash {
             /// The expected parent hash
-            expected: B256,
+            expected: BlockHash,
             /// The actual parent hash
-            actual: B256,
+            actual: BlockHash,
         },
         /// Thrown if block hash mismatches
         #[error("incorrect BlockHash {actual}, expected {expected}")]
         IncorrectBlockHash {
             /// The expected block hash
-            expected: B256,
+            expected: BlockHash,
             /// The actual block hash
-            actual: B256,
+            actual: BlockHash,
         },
         /// Thrown if block hash mismatches
         #[error("incorrect GasLimit {actual}, expected {expected}")]
