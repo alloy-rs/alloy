@@ -1,4 +1,4 @@
-use alloy_primitives::{aliases::TxNonce, Address, Bytes, B256, B512, U256, U64};
+use alloy_primitives::{aliases::TxNonce, Address, Bytes, B256, B512, U256};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
 

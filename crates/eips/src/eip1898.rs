@@ -361,9 +361,9 @@ impl Default for BlockId {
     }
 }
 
-impl From<BlockNumber> for BlockId {
-    fn from(num: BlockNumber) -> Self {
-        BlockNumberOrTag::Number(num).into()
+impl From<u64> for BlockId {
+    fn from(block_number: u64) -> Self {
+        BlockNumberOrTag::Number(block_number).into()
     }
 }
 
@@ -374,19 +374,19 @@ impl From<U64> for BlockId {
 }
 
 impl From<BlockNumberOrTag> for BlockId {
-    fn from(num: BlockNumberOrTag) -> Self {
-        Self::Number(num)
+    fn from(block_number: BlockNumberOrTag) -> Self {
+        Self::Number(block_number)
     }
 }
 
-impl From<BlockHash> for BlockId {
-    fn from(block_hash: BlockHash) -> Self {
+impl From<B256> for BlockId {
+    fn from(block_hash: B256) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 }
 
-impl From<(BlockHash, Option<bool>)> for BlockId {
-    fn from(hash_can: (BlockHash, Option<bool>)) -> Self {
+impl From<(B256, Option<bool>)> for BlockId {
+    fn from(hash_can: (B256, Option<bool>)) -> Self {
         Self::Hash(RpcBlockHash { block_hash: hash_can.0, require_canonical: hash_can.1 })
     }
 }
