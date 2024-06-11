@@ -5,7 +5,7 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, Signature, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -26,14 +26,13 @@ pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-mod signature;
-pub use signature::{Parity, Signature};
-
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
+
+#[cfg(any(test, feature = "arbitrary"))]
+use arbitrary::{Arbitrary, Unstructured};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "Tx")]
 pub struct Transaction {
@@ -158,7 +157,7 @@ impl TryFrom<Transaction> for Signed<TxLegacy> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?;
 
         let tx = TxLegacy {
             chain_id: tx.chain_id,
@@ -177,7 +176,7 @@ impl TryFrom<Transaction> for Signed<TxEip1559> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?;
 
         let tx = TxEip1559 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
@@ -200,7 +199,7 @@ impl TryFrom<Transaction> for Signed<TxEip2930> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?;
 
         let tx = TxEip2930 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
@@ -220,7 +219,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
     type Error = ConversionError;
 
     fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
-        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?;
         let tx = TxEip4844 {
             chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
             nonce: tx.nonce,
@@ -269,10 +268,37 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> Arbitrary<'a> for Transaction {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Self {
+            hash: Arbitrary::arbitrary(u)?,
+            nonce: Arbitrary::arbitrary(u)?,
+            block_hash: Arbitrary::arbitrary(u)?,
+            block_number: Arbitrary::arbitrary(u)?,
+            transaction_index: Arbitrary::arbitrary(u)?,
+            from: Arbitrary::arbitrary(u)?,
+            to: Arbitrary::arbitrary(u)?,
+            value: Arbitrary::arbitrary(u)?,
+            gas_price: Arbitrary::arbitrary(u)?,
+            gas: Arbitrary::arbitrary(u)?,
+            max_fee_per_gas: Arbitrary::arbitrary(u)?,
+            max_priority_fee_per_gas: Arbitrary::arbitrary(u)?,
+            max_fee_per_blob_gas: Arbitrary::arbitrary(u)?,
+            input: Arbitrary::arbitrary(u)?,
+            signature: None, // Skip the signature field
+            chain_id: Arbitrary::arbitrary(u)?,
+            blob_versioned_hashes: Arbitrary::arbitrary(u)?,
+            access_list: Arbitrary::arbitrary(u)?,
+            transaction_type: Arbitrary::arbitrary(u)?,
+            other: Arbitrary::arbitrary(u)?,
+        })
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arbitrary::Arbitrary;
+    use alloy_primitives::Parity;
     use rand::Rng;
 
     #[test]
@@ -297,12 +323,10 @@ mod tests {
             gas_price: Some(9),
             gas: 10,
             input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: None,
-            }),
+            signature: Some(
+                Signature::from_rs_and_parity(U256::from(35), U256::from(35), Parity::Eip155(35))
+                    .unwrap(),
+            ),
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
@@ -313,11 +337,15 @@ mod tests {
             other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
+
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0x23","s":"0x23","v":"0x23","chainId":"0x11","type":"0x14"}"#
         );
-        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
+        let mut deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
+        deserialized.other.remove_entry("r");
+        deserialized.other.remove_entry("s");
+        deserialized.other.remove_entry("v");
         assert_eq!(transaction, deserialized);
     }
 
@@ -335,12 +363,9 @@ mod tests {
             gas_price: Some(9),
             gas: 10,
             input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: Some(Parity(true)),
-            }),
+            signature: Some(
+                Signature::from_rs_and_parity(U256::from(35), U256::from(35), true).unwrap(),
+            ),
             chain_id: Some(17),
             blob_versioned_hashes: None,
             access_list: None,
@@ -353,9 +378,12 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0x23","s":"0x23","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
         );
-        let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
+        let mut deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
+        deserialized.other.remove_entry("r");
+        deserialized.other.remove_entry("s");
+        deserialized.other.remove_entry("yParity");
         assert_eq!(transaction, deserialized);
     }
 
