@@ -52,6 +52,10 @@ where
     T: Future<Output = ()> + 'static,
 {
     fn spawn_task(self) {
+        #[cfg(not(feature = "wasm-bindgen"))]
+        panic!("The 'wasm-bindgen' feature must be enabled");
+
+        #[cfg(feature = "wasm-bindgen")]
         wasm_bindgen_futures::spawn_local(self);
     }
 }

@@ -739,7 +739,7 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 
