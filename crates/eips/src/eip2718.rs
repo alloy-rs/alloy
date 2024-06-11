@@ -51,7 +51,14 @@ impl std::error::Error for Eip2718Error {}
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
 ///
+/// Users should rarely import this trait, and should instead prefer letting the
+/// alloy `Provider` methods handle encoding
 ///
+/// ## Implementing
+///
+/// Implement this trait when you need to make custom TransactionEnvelope
+/// and ReceiptEnvelope types for your network. These types should be enums
+/// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Decodable2718: Sized {
@@ -66,7 +73,7 @@ pub trait Decodable2718: Sized {
     /// This function is invoked by [`Self::decode_2718`] with the type byte,
     /// and the tail of the buffer.
     ///
-    /// ## Note
+    /// ## Implementing
     ///
     /// This should be a simple match block that invokes an inner type's
     /// specific decoder.
@@ -74,7 +81,11 @@ pub trait Decodable2718: Sized {
 
     /// Decode the default variant.
     ///
-    /// This function is invoked by [`Self::decode_2718`] when no type byte can be extracted.
+    /// ## Implementing
+    ///
+    /// This function is invoked by [`Self::decode_2718`] when no type byte can
+    /// be extracted. It should be a simple wrapper around the default type's
+    /// decoder.
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self>;
 
     /// Encode the transaction according to [EIP-2718] rules. First a 1-byte
