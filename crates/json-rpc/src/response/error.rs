@@ -20,7 +20,7 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
     pub data: Option<ErrData>,
 }
 
-impl ErrorPayload {
+impl<E> ErrorPayload<E> {
     /// Analyzes the [ErrorPayload] and decides if the request should be retried based on the
     /// error code or the message.
     pub fn is_retry_err(&self) -> bool {

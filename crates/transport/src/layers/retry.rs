@@ -1,9 +1,8 @@
 use crate::{
     error::{TransportError, TransportErrorKind},
-    TransportFut,
+    RpcErrorExt, TransportFut,
 };
-use alloy_json_rpc::{ErrorPayload, RequestPacket, ResponsePacket};
-use serde::Deserialize;
+use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -64,56 +63,12 @@ pub trait RetryPolicy: Send + Sync + std::fmt::Debug {
 
 impl RetryPolicy for RateLimitRetryPolicy {
     fn should_retry(&self, error: &TransportError) -> bool {
-        match error {
-            // There was a transport-level error. This is either a non-retryable error,
-            // or a server error that should be retried.
-            TransportError::Transport(err) => err.is_retry_err(),
-            // The transport could not serialize the error itself. The request was malformed from
-            // the start.
-            TransportError::SerError(_) => false,
-            TransportError::DeserError { text, .. } => {
-                if let Ok(resp) = serde_json::from_str::<ErrorPayload>(text) {
-                    return resp.is_retry_err();
-                }
-
-                // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
-                // text should be a `JsonRpcError`
-                #[derive(Deserialize)]
-                struct Resp {
-                    error: ErrorPayload,
-                }
-
-                if let Ok(resp) = serde_json::from_str::<Resp>(text) {
-                    return resp.error.is_retry_err();
-                }
-
-                false
-            }
-            TransportError::ErrorResp(err) => err.is_retry_err(),
-            TransportError::NullResp => true,
-            TransportError::UnsupportedFeature(_) => false,
-            TransportError::LocalUsageError(_) => false,
-        }
+        error.is_retryable()
     }
 
     /// Provides a backoff hint if the error response contains it
     fn backoff_hint(&self, error: &TransportError) -> Option<std::time::Duration> {
-        if let TransportError::ErrorResp(resp) = error {
-            let data = resp.try_data_as::<serde_json::Value>();
-            if let Some(Ok(data)) = data {
-                // if daily rate limit exceeded, infura returns the requested backoff in the error
-                // response
-                let backoff_seconds = &data["rate"]["backoff_seconds"];
-                // infura rate limit error
-                if let Some(seconds) = backoff_seconds.as_u64() {
-                    return Some(std::time::Duration::from_secs(seconds));
-                }
-                if let Some(seconds) = backoff_seconds.as_f64() {
-                    return Some(std::time::Duration::from_secs(seconds as u64 + 1));
-                }
-            }
-        }
-        None
+        error.backoff_hint()
     }
 }
 

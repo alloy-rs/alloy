@@ -1,6 +1,7 @@
-use alloy_json_rpc::{Id, RpcError, RpcResult};
+use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
+use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::{error::Error as StdError, fmt::Debug};
+use std::{borrow::Borrow, error::Error as StdError, fmt::Debug};
 use thiserror::Error;
 
 /// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
@@ -8,6 +9,71 @@ pub type TransportError<ErrResp = Box<RawValue>> = RpcError<TransportErrorKind, 
 
 /// A transport result is a [`Result`] containing a [`TransportError`].
 pub type TransportResult<T, ErrResp = Box<RawValue>> = RpcResult<T, TransportErrorKind, ErrResp>;
+
+/// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
+pub trait RpcErrorExt<E> {
+    /// Analyzes whether to retry the request depending on the error.
+    fn is_retryable(&self) -> bool;
+
+    /// Fetches the backoff hint from the error message if present
+    fn backoff_hint(&self) -> Option<std::time::Duration>;
+}
+
+impl<E> RpcErrorExt<E> for RpcError<TransportErrorKind, E>
+where
+    E: Borrow<serde_json::value::RawValue>,
+{
+    fn is_retryable(&self) -> bool {
+        match self {
+            // There was a transport-level error. This is either a non-retryable error,
+            // or a server error that should be retried.
+            TransportError::Transport(err) => err.is_retry_err(),
+            // The transport could not serialize the error itself. The request was malformed from
+            // the start.
+            TransportError::SerError(_) => false,
+            TransportError::DeserError { text, .. } => {
+                if let Ok(resp) = serde_json::from_str::<ErrorPayload>(text) {
+                    return resp.is_retry_err();
+                }
+
+                // some providers send invalid JSON RPC in the error case (no `id:u64`), but the
+                // text should be a `JsonRpcError`
+                #[derive(Deserialize)]
+                struct Resp {
+                    error: ErrorPayload,
+                }
+
+                if let Ok(resp) = serde_json::from_str::<Resp>(text) {
+                    return resp.error.is_retry_err();
+                }
+
+                false
+            }
+            TransportError::ErrorResp(err) => err.is_retry_err(),
+            TransportError::NullResp => true,
+            _ => false,
+        }
+    }
+
+    fn backoff_hint(&self) -> Option<std::time::Duration> {
+        if let TransportError::ErrorResp(resp) = self {
+            let data = resp.try_data_as::<serde_json::Value>();
+            if let Some(Ok(data)) = data {
+                // if daily rate limit exceeded, infura returns the requested backoff in the error
+                // response
+                let backoff_seconds = &data["rate"]["backoff_seconds"];
+                // infura rate limit error
+                if let Some(seconds) = backoff_seconds.as_u64() {
+                    return Some(std::time::Duration::from_secs(seconds));
+                }
+                if let Some(seconds) = backoff_seconds.as_f64() {
+                    return Some(std::time::Duration::from_secs(seconds as u64 + 1));
+                }
+            }
+        }
+        None
+    }
+}
 
 /// Transport error.
 ///
@@ -83,13 +149,11 @@ impl TransportErrorKind {
         match self {
             // Missing batch response errors can be retried.
             Self::MissingBatchResponse(_) => true,
+            Self::HttpError(http_err) => http_err.is_rate_limit_err(),
             Self::Custom(err) => {
-                // currently http error responses are not standard in alloy
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
             }
-            Self::HttpError(http_err) => http_err.is_rate_limit_err(),
-
             // If the backend is gone, or there's a completely custom error, we should assume it's
             // not retryable.
             _ => false,
