@@ -31,7 +31,7 @@ serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.22", optional = true }
+jsonrpsee-types = { version = "0.23", optional = true }
 
 # jwt
 jsonwebtoken = "9.3.0"

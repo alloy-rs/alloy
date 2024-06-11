@@ -1,16 +1,16 @@
 use base64::{engine::general_purpose, Engine};
 use std::{fmt, net::SocketAddr};
 
-/// Basic, bearer or raw authentication in http or websocket transport
+/// Basic, bearer or raw authentication in http or websocket transport.
 ///
-/// Use to inject username and password or an auth token into requests
+/// Use to inject username and password or an auth token into requests.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Authorization {
-    /// [RC7617](https://datatracker.ietf.org/doc/html/rfc7617) HTTP Basic Auth
+    /// [RFC7617](https://datatracker.ietf.org/doc/html/rfc7617) HTTP Basic Auth.
     Basic(String),
-    /// [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750) Bearer Auth
+    /// [RFC6750](https://datatracker.ietf.org/doc/html/rfc6750) Bearer Auth.
     Bearer(String),
-    /// Raw auth string
+    /// Raw auth string.
     Raw(String),
 }
 

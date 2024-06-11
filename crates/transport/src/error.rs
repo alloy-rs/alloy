@@ -27,11 +27,11 @@ where
         match self {
             // There was a transport-level error. This is either a non-retryable error,
             // or a server error that should be retried.
-            TransportError::Transport(err) => err.is_retry_err(),
+            Self::Transport(err) => err.is_retry_err(),
             // The transport could not serialize the error itself. The request was malformed from
             // the start.
-            TransportError::SerError(_) => false,
-            TransportError::DeserError { text, .. } => {
+            Self::SerError(_) => false,
+            Self::DeserError { text, .. } => {
                 if let Ok(resp) = serde_json::from_str::<ErrorPayload>(text) {
                     return resp.is_retry_err();
                 }
@@ -49,14 +49,14 @@ where
 
                 false
             }
-            TransportError::ErrorResp(err) => err.is_retry_err(),
-            TransportError::NullResp => true,
+            Self::ErrorResp(err) => err.is_retry_err(),
+            Self::NullResp => true,
             _ => false,
         }
     }
 
     fn backoff_hint(&self) -> Option<std::time::Duration> {
-        if let TransportError::ErrorResp(resp) = self {
+        if let Self::ErrorResp(resp) = self {
             let data = resp.try_data_as::<serde_json::Value>();
             if let Some(Ok(data)) = data {
                 // if daily rate limit exceeded, infura returns the requested backoff in the error

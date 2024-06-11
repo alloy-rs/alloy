@@ -16,43 +16,43 @@ workspace = true
 
 [dependencies]
 # core
-alloy-core = { workspace = true, default-features = false }
+alloy-core.workspace = true
 
 # alloy
-alloy-consensus = { workspace = true, default-features = false, optional = true }
-alloy-contract = { workspace = true, default-features = false, optional = true }
-alloy-eips = { workspace = true, default-features = false, optional = true }
-alloy-genesis = { workspace = true, default-features = false, optional = true }
-alloy-network = { workspace = true, default-features = false, optional = true }
-alloy-node-bindings = { workspace = true, default-features = false, optional = true }
+alloy-consensus = { workspace = true, optional = true }
+alloy-contract = { workspace = true, optional = true }
+alloy-eips = { workspace = true, optional = true }
+alloy-genesis = { workspace = true, optional = true }
+alloy-network = { workspace = true, optional = true }
+alloy-node-bindings = { workspace = true, optional = true }
 
 # providers
-alloy-provider = { workspace = true, default-features = false, optional = true }
+alloy-provider = { workspace = true, optional = true }
 
 # pubsub
-alloy-pubsub = { workspace = true, default-features = false, optional = true }
+alloy-pubsub = { workspace = true, optional = true }
 
 # rpc
-alloy-json-rpc = { workspace = true, default-features = false, optional = true }
-alloy-rpc-client = { workspace = true, default-features = false, optional = true }
-alloy-rpc-types = { workspace = true, default-features = false, optional = true }
+alloy-json-rpc = { workspace = true, optional = true }
+alloy-rpc-client = { workspace = true, optional = true }
+alloy-rpc-types = { workspace = true, optional = true }
 
 # serde
-alloy-serde = { workspace = true, default-features = false, optional = true }
+alloy-serde = { workspace = true, optional = true }
 
 # signer
-alloy-signer = { workspace = true, default-features = false, optional = true }
-alloy-signer-aws = { workspace = true, default-features = false, optional = true }
-alloy-signer-gcp = { workspace = true, default-features = false, optional = true }
-alloy-signer-ledger = { workspace = true, default-features = false, optional = true }
-alloy-signer-trezor = { workspace = true, default-features = false, optional = true }
-alloy-signer-wallet = { workspace = true, default-features = false, optional = true }
+alloy-signer = { workspace = true, optional = true }
+alloy-signer-aws = { workspace = true, optional = true }
+alloy-signer-gcp = { workspace = true, optional = true }
+alloy-signer-ledger = { workspace = true, optional = true }
+alloy-signer-trezor = { workspace = true, optional = true }
+alloy-signer-wallet = { workspace = true, optional = true }
 
 # transport
-alloy-transport = { workspace = true, default-features = false, optional = true }
-alloy-transport-http = { workspace = true, default-features = false, optional = true }
-alloy-transport-ipc = { workspace = true, default-features = false, optional = true }
-alloy-transport-ws = { workspace = true, default-features = false, optional = true }
+alloy-transport = { workspace = true, optional = true }
+alloy-transport-http = { workspace = true, optional = true }
+alloy-transport-ipc = { workspace = true, optional = true }
+alloy-transport-ws = { workspace = true, optional = true }
 
 # optional
 reqwest = { workspace = true, optional = true }
@@ -86,6 +86,7 @@ hyper = [
     "alloy-provider?/hyper",
     "alloy-transport-http?/hyper",
 ]
+wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
 # ---------------------------------------- Main re-exports --------------------------------------- #
 

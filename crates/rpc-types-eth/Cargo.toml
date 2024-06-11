@@ -34,7 +34,7 @@ proptest = { version = "1.4", optional = true }
 proptest-derive = { version = "0.4", optional = true }
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.22", optional = true }
+jsonrpsee-types = { version = "0.23", optional = true }
 alloy-sol-types.workspace = true
 
 [dev-dependencies]
