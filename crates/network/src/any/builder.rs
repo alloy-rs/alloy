@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::{aliases::TxNonce, Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
@@ -15,11 +15,11 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_chain_id(chain_id)
     }
 
-    fn nonce(&self) -> Option<TxNonce> {
+    fn nonce(&self) -> Option<u64> {
         self.deref().nonce()
     }
 
-    fn set_nonce(&mut self, nonce: TxNonce) {
+    fn set_nonce(&mut self, nonce: u64) {
         self.deref_mut().set_nonce(nonce)
     }
 

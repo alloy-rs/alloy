@@ -1,5 +1,5 @@
 use crate::{SignableTransaction, Signed, Transaction};
-use alloy_primitives::{aliases::TxNonce, keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -202,7 +202,7 @@ impl Transaction for TxLegacy {
         self.chain_id
     }
 
-    fn nonce(&self) -> TxNonce {
+    fn nonce(&self) -> u64 {
         self.nonce
     }
 

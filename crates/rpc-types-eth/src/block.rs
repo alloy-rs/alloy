@@ -5,9 +5,7 @@ pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_primitives::{
-    aliases::BlockTimestamp, Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64,
-};
+use alloy_primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -81,7 +79,7 @@ pub struct Header {
     pub gas_used: u128,
     /// Timestamp
     #[serde(default, with = "alloy_serde::quantity")]
-    pub timestamp: BlockTimestamp,
+    pub timestamp: u64,
     /// Total difficulty
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_difficulty: Option<U256>,

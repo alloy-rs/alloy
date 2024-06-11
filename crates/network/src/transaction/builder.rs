@@ -1,7 +1,7 @@
 use super::signer::NetworkSigner;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::{aliases::TxNonce, Address, Bytes, ChainId, TxKind, U256};
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::AccessList;
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
@@ -65,13 +65,13 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the nonce for the transaction.
-    fn nonce(&self) -> Option<TxNonce>;
+    fn nonce(&self) -> Option<u64>;
 
     /// Set the nonce for the transaction.
-    fn set_nonce(&mut self, nonce: TxNonce);
+    fn set_nonce(&mut self, nonce: u64);
 
     /// Builder-pattern method for setting the nonce.
-    fn with_nonce(mut self, nonce: TxNonce) -> Self {
+    fn with_nonce(mut self, nonce: u64) -> Self {
         self.set_nonce(nonce);
         self
     }

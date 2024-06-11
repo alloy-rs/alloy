@@ -6,9 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{
-    aliases::BlockTimestamp, BlockHash, BlockNumber, ChainId, TxHash, B256, U256,
-};
+use alloy_primitives::{BlockHash, BlockNumber, ChainId, TxHash, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
@@ -67,7 +65,7 @@ pub struct NodeInfo {
     #[serde(with = "alloy_serde::quantity")]
     pub current_block_number: BlockNumber,
     /// The current block timestamp
-    pub current_block_timestamp: BlockTimestamp,
+    pub current_block_timestamp: u64,
     /// The current block hash
     pub current_block_hash: BlockHash,
     /// The enabled hardfork
@@ -150,14 +148,14 @@ pub enum MineOptions {
     Options {
         /// The timestamp the block should be mined with
         #[serde(with = "alloy_serde::quantity::opt")]
-        timestamp: Option<BlockTimestamp>,
+        timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
         blocks: Option<u64>,
     },
     /// The timestamp the block should be mined with
     #[serde(with = "alloy_serde::quantity::opt")]
-    Timestamp(Option<BlockTimestamp>),
+    Timestamp(Option<u64>),
 }
 
 impl Default for MineOptions {

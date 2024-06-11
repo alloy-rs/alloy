@@ -1,7 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
-use alloy_primitives::{aliases::TxNonce, keccak256, ChainId, TxKind, B256, U256};
+use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
 
 #[cfg(not(feature = "std"))]
@@ -40,7 +40,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     fn chain_id(&self) -> Option<ChainId>;
 
     /// Get `nonce`.
-    fn nonce(&self) -> TxNonce;
+    fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
     fn gas_limit(&self) -> u128;

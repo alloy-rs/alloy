@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{aliases::TxNonce, keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -18,7 +18,7 @@ pub struct TxEip2930 {
     pub chain_id: ChainId,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub nonce: TxNonce,
+    pub nonce: u64,
     /// A scalar value equal to the number of
     /// Wei to be paid per unit of gas for all computation
     /// costs incurred as a result of the execution of this transaction; formally Tp.
@@ -63,7 +63,7 @@ impl TxEip2930 {
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
-        mem::size_of::<TxNonce>() + // nonce
+        mem::size_of::<u64>() + // nonce
         mem::size_of::<u128>() + // gas_price
         mem::size_of::<u64>() + // gas_limit
         self.to.size() + // to
@@ -229,7 +229,7 @@ impl Transaction for TxEip2930 {
         Some(self.chain_id)
     }
 
-    fn nonce(&self) -> TxNonce {
+    fn nonce(&self) -> u64 {
         self.nonce
     }
 
