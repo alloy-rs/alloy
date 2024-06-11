@@ -36,17 +36,6 @@ impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
         self.contract_address
     }
 
-    /// ## Note
-    ///
-    /// Caution must be taken when using this method for deep-historical
-    /// receipts, as it may not accurately reflect the status of the
-    /// transaction. The transaction status is not knowable from the receipt
-    /// for transactions before [EIP-658].
-    ///
-    /// This can be handled using [`TxReceipt::status_or_post_state`].
-    ///
-    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
     fn status(&self) -> bool {
         self.inner.status()
     }
