@@ -82,6 +82,16 @@ impl ReceiptResponse for AnyTransactionReceipt {
         self.contract_address
     }
 
+    /// ## Note
+    ///
+    /// Caution must be taken when using this method for deep-historical
+    /// receipts, as it may not accurately reflect the status of the
+    /// transaction. The transaction status is not knowable from the receipt
+    /// for transactions before [EIP-658].
+    ///
+    /// This can be handled using [`TxReceipt::status_or_post_state`].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     fn status(&self) -> bool {
         self.inner.inner.status()
     }
