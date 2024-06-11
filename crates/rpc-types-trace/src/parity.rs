@@ -2,7 +2,7 @@
 //!
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
-use alloy_primitives::{Address, BlockHash, BlockNumber, Bytes, TxHash, TxIndex, B256, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, TxIndex, B256, U256, U64};
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -401,7 +401,7 @@ pub struct LocalizedTransactionTrace {
     /// Block number the transaction is included in, None if pending.
     ///
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
-    pub block_number: Option<BlockNumber>,
+    pub block_number: Option<u64>,
     /// Hash of the transaction
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,

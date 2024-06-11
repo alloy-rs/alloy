@@ -1,6 +1,6 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use alloy_primitives::{Address, BlockHash, BlockNumber, LogData, TxHash, TxIndex, B256};
+use alloy_primitives::{Address, BlockHash, LogData, TxHash, TxIndex, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
@@ -18,7 +18,7 @@ pub struct Log<T = LogData> {
     pub block_hash: Option<BlockHash>,
     /// Number of the block the transaction that emitted this log was mined in
     #[serde(with = "alloy_serde::quantity::opt")]
-    pub block_number: Option<BlockNumber>,
+    pub block_number: Option<u64>,
     /// The timestamp of the block as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>

@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use alloy_primitives::{hex, Address, BlockNumber, ChainId};
+use alloy_primitives::{hex, Address, ChainId};
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     io::{BufRead, BufReader},
@@ -153,7 +153,7 @@ pub struct Anvil {
     chain_id: Option<ChainId>,
     mnemonic: Option<String>,
     fork: Option<String>,
-    fork_block_number: Option<BlockNumber>,
+    fork_block_number: Option<u64>,
     args: Vec<String>,
     timeout: Option<u64>,
 }

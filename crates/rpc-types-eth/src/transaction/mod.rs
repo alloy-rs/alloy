@@ -5,9 +5,7 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-use alloy_primitives::{
-    Address, BlockHash, BlockNumber, Bytes, ChainId, TxHash, TxIndex, TxKind, B256, U256,
-};
+use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxIndex, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -49,7 +47,7 @@ pub struct Transaction {
     pub block_hash: Option<BlockHash>,
     /// Block number
     #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub block_number: Option<BlockNumber>,
+    pub block_number: Option<u64>,
     /// Transaction Index
     #[serde(default, with = "alloy_serde::quantity::opt")]
     pub transaction_index: Option<TxIndex>,

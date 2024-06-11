@@ -2,7 +2,7 @@
 //! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
-use alloy_primitives::{BlockHash, BlockNumber, TxHash, TxIndex};
+use alloy_primitives::{BlockHash, TxHash, TxIndex};
 
 /// Additional fields in the context of a block that contains this transaction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -15,7 +15,7 @@ pub struct TransactionInfo {
     /// Hash of the block.
     pub block_hash: Option<BlockHash>,
     /// Number of the block.
-    pub block_number: Option<BlockNumber>,
+    pub block_number: Option<u64>,
     /// Base fee of the block.
     pub base_fee: Option<u128>,
 }
