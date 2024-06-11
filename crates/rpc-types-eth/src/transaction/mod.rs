@@ -28,9 +28,6 @@ pub use request::{TransactionInput, TransactionRequest};
 
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
-#[cfg(any(test, feature = "arbitrary"))]
-use arbitrary::{Arbitrary, Unstructured};
-
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -269,29 +266,29 @@ impl TryFrom<Transaction> for TxEnvelope {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> Arbitrary<'a> for Transaction {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+impl<'a> arbitrary::Arbitrary<'a> for Transaction {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(Self {
-            hash: Arbitrary::arbitrary(u)?,
-            nonce: Arbitrary::arbitrary(u)?,
-            block_hash: Arbitrary::arbitrary(u)?,
-            block_number: Arbitrary::arbitrary(u)?,
-            transaction_index: Arbitrary::arbitrary(u)?,
-            from: Arbitrary::arbitrary(u)?,
-            to: Arbitrary::arbitrary(u)?,
-            value: Arbitrary::arbitrary(u)?,
-            gas_price: Arbitrary::arbitrary(u)?,
-            gas: Arbitrary::arbitrary(u)?,
-            max_fee_per_gas: Arbitrary::arbitrary(u)?,
-            max_priority_fee_per_gas: Arbitrary::arbitrary(u)?,
-            max_fee_per_blob_gas: Arbitrary::arbitrary(u)?,
-            input: Arbitrary::arbitrary(u)?,
+            hash: arbitrary::Arbitrary::arbitrary(u)?,
+            nonce: arbitrary::Arbitrary::arbitrary(u)?,
+            block_hash: arbitrary::Arbitrary::arbitrary(u)?,
+            block_number: arbitrary::Arbitrary::arbitrary(u)?,
+            transaction_index: arbitrary::Arbitrary::arbitrary(u)?,
+            from: arbitrary::Arbitrary::arbitrary(u)?,
+            to: arbitrary::Arbitrary::arbitrary(u)?,
+            value: arbitrary::Arbitrary::arbitrary(u)?,
+            gas_price: arbitrary::Arbitrary::arbitrary(u)?,
+            gas: arbitrary::Arbitrary::arbitrary(u)?,
+            max_fee_per_gas: arbitrary::Arbitrary::arbitrary(u)?,
+            max_priority_fee_per_gas: arbitrary::Arbitrary::arbitrary(u)?,
+            max_fee_per_blob_gas: arbitrary::Arbitrary::arbitrary(u)?,
+            input: arbitrary::Arbitrary::arbitrary(u)?,
             signature: None, // Skip the signature field
-            chain_id: Arbitrary::arbitrary(u)?,
-            blob_versioned_hashes: Arbitrary::arbitrary(u)?,
-            access_list: Arbitrary::arbitrary(u)?,
-            transaction_type: Arbitrary::arbitrary(u)?,
-            other: Arbitrary::arbitrary(u)?,
+            chain_id: arbitrary::Arbitrary::arbitrary(u)?,
+            blob_versioned_hashes: arbitrary::Arbitrary::arbitrary(u)?,
+            access_list: arbitrary::Arbitrary::arbitrary(u)?,
+            transaction_type: arbitrary::Arbitrary::arbitrary(u)?,
+            other: arbitrary::Arbitrary::arbitrary(u)?,
         })
     }
 }
@@ -299,6 +296,7 @@ impl<'a> Arbitrary<'a> for Transaction {
 mod tests {
     use super::*;
     use alloy_primitives::Parity;
+    use arbitrary::Arbitrary;
     use rand::Rng;
 
     #[test]
