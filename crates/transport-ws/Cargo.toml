@@ -25,9 +25,9 @@ tracing.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-http = "0.2"
+http = "1.1"
 tokio = { workspace = true, features = ["sync", "rt", "time"] }
-tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.23", features = ["rustls-tls-webpki-roots"] }
 
 # WASM only
 [target.'cfg(target_arch = "wasm32")'.dependencies]
