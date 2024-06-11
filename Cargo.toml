@@ -108,7 +108,7 @@ auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
 home = "0.5"
-itertools = "0.12"
+itertools = "0.13"
 once_cell = { version = "1.19", default-features = false }
 pin-project = "1.1"
 rand = "0.8"
