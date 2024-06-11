@@ -33,7 +33,7 @@ pub use ttd::*;
 use alloc::format;
 use serde::Serializer;
 
-use alloy_primitives::B256;
+use alloy_primitives::{hex, B256};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
 ///
@@ -43,7 +43,7 @@ where
     S: Serializer,
     T: AsRef<[u8]>,
 {
-    s.serialize_str(&alloy_primitives::hex::encode(x.as_ref()))
+    s.serialize_str(&hex::encode(x.as_ref()))
 }
 
 /// Serialize a [B256] as a hex string _without_ the "0x" prefix.

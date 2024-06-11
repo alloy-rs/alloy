@@ -1,7 +1,7 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
 use alloy_primitives::{
-    aliases::BlockTimestamp, BlockHash, BlockNumber, LogData, TxHash, TxIndex, B256,
+    aliases::BlockTimestamp, Address, BlockHash, BlockNumber, LogData, TxHash, TxIndex, B256,
 };
 use serde::{Deserialize, Serialize};
 
@@ -43,7 +43,7 @@ pub struct Log<T = LogData> {
 
 impl<T> Log<T> {
     /// Getter for the address field. Shortcut for `log.inner.address`.
-    pub const fn address(&self) -> alloy_primitives::Address {
+    pub const fn address(&self) -> Address {
         self.inner.address
     }
 

@@ -59,7 +59,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Builder-pattern method for setting the chain ID.
-    fn with_chain_id(mut self, chain_id: alloy_primitives::ChainId) -> Self {
+    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
         self.set_chain_id(chain_id);
         self
     }
