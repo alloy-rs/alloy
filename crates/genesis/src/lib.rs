@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt};
 use serde::{Deserialize, Serialize};
 
