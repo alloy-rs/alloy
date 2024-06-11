@@ -170,8 +170,8 @@ pub struct HttpError {
 }
 
 impl HttpError {
-    /// Analyzes the `status` and `body` to determine whether the request should be retried.
-    pub fn is_rate_limit_err(&self) -> bool {
+    /// Checks the `status` to determine whether the request should be retried.
+    pub const fn is_rate_limit_err(&self) -> bool {
         if self.status == 429 {
             return true;
         }

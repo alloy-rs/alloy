@@ -29,7 +29,7 @@ tracing.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
-
+tokio = { workspace = true, features = ["rt", "time"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "time"] }
 
