@@ -1,7 +1,7 @@
 use alloy_json_rpc::{ErrorPayload, Id, RpcError, RpcResult};
 use serde::Deserialize;
 use serde_json::value::RawValue;
-use std::{borrow::Borrow, error::Error as StdError, fmt::Debug};
+use std::{error::Error as StdError, fmt::Debug};
 use thiserror::Error;
 
 /// A transport error is an [`RpcError`] containing a [`TransportErrorKind`].
@@ -115,7 +115,7 @@ impl HttpError {
 }
 
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
-pub trait RpcErrorExt<E> {
+pub trait RpcErrorExt {
     /// Analyzes whether to retry the request depending on the error.
     fn is_retryable(&self) -> bool;
 
@@ -123,10 +123,7 @@ pub trait RpcErrorExt<E> {
     fn backoff_hint(&self) -> Option<std::time::Duration>;
 }
 
-impl<E> RpcErrorExt<E> for RpcError<TransportErrorKind, E>
-where
-    E: Borrow<serde_json::value::RawValue>,
-{
+impl RpcErrorExt for RpcError<TransportErrorKind> {
     fn is_retryable(&self) -> bool {
         match self {
             // There was a transport-level error. This is either a non-retryable error,
