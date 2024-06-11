@@ -23,6 +23,7 @@ pub use alloy_rpc_types_engine as engine;
 
 #[cfg(feature = "eth")]
 pub use alloy_rpc_types_eth as eth;
+#[cfg(feature = "eth")]
 pub use eth::*;
 
 #[cfg(feature = "trace")]
