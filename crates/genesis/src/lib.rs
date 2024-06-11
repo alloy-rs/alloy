@@ -12,7 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
-use alloy_primitives::{aliases::BlockTimestamp, Address, BlockNumber, Bytes, ChainId, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt};
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct Genesis {
     pub nonce: u64,
     /// The genesis header timestamp.
     #[serde(with = "alloy_serde::quantity")]
-    pub timestamp: BlockTimestamp,
+    pub timestamp: u64,
     /// The genesis header extra data.
     pub extra_data: Bytes,
     /// The genesis header gas limit.
@@ -60,7 +60,7 @@ pub struct Genesis {
     pub blob_gas_used: Option<u128>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub number: Option<BlockNumber>,
+    pub number: Option<u64>,
 }
 
 impl Genesis {
@@ -68,7 +68,7 @@ impl Genesis {
     /// and funds the given address with max coins.
     ///
     /// Enables all hard forks up to London at genesis.
-    pub fn clique_genesis(chain_id: ChainId, signer_addr: Address) -> Self {
+    pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
         // set up a clique config with an instant sealing period and short (8 block) epoch
         let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
 
@@ -262,7 +262,7 @@ impl GenesisAccount {
 pub struct ChainConfig {
     /// The network's chain ID.
     #[serde(default = "mainnet_id")]
-    pub chain_id: ChainId,
+    pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
     #[serde(
