@@ -172,40 +172,9 @@ pub struct HttpError {
 impl HttpError {
     /// Analyzes the `status` and `body` to determine whether the request should be retried.
     pub fn is_rate_limit_err(&self) -> bool {
-        // alchemy throws it this way
         if self.status == 429 {
             return true;
         }
-
-        // alternative alchemy error for specific IPs
-        if self.body.contains("rate limit") {
-            return true;
-        }
-
-        // quick node error `"credits limited to 6000/sec"`
-        // <https://github.com/foundry-rs/foundry/pull/6712#issuecomment-1951441240>
-        if self.body.contains("credits") {
-            return true;
-        }
-
-        // quick node rate limit error: `100/second request limit reached - reduce calls per second
-        // or upgrade your account at quicknode.com` <https://github.com/foundry-rs/foundry/issues/4894>
-        if self.body.contains("request limit reached") {
-            return true;
-        }
-
-        match self.body.as_str() {
-            // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
-            "header not found" => true,
-            // also thrown by infura if out of budget for the day and ratelimited
-            "daily request count exceeded, request rate limited" => true,
-            msg => {
-                msg.contains("rate limit")
-                    || msg.contains("rate exceeded")
-                    || msg.contains("too many requests")
-                    || msg.contains("credits limited")
-                    || msg.contains("request limit")
-            }
-        }
+        false
     }
 }
