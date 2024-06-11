@@ -37,7 +37,7 @@ use alloy_primitives::{hex, B256};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
 ///
-/// This behaves the same as [`hex::encode`](alloy_primitives::hex::encode).
+/// This behaves the same as [`hex::encode`].
 pub fn serialize_hex_string_no_prefix<S, T>(x: T, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
