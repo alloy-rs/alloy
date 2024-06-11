@@ -1,5 +1,5 @@
 use crate::{Eip658Value, ReceiptWithBloom, TxReceipt};
-use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
 
@@ -130,12 +130,12 @@ impl Encodable2718 for AnyReceiptEnvelope {
 }
 
 impl Decodable2718 for AnyReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         let receipt = Decodable::decode(buf)?;
         Ok(Self { inner: receipt, r#type: ty })
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Self::typed_decode(0, buf)
     }
 }

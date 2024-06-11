@@ -1,5 +1,5 @@
 use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
-use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
@@ -185,19 +185,17 @@ impl Encodable2718 for ReceiptEnvelope {
 }
 
 impl Decodable2718 for ReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         let receipt = Decodable::decode(buf)?;
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))? {
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
             TxType::Eip4844 => Ok(Self::Eip4844(receipt)),
-            TxType::Legacy => {
-                Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
-            }
+            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Ok(Self::Legacy(Decodable::decode(buf)?))
     }
 }
