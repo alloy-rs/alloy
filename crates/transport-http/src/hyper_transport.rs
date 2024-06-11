@@ -89,7 +89,7 @@ where
                 if status != hyper::StatusCode::OK {
                     return Err(TransportErrorKind::http_error(
                         status.as_u16(),
-                        String::from_utf8_lossy(&body).to_string(),
+                        String::from_utf8_lossy(&body).into_owned(),
                     ));
                 }
 

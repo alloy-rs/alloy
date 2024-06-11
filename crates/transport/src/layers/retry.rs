@@ -48,7 +48,8 @@ impl RetryBackoffLayer {
 
 /// [RateLimitRetryPolicy] implements [RetryPolicy] to determine whether to retry depending on the
 /// err.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
+#[non_exhaustive]
 pub struct RateLimitRetryPolicy;
 
 /// [RetryPolicy] defines logic for which [TransportError] instances should
