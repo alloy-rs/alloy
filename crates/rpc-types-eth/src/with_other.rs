@@ -1,3 +1,5 @@
+//! Wrapper allowing to catch all fields missing while deserialize.
+
 use crate::{other::OtherFields, TransactionRequest};
 use alloy_consensus::{TxEnvelope, TypedTransaction};
 use serde::{Deserialize, Serialize};
@@ -6,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 
 /// Wrapper allowing to catch all fields missing on the inner struct while
 /// deserialize.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct WithOtherFields<T> {
     /// The inner struct.
     #[serde(flatten)]
@@ -20,6 +22,17 @@ impl<T> WithOtherFields<T> {
     /// Create a new `Extra`.
     pub fn new(inner: T) -> Self {
         Self { inner, other: Default::default() }
+    }
+}
+
+impl<T> WithOtherFields<T>
+where
+    T: Into<TransactionRequest>,
+{
+    /// Convert a generic type `WithOtherFields<T>` to a `WithOtherFields<TransactionRequest>`
+    #[doc(alias = "into_tx_request")]
+    pub fn into_transaction_request(self) -> WithOtherFields<TransactionRequest> {
+        WithOtherFields::new(self.inner.into())
     }
 }
 

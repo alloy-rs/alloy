@@ -1,6 +1,8 @@
-use crate::Http;
+use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
+use alloy_transport::{
+    utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
+};
 use std::task;
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
@@ -11,6 +13,23 @@ pub use reqwest::Client;
 
 /// An [`Http`] transport using [`reqwest`].
 pub type ReqwestTransport = Http<Client>;
+
+/// Connection details for a [`ReqwestTransport`].
+pub type ReqwestConnect = HttpConnect<ReqwestTransport>;
+
+impl TransportConnect for ReqwestConnect {
+    type Transport = ReqwestTransport;
+
+    fn is_local(&self) -> bool {
+        guess_local_url(self.url.as_str())
+    }
+
+    fn get_transport<'a: 'b, 'b>(
+        &'a self,
+    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
+        Box::pin(async move { Ok(Http::with_client(Client::new(), self.url.clone())) })
+    }
+}
 
 impl Http<Client> {
     /// Create a new [`Http`] transport.
@@ -50,7 +69,7 @@ impl Http<Client> {
                     )));
                 }
 
-                // Deser a Box<RawValue> from the body. If deser fails, return
+                // Deserialize a Box<RawValue> from the body. If deserialization fails, return
                 // the body as a string in the error. The conversion to String
                 // is lossy and may not cover all the bytes in the body.
                 serde_json::from_slice(&body)

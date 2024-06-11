@@ -9,7 +9,7 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::Address;
+use alloy_primitives::{Address, B256, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -36,6 +36,29 @@ pub trait ReceiptResponse {
     fn contract_address(&self) -> Option<Address>;
 }
 
+/// Transaction Response
+///
+/// This is distinct from [`Transaction`], since this is a JSON-RPC response.
+///
+/// [`Transaction`]: alloy_consensus::Transaction
+pub trait TransactionResponse {
+    /// Hash of the transaction
+    #[doc(alias = "transaction_hash")]
+    fn tx_hash(&self) -> B256;
+
+    /// Sender of the transaction
+    fn from(&self) -> Address;
+
+    /// Recipient of the transaction
+    fn to(&self) -> Option<Address>;
+
+    /// Transferred value
+    fn value(&self) -> U256;
+
+    /// Gas limit
+    fn gas(&self) -> u128;
+}
+
 /// Captures type info for network-specific RPC requests/responses.
 ///
 /// Networks are only containers for types, so it is recommended to use ZSTs for their definition.
@@ -48,6 +71,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     ///
     /// This should be a simple `#[repr(u8)]` enum, and as such has strict type
     /// bounds for better use in error messages, assertions etc.
+    #[doc(alias = "TransactionType")]
     type TxType: Into<u8>
         + PartialEq
         + Eq
@@ -61,12 +85,15 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + 'static;
 
     /// The network transaction envelope type.
+    #[doc(alias = "TransactionEnvelope")]
     type TxEnvelope: Eip2718Envelope + Debug;
 
     /// An enum over the various transaction types.
+    #[doc(alias = "UnsignedTransaction")]
     type UnsignedTx: From<Self::TxEnvelope>;
 
     /// The network receipt envelope type.
+    #[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
     type ReceiptEnvelope: Eip2718Envelope + TxReceipt;
 
     /// The network header type.
@@ -75,6 +102,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     // -- JSON RPC types --
 
     /// The JSON body of a transaction request.
+    #[doc(alias = "TxRequest")]
     type TransactionRequest: RpcObject
         + TransactionBuilder<Self>
         + Debug
@@ -82,9 +110,11 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
         + From<Self::UnsignedTx>;
 
     /// The JSON body of a transaction response.
-    type TransactionResponse: RpcObject;
+    #[doc(alias = "TxResponse")]
+    type TransactionResponse: RpcObject + TransactionResponse;
 
     /// The JSON body of a transaction receipt.
+    #[doc(alias = "TransactionReceiptResponse", alias = "TxReceiptResponse")]
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.

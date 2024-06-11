@@ -3,6 +3,11 @@
 mod admin;
 pub use admin::AdminApi;
 
+#[cfg(feature = "anvil-api")]
+mod anvil;
+#[cfg(feature = "anvil-api")]
+pub use anvil::AnvilApi;
+
 #[cfg(feature = "engine-api")]
 mod engine;
 #[cfg(feature = "engine-api")]
@@ -10,6 +15,9 @@ pub use engine::EngineApi;
 
 mod debug;
 pub use debug::DebugApi;
+
+mod trace;
+pub use trace::{TraceApi, TraceCallList};
 
 mod txpool;
 pub use txpool::TxPoolApi;

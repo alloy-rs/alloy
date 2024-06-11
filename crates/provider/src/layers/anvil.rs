@@ -26,6 +26,7 @@ impl AnvilLayer {
     }
 
     /// Get the instance http endpoint.
+    #[doc(alias = "http_endpoint_url")]
     pub fn endpoint_url(&self) -> Url {
         self.instance().endpoint_url()
     }

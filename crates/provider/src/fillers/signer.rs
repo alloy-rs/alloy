@@ -15,7 +15,7 @@ use super::{FillerControlFlow, TxFiller};
 ///
 /// ```
 /// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
-/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
@@ -68,6 +68,14 @@ where
         }
     }
 
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        if let Some(builder) = tx.as_mut_builder() {
+            if builder.from().is_none() {
+                builder.set_from(self.signer.default_signer_address());
+            }
+        }
+    }
+
     async fn prepare<P, T>(
         &self,
         _provider: &P,
@@ -85,17 +93,10 @@ where
         _fillable: Self::Fillable,
         tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        let mut builder = match tx {
+        let builder = match tx {
             SendableTx::Builder(builder) => builder,
             _ => return Ok(tx),
         };
-
-        if builder.from().is_none() {
-            builder.set_from(self.signer.default_signer_address());
-            if !builder.can_build() {
-                return Ok(SendableTx::Builder(builder));
-            }
-        }
 
         let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
 
@@ -108,7 +109,7 @@ where
 mod tests {
     use crate::{Provider, ProviderBuilder};
     use alloy_primitives::{address, b256, U256};
-    use alloy_rpc_types::TransactionRequest;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn poc() {

@@ -1,11 +1,11 @@
-//! This modules extends the Ethereum JSON-RPC provider with the Txpool namespace available in geth.
+//! This modules extends the Ethereum JSON-RPC provider with the `txpool` namespace.
 use crate::Provider;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::Address;
-use alloy_rpc_types::txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, TxpoolStatus};
+use alloy_rpc_types_eth::txpool::{TxpoolContent, TxpoolContentFrom, TxpoolInspect, TxpoolStatus};
 use alloy_transport::{Transport, TransportResult};
 
-/// Geth only Txpool namespace rpc interface.
+/// Txpool namespace rpc interface.
 #[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]

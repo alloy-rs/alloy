@@ -19,8 +19,10 @@ pub struct BlockOpcodeGas {
 /// Opcode gas usage for a transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxOpcodeGas")]
 pub struct TransactionOpcodeGas {
     /// The transaction hash
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
     /// The gas used by each opcode in the transaction
     pub opcode_gas: Vec<OpcodeGas>,

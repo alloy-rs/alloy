@@ -1,4 +1,4 @@
-use crate::{eth::log::Log as RpcLog, BlockNumberOrTag, Transaction};
+use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
 use alloy_primitives::{keccak256, Address, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
 use serde::{
@@ -7,7 +7,10 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::{
-    collections::HashSet,
+    collections::{
+        hash_set::{IntoIter, Iter},
+        HashSet,
+    },
     hash::Hash,
     ops::{Range, RangeFrom, RangeTo},
 };
@@ -25,7 +28,7 @@ impl From<Vec<Bloom>> for BloomFilter {
 impl BloomFilter {
     /// Returns whether the given bloom matches the list of Blooms in the current filter.
     /// If the filter is empty (the list is empty), then any bloom matches
-    /// Otherwise, there must be at least one matche for the BloomFilter to match.
+    /// Otherwise, there must be at least one match for the BloomFilter to match.
     pub fn matches(&self, bloom: Bloom) -> bool {
         self.0.is_empty() || self.0.iter().any(|a| bloom.contains(a))
     }
@@ -84,6 +87,21 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
     }
 }
 
+impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T: Eq + Hash> FromIterator<T> for FilterSet<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(HashSet::from_iter(iter))
+    }
+}
+
 impl<T: Eq + Hash> FilterSet<T> {
     /// Returns whether the filter is empty
     pub fn is_empty(&self) -> bool {
@@ -94,6 +112,12 @@ impl<T: Eq + Hash> FilterSet<T> {
     /// any value matches. Otherwise, the filter must include the value
     pub fn matches(&self, value: &T) -> bool {
         self.is_empty() || self.0.contains(value)
+    }
+
+    /// Returns an iterator over the underlying HashSet. Values are visited
+    /// in an arbitrary order.
+    pub fn iter(&self) -> Iter<'_, T> {
+        self.0.iter()
     }
 }
 
@@ -243,6 +267,7 @@ impl FilterBlockOption {
 
     /// Pins the block hash this filter should target.
     #[must_use]
+    #[doc(alias = "set_block_hash")]
     pub const fn set_hash(&self, hash: B256) -> Self {
         Self::AtBlockHash(hash)
     }
@@ -275,7 +300,7 @@ impl Filter {
     /// Match only a specific block
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(69u64);
     /// # }
@@ -285,8 +310,8 @@ impl Filter {
     /// Match the latest block only
     ///
     /// ```rust
-    /// # use alloy_rpc_types::BlockNumberOrTag;
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::BlockNumberOrTag;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(BlockNumberOrTag::Latest);
     /// # }
@@ -296,7 +321,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::B256;
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(B256::ZERO);
     /// # }
@@ -306,7 +331,7 @@ impl Filter {
     /// Match a range of blocks
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(0u64..100u64);
     /// # }
@@ -315,7 +340,7 @@ impl Filter {
     /// Match all blocks in range `(1337..BlockNumberOrTag::Latest)`
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(1337u64..);
     /// # }
@@ -324,7 +349,7 @@ impl Filter {
     /// Match all blocks in range `(BlockNumberOrTag::Earliest..1337)`
     ///
     /// ```rust
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new().select(..1337u64);
     /// # }
@@ -372,7 +397,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::Address;
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let filter = Filter::new()
     ///     .address("0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap());
@@ -384,7 +409,7 @@ impl Filter {
     ///
     /// ```rust
     /// # use alloy_primitives::Address;
-    /// # use alloy_rpc_types::Filter;
+    /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
     /// let addresses = vec![
     ///     "0xAc4b3DacB91461209Ae9d41EC517c2B9Cb1B7DAF".parse::<Address>().unwrap(),

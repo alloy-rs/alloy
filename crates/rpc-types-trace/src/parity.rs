@@ -61,6 +61,7 @@ pub struct TraceResultsWithTransactionHash {
     #[serde(flatten)]
     pub full_trace: TraceResults,
     /// Hash of the traced transaction.
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
 }
 
@@ -172,6 +173,12 @@ pub enum Action {
     Reward(RewardAction),
 }
 
+impl Default for Action {
+    fn default() -> Self {
+        Self::Call(CallAction::default())
+    }
+}
+
 impl Action {
     /// Returns true if this is a call action
     pub const fn is_call(&self) -> bool {
@@ -240,7 +247,7 @@ pub enum CallType {
 }
 
 /// Represents a certain [CallType] of a _call_ or message transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CallAction {
     /// Address of the sending account.
@@ -358,8 +365,9 @@ impl TraceOutput {
 }
 
 /// A parity style trace of a transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxTrace")]
 pub struct TransactionTrace {
     /// Represents what kind of trace this is
     #[serde(flatten)]
@@ -381,6 +389,7 @@ pub struct TransactionTrace {
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "LocalizedTxTrace")]
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
@@ -394,8 +403,10 @@ pub struct LocalizedTransactionTrace {
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
     pub block_number: Option<u64>,
     /// Hash of the transaction
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<B256>,
     /// Transaction index within the block, None if pending.
+    #[doc(alias = "tx_position")]
     pub transaction_position: Option<u64>,
 }
 

@@ -1,6 +1,6 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-#![allow(unknown_lints, non_local_definitions)]
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, BlockNumber, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
@@ -36,6 +36,7 @@ pub struct RpcBlockHash {
 
 impl RpcBlockHash {
     /// Returns an [RpcBlockHash] from a [B256].
+    #[doc(alias = "from_block_hash")]
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
         Self { block_hash, require_canonical }
     }
@@ -721,7 +722,9 @@ impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        #[cfg(not(feature = "std"))]
         use alloc::string::ToString;
+
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
             Err(parse_int_error) => match B256::from_str(s) {
@@ -736,7 +739,7 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 

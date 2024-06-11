@@ -20,9 +20,11 @@ pub use gas::GasFiller;
 
 mod join_fill;
 pub use join_fill::JoinFill;
+use tracing::error;
 
 use crate::{
-    provider::SendableTx, PendingTransactionBuilder, Provider, ProviderLayer, RootProvider,
+    provider::SendableTx, Identity, PendingTransactionBuilder, Provider, ProviderLayer,
+    RootProvider,
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Ethereum, Network};
@@ -30,6 +32,11 @@ use alloy_transport::{Transport, TransportResult};
 use async_trait::async_trait;
 use futures_utils_wasm::impl_future;
 use std::marker::PhantomData;
+
+/// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
+/// management, and chain-id fetching.
+pub type RecommendedFiller =
+    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -121,6 +128,7 @@ impl FillerControlFlow {
 /// [`TxFiller::status`] should return [`FillerControlFlow::Ready`].
 /// - **Finished**: The filler has filled in all properties that it can fill.
 /// [`TxFiller::status`] should return [`FillerControlFlow::Finished`].
+#[doc(alias = "TransactionFiller")]
 pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug {
     /// The properties that this filler retrieves from the RPC. to fill in the
     /// TransactionRequest.
@@ -139,7 +147,7 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     /// properties.
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow;
 
-    /// Returns `true` if the filler is should continnue filling.
+    /// Returns `true` if the filler is should continue filling.
     fn continue_filling(&self, tx: &SendableTx<N>) -> bool {
         tx.as_builder().map(|tx| self.status(tx).is_ready()).unwrap_or_default()
     }
@@ -153,6 +161,11 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     fn finished(&self, tx: &N::TransactionRequest) -> bool {
         self.status(tx).is_finished()
     }
+
+    /// Performs any synchronous filling. This should be called before
+    /// [`TxFiller::prepare`] and [`TxFiller::fill`] to fill in any properties
+    /// that can be filled synchronously.
+    fn fill_sync(&self, tx: &mut SendableTx<N>);
 
     /// Prepares fillable properties, potentially by making an RPC request.
     fn prepare<P, T>(
@@ -238,12 +251,29 @@ where
         self.filler.join_with(other).layer(self.inner)
     }
 
+    async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+        let mut count = 0;
+
+        while self.filler.continue_filling(&tx) {
+            self.filler.fill_sync(&mut tx);
+            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
+
+            count += 1;
+            if count >= 20 {
+                const ERROR: &str = "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing this message.";
+                error!(
+                    ?tx, ?self.filler,
+                    ERROR
+                );
+                panic!("{}, {:?}, {:?}", ERROR, &tx, &self.filler);
+            }
+        }
+        Ok(tx)
+    }
+
     /// Fills the transaction request, using the configured fillers
-    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>>
-    where
-        N::TxEnvelope: Clone,
-    {
-        self.filler.prepare_and_fill(self, SendableTx::Builder(tx)).await
+    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
+        self.fill_inner(SendableTx::Builder(tx)).await
     }
 }
 
@@ -264,18 +294,7 @@ where
         &self,
         mut tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        let mut count = 0;
-
-        while self.filler.continue_filling(&tx) {
-            tx = self.filler.prepare_and_fill(&self.inner, tx).await?;
-
-            count += 1;
-            if count >= 20 {
-                panic!(
-                    "Tx filler loop detected. This indicates a bug in some filler implementation. Please file an issue containing your tx filler set."
-                );
-            }
-        }
+        tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
             if let FillerControlFlow::Missing(missing) = self.filler.status(builder) {

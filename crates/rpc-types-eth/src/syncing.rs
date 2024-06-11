@@ -145,6 +145,7 @@ impl Serialize for SyncStatus {
 /// Propagation statistics for pending transaction.
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxStats")]
 pub struct TransactionStats {
     /// Block no this transaction was first seen.
     pub first_seen: u64,

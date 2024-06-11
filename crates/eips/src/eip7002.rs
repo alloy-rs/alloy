@@ -2,7 +2,7 @@
 //!
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
-#![allow(unknown_lints, non_local_definitions)]
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
@@ -37,6 +37,6 @@ pub struct WithdrawalRequest {
     /// Validator public key.
     pub validator_public_key: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,
 }

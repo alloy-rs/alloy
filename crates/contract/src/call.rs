@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
+use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -129,6 +129,12 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     pub provider: P,
     decoder: D,
     transport: PhantomData<T>,
+}
+
+impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+    fn as_ref(&self) -> &N::TransactionRequest {
+        &self.request
+    }
 }
 
 // See [`ContractInstance`].
@@ -406,7 +412,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request).block_id(self.block).await.map_err(Into::into)
+        self.provider.estimate_gas(&self.request).block(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -540,7 +546,7 @@ mod tests {
     use alloy_provider::{
         layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
     };
-    use alloy_rpc_types::AccessListItem;
+    use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
@@ -712,7 +718,7 @@ mod tests {
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
         let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert!(result._0);
+        assert!(result.myState);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(

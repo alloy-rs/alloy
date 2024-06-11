@@ -101,6 +101,7 @@ impl alloy_network::TxSigner<Signature> for AwsSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,

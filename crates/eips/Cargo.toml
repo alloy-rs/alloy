@@ -15,14 +15,14 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
-alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
 alloy-serde.workspace = true
 
-sha2 = { workspace = true, default-features = false }
+sha2.workspace = true
 
 # serde
-serde = { workspace = true, default-features = false, optional = true }
+serde = { workspace = true, optional = true }
 
 # kzg
 derive_more = { workspace = true, optional = true }
@@ -39,16 +39,37 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "serde",
+    "arbitrary",
+] }
 arbitrary = { workspace = true, features = ["derive"] }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
+proptest.workspace = true
+proptest-derive.workspace = true
 serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std", "c-kzg?/std", "once_cell?/std"]
+std = [
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+    "serde?/std",
+    "c-kzg?/std",
+    "once_cell?/std",
+]
 serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
 kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
-arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+ssz = [
+    "std",
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+]
+arbitrary = [
+    "std",
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+]

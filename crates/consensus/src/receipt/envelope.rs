@@ -6,7 +6,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol merkle tree may commit to EITHER 0-prefixed or raw. Therefore
+/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
 /// we must ensure that encoding returns the precise byte-array that was
 /// decoded, preserving the presence or absence of the `TransactionType` flag.
 ///
@@ -17,6 +17,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
+#[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
@@ -40,6 +41,7 @@ pub enum ReceiptEnvelope<T = Log> {
 
 impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
@@ -56,7 +58,7 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns the success status of the receipt's transaction.
     pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
@@ -94,8 +96,12 @@ impl<T> ReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
+    fn status_or_post_state(&self) -> &crate::Eip658Value {
+        &self.as_receipt().unwrap().status
+    }
+
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Return the receipt's bloom.

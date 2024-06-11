@@ -1,6 +1,8 @@
-use crate::Http;
+use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
-use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
+use alloy_transport::{
+    utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
+};
 use http_body_util::{BodyExt, Full};
 use hyper::{
     body::{Buf, Bytes},
@@ -19,6 +21,27 @@ pub type HyperClient = hyper_util::client::legacy::Client<
 
 /// An [`Http`] transport using [`hyper`].
 pub type HyperTransport = Http<HyperClient>;
+
+/// Connection details for a [`HyperTransport`].
+pub type HyperConnect = HttpConnect<HyperTransport>;
+
+impl TransportConnect for HyperConnect {
+    type Transport = HyperTransport;
+
+    fn is_local(&self) -> bool {
+        guess_local_url(self.url.as_str())
+    }
+
+    fn get_transport<'a: 'b, 'b>(
+        &'a self,
+    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
+        let executor = hyper_util::rt::TokioExecutor::new();
+
+        let client = hyper_util::client::legacy::Client::builder(executor).build_http();
+
+        Box::pin(async move { Ok(Http::with_client(client, self.url.clone())) })
+    }
+}
 
 impl<C, B> Http<Client<C, Full<B>>>
 where
@@ -70,7 +93,7 @@ where
                     )));
                 }
 
-                // Deser a Box<RawValue> from the body. If deser fails, return
+                // Deserialize a Box<RawValue> from the body. If deserialization fails, return
                 // the body as a string in the error. The conversion to String
                 // is lossy and may not cover all the bytes in the body.
                 serde_json::from_slice(&body).map_err(|err| {

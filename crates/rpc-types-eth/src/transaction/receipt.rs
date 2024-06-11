@@ -1,3 +1,5 @@
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use crate::{Log, WithOtherFields};
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
 use alloy_primitives::{Address, B256};
@@ -13,44 +15,39 @@ use serde::{Deserialize, Serialize};
     derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
 )]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The receipt envelope, which contains the consensus receipt data..
     #[serde(flatten)]
     pub inner: T,
     /// Transaction Hash.
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
     /// Index within the block.
-    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity::opt")]
+    #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Hash of the block this transaction was included within.
     #[serde(default)]
     pub block_hash: Option<B256>,
     /// Number of the block this transaction was included within.
-    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity::opt")]
     pub block_number: Option<u64>,
     /// Gas used by this transaction alone.
-    #[serde(with = "alloy_serde::u128_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u128,
     /// The price paid post-execution by the transaction (i.e. base fee + priority fee). Both
     /// fields in 1559-style transactions are maximums (max fee + max priority fee), the amount
     /// that's actually paid by users can only be determined post-execution
-    #[serde(with = "alloy_serde::u128_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub effective_gas_price: u128,
     /// Blob gas used by the eip-4844 transaction
     ///
     /// This is None for non eip-4844 transactions
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::u128_opt_via_ruint",
-        default
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub blob_gas_used: Option<u128>,
     /// The price paid by the eip-4844 transaction per blob gas.
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::u128_opt_via_ruint",
-        default
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub blob_gas_price: Option<u128>,
     /// Address of the sender
     pub from: Address,
@@ -78,12 +75,13 @@ impl TransactionReceipt {
             ReceiptEnvelope::Eip1559(receipt)
             | ReceiptEnvelope::Eip2930(receipt)
             | ReceiptEnvelope::Eip4844(receipt)
-            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status,
+            | ReceiptEnvelope::Legacy(receipt) => receipt.receipt.status.coerce_status(),
             _ => false,
         }
     }
 
     /// Returns the transaction type.
+    #[doc(alias = "tx_type")]
     pub const fn transaction_type(&self) -> TxType {
         self.inner.tx_type()
     }
@@ -125,12 +123,14 @@ impl<T> TransactionReceipt<T> {
 }
 
 /// Alias for a catch-all receipt type.
+#[doc(alias = "AnyTxReceipt")]
 pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloy_consensus::{Receipt, ReceiptWithBloom};
+    use crate::TransactionReceipt;
+    use alloy_consensus::{Eip658Value, Receipt, ReceiptWithBloom};
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;
     use rand::Rng;
@@ -160,7 +160,11 @@ mod test {
         assert!(matches!(
             receipt.inner,
             ReceiptEnvelope::Eip1559(ReceiptWithBloom {
-                receipt: Receipt { status: true, cumulative_gas_used: EXPECTED_CGU, .. },
+                receipt: Receipt {
+                    status: Eip658Value::Eip658(true),
+                    cumulative_gas_used: EXPECTED_CGU,
+                    ..
+                },
                 logs_bloom: EXPECTED_BLOOM
             })
         ));

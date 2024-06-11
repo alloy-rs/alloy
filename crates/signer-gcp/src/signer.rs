@@ -153,6 +153,7 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -274,7 +275,7 @@ fn decode_signature(raw: Vec<u8>) -> Result<ecdsa::Signature, GcpSignerError> {
     Ok(sig.normalize_s().unwrap_or(sig))
 }
 
-/// Recover an rsig from a signature under a known key by trial/error.
+/// Recover an RSig from a signature under a known key by trial/error.
 fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,

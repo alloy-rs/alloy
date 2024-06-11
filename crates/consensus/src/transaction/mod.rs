@@ -34,6 +34,7 @@ mod typed;
 pub use typed::TypedTransaction;
 
 /// Represents a minimal EVM transaction.
+#[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `data`.
     fn input(&self) -> &[u8];
@@ -63,6 +64,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 /// [`alloy_primitives::Signature`], however, it may be different for future EIP-2718 transaction
 /// types, or in other networks. For example, in Optimism, the deposit transaction signature is the
 /// unit type `()`.
+#[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
     /// True if the transaction uses EIP-155 signatures.
     fn use_eip155(&self) -> bool {

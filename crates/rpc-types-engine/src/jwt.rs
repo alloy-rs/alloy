@@ -109,12 +109,12 @@ pub struct Claims {
 
 impl Claims {
     /// Creates a new instance of [`Claims`] with the current timestamp as the `iat` claim.
-    fn with_current_timestamp() -> Self {
+    pub fn with_current_timestamp() -> Self {
         Self { iat: get_current_timestamp(), exp: None }
     }
 
     /// Checks if the `iat` claim is within the allowed range from the current time.
-    fn is_within_time_window(&self) -> bool {
+    pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
     }

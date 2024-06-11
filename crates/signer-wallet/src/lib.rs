@@ -65,7 +65,7 @@ pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// let signature = wallet.sign_message_sync(message)?;
 /// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), wallet.address());
 ///
-/// // LocalWallet is clonable:
+/// // LocalWallet is cloneable:
 /// let wallet_clone = wallet.clone();
 /// let signature2 = wallet_clone.sign_message_sync(message)?;
 /// assert_eq!(signature, signature2);
@@ -170,6 +170,7 @@ where
         self.address
     }
 
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -186,6 +187,7 @@ where
         self.address
     }
 
+    #[doc(alias = "sign_tx_sync")]
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,

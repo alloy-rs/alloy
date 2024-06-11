@@ -16,46 +16,43 @@ workspace = true
 
 [dependencies]
 # core
-alloy-core = { workspace = true, default-features = false }
+alloy-core.workspace = true
 
 # alloy
-alloy-consensus = { workspace = true, default-features = false, optional = true }
-alloy-contract = { workspace = true, default-features = false, optional = true }
-alloy-eips = { workspace = true, default-features = false, optional = true }
-alloy-genesis = { workspace = true, default-features = false, optional = true }
-alloy-network = { workspace = true, default-features = false, optional = true }
-alloy-node-bindings = { workspace = true, default-features = false, optional = true }
+alloy-consensus = { workspace = true, optional = true }
+alloy-contract = { workspace = true, optional = true }
+alloy-eips = { workspace = true, optional = true }
+alloy-genesis = { workspace = true, optional = true }
+alloy-network = { workspace = true, optional = true }
+alloy-node-bindings = { workspace = true, optional = true }
 
 # providers
-alloy-provider = { workspace = true, default-features = false, optional = true }
+alloy-provider = { workspace = true, optional = true }
 
 # pubsub
-alloy-pubsub = { workspace = true, default-features = false, optional = true }
+alloy-pubsub = { workspace = true, optional = true }
 
 # rpc
-alloy-json-rpc = { workspace = true, default-features = false, optional = true }
-alloy-rpc-client = { workspace = true, default-features = false, optional = true }
-alloy-rpc-types-beacon = { workspace = true, default-features = false, optional = true }
-alloy-rpc-types-engine = { workspace = true, default-features = false, optional = true }
-alloy-rpc-types-trace = { workspace = true, default-features = false, optional = true }
-alloy-rpc-types = { workspace = true, default-features = false, optional = true }
+alloy-json-rpc = { workspace = true, optional = true }
+alloy-rpc-client = { workspace = true, optional = true }
+alloy-rpc-types = { workspace = true, optional = true }
 
 # serde
-alloy-serde = { workspace = true, default-features = false, optional = true }
+alloy-serde = { workspace = true, optional = true }
 
 # signer
-alloy-signer = { workspace = true, default-features = false, optional = true }
-alloy-signer-aws = { workspace = true, default-features = false, optional = true }
-alloy-signer-gcp = { workspace = true, default-features = false, optional = true }
-alloy-signer-ledger = { workspace = true, default-features = false, optional = true }
-alloy-signer-trezor = { workspace = true, default-features = false, optional = true }
-alloy-signer-wallet = { workspace = true, default-features = false, optional = true }
+alloy-signer = { workspace = true, optional = true }
+alloy-signer-aws = { workspace = true, optional = true }
+alloy-signer-gcp = { workspace = true, optional = true }
+alloy-signer-ledger = { workspace = true, optional = true }
+alloy-signer-trezor = { workspace = true, optional = true }
+alloy-signer-wallet = { workspace = true, optional = true }
 
 # transport
-alloy-transport = { workspace = true, default-features = false, optional = true }
-alloy-transport-http = { workspace = true, default-features = false, optional = true }
-alloy-transport-ipc = { workspace = true, default-features = false, optional = true }
-alloy-transport-ws = { workspace = true, default-features = false, optional = true }
+alloy-transport = { workspace = true, optional = true }
+alloy-transport-http = { workspace = true, optional = true }
+alloy-transport-ipc = { workspace = true, optional = true }
+alloy-transport-ws = { workspace = true, optional = true }
 
 # optional
 reqwest = { workspace = true, optional = true }
@@ -98,7 +95,7 @@ contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
 eips = ["dep:alloy-eips"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
-node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil"]
+node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
 providers = ["dep:alloy-provider"]
@@ -120,15 +117,13 @@ json-rpc = ["rpc", "dep:alloy-json-rpc"]
 rpc-client = ["rpc", "dep:alloy-rpc-client"]
 rpc-client-ws = ["rpc", "alloy-rpc-client?/ws"]
 rpc-client-ipc = ["rpc", "alloy-rpc-client?/ipc"]
-rpc-types = ["rpc"]
-rpc-types-eth = ["rpc-types", "dep:alloy-rpc-types"]
-rpc-types-beacon = ["rpc-types", "dep:alloy-rpc-types-beacon"]
-rpc-types-engine = ["rpc-types", "dep:alloy-rpc-types-engine"]
-rpc-types-json = [
-    "alloy-rpc-types?/jsonrpsee-types",
-    "alloy-rpc-types-engine?/jsonrpsee-types",
-]
-rpc-types-trace = ["rpc-types", "dep:alloy-rpc-types-trace"]
+rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
+rpc-types-anvil = ["rpc-types", "alloy-rpc-types?/anvil"]
+rpc-types-beacon = ["rpc-types", "alloy-rpc-types?/beacon"]
+rpc-types-engine = ["rpc-types", "alloy-rpc-types?/engine"]
+rpc-types-eth = ["rpc-types", "alloy-rpc-types?/eth"]
+rpc-types-json = ["rpc-types", "alloy-rpc-types?/jsonrpsee-types"]
+rpc-types-trace = ["rpc-types", "alloy-rpc-types?/trace"]
 
 # signers
 signers = ["dep:alloy-signer"]
@@ -170,15 +165,20 @@ getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "alloy-serde"]
-ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz", "alloy-rpc-types-engine?/ssz"]
+ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
     "alloy-consensus?/arbitrary",
     "alloy-eips?/arbitrary",
     "alloy-rpc-types?/arbitrary",
 ]
-k256 = ["alloy-core/k256", "alloy-consensus?/k256", "alloy-network?/k256"]
-kzg = ["alloy-consensus?/kzg"]
+k256 = [
+    "alloy-core/k256",
+    "alloy-consensus?/k256",
+    "alloy-network?/k256",
+    "alloy-rpc-types?/k256",
+]
+kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",

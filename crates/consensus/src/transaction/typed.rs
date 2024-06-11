@@ -14,6 +14,7 @@ use alloy_primitives::TxKind;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[doc(alias = "TypedTx", alias = "TxTyped", alias = "TransactionTyped")]
 pub enum TypedTransaction {
     /// Legacy transaction
     #[cfg_attr(feature = "serde", serde(rename = "0x00", alias = "0x0"))]
@@ -78,6 +79,7 @@ impl From<TxEnvelope> for TypedTransaction {
 
 impl TypedTransaction {
     /// Return the [`TxType`] of the inner txn.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,

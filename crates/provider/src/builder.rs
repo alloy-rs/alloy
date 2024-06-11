@@ -1,6 +1,7 @@
 use crate::{
     fillers::{
-        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, SignerFiller, TxFiller,
+        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
+        SignerFiller, TxFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -10,10 +11,6 @@ use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
-
-/// The recommended filler.
-type RecommendFiller =
-    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
@@ -39,6 +36,8 @@ where
     fn status(&self, _tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
         FillerControlFlow::Finished
     }
+
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
 
     async fn prepare<P, T>(
         &self,
@@ -130,7 +129,7 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
-    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendFiller, N> {
+    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendedFiller, N> {
         self.filler(GasFiller).filler(NonceFiller::default()).filler(ChainIdFiller::default())
     }
 
@@ -348,7 +347,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
 // Enabled when the `anvil` feature is enabled, or when both in test and the
 // `reqwest` feature is enabled.
-#[cfg(any(test, feature = "anvil"))]
+#[cfg(any(test, feature = "anvil-node"))]
 impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// Build this provider with anvil, using an Reqwest HTTP transport.
     pub fn on_anvil(self) -> F::Provider

@@ -11,7 +11,7 @@ use tower::Service;
 /// with different transport types.
 ///
 /// Most higher-level types will be generic over `T: Transport = BoxTransport`.
-/// This allows paramterization with a concrete type, while hiding this
+/// This allows parameterization with a concrete type, while hiding this
 /// complexity from the library consumer.
 ///
 /// [`RpcClient`]: crate::client::RpcClient

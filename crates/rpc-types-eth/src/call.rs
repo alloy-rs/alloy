@@ -21,6 +21,7 @@ pub struct StateContext {
     pub block_number: Option<BlockId>,
     /// Inclusive number of tx to replay in block. -1 means replay all
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[doc(alias = "tx_index")]
     pub transaction_index: Option<TransactionIndex>,
 }
 

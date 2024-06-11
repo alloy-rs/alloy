@@ -8,7 +8,7 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_rpc_types::BlockNumberOrTag;
+use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
@@ -50,7 +50,7 @@ pub enum GasFillable {
 ///
 /// ```
 /// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
-/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
@@ -197,6 +197,8 @@ impl<N: Network> TxFiller<N> for GasFiller {
         FillerControlFlow::Ready
     }
 
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
     async fn prepare<P, T>(
         &self,
         provider: &P,
@@ -254,7 +256,7 @@ mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types::TransactionRequest;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
@@ -273,7 +275,7 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        assert_eq!(tx.effective_gas_price, 0x3b9aca00);
+        assert_eq!(tx.effective_gas_price, 0x3b9aca01);
         assert_eq!(tx.gas_used, 0x5208);
     }
 

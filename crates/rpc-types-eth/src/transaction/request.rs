@@ -1,6 +1,6 @@
 //! Alloy basic Transaction Request type.
 
-use crate::{eth::transaction::AccessList, BlobTransactionSidecar, Transaction};
+use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
     TxType, TypedTransaction,
@@ -12,6 +12,7 @@ use std::hash::Hash;
 /// Represents _all_ transaction requests to/from RPC.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxRequest")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -20,39 +21,19 @@ pub struct TransactionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<TxKind>,
     /// The legacy gas price.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub gas_price: Option<u128>,
     /// The max base fee per gas the sender is willing to pay.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub max_fee_per_gas: Option<u128>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u128_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,18 +42,10 @@ pub struct TransactionRequest {
     #[serde(default, flatten)]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u64_opt_via_ruint"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -82,8 +55,9 @@ pub struct TransactionRequest {
         default,
         rename = "type",
         skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::num::u8_opt_via_ruint"
+        with = "alloy_serde::quantity::opt"
     )]
+    #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -102,6 +76,7 @@ impl TransactionRequest {
     }
 
     /// Sets the transactions type for the transactions.
+    #[doc(alias = "tx_type")]
     pub const fn transaction_type(mut self, transaction_type: u8) -> Self {
         self.transaction_type = Some(transaction_type);
         self
@@ -512,6 +487,7 @@ impl TransactionRequest {
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[doc(alias = "TxInput")]
 pub struct TransactionInput {
     /// Transaction data
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -789,6 +765,7 @@ impl From<TxEnvelope> for TransactionRequest {
 /// Error thrown when both `data` and `input` fields are set and not equal.
 #[derive(Debug, Default, thiserror::Error)]
 #[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
 

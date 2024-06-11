@@ -4,6 +4,8 @@
 //!
 //! Provides validator deposits as a list of deposit operations added to the Execution Layer block.
 
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use alloy_primitives::{address, Address, FixedBytes, B256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -26,11 +28,11 @@ pub struct DepositRequest {
     /// Withdrawal credentials
     pub withdrawal_credentials: B256,
     /// Amount of ether deposited in gwei
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,
     /// Deposit signature
     pub signature: FixedBytes<96>,
     /// Deposit index
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub index: u64,
 }

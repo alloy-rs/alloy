@@ -45,7 +45,7 @@ impl EthereumSigner {
     /// [`TransactionRequest`] and [`TypedTransaction`] object that specify the
     /// signer's address in the `from` field.
     ///
-    /// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
+    /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
     pub fn register_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -58,7 +58,7 @@ impl EthereumSigner {
     /// [`TypedTransaction`] objects that do not specify a signer address in the
     /// `from` field.
     ///
-    /// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
+    /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
     pub fn register_default_signer<S>(&mut self, signer: S)
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
@@ -80,6 +80,7 @@ impl EthereumSigner {
         self.secp_signers.get(&address).cloned()
     }
 
+    #[doc(alias = "sign_tx_inner")]
     async fn sign_transaction_inner(
         &self,
         sender: Address,
@@ -112,6 +113,7 @@ where
         self.secp_signers.keys().copied()
     }
 
+    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,

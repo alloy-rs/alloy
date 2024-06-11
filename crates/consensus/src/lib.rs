@@ -19,7 +19,12 @@ mod header;
 pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
-pub use receipt::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt};
+pub use receipt::{
+    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
+};
+
+mod request;
+pub use request::Request;
 
 pub mod transaction;
 #[cfg(feature = "kzg")]

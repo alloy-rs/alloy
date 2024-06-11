@@ -6,6 +6,7 @@ use alloy_primitives::{TxHash, B256};
 
 /// Additional fields in the context of a block that contains this transaction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[doc(alias = "TxInfo")]
 pub struct TransactionInfo {
     /// Hash of the transaction.
     pub hash: Option<TxHash>,

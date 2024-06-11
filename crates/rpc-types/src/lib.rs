@@ -10,10 +10,19 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod eth;
-
 pub use alloy_serde as serde_helpers;
-pub use eth::*;
 
-mod with_other;
-pub use with_other::WithOtherFields;
+#[cfg(feature = "anvil")]
+pub use alloy_rpc_types_anvil as anvil;
+
+#[cfg(feature = "beacon")]
+pub use alloy_rpc_types_beacon as beacon;
+
+#[cfg(feature = "engine")]
+pub use alloy_rpc_types_engine as engine;
+
+#[cfg(feature = "eth")]
+pub use alloy_rpc_types_eth::*;
+
+#[cfg(feature = "trace")]
+pub use alloy_rpc_types_trace as trace;

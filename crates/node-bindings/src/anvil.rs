@@ -61,6 +61,7 @@ impl AnvilInstance {
     }
 
     /// Returns the HTTP endpoint of this instance
+    #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
         format!("http://localhost:{}", self.port)
     }
@@ -71,6 +72,7 @@ impl AnvilInstance {
     }
 
     /// Returns the HTTP endpoint url of this instance
+    #[doc(alias = "http_endpoint_url")]
     pub fn endpoint_url(&self) -> Url {
         Url::parse(&self.endpoint()).unwrap()
     }

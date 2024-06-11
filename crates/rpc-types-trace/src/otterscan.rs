@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, U256};
-use alloy_rpc_types::{Block, Rich, Transaction, TransactionReceipt};
+use alloy_rpc_types_eth::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct
@@ -71,6 +71,7 @@ pub struct OtsBlock {
     #[serde(flatten)]
     pub block: Block,
     /// The number of transactions in the block.
+    #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
@@ -112,7 +113,7 @@ pub struct OtsTransactionReceipt {
     #[serde(flatten)]
     pub receipt: TransactionReceipt<OtsReceipt>,
     /// The timestamp of the transaction.
-    #[serde(default, with = "alloy_serde::u64_opt_via_ruint")]
+    #[serde(default, with = "alloy_serde::quantity::opt")]
     pub timestamp: Option<u64>,
 }
 
@@ -123,10 +124,10 @@ pub struct OtsReceipt {
     /// If the transaction is executed successfully.
     ///
     /// This is the `statusCode`
-    #[serde(with = "alloy_serde::quantity_bool")]
+    #[serde(with = "alloy_serde::quantity")]
     pub status: bool,
     /// The cumulative gas used.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub cumulative_gas_used: u64,
     /// The logs sent from contracts.
     ///
@@ -137,7 +138,7 @@ pub struct OtsReceipt {
     /// Note: this is set to null.
     pub logs_bloom: Option<Bloom>,
     /// The transaction type.
-    #[serde(with = "alloy_serde::num::u8_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub r#type: u8,
 }
 
@@ -154,8 +155,10 @@ pub struct OtsBlockTransactions {
 /// responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxWithReceipts")]
 pub struct TransactionsWithReceipts {
     /// The list of transactions.
+    #[doc(alias = "transactions")]
     pub txs: Vec<Transaction>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
@@ -169,6 +172,7 @@ pub struct TransactionsWithReceipts {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     /// The transaction used to create the contract.
+    #[doc(alias = "transaction")]
     pub tx: Transaction,
     /// The address of the contract creator.
     pub creator: Address,
@@ -181,21 +185,21 @@ mod tests {
     #[test]
     fn test_otterscan_receipt() {
         let s = r#"{
-      "blockHash": "0xf05aa8b73b005314684595adcff8e6149917b3239b6316247ce5e88eba9fd3f5",
-      "blockNumber": "0x1106fe7",
-      "contractAddress": null,
-      "cumulativeGasUsed": "0x95fac3",
-      "effectiveGasPrice": "0x2e9f0055d",
-      "from": "0x793abeea78d94c14b884a56788f549836a35db65",
-      "gasUsed": "0x14427",
-      "logs": null,
-      "logsBloom": null,
-      "status": "0x1",
-      "to": "0x06450dee7fd2fb8e39061434babcfc05599a6fb8",
-      "transactionHash": "0xd3cead022cbb5d6d18091f8b375e3a3896ec139e986144b9448290d55837275a",
-      "transactionIndex": "0x90",
-      "type": "0x2"
-    }"#;
+            "blockHash": "0xf05aa8b73b005314684595adcff8e6149917b3239b6316247ce5e88eba9fd3f5",
+            "blockNumber": "0x1106fe7",
+            "contractAddress": null,
+            "cumulativeGasUsed": "0x95fac3",
+            "effectiveGasPrice": "0x2e9f0055d",
+            "from": "0x793abeea78d94c14b884a56788f549836a35db65",
+            "gasUsed": "0x14427",
+            "logs": null,
+            "logsBloom": null,
+            "status": "0x1",
+            "to": "0x06450dee7fd2fb8e39061434babcfc05599a6fb8",
+            "transactionHash": "0xd3cead022cbb5d6d18091f8b375e3a3896ec139e986144b9448290d55837275a",
+            "transactionIndex": "0x90",
+            "type": "0x2"
+        }"#;
 
         let _receipt: OtsTransactionReceipt = serde_json::from_str(s).unwrap();
     }
