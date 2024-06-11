@@ -46,7 +46,7 @@ impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
     /// This can be handled using [`TxReceipt::status_or_post_state`].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    /// [`TxReceipt`]: alloy_consensus::TxReceipt
+    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
     fn status(&self) -> bool {
         self.inner.status()
     }
