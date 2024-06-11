@@ -938,6 +938,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 mod tests {
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types_eth::request::TransactionRequest;
@@ -959,6 +960,16 @@ mod tests {
     async fn test_builder_helper_fn() {
         init_tracing();
         let provider = builder().with_recommended_fillers().on_anvil();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn test_builder_helper_fn_any_network() {
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+        let provider =
+            builder::<AnyNetwork>().with_recommended_fillers().on_http(anvil.endpoint_url());
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
