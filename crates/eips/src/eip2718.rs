@@ -160,7 +160,7 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     }
 
     /// The length of the 2718 encoded envelope. This is the length of the type
-    /// flag + the length of the inner transaction RLP.
+    /// flag + the length of the inner encoding.
     fn encode_2718_len(&self) -> usize;
 
     /// Encode the transaction according to [EIP-2718] rules. First a 1-byte
