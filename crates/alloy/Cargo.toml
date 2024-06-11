@@ -86,6 +86,7 @@ hyper = [
     "alloy-provider?/hyper",
     "alloy-transport-http?/hyper",
 ]
+wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
