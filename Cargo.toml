@@ -130,7 +130,7 @@ serde_with = "3.3.0"
 ## misc-testing
 arbitrary = "1.3"
 assert_matches = "1.5"
-proptest = { version = "1.4", default-features = false }
+proptest = { version = "1.4", default-features = false, features = ["alloc"] }
 proptest-derive = { version = "0.4", default-features = false }
 serial_test = "3.0"
 similar-asserts = "1.5"
