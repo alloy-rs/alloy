@@ -2,7 +2,7 @@
 //! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
-use alloy_primitives::{BlockHash, TxHash, TxIndex};
+use alloy_primitives::{BlockHash, TxHash};
 
 /// Additional fields in the context of a block that contains this transaction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -11,7 +11,7 @@ pub struct TransactionInfo {
     /// Hash of the transaction.
     pub hash: Option<TxHash>,
     /// Index of the transaction in the block
-    pub index: Option<TxIndex>,
+    pub index: Option<u64>,
     /// Hash of the block.
     pub block_hash: Option<BlockHash>,
     /// Number of the block.

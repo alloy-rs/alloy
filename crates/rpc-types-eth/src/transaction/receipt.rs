@@ -2,7 +2,7 @@
 
 use crate::{Log, WithOtherFields};
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
-use alloy_primitives::{Address, BlockHash, TxHash, TxIndex, B256};
+use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use serde::{Deserialize, Serialize};
 
 /// Transaction receipt
@@ -26,7 +26,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Index within the block.
     #[serde(default, with = "alloy_serde::quantity::opt")]
     #[doc(alias = "tx_index")]
-    pub transaction_index: Option<TxIndex>,
+    pub transaction_index: Option<u64>,
     /// Hash of the block this transaction was included within.
     #[serde(default)]
     pub block_hash: Option<BlockHash>,

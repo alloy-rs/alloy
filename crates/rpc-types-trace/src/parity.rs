@@ -2,7 +2,7 @@
 //!
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, TxIndex, B256, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -407,7 +407,7 @@ pub struct LocalizedTransactionTrace {
     pub transaction_hash: Option<TxHash>,
     /// Transaction index within the block, None if pending.
     #[doc(alias = "tx_position", alias = "transaction_index", alias = "tx_index")]
-    pub transaction_position: Option<TxIndex>,
+    pub transaction_position: Option<u64>,
 }
 
 // Implement Serialize manually to ensure consistent ordering of fields to match other client's

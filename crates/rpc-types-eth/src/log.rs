@@ -1,6 +1,6 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use alloy_primitives::{Address, BlockHash, LogData, TxHash, TxIndex, B256};
+use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
@@ -30,7 +30,7 @@ pub struct Log<T = LogData> {
     /// Index of the Transaction in the block
     #[serde(with = "alloy_serde::quantity::opt")]
     #[doc(alias = "tx_index")]
-    pub transaction_index: Option<TxIndex>,
+    pub transaction_index: Option<u64>,
     /// Log Index in Block
     #[serde(with = "alloy_serde::quantity::opt")]
     pub log_index: Option<u64>,
