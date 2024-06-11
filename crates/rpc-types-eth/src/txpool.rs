@@ -207,7 +207,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x0",
         "r": "0xbb809ae71b03319ba2811ebd581c85665169143ffade86e07d2eb4cd03b544dc",
-        "s": "0x65a2aa7e0e70356f765205a611d580de8e84fa79086f117fd9ab4765f5cf1339"
+        "s": "0x65a2aa7e0e70356f765205a611d580de8e84fa79086f117fd9ab4765f5cf1339",
+        "yParity": "0x0"
       }
     },
     "0x000042429c09de5881f05a0c2a068222f4f5b091": {
@@ -227,7 +228,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x26",
         "r": "0xaf46b2c0f067f7d1d63ac19daa349c0e1eb83f019ee00542ffa7095e05352e92",
-        "s": "0x21d6d24d58ec361379ffffe4cc17bec8ce2b9f5f9759a91afc9a54dfdfa519c2"
+        "s": "0x21d6d24d58ec361379ffffe4cc17bec8ce2b9f5f9759a91afc9a54dfdfa519c2",
+        "yParity": "0x0"
       }
     },
     "0x000fab888651fbceb55de230493562159ead0340": {
@@ -250,7 +252,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x0",
         "r": "0x7b717e689d1bd045ee7afd79b97219f2e36bd22a6a14e07023902194bca96fbf",
-        "s": "0x7b0ba462c98e7b0f95a53f047cf568ee0443839628dfe4ab294bfab88fa8e251"
+        "s": "0x7b0ba462c98e7b0f95a53f047cf568ee0443839628dfe4ab294bfab88fa8e251",
+        "yParity": "0x0"
       }
     }
   },
@@ -275,7 +278,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x0",
         "r": "0x77d149add2b1b84af9408af55661b05b21e2a436f9bfcaa844584905a0f8f1ac",
-        "s": "0x358d79063d702f0c3fb46ad0f6ce5db61f5fdb0b20359c8da2e72a11988db283"
+        "s": "0x358d79063d702f0c3fb46ad0f6ce5db61f5fdb0b20359c8da2e72a11988db283",
+        "yParity": "0x0"
       }
     },
     "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd": {
@@ -298,7 +302,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x0",
         "r": "0x863ed0413a14f3f1695fd9728f1500a2b46e69d6f4c82408af15354cc5a667d6",
-        "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a"
+        "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a",
+        "yParity": "0x0"
       },
       "4": {
         "blockHash": null,
@@ -319,7 +324,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x1",
         "r": "0xb6a571191c4b5b667876295571c42c9411bbb4569eea1a6ad149572e4efc55a9",
-        "s": "0x248a72dab9b24568dd9cbe289c205eaba1a6b58b32b5a96c48554945d3fd0d86"
+        "s": "0x248a72dab9b24568dd9cbe289c205eaba1a6b58b32b5a96c48554945d3fd0d86",
+        "yParity": "0x1"
       }
     },
     "0x02666081cfb787de3562efbbca5f0fe890e927f1": {
@@ -342,7 +348,8 @@ mod tests {
         "chainId": "0x1",
         "v": "0x1",
         "r": "0xcfc88f55fc0779d12705acba58719cd7d0ed5b0c1a7c3c3682b56397ca493dd5",
-        "s": "0x7e7dc008058c543ebfdae67154c797639447db5e8006f8fc0585352d857c1b6c"
+        "s": "0x7e7dc008058c543ebfdae67154c797639447db5e8006f8fc0585352d857c1b6c",
+        "yParity": "0x1"
       }
     }
   }
