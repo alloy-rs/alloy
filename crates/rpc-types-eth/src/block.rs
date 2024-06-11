@@ -5,7 +5,7 @@ pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_primitives::{Address, BlockHash, BlockNumber, Bloom, Bytes, B256, B64, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256, U64};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -70,7 +70,7 @@ pub struct Header {
     pub difficulty: U256,
     /// Block number
     #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub number: Option<BlockNumber>,
+    pub number: Option<u64>,
     /// Gas Limit
     #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
@@ -557,7 +557,7 @@ pub struct BlockOverrides {
     /// A dictionary that maps blockNumber to a user-defined hash. It could be queried from the
     /// solidity opcode BLOCKHASH.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub block_hash: Option<BTreeMap<BlockNumber, B256>>,
+    pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
 #[cfg(test)]

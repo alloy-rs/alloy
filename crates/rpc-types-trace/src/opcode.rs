@@ -1,6 +1,6 @@
 //! Types for opcode tracing.
 
-use alloy_primitives::{BlockHash, BlockNumber, TxHash};
+use alloy_primitives::{BlockHash, TxHash};
 use serde::{Deserialize, Serialize};
 
 /// Opcode gas usage for a transaction.
@@ -10,7 +10,7 @@ pub struct BlockOpcodeGas {
     /// The block hash
     pub block_hash: BlockHash,
     /// The block number
-    pub block_number: BlockNumber,
+    pub block_number: u64,
     /// All executed transactions in the block in the order they were executed, with their opcode
     /// gas usage.
     pub transactions: Vec<TransactionOpcodeGas>,

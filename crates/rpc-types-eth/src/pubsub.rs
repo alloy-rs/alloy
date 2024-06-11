@@ -1,7 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Log, RichHeader, Transaction};
-use alloy_primitives::{BlockNumber, B256};
+use alloy_primitives::B256;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Subscription result.
@@ -37,12 +37,12 @@ pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
     /// The starting block.
-    pub starting_block: BlockNumber,
+    pub starting_block: u64,
     /// The current block.
-    pub current_block: BlockNumber,
+    pub current_block: u64,
     /// The highest block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub highest_block: Option<BlockNumber>,
+    pub highest_block: Option<u64>,
 }
 
 impl Serialize for SubscriptionResult {

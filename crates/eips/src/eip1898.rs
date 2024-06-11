@@ -119,14 +119,14 @@ impl BlockNumberOrTag {
 }
 
 impl From<u64> for BlockNumberOrTag {
-    fn from(block_number: u64) -> Self {
-        Self::Number(block_number)
+    fn from(num: u64) -> Self {
+        Self::Number(num)
     }
 }
 
 impl From<U64> for BlockNumberOrTag {
-    fn from(block_number: U64) -> Self {
-        block_number.to::<u64>().into()
+    fn from(num: U64) -> Self {
+        num.to::<u64>().into()
     }
 }
 
@@ -362,8 +362,8 @@ impl Default for BlockId {
 }
 
 impl From<u64> for BlockId {
-    fn from(block_number: u64) -> Self {
-        BlockNumberOrTag::Number(block_number).into()
+    fn from(num: u64) -> Self {
+        BlockNumberOrTag::Number(num).into()
     }
 }
 
@@ -374,8 +374,8 @@ impl From<U64> for BlockId {
 }
 
 impl From<BlockNumberOrTag> for BlockId {
-    fn from(block_number: BlockNumberOrTag) -> Self {
-        Self::Number(block_number)
+    fn from(num: BlockNumberOrTag) -> Self {
+        Self::Number(num)
     }
 }
 
