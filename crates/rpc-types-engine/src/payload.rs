@@ -1,9 +1,7 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
-use alloy_primitives::{
-    aliases::BlockTimestamp, Address, BlockNumber, Bloom, Bytes, B256, B64, U256,
-};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
@@ -158,7 +156,7 @@ pub struct ExecutionPayloadV1 {
     pub prev_randao: B256,
     /// The block number.
     #[serde(with = "alloy_serde::quantity")]
-    pub block_number: BlockNumber,
+    pub block_number: u64,
     /// The gas limit of the block.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_limit: u64,
@@ -167,7 +165,7 @@ pub struct ExecutionPayloadV1 {
     pub gas_used: u64,
     /// The timestamp of the block.
     #[serde(with = "alloy_serde::quantity")]
-    pub timestamp: BlockTimestamp,
+    pub timestamp: u64,
     /// The extra data of the block.
     pub extra_data: Bytes,
     /// The base fee per gas of the block.

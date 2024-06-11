@@ -3,7 +3,7 @@
 //! See also <https://flashbots.github.io/relay-specs/>
 
 use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, BlockHash, BlockNumber, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
@@ -66,7 +66,7 @@ pub struct BidTrace {
     /// The parent hash of the block.
     pub parent_hash: B256,
     /// The hash of the block.
-    pub block_hash: BlockHash,
+    pub block_hash: B256,
     /// The public key of the builder.
     pub builder_pubkey: BlsPublicKey,
     /// The public key of the proposer.
@@ -189,10 +189,10 @@ pub struct ProposerPayloadsDeliveredQuery {
     pub limit: Option<u64>,
     /// Search for a specific blockhash
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_hash: Option<BlockHash>,
+    pub block_hash: Option<B256>,
     /// Search for a specific EL block number
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_number: Option<BlockNumber>,
+    pub block_number: Option<u64>,
     /// Filter results by a proposer public key
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proposer_pubkey: Option<BlsPublicKey>,
@@ -218,7 +218,7 @@ impl ProposerPayloadsDeliveredQuery {
     }
 
     /// Sets the specific blockhash
-    pub const fn block_hash(mut self, block_hash: BlockHash) -> Self {
+    pub const fn block_hash(mut self, block_hash: B256) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
@@ -288,7 +288,7 @@ pub struct BuilderBlocksReceivedQuery {
     pub limit: Option<u64>,
     /// Search for a specific blockhash
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_hash: Option<BlockHash>,
+    pub block_hash: Option<B256>,
     /// Search for a specific EL block number
     #[serde(skip_serializing_if = "Option::is_none")]
     pub block_number: Option<u64>,
@@ -311,7 +311,7 @@ impl BuilderBlocksReceivedQuery {
     }
 
     /// Sets the specific blockhash
-    pub const fn block_hash(mut self, block_hash: BlockHash) -> Self {
+    pub const fn block_hash(mut self, block_hash: B256) -> Self {
         self.block_hash = Some(block_hash);
         self
     }
@@ -349,9 +349,9 @@ pub mod error {
         #[error("incorrect BlockHash {actual}, expected {expected}")]
         IncorrectBlockHash {
             /// The expected block hash
-            expected: BlockHash,
+            expected: B256,
             /// The actual block hash
-            actual: BlockHash,
+            actual: B256,
         },
         /// Thrown if block hash mismatches
         #[error("incorrect GasLimit {actual}, expected {expected}")]
