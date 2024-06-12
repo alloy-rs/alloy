@@ -96,9 +96,9 @@ http-body-util = "0.1"
 tokio = "1"
 tokio-util = "0.7"
 tokio-stream = "0.1"
+rustls = { version = "0.23", default-features = false, features = ["std"] }
 tokio-test = "0.4"
-# enforce default crypto backend https://github.com/alloy-rs/alloy/issues/874
-tokio-tungstenite = { version = "=0.22" }
+tokio-tungstenite = { version = "0.23" }
 tower = { version = "0.4", features = ["util"] }
 
 # tracing
