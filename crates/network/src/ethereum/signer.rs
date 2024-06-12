@@ -1,4 +1,4 @@
-use crate::{Network, NetworkSigner, TxSigner};
+use crate::{Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::Address;
 use alloy_signer::Signature;
@@ -97,7 +97,7 @@ impl EthereumSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N> NetworkSigner<N> for EthereumSigner
+impl<N> NetworkWallet<N> for EthereumSigner
 where
     N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
 {

@@ -2,14 +2,14 @@ use crate::{
     fillers::{FillProvider, JoinFill, SignerFiller, TxFiller},
     Provider,
 };
-use alloy_network::{Ethereum, Network, NetworkSigner};
+use alloy_network::{Ethereum, Network, NetworkWallet};
 use alloy_primitives::Address;
 use alloy_transport::Transport;
 
-/// Trait for Providers, Fill stacks, etc, which contain [`NetworkSigner`].
+/// Trait for Providers, Fill stacks, etc, which contain [`NetworkWallet`].
 pub trait WalletProvider<N: Network = Ethereum> {
-    /// The underlying [`NetworkSigner`] type contained in this stack.
-    type Signer: NetworkSigner<N>;
+    /// The underlying [`NetworkWallet`] type contained in this stack.
+    type Signer: NetworkWallet<N>;
 
     /// Get a reference to the underlying signer.
     fn signer(&self) -> &Self::Signer;
@@ -37,7 +37,7 @@ pub trait WalletProvider<N: Network = Ethereum> {
 
 impl<S, N> WalletProvider<N> for SignerFiller<S>
 where
-    S: NetworkSigner<N> + Clone,
+    S: NetworkWallet<N> + Clone,
     N: Network,
 {
     type Signer = S;

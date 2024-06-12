@@ -1,5 +1,5 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
@@ -171,7 +171,7 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: NetworkSigner<Ethereum>>(
+    async fn build<S: NetworkWallet<Ethereum>>(
         self,
         signer: &S,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {

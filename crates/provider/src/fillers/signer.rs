@@ -1,23 +1,23 @@
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, NetworkSigner, TransactionBuilder};
+use alloy_network::{Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::{Transport, TransportResult};
 
 use super::{FillerControlFlow, TxFiller};
 
 /// A layer that signs transactions locally.
 ///
-/// The layer uses a [`NetworkSigner`] to sign transactions sent using
+/// The layer uses a [`NetworkWallet`] to sign transactions sent using
 /// [`Provider::send_transaction`] locally before passing them to the node with
 /// [`Provider::send_raw_transaction`].
 ///
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
+/// # use alloy_network::{NetworkWallet, EthereumSigner, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .signer(signer)
 ///     .on_http(url);
@@ -53,7 +53,7 @@ impl<S> SignerFiller<S> {
 impl<S, N> TxFiller<N> for SignerFiller<S>
 where
     N: Network,
-    S: NetworkSigner<N> + Clone,
+    S: NetworkWallet<N> + Clone,
 {
     type Fillable = ();
 

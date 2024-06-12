@@ -4,7 +4,10 @@ use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
 
-use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
+use crate::{
+    any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
+    TransactionBuilderError,
+};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
@@ -154,7 +157,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: crate::NetworkSigner<AnyNetwork>>(
+    async fn build<S: NetworkWallet<AnyNetwork>>(
         self,
         signer: &S,
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {

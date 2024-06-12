@@ -14,7 +14,7 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilderError, TxSigner,
     TxSignerSync, UnbuiltTransactionError,
 };
 
