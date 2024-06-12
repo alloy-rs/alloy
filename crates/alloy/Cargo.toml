@@ -196,7 +196,9 @@ eip712 = [
 full = [
     "consensus",
     "contract",
+    "eips",
     "k256",
+    "kzg",
     "network",
     "provider-http", # includes `providers`
     "provider-ws",   # includes `providers`
