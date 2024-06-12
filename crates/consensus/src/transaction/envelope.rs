@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::{Signed, TxEip1559, TxEip2930, TxLegacy};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, Header};
 
@@ -304,23 +304,28 @@ impl Encodable for TxEnvelope {
 
 impl Decodable for TxEnvelope {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::network_decode(buf)
+        match Self::network_decode(buf) {
+            Ok(t) => Ok(t),
+            Err(Eip2718Error::RlpError(e)) => Err(e),
+            Err(Eip2718Error::UnexpectedType(_)) => {
+                Err(alloy_rlp::Error::Custom("unexpected tx type"))
+            }
+            _ => Err(alloy_rlp::Error::Custom("unknown error decoding tx envelope")),
+        }
     }
 }
 
 impl Decodable2718 for TxEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
             TxType::Eip2930 => Ok(TxEip2930::decode_signed_fields(buf)?.into()),
             TxType::Eip1559 => Ok(TxEip1559::decode_signed_fields(buf)?.into()),
             TxType::Eip4844 => Ok(TxEip4844Variant::decode_signed_fields(buf)?.into()),
-            TxType::Legacy => {
-                Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
-            }
+            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Ok(TxLegacy::decode_signed_fields(buf)?.into())
     }
 }
