@@ -35,6 +35,10 @@ impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
     }
+
+    fn status(&self) -> bool {
+        self.inner.status()
+    }
 }
 
 impl TransactionResponse for alloy_rpc_types_eth::Transaction {
