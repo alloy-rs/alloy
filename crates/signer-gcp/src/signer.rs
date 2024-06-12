@@ -56,7 +56,7 @@ impl KeySpecifier {
     }
 }
 
-/// Google Cloud Platform Key Management Service (GCP KMS) Ethereum signer.
+/// Google Cloud Platform Key Management Service (GCP KMS) Ethereum wallet.
 ///
 /// The GCP Signer passes signing requests to the cloud service. GCP KMS keys belong to a key ring,
 /// which is identified by a project ID, location, and key ring name. The key ring contains keys,
@@ -65,14 +65,14 @@ impl KeySpecifier {
 /// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
 /// that the new function is `async` and must be called within some runtime.
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_signer_gcp::{GcpKeyRingRef, GcpSigner, KeySpecifier};
+/// use alloy_signer_gcp::{GcpKeyRingRef, GcpWallet, KeySpecifier};
 /// use gcloud_sdk::{
 ///     google::cloud::kms::v1::key_management_service_client::KeyManagementServiceClient,
 ///     GoogleApi,
@@ -97,7 +97,7 @@ impl KeySpecifier {
 /// let key_version = 1;
 /// let key_specifier = KeySpecifier::new(keyring, key_name, key_version);
 /// let chain_id = Some(1);
-/// let signer = GcpSigner::new(client, key_specifier, chain_id).await.unwrap();
+/// let signer = GcpWallet::new(client, key_specifier, chain_id).await.unwrap();
 ///
 /// let message = vec![0, 1, 2, 3];
 ///
@@ -106,7 +106,7 @@ impl KeySpecifier {
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct GcpSigner {
+pub struct GcpWallet {
     client: Client,
     key_name: String,
     chain_id: Option<ChainId>,
@@ -114,9 +114,9 @@ pub struct GcpSigner {
     address: Address,
 }
 
-impl fmt::Debug for GcpSigner {
+impl fmt::Debug for GcpWallet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("GcpSigner")
+        f.debug_struct("GcpWallet")
             .field("key_name", &self.key_name)
             .field("chain_id", &self.chain_id)
             .field("pubkey", &hex::encode(self.pubkey.to_sec1_bytes()))
@@ -125,9 +125,9 @@ impl fmt::Debug for GcpSigner {
     }
 }
 
-/// Errors thrown by [`GcpSigner`].
+/// Errors thrown by [`GcpWallet`].
 #[derive(Debug, Error)]
-pub enum GcpSignerError {
+pub enum GcpWalletError {
     /// Thrown when the GCP KMS API returns a signing error.
     #[error(transparent)]
     GoogleKmsError(#[from] gcloud_sdk::error::Error),
@@ -147,7 +147,7 @@ pub enum GcpSignerError {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl alloy_network::TxSigner<Signature> for GcpSigner {
+impl alloy_network::TxSigner<Signature> for GcpWallet {
     fn address(&self) -> Address {
         self.address
     }
@@ -164,7 +164,7 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for GcpSigner {
+impl Signer for GcpWallet {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
@@ -187,7 +187,7 @@ impl Signer for GcpSigner {
     }
 }
 
-impl GcpSigner {
+impl GcpWallet {
     /// Instantiate a new signer from an existing `Client`, keyring reference, key ID, and version.
     ///
     /// Retrieves the public key from GCP and calculates the Ethereum address.
@@ -196,7 +196,7 @@ impl GcpSigner {
         client: Client,
         key_specifier: KeySpecifier,
         chain_id: Option<ChainId>,
-    ) -> Result<Self, GcpSignerError> {
+    ) -> Result<Self, GcpWalletError> {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;
         let pubkey = decode_pubkey(resp)?;
@@ -206,19 +206,19 @@ impl GcpSigner {
     }
 
     /// Fetch the pubkey associated with this signer's key.
-    pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpSignerError> {
+    pub async fn get_pubkey(&self) -> Result<VerifyingKey, GcpWalletError> {
         request_get_pubkey(&self.client, &self.key_name).await.and_then(decode_pubkey)
     }
 
     /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, GcpSignerError> {
+    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, GcpWalletError> {
         request_sign_digest(&self.client, &self.key_name, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key and add the eip155 `v` value
     /// corresponding to the input chain_id
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpSignerError> {
+    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, GcpWalletError> {
         let sig = self.sign_digest(digest).await?;
         let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
         if let Some(chain_id) = self.chain_id {
@@ -232,7 +232,7 @@ impl GcpSigner {
 async fn request_get_pubkey(
     client: &Client,
     kms_key_name: &str,
-) -> Result<PublicKey, GcpSignerError> {
+) -> Result<PublicKey, GcpWalletError> {
     let mut request = tonic::Request::new(GetPublicKeyRequest { name: kms_key_name.to_string() });
     request
         .metadata_mut()
@@ -245,7 +245,7 @@ async fn request_sign_digest(
     client: &Client,
     kms_key_name: &str,
     digest: &B256,
-) -> Result<Vec<u8>, GcpSignerError> {
+) -> Result<Vec<u8>, GcpWalletError> {
     let mut request = Request::new(AsymmetricSignRequest {
         name: kms_key_name.to_string(),
         digest: Some(kms::v1::Digest {
@@ -265,12 +265,12 @@ async fn request_sign_digest(
 }
 
 /// Parse the PEM-encoded public key returned by GCP KMS.
-fn decode_pubkey(key: PublicKey) -> Result<VerifyingKey, GcpSignerError> {
+fn decode_pubkey(key: PublicKey) -> Result<VerifyingKey, GcpWalletError> {
     VerifyingKey::from_public_key_pem(&key.pem).map_err(Into::into)
 }
 
 /// Decode a raw GCP KMS Signature response.
-fn decode_signature(raw: Vec<u8>) -> Result<ecdsa::Signature, GcpSignerError> {
+fn decode_signature(raw: Vec<u8>) -> Result<ecdsa::Signature, GcpWalletError> {
     let sig = ecdsa::Signature::from_der(raw.as_ref())?;
     Ok(sig.normalize_s().unwrap_or(sig))
 }
@@ -325,7 +325,7 @@ mod tests {
         let key_version = 1;
 
         let specifier = KeySpecifier::new(keyring, &key_name, key_version);
-        let signer = GcpSigner::new(client, specifier, None).await.expect("get key");
+        let signer = GcpWallet::new(client, specifier, None).await.expect("get key");
 
         let message = vec![0, 1, 2, 3];
         let sig = signer.sign_message(&message).await.unwrap();

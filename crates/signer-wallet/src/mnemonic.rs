@@ -3,7 +3,7 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
-use crate::{LocalWallet, Wallet, WalletError};
+use crate::{LocalSigner, Wallet, WalletError};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{Mnemonic, Wordlist};
@@ -15,7 +15,7 @@ use thiserror::Error;
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
-/// Represents a structure that can resolve into a `LocalWallet`.
+/// Represents a structure that can resolve into a `LocalSigner`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist> {
@@ -126,30 +126,30 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self
     }
 
-    /// Builds a `LocalWallet` using the parameters set in mnemonic builder. This method expects
+    /// Builds a `LocalSigner` using the parameters set in mnemonic builder. This method expects
     /// the phrase field to be set.
-    pub fn build(&self) -> Result<LocalWallet, WalletError> {
+    pub fn build(&self) -> Result<LocalSigner, WalletError> {
         let mnemonic = match &self.phrase {
             Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
             None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
         };
-        self.mnemonic_to_wallet(&mnemonic)
+        self.mnemonic_to_signer(&mnemonic)
     }
 
-    /// Builds a `LocalWallet` using the parameters set in the mnemonic builder and constructing
+    /// Builds a `LocalSigner` using the parameters set in the mnemonic builder and constructing
     /// the phrase using the thread RNG.
-    pub fn build_random(&self) -> Result<LocalWallet, WalletError> {
+    pub fn build_random(&self) -> Result<LocalSigner, WalletError> {
         self.build_random_with(&mut rand::thread_rng())
     }
 
-    /// Builds a `LocalWallet` using the parameters set in the mnemonic builder and constructing
+    /// Builds a `LocalSigner` using the parameters set in the mnemonic builder and constructing
     /// the phrase using the provided random number generator.
-    pub fn build_random_with<R: Rng>(&self, rng: &mut R) -> Result<LocalWallet, WalletError> {
+    pub fn build_random_with<R: Rng>(&self, rng: &mut R) -> Result<LocalSigner, WalletError> {
         let mnemonic = match &self.phrase {
             None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
         };
-        let wallet = self.mnemonic_to_wallet(&mnemonic)?;
+        let wallet = self.mnemonic_to_signer(&mnemonic)?;
 
         // Write the mnemonic phrase to storage if a directory has been provided.
         if let Some(dir) = &self.write_to {
@@ -159,7 +159,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         Ok(wallet)
     }
 
-    fn mnemonic_to_wallet(&self, mnemonic: &Mnemonic<W>) -> Result<LocalWallet, WalletError> {
+    fn mnemonic_to_signer(&self, mnemonic: &Mnemonic<W>) -> Result<LocalSigner, WalletError> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();

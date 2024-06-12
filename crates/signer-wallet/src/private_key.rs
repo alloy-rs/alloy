@@ -175,7 +175,7 @@ impl FromStr for Wallet<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LocalWallet, SignerSync};
+    use crate::{LocalSigner, SignerSync};
     use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
@@ -191,7 +191,7 @@ mod tests {
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
         assert!(s.len() < 64);
-        let pk = s.parse::<LocalWallet>().unwrap_err();
+        let pk = s.parse::<LocalSigner>().unwrap_err();
         match pk {
             WalletError::HexError(hex::FromHexError::InvalidStringLength) => {}
             _ => panic!("Unexpected error"),
@@ -333,7 +333,7 @@ mod tests {
     fn conversions() {
         let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
 
-        let wallet_b256: Wallet<SigningKey> = LocalWallet::from_bytes(&key).unwrap();
+        let wallet_b256: Wallet<SigningKey> = LocalSigner::from_bytes(&key).unwrap();
         assert_eq!(wallet_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
         assert_eq!(wallet_b256.chain_id, None);
         assert_eq!(wallet_b256.signer, SigningKey::from_bytes((&key.0).into()).unwrap());

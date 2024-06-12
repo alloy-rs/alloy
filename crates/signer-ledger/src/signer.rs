@@ -16,14 +16,14 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// A Ledger Ethereum signer.
+/// A Ledger Ethereum wallet.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 #[derive(Debug)]
-pub struct LedgerSigner {
+pub struct LedgerWallet {
     transport: Mutex<Ledger>,
     derivation: DerivationType,
     pub(crate) chain_id: Option<ChainId>,
@@ -32,7 +32,7 @@ pub struct LedgerSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl alloy_network::TxSigner<Signature> for LedgerSigner {
+impl alloy_network::TxSigner<Signature> for LedgerWallet {
     fn address(&self) -> Address {
         self.address
     }
@@ -49,7 +49,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for LedgerSigner {
+impl Signer for LedgerWallet {
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
@@ -103,7 +103,7 @@ impl Signer for LedgerSigner {
     }
 }
 
-impl LedgerSigner {
+impl LedgerWallet {
     /// Instantiate the application by acquiring a lock on the ledger device.
     ///
     /// # Examples
@@ -316,9 +316,9 @@ mod tests {
         })
     }
 
-    async fn init_ledger() -> LedgerSigner {
+    async fn init_ledger() -> LedgerWallet {
         let _ = tracing_subscriber::fmt::try_init();
-        match LedgerSigner::new(DTYPE, None).await {
+        match LedgerWallet::new(DTYPE, None).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
         }

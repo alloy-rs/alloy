@@ -5,15 +5,15 @@ use alloy_signer::utils::raw_public_key_to_address;
 use elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::{PublicKey, Secp256k1};
 use yubihsm::{
-    asymmetric::Algorithm::EcK256, ecdsa::Signer as YubiSigner, object, object::Label, Capability,
+    asymmetric::Algorithm::EcK256, ecdsa::Signer as YubiWallet, object, object::Label, Capability,
     Client, Connector, Credentials, Domain,
 };
 
-impl Wallet<YubiSigner<Secp256k1>> {
+impl Wallet<YubiWallet<Secp256k1>> {
     /// Connects to a yubi key's ECDSA account at the provided id
     pub fn connect(connector: Connector, credentials: Credentials, id: object::Id) -> Self {
         let client = Client::open(connector, credentials, true).unwrap();
-        let signer = YubiSigner::create(client, id).unwrap();
+        let signer = YubiWallet::create(client, id).unwrap();
         signer.into()
     }
 
@@ -29,7 +29,7 @@ impl Wallet<YubiSigner<Secp256k1>> {
         let id = client
             .generate_asymmetric_key(id, label, domain, Capability::SIGN_ECDSA, EcK256)
             .unwrap();
-        let signer = YubiSigner::create(client, id).unwrap();
+        let signer = YubiWallet::create(client, id).unwrap();
         signer.into()
     }
 
@@ -46,13 +46,13 @@ impl Wallet<YubiSigner<Secp256k1>> {
         let id = client
             .put_asymmetric_key(id, label, domain, Capability::SIGN_ECDSA, EcK256, key)
             .unwrap();
-        let signer = YubiSigner::create(client, id).unwrap();
+        let signer = YubiWallet::create(client, id).unwrap();
         signer.into()
     }
 }
 
-impl From<YubiSigner<Secp256k1>> for Wallet<YubiSigner<Secp256k1>> {
-    fn from(signer: YubiSigner<Secp256k1>) -> Self {
+impl From<YubiWallet<Secp256k1>> for Wallet<YubiWallet<Secp256k1>> {
+    fn from(signer: YubiWallet<Secp256k1>) -> Self {
         // Uncompress the public key.
         let pubkey = PublicKey::from_encoded_point(signer.public_key()).unwrap();
         let pubkey = pubkey.to_encoded_point(false);
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn new_key() {
         let connector = yubihsm::Connector::mockhsm();
-        let wallet = Wallet::<YubiSigner<Secp256k1>>::new(
+        let wallet = Wallet::<YubiWallet<Secp256k1>>::new(
             connector,
             Credentials::default(),
             0,

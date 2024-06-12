@@ -10,11 +10,15 @@
 extern crate tracing;
 
 mod signer;
-pub use signer::LedgerSigner;
+pub use signer::LedgerWallet;
 
 mod types;
 pub use types::{DerivationType as HDPath, LedgerError};
 
 #[doc(hidden)]
-#[deprecated(note = "use `LedgerSigner` instead")]
-pub type Ledger = LedgerSigner;
+#[deprecated(note = "use `LedgerWallet` instead")]
+pub type Ledger = LedgerWallet;
+
+#[doc(hidden)]
+#[deprecated(note = "use `LedgerWallet` instead")]
+pub type LedgerSigner = LedgerWallet;

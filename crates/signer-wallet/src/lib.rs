@@ -33,8 +33,8 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
-/// A wallet instantiated with a locally stored private key
-pub type LocalWallet = Wallet<k256::ecdsa::SigningKey>;
+/// A signer instantiated with a locally stored private key
+pub type LocalSigner = Wallet<k256::ecdsa::SigningKey>;
 
 /// A wallet instantiated with a YubiHSM
 #[cfg(feature = "yubihsm")]
@@ -54,7 +54,7 @@ pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// ```
 /// use alloy_signer::{Signer, SignerSync};
 ///
-/// let wallet = alloy_signer_wallet::LocalWallet::random();
+/// let wallet = alloy_signer_wallet::LocalSigner::random();
 ///
 /// // Optionally, the wallet's chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
@@ -65,7 +65,7 @@ pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// let signature = wallet.sign_message_sync(message)?;
 /// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), wallet.address());
 ///
-/// // LocalWallet is cloneable:
+/// // LocalSigner is cloneable:
 /// let wallet_clone = wallet.clone();
 /// let signature2 = wallet_clone.sign_message_sync(message)?;
 /// assert_eq!(signature, signature2);
@@ -219,7 +219,7 @@ mod test {
             tx: &mut dyn SignableTransaction<Signature>,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
-            let mut wallet: LocalWallet =
+            let mut wallet: LocalSigner =
                 "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
             wallet.set_chain_id(chain_id);
 

@@ -10,22 +10,22 @@ use trezor_client::client::Trezor;
 const FIRMWARE_1_MIN_VERSION: &str = ">=1.11.1";
 const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 
-/// A Trezor Ethereum signer.
+/// A Trezor Ethereum wallet.
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor).
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
-pub struct TrezorSigner {
+pub struct TrezorWallet {
     derivation: DerivationType,
     session_id: Vec<u8>,
     pub(crate) chain_id: Option<ChainId>,
     pub(crate) address: Address,
 }
 
-impl fmt::Debug for TrezorSigner {
+impl fmt::Debug for TrezorWallet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("TrezorSigner")
+        f.debug_struct("TrezorWallet")
             .field("derivation", &self.derivation)
             .field("session_id", &hex::encode(&self.session_id))
             .field("address", &self.address)
@@ -35,7 +35,7 @@ impl fmt::Debug for TrezorSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for TrezorSigner {
+impl Signer for TrezorWallet {
     #[inline]
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
@@ -66,7 +66,7 @@ impl Signer for TrezorSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl alloy_network::TxSigner<Signature> for TrezorSigner {
+impl alloy_network::TxSigner<Signature> for TrezorWallet {
     fn address(&self) -> Address {
         self.address
     }
@@ -81,8 +81,8 @@ impl alloy_network::TxSigner<Signature> for TrezorSigner {
     }
 }
 
-impl TrezorSigner {
-    /// Instantiates a new Trezor signer.
+impl TrezorWallet {
+    /// Instantiates a new Trezor wallet.
     #[instrument(ret)]
     pub async fn new(
         derivation: DerivationType,
@@ -291,7 +291,7 @@ mod tests {
     // Replace this with your ETH addresses.
     async fn test_get_address() {
         // Instantiate it with the default trezor derivation path
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(1), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(1), Some(1)).await.unwrap();
         assert_eq!(
             trezor.get_address().await.unwrap(),
             address!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
@@ -305,7 +305,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_message() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
         let message = "hello world";
         let sig = trezor.sign_message(message.as_bytes()).await.unwrap();
         let addr = trezor.get_address().await.unwrap();
@@ -315,7 +315,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();
@@ -334,7 +334,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_big_data_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
 
         // invalid data
         let big_data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string()+ &"ff".repeat(1032*2) + "aa").unwrap();
@@ -353,7 +353,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_empty_txes() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
         TransactionRequest::default()
             .to(address!("2ed7afa17473e17ac59908f088b4371d28585476"))
             .with_gas_price(1)
@@ -366,7 +366,7 @@ mod tests {
         // Contract creation (empty `to`, with data) should show on the trezor device as:
         //  ` "0 Wei ETH
         //  ` new contract?"
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
         {
             let _tx = TransactionRequest::default()
                 .into_create()
@@ -381,7 +381,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_sign_eip1559_tx() {
-        let trezor = TrezorSigner::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
+        let trezor = TrezorWallet::new(DerivationType::TrezorLive(0), Some(1)).await.unwrap();
 
         // approve uni v2 router 0xff
         let data = hex::decode("095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap();

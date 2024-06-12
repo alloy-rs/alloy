@@ -6,8 +6,8 @@ Local wallet implementations:
 
 ## Features
 
-- `keystore`: enables Ethereum keystore functionality on the `LocalWallet` type.
-- `mnemonic`: enables BIP-39 mnemonic functionality for building `LocalWallet`s.
+- `keystore`: enables Ethereum keystore functionality on the `LocalSigner` type.
+- `mnemonic`: enables BIP-39 mnemonic functionality for building `LocalSigner`s.
 - `yubihsm`: enables `Wallet`s with [YubiHSM2] support.
 
 [YubiHSM2]: https://www.yubico.com/products/hardware-security-module/

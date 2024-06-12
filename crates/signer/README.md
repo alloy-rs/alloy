@@ -24,7 +24,7 @@ Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-
 use alloy_signer::{Signer, SignerSync};
 
 // Instantiate a signer.
-let signer = alloy_signer_wallet::LocalWallet::random();
+let signer = alloy_signer_wallet::LocalSigner::random();
 
 // Sign a message.
 let message = "Some data";
@@ -46,7 +46,7 @@ use alloy_network::{TxSignerSync};
 
 // Instantiate a signer.
 let signer = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
-    .parse::<alloy_signer_wallet::LocalWallet>()?;
+    .parse::<alloy_signer_wallet::LocalSigner>()?;
 
 // Create a transaction.
 let mut tx = TxLegacy {
