@@ -9,13 +9,13 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, TxHash, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
     BuildResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
-    TxSignerSync, Unbuilt,
+    TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
@@ -34,6 +34,21 @@ pub use alloy_eips::eip2718;
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
     fn contract_address(&self) -> Option<Address>;
+
+    /// Status of the transaction.
+    ///
+    /// ## Note
+    ///
+    /// Caution must be taken when using this method for deep-historical
+    /// receipts, as it may not accurately reflect the status of the
+    /// transaction. The transaction status is not knowable from the receipt
+    /// for transactions before [EIP-658].
+    ///
+    /// This can be handled using [`TxReceipt::status_or_post_state`].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
+    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
+    fn status(&self) -> bool;
 }
 
 /// Transaction Response
@@ -44,7 +59,7 @@ pub trait ReceiptResponse {
 pub trait TransactionResponse {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> B256;
+    fn tx_hash(&self) -> TxHash;
 
     /// Sender of the transaction
     fn from(&self) -> Address;

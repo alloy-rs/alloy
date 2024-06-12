@@ -7,10 +7,18 @@ use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
 /// Result type for transaction builders
-pub type BuildResult<T, N> = Result<T, Unbuilt<N>>;
+pub type BuildResult<T, N> = Result<T, UnbuiltTransactionError<N>>;
 
 /// An unbuilt transaction, along with some error.
-pub type Unbuilt<N> = (<N as Network>::TransactionRequest, TransactionBuilderError<N>);
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to build transaction: {error}")]
+pub struct UnbuiltTransactionError<N: Network> {
+    /// The original request that failed to build.
+    pub request: N::TransactionRequest,
+    /// The error that occurred.
+    #[source]
+    pub error: TransactionBuilderError<N>,
+}
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +48,11 @@ impl<N: Network> TransactionBuilderError<N> {
     {
         Self::Custom(Box::new(e))
     }
+
+    /// Convert the error into an unbuilt transaction error.
+    pub const fn into_unbuilt(self, request: N::TransactionRequest) -> UnbuiltTransactionError<N> {
+        UnbuiltTransactionError { request, error: self }
+    }
 }
 
 /// A Transaction builder for a network.
@@ -59,7 +72,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Builder-pattern method for setting the chain ID.
-    fn with_chain_id(mut self, chain_id: alloy_primitives::ChainId) -> Self {
+    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
         self.set_chain_id(chain_id);
         self
     }
@@ -101,16 +114,16 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the kind of transaction.
-    fn kind(&self) -> Option<alloy_primitives::TxKind>;
+    fn kind(&self) -> Option<TxKind>;
 
     /// Clear the kind of transaction.
     fn clear_kind(&mut self);
 
     /// Set the kind of transaction.
-    fn set_kind(&mut self, kind: alloy_primitives::TxKind);
+    fn set_kind(&mut self, kind: TxKind);
 
     /// Builder-pattern method for setting the kind of transaction.
-    fn with_kind(mut self, kind: alloy_primitives::TxKind) -> Self {
+    fn with_kind(mut self, kind: TxKind) -> Self {
         self.set_kind(kind);
         self
     }

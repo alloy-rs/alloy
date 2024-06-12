@@ -1,17 +1,17 @@
 use std::ops::{Deref, DerefMut};
 
 use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::Bytes;
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
 
 use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    fn chain_id(&self) -> Option<ChainId> {
         self.deref().chain_id()
     }
 
-    fn set_chain_id(&mut self, chain_id: alloy_primitives::ChainId) {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
         self.deref_mut().set_chain_id(chain_id)
     }
 
@@ -23,7 +23,7 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_nonce(nonce)
     }
 
-    fn input(&self) -> Option<&alloy_primitives::Bytes> {
+    fn input(&self) -> Option<&Bytes> {
         self.deref().input()
     }
 
@@ -31,15 +31,15 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().set_input(input);
     }
 
-    fn from(&self) -> Option<alloy_primitives::Address> {
+    fn from(&self) -> Option<Address> {
         self.deref().from()
     }
 
-    fn set_from(&mut self, from: alloy_primitives::Address) {
+    fn set_from(&mut self, from: Address) {
         self.deref_mut().set_from(from);
     }
 
-    fn kind(&self) -> Option<alloy_primitives::TxKind> {
+    fn kind(&self) -> Option<TxKind> {
         self.deref().kind()
     }
 
@@ -47,15 +47,15 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref_mut().clear_kind()
     }
 
-    fn set_kind(&mut self, kind: alloy_primitives::TxKind) {
+    fn set_kind(&mut self, kind: TxKind) {
         self.deref_mut().set_kind(kind)
     }
 
-    fn value(&self) -> Option<alloy_primitives::U256> {
+    fn value(&self) -> Option<U256> {
         self.deref().value()
     }
 
-    fn set_value(&mut self, value: alloy_primitives::U256) {
+    fn set_value(&mut self, value: U256) {
         self.deref_mut().set_value(value)
     }
 
@@ -145,10 +145,11 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
 
     fn build_unsigned(self) -> BuildResult<<AnyNetwork as Network>::UnsignedTx, AnyNetwork> {
         if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err((
-                self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type.into(), missing),
-            ));
+            return Err(TransactionBuilderError::InvalidTransactionRequest(
+                tx_type.into(),
+                missing,
+            )
+            .into_unbuilt(self));
         }
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
     }

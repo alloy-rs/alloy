@@ -81,6 +81,10 @@ impl ReceiptResponse for AnyTransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
     }
+
+    fn status(&self) -> bool {
+        self.inner.inner.status()
+    }
 }
 
 impl TransactionResponse for WithOtherFields<Transaction> {

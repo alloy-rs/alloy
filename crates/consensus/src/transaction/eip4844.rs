@@ -868,16 +868,16 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.chain_id()
     }
 
+    fn nonce(&self) -> u64 {
+        self.tx.nonce()
+    }
+
     fn gas_limit(&self) -> u128 {
         self.tx.gas_limit()
     }
 
     fn gas_price(&self) -> Option<u128> {
         self.tx.gas_price()
-    }
-
-    fn nonce(&self) -> u64 {
-        self.tx.nonce()
     }
 
     fn to(&self) -> TxKind {

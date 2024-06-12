@@ -29,7 +29,7 @@ use serde::{
 #[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
 pub struct RpcBlockHash {
     /// A block hash
-    pub block_hash: B256,
+    pub block_hash: BlockHash,
     /// Whether the block must be a canonical block
     pub require_canonical: Option<bool>,
 }
@@ -273,7 +273,7 @@ pub enum BlockId {
 
 impl BlockId {
     /// Returns the block hash if it is [BlockId::Hash]
-    pub const fn as_block_hash(&self) -> Option<B256> {
+    pub const fn as_block_hash(&self) -> Option<BlockHash> {
         match self {
             Self::Hash(hash) => Some(hash.block_hash),
             Self::Number(_) => None,
@@ -345,12 +345,12 @@ impl BlockId {
     }
 
     /// Create a new block hash instance.
-    pub const fn hash(block_hash: B256) -> Self {
+    pub const fn hash(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 
     /// Create a new block hash instance that requires the block to be canonical.
-    pub const fn hash_canonical(block_hash: B256) -> Self {
+    pub const fn hash_canonical(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
     }
 }

@@ -41,7 +41,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_set_interval_mining(&self, secs: u64) -> TransportResult<()>;
 
     /// Removes transactions from the pool.
-    async fn anvil_drop_transaction(&self, tx_hash: B256) -> TransportResult<Option<B256>>;
+    async fn anvil_drop_transaction(&self, tx_hash: TxHash) -> TransportResult<Option<TxHash>>;
 
     /// Removes all transactions from the pool.
     async fn anvil_drop_all_transactions(&self) -> TransportResult<()>;
@@ -111,7 +111,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     async fn anvil_increase_time(&self, seconds: U256) -> TransportResult<i64>;
 
     /// Similar to `evm_increaseTime` but takes the exact timestamp that you want in the next block.
-    async fn anvil_set_next_block_timestamp(&self, seconds: u64) -> TransportResult<()>;
+    async fn anvil_set_next_block_timestamp(&self, timestamp: u64) -> TransportResult<()>;
 
     /// Sets the specific timestamp and returns the number of seconds between the given timestamp
     /// and the current time.
@@ -184,7 +184,7 @@ where
         self.client().request("anvil_setIntervalMining", (secs,)).await
     }
 
-    async fn anvil_drop_transaction(&self, tx_hash: B256) -> TransportResult<Option<B256>> {
+    async fn anvil_drop_transaction(&self, tx_hash: TxHash) -> TransportResult<Option<TxHash>> {
         self.client().request("anvil_dropTransaction", (tx_hash,)).await
     }
 
