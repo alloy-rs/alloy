@@ -88,17 +88,6 @@ hyper = [
 ]
 wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
-# full
-full = [
-    "providers",
-    "rpc-client",
-    "rpc-types",
-    "network",
-    "signer-wallet",
-    "consensus",
-    "k256",
-]
-
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
 # general
@@ -176,7 +165,7 @@ postgres = ["alloy-core/postgres"]
 getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
-serde = ["alloy-core/serde", "alloy-eips?/serde", "alloy-serde"]
+serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
 ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
@@ -199,4 +188,17 @@ eip712 = [
     "alloy-signer-ledger?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
+]
+
+# ---------------------------------------- Full re-exports --------------------------------------- #
+
+# full
+full = [
+    "providers",
+    "rpc-client",
+    "rpc-types",
+    "network",
+    "signer-wallet",
+    "consensus",
+    "k256",
 ]
