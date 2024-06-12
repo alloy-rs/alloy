@@ -59,7 +59,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Builder-pattern method for setting the chain ID.
-    fn with_chain_id(mut self, chain_id: alloy_primitives::ChainId) -> Self {
+    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
         self.set_chain_id(chain_id);
         self
     }
@@ -101,16 +101,16 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the kind of transaction.
-    fn kind(&self) -> Option<alloy_primitives::TxKind>;
+    fn kind(&self) -> Option<TxKind>;
 
     /// Clear the kind of transaction.
     fn clear_kind(&mut self);
 
     /// Set the kind of transaction.
-    fn set_kind(&mut self, kind: alloy_primitives::TxKind);
+    fn set_kind(&mut self, kind: TxKind);
 
     /// Builder-pattern method for setting the kind of transaction.
-    fn with_kind(mut self, kind: alloy_primitives::TxKind) -> Self {
+    fn with_kind(mut self, kind: TxKind) -> Self {
         self.set_kind(kind);
         self
     }

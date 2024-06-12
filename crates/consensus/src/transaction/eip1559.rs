@@ -261,18 +261,6 @@ impl TxEip1559 {
 }
 
 impl Transaction for TxEip1559 {
-    fn input(&self) -> &[u8] {
-        &self.input
-    }
-
-    fn to(&self) -> TxKind {
-        self.to
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
@@ -287,6 +275,18 @@ impl Transaction for TxEip1559 {
 
     fn gas_price(&self) -> Option<u128> {
         None
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 

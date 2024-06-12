@@ -5,7 +5,7 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
-use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -38,13 +38,13 @@ pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptW
 #[doc(alias = "Tx")]
 pub struct Transaction {
     /// Hash
-    pub hash: B256,
+    pub hash: TxHash,
     /// Nonce
     #[serde(with = "alloy_serde::quantity")]
     pub nonce: u64,
     /// Block hash
     #[serde(default)]
-    pub block_hash: Option<B256>,
+    pub block_hash: Option<BlockHash>,
     /// Block number
     #[serde(default, with = "alloy_serde::quantity::opt")]
     pub block_number: Option<u64>,
@@ -81,7 +81,7 @@ pub struct Transaction {
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub chain_id: Option<u64>,
+    pub chain_id: Option<ChainId>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blob_versioned_hashes: Option<Vec<B256>>,

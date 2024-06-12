@@ -6,7 +6,7 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{TxHash, B256, U256};
+use alloy_primitives::{BlockHash, ChainId, TxHash, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
@@ -67,7 +67,7 @@ pub struct NodeInfo {
     /// The current block timestamp
     pub current_block_timestamp: u64,
     /// The current block hash
-    pub current_block_hash: B256,
+    pub current_block_hash: BlockHash,
     /// The enabled hardfork
     pub hard_fork: String,
     /// How transactions are ordered for mining
@@ -86,7 +86,7 @@ pub struct NodeEnvironment {
     /// Base fee of the current block
     pub base_fee: U256,
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Configured block gas limit
     pub gas_limit: U256,
     /// Configured gas price
@@ -114,13 +114,13 @@ pub struct Metadata {
     /// client version
     pub client_version: String,
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Unique instance id
     pub instance_id: B256,
     /// Latest block number
     pub latest_block_number: u64,
     /// Latest block hash
-    pub latest_block_hash: B256,
+    pub latest_block_hash: BlockHash,
     /// Forked network info
     pub forked_network: Option<ForkedNetwork>,
     /// Snapshots of the chain
@@ -133,7 +133,7 @@ pub struct Metadata {
 #[serde(rename_all = "camelCase")]
 pub struct ForkedNetwork {
     /// Chain id of the node.
-    pub chain_id: u64,
+    pub chain_id: ChainId,
     /// Block number of the forked chain
     pub fork_block_number: u64,
     /// Block hash of the forked chain

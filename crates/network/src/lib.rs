@@ -9,7 +9,7 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, TxHash, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -59,7 +59,7 @@ pub trait ReceiptResponse {
 pub trait TransactionResponse {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> B256;
+    fn tx_hash(&self) -> TxHash;
 
     /// Sender of the transaction
     fn from(&self) -> Address;

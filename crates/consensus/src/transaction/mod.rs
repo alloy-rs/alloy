@@ -36,15 +36,6 @@ pub use typed::TypedTransaction;
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
-    /// Get `data`.
-    fn input(&self) -> &[u8];
-
-    /// Get `to`.
-    fn to(&self) -> TxKind;
-
-    /// Get `value`.
-    fn value(&self) -> U256;
-
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -56,6 +47,15 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;
+
+    /// Get `to`.
+    fn to(&self) -> TxKind;
+
+    /// Get `value`.
+    fn value(&self) -> U256;
+
+    /// Get `data`.
+    fn input(&self) -> &[u8];
 }
 
 /// A signable transaction.

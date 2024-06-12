@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, B256};
+use alloy_primitives::{hex, Address, ChainId, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
@@ -109,7 +109,7 @@ impl KeySpecifier {
 pub struct GcpSigner {
     client: Client,
     key_name: String,
-    chain_id: Option<u64>,
+    chain_id: Option<ChainId>,
     pubkey: VerifyingKey,
     address: Address,
 }
@@ -177,12 +177,12 @@ impl Signer for GcpSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> Option<u64> {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: Option<u64>) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -195,7 +195,7 @@ impl GcpSigner {
     pub async fn new(
         client: Client,
         key_specifier: KeySpecifier,
-        chain_id: Option<u64>,
+        chain_id: Option<ChainId>,
     ) -> Result<Self, GcpSignerError> {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;

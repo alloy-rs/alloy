@@ -1,6 +1,6 @@
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use alloy_primitives::{LogData, B256};
+use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
@@ -15,7 +15,7 @@ pub struct Log<T = LogData> {
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
     /// Hash of the block the transaction that emitted this log was mined in
-    pub block_hash: Option<B256>,
+    pub block_hash: Option<BlockHash>,
     /// Number of the block the transaction that emitted this log was mined in
     #[serde(with = "alloy_serde::quantity::opt")]
     pub block_number: Option<u64>,
@@ -26,7 +26,7 @@ pub struct Log<T = LogData> {
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
     #[doc(alias = "tx_hash")]
-    pub transaction_hash: Option<B256>,
+    pub transaction_hash: Option<TxHash>,
     /// Index of the Transaction in the block
     #[serde(with = "alloy_serde::quantity::opt")]
     #[doc(alias = "tx_index")]
@@ -41,7 +41,7 @@ pub struct Log<T = LogData> {
 
 impl<T> Log<T> {
     /// Getter for the address field. Shortcut for `log.inner.address`.
-    pub const fn address(&self) -> alloy_primitives::Address {
+    pub const fn address(&self) -> Address {
         self.inner.address
     }
 

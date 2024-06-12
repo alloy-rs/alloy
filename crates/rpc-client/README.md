@@ -13,7 +13,7 @@ For example, to make a simple request:
 
 ```rust,ignore
 // Instantiate a new client over a transport.
-let client: ReqwestClient = ClientBulider::default().http(url);
+let client: ReqwestClient = ClientBuilder::default().http(url);
 
 // Prepare a request to the server.
 let request = client.request("eth_blockNumber", ());
@@ -26,7 +26,7 @@ Batch requests are also supported:
 
 ```rust,ignore
 // Instantiate a new client over a transport.
-let client: ReqwestClient = ClientBulider::default().http(url);
+let client: ReqwestClient = ClientBuilder::default().http(url);
 
 // Prepare a batch request to the server.
 let batch = client.new_batch();

@@ -198,18 +198,6 @@ impl TxLegacy {
 }
 
 impl Transaction for TxLegacy {
-    fn input(&self) -> &[u8] {
-        &self.input
-    }
-
-    fn to(&self) -> TxKind {
-        self.to
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -224,6 +212,18 @@ impl Transaction for TxLegacy {
 
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 
