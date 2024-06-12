@@ -1044,6 +1044,17 @@ mod tests {
 
     #[cfg(feature = "ws")]
     #[tokio::test]
+    async fn websocket_tls_setup() {
+        let url = "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F";
+        // we don't care about the response, only that it doesn't panic on the TLS setup
+        let _provider = ProviderBuilder::<_, _, Ethereum>::default()
+            .with_recommended_fillers()
+            .on_builtin(url)
+            .await;
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
 
