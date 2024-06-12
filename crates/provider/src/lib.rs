@@ -49,4 +49,8 @@ pub mod utils;
 #[doc(no_inline)]
 pub use alloy_network::{self as network, Network};
 
-pub use alloy_rpc_client as client;
+#[cfg(feature = "ws")]
+pub use alloy_rpc_client::WsConnect;
+
+#[cfg(feature = "ipc")]
+pub use alloy_rpc_client::IpcConnect;
