@@ -22,7 +22,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumSigner, Ethereum};
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {

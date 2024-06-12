@@ -1,7 +1,7 @@
 use crate::{
     fillers::{
         ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
-        SignerFiller, TxFiller,
+        TxFiller, WalletFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -200,9 +200,9 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Add a signer layer to the stack being built.
     ///
-    /// See [`SignerFiller`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, SignerFiller<S>>, N> {
-        self.filler(SignerFiller::new(signer))
+    /// See [`WalletFiller`].
+    pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, WalletFiller<S>>, N> {
+        self.filler(WalletFiller::new(signer))
     }
 
     /// Change the network.
@@ -367,11 +367,11 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
-    /// function configures a signer backed by anvil keys, and is intended for
+    /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_signer(
+    pub fn on_anvil_with_wallet(
         self,
-    ) -> <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
         L::Provider,
         alloy_transport_http::Http<reqwest::Client>,
     >>::Provider
@@ -386,7 +386,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             alloy_transport_http::Http<reqwest::Client>,
         >,
     {
-        self.on_anvil_with_signer_and_config(std::convert::identity)
+        self.on_anvil_with_wallet_and_config(std::convert::identity)
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. The
@@ -414,12 +414,12 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. The
     /// given function is used to configure the anvil instance. This
-    /// function configures a signer backed by anvil keys, and is intended for
+    /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_signer_and_config(
+    pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
         L::Provider,
         alloy_transport_http::Http<reqwest::Client>,
     >>::Provider
@@ -439,7 +439,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let wallet = alloy_signer_wallet::Wallet::from(anvil_layer.instance().keys()[0].clone());
 
-        let signer = crate::network::EthereumSigner::from(wallet);
+        let signer = crate::network::EthereumWallet::from(wallet);
 
         self.signer(signer).layer(anvil_layer).on_http(url)
     }

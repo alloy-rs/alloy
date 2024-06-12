@@ -1,5 +1,5 @@
 use crate::{
-    fillers::{FillProvider, JoinFill, SignerFiller, TxFiller},
+    fillers::{FillProvider, JoinFill, TxFiller, WalletFiller},
     Provider,
 };
 use alloy_network::{Ethereum, Network, NetworkWallet};
@@ -35,7 +35,7 @@ pub trait WalletProvider<N: Network = Ethereum> {
     }
 }
 
-impl<S, N> WalletProvider<N> for SignerFiller<S>
+impl<S, N> WalletProvider<N> for WalletFiller<S>
 where
     S: NetworkWallet<N> + Clone,
     N: Network,
@@ -98,14 +98,14 @@ mod test {
 
     #[test]
     fn basic_usage() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }
 
     #[test]
     fn bubbles_through_fillers() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
     }

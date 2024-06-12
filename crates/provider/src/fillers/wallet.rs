@@ -14,7 +14,7 @@ use super::{FillerControlFlow, TxFiller};
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkWallet, EthereumSigner, Ethereum};
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
@@ -27,30 +27,30 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct SignerFiller<S> {
-    signer: S,
+pub struct WalletFiller<S> {
+    wallet: S,
 }
 
-impl<S> AsRef<S> for SignerFiller<S> {
+impl<S> AsRef<S> for WalletFiller<S> {
     fn as_ref(&self) -> &S {
-        &self.signer
+        &self.wallet
     }
 }
 
-impl<S> AsMut<S> for SignerFiller<S> {
+impl<S> AsMut<S> for WalletFiller<S> {
     fn as_mut(&mut self) -> &mut S {
-        &mut self.signer
+        &mut self.wallet
     }
 }
 
-impl<S> SignerFiller<S> {
-    /// Creates a new signing layer with the given signer.
-    pub const fn new(signer: S) -> Self {
-        Self { signer }
+impl<S> WalletFiller<S> {
+    /// Creates a new signing layer with the given wallet.
+    pub const fn new(wallet: S) -> Self {
+        Self { wallet }
     }
 }
 
-impl<S, N> TxFiller<N> for SignerFiller<S>
+impl<S, N> TxFiller<N> for WalletFiller<S>
 where
     N: Network,
     S: NetworkWallet<N> + Clone,
@@ -71,7 +71,7 @@ where
     fn fill_sync(&self, tx: &mut SendableTx<N>) {
         if let Some(builder) = tx.as_mut_builder() {
             if builder.from().is_none() {
-                builder.set_from(self.signer.default_signer_address());
+                builder.set_from(self.wallet.default_signer_address());
             }
         }
     }
@@ -98,7 +98,7 @@ where
             _ => return Ok(tx),
         };
 
-        let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
+        let envelope = builder.build(&self.wallet).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))
     }
@@ -113,7 +113,7 @@ mod tests {
 
     #[tokio::test]
     async fn poc() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let tx = TransactionRequest {
             nonce: Some(0),

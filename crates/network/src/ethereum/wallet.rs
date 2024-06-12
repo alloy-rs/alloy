@@ -5,23 +5,23 @@ use alloy_signer::Signature;
 use async_trait::async_trait;
 use std::{collections::BTreeMap, sync::Arc};
 
-/// A signer capable of signing any transaction for the Ethereum network.
+/// A wallet capable of signing any transaction for the Ethereum network.
 #[derive(Clone, Default)]
-pub struct EthereumSigner {
+pub struct EthereumWallet {
     default: Address,
-    secp_signers: BTreeMap<Address, Arc<dyn TxSigner<Signature> + Send + Sync>>,
+    signers: BTreeMap<Address, Arc<dyn TxSigner<Signature> + Send + Sync>>,
 }
 
-impl std::fmt::Debug for EthereumSigner {
+impl std::fmt::Debug for EthereumWallet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EthereumSigner")
+        f.debug_struct("EthereumWallet")
             .field("default_signer", &self.default)
-            .field("credentials", &self.secp_signers.len())
+            .field("credentials", &self.signers.len())
             .finish()
     }
 }
 
-impl<S> From<S> for EthereumSigner
+impl<S> From<S> for EthereumWallet
 where
     S: TxSigner<Signature> + Send + Sync + 'static,
 {
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl EthereumSigner {
+impl EthereumWallet {
     /// Create a new signer with the given signer as the default signer.
     pub fn new<S>(signer: S) -> Self
     where
@@ -50,7 +50,7 @@ impl EthereumSigner {
     where
         S: TxSigner<Signature> + Send + Sync + 'static,
     {
-        self.secp_signers.insert(signer.address(), Arc::new(signer));
+        self.signers.insert(signer.address(), Arc::new(signer));
     }
 
     /// Register a new signer on this object, and set it as the default signer.
@@ -69,7 +69,7 @@ impl EthereumSigner {
 
     /// Get the default signer.
     pub fn default_signer(&self) -> Arc<dyn TxSigner<Signature> + Send + Sync + 'static> {
-        self.secp_signers.get(&self.default).cloned().expect("invalid signer")
+        self.signers.get(&self.default).cloned().expect("invalid signer")
     }
 
     /// Get the signer for the given address.
@@ -77,7 +77,7 @@ impl EthereumSigner {
         &self,
         address: Address,
     ) -> Option<Arc<dyn TxSigner<Signature> + Send + Sync + 'static>> {
-        self.secp_signers.get(&address).cloned()
+        self.signers.get(&address).cloned()
     }
 
     #[doc(alias = "sign_tx_inner")]
@@ -97,7 +97,7 @@ impl EthereumSigner {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<N> NetworkWallet<N> for EthereumSigner
+impl<N> NetworkWallet<N> for EthereumWallet
 where
     N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
 {
@@ -106,11 +106,11 @@ where
     }
 
     fn has_signer_for(&self, address: &Address) -> bool {
-        self.secp_signers.contains_key(address)
+        self.signers.contains_key(address)
     }
 
     fn signer_addresses(&self) -> impl Iterator<Item = Address> {
-        self.secp_signers.keys().copied()
+        self.signers.keys().copied()
     }
 
     #[doc(alias = "sign_tx_from")]
