@@ -33,6 +33,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
+alloy-eips = { workspace = true, features = ["arbitrary"] }
 alloy-signer.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }

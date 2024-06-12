@@ -361,7 +361,9 @@ mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
     use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, U256};
+    use alloy_primitives::{hex, Address, Signature, U256};
+    #[allow(unused_imports)]
+    use alloy_primitives::{Bytes, TxKind};
     use std::{fs, path::PathBuf, vec};
 
     #[cfg(not(feature = "std"))]
