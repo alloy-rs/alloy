@@ -10,4 +10,4 @@
 extern crate tracing;
 
 mod wallet;
-pub use wallet::{AwsSigner, AwsSignerError};
+pub use wallet::{AwsWallet, AwsWalletError};

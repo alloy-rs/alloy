@@ -20,9 +20,9 @@ const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
-    /// phrase should `build` the wallet.
+    /// phrase should `build` the signer.
     phrase: Option<String>,
-    /// The mnemonic builder can also be asked to generate a new random wallet by providing the
+    /// The mnemonic builder can also be asked to generate a new random signer by providing the
     /// number of words in the phrase. By default this is set to 12.
     word_count: usize,
     /// The derivation path at which the extended private key child will be derived at. By default
@@ -37,7 +37,7 @@ pub struct MnemonicBuilder<W: Wordlist> {
     _wordlist: PhantomData<W>,
 }
 
-/// Error produced by the mnemonic wallet module
+/// Error produced by the mnemonic signer module.
 #[derive(Debug, Error)]
 pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was expected but not found.
@@ -70,7 +70,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ///
     /// ```
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_wallet::{MnemonicBuilder, coins_bip39::English};
+    /// use alloy_signer_local::{MnemonicBuilder, coins_bip39::English};
     ///
     /// let wallet = MnemonicBuilder::<English>::default()
     ///     .phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
@@ -90,7 +90,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ///
     /// ```no_run
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_wallet::{coins_bip39::English, MnemonicBuilder};
+    /// use alloy_signer_local::{coins_bip39::English, MnemonicBuilder};
     ///
     /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
     /// # Ok(())

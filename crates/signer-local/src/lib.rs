@@ -54,7 +54,7 @@ pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>
 /// ```
 /// use alloy_signer::{Signer, SignerSync};
 ///
-/// let signer = alloy_signer_wallet::LocalSigner::random();
+/// let signer = alloy_signer_local::LocalSigner::random();
 ///
 /// // Optionally, the signers' chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
