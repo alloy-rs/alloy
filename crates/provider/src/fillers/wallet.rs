@@ -64,7 +64,7 @@ where
 
         match tx.complete_preferred() {
             Ok(_) => FillerControlFlow::Ready,
-            Err(e) => FillerControlFlow::Missing(vec![("Signer", e)]),
+            Err(e) => FillerControlFlow::Missing(vec![("Wallet", e)]),
         }
     }
 

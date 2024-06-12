@@ -175,7 +175,7 @@ impl FromStr for LocalSigner<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FilledLocalSigner, LocalSigner, SignerSync};
+    use crate::{FilledLocalSigner, SignerSync};
     use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
