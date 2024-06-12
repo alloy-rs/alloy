@@ -23,8 +23,9 @@ body:
         - serde
         - signers
         - transports
+        - other
     validations:
-      required: false
+      required: true
   - type: textarea
     attributes:
       label: Describe the feature you would like

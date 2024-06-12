@@ -25,8 +25,9 @@ body:
         - serde
         - signers
         - transports
+        - other
     validations:
-      required: false
+      required: true
   - type: input
     attributes:
       label: What version of Alloy are you on?
