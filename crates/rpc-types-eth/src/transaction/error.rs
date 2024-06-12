@@ -62,8 +62,8 @@ pub enum ConversionError {
     #[error("missing source hash")]
     MissingSourceHash,
     /// Invalid source hash (for Optimism deposit tx)
-    #[error("invalid block number")]
-    InvalidBlockNumber,
+    #[error("invalid source hash")]
+    InvalidSourceHash,
     /// Invalid mint value (for Optimism deposit tx)
     #[error("invalid mint value")]
     InvalidMintValue,
