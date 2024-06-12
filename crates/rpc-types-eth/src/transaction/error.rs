@@ -58,6 +58,15 @@ pub enum ConversionError {
     /// Missing block number
     #[error("missing block number")]
     MissingBlockNumber,
+    /// Missing source hash (for Optimism deposit tx)
+    #[error("missing source hash")]
+    MissingSourceHash,
+    /// Invalid source hash (for Optimism deposit tx)
+    #[error("invalid block number")]
+    InvalidBlockNumber,
+    /// Invalid mint value (for Optimism deposit tx)
+    #[error("invalid mint value")]
+    InvalidMintValue,
     /// Blob gas used integer conversion error
     #[error("blob gas used integer conversion error: {0}")]
     BlobGasUsedConversion(TryFromIntError),
