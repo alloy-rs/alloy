@@ -165,10 +165,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
         if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err((
-                self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
-            ));
+            return Err(TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
+                .into_unbuilt(self));
         }
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
