@@ -88,6 +88,17 @@ hyper = [
 ]
 wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
+# full
+full = [
+    "providers",
+    "rpc-client",
+    "rpc-types",
+    "network",
+    "signer-wallet",
+    "consensus",
+    "k256",
+]
+
 # ---------------------------------------- Main re-exports --------------------------------------- #
 
 # general
@@ -116,8 +127,8 @@ pubsub = [
 rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
 rpc-client = ["rpc", "dep:alloy-rpc-client"]
-rpc-client-ws = ["rpc", "alloy-rpc-client?/ws"]
-rpc-client-ipc = ["rpc", "alloy-rpc-client?/ipc"]
+rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-anvil = ["rpc-types", "alloy-rpc-types?/anvil"]
 rpc-types-beacon = ["rpc-types", "alloy-rpc-types?/beacon"]
