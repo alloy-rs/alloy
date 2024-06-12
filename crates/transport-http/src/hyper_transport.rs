@@ -87,10 +87,10 @@ where
                 trace!(body = %String::from_utf8_lossy(&body), "response body");
 
                 if status != hyper::StatusCode::OK {
-                    return Err(TransportErrorKind::custom_str(&format!(
-                        "HTTP error {status} with body: {}",
-                        String::from_utf8_lossy(&body)
-                    )));
+                    return Err(TransportErrorKind::http_error(
+                        status.as_u16(),
+                        String::from_utf8_lossy(&body).into_owned(),
+                    ));
                 }
 
                 // Deserialize a Box<RawValue> from the body. If deserialization fails, return
