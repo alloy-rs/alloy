@@ -7,10 +7,18 @@ use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
 /// Result type for transaction builders
-pub type BuildResult<T, N> = Result<T, Unbuilt<N>>;
+pub type BuildResult<T, N> = Result<T, UnbuiltTransactionError<N>>;
 
 /// An unbuilt transaction, along with some error.
-pub type Unbuilt<N> = (<N as Network>::TransactionRequest, TransactionBuilderError<N>);
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to build transaction: {error}")]
+pub struct UnbuiltTransactionError<N: Network> {
+    /// The original request that failed to build.
+    pub request: N::TransactionRequest,
+    /// The error that occurred.
+    #[source]
+    pub error: TransactionBuilderError<N>,
+}
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
@@ -39,6 +47,11 @@ impl<N: Network> TransactionBuilderError<N> {
         E: std::error::Error + Send + Sync + 'static,
     {
         Self::Custom(Box::new(e))
+    }
+
+    /// Convert the error into an unbuilt transaction error.
+    pub const fn into_unbuilt(self, request: N::TransactionRequest) -> UnbuiltTransactionError<N> {
+        UnbuiltTransactionError { request, error: self }
     }
 }
 

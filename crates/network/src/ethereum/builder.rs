@@ -165,10 +165,8 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
         if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err((
-                self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
-            ));
+            return Err(TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
+                .into_unbuilt(self));
         }
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
@@ -265,7 +263,7 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        assert!(matches!(error.1, TransactionBuilderError::InvalidTransactionRequest(_, _)));
+        assert!(matches!(error.error, TransactionBuilderError::InvalidTransactionRequest(_, _)));
     }
 
     #[test]
@@ -274,7 +272,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -291,7 +290,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -312,7 +312,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -330,7 +331,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
