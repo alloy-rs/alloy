@@ -142,6 +142,62 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
 }
 
 impl TxEnvelope {
+    /// Returns true if the transaction is a legacy transaction.
+    #[inline]
+    pub const fn is_legacy(&self) -> bool {
+        matches!(self, Self::Legacy(_))
+    }
+
+    /// Returns true if the transaction is an EIP-2930 transaction.
+    #[inline]
+    pub const fn is_eip2930(&self) -> bool {
+        matches!(self, Self::Eip2930(_))
+    }
+
+    /// Returns true if the transaction is an EIP-1559 transaction.
+    #[inline]
+    pub const fn is_eip1559(&self) -> bool {
+        matches!(self, Self::Eip1559(_))
+    }
+
+    /// Returns true if the transaction is an EIP-4844 transaction.
+    #[inline]
+    pub const fn is_eip4844(&self) -> bool {
+        matches!(self, Self::Eip4844(_))
+    }
+
+    /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
+    pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
+        match self {
+            Self::Legacy(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
+    pub const fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
+        match self {
+            Self::Eip2930(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip1559`] variant if the transaction is an EIP-1559 transaction.
+    pub const fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
+        match self {
+            Self::Eip1559(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`TxEip4844`] variant if the transaction is an EIP-4844 transaction.
+    pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
+        match self {
+            Self::Eip4844(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
     pub fn recover_signer(
