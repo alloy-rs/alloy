@@ -110,9 +110,9 @@ impl LedgerWallet {
     ///
     /// ```
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_ledger::{HDPath, Ledger};
+    /// use alloy_wallet_ledger::{HDPath, LedgerWallet};
     ///
-    /// let ledger = Ledger::new(HDPath::LedgerLive(0), Some(1)).await?;
+    /// let ledger = LedgerWallet::new(HDPath::LedgerLive(0), Some(1)).await?;
     /// # Ok(())
     /// # }
     /// ```

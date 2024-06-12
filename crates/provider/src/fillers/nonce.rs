@@ -33,7 +33,7 @@ use tokio::sync::Mutex;
 /// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .with_nonce_management()
-///     .wallet(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;

@@ -1,7 +1,9 @@
 # alloy-signer-local
 
-Local wallet implementations:
+Local signer implementations:
+
 - [K256 private key](./src/private_key.rs)
+- [Mnemonic phrase](./src/mnemonic.rs)
 - [YubiHSM2](./src/yubi.rs)
 
 ## Features
