@@ -72,7 +72,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_local::{MnemonicBuilder, coins_bip39::English};
     ///
-    /// let wallet = MnemonicBuilder::<English>::default()
+    /// let signer = MnemonicBuilder::<English>::default()
     ///     .phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
     ///     .build()?;
     /// # Ok(())
@@ -92,7 +92,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_signer_local::{coins_bip39::English, MnemonicBuilder};
     ///
-    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
+    /// let signer = MnemonicBuilder::<English>::default().word_count(24).build()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -227,7 +227,7 @@ mod tests {
     fn mnemonic_write_read() {
         let dir = tempdir().unwrap();
 
-        let wallet1 = MnemonicBuilder::<English>::default()
+        let signer1 = MnemonicBuilder::<English>::default()
             .word_count(24)
             .derivation_path(TEST_DERIVATION_PATH)
             .unwrap()
@@ -240,17 +240,17 @@ mod tests {
         assert_eq!(paths.count(), 1);
 
         // Use the newly created mnemonic to instantiate wallet.
-        let phrase_path = dir.as_ref().join(wallet1.address.to_string());
+        let phrase_path = dir.as_ref().join(signer1.address.to_string());
         let phrase = std::fs::read_to_string(phrase_path).unwrap();
-        let wallet2 = MnemonicBuilder::<English>::default()
+        let signer2 = MnemonicBuilder::<English>::default()
             .phrase(phrase)
             .derivation_path(TEST_DERIVATION_PATH)
             .unwrap()
             .build()
             .unwrap();
 
-        // Ensure that both wallets belong to the same address.
-        assert_eq!(wallet1.address, wallet2.address);
+        // Ensure that both signers belong to the same address.
+        assert_eq!(signer1.address, signer2.address);
 
         dir.close().unwrap();
     }
