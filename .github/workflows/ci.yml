@@ -93,12 +93,12 @@ jobs:
             --exclude alloy-node-bindings \
             --exclude alloy-provider \
             --exclude alloy-signer \
-            --exclude alloy-signer-aws \
-            --exclude alloy-signer-gcp \
-            --exclude alloy-signer-ledger \
-            --exclude alloy-signer-trezor \
             --exclude alloy-signer-local \
-            --exclude alloy-transport-ipc
+            --exclude alloy-transport-ipc \
+            --exclude alloy-wallet-aws \
+            --exclude alloy-wallet-gcp \
+            --exclude alloy-wallet-ledger \
+            --exclude alloy-wallet-trezor
 
   wasm-wasi:
     runs-on: ubuntu-latest
@@ -115,13 +115,13 @@ jobs:
       - name: cargo hack
         run: |
           cargo hack build --workspace --target wasm32-wasi \
-            --exclude alloy-signer-gcp \
-            --exclude alloy-signer-ledger \
-            --exclude alloy-signer-trezor \
-            --exclude alloy-transport-ipc
-      # Ledger signer requires one of `browser` or `node` features.
+            --exclude alloy-transport-ipc \
+            --exclude alloy-wallet-gcp \
+            --exclude alloy-wallet-ledger \
+            --exclude alloy-wallet-trezor
+      # Ledger wallet requires one of `browser` or `node` features.
       - name: build ledger
-        run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
+        run: cargo build -p alloy-wallet-ledger --features browser --target wasm32-wasi
 
   no-std:
     runs-on: ubuntu-latest

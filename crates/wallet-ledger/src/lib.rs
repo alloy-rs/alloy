@@ -9,5 +9,8 @@
 #[macro_use]
 extern crate tracing;
 
-mod signer;
-pub use signer::{AwsSigner, AwsSignerError};
+mod wallet;
+pub use wallet::LedgerWallet;
+
+mod types;
+pub use types::{DerivationType as HDPath, LedgerError};

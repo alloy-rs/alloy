@@ -9,8 +9,5 @@
 #[macro_use]
 extern crate tracing;
 
-mod signer;
-pub use signer::LedgerWallet;
-
-mod types;
-pub use types::{DerivationType as HDPath, LedgerError};
+mod wallet;
+pub use wallet::{GcpKeyRingRef, GcpWallet, GcpWalletError, KeySpecifier};

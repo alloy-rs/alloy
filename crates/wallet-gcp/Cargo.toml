@@ -1,6 +1,6 @@
 [package]
-name = "alloy-signer-gcp"
-description = "Ethereum GCP KMS signer"
+name = "alloy-wallet-gcp"
+description = "Ethereum GCP KMS wallet"
 
 version.workspace = true
 edition.workspace = true

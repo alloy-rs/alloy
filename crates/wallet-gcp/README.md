@@ -1,5 +1,5 @@
-# alloy-signer-gcp
+# alloy-wallet-gcp
 
-Ethereum [GCP KMS] signer.
+Ethereum [GCP KMS] wallet.
 
 [GCP KMS]: https://cloud.google.com/kms/docs/
