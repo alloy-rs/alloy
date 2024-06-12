@@ -194,11 +194,14 @@ eip712 = [
 
 # full
 full = [
-    "providers",
-    "rpc-client",
-    "rpc-types",
-    "network",
-    "signer-wallet",
     "consensus",
+    "contract",
     "k256",
+    "network",
+    "provider-http", # includes `providers`
+    "provider-ws",   # includes `providers`
+    "provider-ipc",  # includes `providers`
+    "rpc-client",
+    "rpc-types",     # includes `rpc-types-eth`
+    "signer-wallet", # includes `signers`
 ]
