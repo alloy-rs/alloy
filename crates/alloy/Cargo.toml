@@ -72,6 +72,21 @@ std = [
     "alloy-consensus?/std",
 ]
 
+# full
+full = [
+    "consensus",
+    "contract",
+    "eips",
+    "k256",
+    "kzg",
+    "network",
+    "provider-http", # includes `providers`
+    "provider-ws",   # includes `providers`
+    "provider-ipc",  # includes `providers`
+    "rpc-types",     # includes `rpc-types-eth`
+    "signer-wallet", # includes `signers`
+]
+
 # configuration
 reqwest = [
     "dep:reqwest",
@@ -188,22 +203,4 @@ eip712 = [
     "alloy-signer-ledger?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
-]
-
-# ---------------------------------------- Full re-exports --------------------------------------- #
-
-# full
-full = [
-    "consensus",
-    "contract",
-    "eips",
-    "k256",
-    "kzg",
-    "network",
-    "provider-http", # includes `providers`
-    "provider-ws",   # includes `providers`
-    "provider-ipc",  # includes `providers`
-    "rpc-client",
-    "rpc-types",     # includes `rpc-types-eth`
-    "signer-wallet", # includes `signers`
 ]
