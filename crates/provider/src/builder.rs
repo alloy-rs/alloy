@@ -442,7 +442,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
         let wallet = crate::network::EthereumWallet::from(signer);
 
-        self.wallet(signer).layer(anvil_layer).on_http(url)
+        self.wallet(wallet).layer(anvil_layer).on_http(url)
     }
 }
 

@@ -171,11 +171,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: NetworkWallet<Ethereum>>(
+    async fn build<W: NetworkWallet<Ethereum>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
-        Ok(signer.sign_request(self).await?)
+        Ok(wallet.sign_request(self).await?)
     }
 }
 

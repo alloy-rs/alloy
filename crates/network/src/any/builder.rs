@@ -157,10 +157,10 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: NetworkWallet<AnyNetwork>>(
+    async fn build<W: NetworkWallet<AnyNetwork>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
-        Ok(signer.sign_request(self).await?)
+        Ok(wallet.sign_request(self).await?)
     }
 }
