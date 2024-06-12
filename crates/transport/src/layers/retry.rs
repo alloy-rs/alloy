@@ -9,6 +9,7 @@ use std::{
         Arc,
     },
     task::{Context, Poll},
+    time::Duration,
 };
 use tower::{Layer, Service};
 use tracing::trace;
@@ -109,6 +110,12 @@ pub struct RetryBackoffService<S> {
     requests_enqueued: Arc<AtomicU32>,
 }
 
+impl<S> RetryBackoffService<S> {
+    const fn initial_backoff(&self) -> Duration {
+        Duration::from_millis(self.initial_backoff)
+    }
+}
+
 impl<S> Service<RequestPacket> for RetryBackoffService<S>
 where
     S: Service<RequestPacket, Response = ResponsePacket, Error = TransportError>
@@ -137,9 +144,9 @@ where
             let mut timeout_retries: u32 = 0;
             loop {
                 let err;
-                let fut = inner.call(request.clone()).await;
+                let res = inner.call(request.clone()).await;
 
-                match fut {
+                match res {
                     Ok(res) => {
                         if let Some(e) = res.as_error() {
                             err = TransportError::ErrorResp(e.clone())
@@ -155,17 +162,19 @@ where
                 if should_retry {
                     rate_limit_retry_number += 1;
                     if rate_limit_retry_number > this.max_rate_limit_retries {
-                        return Err(TransportErrorKind::custom_str("Max retries exceeded"));
+                        return Err(TransportErrorKind::custom_str(&format!(
+                            "Max retries exceeded {}",
+                            err
+                        )));
                     }
-                    trace!("retrying request due to {:?}", err);
+                    trace!(%err, "retrying request");
 
                     let current_queued_reqs = this.requests_enqueued.load(Ordering::SeqCst) as u64;
 
                     // try to extract the requested backoff from the error or compute the next
                     // backoff based on retry count
                     let backoff_hint = this.policy.backoff_hint(&err);
-                    let next_backoff = backoff_hint
-                        .unwrap_or_else(|| std::time::Duration::from_millis(this.initial_backoff));
+                    let next_backoff = backoff_hint.unwrap_or_else(|| this.initial_backoff());
 
                     // requests are usually weighted and can vary from 10 CU to several 100 CU,
                     // cheaper requests are more common some example alchemy
@@ -187,9 +196,13 @@ where
                     let total_backoff = next_backoff
                         + std::time::Duration::from_secs(seconds_to_wait_for_compute_budget);
 
-                    trace!(?total_backoff, budget_backoff = ?seconds_to_wait_for_compute_budget,
-                    default_backoff = ?next_backoff, ?backoff_hint, "backing off due to rate
-                    limit");
+                    trace!(
+                        total_backoff_millis = total_backoff.as_millis(),
+                        budget_backoff_millis = seconds_to_wait_for_compute_budget * 1000,
+                        default_backoff_millis = next_backoff.as_millis(),
+                        backoff_hint_millis = backoff_hint.map(|d| d.as_millis()),
+                        "(all in ms) backing off due to rate limit"
+                    );
 
                     tokio::time::sleep(total_backoff).await;
                 } else {
