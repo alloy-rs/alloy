@@ -15,7 +15,7 @@ use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
 mod error;
-pub use error::WalletError;
+pub use error::LocalSignerError;
 
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
@@ -34,11 +34,11 @@ pub use yubihsm;
 pub use coins_bip39;
 
 /// A signer instantiated with a locally stored private key
-pub type LocalSigner = Wallet<k256::ecdsa::SigningKey>;
+pub type FilledLocalSigner = LocalSigner<k256::ecdsa::SigningKey>;
 
 /// A wallet instantiated with a YubiHSM
 #[cfg(feature = "yubihsm")]
-pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
+pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///
@@ -72,18 +72,18 @@ pub type YubiWallet = Wallet<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]
-pub struct Wallet<D> {
-    /// The wallet's private key.
+pub struct LocalSigner<D> {
+    /// The signers' private key.
     pub(crate) signer: D,
-    /// The wallet's address.
+    /// The signers' address.
     pub(crate) address: Address,
-    /// The wallet's chain ID (for EIP-155).
+    /// The signers' chain ID (for EIP-155).
     pub(crate) chain_id: Option<ChainId>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<D> {
     #[inline]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_hash_sync(hash)
@@ -105,7 +105,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigner<D> {
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
@@ -118,8 +118,8 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for Wallet<D> 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
-    /// Construct a new wallet with an external [`PrehashSigner`].
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<D> {
+    /// Construct a new signer with an external [`PrehashSigner`].
     #[inline]
     pub const fn new_with_signer(signer: D, address: Address, chain_id: Option<ChainId>) -> Self {
         Self { signer, address, chain_id }
@@ -151,7 +151,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> Wallet<D> {
 }
 
 // do not log the signer
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for Wallet<D> {
+impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Wallet")
             .field("address", &self.address)
@@ -162,7 +162,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for Wallet<D> 
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D> TxSigner<Signature> for Wallet<D>
+impl<D> TxSigner<Signature> for LocalSigner<D>
 where
     D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
 {
@@ -179,7 +179,7 @@ where
     }
 }
 
-impl<D> TxSignerSync<Signature> for Wallet<D>
+impl<D> TxSignerSync<Signature> for LocalSigner<D>
 where
     D: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
 {
@@ -219,15 +219,15 @@ mod test {
             tx: &mut dyn SignableTransaction<Signature>,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
-            let mut wallet: LocalSigner =
+            let mut signer: FilledLocalSigner =
                 "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
-            wallet.set_chain_id(chain_id);
+            signer.set_chain_id(chain_id);
 
-            let sig = wallet.sign_transaction_sync(tx)?;
+            let sig = signer.sign_transaction_sync(tx)?;
             let sighash = tx.signature_hash();
-            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), wallet.address());
+            assert_eq!(sig.recover_address_from_prehash(&sighash).unwrap(), signer.address());
 
-            let sig_async = wallet.sign_transaction(tx).await.unwrap();
+            let sig_async = signer.sign_transaction(tx).await.unwrap();
             assert_eq!(sig_async, sig);
 
             Ok(sig)

@@ -97,7 +97,7 @@ jobs:
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
-            --exclude alloy-signer-wallet \
+            --exclude alloy-signer-local \
             --exclude alloy-transport-ipc
 
   wasm-wasi:

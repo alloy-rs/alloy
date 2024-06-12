@@ -1,19 +1,19 @@
-//! [YubiHSM2](yubihsm) wallet implementation.
+//! [YubiHSM2](yubihsm) signer implementation.
 
-use super::Wallet;
+use super::LocalSigner;
 use alloy_signer::utils::raw_public_key_to_address;
 use elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use k256::{PublicKey, Secp256k1};
 use yubihsm::{
-    asymmetric::Algorithm::EcK256, ecdsa::Signer as YubiWallet, object, object::Label, Capability,
+    asymmetric::Algorithm::EcK256, ecdsa::Signer as YubiSigner, object, object::Label, Capability,
     Client, Connector, Credentials, Domain,
 };
 
-impl Wallet<YubiWallet<Secp256k1>> {
+impl LocalSigner<YubiSigner<Secp256k1>> {
     /// Connects to a yubi key's ECDSA account at the provided id
     pub fn connect(connector: Connector, credentials: Credentials, id: object::Id) -> Self {
         let client = Client::open(connector, credentials, true).unwrap();
-        let signer = YubiWallet::create(client, id).unwrap();
+        let signer = YubiSigner::create(client, id).unwrap();
         signer.into()
     }
 
@@ -29,7 +29,7 @@ impl Wallet<YubiWallet<Secp256k1>> {
         let id = client
             .generate_asymmetric_key(id, label, domain, Capability::SIGN_ECDSA, EcK256)
             .unwrap();
-        let signer = YubiWallet::create(client, id).unwrap();
+        let signer = YubiSigner::create(client, id).unwrap();
         signer.into()
     }
 
@@ -46,13 +46,13 @@ impl Wallet<YubiWallet<Secp256k1>> {
         let id = client
             .put_asymmetric_key(id, label, domain, Capability::SIGN_ECDSA, EcK256, key)
             .unwrap();
-        let signer = YubiWallet::create(client, id).unwrap();
+        let signer = YubiSigner::create(client, id).unwrap();
         signer.into()
     }
 }
 
-impl From<YubiWallet<Secp256k1>> for Wallet<YubiWallet<Secp256k1>> {
-    fn from(signer: YubiWallet<Secp256k1>) -> Self {
+impl From<YubiSigner<Secp256k1>> for LocalSigner<YubiSigner<Secp256k1>> {
+    fn from(signer: YubiSigner<Secp256k1>) -> Self {
         // Uncompress the public key.
         let pubkey = PublicKey::from_encoded_point(signer.public_key()).unwrap();
         let pubkey = pubkey.to_encoded_point(false);
@@ -75,7 +75,7 @@ mod tests {
             .unwrap();
 
         let connector = yubihsm::Connector::mockhsm();
-        let wallet = Wallet::from_key(
+        let signer = LocalSigner::from_key(
             connector,
             Credentials::default(),
             0,
@@ -85,15 +85,15 @@ mod tests {
         );
 
         let msg = "Some data";
-        let sig = wallet.sign_message_sync(msg.as_bytes()).unwrap();
-        assert_eq!(sig.recover_address_from_msg(msg).unwrap(), wallet.address());
-        assert_eq!(wallet.address(), address!("2DE2C386082Cff9b28D62E60983856CE1139eC49"));
+        let sig = signer.sign_message_sync(msg.as_bytes()).unwrap();
+        assert_eq!(sig.recover_address_from_msg(msg).unwrap(), signer.address());
+        assert_eq!(signer.address(), address!("2DE2C386082Cff9b28D62E60983856CE1139eC49"));
     }
 
     #[test]
     fn new_key() {
         let connector = yubihsm::Connector::mockhsm();
-        let wallet = Wallet::<YubiWallet<Secp256k1>>::new(
+        let signer = LocalSigner::<YubiSigner<Secp256k1>>::new(
             connector,
             Credentials::default(),
             0,
@@ -102,7 +102,7 @@ mod tests {
         );
 
         let msg = "Some data";
-        let sig = wallet.sign_message_sync(msg.as_bytes()).unwrap();
-        assert_eq!(sig.recover_address_from_msg(msg).unwrap(), wallet.address());
+        let sig = signer.sign_message_sync(msg.as_bytes()).unwrap();
+        assert_eq!(sig.recover_address_from_msg(msg).unwrap(), signer.address());
     }
 }

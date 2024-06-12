@@ -1,6 +1,6 @@
-//! [`k256`] wallet implementation.
+//! [`k256`] signer implementation.
 
-use super::{Wallet, WalletError};
+use super::{LocalSigner, LocalSignerError};
 use alloy_primitives::{hex, B256};
 use alloy_signer::utils::secret_key_to_address;
 use k256::{
@@ -13,7 +13,7 @@ use std::str::FromStr;
 #[cfg(feature = "keystore")]
 use std::path::Path;
 
-impl Wallet<SigningKey> {
+impl LocalSigner<SigningKey> {
     /// Creates a new Wallet instance from a [`SigningKey`].
     ///
     /// This can also be used to create a Wallet from a [`SecretKey`](K256SecretKey).
@@ -87,7 +87,7 @@ impl Wallet<SigningKey> {
 }
 
 #[cfg(feature = "keystore")]
-impl Wallet<SigningKey> {
+impl LocalSigner<SigningKey> {
     /// Creates a new random encrypted JSON with the provided password and stores it in the
     /// provided directory. Returns a tuple (Wallet, String) of the wallet instance for the
     /// keystore with its random UUID. Accepts an optional name for the keystore file. If `None`,
@@ -98,7 +98,7 @@ impl Wallet<SigningKey> {
         rng: &mut R,
         password: S,
         name: Option<&str>,
-    ) -> Result<(Self, String), WalletError>
+    ) -> Result<(Self, String), LocalSignerError>
     where
         P: AsRef<Path>,
         R: Rng + CryptoRng,
@@ -110,7 +110,7 @@ impl Wallet<SigningKey> {
 
     /// Decrypts an encrypted JSON from the provided path to construct a Wallet instance
     #[inline]
-    pub fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<Self, WalletError>
+    pub fn decrypt_keystore<P, S>(keypath: P, password: S) -> Result<Self, LocalSignerError>
     where
         P: AsRef<Path>,
         S: AsRef<[u8]>,
@@ -130,7 +130,7 @@ impl Wallet<SigningKey> {
         pk: B,
         password: S,
         name: Option<&str>,
-    ) -> Result<(Self, String), WalletError>
+    ) -> Result<(Self, String), LocalSignerError>
     where
         P: AsRef<Path>,
         R: Rng + CryptoRng,
@@ -143,7 +143,7 @@ impl Wallet<SigningKey> {
     }
 }
 
-impl PartialEq for Wallet<SigningKey> {
+impl PartialEq for LocalSigner<SigningKey> {
     fn eq(&self, other: &Self) -> bool {
         self.signer.to_bytes().eq(&other.signer.to_bytes())
             && self.address == other.address
@@ -151,20 +151,20 @@ impl PartialEq for Wallet<SigningKey> {
     }
 }
 
-impl From<SigningKey> for Wallet<SigningKey> {
+impl From<SigningKey> for LocalSigner<SigningKey> {
     fn from(value: SigningKey) -> Self {
         Self::from_signing_key(value)
     }
 }
 
-impl From<K256SecretKey> for Wallet<SigningKey> {
+impl From<K256SecretKey> for LocalSigner<SigningKey> {
     fn from(value: K256SecretKey) -> Self {
         Self::from_signing_key(value.into())
     }
 }
 
-impl FromStr for Wallet<SigningKey> {
-    type Err = WalletError;
+impl FromStr for LocalSigner<SigningKey> {
+    type Err = LocalSignerError;
 
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         let array = hex::decode_to_array::<_, 32>(src)?;
@@ -175,7 +175,7 @@ impl FromStr for Wallet<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LocalSigner, SignerSync};
+    use crate::{FilledLocalSigner, LocalSigner, SignerSync};
     use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
@@ -184,22 +184,22 @@ mod tests {
     #[test]
     fn parse_pk() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: Wallet<SigningKey> = s.parse().unwrap();
+        let _pk: LocalSigner<SigningKey> = s.parse().unwrap();
     }
 
     #[test]
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
         assert!(s.len() < 64);
-        let pk = s.parse::<LocalSigner>().unwrap_err();
+        let pk = s.parse::<FilledLocalSigner>().unwrap_err();
         match pk {
-            WalletError::HexError(hex::FromHexError::InvalidStringLength) => {}
+            LocalSignerError::HexError(hex::FromHexError::InvalidStringLength) => {}
             _ => panic!("Unexpected error"),
         }
     }
 
     #[cfg(feature = "keystore")]
-    fn test_encrypted_json_keystore(key: Wallet<SigningKey>, uuid: &str, dir: &Path) {
+    fn test_encrypted_json_keystore(key: LocalSigner<SigningKey>, uuid: &str, dir: &Path) {
         // sign a message using the given key
         let message = "Some data";
         let signature = key.sign_message_sync(message.as_bytes()).unwrap();
@@ -207,7 +207,7 @@ mod tests {
         // read from the encrypted JSON keystore and decrypt it, while validating that the
         // signatures produced by both the keys should match
         let path = Path::new(dir).join(uuid);
-        let key2 = Wallet::<SigningKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
+        let key2 = LocalSigner::<SigningKey>::decrypt_keystore(path.clone(), "randpsswd").unwrap();
 
         let signature2 = key2.sign_message_sync(message.as_bytes()).unwrap();
         assert_eq!(signature, signature2);
@@ -222,7 +222,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut rng = rand::thread_rng();
         let (key, uuid) =
-            Wallet::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
+            LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
@@ -238,9 +238,14 @@ mod tests {
             hex::decode("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b")
                 .unwrap();
 
-        let (key, uuid) =
-            Wallet::<SigningKey>::encrypt_keystore(&dir, &mut rng, private_key, "randpsswd", None)
-                .unwrap();
+        let (key, uuid) = LocalSigner::<SigningKey>::encrypt_keystore(
+            &dir,
+            &mut rng,
+            private_key,
+            "randpsswd",
+            None,
+        )
+        .unwrap();
 
         test_encrypted_json_keystore(key, &uuid, dir.path());
     }
@@ -249,7 +254,7 @@ mod tests {
     fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);
-        let key = Wallet::<SigningKey>::random_with(&mut rand::thread_rng());
+        let key = LocalSigner::<SigningKey>::random_with(&mut rand::thread_rng());
         let address = key.address;
 
         // sign a message
@@ -316,67 +321,68 @@ mod tests {
 
     #[test]
     fn key_to_address() {
-        let wallet: Wallet<SigningKey> =
+        let signer: LocalSigner<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
-        assert_eq!(wallet.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+        assert_eq!(signer.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
 
-        let wallet: Wallet<SigningKey> =
+        let signer: LocalSigner<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000002".parse().unwrap();
-        assert_eq!(wallet.address, address!("2B5AD5c4795c026514f8317c7a215E218DcCD6cF"));
+        assert_eq!(signer.address, address!("2B5AD5c4795c026514f8317c7a215E218DcCD6cF"));
 
-        let wallet: Wallet<SigningKey> =
+        let signer: LocalSigner<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000003".parse().unwrap();
-        assert_eq!(wallet.address, address!("6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
+        assert_eq!(signer.address, address!("6813Eb9362372EEF6200f3b1dbC3f819671cBA69"));
     }
 
     #[test]
     fn conversions() {
         let key = b256!("0000000000000000000000000000000000000000000000000000000000000001");
 
-        let wallet_b256: Wallet<SigningKey> = LocalSigner::from_bytes(&key).unwrap();
-        assert_eq!(wallet_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
-        assert_eq!(wallet_b256.chain_id, None);
-        assert_eq!(wallet_b256.signer, SigningKey::from_bytes((&key.0).into()).unwrap());
+        let signer_b256: LocalSigner<SigningKey> = LocalSigner::from_bytes(&key).unwrap();
+        assert_eq!(signer_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
+        assert_eq!(signer_b256.chain_id, None);
+        assert_eq!(signer_b256.signer, SigningKey::from_bytes((&key.0).into()).unwrap());
 
-        let wallet_str =
-            Wallet::from_str("0000000000000000000000000000000000000000000000000000000000000001")
-                .unwrap();
-        assert_eq!(wallet_str.address, wallet_b256.address);
-        assert_eq!(wallet_str.chain_id, wallet_b256.chain_id);
-        assert_eq!(wallet_str.signer, wallet_b256.signer);
-        assert_eq!(wallet_str.to_bytes(), key);
-        assert_eq!(wallet_str.to_field_bytes(), key.0.into());
+        let signer_str = LocalSigner::from_str(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+        assert_eq!(signer_str.address, signer_b256.address);
+        assert_eq!(signer_str.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_str.signer, signer_b256.signer);
+        assert_eq!(signer_str.to_bytes(), key);
+        assert_eq!(signer_str.to_field_bytes(), key.0.into());
 
-        let wallet_slice = Wallet::from_slice(&key[..]).unwrap();
-        assert_eq!(wallet_slice.address, wallet_b256.address);
-        assert_eq!(wallet_slice.chain_id, wallet_b256.chain_id);
-        assert_eq!(wallet_slice.signer, wallet_b256.signer);
-        assert_eq!(wallet_slice.to_bytes(), key);
-        assert_eq!(wallet_slice.to_field_bytes(), key.0.into());
+        let signer_slice = LocalSigner::from_slice(&key[..]).unwrap();
+        assert_eq!(signer_slice.address, signer_b256.address);
+        assert_eq!(signer_slice.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_slice.signer, signer_b256.signer);
+        assert_eq!(signer_slice.to_bytes(), key);
+        assert_eq!(signer_slice.to_field_bytes(), key.0.into());
 
-        let wallet_field_bytes = Wallet::from_field_bytes((&key.0).into()).unwrap();
-        assert_eq!(wallet_field_bytes.address, wallet_b256.address);
-        assert_eq!(wallet_field_bytes.chain_id, wallet_b256.chain_id);
-        assert_eq!(wallet_field_bytes.signer, wallet_b256.signer);
-        assert_eq!(wallet_field_bytes.to_bytes(), key);
-        assert_eq!(wallet_field_bytes.to_field_bytes(), key.0.into());
+        let signer_field_bytes = LocalSigner::from_field_bytes((&key.0).into()).unwrap();
+        assert_eq!(signer_field_bytes.address, signer_b256.address);
+        assert_eq!(signer_field_bytes.chain_id, signer_b256.chain_id);
+        assert_eq!(signer_field_bytes.signer, signer_b256.signer);
+        assert_eq!(signer_field_bytes.to_bytes(), key);
+        assert_eq!(signer_field_bytes.to_field_bytes(), key.0.into());
     }
 
     #[test]
     fn key_from_str() {
-        let wallet: Wallet<SigningKey> =
+        let signer: LocalSigner<SigningKey> =
             "0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
 
         // Check FromStr and `0x`
-        let wallet_0x: Wallet<SigningKey> =
+        let signer_0x: LocalSigner<SigningKey> =
             "0x0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
-        assert_eq!(wallet.address, wallet_0x.address);
-        assert_eq!(wallet.chain_id, wallet_0x.chain_id);
-        assert_eq!(wallet.signer, wallet_0x.signer);
+        assert_eq!(signer.address, signer_0x.address);
+        assert_eq!(signer.chain_id, signer_0x.chain_id);
+        assert_eq!(signer.signer, signer_0x.signer);
 
         // Must fail because of `0z`
         "0z0000000000000000000000000000000000000000000000000000000000000001"
-            .parse::<Wallet<SigningKey>>()
+            .parse::<LocalSigner<SigningKey>>()
             .unwrap_err();
     }
 }

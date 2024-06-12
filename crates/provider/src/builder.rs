@@ -198,11 +198,11 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a signer layer to the stack being built.
+    /// Add a wallet layer to the stack being built.
     ///
     /// See [`WalletFiller`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, WalletFiller<S>>, N> {
-        self.filler(WalletFiller::new(signer))
+    pub fn wallet<W>(self, wallet: W) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W>>, N> {
+        self.filler(WalletFiller::new(wallet))
     }
 
     /// Change the network.
@@ -437,11 +437,12 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        let wallet = alloy_signer_wallet::Wallet::from(anvil_layer.instance().keys()[0].clone());
+        let signer =
+            alloy_signer_local::LocalSigner::from(anvil_layer.instance().keys()[0].clone());
 
-        let signer = crate::network::EthereumWallet::from(wallet);
+        let wallet = crate::network::EthereumWallet::from(signer);
 
-        self.signer(signer).layer(anvil_layer).on_http(url)
+        self.wallet(signer).layer(anvil_layer).on_http(url)
     }
 }
 

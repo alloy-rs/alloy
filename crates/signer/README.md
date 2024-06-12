@@ -6,8 +6,8 @@ You can implement the [`Signer`][Signer] trait to extend functionality to other 
 such as Hardware Security Modules, KMS etc. See [its documentation][Signer] for more.
 
 Signer implementation in Alloy:
-- [K256 private key](../signer-wallet/src/private_key.rs)
-- [YubiHSM2](../signer-wallet/src/yubi.rs)
+- [K256 private key](../signer-local/src/private_key.rs)
+- [YubiHSM2](../signer-local/src/yubi.rs)
 - [Ledger](../signer-ledger/)
 - [Trezor](../signer-trezor/)
 - [AWS KMS](../signer-aws/)

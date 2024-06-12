@@ -3,7 +3,7 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
-use crate::{LocalSigner, Wallet, WalletError};
+use crate::{FilledLocalSigner, LocalSigner, LocalSignerError};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{Mnemonic, Wordlist};
@@ -15,7 +15,7 @@ use thiserror::Error;
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
-/// Represents a structure that can resolve into a `LocalSigner`.
+/// Represents a structure that can resolve into a `FilledLocalSigner`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist> {
@@ -103,12 +103,12 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
-    pub fn index(self, index: u32) -> Result<Self, WalletError> {
+    pub fn index(self, index: u32) -> Result<Self, LocalSignerError> {
         self.derivation_path(format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 
     /// Sets the derivation path of the child key to be derived.
-    pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, WalletError> {
+    pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, LocalSignerError> {
         self.derivation_path = path.as_ref().parse()?;
         Ok(self)
     }
@@ -126,9 +126,9 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self
     }
 
-    /// Builds a `LocalSigner` using the parameters set in mnemonic builder. This method expects
-    /// the phrase field to be set.
-    pub fn build(&self) -> Result<LocalSigner, WalletError> {
+    /// Builds a `FilledLocalSigner` using the parameters set in mnemonic builder. This method
+    /// expects the phrase field to be set.
+    pub fn build(&self) -> Result<FilledLocalSigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
             None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
@@ -136,15 +136,18 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self.mnemonic_to_signer(&mnemonic)
     }
 
-    /// Builds a `LocalSigner` using the parameters set in the mnemonic builder and constructing
-    /// the phrase using the thread RNG.
-    pub fn build_random(&self) -> Result<LocalSigner, WalletError> {
+    /// Builds a `FilledLocalSigner` using the parameters set in the mnemonic builder and
+    /// constructing the phrase using the thread RNG.
+    pub fn build_random(&self) -> Result<FilledLocalSigner, LocalSignerError> {
         self.build_random_with(&mut rand::thread_rng())
     }
 
-    /// Builds a `LocalSigner` using the parameters set in the mnemonic builder and constructing
-    /// the phrase using the provided random number generator.
-    pub fn build_random_with<R: Rng>(&self, rng: &mut R) -> Result<LocalSigner, WalletError> {
+    /// Builds a `FilledLocalSigner` using the parameters set in the mnemonic builder and
+    /// constructing the phrase using the provided random number generator.
+    pub fn build_random_with<R: Rng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<FilledLocalSigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
@@ -159,13 +162,16 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         Ok(wallet)
     }
 
-    fn mnemonic_to_signer(&self, mnemonic: &Mnemonic<W>) -> Result<LocalSigner, WalletError> {
+    fn mnemonic_to_signer(
+        &self,
+        mnemonic: &Mnemonic<W>,
+    ) -> Result<FilledLocalSigner, LocalSignerError> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();
         let signer = SigningKey::from_bytes(&key.to_bytes())?;
         let address = secret_key_to_address(&signer);
-        Ok(Wallet::<SigningKey> { signer, address, chain_id: None })
+        Ok(LocalSigner::<SigningKey> { signer, address, chain_id: None })
     }
 }
 

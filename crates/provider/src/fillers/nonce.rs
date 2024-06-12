@@ -30,10 +30,10 @@ use tokio::sync::Mutex;
 /// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .with_nonce_management()
-///     .signer(signer)
+///     .wallet(signer)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;

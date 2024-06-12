@@ -1,4 +1,4 @@
-# alloy-signer-wallet
+# alloy-signer-local
 
 Local wallet implementations:
 - [K256 private key](./src/private_key.rs)

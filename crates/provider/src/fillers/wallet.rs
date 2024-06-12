@@ -17,9 +17,9 @@ use super::{FillerControlFlow, TxFiller};
 /// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<S: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
-///     .signer(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -27,33 +27,33 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct WalletFiller<S> {
-    wallet: S,
+pub struct WalletFiller<W> {
+    wallet: W,
 }
 
-impl<S> AsRef<S> for WalletFiller<S> {
-    fn as_ref(&self) -> &S {
+impl<W> AsRef<W> for WalletFiller<W> {
+    fn as_ref(&self) -> &W {
         &self.wallet
     }
 }
 
-impl<S> AsMut<S> for WalletFiller<S> {
-    fn as_mut(&mut self) -> &mut S {
+impl<W> AsMut<W> for WalletFiller<W> {
+    fn as_mut(&mut self) -> &mut W {
         &mut self.wallet
     }
 }
 
-impl<S> WalletFiller<S> {
-    /// Creates a new signing layer with the given wallet.
-    pub const fn new(wallet: S) -> Self {
+impl<W> WalletFiller<W> {
+    /// Creates a new wallet layer with the given wallet.
+    pub const fn new(wallet: W) -> Self {
         Self { wallet }
     }
 }
 
-impl<S, N> TxFiller<N> for WalletFiller<S>
+impl<W, N> TxFiller<N> for WalletFiller<W>
 where
     N: Network,
-    S: NetworkWallet<N> + Clone,
+    W: NetworkWallet<N> + Clone,
 {
     type Fillable = ();
 
