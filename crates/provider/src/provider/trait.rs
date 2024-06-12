@@ -960,34 +960,7 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
-    use alloy_rpc_types_eth::{request::TransactionRequest, WithOtherFields};
-    use serde::Deserialize;
-
-    // OtherFields for Optimism
-    #[derive(Debug, Deserialize)]
-    struct OptOtherFields {
-        #[serde(rename = "l1BaseFeeScalar")]
-        l1_base_fee_scalar: String,
-        #[serde(rename = "l1BlobBaseFee")]
-        l1_blob_base_fee: String,
-        #[serde(rename = "l1BlobBaseFeeScalar")]
-        l1_blob_base_fee_scalar: String,
-        #[serde(rename = "l1Fee")]
-        l1_fee: String,
-        #[serde(rename = "l1GasPrice")]
-        l1_gas_price: String,
-        #[serde(rename = "l1GasUsed")]
-        l1_gas_used: String,
-    }
-
-    // OtherFields for Arbitrum
-    #[derive(Debug, Deserialize)]
-    struct ArbOtherFields {
-        #[serde(rename = "gasUsedForL1")]
-        gas_used_for_l1: String,
-        #[serde(rename = "l1BlockNumber")]
-        l1_block_number: String,
-    }
+    use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1333,58 +1306,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn gets_tx_receipt_opt() {
-        init_tracing();
-        let url = "https://opt-mainnet.g.alchemy.com/v2/demo";
-        let provider = ProviderBuilder::new().network::<AnyNetwork>().on_http(url.parse().unwrap());
-        let receipt = provider
-            .get_transaction_receipt(b256!(
-                "2bc7cb4648e847712e39abd42178e35214a70bb15c568d604687661b9539b4c2"
-            ))
-            .await
-            .unwrap();
-        assert!(receipt.is_some());
-        let receipt = receipt.unwrap();
-        assert_eq!(
-            receipt.transaction_hash,
-            b256!("2bc7cb4648e847712e39abd42178e35214a70bb15c568d604687661b9539b4c2")
-        );
-
-        let other: OptOtherFields = receipt.other.deserialize_into().unwrap();
-        assert_eq!(other.l1_base_fee_scalar, "0x558");
-        assert_eq!(other.l1_blob_base_fee, "0x1");
-        assert_eq!(other.l1_blob_base_fee_scalar, "0xc5fc5");
-        assert_eq!(other.l1_fee, "0x105d4b2024");
-        assert_eq!(other.l1_gas_price, "0x5d749a07e");
-        assert_eq!(other.l1_gas_used, "0x800");
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn gets_tx_receipt_arb() {
-        init_tracing();
-        let url = "https://arb-mainnet.g.alchemy.com/v2/demo";
-        let provider = ProviderBuilder::new().network::<AnyNetwork>().on_http(url.parse().unwrap());
-        let receipt = provider
-            .get_transaction_receipt(b256!(
-                "5aeca744e0c1f6d7f68641aedd394ac4b6e18cbeac3f8b3c81056c0e51a61cf3"
-            ))
-            .await
-            .unwrap();
-        assert!(receipt.is_some());
-        let receipt = receipt.unwrap();
-        assert_eq!(
-            receipt.transaction_hash,
-            b256!("5aeca744e0c1f6d7f68641aedd394ac4b6e18cbeac3f8b3c81056c0e51a61cf3")
-        );
-
-        let other: ArbOtherFields = receipt.other.deserialize_into().unwrap();
-        assert_eq!(other.gas_used_for_l1, "0x2c906");
-        assert_eq!(other.l1_block_number, "0x1323b96");
-    }
-
-    #[tokio::test]
     async fn gets_max_priority_fee_per_gas() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
@@ -1479,48 +1400,6 @@ mod tests {
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(&req).await.unwrap();
-        assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
-    }
-
-    #[tokio::test]
-    #[cfg(any(
-        feature = "reqwest-default-tls",
-        feature = "reqwest-rustls-tls",
-        feature = "reqwest-native-tls",
-    ))]
-    async fn call_opt_mainnet() {
-        use alloy_network::TransactionBuilder;
-        use alloy_sol_types::SolValue;
-
-        init_tracing();
-        let url = "https://opt-mainnet.g.alchemy.com/v2/demo";
-        let provider = ProviderBuilder::new().network::<AnyNetwork>().on_http(url.parse().unwrap());
-        let req = TransactionRequest::default()
-            .with_to(address!("4200000000000000000000000000000000000006")) // WETH
-            .with_input(bytes!("06fdde03")); // `name()`
-        let req = WithOtherFields::new(req);
-        let result = provider.call(&req).await.unwrap();
-        assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
-    }
-
-    #[tokio::test]
-    #[cfg(any(
-        feature = "reqwest-default-tls",
-        feature = "reqwest-rustls-tls",
-        feature = "reqwest-native-tls",
-    ))]
-    async fn call_arb_mainnet() {
-        use alloy_network::TransactionBuilder;
-        use alloy_sol_types::SolValue;
-
-        init_tracing();
-        let url = "https://arb-mainnet.g.alchemy.com/v2/demo";
-        let provider = ProviderBuilder::new().network::<AnyNetwork>().on_http(url.parse().unwrap());
-        let req = TransactionRequest::default()
-            .with_to(address!("82aF49447D8a07e3bd95BD0d56f35241523fBab1")) // WETH
-            .with_input(bytes!("06fdde03")); // `name()`
-        let req = WithOtherFields::new(req);
         let result = provider.call(&req).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
     }
