@@ -46,7 +46,7 @@ pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>
 ///
 /// ## Signing and Verifying a message
 ///
-/// The wallet can be used to produce ECDSA [`Signature`] objects, which can be
+/// The signer can be used to produce ECDSA [`Signature`] objects, which can be
 /// then verified. Note that this uses
 /// [`eip191_hash_message`](alloy_primitives::eip191_hash_message) under the hood which will
 /// prefix the message being hashed with the `Ethereum Signed Message` domain separator.
@@ -54,27 +54,27 @@ pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>
 /// ```
 /// use alloy_signer::{Signer, SignerSync};
 ///
-/// let wallet = alloy_signer_wallet::LocalSigner::random();
+/// let signer = alloy_signer_wallet::LocalSigner::random();
 ///
-/// // Optionally, the wallet's chain id can be set, in order to use EIP-155
+/// // Optionally, the signers' chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
-/// let wallet = wallet.with_chain_id(Some(1337));
+/// let signer = signer.with_chain_id(Some(1337));
 ///
-/// // The wallet can be used to sign messages
+/// // The signer can be used to sign messages
 /// let message = b"hello";
-/// let signature = wallet.sign_message_sync(message)?;
-/// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), wallet.address());
+/// let signature = signer.sign_message_sync(message)?;
+/// assert_eq!(signature.recover_address_from_msg(&message[..]).unwrap(), signer.address());
 ///
 /// // LocalSigner is cloneable:
-/// let wallet_clone = wallet.clone();
-/// let signature2 = wallet_clone.sign_message_sync(message)?;
+/// let signer_clone = signer.clone();
+/// let signature2 = signer_clone.sign_message_sync(message)?;
 /// assert_eq!(signature, signature2);
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]
-pub struct LocalSigner<D> {
+pub struct LocalSigner<C> {
     /// The signers' credential.
-    pub(crate) credential: D,
+    pub(crate) credential: C,
     /// The signers' address.
     pub(crate) address: Address,
     /// The signers' chain ID (for EIP-155).
@@ -155,7 +155,7 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
 }
 
 // do not log the signer
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<D> {
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LocalSigner")
             .field("address", &self.address)
@@ -166,9 +166,9 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigne
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D> TxSigner<Signature> for LocalSigner<D>
+impl<C> TxSigner<Signature> for LocalSigner<C>
 where
-    D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
+    C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync,
 {
     fn address(&self) -> Address {
         self.address
@@ -183,9 +183,9 @@ where
     }
 }
 
-impl<D> TxSignerSync<Signature> for LocalSigner<D>
+impl<C> TxSignerSync<Signature> for LocalSigner<C>
 where
-    D: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
+    C: PrehashSigner<(ecdsa::Signature, RecoveryId)>,
 {
     fn address(&self) -> Address {
         self.address
