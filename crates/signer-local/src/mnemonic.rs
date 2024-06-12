@@ -6,7 +6,7 @@
 use crate::{FilledLocalSigner, LocalSigner, LocalSignerError};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
-use coins_bip39::{Mnemonic, Wordlist};
+use coins_bip39::{English, Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
@@ -18,7 +18,7 @@ const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 /// Represents a structure that can resolve into a `FilledLocalSigner`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use = "builders do nothing unless `build` is called"]
-pub struct MnemonicBuilder<W: Wordlist> {
+pub struct MnemonicBuilder<W: Wordlist = English> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
     /// phrase should `build` the signer.
     phrase: Option<String>,
