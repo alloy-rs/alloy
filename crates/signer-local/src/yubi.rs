@@ -52,14 +52,14 @@ impl LocalSigner<YubiSigner<Secp256k1>> {
 }
 
 impl From<YubiSigner<Secp256k1>> for LocalSigner<YubiSigner<Secp256k1>> {
-    fn from(signer: YubiSigner<Secp256k1>) -> Self {
+    fn from(credential: YubiSigner<Secp256k1>) -> Self {
         // Uncompress the public key.
-        let pubkey = PublicKey::from_encoded_point(signer.public_key()).unwrap();
+        let pubkey = PublicKey::from_encoded_point(credential.public_key()).unwrap();
         let pubkey = pubkey.to_encoded_point(false);
         let bytes = pubkey.as_bytes();
         debug_assert_eq!(bytes[0], 0x04);
         let address = raw_public_key_to_address(&bytes[1..]);
-        Self::new_with_signer(signer, address, None)
+        Self::new_with_credential(credential, address, None)
     }
 }
 

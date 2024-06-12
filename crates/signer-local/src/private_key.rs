@@ -22,9 +22,9 @@ impl LocalSigner<SigningKey> {
     #[doc(alias = "new_private_key")]
     #[doc(alias = "new_pk")]
     #[inline]
-    pub fn from_signing_key(signer: SigningKey) -> Self {
-        let address = secret_key_to_address(&signer);
-        Self::new_with_signer(signer, address, None)
+    pub fn from_signing_key(credential: SigningKey) -> Self {
+        let address = secret_key_to_address(&credential);
+        Self::new_with_credential(credential, address, None)
     }
 
     /// Creates a new Wallet instance from a raw scalar serialized as a [`B256`] byte array.
@@ -70,7 +70,7 @@ impl LocalSigner<SigningKey> {
     /// Please treat it with the care it deserves!
     #[inline]
     pub fn as_nonzero_scalar(&self) -> &NonZeroScalar {
-        self.signer.as_nonzero_scalar()
+        self.credential.as_nonzero_scalar()
     }
 
     /// Serialize this [`Wallet`]'s [`SigningKey`] as a [`B256`] byte array.
@@ -82,7 +82,7 @@ impl LocalSigner<SigningKey> {
     /// Serialize this [`Wallet`]'s [`SigningKey`] as a [`FieldBytes`] byte array.
     #[inline]
     pub fn to_field_bytes(&self) -> FieldBytes {
-        self.signer.to_bytes()
+        self.credential.to_bytes()
     }
 }
 
@@ -145,7 +145,7 @@ impl LocalSigner<SigningKey> {
 
 impl PartialEq for LocalSigner<SigningKey> {
     fn eq(&self, other: &Self) -> bool {
-        self.signer.to_bytes().eq(&other.signer.to_bytes())
+        self.credential.to_bytes().eq(&other.credential.to_bytes())
             && self.address == other.address
             && self.chain_id == other.chain_id
     }
@@ -341,7 +341,7 @@ mod tests {
         let signer_b256: LocalSigner<SigningKey> = LocalSigner::from_bytes(&key).unwrap();
         assert_eq!(signer_b256.address, address!("7E5F4552091A69125d5DfCb7b8C2659029395Bdf"));
         assert_eq!(signer_b256.chain_id, None);
-        assert_eq!(signer_b256.signer, SigningKey::from_bytes((&key.0).into()).unwrap());
+        assert_eq!(signer_b256.credential, SigningKey::from_bytes((&key.0).into()).unwrap());
 
         let signer_str = LocalSigner::from_str(
             "0000000000000000000000000000000000000000000000000000000000000001",
@@ -349,21 +349,21 @@ mod tests {
         .unwrap();
         assert_eq!(signer_str.address, signer_b256.address);
         assert_eq!(signer_str.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_str.signer, signer_b256.signer);
+        assert_eq!(signer_str.credential, signer_b256.credential);
         assert_eq!(signer_str.to_bytes(), key);
         assert_eq!(signer_str.to_field_bytes(), key.0.into());
 
         let signer_slice = LocalSigner::from_slice(&key[..]).unwrap();
         assert_eq!(signer_slice.address, signer_b256.address);
         assert_eq!(signer_slice.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_slice.signer, signer_b256.signer);
+        assert_eq!(signer_slice.credential, signer_b256.credential);
         assert_eq!(signer_slice.to_bytes(), key);
         assert_eq!(signer_slice.to_field_bytes(), key.0.into());
 
         let signer_field_bytes = LocalSigner::from_field_bytes((&key.0).into()).unwrap();
         assert_eq!(signer_field_bytes.address, signer_b256.address);
         assert_eq!(signer_field_bytes.chain_id, signer_b256.chain_id);
-        assert_eq!(signer_field_bytes.signer, signer_b256.signer);
+        assert_eq!(signer_field_bytes.credential, signer_b256.credential);
         assert_eq!(signer_field_bytes.to_bytes(), key);
         assert_eq!(signer_field_bytes.to_field_bytes(), key.0.into());
     }
@@ -378,7 +378,7 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000000001".parse().unwrap();
         assert_eq!(signer.address, signer_0x.address);
         assert_eq!(signer.chain_id, signer_0x.chain_id);
-        assert_eq!(signer.signer, signer_0x.signer);
+        assert_eq!(signer.credential, signer_0x.credential);
 
         // Must fail because of `0z`
         "0z0000000000000000000000000000000000000000000000000000000000000001"

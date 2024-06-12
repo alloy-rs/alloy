@@ -169,9 +169,9 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();
-        let signer = SigningKey::from_bytes(&key.to_bytes())?;
-        let address = secret_key_to_address(&signer);
-        Ok(LocalSigner::<SigningKey> { signer, address, chain_id: None })
+        let credential = SigningKey::from_bytes(&key.to_bytes())?;
+        let address = secret_key_to_address(&credential);
+        Ok(LocalSigner::<SigningKey> { credential, address, chain_id: None })
     }
 }
 

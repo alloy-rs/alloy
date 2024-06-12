@@ -33,10 +33,10 @@ pub use yubihsm;
 #[cfg(feature = "mnemonic")]
 pub use coins_bip39;
 
-/// A signer instantiated with a locally stored private key
+/// A signer instantiated with a locally stored private key.
 pub type FilledLocalSigner = LocalSigner<k256::ecdsa::SigningKey>;
 
-/// A wallet instantiated with a YubiHSM
+/// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 
@@ -73,8 +73,8 @@ pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>
 /// ```
 #[derive(Clone)]
 pub struct LocalSigner<D> {
-    /// The signers' private key.
-    pub(crate) signer: D,
+    /// The signers' credential.
+    pub(crate) credential: D,
     /// The signers' address.
     pub(crate) address: Address,
     /// The signers' chain ID (for EIP-155).
@@ -83,7 +83,7 @@ pub struct LocalSigner<D> {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<D> {
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for LocalSigner<C> {
     #[inline]
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
         self.sign_hash_sync(hash)
@@ -105,10 +105,10 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)> + Send + Sync> Signer for 
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigner<D> {
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigner<C> {
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
-        let (recoverable_sig, recovery_id) = self.signer.sign_prehash(hash.as_ref())?;
+        let (recoverable_sig, recovery_id) = self.credential.sign_prehash(hash.as_ref())?;
         Ok(Signature::from_signature_and_parity(recoverable_sig, recovery_id)?)
     }
 
@@ -118,32 +118,36 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigne
     }
 }
 
-impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<D> {
-    /// Construct a new signer with an external [`PrehashSigner`].
+impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
+    /// Construct a new credential with an external [`PrehashSigner`].
     #[inline]
-    pub const fn new_with_signer(signer: D, address: Address, chain_id: Option<ChainId>) -> Self {
-        Self { signer, address, chain_id }
+    pub const fn new_with_credential(
+        credential: C,
+        address: Address,
+        chain_id: Option<ChainId>,
+    ) -> Self {
+        Self { credential, address, chain_id }
     }
 
-    /// Returns this wallet's signer.
+    /// Returns this signer's credential.
     #[inline]
-    pub const fn signer(&self) -> &D {
-        &self.signer
+    pub const fn credential(&self) -> &C {
+        &self.credential
     }
 
-    /// Consumes this wallet and returns its signer.
+    /// Consumes this signer and returns its credential.
     #[inline]
-    pub fn into_signer(self) -> D {
-        self.signer
+    pub fn into_credential(self) -> C {
+        self.credential
     }
 
-    /// Returns this wallet's chain ID.
+    /// Returns this signers' address.
     #[inline]
     pub const fn address(&self) -> Address {
         self.address
     }
 
-    /// Returns this wallet's chain ID.
+    /// Returns this signers' chain ID.
     #[inline]
     pub const fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
@@ -153,7 +157,7 @@ impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<D> {
 // do not log the signer
 impl<D: PrehashSigner<(ecdsa::Signature, RecoveryId)>> fmt::Debug for LocalSigner<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Wallet")
+        f.debug_struct("LocalSigner")
             .field("address", &self.address)
             .field("chain_id", &self.chain_id)
             .finish()
