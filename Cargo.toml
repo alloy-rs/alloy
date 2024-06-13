@@ -50,15 +50,15 @@ alloy-rpc-types-trace = { version = "0.1.0", default-features = false, path = "c
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }
 alloy-serde = { version = "0.1.0", default-features = false, path = "crates/serde" }
 alloy-signer = { version = "0.1.0", default-features = false, path = "crates/signer" }
+alloy-signer-aws = { version = "0.1.0", default-features = false, path = "crates/signer-aws" }
+alloy-signer-gcp = { version = "0.1.0", default-features = false, path = "crates/signer-gcp" }
+alloy-signer-ledger = { version = "0.1.0", default-features = false, path = "crates/signer-ledger" }
 alloy-signer-local = { version = "0.1.0", default-features = false, path = "crates/signer-local" }
+alloy-signer-trezor = { version = "0.1.0", default-features = false, path = "crates/signer-trezor" }
 alloy-transport = { version = "0.1.0", default-features = false, path = "crates/transport" }
 alloy-transport-http = { version = "0.1.0", default-features = false, path = "crates/transport-http" }
 alloy-transport-ipc = { version = "0.1.0", default-features = false, path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.0", default-features = false, path = "crates/transport-ws" }
-alloy-wallet-aws = { version = "0.1.0", default-features = false, path = "crates/wallet-aws" }
-alloy-wallet-gcp = { version = "0.1.0", default-features = false, path = "crates/wallet-gcp" }
-alloy-wallet-ledger = { version = "0.1.0", default-features = false, path = "crates/wallet-ledger" }
-alloy-wallet-trezor = { version = "0.1.0", default-features = false, path = "crates/wallet-trezor" }
 
 test-utils = { version = "0.1.0", default-features = false, path = "crates/internal-test-utils", package = "alloy-internal-test-utils" }
 

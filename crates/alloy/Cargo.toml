@@ -42,19 +42,17 @@ alloy-serde = { workspace = true, optional = true }
 
 # signer
 alloy-signer = { workspace = true, optional = true }
+alloy-signer-aws = { workspace = true, optional = true }
+alloy-signer-gcp = { workspace = true, optional = true }
+alloy-signer-ledger = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
+alloy-signer-trezor = { workspace = true, optional = true }
 
 # transport
 alloy-transport = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
-
-# wallets
-alloy-wallet-aws = { workspace = true, optional = true }
-alloy-wallet-gcp = { workspace = true, optional = true }
-alloy-wallet-ledger = { workspace = true, optional = true }
-alloy-wallet-trezor = { workspace = true, optional = true }
 
 # optional
 reqwest = { workspace = true, optional = true }
@@ -130,7 +128,13 @@ rpc-types-trace = ["rpc-types", "alloy-rpc-types?/trace"]
 
 # signers
 signers = ["dep:alloy-signer"]
+signer-aws = ["signers", "dep:alloy-signer-aws"]
+signer-gcp = ["signers", "dep:alloy-signer-gcp"]
+signer-ledger = ["signers", "dep:alloy-signer-ledger"]
+signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
+signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
 signer-local = ["signers", "dep:alloy-signer-local"]
+signer-trezor = ["signers", "dep:alloy-signer-trezor"]
 signer-keystore = ["signer-local", "alloy-signer-local?/keystore"]
 signer-mnemonic = ["signer-local", "alloy-signer-local?/mnemonic"]
 signer-mnemonic-all-languages = [
@@ -145,15 +149,6 @@ transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
-
-# wallets
-wallets = []
-wallet-aws = ["wallets", "signers", "dep:alloy-wallet-aws"]
-wallet-gcp = ["wallets", "signers", "dep:alloy-wallet-gcp"]
-wallet-ledger = ["wallets", "signers", "dep:alloy-wallet-ledger"]
-wallet-ledger-browser = ["wallet-ledger", "alloy-wallet-ledger?/browser"]
-wallet-ledger-node = ["wallet-ledger", "alloy-wallet-ledger?/node"]
-wallet-trezor = ["wallets", "signers", "dep:alloy-wallet-trezor"]
 
 # ---------------------------------------- Core re-exports --------------------------------------- #
 
@@ -188,9 +183,9 @@ kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",
-    "alloy-wallet-aws?/eip712",
-    "alloy-wallet-gcp?/eip712",
-    "alloy-wallet-ledger?/eip712",
+    "alloy-signer-aws?/eip712",
+    "alloy-signer-gcp?/eip712",
+    "alloy-signer-ledger?/eip712",
     # TODO: https://github.com/alloy-rs/alloy/issues/201
-    # "alloy-wallet-trezor?/eip712",
+    # "alloy-signer-trezor?/eip712",
 ]

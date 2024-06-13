@@ -49,16 +49,15 @@ This repository contains the following crates:
   - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
 - [`alloy-serde`] - Serde related helpers for Alloy.
 - [`alloy-signer`] - Ethereum signer abstraction
-  - [`alloy-signer-local`] - Local wallet (Keystore/Mnemonic/Yubihsm) signer implementation
+  - [`alloy-signer-aws`] - [AWS KMS] signer implementation
+  - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
+  - [`alloy-signer-ledger`] - [Ledger] signer implementation
+  - [`alloy-signer-local`] - Local signer (Keystore/Mnemonic/Yubihsm) signer implementation
+  - [`alloy-signer-trezor`] - [Trezor] signer implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
   - [`alloy-transport-ipc`] - IPC transport implementation
   - [`alloy-transport-ws`] - WS transport implementation
-- [`alloy-wallet`] - Ethereum wallet abstraction
-  - [`alloy-wallet-aws`] - [AWS KMS] signer implementation
-  - [`alloy-wallet-gcp`] - [GCP KMS] signer implementation
-  - [`alloy-wallet-ledger`] - [Ledger] signer implementation
-  - [`alloy-wallet-trezor`] - [Trezor] signer implementation
 
 [`alloy`]: https://github.com/alloy-rs/alloy/tree/main/crates/alloy
 [`alloy-core`]: https://docs.rs/alloy-core
@@ -80,15 +79,16 @@ This repository contains the following crates:
 [`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
 [`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
+[`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
+[`alloy-signer-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp
+[`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
 [`alloy-signer-local`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-local
+[`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
 [`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
-[`alloy-wallet-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/wallet-aws
-[`alloy-wallet-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/wallet-gcp
-[`alloy-wallet-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/wallet-ledger
-[`alloy-wallet-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/wallet-trezor
+
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms

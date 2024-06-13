@@ -72,7 +72,7 @@ impl KeySpecifier {
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_wallet_gcp::{GcpKeyRingRef, GcpWallet, KeySpecifier};
+/// use alloy_signer_gcp::{GcpKeyRingRef, GcpWallet, KeySpecifier};
 /// use gcloud_sdk::{
 ///     google::cloud::kms::v1::key_management_service_client::KeyManagementServiceClient,
 ///     GoogleApi,

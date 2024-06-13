@@ -1,6 +1,6 @@
 [package]
-name = "alloy-wallet-aws"
-description = "Ethereum AWS KMS wallet"
+name = "alloy-signer-aws"
+description = "Ethereum AWS KMS signer"
 
 version.workspace = true
 edition.workspace = true

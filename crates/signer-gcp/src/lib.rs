@@ -9,5 +9,5 @@
 #[macro_use]
 extern crate tracing;
 
-mod wallet;
-pub use wallet::{AwsWallet, AwsWalletError};
+mod signer;
+pub use signer::{GcpKeyRingRef, GcpWallet, GcpWalletError, KeySpecifier};

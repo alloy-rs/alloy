@@ -142,9 +142,25 @@ pub mod signers {
     #[doc(inline)]
     pub use alloy_signer::*;
 
+    #[cfg(feature = "signer-aws")]
+    #[doc(inline)]
+    pub use alloy_signer_aws as aws;
+
+    #[cfg(feature = "signer-gcp")]
+    #[doc(inline)]
+    pub use alloy_signer_gcp as gcp;
+
+    #[cfg(feature = "signer-ledger")]
+    #[doc(inline)]
+    pub use alloy_signer_ledger as ledger;
+
     #[cfg(feature = "signer-local")]
     #[doc(inline)]
     pub use alloy_signer_local as local;
+
+    #[cfg(feature = "signer-trezor")]
+    #[doc(inline)]
+    pub use alloy_signer_trezor as trezor;
 }
 
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.
@@ -175,24 +191,4 @@ pub mod transports {
     #[cfg(feature = "transport-ws")]
     #[doc(inline)]
     pub use alloy_transport_ws as ws;
-}
-
-/// Ethereum wallet implementations.
-#[cfg(feature = "wallets")]
-pub mod wallets {
-    #[cfg(feature = "wallet-aws")]
-    #[doc(inline)]
-    pub use alloy_wallet_aws as aws;
-
-    #[cfg(feature = "wallet-gcp")]
-    #[doc(inline)]
-    pub use alloy_wallet_gcp as gcp;
-
-    #[cfg(feature = "wallet-ledger")]
-    #[doc(inline)]
-    pub use alloy_wallet_ledger as ledger;
-
-    #[cfg(feature = "wallet-trezor")]
-    #[doc(inline)]
-    pub use alloy_wallet_trezor as trezor;
 }

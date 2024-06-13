@@ -1,6 +1,6 @@
 [package]
-name = "alloy-wallet-gcp"
-description = "Ethereum GCP KMS wallet"
+name = "alloy-signer-trezor"
+description = "Ethereum Trezor signer"
 
 version.workspace = true
 edition.workspace = true
@@ -20,18 +20,15 @@ alloy-network.workspace = true
 alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
-async-trait.workspace = true
-gcloud-sdk = { version = "0.24", features = [
-    "google-cloud-kms-v1",
-    "google-longrunning",
+trezor-client = { version = "=0.1.3", default-features = false, features = [
+    "ethereum",
 ] }
-k256 = { workspace = true, features = ["pem"] }
-spki.workspace = true
+
+async-trait.workspace = true
+semver.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+alloy-rpc-types-eth.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-
-[features]
-eip712 = ["alloy-signer/eip712"]

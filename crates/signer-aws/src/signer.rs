@@ -30,7 +30,7 @@ use std::fmt;
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_wallet_aws::AwsWallet;
+/// use alloy_signer_aws::AwsWallet;
 /// use aws_config::BehaviorVersion;
 ///
 /// # async fn test() {

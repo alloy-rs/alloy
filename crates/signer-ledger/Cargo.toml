@@ -1,6 +1,6 @@
 [package]
-name = "alloy-wallet-ledger"
-description = "Ethereum Ledger wallet"
+name = "alloy-signer-ledger"
+description = "Ethereum Ledger signer"
 
 version.workspace = true
 edition.workspace = true
