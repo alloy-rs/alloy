@@ -78,7 +78,7 @@ pub struct LocalSigner<C> {
     pub(crate) credential: C,
     /// The signers' address.
     pub(crate) address: Address,
-    /// The signers' chain ID (for EIP-155).
+    /// The signer's chain ID (for EIP-155).
     pub(crate) chain_id: Option<ChainId>,
 }
 
