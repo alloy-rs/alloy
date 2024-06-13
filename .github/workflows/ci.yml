@@ -100,7 +100,6 @@ jobs:
             --exclude alloy-signer-trezor \
             --exclude alloy-transport-ipc
 
-
   wasm-wasi:
     runs-on: ubuntu-latest
     timeout-minutes: 30

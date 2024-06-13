@@ -8,8 +8,8 @@ Local signer implementations:
 
 ## Features
 
-- `keystore`: enables Ethereum keystore functionality on the `LocalSigner` type.
-- `mnemonic`: enables BIP-39 mnemonic functionality for building `LocalSigner`s.
+- `keystore`: enables Ethereum keystore functionality on the `PrivateKeySigner` type.
+- `mnemonic`: enables BIP-39 mnemonic functionality for building `PrivateKeySigner`s.
 - `yubihsm`: enables `LocalSigner`s with [YubiHSM2] support.
 
 [YubiHSM2]: https://www.yubico.com/products/hardware-security-module/

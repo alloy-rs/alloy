@@ -11,7 +11,7 @@ use alloy_network::{TxSigner, TxSignerSync};
 use alloy_primitives::{Address, ChainId, Signature, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signer, SignerSync};
 use async_trait::async_trait;
-use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId, SigningKey};
+use k256::ecdsa::{self, signature::hazmat::PrehashSigner, RecoveryId};
 use std::fmt;
 
 mod error;
@@ -34,7 +34,7 @@ pub use yubihsm;
 pub use coins_bip39;
 
 /// A signer instantiated with a locally stored private key.
-pub type PrivateKeySigner = LocalSigner<SigningKey>;
+pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
