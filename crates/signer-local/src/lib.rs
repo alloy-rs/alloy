@@ -36,9 +36,18 @@ pub use coins_bip39;
 /// A signer instantiated with a locally stored private key.
 pub type PrivateKeySigner = LocalSigner<k256::ecdsa::SigningKey>;
 
+#[doc(hidden)]
+#[deprecated(note = "use `PrivateKeySigner` instead")]
+pub type LocalWallet = PrivateKeySigner;
+
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
 pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
+
+#[cfg(feature = "yubihsm")]
+#[doc(hidden)]
+#[deprecated(note = "use `YubiSigner` instead")]
+pub type YubiWallet = YubiSigner;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///
