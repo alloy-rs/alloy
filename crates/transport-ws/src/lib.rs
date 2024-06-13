@@ -16,6 +16,9 @@ mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native::WsConnect;
 
+#[cfg(not(target_arch = "wasm32"))]
+use rustls as _;
+
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 #[cfg(target_arch = "wasm32")]
