@@ -30,7 +30,7 @@ use std::fmt;
 ///
 /// ```no_run
 /// use alloy_signer::Signer;
-/// use alloy_signer_aws::AwsWallet;
+/// use alloy_signer_aws::AwsSigner;
 /// use aws_config::BehaviorVersion;
 ///
 /// # async fn test() {
@@ -39,7 +39,7 @@ use std::fmt;
 ///
 /// let key_id = "...".to_string();
 /// let chain_id = Some(1);
-/// let signer = AwsWallet::new(client, key_id, chain_id).await.unwrap();
+/// let signer = AwsSigner::new(client, key_id, chain_id).await.unwrap();
 ///
 /// let message = vec![0, 1, 2, 3];
 ///
@@ -48,7 +48,7 @@ use std::fmt;
 /// # }
 /// ```
 #[derive(Clone)]
-pub struct AwsWallet {
+pub struct AwsSigner {
     kms: Client,
     key_id: String,
     pubkey: VerifyingKey,
@@ -56,9 +56,9 @@ pub struct AwsWallet {
     chain_id: Option<ChainId>,
 }
 
-impl fmt::Debug for AwsWallet {
+impl fmt::Debug for AwsSigner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AwsWallet")
+        f.debug_struct("AwsSigner")
             .field("key_id", &self.key_id)
             .field("chain_id", &self.chain_id)
             .field("pubkey", &hex::encode(self.pubkey.to_sec1_bytes()))
@@ -67,9 +67,9 @@ impl fmt::Debug for AwsWallet {
     }
 }
 
-/// Errors thrown by [`AwsWallet`].
+/// Errors thrown by [`AwsSigner`].
 #[derive(Debug, thiserror::Error)]
-pub enum AwsWalletError {
+pub enum AwsSignerError {
     /// Thrown when the AWS KMS API returns a signing error.
     #[error(transparent)]
     Sign(#[from] SdkError<SignError>),
@@ -95,7 +95,7 @@ pub enum AwsWalletError {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl alloy_network::TxSigner<Signature> for AwsWallet {
+impl alloy_network::TxSigner<Signature> for AwsSigner {
     fn address(&self) -> Address {
         self.address
     }
@@ -112,7 +112,7 @@ impl alloy_network::TxSigner<Signature> for AwsWallet {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for AwsWallet {
+impl Signer for AwsSigner {
     #[instrument(err)]
     #[allow(clippy::blocks_in_conditions)] // tracing::instrument on async fn
     async fn sign_hash(&self, hash: &B256) -> Result<Signature> {
@@ -135,7 +135,7 @@ impl Signer for AwsWallet {
     }
 }
 
-impl AwsWallet {
+impl AwsSigner {
     /// Instantiate a new signer from an existing `Client` and key ID.
     ///
     /// Retrieves the public key from AWS and calculates the Ethereum address.
@@ -144,7 +144,7 @@ impl AwsWallet {
         kms: Client,
         key_id: String,
         chain_id: Option<ChainId>,
-    ) -> Result<Self, AwsWalletError> {
+    ) -> Result<Self, AwsSignerError> {
         let resp = request_get_pubkey(&kms, key_id.clone()).await?;
         let pubkey = decode_pubkey(resp)?;
         let address = alloy_signer::utils::public_key_to_address(&pubkey);
@@ -153,12 +153,12 @@ impl AwsWallet {
     }
 
     /// Fetch the pubkey associated with a key ID.
-    pub async fn get_pubkey_for_key(&self, key_id: String) -> Result<VerifyingKey, AwsWalletError> {
+    pub async fn get_pubkey_for_key(&self, key_id: String) -> Result<VerifyingKey, AwsSignerError> {
         request_get_pubkey(&self.kms, key_id).await.and_then(decode_pubkey)
     }
 
     /// Fetch the pubkey associated with this signer's key ID.
-    pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsWalletError> {
+    pub async fn get_pubkey(&self) -> Result<VerifyingKey, AwsSignerError> {
         self.get_pubkey_for_key(self.key_id.clone()).await
     }
 
@@ -167,18 +167,18 @@ impl AwsWallet {
         &self,
         key_id: String,
         digest: &B256,
-    ) -> Result<ecdsa::Signature, AwsWalletError> {
+    ) -> Result<ecdsa::Signature, AwsSignerError> {
         request_sign_digest(&self.kms, key_id, digest).await.and_then(decode_signature)
     }
 
     /// Sign a digest with this signer's key
-    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsWalletError> {
+    pub async fn sign_digest(&self, digest: &B256) -> Result<ecdsa::Signature, AwsSignerError> {
         self.sign_digest_with_key(self.key_id.clone(), digest).await
     }
 
     /// Sign a digest with this signer's key and applies EIP-155.
     #[instrument(err, skip(digest), fields(digest = %hex::encode(digest)))]
-    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsWalletError> {
+    async fn sign_digest_inner(&self, digest: &B256) -> Result<Signature, AwsSignerError> {
         let sig = self.sign_digest(digest).await?;
         let mut sig = sig_from_digest_bytes_trial_recovery(sig, digest, &self.pubkey);
         if let Some(chain_id) = self.chain_id {
@@ -192,7 +192,7 @@ impl AwsWallet {
 async fn request_get_pubkey(
     kms: &Client,
     key_id: String,
-) -> Result<GetPublicKeyOutput, AwsWalletError> {
+) -> Result<GetPublicKeyOutput, AwsSignerError> {
     kms.get_public_key().key_id(key_id).send().await.map_err(Into::into)
 }
 
@@ -201,7 +201,7 @@ async fn request_sign_digest(
     kms: &Client,
     key_id: String,
     digest: &B256,
-) -> Result<SignOutput, AwsWalletError> {
+) -> Result<SignOutput, AwsSignerError> {
     kms.sign()
         .key_id(key_id)
         .message(Blob::new(digest.as_slice()))
@@ -213,16 +213,16 @@ async fn request_sign_digest(
 }
 
 /// Decode an AWS KMS Pubkey response.
-fn decode_pubkey(resp: GetPublicKeyOutput) -> Result<VerifyingKey, AwsWalletError> {
-    let raw = resp.public_key.as_ref().ok_or(AwsWalletError::PublicKeyNotFound)?;
+fn decode_pubkey(resp: GetPublicKeyOutput) -> Result<VerifyingKey, AwsSignerError> {
+    let raw = resp.public_key.as_ref().ok_or(AwsSignerError::PublicKeyNotFound)?;
     let spki = spki::SubjectPublicKeyInfoRef::try_from(raw.as_ref())?;
     let key = VerifyingKey::from_sec1_bytes(spki.subject_public_key.raw_bytes())?;
     Ok(key)
 }
 
 /// Decode an AWS KMS Signature response.
-fn decode_signature(resp: SignOutput) -> Result<ecdsa::Signature, AwsWalletError> {
-    let raw = resp.signature.as_ref().ok_or(AwsWalletError::SignatureNotFound)?;
+fn decode_signature(resp: SignOutput) -> Result<ecdsa::Signature, AwsSignerError> {
+    let raw = resp.signature.as_ref().ok_or(AwsSignerError::SignatureNotFound)?;
     let sig = ecdsa::Signature::from_der(raw.as_ref())?;
     Ok(sig.normalize_s().unwrap_or(sig))
 }
@@ -262,7 +262,7 @@ mod tests {
         let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let client = aws_sdk_kms::Client::new(&config);
 
-        let signer = AwsWallet::new(client, key_id, Some(1)).await.unwrap();
+        let signer = AwsSigner::new(client, key_id, Some(1)).await.unwrap();
 
         let message = vec![0, 1, 2, 3];
 

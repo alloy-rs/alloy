@@ -10,18 +10,14 @@
 extern crate tracing;
 
 mod signer;
-pub use signer::TrezorWallet;
+pub use signer::TrezorSigner;
 
 mod types;
 pub use types::{DerivationType as HDPath, TrezorError};
 
 #[doc(hidden)]
-#[deprecated(note = "use `TrezorWallet` instead")]
-pub type Trezor = TrezorWallet;
-
-#[doc(hidden)]
-#[deprecated(note = "use `TrezorWallet` instead")]
-pub type TrezorSigner = TrezorWallet;
+#[deprecated(note = "use `TrezorSigner` instead")]
+pub type Trezor = TrezorSigner;
 
 #[doc(hidden)]
 #[deprecated(note = "use `HDPath` instead")]

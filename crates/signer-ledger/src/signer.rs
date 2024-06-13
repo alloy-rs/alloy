@@ -16,14 +16,14 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
-/// A Ledger Ethereum wallet.
+/// A Ledger Ethereum signer.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
 ///
 /// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 #[derive(Debug)]
-pub struct LedgerWallet {
+pub struct LedgerSigner {
     transport: Mutex<Ledger>,
     derivation: DerivationType,
     pub(crate) chain_id: Option<ChainId>,
@@ -32,7 +32,7 @@ pub struct LedgerWallet {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl alloy_network::TxSigner<Signature> for LedgerWallet {
+impl alloy_network::TxSigner<Signature> for LedgerSigner {
     fn address(&self) -> Address {
         self.address
     }
@@ -49,7 +49,7 @@ impl alloy_network::TxSigner<Signature> for LedgerWallet {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl Signer for LedgerWallet {
+impl Signer for LedgerSigner {
     async fn sign_hash(&self, _hash: &B256) -> Result<Signature> {
         Err(alloy_signer::Error::UnsupportedOperation(
             alloy_signer::UnsupportedSignerOperation::SignHash,
@@ -103,16 +103,16 @@ impl Signer for LedgerWallet {
     }
 }
 
-impl LedgerWallet {
+impl LedgerSigner {
     /// Instantiate the application by acquiring a lock on the ledger device.
     ///
     /// # Examples
     ///
     /// ```
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_ledger::{HDPath, LedgerWallet};
+    /// use alloy_signer_ledger::{HDPath, LedgerSigner};
     ///
-    /// let ledger = LedgerWallet::new(HDPath::LedgerLive(0), Some(1)).await?;
+    /// let ledger = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -316,9 +316,9 @@ mod tests {
         })
     }
 
-    async fn init_ledger() -> LedgerWallet {
+    async fn init_ledger() -> LedgerSigner {
         let _ = tracing_subscriber::fmt::try_init();
-        match LedgerWallet::new(DTYPE, None).await {
+        match LedgerSigner::new(DTYPE, None).await {
             Ok(ledger) => ledger,
             Err(e) => panic!("{e:?}\n{e}"),
         }

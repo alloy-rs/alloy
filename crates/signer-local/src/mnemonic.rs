@@ -239,7 +239,7 @@ mod tests {
         let paths = std::fs::read_dir(dir.as_ref()).unwrap();
         assert_eq!(paths.count(), 1);
 
-        // Use the newly created mnemonic to instantiate wallet.
+        // Use the newly created mnemonic to instantiate signer.
         let phrase_path = dir.as_ref().join(signer1.address.to_string());
         let phrase = std::fs::read_to_string(phrase_path).unwrap();
         let signer2 = MnemonicBuilder::<English>::default()
