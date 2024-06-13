@@ -23,7 +23,7 @@ To incorporate Alloy into your project, you will need to specify the GitHub repo
 cargo add alloy --git https://github.com/alloy-rs/alloy
 ```
 
-After incorporating Alloy, you may wish to utilize specific features of the crate. These features can be enabled through modifications in your project's `Cargo.toml` file. A comprehensive list of available features can be found at [this GitHub link](https://github.com/alloy-rs/alloy/blob/35cbf35164f31d2de1b84b2a8a9986e5b9b1560f/crates/alloy/Cargo.toml#L89). 
+After incorporating Alloy, you may wish to utilize specific features of the crate. These features can be enabled through modifications in your project's `Cargo.toml` file. A comprehensive list of available features can be found at [this GitHub link](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
 
 ## Overview
 
