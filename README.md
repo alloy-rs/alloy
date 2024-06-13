@@ -52,7 +52,7 @@ This repository contains the following crates:
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
-  - [`alloy-signer-local`] - Local (keystore, mnemonic, YubiHSM) signer implementations
+  - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
