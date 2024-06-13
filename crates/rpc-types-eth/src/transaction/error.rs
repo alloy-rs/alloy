@@ -64,4 +64,7 @@ pub enum ConversionError {
     /// Excess blob gas integer conversion error
     #[error("excess blob gas integer conversion error: {0}")]
     ExcessBlobGasConversion(TryFromIntError),
+    /// A custom Conversion Error that doesn't fit other categories.
+    #[error("conversion error: {0}")]
+    Custom(String),
 }
