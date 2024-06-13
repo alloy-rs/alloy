@@ -77,6 +77,8 @@ footer = """
 [alloy-signer-gcp]: https://crates.io/crates/alloy-signer-gcp
 [`alloy-signer-ledger`]: https://crates.io/crates/alloy-signer-ledger
 [alloy-signer-ledger]: https://crates.io/crates/alloy-signer-ledger
+[`alloy-signer-local`]: https://crates.io/crates/alloy-signer-local
+[alloy-signer-local]: https://crates.io/crates/alloy-signer-local
 [`alloy-signer-trezor`]: https://crates.io/crates/alloy-signer-trezor
 [alloy-signer-trezor]: https://crates.io/crates/alloy-signer-trezor
 [`alloy-signer-wallet`]: https://crates.io/crates/alloy-signer-wallet
