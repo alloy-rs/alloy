@@ -60,14 +60,13 @@ impl<N: Network> TxFiller<N> for NonceFiller {
 
     fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider,
     {
         let from = tx.from().expect("checked by 'ready()'");
         self.get_next_nonce(provider, from).await
@@ -87,11 +86,9 @@ impl<N: Network> TxFiller<N> for NonceFiller {
 
 impl NonceFiller {
     /// Get the next nonce for the given account.
-    async fn get_next_nonce<P, T, N>(&self, provider: &P, from: Address) -> TransportResult<u64>
+    async fn get_next_nonce<P>(&self, provider: &P, from: Address) -> TransportResult<u64>
     where
-        P: Provider<T, N>,
-        N: Network,
-        T: Transport + Clone,
+        P: Provider,
     {
         // locks dashmap internally for a short duration to clone the `Arc`
         let mutex = Arc::clone(self.nonces.entry(from).or_default().value());

@@ -66,15 +66,13 @@ pub enum GasFillable {
 pub struct GasFiller;
 
 impl GasFiller {
-    async fn prepare_legacy<P, T, N>(
+    async fn prepare_legacy<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<P::N as Network>::TransactionRequest,
     ) -> TransportResult<GasFillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        N: Network,
+        P: Provider,
     {
         let gas_price_fut = tx.gas_price().map_or_else(
             || provider.get_gas_price().right_future(),
@@ -91,15 +89,13 @@ impl GasFiller {
         Ok(GasFillable::Legacy { gas_limit, gas_price })
     }
 
-    async fn prepare_1559<P, T, N>(
+    async fn prepare_1559<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<P::N as Network>::TransactionRequest,
     ) -> TransportResult<GasFillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        N: Network,
+        P: Provider,
     {
         let gas_limit_fut = tx.gas_limit().map_or_else(
             || provider.estimate_gas(tx).into_future().right_future(),
@@ -120,15 +116,13 @@ impl GasFiller {
         Ok(GasFillable::Eip1559 { gas_limit, estimate })
     }
 
-    async fn prepare_4844<P, T, N>(
+    async fn prepare_4844<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<P::N as Network>::TransactionRequest,
     ) -> TransportResult<GasFillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        N: Network,
+        P: Provider,
     {
         let gas_limit_fut = tx.gas_limit().map_or_else(
             || provider.estimate_gas(tx).into_future().right_future(),
@@ -199,14 +193,13 @@ impl<N: Network> TxFiller<N> for GasFiller {
 
     fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
         tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N = N>,
     {
         if tx.gas_price().is_some() || tx.access_list().is_some() {
             self.prepare_legacy(provider, tx).await

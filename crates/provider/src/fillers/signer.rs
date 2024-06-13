@@ -76,14 +76,13 @@ where
         }
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         _provider: &P,
         _tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider
     {
         Ok(())
     }

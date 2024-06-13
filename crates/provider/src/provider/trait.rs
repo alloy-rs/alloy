@@ -64,14 +64,17 @@ pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[auto_impl::auto_impl(&, &mut, Rc, Arc, Box)]
-pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
+pub trait Provider:
     Send + Sync
 {
+    type T: Transport + Clone;
+    type N: Network;
+
     /// Returns the root provider.
-    fn root(&self) -> &RootProvider<T, N>;
+    fn root(&self) -> &RootProvider<Self::T, Self::N>;
 
     /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
-    fn builder() -> ProviderBuilder<Identity, Identity, N>
+    fn builder() -> ProviderBuilder<Identity, Identity, Self::N>
     where
         Self: Sized,
     {
@@ -82,7 +85,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// NOTE: this method should not be overridden.
     #[inline]
-    fn client(&self) -> ClientRef<'_, T> {
+    fn client(&self) -> ClientRef<'_, Self::T> {
         self.root().client()
     }
 
@@ -90,7 +93,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// NOTE: this method should not be overridden.
     #[inline]
-    fn weak_client(&self) -> WeakClient<T> {
+    fn weak_client(&self) -> WeakClient<Self::T> {
         self.root().weak_client()
     }
 
@@ -106,7 +109,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Get the last block number available.
-    fn get_block_number(&self) -> RpcCall<T, (), U64, BlockNumber> {
+    fn get_block_number(&self) -> RpcCall<Self::T, (), U64, BlockNumber> {
         self.client().request("eth_blockNumber", ()).map_resp(crate::utils::convert_u64)
     }
 
@@ -147,12 +150,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
+    fn call<'req>(&self, tx: &'req <Self::N as Network>::TransactionRequest) -> EthCall<'req, 'static, Self::T, Self::N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
     /// Gets the chain ID.
-    fn get_chain_id(&self) -> RpcCall<T, (), U64, u64> {
+    fn get_chain_id(&self) -> RpcCall<Self::T, (), U64, u64> {
         self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64)
     }
 
@@ -161,8 +164,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
     fn create_access_list<'a>(
         &self,
-        request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+        request: &'a <Self::N as Network>::TransactionRequest,
+    ) -> RpcWithBlock<Self::T, &'a <Self::N as Network>::TransactionRequest, AccessListWithGasUsed> {
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
@@ -178,8 +181,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides for eth_estimateGas.
     fn estimate_gas<'req>(
         &self,
-        tx: &'req N::TransactionRequest,
-    ) -> EthCall<'req, 'static, T, N, U128, u128> {
+        tx: &'req <Self::N as Network>::TransactionRequest,
+    ) -> EthCall<'req, 'static, Self::T, Self::N, U128, u128> {
         EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
     }
 
@@ -235,7 +238,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    fn get_gas_price(&self) -> RpcCall<T, (), U128, u128> {
+    fn get_gas_price(&self) -> RpcCall<Self::T, (), U128, u128> {
         self.client().request("eth_gasPrice", ()).map_resp(crate::utils::convert_u128)
     }
 
@@ -244,12 +247,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_account(
         &self,
         address: Address,
-    ) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+    ) -> RpcWithBlock<Self::T, Address, alloy_consensus::Account> {
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
     /// Gets the balance of the account at the specified tag, which defaults to latest.
-    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
+    fn get_balance(&self, address: Address) -> RpcWithBlock<Self::T, Address, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
@@ -321,12 +324,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_block_receipts(
         &self,
         block: BlockNumberOrTag,
-    ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
+    ) -> TransportResult<Option<Vec<<Self::N as Network>::ReceiptResponse>>> {
         self.client().request("eth_getBlockReceipts", (block,)).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+    fn get_code_at(&self, address: Address) -> RpcWithBlock<Self::T, Address, Bytes> {
         RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
@@ -352,7 +355,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+    async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<Self::T, B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -379,7 +382,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
+    async fn watch_pending_transactions(&self) -> TransportResult<FilterPollerBuilder<Self::T, B256>> {
         let id = self.new_pending_transactions_filter(false).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -412,7 +415,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<T, Log>> {
+    async fn watch_logs(&self, filter: &Filter) -> TransportResult<FilterPollerBuilder<Self::T, Log>> {
         let id = self.new_filter(filter).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -445,7 +448,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```
     async fn watch_full_pending_transactions(
         &self,
-    ) -> TransportResult<FilterPollerBuilder<T, N::TransactionResponse>> {
+    ) -> TransportResult<FilterPollerBuilder<Self::T, <Self::N as Network>::TransactionResponse>> {
         let id = self.new_pending_transactions_filter(true).await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
     }
@@ -494,7 +497,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+    ) -> RpcWithBlock<Self::T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
         RpcWithBlock::new(self.weak_client(), "eth_getProof", (address, keys))
     }
 
@@ -503,7 +506,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         key: U256,
-    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+    ) -> RpcWithBlock<Self::T, (Address, U256), StorageValue> {
         RpcWithBlock::new(self.weak_client(), "eth_getStorageAt", (address, key))
     }
 
@@ -511,14 +514,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<N::TransactionResponse>> {
+    ) -> TransportResult<Option<<Self::N as Network>::TransactionResponse>> {
         self.client().request("eth_getTransactionByHash", (hash,)).await
     }
 
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
+    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<Self::T, Address, U64, u64> {
         RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
             .map_resp(crate::utils::convert_u64)
     }
@@ -527,7 +530,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<N::ReceiptResponse>> {
+    ) -> TransportResult<Option<<Self::N as Network>::ReceiptResponse>> {
         self.client().request("eth_getTransactionReceipt", (hash,)).await
     }
 
@@ -609,7 +612,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_raw_transaction(
         &self,
         encoded_tx: &[u8],
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<'_, Self::T, Self::N>> {
         let rlp_hex = hex::encode_prefixed(encoded_tx);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
@@ -637,8 +640,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```
     async fn send_transaction(
         &self,
-        tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        tx: <Self::N as Network>::TransactionRequest,
+    ) -> TransportResult<PendingTransactionBuilder<'_, Self::T, Self::N>> {
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
@@ -648,8 +651,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// how and when to await the transaction's confirmation.
     async fn send_tx_envelope(
         &self,
-        tx: N::TxEnvelope,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        tx: <Self::N as Network>::TxEnvelope,
+    ) -> TransportResult<PendingTransactionBuilder<'_, Self::T, Self::N>> {
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
@@ -663,8 +666,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(hidden)]
     async fn send_transaction_internal(
         &self,
-        tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        tx: SendableTx<Self::N>,
+    ) -> TransportResult<PendingTransactionBuilder<'_, Self::T, Self::N>> {
         match tx {
             SendableTx::Builder(mut tx) => {
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
@@ -855,7 +858,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    fn get_net_version(&self) -> RpcCall<T, (), U64, u64> {
+    fn get_net_version(&self) -> RpcCall<Self::T, (), U64, u64> {
         self.client().request("net_version", ()).map_resp(crate::utils::convert_u64)
     }
 
@@ -921,26 +924,29 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Creates a new [`TransactionRequest`](alloy_network::Network).
     #[inline]
-    fn transaction_request(&self) -> N::TransactionRequest {
+    fn transaction_request(&self) -> <Self::N as Network>::TransactionRequest {
         Default::default()
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
+impl<T: Transport + Clone, N: Network> Provider for RootProvider<T, N> {
+    type T = T;
+    type N = N;
+
     #[inline]
     fn root(&self) -> &Self {
         self
     }
 
     #[inline]
-    fn client(&self) -> ClientRef<'_, T> {
+    fn client(&self) -> ClientRef<'_, Self::T> {
         self.inner.client_ref()
     }
 
     #[inline]
-    fn weak_client(&self) -> WeakClient<T> {
+    fn weak_client(&self) -> WeakClient<Self::T> {
         self.inner.weak_client()
     }
 

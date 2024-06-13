@@ -9,7 +9,7 @@ use alloy_transport::{Transport, TransportResult};
 #[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait TxPoolApi<T, N = Ethereum>: Send + Sync {
+pub trait TxPoolApi: Send + Sync {
     /// Returns the content of the transaction pool.
     ///
     /// Lists the exact details of all the transactions currently pending for inclusion in the next
@@ -44,11 +44,9 @@ pub trait TxPoolApi<T, N = Ethereum>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<P, T, N> TxPoolApi<T, N> for P
+impl<P> TxPoolApi for P
 where
-    P: Provider<T, N>,
-    T: Transport + Clone,
-    N: Network,
+    P: Provider,
 {
     async fn txpool_content(&self) -> TransportResult<TxpoolContent> {
         self.client().request("txpool_content", ()).await

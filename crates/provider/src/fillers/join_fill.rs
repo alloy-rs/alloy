@@ -44,16 +44,14 @@ impl<L, R> JoinFill<L, R> {
 
 impl<L, R> JoinFill<L, R> {
     /// Get a request for the left filler, if the left filler is ready.
-    async fn prepare_left<P, T, N>(
+    async fn prepare_left<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<P::N as Network>::TransactionRequest,
     ) -> TransportResult<Option<L::Fillable>>
-    where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        L: TxFiller<N>,
-        N: Network,
+where
+        P: Provider,
+        L: TxFiller<P::N>,
     {
         if self.left.ready(tx) {
             self.left.prepare(provider, tx).await.map(Some)
@@ -63,16 +61,14 @@ impl<L, R> JoinFill<L, R> {
     }
 
     /// Get a prepare for the right filler, if the right filler is ready.
-    async fn prepare_right<P, T, N>(
+    async fn prepare_right<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<P::N as Network>::TransactionRequest,
     ) -> TransportResult<Option<R::Fillable>>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        R: TxFiller<N>,
-        N: Network,
+        P: Provider,
+        R: TxFiller<P::N>,
     {
         if self.right.ready(tx) {
             self.right.prepare(provider, tx).await.map(Some)
@@ -99,14 +95,13 @@ where
         self.right.fill_sync(tx);
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
-        tx: &N::TransactionRequest,
+        tx: &<N as Network>::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N = N>,
     {
         try_join!(self.prepare_left(provider, tx), self.prepare_right(provider, tx))
     }
@@ -126,15 +121,13 @@ where
     }
 }
 
-impl<L, R, P, T, N> ProviderLayer<P, T, N> for JoinFill<L, R>
+impl<L, R, P> ProviderLayer<P> for JoinFill<L, R>
 where
-    L: TxFiller<N>,
-    R: TxFiller<N>,
-    P: Provider<T, N>,
-    T: alloy_transport::Transport + Clone,
-    N: Network,
+    P: Provider,
+    L: TxFiller<P::N>,
+    R: TxFiller<P::N>,
 {
-    type Provider = FillProvider<Self, P, T, N>;
+    type Provider = FillProvider<Self, P>;
     fn layer(&self, inner: P) -> Self::Provider {
         FillProvider::new(inner, self.clone())
     }

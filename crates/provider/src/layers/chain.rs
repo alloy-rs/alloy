@@ -25,10 +25,9 @@ impl From<NamedChain> for ChainLayer {
     }
 }
 
-impl<P, T> ProviderLayer<P, T, Ethereum> for ChainLayer
+impl<P> ProviderLayer<P> for ChainLayer
 where
-    P: Provider<T>,
-    T: Transport + Clone,
+    P: Provider,
 {
     type Provider = P;
 

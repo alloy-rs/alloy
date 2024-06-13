@@ -11,7 +11,7 @@ use alloy_transport::{Transport, TransportResult};
 /// Debug namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait DebugApi<N, T>: Send + Sync {
+pub trait DebugApi: Send + Sync {
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -93,11 +93,9 @@ pub trait DebugApi<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> DebugApi<N, T> for P
+impl<P> DebugApi for P
 where
-    N: Network,
-    T: Transport + Clone,
-    P: Provider<T, N>,
+    P: Provider,
 {
     async fn debug_trace_transaction(
         &self,

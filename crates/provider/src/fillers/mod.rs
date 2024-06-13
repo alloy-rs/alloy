@@ -168,14 +168,13 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     fn fill_sync(&self, tx: &mut SendableTx<N>);
 
     /// Prepares fillable properties, potentially by making an RPC request.
-    fn prepare<P, T>(
+    fn prepare<P>(
         &self,
         provider: &P,
         tx: &N::TransactionRequest,
     ) -> impl_future!(<Output = TransportResult<Self::Fillable>>)
     where
-        P: Provider<T, N>,
-        T: Transport + Clone;
+        P: Provider<N = N>;
 
     /// Fills in the transaction request with the fillable properties.
     fn fill(
@@ -185,14 +184,13 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>);
 
     /// Prepares and fills the transaction request with the fillable properties.
-    fn prepare_and_fill<P, T>(
+    fn prepare_and_fill<P>(
         &self,
         provider: &P,
         tx: SendableTx<N>,
     ) -> impl_future!(<Output = TransportResult<SendableTx<N>>>)
     where
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        P: Provider<N = N>,
     {
         async move {
             if tx.is_envelope() {
@@ -219,39 +217,34 @@ pub trait TxFiller<N: Network = Ethereum>: Clone + Send + Sync + std::fmt::Debug
 ///
 /// [`ProviderBuilder::filler`]: crate::ProviderBuilder::filler
 #[derive(Clone, Debug)]
-pub struct FillProvider<F, P, T, N>
+pub struct FillProvider<F, P>
 where
-    F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
-    N: Network,
+    F: TxFiller<P::N>,
+    P: Provider,
 {
     pub(crate) inner: P,
     pub(crate) filler: F,
-    _pd: PhantomData<fn() -> (T, N)>,
 }
 
-impl<F, P, T, N> FillProvider<F, P, T, N>
+impl<F, P> FillProvider<F, P>
 where
-    F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
-    N: Network,
+    F: TxFiller<P::N>,
+    P: Provider,
 {
     /// Creates a new `FillProvider` with the given filler and inner provider.
     pub fn new(inner: P, filler: F) -> Self {
-        Self { inner, filler, _pd: PhantomData }
+        Self { inner, filler }
     }
 
     /// Joins a filler to this provider
-    pub fn join_with<Other: TxFiller<N>>(
+    pub fn join_with<Other: TxFiller<P::N>>(
         self,
         other: Other,
-    ) -> FillProvider<JoinFill<F, Other>, P, T, N> {
+    ) -> FillProvider<JoinFill<F, Other>, P> {
         self.filler.join_with(other).layer(self.inner)
     }
 
-    async fn fill_inner(&self, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+    async fn fill_inner(&self, mut tx: SendableTx<P::N>) -> TransportResult<SendableTx<P::N>> {
         let mut count = 0;
 
         while self.filler.continue_filling(&tx) {
@@ -272,28 +265,29 @@ where
     }
 
     /// Fills the transaction request, using the configured fillers
-    pub async fn fill(&self, tx: N::TransactionRequest) -> TransportResult<SendableTx<N>> {
+    pub async fn fill(&self, tx: <P::N as Network>::TransactionRequest) -> TransportResult<SendableTx<P::N>> {
         self.fill_inner(SendableTx::Builder(tx)).await
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<F, P, T, N> Provider<T, N> for FillProvider<F, P, T, N>
+impl<F, P> Provider for FillProvider<F, P>
 where
-    F: TxFiller<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
-    N: Network,
+    F: TxFiller<P::N>,
+    P: Provider,
 {
-    fn root(&self) -> &RootProvider<T, N> {
+    type T = P::T;
+    type N = P::N;
+
+    fn root(&self) -> &RootProvider<Self::T, Self::N> {
         self.inner.root()
     }
 
     async fn send_transaction_internal(
         &self,
-        mut tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        mut tx: SendableTx<Self::N>,
+    ) -> TransportResult<PendingTransactionBuilder<'_, Self::T, Self::N>> {
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {

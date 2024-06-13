@@ -74,14 +74,13 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
         }
     }
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         provider: &P,
         _tx: &N::TransactionRequest,
     ) -> TransportResult<Self::Fillable>
     where
-        P: crate::Provider<T, N>,
-        T: alloy_transport::Transport + Clone,
+        P: crate::Provider,
     {
         match self.0.get().copied() {
             Some(chain_id) => Ok(chain_id),

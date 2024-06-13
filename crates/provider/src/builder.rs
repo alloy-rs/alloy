@@ -16,9 +16,9 @@ use std::marker::PhantomData;
 /// A layering abstraction in the vein of [`tower::Layer`]
 ///
 /// [`tower::Layer`]: https://docs.rs/tower/latest/tower/trait.Layer.html
-pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Ethereum> {
+pub trait ProviderLayer<P: Provider> {
     /// The provider constructed by this layer.
-    type Provider: Provider<T, N>;
+    type Provider: Provider;
 
     /// Wrap the given provider in the layer's provider.
     fn layer(&self, inner: P) -> Self::Provider;
@@ -40,7 +40,7 @@ where
 
     fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
 
-    async fn prepare<P, T>(
+    async fn prepare<P>(
         &self,
         _provider: &P,
         _tx: &N::TransactionRequest,
@@ -57,11 +57,9 @@ where
     }
 }
 
-impl<P, T, N> ProviderLayer<P, T, N> for Identity
+impl<P> ProviderLayer<P> for Identity
 where
-    T: Transport + Clone,
-    N: Network,
-    P: Provider<T, N>,
+    P: Provider,
 {
     type Provider = P;
 
@@ -84,13 +82,11 @@ impl<Inner, Outer> Stack<Inner, Outer> {
     }
 }
 
-impl<P, T, N, Inner, Outer> ProviderLayer<P, T, N> for Stack<Inner, Outer>
+impl<P, Inner, Outer> ProviderLayer<P> for Stack<Inner, Outer>
 where
-    T: Transport + Clone,
-    N: Network,
-    P: Provider<T, N>,
-    Inner: ProviderLayer<P, T, N>,
-    Outer: ProviderLayer<Inner::Provider, T, N>,
+    P: Provider,
+    Inner: ProviderLayer<P>,
+    Outer: ProviderLayer<Inner::Provider>,
 {
     type Provider = Outer::Provider;
 
@@ -231,12 +227,11 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 
     /// Finish the layer stack by providing a root [`Provider`], outputting
     /// the final [`Provider`] type with all stack components.
-    pub fn on_provider<P, T>(self, provider: P) -> F::Provider
+    pub fn on_provider<P>(self, provider: P) -> F::Provider
     where
-        L: ProviderLayer<P, T, N>,
-        F: TxFiller<N> + ProviderLayer<L::Provider, T, N>,
-        P: Provider<T, N>,
-        T: Transport + Clone,
+        L: ProviderLayer<P>,
+        F: TxFiller<N> + ProviderLayer<L::Provider>,
+        P: Provider,
         N: Network,
     {
         let Self { layer, filler, .. } = self;
@@ -251,8 +246,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// `ProviderBuilder::provider<RpcClient>`.
     pub fn on_client<T>(self, client: RpcClient<T>) -> F::Provider
     where
-        L: ProviderLayer<RootProvider<T, N>, T, N>,
-        F: TxFiller<N> + ProviderLayer<L::Provider, T, N>,
+        L: ProviderLayer<RootProvider<T, N>>,
+        F: TxFiller<N> + ProviderLayer<L::Provider>,
         T: Transport + Clone,
         N: Network,
     {
@@ -264,8 +259,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     /// components.
     pub async fn on_builtin(self, s: &str) -> Result<F::Provider, TransportError>
     where
-        L: ProviderLayer<RootProvider<BoxTransport, N>, BoxTransport, N>,
-        F: TxFiller<N> + ProviderLayer<L::Provider, BoxTransport, N>,
+        L: ProviderLayer<RootProvider<BoxTransport, N>>,
+        F: TxFiller<N> + ProviderLayer<L::Provider>,
         N: Network,
     {
         let connect: BuiltInConnectionString = s.parse()?;
@@ -316,8 +311,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(any(test, feature = "reqwest"))]
     pub fn on_http(self, url: reqwest::Url) -> F::Provider
     where
-        L: ProviderLayer<crate::ReqwestProvider<N>, alloy_transport_http::Http<reqwest::Client>, N>,
-        F: TxFiller<N> + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, N>,
+        L: ProviderLayer<crate::ReqwestProvider<N>>,
+        F: TxFiller<N> + ProviderLayer<L::Provider>,
         N: Network,
     {
         let client = ClientBuilder::default().http(url);

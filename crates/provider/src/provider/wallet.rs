@@ -71,11 +71,10 @@ where
     }
 }
 
-impl<F, P, T, N> WalletProvider<N> for FillProvider<F, P, T, N>
+impl<F, P, N> WalletProvider<N> for FillProvider<F, P>
 where
     F: TxFiller<N> + WalletProvider<N>,
-    P: Provider<T, N>,
-    T: Transport + Clone,
+    P: Provider<N = N>,
     N: Network,
 {
     type Signer = F::Signer;
