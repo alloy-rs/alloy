@@ -159,7 +159,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
             std::fs::write(dir.join(signer.address.to_string()), mnemonic.to_phrase().as_bytes())?;
         }
 
-        Ok(wallet)
+        Ok(signer)
     }
 
     fn mnemonic_to_signer(
