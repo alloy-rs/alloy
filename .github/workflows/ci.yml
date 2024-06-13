@@ -120,7 +120,7 @@ jobs:
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-transport-ipc
-      # Ledger wallet requires one of `browser` or `node` features.
+      # Ledger signer requires one of `browser` or `node` features.
       - name: build ledger
         run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
 

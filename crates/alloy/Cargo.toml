@@ -84,7 +84,7 @@ full = [
     "provider-ws",   # includes `providers`
     "provider-ipc",  # includes `providers`
     "rpc-types",     # includes `rpc-types-eth`
-    "signer-wallet", # includes `signers`
+    "signer-local",  # includes `signers`
 ]
 
 # configuration
