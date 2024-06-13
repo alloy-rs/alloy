@@ -5,7 +5,7 @@ Ethereum signer abstraction.
 You can implement the [`Signer`][Signer] trait to extend functionality to other signers
 such as Hardware Security Modules, KMS etc. See [its documentation][Signer] for more.
 
-Signer implementation in Alloy:
+Signer implementations in Alloy:
 - [K256 private key](../signer-local/src/private_key.rs)
 - [YubiHSM2](../signer-local/src/yubi.rs)
 - [Ledger](../signer-ledger/)
