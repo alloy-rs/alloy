@@ -76,7 +76,7 @@ pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 pub struct LocalSigner<C> {
     /// The signers' credential.
     pub(crate) credential: C,
-    /// The signers' address.
+    /// The signer's address.
     pub(crate) address: Address,
     /// The signer's chain ID (for EIP-155).
     pub(crate) chain_id: Option<ChainId>,
