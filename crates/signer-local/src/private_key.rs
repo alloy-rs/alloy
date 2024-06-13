@@ -177,7 +177,7 @@ impl FromStr for LocalSigner<SigningKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FilledLocalSigner, SignerSync};
+    use crate::{PrivateKeySigner, SignerSync};
     use alloy_primitives::{address, b256};
 
     #[cfg(feature = "keystore")]
@@ -186,14 +186,14 @@ mod tests {
     #[test]
     fn parse_pk() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b";
-        let _pk: LocalSigner<SigningKey> = s.parse().unwrap();
+        let _pk: PrivateKeySigner = s.parse().unwrap();
     }
 
     #[test]
     fn parse_short_key() {
         let s = "6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea3";
         assert!(s.len() < 64);
-        let pk = s.parse::<FilledLocalSigner>().unwrap_err();
+        let pk = s.parse::<PrivateKeySigner>().unwrap_err();
         match pk {
             LocalSignerError::HexError(hex::FromHexError::InvalidStringLength) => {}
             _ => panic!("Unexpected error"),

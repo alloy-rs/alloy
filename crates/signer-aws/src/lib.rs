@@ -11,3 +11,11 @@ extern crate tracing;
 
 mod signer;
 pub use signer::{AwsWallet, AwsWalletError};
+
+#[doc(hidden)]
+#[deprecated(note = "use `AwsWallet` instead")]
+pub type AwsSigner = AwsWallet;
+
+#[doc(hidden)]
+#[deprecated(note = "use `AwsWalletError` instead")]
+pub type AwsSignerError = AwsWalletError;

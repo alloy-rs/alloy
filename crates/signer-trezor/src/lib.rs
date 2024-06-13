@@ -20,5 +20,9 @@ pub use types::{DerivationType as HDPath, TrezorError};
 pub type Trezor = TrezorWallet;
 
 #[doc(hidden)]
+#[deprecated(note = "use `TrezorWallet` instead")]
+pub type TrezorSigner = TrezorWallet;
+
+#[doc(hidden)]
 #[deprecated(note = "use `HDPath` instead")]
 pub type TrezorHDPath = HDPath;

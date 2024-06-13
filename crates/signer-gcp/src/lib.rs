@@ -11,3 +11,11 @@ extern crate tracing;
 
 mod signer;
 pub use signer::{GcpKeyRingRef, GcpWallet, GcpWalletError, KeySpecifier};
+
+#[doc(hidden)]
+#[deprecated(note = "use `GcpWallet` instead")]
+pub type GcpSigner = GcpWallet;
+
+#[doc(hidden)]
+#[deprecated(note = "use `GcpWalletError` instead")]
+pub type GcpSignerError = GcpWalletError;

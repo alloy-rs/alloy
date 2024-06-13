@@ -3,7 +3,7 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
-use crate::{FilledLocalSigner, LocalSigner, LocalSignerError};
+use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
 use coins_bip39::{English, Mnemonic, Wordlist};
@@ -15,7 +15,7 @@ use thiserror::Error;
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
-/// Represents a structure that can resolve into a `FilledLocalSigner`.
+/// Represents a structure that can resolve into a `PrivateKeySigner`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use = "builders do nothing unless `build` is called"]
 pub struct MnemonicBuilder<W: Wordlist = English> {
@@ -126,9 +126,9 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self
     }
 
-    /// Builds a `FilledLocalSigner` using the parameters set in mnemonic builder. This method
+    /// Builds a `PrivateKeySigner` using the parameters set in mnemonic builder. This method
     /// expects the phrase field to be set.
-    pub fn build(&self) -> Result<FilledLocalSigner, LocalSignerError> {
+    pub fn build(&self) -> Result<PrivateKeySigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
             None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
@@ -136,18 +136,18 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self.mnemonic_to_signer(&mnemonic)
     }
 
-    /// Builds a `FilledLocalSigner` using the parameters set in the mnemonic builder and
+    /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
     /// constructing the phrase using the thread RNG.
-    pub fn build_random(&self) -> Result<FilledLocalSigner, LocalSignerError> {
+    pub fn build_random(&self) -> Result<PrivateKeySigner, LocalSignerError> {
         self.build_random_with(&mut rand::thread_rng())
     }
 
-    /// Builds a `FilledLocalSigner` using the parameters set in the mnemonic builder and
+    /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
     /// constructing the phrase using the provided random number generator.
     pub fn build_random_with<R: Rng>(
         &self,
         rng: &mut R,
-    ) -> Result<FilledLocalSigner, LocalSignerError> {
+    ) -> Result<PrivateKeySigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
@@ -165,7 +165,7 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     fn mnemonic_to_signer(
         &self,
         mnemonic: &Mnemonic<W>,
-    ) -> Result<FilledLocalSigner, LocalSignerError> {
+    ) -> Result<PrivateKeySigner, LocalSignerError> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();

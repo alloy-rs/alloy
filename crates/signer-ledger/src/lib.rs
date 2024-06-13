@@ -14,3 +14,11 @@ pub use signer::LedgerWallet;
 
 mod types;
 pub use types::{DerivationType as HDPath, LedgerError};
+
+#[doc(hidden)]
+#[deprecated(note = "use `LedgerWallet` instead")]
+pub type Ledger = LedgerWallet;
+
+#[doc(hidden)]
+#[deprecated(note = "use `LedgerWallet` instead")]
+pub type LedgerSigner = LedgerWallet;

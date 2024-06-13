@@ -34,11 +34,11 @@ pub use yubihsm;
 pub use coins_bip39;
 
 /// A signer instantiated with a locally stored private key.
-pub type FilledLocalSigner = LocalSigner<SigningKey>;
+pub type PrivateKeySigner = LocalSigner<SigningKey>;
 
 /// A signer instantiated with a YubiHSM.
 #[cfg(feature = "yubihsm")]
-pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
+pub type YubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>;
 
 /// An Ethereum private-public key pair which can be used for signing messages.
 ///
@@ -53,8 +53,9 @@ pub type FilledYubiSigner = LocalSigner<yubihsm::ecdsa::Signer<k256::Secp256k1>>
 ///
 /// ```
 /// use alloy_signer::{Signer, SignerSync};
+/// use alloy_signer_local::PrivateKeySigner;
 ///
-/// let signer = alloy_signer_local::LocalSigner::random();
+/// let signer = PrivateKeySigner::random();
 ///
 /// // Optionally, the signers' chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
@@ -223,7 +224,7 @@ mod test {
             tx: &mut dyn SignableTransaction<Signature>,
             chain_id: Option<ChainId>,
         ) -> Result<Signature> {
-            let mut signer: FilledLocalSigner =
+            let mut signer: PrivateKeySigner =
                 "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318".parse().unwrap();
             signer.set_chain_id(chain_id);
 

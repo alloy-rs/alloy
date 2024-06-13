@@ -22,9 +22,10 @@ Sign an Ethereum prefixed message ([EIP-712](https://eips.ethereum.org/EIPS/eip-
 
 ```rust
 use alloy_signer::{Signer, SignerSync};
+use alloy_signer_local::PrivateKeySigner;
 
 // Instantiate a signer.
-let signer = alloy_signer_local::FilledLocalSigner::random();
+let signer = PrivateKeySigner::random();
 
 // Sign a message.
 let message = "Some data";
@@ -42,11 +43,12 @@ Sign a transaction:
 use alloy_consensus::TxLegacy;
 use alloy_primitives::{U256, address, bytes};
 use alloy_signer::{Signer, SignerSync};
+use alloy_signer_local::PrivateKeySigner;
 use alloy_network::{TxSignerSync};
 
 // Instantiate a signer.
 let signer = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
-    .parse::<alloy_signer_local::FilledLocalSigner>()?;
+    .parse::<PrivateKeySigner>()?;
 
 // Create a transaction.
 let mut tx = TxLegacy {
