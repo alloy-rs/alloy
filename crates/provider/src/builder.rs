@@ -3,7 +3,6 @@ use crate::{
         ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
         TxFiller, WalletFiller,
     },
-    network::EthereumWallet,
     provider::SendableTx,
     Provider, RootProvider,
 };
@@ -11,7 +10,6 @@ use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
-use alloy_signer_local::LocalSigner;
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -439,15 +437,10 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        let default_keys = anvil_layer.instance().keys().to_vec();
-        let (default_key, remaining_keys) = default_keys.split_first().expect("no keys available");
+        let signer =
+            alloy_signer_local::LocalSigner::from(anvil_layer.instance().keys()[0].clone());
 
-        let default_signer = LocalSigner::from(default_key.clone());
-        let mut wallet = EthereumWallet::from(default_signer);
-
-        remaining_keys
-            .iter()
-            .for_each(|key| wallet.register_signer(LocalSigner::from(key.clone())));
+        let wallet = crate::network::EthereumWallet::from(signer);
 
         self.wallet(wallet).layer(anvil_layer).on_http(url)
     }
