@@ -2,8 +2,8 @@ use crate::{Network, ReceiptResponse, TransactionResponse};
 
 mod builder;
 
-mod signer;
-pub use signer::EthereumSigner;
+mod wallet;
+pub use wallet::EthereumWallet;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]

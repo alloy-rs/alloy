@@ -1,25 +1,25 @@
 use crate::{provider::SendableTx, Provider};
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, NetworkSigner, TransactionBuilder};
+use alloy_network::{Network, NetworkWallet, TransactionBuilder};
 use alloy_transport::{Transport, TransportResult};
 
 use super::{FillerControlFlow, TxFiller};
 
 /// A layer that signs transactions locally.
 ///
-/// The layer uses a [`NetworkSigner`] to sign transactions sent using
+/// The layer uses a [`NetworkWallet`] to sign transactions sent using
 /// [`Provider::send_transaction`] locally before passing them to the node with
 /// [`Provider::send_raw_transaction`].
 ///
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
-///     .signer(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -27,33 +27,33 @@ use super::{FillerControlFlow, TxFiller};
 /// # }
 /// ```
 #[derive(Clone, Debug)]
-pub struct SignerFiller<S> {
-    signer: S,
+pub struct WalletFiller<W> {
+    wallet: W,
 }
 
-impl<S> AsRef<S> for SignerFiller<S> {
-    fn as_ref(&self) -> &S {
-        &self.signer
+impl<W> AsRef<W> for WalletFiller<W> {
+    fn as_ref(&self) -> &W {
+        &self.wallet
     }
 }
 
-impl<S> AsMut<S> for SignerFiller<S> {
-    fn as_mut(&mut self) -> &mut S {
-        &mut self.signer
+impl<W> AsMut<W> for WalletFiller<W> {
+    fn as_mut(&mut self) -> &mut W {
+        &mut self.wallet
     }
 }
 
-impl<S> SignerFiller<S> {
-    /// Creates a new signing layer with the given signer.
-    pub const fn new(signer: S) -> Self {
-        Self { signer }
+impl<W> WalletFiller<W> {
+    /// Creates a new wallet layer with the given wallet.
+    pub const fn new(wallet: W) -> Self {
+        Self { wallet }
     }
 }
 
-impl<S, N> TxFiller<N> for SignerFiller<S>
+impl<W, N> TxFiller<N> for WalletFiller<W>
 where
     N: Network,
-    S: NetworkSigner<N> + Clone,
+    W: NetworkWallet<N> + Clone,
 {
     type Fillable = ();
 
@@ -64,14 +64,14 @@ where
 
         match tx.complete_preferred() {
             Ok(_) => FillerControlFlow::Ready,
-            Err(e) => FillerControlFlow::Missing(vec![("Signer", e)]),
+            Err(e) => FillerControlFlow::Missing(vec![("Wallet", e)]),
         }
     }
 
     fn fill_sync(&self, tx: &mut SendableTx<N>) {
         if let Some(builder) = tx.as_mut_builder() {
             if builder.from().is_none() {
-                builder.set_from(self.signer.default_signer_address());
+                builder.set_from(self.wallet.default_signer_address());
             }
         }
     }
@@ -98,7 +98,7 @@ where
             _ => return Ok(tx),
         };
 
-        let envelope = builder.build(&self.signer).await.map_err(RpcError::local_usage)?;
+        let envelope = builder.build(&self.wallet).await.map_err(RpcError::local_usage)?;
 
         Ok(SendableTx::Envelope(envelope))
     }
@@ -113,7 +113,7 @@ mod tests {
 
     #[tokio::test]
     async fn poc() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let tx = TransactionRequest {
             nonce: Some(0),

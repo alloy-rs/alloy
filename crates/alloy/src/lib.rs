@@ -154,13 +154,13 @@ pub mod signers {
     #[doc(inline)]
     pub use alloy_signer_ledger as ledger;
 
+    #[cfg(feature = "signer-local")]
+    #[doc(inline)]
+    pub use alloy_signer_local as local;
+
     #[cfg(feature = "signer-trezor")]
     #[doc(inline)]
     pub use alloy_signer_trezor as trezor;
-
-    #[cfg(feature = "signer-wallet")]
-    #[doc(inline)]
-    pub use alloy_signer_wallet as wallet;
 }
 
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.

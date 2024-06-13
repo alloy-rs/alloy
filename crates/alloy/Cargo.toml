@@ -45,8 +45,8 @@ alloy-signer = { workspace = true, optional = true }
 alloy-signer-aws = { workspace = true, optional = true }
 alloy-signer-gcp = { workspace = true, optional = true }
 alloy-signer-ledger = { workspace = true, optional = true }
+alloy-signer-local = { workspace = true, optional = true }
 alloy-signer-trezor = { workspace = true, optional = true }
-alloy-signer-wallet = { workspace = true, optional = true }
 
 # transport
 alloy-transport = { workspace = true, optional = true }
@@ -84,7 +84,7 @@ full = [
     "provider-ws",   # includes `providers`
     "provider-ipc",  # includes `providers`
     "rpc-types",     # includes `rpc-types-eth`
-    "signer-wallet", # includes `signers`
+    "signer-local",  # includes `signers`
 ]
 
 # configuration
@@ -148,15 +148,15 @@ signer-gcp = ["signers", "dep:alloy-signer-gcp"]
 signer-ledger = ["signers", "dep:alloy-signer-ledger"]
 signer-ledger-browser = ["signer-ledger", "alloy-signer-ledger?/browser"]
 signer-ledger-node = ["signer-ledger", "alloy-signer-ledger?/node"]
+signer-local = ["signers", "dep:alloy-signer-local"]
 signer-trezor = ["signers", "dep:alloy-signer-trezor"]
-signer-wallet = ["signers", "dep:alloy-signer-wallet"]
-signer-keystore = ["signer-wallet", "alloy-signer-wallet?/keystore"]
-signer-mnemonic = ["signer-wallet", "alloy-signer-wallet?/mnemonic"]
+signer-keystore = ["signer-local", "alloy-signer-local?/keystore"]
+signer-mnemonic = ["signer-local", "alloy-signer-local?/mnemonic"]
 signer-mnemonic-all-languages = [
     "signer-mnemonic",
-    "alloy-signer-wallet?/mnemonic-all-languages",
+    "alloy-signer-local?/mnemonic-all-languages",
 ]
-signer-yubihsm = ["signer-wallet", "alloy-signer-wallet?/yubihsm"]
+signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
 
 # transports
 transports = ["dep:alloy-transport"]

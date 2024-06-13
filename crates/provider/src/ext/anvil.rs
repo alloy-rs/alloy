@@ -439,7 +439,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_drop_transaction() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -467,7 +467,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_drop_all_transactions() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 
@@ -669,7 +669,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_anvil_remove_pool_transactions() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         provider.anvil_set_auto_mine(false).await.unwrap();
 

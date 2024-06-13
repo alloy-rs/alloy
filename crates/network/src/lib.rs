@@ -14,12 +14,12 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilderError, TxSigner,
     TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumSigner};
+pub use ethereum::{Ethereum, EthereumWallet};
 
 mod any;
 pub use any::AnyNetwork;

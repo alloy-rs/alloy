@@ -20,7 +20,7 @@ alloy-consensus.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
-alloy-signer-wallet = { workspace = true, optional = true }
+alloy-signer-local = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth.workspace = true
@@ -55,9 +55,10 @@ alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 alloy-signer.workspace = true
-alloy-signer-wallet.workspace = true
+alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
 
+itertools.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
@@ -83,6 +84,6 @@ anvil-node = [
     "anvil-api",
     "reqwest",
     "dep:alloy-node-bindings",
-    "dep:alloy-signer-wallet",
+    "dep:alloy-signer-local",
 ]
 engine-api = ["dep:alloy-rpc-types-engine"]

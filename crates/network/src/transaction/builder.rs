@@ -1,4 +1,4 @@
-use super::signer::NetworkSigner;
+use super::signer::NetworkWallet;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
@@ -365,8 +365,8 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn build_unsigned(self) -> BuildResult<N::UnsignedTx, N>;
 
     /// Build a signed transaction.
-    fn build<S: NetworkSigner<N>>(
+    fn build<W: NetworkWallet<N>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
 }

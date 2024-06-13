@@ -52,8 +52,8 @@ This repository contains the following crates:
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
   - [`alloy-signer-ledger`] - [Ledger] signer implementation
+  - [`alloy-signer-local`] - Local (private key, keystore, mnemonic, YubiHSM) signer implementations
   - [`alloy-signer-trezor`] - [Trezor] signer implementation
-  - [`alloy-signer-wallet`] - Local wallet (Keystore/Mnemonic/Yubihsm) signer implementation
 - [`alloy-transport`] - Low-level Ethereum JSON-RPC transport abstraction
   - [`alloy-transport-http`] - HTTP transport implementation
   - [`alloy-transport-ipc`] - IPC transport implementation
@@ -82,12 +82,13 @@ This repository contains the following crates:
 [`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
 [`alloy-signer-gcp`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-gcp
 [`alloy-signer-ledger`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-ledger
+[`alloy-signer-local`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-local
 [`alloy-signer-trezor`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-trezor
-[`alloy-signer-wallet`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-wallet
 [`alloy-transport`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport
 [`alloy-transport-http`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-http
 [`alloy-transport-ipc`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ipc
 [`alloy-transport-ws`]: https://github.com/alloy-rs/alloy/tree/main/crates/transport-ws
+
 [publish-subscribe]: https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern
 [AWS KMS]: https://aws.amazon.com/kms
 [GCP KMS]: https://cloud.google.com/kms

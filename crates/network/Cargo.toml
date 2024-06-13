@@ -29,7 +29,7 @@ futures-utils-wasm.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-alloy-signer-wallet.workspace = true
+alloy-signer-local.workspace = true
 tokio.workspace = true
 
 [features]

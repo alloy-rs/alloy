@@ -1,5 +1,5 @@
 [package]
-name = "alloy-signer-wallet"
+name = "alloy-signer-local"
 description = "sepc256k1 ECDSA and YubiHSM signer implementations"
 
 version.workspace = true

@@ -3,10 +3,10 @@
 //!
 //! [BIP-39]: https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 
-use crate::{LocalWallet, Wallet, WalletError};
+use crate::{LocalSigner, LocalSignerError, PrivateKeySigner};
 use alloy_signer::utils::secret_key_to_address;
 use coins_bip32::path::DerivationPath;
-use coins_bip39::{Mnemonic, Wordlist};
+use coins_bip39::{English, Mnemonic, Wordlist};
 use k256::ecdsa::SigningKey;
 use rand::Rng;
 use std::{marker::PhantomData, path::PathBuf};
@@ -15,14 +15,14 @@ use thiserror::Error;
 const DEFAULT_DERIVATION_PATH_PREFIX: &str = "m/44'/60'/0'/0/";
 const DEFAULT_DERIVATION_PATH: &str = "m/44'/60'/0'/0/0";
 
-/// Represents a structure that can resolve into a `LocalWallet`.
+/// Represents a structure that can resolve into a `PrivateKeySigner`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use = "builders do nothing unless `build` is called"]
-pub struct MnemonicBuilder<W: Wordlist> {
+pub struct MnemonicBuilder<W: Wordlist = English> {
     /// The mnemonic phrase can be supplied to the builder as a string. A builder that has a valid
-    /// phrase should `build` the wallet.
+    /// phrase should `build` the signer.
     phrase: Option<String>,
-    /// The mnemonic builder can also be asked to generate a new random wallet by providing the
+    /// The mnemonic builder can also be asked to generate a new random signer by providing the
     /// number of words in the phrase. By default this is set to 12.
     word_count: usize,
     /// The derivation path at which the extended private key child will be derived at. By default
@@ -37,7 +37,7 @@ pub struct MnemonicBuilder<W: Wordlist> {
     _wordlist: PhantomData<W>,
 }
 
-/// Error produced by the mnemonic wallet module
+/// Error produced by the mnemonic signer module.
 #[derive(Debug, Error)]
 pub enum MnemonicBuilderError {
     /// Error suggests that a phrase (path or words) was expected but not found.
@@ -70,9 +70,9 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ///
     /// ```
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_wallet::{MnemonicBuilder, coins_bip39::English};
+    /// use alloy_signer_local::{MnemonicBuilder, coins_bip39::English};
     ///
-    /// let wallet = MnemonicBuilder::<English>::default()
+    /// let signer = MnemonicBuilder::<English>::default()
     ///     .phrase("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about")
     ///     .build()?;
     /// # Ok(())
@@ -90,9 +90,9 @@ impl<W: Wordlist> MnemonicBuilder<W> {
     ///
     /// ```no_run
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_wallet::{coins_bip39::English, MnemonicBuilder};
+    /// use alloy_signer_local::{coins_bip39::English, MnemonicBuilder};
     ///
-    /// let wallet = MnemonicBuilder::<English>::default().word_count(24).build()?;
+    /// let signer = MnemonicBuilder::<English>::default().word_count(24).build()?;
     /// # Ok(())
     /// # }
     /// ```
@@ -103,12 +103,12 @@ impl<W: Wordlist> MnemonicBuilder<W> {
 
     /// Sets the derivation path of the child key to be derived. The derivation path is calculated
     /// using the default derivation path prefix used in Ethereum, i.e. "m/44'/60'/0'/0/{index}".
-    pub fn index(self, index: u32) -> Result<Self, WalletError> {
+    pub fn index(self, index: u32) -> Result<Self, LocalSignerError> {
         self.derivation_path(format!("{DEFAULT_DERIVATION_PATH_PREFIX}{index}"))
     }
 
     /// Sets the derivation path of the child key to be derived.
-    pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, WalletError> {
+    pub fn derivation_path<T: AsRef<str>>(mut self, path: T) -> Result<Self, LocalSignerError> {
         self.derivation_path = path.as_ref().parse()?;
         Ok(self)
     }
@@ -126,46 +126,52 @@ impl<W: Wordlist> MnemonicBuilder<W> {
         self
     }
 
-    /// Builds a `LocalWallet` using the parameters set in mnemonic builder. This method expects
-    /// the phrase field to be set.
-    pub fn build(&self) -> Result<LocalWallet, WalletError> {
+    /// Builds a `PrivateKeySigner` using the parameters set in mnemonic builder. This method
+    /// expects the phrase field to be set.
+    pub fn build(&self) -> Result<PrivateKeySigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             Some(phrase) => Mnemonic::<W>::new_from_phrase(phrase)?,
             None => return Err(MnemonicBuilderError::ExpectedPhraseNotFound.into()),
         };
-        self.mnemonic_to_wallet(&mnemonic)
+        self.mnemonic_to_signer(&mnemonic)
     }
 
-    /// Builds a `LocalWallet` using the parameters set in the mnemonic builder and constructing
-    /// the phrase using the thread RNG.
-    pub fn build_random(&self) -> Result<LocalWallet, WalletError> {
+    /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
+    /// constructing the phrase using the thread RNG.
+    pub fn build_random(&self) -> Result<PrivateKeySigner, LocalSignerError> {
         self.build_random_with(&mut rand::thread_rng())
     }
 
-    /// Builds a `LocalWallet` using the parameters set in the mnemonic builder and constructing
-    /// the phrase using the provided random number generator.
-    pub fn build_random_with<R: Rng>(&self, rng: &mut R) -> Result<LocalWallet, WalletError> {
+    /// Builds a `PrivateKeySigner` using the parameters set in the mnemonic builder and
+    /// constructing the phrase using the provided random number generator.
+    pub fn build_random_with<R: Rng>(
+        &self,
+        rng: &mut R,
+    ) -> Result<PrivateKeySigner, LocalSignerError> {
         let mnemonic = match &self.phrase {
             None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
         };
-        let wallet = self.mnemonic_to_wallet(&mnemonic)?;
+        let signer = self.mnemonic_to_signer(&mnemonic)?;
 
         // Write the mnemonic phrase to storage if a directory has been provided.
         if let Some(dir) = &self.write_to {
-            std::fs::write(dir.join(wallet.address.to_string()), mnemonic.to_phrase().as_bytes())?;
+            std::fs::write(dir.join(signer.address.to_string()), mnemonic.to_phrase().as_bytes())?;
         }
 
-        Ok(wallet)
+        Ok(signer)
     }
 
-    fn mnemonic_to_wallet(&self, mnemonic: &Mnemonic<W>) -> Result<LocalWallet, WalletError> {
+    fn mnemonic_to_signer(
+        &self,
+        mnemonic: &Mnemonic<W>,
+    ) -> Result<PrivateKeySigner, LocalSignerError> {
         let derived_priv_key =
             mnemonic.derive_key(&self.derivation_path, self.password.as_deref())?;
         let key: &coins_bip32::prelude::SigningKey = derived_priv_key.as_ref();
-        let signer = SigningKey::from_bytes(&key.to_bytes())?;
-        let address = secret_key_to_address(&signer);
-        Ok(Wallet::<SigningKey> { signer, address, chain_id: None })
+        let credential = SigningKey::from_bytes(&key.to_bytes())?;
+        let address = secret_key_to_address(&credential);
+        Ok(LocalSigner::<SigningKey> { credential, address, chain_id: None })
     }
 }
 
@@ -212,8 +218,8 @@ mod tests {
             if let Some(psswd) = password {
                 builder = builder.password(psswd);
             }
-            let wallet = builder.build().unwrap();
-            assert_eq!(&wallet.address.to_string(), expected_addr);
+            let signer = builder.build().unwrap();
+            assert_eq!(&signer.address.to_string(), expected_addr);
         }
     }
 
@@ -221,7 +227,7 @@ mod tests {
     fn mnemonic_write_read() {
         let dir = tempdir().unwrap();
 
-        let wallet1 = MnemonicBuilder::<English>::default()
+        let signer1 = MnemonicBuilder::<English>::default()
             .word_count(24)
             .derivation_path(TEST_DERIVATION_PATH)
             .unwrap()
@@ -233,18 +239,18 @@ mod tests {
         let paths = std::fs::read_dir(dir.as_ref()).unwrap();
         assert_eq!(paths.count(), 1);
 
-        // Use the newly created mnemonic to instantiate wallet.
-        let phrase_path = dir.as_ref().join(wallet1.address.to_string());
+        // Use the newly created mnemonic to instantiate signer.
+        let phrase_path = dir.as_ref().join(signer1.address.to_string());
         let phrase = std::fs::read_to_string(phrase_path).unwrap();
-        let wallet2 = MnemonicBuilder::<English>::default()
+        let signer2 = MnemonicBuilder::<English>::default()
             .phrase(phrase)
             .derivation_path(TEST_DERIVATION_PATH)
             .unwrap()
             .build()
             .unwrap();
 
-        // Ensure that both wallets belong to the same address.
-        assert_eq!(wallet1.address, wallet2.address);
+        // Ensure that both signers belong to the same address.
+        assert_eq!(signer1.address, signer2.address);
 
         dir.close().unwrap();
     }

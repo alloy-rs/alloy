@@ -9,8 +9,8 @@
 mod chain_id;
 pub use chain_id::ChainIdFiller;
 
-mod signer;
-pub use signer::SignerFiller;
+mod wallet;
+pub use wallet::WalletFiller;
 
 mod nonce;
 pub use nonce::NonceFiller;
