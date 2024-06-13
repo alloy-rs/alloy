@@ -152,11 +152,11 @@ impl<W: Wordlist> MnemonicBuilder<W> {
             None => Mnemonic::<W>::new_with_count(rng, self.word_count)?,
             _ => return Err(MnemonicBuilderError::UnexpectedPhraseFound.into()),
         };
-        let wallet = self.mnemonic_to_signer(&mnemonic)?;
+        let signer = self.mnemonic_to_signer(&mnemonic)?;
 
         // Write the mnemonic phrase to storage if a directory has been provided.
         if let Some(dir) = &self.write_to {
-            std::fs::write(dir.join(wallet.address.to_string()), mnemonic.to_phrase().as_bytes())?;
+            std::fs::write(dir.join(signer.address.to_string()), mnemonic.to_phrase().as_bytes())?;
         }
 
         Ok(wallet)
@@ -218,8 +218,8 @@ mod tests {
             if let Some(psswd) = password {
                 builder = builder.password(psswd);
             }
-            let wallet = builder.build().unwrap();
-            assert_eq!(&wallet.address.to_string(), expected_addr);
+            let signer = builder.build().unwrap();
+            assert_eq!(&signer.address.to_string(), expected_addr);
         }
     }
 
