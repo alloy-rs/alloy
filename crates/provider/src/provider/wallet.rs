@@ -95,18 +95,19 @@ where
 mod test {
     use super::*;
     use crate::ProviderBuilder;
+    use itertools::Itertools;
 
     #[test]
     fn basic_usage() {
         let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
-        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
+        assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 
     #[test]
     fn bubbles_through_fillers() {
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
-        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
+        assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 }

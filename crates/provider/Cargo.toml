@@ -58,6 +58,7 @@ alloy-signer.workspace = true
 alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
 
+itertools.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
