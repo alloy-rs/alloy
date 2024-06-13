@@ -66,7 +66,7 @@ pub type YubiWallet = YubiSigner;
 ///
 /// let signer = PrivateKeySigner::random();
 ///
-/// // Optionally, the signers' chain id can be set, in order to use EIP-155
+/// // Optionally, the signer's chain id can be set, in order to use EIP-155
 /// // replay protection with different chains
 /// let signer = signer.with_chain_id(Some(1337));
 ///
@@ -83,7 +83,7 @@ pub type YubiWallet = YubiSigner;
 /// ```
 #[derive(Clone)]
 pub struct LocalSigner<C> {
-    /// The signers' credential.
+    /// The signer's credential.
     pub(crate) credential: C,
     /// The signer's address.
     pub(crate) address: Address,
@@ -151,13 +151,13 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> LocalSigner<C> {
         self.credential
     }
 
-    /// Returns this signers' address.
+    /// Returns this signer's address.
     #[inline]
     pub const fn address(&self) -> Address {
         self.address
     }
 
-    /// Returns this signers' chain ID.
+    /// Returns this signer's chain ID.
     #[inline]
     pub const fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
