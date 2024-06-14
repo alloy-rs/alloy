@@ -896,7 +896,7 @@ impl From<Vec<Transaction>> for FilterChanges {
 
 impl<T> FilterChanges<T> {
     /// Get the hashes if present.
-    pub fn hashes(&self) -> Option<&[B256]> {
+    pub fn as_hashes(&self) -> Option<&[B256]> {
         if let Self::Hashes(hashes) = self {
             Some(hashes)
         } else {
@@ -905,7 +905,7 @@ impl<T> FilterChanges<T> {
     }
 
     /// Get the logs if present.
-    pub fn logs(&self) -> Option<&[RpcLog]> {
+    pub fn as_logs(&self) -> Option<&[RpcLog]> {
         if let Self::Logs(logs) = self {
             Some(logs)
         } else {
@@ -914,7 +914,7 @@ impl<T> FilterChanges<T> {
     }
 
     /// Get the transactions if present.
-    pub fn transactions(&self) -> Option<&[T]> {
+    pub fn as_transactions(&self) -> Option<&[T]> {
         if let Self::Transactions(transactions) = self {
             Some(transactions)
         } else {
