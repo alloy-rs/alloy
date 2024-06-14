@@ -30,7 +30,7 @@ engine = ["alloy-rpc-types-engine"]
 eth = ["alloy-rpc-types-eth"]
 trace = ["alloy-rpc-types-trace"]
 
-arbitrary = ["alloy-rpc-types-eth?/arbitrary"]
+arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
 jsonrpsee-types = [
     "alloy-rpc-types-eth?/jsonrpsee-types",
     "alloy-rpc-types-engine?/jsonrpsee-types",

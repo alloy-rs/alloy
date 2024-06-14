@@ -10,7 +10,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-#[cfg(feature = "arbitrary")]
+#[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
 
 /// Generic type for capturing additional fields when deserializing structs.
@@ -236,7 +236,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arbitrary::Arbitrary;
     use rand::Rng;
 
     #[test]
@@ -244,7 +243,7 @@ mod tests {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
 
-        let _ = OtherFields::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+        let _ = arbitrary::Unstructured::new(&bytes).arbitrary::<OtherFields>().unwrap();
     }
 
     #[test]
