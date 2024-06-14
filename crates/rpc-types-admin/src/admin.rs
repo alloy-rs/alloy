@@ -99,7 +99,7 @@ pub struct PeerProtocolInfo {
 
 /// Can contain either eth protocol info or a string "handshake", which geth uses if the peer is
 /// still completing the handshake for the protocol.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum EthPeerInfo {
     /// The `eth` sub-protocol metadata known about the host peer.
@@ -123,7 +123,7 @@ pub struct EthInfo {
 
 /// Can contain either snap protocol info or a string "handshake", which geth uses if the peer is
 /// still completing the handshake for the protocol.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapPeerInfo {
     /// The `snap` sub-protocol metadata known about the host peer.
