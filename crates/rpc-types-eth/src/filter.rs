@@ -894,6 +894,35 @@ impl From<Vec<Transaction>> for FilterChanges {
     }
 }
 
+impl<T> FilterChanges<T> {
+    /// Get the hashes if present.
+    pub fn as_hashes(&self) -> Option<&[B256]> {
+        if let Self::Hashes(hashes) = self {
+            Some(hashes)
+        } else {
+            None
+        }
+    }
+
+    /// Get the logs if present.
+    pub fn as_logs(&self) -> Option<&[RpcLog]> {
+        if let Self::Logs(logs) = self {
+            Some(logs)
+        } else {
+            None
+        }
+    }
+
+    /// Get the transactions if present.
+    pub fn as_transactions(&self) -> Option<&[T]> {
+        if let Self::Transactions(transactions) = self {
+            Some(transactions)
+        } else {
+            None
+        }
+    }
+}
+
 mod empty_array {
     use serde::{Serialize, Serializer};
 
