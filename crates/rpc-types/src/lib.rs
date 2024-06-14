@@ -12,6 +12,9 @@
 
 pub use alloy_serde as serde_helpers;
 
+#[cfg(feature = "admin")]
+pub use alloy_rpc_types_admin as admin;
+
 #[cfg(feature = "anvil")]
 pub use alloy_rpc_types_anvil as anvil;
 
@@ -28,3 +31,6 @@ pub use eth::*;
 
 #[cfg(feature = "trace")]
 pub use alloy_rpc_types_trace as trace;
+
+#[cfg(feature = "txpool")]
+pub use alloy_rpc_types_txpool as txpool;

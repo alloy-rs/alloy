@@ -1,12 +1,15 @@
-//! Ethereum related types
+#![doc = include_str!("../README.md")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",
+    html_favicon_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"
+)]
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 pub use alloy_eips::eip4895::Withdrawal;
 
 mod account;
 pub use account::*;
-
-pub mod admin;
-pub use admin::NodeInfo;
 
 mod block;
 pub use block::*;
@@ -40,8 +43,6 @@ pub use syncing::*;
 
 pub mod transaction;
 pub use transaction::*;
-
-pub mod txpool;
 
 mod work;
 pub use work::Work;

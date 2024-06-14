@@ -16,19 +16,23 @@ workspace = true
 
 [dependencies]
 alloy-serde.workspace = true
+alloy-rpc-types-admin = { workspace = true, optional = true }
+alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
-alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-txpool = { workspace = true, optional = true }
 
 [features]
 default = ["eth"]
+admin = ["alloy-rpc-types-admin"]
 anvil = ["alloy-rpc-types-anvil"]
 beacon = ["alloy-rpc-types-beacon"]
 engine = ["alloy-rpc-types-engine"]
 eth = ["alloy-rpc-types-eth"]
 trace = ["alloy-rpc-types-trace"]
+txpool = ["alloy-rpc-types-txpool"]
 
 arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
 jsonrpsee-types = [

@@ -134,12 +134,35 @@ rpc-client = ["rpc", "dep:alloy-rpc-client"]
 rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
 rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
-rpc-types-anvil = ["rpc-types", "alloy-rpc-types?/anvil"]
+rpc-types-admin = [
+    "rpc-types",
+    "alloy-rpc-types?/admin",
+    "alloy-provider?/admin-api",
+]
+rpc-types-anvil = [
+    "rpc-types",
+    "alloy-rpc-types?/anvil",
+    "alloy-provider?/anvil-api",
+]
 rpc-types-beacon = ["rpc-types", "alloy-rpc-types?/beacon"]
-rpc-types-engine = ["rpc-types", "alloy-rpc-types?/engine"]
+rpc-types-debug = ["rpc-types", "alloy-provider?/debug-api"]
+rpc-types-engine = [
+    "rpc-types",
+    "alloy-rpc-types?/engine",
+    "alloy-provider?/engine-api",
+]
 rpc-types-eth = ["rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-json = ["rpc-types", "alloy-rpc-types?/jsonrpsee-types"]
-rpc-types-trace = ["rpc-types", "alloy-rpc-types?/trace"]
+rpc-types-trace = [
+    "rpc-types",
+    "alloy-rpc-types?/trace",
+    "alloy-provider?/trace-api",
+]
+rpc-types-txpool = [
+    "rpc-types",
+    "alloy-rpc-types?/txpool",
+    "alloy-provider?/txpool-api",
+]
 
 # signers
 signers = ["dep:alloy-signer"]
