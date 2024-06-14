@@ -42,10 +42,11 @@ alloy-node-bindings = { version = "0.1.0", default-features = false, path = "cra
 alloy-provider = { version = "0.1.0", default-features = false, path = "crates/provider" }
 alloy-pubsub = { version = "0.1.0", default-features = false, path = "crates/pubsub" }
 alloy-rpc-client = { version = "0.1.0", default-features = false, path = "crates/rpc-client" }
-alloy-rpc-types-eth = { version = "0.1.0", default-features = false, path = "crates/rpc-types-eth" }
-alloy-rpc-types-engine = { version = "0.1.0", default-features = false, path = "crates/rpc-types-engine" }
+alloy-rpc-types-admin = { version = "0.1.0", default-features = false, path = "crates/rpc-types-admin" }
 alloy-rpc-types-anvil = { version = "0.1.0", default-features = false, path = "crates/rpc-types-anvil" }
 alloy-rpc-types-beacon = { version = "0.1.0", default-features = false, path = "crates/rpc-types-beacon" }
+alloy-rpc-types-engine = { version = "0.1.0", default-features = false, path = "crates/rpc-types-engine" }
+alloy-rpc-types-eth = { version = "0.1.0", default-features = false, path = "crates/rpc-types-eth" }
 alloy-rpc-types-trace = { version = "0.1.0", default-features = false, path = "crates/rpc-types-trace" }
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }
 alloy-serde = { version = "0.1.0", default-features = false, path = "crates/serde" }

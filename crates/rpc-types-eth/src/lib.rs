@@ -5,9 +5,6 @@ pub use alloy_eips::eip4895::Withdrawal;
 mod account;
 pub use account::*;
 
-pub mod admin;
-pub use admin::NodeInfo;
-
 mod block;
 pub use block::*;
 
