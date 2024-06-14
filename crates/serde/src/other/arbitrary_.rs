@@ -74,9 +74,9 @@ impl ArbitraryValue {
             Self::Bool(b) => serde_json::Value::Bool(b),
             Self::Number(n) => serde_json::Value::Number(n.into()),
             Self::String(s) => serde_json::Value::String(s),
-            Self::Array(a) => serde_json::Value::Array(
-                a.into_iter().map(ArbitraryValue::into_json_value).collect(),
-            ),
+            Self::Array(a) => {
+                serde_json::Value::Array(a.into_iter().map(Self::into_json_value).collect())
+            }
             Self::Object(o) => serde_json::Value::Object(
                 o.into_iter().map(|(k, v)| (k, v.into_json_value())).collect(),
             ),

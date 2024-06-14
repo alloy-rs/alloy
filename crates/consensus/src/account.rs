@@ -42,7 +42,7 @@ mod tests {
             code_hash: keccak256(hex!("5a465a905090036002900360015500")),
         };
 
-        let encoded = alloy_rlp::encode(&account);
+        let encoded = alloy_rlp::encode(account);
 
         let decoded = Account::decode(&mut &encoded[..]).unwrap();
         assert_eq!(account, decoded);
@@ -59,7 +59,7 @@ mod tests {
             code_hash: keccak256(hex!("5a465a905090036002900360015500")),
         };
 
-        let expected_hash = keccak256(alloy_rlp::encode(&account));
+        let expected_hash = keccak256(alloy_rlp::encode(account));
         let actual_hash = account.trie_hash_slow();
         assert_eq!(expected_hash, actual_hash);
     }
