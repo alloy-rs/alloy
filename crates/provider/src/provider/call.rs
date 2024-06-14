@@ -14,19 +14,25 @@ type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
 #[derive(Clone, Debug)]
 struct EthCallParams<'req, 'state, N: Network> {
     data: &'req N::TransactionRequest,
-    block: BlockId,
+    block: Option<BlockId>,
     overrides: Option<&'state StateOverride>,
 }
 
 impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let len = if self.overrides.is_some() { 3 } else { 2 };
+        let len = 1 + self.block.is_some() as usize + self.overrides.is_some() as usize;
+
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&self.data)?;
-        seq.serialize_element(&self.block)?;
+
+        if let Some(block) = self.block {
+            seq.serialize_element(&block)?;
+        }
+
         if let Some(overrides) = self.overrides {
             seq.serialize_element(overrides)?;
         }
+
         seq.end()
     }
 }
@@ -94,7 +100,7 @@ where
             Err(e) => return Poll::Ready(Err(e)),
         };
 
-        let params = EthCallParams { data, block: block.unwrap_or_default(), overrides };
+        let params = EthCallParams { data, block, overrides };
 
         let fut = client.request(method, params).map_resp(map);
 
