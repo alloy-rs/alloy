@@ -22,11 +22,11 @@ alloy-network.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
-alloy-rpc-types-admin.workspace = true
+alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth.workspace = true
-alloy-rpc-types-trace.workspace = true
-alloy-rpc-types-txpool.workspace = true
+alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -81,6 +81,7 @@ ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
 reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
 reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
 reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
+admin-api = ["dep:alloy-rpc-types-admin"]
 anvil-api = ["dep:alloy-rpc-types-anvil"]
 anvil-node = [
     "anvil-api",
@@ -88,4 +89,7 @@ anvil-node = [
     "dep:alloy-node-bindings",
     "dep:alloy-signer-local",
 ]
+debug-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
+trace-api = ["dep:alloy-rpc-types-trace"]
+txpool-api = ["dep:alloy-rpc-types-txpool"]
