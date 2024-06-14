@@ -28,11 +28,9 @@ pub use index::Index;
 mod log;
 pub use log::*;
 
-pub mod other;
-
 pub mod pubsub;
 
-pub mod raw_log;
+mod raw_log;
 pub use raw_log::{logs_bloom, Log as RawLog};
 
 pub mod state;
@@ -47,6 +45,3 @@ pub mod txpool;
 
 mod work;
 pub use work::Work;
-
-pub mod with_other;
-pub use with_other::WithOtherFields;

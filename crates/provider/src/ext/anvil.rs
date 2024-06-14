@@ -1,15 +1,16 @@
 //! This module extends the Ethereum JSON-RPC provider with the Anvil namespace's RPC methods.
+
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_anvil::{Forking, Metadata, MineOptions, NodeInfo};
-use alloy_rpc_types_eth::{Block, TransactionRequest, WithOtherFields};
+use alloy_rpc_types_eth::Block;
 use alloy_transport::{Transport, TransportResult};
 
 /// Anvil namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait AnvilApi<N, T>: Send + Sync {
+pub trait AnvilApi<N: Network, T>: Send + Sync {
     // Not implemented:
     // - anvil_enable_traces: Not implemented in the Anvil RPC API.
     // - anvil_set_block: Not implemented / wired correctly in the Anvil RPC API.
@@ -140,7 +141,7 @@ pub trait AnvilApi<N, T>: Send + Sync {
     /// Execute a transaction regardless of signature status.
     async fn eth_send_unsigned_transaction(
         &self,
-        request: WithOtherFields<TransactionRequest>,
+        request: N::TransactionRequest,
     ) -> TransportResult<TxHash>;
 }
 
@@ -303,7 +304,7 @@ where
 
     async fn eth_send_unsigned_transaction(
         &self,
-        request: WithOtherFields<TransactionRequest>,
+        request: N::TransactionRequest,
     ) -> TransportResult<TxHash> {
         self.client().request("eth_sendUnsignedTransaction", (request,)).await
     }
@@ -311,14 +312,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
-
-    use crate::ProviderBuilder;
     use alloy_primitives::B256;
+    use alloy_rpc_types_eth::TransactionRequest;
 
-    use super::*;
+    // use alloy_node_bindings::Anvil; (to be used in `test_anvil_reset`)
 
     #[tokio::test]
     async fn test_anvil_impersonate_account_stop_impersonating_account() {
@@ -937,8 +938,7 @@ mod tests {
             .with_max_priority_fee_per_gas(1_000_000_000)
             .with_max_fee_per_gas(20_000_000_000);
 
-        let tx_hash =
-            provider.eth_send_unsigned_transaction(WithOtherFields::new(tx)).await.unwrap();
+        let tx_hash = provider.eth_send_unsigned_transaction(tx).await.unwrap();
 
         provider.evm_mine(None).await.unwrap();
 

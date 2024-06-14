@@ -1,19 +1,33 @@
-//! Support for capturing other fields
+//! Support for capturing other fields.
+
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Map;
+use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fmt,
     ops::{Deref, DerefMut},
 };
 
-/// A type that is supposed to capture additional fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
+#[cfg(feature = "arbitrary")]
+mod arbitrary_;
+
+/// Generic type for capturing additional fields when deserializing structs.
 ///
-/// This type is supposed to be used with [`#[serde(flatten)`](https://serde.rs/field-attrs.html#flatten)
+/// For example, the [optimism `eth_getTransactionByHash` request][optimism] returns additional
+/// fields that this type will capture instead.
+///
+/// Use `deserialize_as` or `deserialize_into` with a struct that captures the unknown fields, or
+/// deserialize the individual fields manually with `get_deserialized`.
+///
+/// This type must be used with [`#[serde(flatten)]`][flatten].
+///
+/// [optimism]: https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash
+/// [flatten]: https://serde.rs/field-attrs.html#flatten
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OtherFields {
-    /// Contains all unknown fields
     inner: BTreeMap<String, serde_json::Value>,
 }
 
@@ -21,6 +35,18 @@ impl OtherFields {
     /// Creates a new instance
     pub fn new(inner: BTreeMap<String, serde_json::Value>) -> Self {
         Self { inner }
+    }
+
+    /// Deserialized this type into another container type.
+    pub fn deserialize_as<T: DeserializeOwned>(&self) -> serde_json::Result<T> {
+        let map = self.inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        serde_json::from_value(serde_json::Value::Object(map))
+    }
+
+    /// Deserialized this type into another container type.
+    pub fn deserialize_into<T: DeserializeOwned>(self) -> serde_json::Result<T> {
+        let map = self.inner.into_iter().collect();
+        serde_json::from_value(serde_json::Value::Object(map))
     }
 
     /// Returns the deserialized value of the field, if it exists.
@@ -37,7 +63,7 @@ impl OtherFields {
         &self,
         key: impl AsRef<str>,
     ) -> Option<serde_json::Result<V>> {
-        self.inner.get(key.as_ref()).cloned().map(serde_json::from_value)
+        self.get_with(key, serde_json::from_value)
     }
 
     /// Removes the deserialized value of the field, if it exists
@@ -71,13 +97,6 @@ impl OtherFields {
         self.inner
             .remove_entry(key.as_ref())
             .map(|(key, value)| (key, serde_json::from_value(value)))
-    }
-
-    /// Deserialized this type into another container type
-    pub fn deserialize_into<T: DeserializeOwned>(self) -> serde_json::Result<T> {
-        let mut map = Map::with_capacity(self.inner.len());
-        map.extend(self);
-        serde_json::from_value(serde_json::Value::Object(map))
     }
 }
 
@@ -144,28 +163,73 @@ impl<'a> IntoIterator for &'a OtherFields {
     }
 }
 
-#[cfg(any(test, feature = "arbitrary"))]
-impl arbitrary::Arbitrary<'_> for OtherFields {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        // Generate a random number of entries for the BTreeMap
-        let num_entries = u.int_in_range(0..=10)?;
+/// An extension to a struct that allows to capture additional fields when deserializing.
+///
+/// See [`OtherFields`] for more information.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
+pub struct WithOtherFields<T> {
+    /// The inner struct.
+    #[serde(flatten)]
+    pub inner: T,
+    /// All fields not present in the inner struct.
+    #[serde(flatten)]
+    pub other: OtherFields,
+}
 
-        // Generate random key-value pairs and insert them into the BTreeMap
-        let mut inner = BTreeMap::new();
-        for _ in 0..num_entries {
-            inner.insert(
-                String::arbitrary(u)?,
-                match u.int_in_range(0..=3)? {
-                    0 => serde_json::Value::Null,
-                    1 => serde_json::Value::Bool(u.arbitrary()?),
-                    2 => serde_json::Value::Number(u.arbitrary::<u64>()?.into()),
-                    3 => serde_json::Value::String(u.arbitrary()?),
-                    _ => unreachable!(),
-                },
-            );
+impl<T> WithOtherFields<T> {
+    /// Creates a new [`WithOtherFields`] instance.
+    pub fn new(inner: T) -> Self {
+        Self { inner, other: Default::default() }
+    }
+}
+
+impl<T> Deref for WithOtherFields<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for WithOtherFields<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<'de, T> Deserialize<'de> for WithOtherFields<T>
+where
+    T: Deserialize<'de> + Serialize,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct WithOtherFieldsHelper<T> {
+            #[serde(flatten)]
+            inner: T,
+            #[serde(flatten)]
+            other: OtherFields,
         }
 
-        Ok(Self { inner })
+        let mut helper = WithOtherFieldsHelper::deserialize(deserializer)?;
+        // remove all fields present in the inner struct from the other fields, this is to avoid
+        // duplicate fields in the catch all other fields because serde flatten does not exclude
+        // already deserialized fields when deserializing the other fields.
+        if let Value::Object(map) =
+            serde_json::to_value(&helper.inner).map_err(serde::de::Error::custom)?
+        {
+            for key in map.keys() {
+                helper.other.remove(key);
+            }
+        }
+
+        Ok(Self { inner: helper.inner, other: helper.other })
     }
 }
 
@@ -181,5 +245,27 @@ mod tests {
         rand::thread_rng().fill(bytes.as_mut_slice());
 
         let _ = OtherFields::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
+    }
+
+    #[test]
+    fn test_correct_other() {
+        #[derive(Serialize, Deserialize)]
+        struct Inner {
+            a: u64,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct InnerWrapper {
+            #[serde(flatten)]
+            inner: Inner,
+        }
+
+        let with_other: WithOtherFields<InnerWrapper> =
+            serde_json::from_str("{\"a\": 1, \"b\": 2}").unwrap();
+        assert_eq!(with_other.inner.inner.a, 1);
+        assert_eq!(
+            with_other.other,
+            OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
+        );
     }
 }
