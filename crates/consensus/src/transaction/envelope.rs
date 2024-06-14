@@ -365,7 +365,10 @@ impl Encodable2718 for TxEnvelope {
 mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
-    use alloy_eips::eip2930::{AccessList, AccessListItem};
+    use alloy_eips::{
+        eip2930::{AccessList, AccessListItem},
+        eip4844::BlobTransactionSidecar,
+    };
     use alloy_primitives::{hex, Address, Parity, Signature, U256};
     #[allow(unused_imports)]
     use alloy_primitives::{Bytes, TxKind};
@@ -525,7 +528,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_encode_decode_eip4844_parity_eip155() {
         let tx = TxEip4844 {
             chain_id: 1,
@@ -543,6 +545,57 @@ mod tests {
             blob_versioned_hashes: vec![B256::random()],
             max_fee_per_blob_gas: 0,
         };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip4844_sidecar_parity_eip155() {
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        };
+        let sidecar = BlobTransactionSidecar {
+            blobs: vec![[2; 131072].into()],
+            commitments: vec![[3; 48].into()],
+            proofs: vec![[4; 48].into()],
+        };
+        let tx = TxEip4844WithSidecar { tx, sidecar };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip4844_variant_parity_eip155() {
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        };
+        let tx = TxEip4844Variant::TxEip4844(tx);
         let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
         test_encode_decode_roundtrip(tx, Some(signature));
     }
