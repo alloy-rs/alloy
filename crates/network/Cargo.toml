@@ -21,6 +21,7 @@ alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-signer.workspace = true
+alloy-serde.workspace = true
 alloy-sol-types.workspace = true
 
 auto_impl.workspace = true
