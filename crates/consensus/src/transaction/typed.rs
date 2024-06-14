@@ -178,3 +178,17 @@ impl Transaction for TypedTransaction {
         }
     }
 }
+
+#[cfg(feature = "serde")]
+impl<T: From<TypedTransaction>> From<TypedTransaction> for alloy_serde::WithOtherFields<T> {
+    fn from(value: TypedTransaction) -> Self {
+        Self::new(value.into())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
+    fn from(value: TxEnvelope) -> Self {
+        Self::new(value.into())
+    }
+}

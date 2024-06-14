@@ -58,6 +58,7 @@ arbitrary = [
     "dep:proptest-derive",
     "dep:proptest",
     "alloy-primitives/arbitrary",
+    "alloy-serde/arbitrary",
     "alloy-eips/arbitrary",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]

@@ -1,13 +1,12 @@
-use std::ops::{Deref, DerefMut};
-
-use alloy_consensus::BlobTransactionSidecar;
-use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
-
 use crate::{
     any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
     TransactionBuilderError,
 };
+use alloy_consensus::BlobTransactionSidecar;
+use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
+use alloy_rpc_types_eth::{AccessList, TransactionRequest};
+use alloy_serde::WithOtherFields;
+use std::ops::{Deref, DerefMut};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {

@@ -1,8 +1,6 @@
 use alloy_primitives::B256;
 use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Error, Header};
 
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 /// Captures the result of a transaction execution.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]

@@ -1,5 +1,5 @@
 use crate::receipt::{Eip658Value, TxReceipt};
-use alloy_primitives::{Bloom, Log, U128};
+use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::borrow::Borrow;
 
@@ -43,7 +43,10 @@ where
         let key = if self.status.is_eip658() { "status" } else { "root" };
         s.serialize_field(key, &self.status)?;
 
-        s.serialize_field("cumulativeGasUsed", &U128::from(self.cumulative_gas_used))?;
+        s.serialize_field(
+            "cumulativeGasUsed",
+            &alloy_primitives::U128::from(self.cumulative_gas_used),
+        )?;
         s.serialize_field("logs", &self.logs)?;
 
         s.end()
