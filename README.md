@@ -73,11 +73,13 @@ This repository contains the following crates:
 [`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub
 [`alloy-rpc-client`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-client
 [`alloy-rpc-types`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types
+[`alloy-rpc-types-admin`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-admin
 [`alloy-rpc-types-anvil`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-anvil
 [`alloy-rpc-types-beacon`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon
 [`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
 [`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
 [`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
+[`alloy-rpc-types-txpool`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-txpool
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
 [`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
 [`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
