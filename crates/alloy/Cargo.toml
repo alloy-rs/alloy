@@ -141,6 +141,7 @@ rpc-types-engine = ["rpc-types", "alloy-rpc-types?/engine"]
 rpc-types-eth = ["rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-json = ["rpc-types", "alloy-rpc-types?/jsonrpsee-types"]
 rpc-types-trace = ["rpc-types", "alloy-rpc-types?/trace"]
+rpc-types-txpool = ["rpc-types", "alloy-rpc-types?/txpool"]
 
 # signers
 signers = ["dep:alloy-signer"]

@@ -1,3 +1,3 @@
 # alloy-rpc-types-admin
 
-Ethereum RPC admin types.
+Ethereum RPC `admin` types.

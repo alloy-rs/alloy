@@ -48,6 +48,7 @@ alloy-rpc-types-beacon = { version = "0.1.0", default-features = false, path = "
 alloy-rpc-types-engine = { version = "0.1.0", default-features = false, path = "crates/rpc-types-engine" }
 alloy-rpc-types-eth = { version = "0.1.0", default-features = false, path = "crates/rpc-types-eth" }
 alloy-rpc-types-trace = { version = "0.1.0", default-features = false, path = "crates/rpc-types-trace" }
+alloy-rpc-types-txpool = { version = "0.1.0", default-features = false, path = "crates/rpc-types-txpool" }
 alloy-rpc-types = { version = "0.1.0", default-features = false, path = "crates/rpc-types" }
 alloy-serde = { version = "0.1.0", default-features = false, path = "crates/serde" }
 alloy-signer = { version = "0.1.0", default-features = false, path = "crates/signer" }
