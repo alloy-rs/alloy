@@ -41,11 +41,13 @@ This repository contains the following crates:
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Meta-crate for all Ethereum JSON-RPC types
-  - [`alloy-rpc-types-anvil`] - RPC types for the Anvil development node.
-  - [`alloy-rpc-types-beacon`] - Ethereum RPC-related types for the Beacon API.
+  - [`alloy-rpc-types-admin`] - Ethereum RPC admin types
+  - [`alloy-rpc-types-anvil`] - RPC types for the Anvil development node
+  - [`alloy-rpc-types-beacon`] - Ethereum RPC-related types for the Beacon API
   - [`alloy-rpc-types-engine`] - Ethereum execution-consensus layer (engine) API RPC types
-  - [`alloy-rpc-types-eth`] - Ethereum RPC-related types for Alloy.
+  - [`alloy-rpc-types-eth`] - Ethereum RPC-related types for Alloy
   - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
+  - [`alloy-rpc-types-txpool`] - Ethereum RPC txpool types
 - [`alloy-serde`] - Serde related helpers for Alloy.
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
