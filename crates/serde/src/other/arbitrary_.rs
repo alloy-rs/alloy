@@ -6,6 +6,9 @@ use proptest::{
     strategy::{BoxedStrategy, Just, Strategy},
 };
 
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec};
+
 impl arbitrary::Arbitrary<'_> for OtherFields {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
         let mut inner = BTreeMap::new();

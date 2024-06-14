@@ -2,13 +2,16 @@
 
 #![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Value;
-use std::{
-    collections::BTreeMap,
+use alloc::collections::BTreeMap;
+use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::Value;
+
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
 
 #[cfg(any(test, feature = "arbitrary"))]
 mod arbitrary_;
@@ -147,7 +150,7 @@ impl AsRef<BTreeMap<String, serde_json::Value>> for OtherFields {
 
 impl IntoIterator for OtherFields {
     type Item = (String, serde_json::Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, serde_json::Value>;
+    type IntoIter = alloc::collections::btree_map::IntoIter<String, serde_json::Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
@@ -156,7 +159,7 @@ impl IntoIterator for OtherFields {
 
 impl<'a> IntoIterator for &'a OtherFields {
     type Item = (&'a String, &'a serde_json::Value);
-    type IntoIter = std::collections::btree_map::Iter<'a, String, serde_json::Value>;
+    type IntoIter = alloc::collections::btree_map::Iter<'a, String, serde_json::Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.as_ref().iter()

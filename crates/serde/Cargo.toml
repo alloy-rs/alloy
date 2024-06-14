@@ -45,4 +45,5 @@ arbitrary = [
     "dep:proptest-derive",
     "dep:proptest",
     "alloy-primitives/arbitrary",
+    "std",
 ]
