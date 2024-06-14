@@ -469,7 +469,7 @@ mod tests {
     ) where
         Signed<T>: Into<TxEnvelope>,
     {
-        let signature = signature.unwrap_or(Signature::test_signature());
+        let signature = signature.unwrap_or_else(Signature::test_signature);
         let tx_signed = tx.into_signed(signature);
         let tx_envelope: TxEnvelope = tx_signed.into();
         let encoded = tx_envelope.encoded_2718();
