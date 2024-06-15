@@ -1,5 +1,6 @@
 //! bindings for state overrides in eth_call
 
+use crate::BlockOverrides;
 use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,6 +29,64 @@ pub struct AccountOverride {
     /// the call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state_diff: Option<HashMap<B256, B256>>,
+}
+
+/// Helper type that bundles various overrides for EVM Execution.
+///
+/// By `Default`, no overrides are included.
+#[derive(Debug, Clone, Default)]
+pub struct EvmOverrides {
+    /// Applies overrides to the state before execution.
+    pub state: Option<StateOverride>,
+    /// Applies overrides to the block before execution.
+    ///
+    /// This is a `Box` because less common and only available in debug trace endpoints.
+    pub block: Option<Box<BlockOverrides>>,
+}
+
+impl EvmOverrides {
+    /// Creates a new instance with the given overrides
+    pub const fn new(state: Option<StateOverride>, block: Option<Box<BlockOverrides>>) -> Self {
+        Self { state, block }
+    }
+
+    /// Creates a new instance with the given state overrides.
+    pub const fn state(state: Option<StateOverride>) -> Self {
+        Self { state, block: None }
+    }
+
+    /// Creates a new instance with the given block overrides.
+    pub const fn block(block: Option<Box<BlockOverrides>>) -> Self {
+        Self { state: None, block }
+    }
+
+    /// Returns `true` if the overrides contain state overrides.
+    pub const fn has_state(&self) -> bool {
+        self.state.is_some()
+    }
+
+    /// Returns `true` if the overrides contain block overrides.
+    pub const fn has_block(&self) -> bool {
+        self.block.is_some()
+    }
+
+    /// Adds state overrides to an existing instance.
+    pub fn with_state(mut self, state: StateOverride) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    /// Adds block overrides to an existing instance.
+    pub fn with_block(mut self, block: Box<BlockOverrides>) -> Self {
+        self.block = Some(block);
+        self
+    }
+}
+
+impl From<Option<StateOverride>> for EvmOverrides {
+    fn from(state: Option<StateOverride>) -> Self {
+        Self::state(state)
+    }
 }
 
 #[cfg(test)]
@@ -103,5 +162,73 @@ mod tests {
         let acc =
             state_override.get(&address!("1b5212AF6b76113afD94cD2B5a78a73B7d7A8222")).unwrap();
         assert!(acc.state_diff.is_some());
+    }
+
+    #[test]
+    fn test_evm_overrides_new() {
+        let state: StateOverride = HashMap::new();
+        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+
+        let evm_overrides = EvmOverrides::new(Some(state.clone()), Some(block.clone()));
+
+        assert!(evm_overrides.has_state());
+        assert!(evm_overrides.has_block());
+        assert_eq!(evm_overrides.state.unwrap(), state);
+        assert_eq!(*evm_overrides.block.unwrap(), *block);
+    }
+
+    #[test]
+    fn test_evm_overrides_state() {
+        let state: StateOverride = HashMap::new();
+        let evm_overrides = EvmOverrides::state(Some(state.clone()));
+
+        assert!(evm_overrides.has_state());
+        assert!(!evm_overrides.has_block());
+        assert_eq!(evm_overrides.state.unwrap(), state);
+    }
+
+    #[test]
+    fn test_evm_overrides_block() {
+        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+        let evm_overrides = EvmOverrides::block(Some(block.clone()));
+
+        assert!(!evm_overrides.has_state());
+        assert!(evm_overrides.has_block());
+        assert_eq!(*evm_overrides.block.unwrap(), *block);
+    }
+
+    #[test]
+    fn test_evm_overrides_with_state() {
+        let state: StateOverride = HashMap::new();
+        let mut evm_overrides = EvmOverrides::default();
+
+        assert!(!evm_overrides.has_state());
+
+        evm_overrides = evm_overrides.with_state(state.clone());
+
+        assert!(evm_overrides.has_state());
+        assert_eq!(evm_overrides.state.unwrap(), state);
+    }
+
+    #[test]
+    fn test_evm_overrides_with_block() {
+        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+        let mut evm_overrides = EvmOverrides::default();
+
+        assert!(!evm_overrides.has_block());
+
+        evm_overrides = evm_overrides.with_block(block.clone());
+
+        assert!(evm_overrides.has_block());
+        assert_eq!(*evm_overrides.block.unwrap(), *block);
+    }
+
+    #[test]
+    fn test_evm_overrides_from_state() {
+        let state: StateOverride = HashMap::new();
+        let evm_overrides: EvmOverrides = Some(state.clone()).into();
+
+        assert!(evm_overrides.has_state());
+        assert_eq!(evm_overrides.state.unwrap(), state);
     }
 }
