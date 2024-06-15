@@ -56,6 +56,13 @@ where
         &self,
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
+
+    /// Replays a transaction.
+    async fn trace_replay_transaction(
+        &self,
+        hash: TxHash,
+        trace_type: &[TraceType],
+    ) -> TransportResult<TraceResults>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -94,6 +101,14 @@ where
         block: BlockNumberOrTag,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.client().request("trace_block", (block,)).await
+    }
+
+    async fn trace_replay_transaction(
+        &self,
+        hash: TxHash,
+        trace_type: &[TraceType],
+    ) -> TransportResult<TraceResults> {
+        self.client().request("trace_replayTransaction", (hash, trace_type)).await
     }
 }
 
