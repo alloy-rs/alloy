@@ -120,14 +120,14 @@ impl<Payload, ErrData> FromIterator<Response<Payload, ErrData>>
         let mut iter = iter.into_iter().peekable();
         // return single if iter has exactly one element, else make a batch
         if let Some(first) = iter.next() {
-            if iter.peek().is_none() {
-                return Self::Single(first);
+            return if iter.peek().is_none() {
+                Self::Single(first)
             } else {
                 let mut batch = Vec::new();
                 batch.push(first);
                 batch.extend(iter);
-                return Self::Batch(batch);
-            }
+                Self::Batch(batch)
+            };
         }
         Self::Batch(vec![])
     }

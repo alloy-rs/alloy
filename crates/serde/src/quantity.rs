@@ -146,7 +146,7 @@ pub mod u128_vec_vec_opt {
     where
         D: Deserializer<'de>,
     {
-        (Option::<Vec<Vec<U128>>>::deserialize(deserializer)?).map_or_else(
+        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
             || Ok(None),
             |vec| {
                 Ok(Some(
