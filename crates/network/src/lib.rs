@@ -10,6 +10,7 @@ use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
 use alloy_primitives::{Address, TxHash, U256};
+use alloy_serde::WithOtherFields;
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -49,6 +50,32 @@ pub trait ReceiptResponse {
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
     fn status(&self) -> bool;
+}
+
+impl<T> ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt<T>
+where
+    T: TxReceipt,
+{
+    fn contract_address(&self) -> Option<Address> {
+        self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        TxReceipt::status(&self.inner)
+    }
+}
+
+impl<T> ReceiptResponse for WithOtherFields<alloy_rpc_types_eth::TransactionReceipt<T>>
+where
+    T: TxReceipt,
+{
+    fn contract_address(&self) -> Option<Address> {
+        self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.inner.inner.status()
+    }
 }
 
 /// Transaction Response

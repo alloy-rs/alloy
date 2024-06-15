@@ -1,4 +1,4 @@
-use crate::{Network, ReceiptResponse, TransactionResponse};
+use crate::{Network, TransactionResponse};
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
 use alloy_rpc_types_eth::{AnyTransactionReceipt, Header, Transaction, TransactionRequest};
@@ -73,16 +73,6 @@ impl Network for AnyNetwork {
     type ReceiptResponse = AnyTransactionReceipt;
 
     type HeaderResponse = WithOtherFields<Header>;
-}
-
-impl ReceiptResponse for AnyTransactionReceipt {
-    fn contract_address(&self) -> Option<alloy_primitives::Address> {
-        self.contract_address
-    }
-
-    fn status(&self) -> bool {
-        self.inner.inner.status()
-    }
 }
 
 impl TransactionResponse for WithOtherFields<Transaction> {
