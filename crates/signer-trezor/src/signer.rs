@@ -187,7 +187,7 @@ impl TrezorSigner {
         let data = tx.input().to_vec();
         let chain_id = tx.chain_id();
 
-        // TODO: Uncomment in 1.76
+        // TODO: Uncomment in 1.75
         /*
         let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
         */

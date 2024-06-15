@@ -79,7 +79,9 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     /// This will create a new provider if this instance is not the only reference to the inner
     /// client.
     pub fn boxed(self) -> RootProvider<BoxTransport, N> {
-        let inner = Arc::unwrap_or_clone(self.inner);
+        // TODO(MSRV-1.76): Use `Arc::unwrap_or_clone`.
+        // let inner = Arc::unwrap_or_clone(self.inner);
+        let inner = Arc::try_unwrap(self.inner).unwrap_or_else(|arc| (*arc).clone());
         RootProvider { inner: Arc::new(inner.boxed()) }
     }
 

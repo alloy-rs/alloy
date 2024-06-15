@@ -64,7 +64,16 @@ where
     let json = json.borrow().get();
     trace!(ty=%std::any::type_name::<T>(), json, "deserializing response");
     serde_json::from_str(json)
-        .inspect(|response| trace!(?response, "deserialized response"))
-        .inspect_err(|err| trace!(?err, "failed to deserialize response"))
+        // TODO(MSRV-1.76): Use `inspect*`.
+        // .inspect(|response| trace!(?response, "deserialized response"))
+        // .inspect_err(|err| trace!(?err, "failed to deserialize response"))
+        .map(|response| {
+            trace!(?response, "deserialized response");
+            response
+        })
+        .map_err(|err| {
+            trace!(?err, "failed to deserialize response");
+            err
+        })
         .map_err(|err| RpcError::deser_err(err, json))
 }
