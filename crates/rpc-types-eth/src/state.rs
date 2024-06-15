@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_evm_overrides_new() {
         let state: StateOverride = HashMap::new();
-        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+        let block: Box<BlockOverrides> = Box::default();
 
         let evm_overrides = EvmOverrides::new(Some(state.clone()), Some(block.clone()));
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_evm_overrides_block() {
-        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+        let block: Box<BlockOverrides> = Box::default();
         let evm_overrides = EvmOverrides::block(Some(block.clone()));
 
         assert!(!evm_overrides.has_state());
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_evm_overrides_with_block() {
-        let block: Box<BlockOverrides> = Box::new(BlockOverrides::default());
+        let block: Box<BlockOverrides> = Box::default();
         let mut evm_overrides = EvmOverrides::default();
 
         assert!(!evm_overrides.has_block());
