@@ -123,12 +123,12 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().complete_type(ty.try_into().map_err(|_| vec!["supported tx type"])?)
     }
 
-    fn can_build(&self) -> bool {
-        self.deref().can_build()
-    }
-
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
+    }
+
+    fn can_build(&self) -> bool {
+        self.deref().can_build()
     }
 
     #[doc(alias = "output_transaction_type")]

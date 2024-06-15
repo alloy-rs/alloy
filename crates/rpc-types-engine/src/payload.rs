@@ -497,12 +497,12 @@ impl ssz::Encode for BlobsBundleV1 {
         BlobsBundleV1Ssz::wrap_ref(self).ssz_append(buf)
     }
 
-    fn ssz_bytes_len(&self) -> usize {
-        BlobsBundleV1Ssz::wrap_ref(self).ssz_bytes_len()
-    }
-
     fn ssz_fixed_len() -> usize {
         <BlobsBundleV1Ssz as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        BlobsBundleV1Ssz::wrap_ref(self).ssz_bytes_len()
     }
 
     fn as_ssz_bytes(&self) -> Vec<u8> {
@@ -516,12 +516,12 @@ impl ssz::Decode for BlobsBundleV1 {
         <BlobsBundleV1Ssz as ssz::Decode>::is_ssz_fixed_len()
     }
 
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        BlobsBundleV1Ssz::from_ssz_bytes(bytes).map(BlobsBundleV1Ssz::unwrap)
-    }
-
     fn ssz_fixed_len() -> usize {
         <BlobsBundleV1Ssz as ssz::Decode>::ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        BlobsBundleV1Ssz::from_ssz_bytes(bytes).map(BlobsBundleV1Ssz::unwrap)
     }
 }
 
