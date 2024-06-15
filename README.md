@@ -98,7 +98,7 @@ This repository contains the following crates:
 [Ledger]: https://www.ledger.com
 [Trezor]: https://trezor.io
 
-## Supported Rust Versions
+## Supported Rust Versions (MSRV)
 
 <!--
 When updating this, also update:
@@ -107,12 +107,14 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-Alloy will keep a rolling MSRV (minimum supported rust version) policy of **at
-least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.76.
+The current MSRV (minimum supported rust version) is 1.76.
 
-Note that the MSRV is not increased automatically, and only as part of a minor
-release.
+Alloy will keep a rolling MSRV policy of **at least** two versions behind the
+latest stable release (so if the latest stable release is 1.58, we would
+support 1.56).
+
+Note that the MSRV is not increased automatically, and only as part of a patch
+(pre-1.0) or minor (post-1.0) release.
 
 ## Contributing
 
