@@ -52,6 +52,7 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
