@@ -83,12 +83,6 @@ impl EvmOverrides {
     }
 }
 
-impl From<Option<StateOverride>> for EvmOverrides {
-    fn from(state: Option<StateOverride>) -> Self {
-        Self::state(state)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,14 +215,5 @@ mod tests {
 
         assert!(evm_overrides.has_block());
         assert_eq!(*evm_overrides.block.unwrap(), *block);
-    }
-
-    #[test]
-    fn test_evm_overrides_from_state() {
-        let state: StateOverride = HashMap::new();
-        let evm_overrides: EvmOverrides = Some(state.clone()).into();
-
-        assert!(evm_overrides.has_state());
-        assert_eq!(evm_overrides.state.unwrap(), state);
     }
 }
