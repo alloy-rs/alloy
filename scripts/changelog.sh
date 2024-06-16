@@ -11,7 +11,7 @@ run_unless_dry_run() {
 
 root=$WORKSPACE_ROOT
 crate=$CRATE_ROOT
-# crate_glob="${crate#"$root/"}/**/*"
+crate_glob="${crate#"$root/"}/**"
 
 if [[ "$crate" = */tests/* || "$crate" = *test-utils* ]]; then
     exit 0
@@ -19,7 +19,6 @@ fi
 
 command=(git cliff --workdir "$root" --config "$root/cliff.toml" "${@}")
 run_unless_dry_run "${command[@]}" --output "$root/CHANGELOG.md"
-# TODO: https://github.com/orhun/git-cliff/issues/208
-# if [ -n "$crate" ] && [ "$root" != "$crate" ]; then
-#     run_unless_dry_run "${command[@]}" --include-path "$crate_glob" --output "$crate/CHANGELOG.md"
-# fi
+if [ -n "$crate" ] && [ "$root" != "$crate" ]; then
+    run_unless_dry_run "${command[@]}" --include-path "$crate_glob" --output "$crate/CHANGELOG.md"
+fi
