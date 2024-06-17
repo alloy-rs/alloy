@@ -195,11 +195,11 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
             let mut confirmed = false;
 
             select! {
-                 _ = interval.tick() => {},
-                 res = &mut pending_tx => {
-                        let _ = res?;
-                        confirmed = true;
-                    }
+                _ = interval.tick() => {},
+                res = &mut pending_tx => {
+                    let _ = res?;
+                    confirmed = true;
+                }
             }
 
             // try to fetch the receipt

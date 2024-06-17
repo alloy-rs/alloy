@@ -653,7 +653,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///

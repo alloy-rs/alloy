@@ -1,7 +1,3 @@
-//! Alloy RPC type definitions.
-//!
-//! Provides all relevant types for the various RPC endpoints, grouped by namespace.
-
 #![doc = include_str!("../README.md")]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg",

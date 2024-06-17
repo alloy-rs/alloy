@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-txpool"
-description = "Ethereum RPC txpool types"
+description = "Types for the `txpool` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true

@@ -1,3 +1,3 @@
 # alloy-rpc-types-admin
 
-Ethereum RPC `admin` types.
+Types for the `admin` Ethereum JSON-RPC namespace.
