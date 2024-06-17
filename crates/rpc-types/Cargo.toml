@@ -30,13 +30,13 @@ alloy-rpc-types-txpool = { workspace = true, optional = true }
 
 [features]
 default = ["eth"]
-admin = ["alloy-rpc-types-admin"]
-anvil = ["alloy-rpc-types-anvil"]
-beacon = ["alloy-rpc-types-beacon"]
-engine = ["alloy-rpc-types-engine"]
-eth = ["alloy-rpc-types-eth"]
-trace = ["alloy-rpc-types-trace"]
-txpool = ["alloy-rpc-types-txpool"]
+admin = ["dep:alloy-rpc-types-admin"]
+anvil = ["dep:alloy-rpc-types-anvil"]
+beacon = ["dep:alloy-rpc-types-beacon"]
+engine = ["dep:alloy-rpc-types-engine"]
+eth = ["dep:alloy-rpc-types-eth"]
+trace = ["dep:alloy-rpc-types-trace"]
+txpool = ["dep:alloy-rpc-types-txpool"]
 
 arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
 jsonrpsee-types = [
