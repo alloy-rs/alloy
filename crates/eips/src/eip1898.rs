@@ -759,6 +759,18 @@ mod tests {
     }
 
     #[test]
+    fn block_id_as_u64() {
+        assert_eq!(BlockId::number(123).as_u64(), Some(123));
+        assert_eq!(BlockId::number(0).as_u64(), Some(0));
+        assert_eq!(BlockId::earliest().as_u64(), None);
+        assert_eq!(BlockId::latest().as_u64(), None);
+        assert_eq!(BlockId::pending().as_u64(), None);
+        assert_eq!(BlockId::safe().as_u64(), None);
+        assert_eq!(BlockId::hash(BlockHash::ZERO).as_u64(), None);
+        assert_eq!(BlockId::hash_canonical(BlockHash::ZERO).as_u64(), None);
+    }
+
+    #[test]
     fn can_parse_eip1898_block_ids() {
         let num = serde_json::json!(
             { "blockNumber": "0x0" }
