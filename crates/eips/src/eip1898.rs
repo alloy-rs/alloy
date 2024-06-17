@@ -281,7 +281,7 @@ impl BlockId {
     }
 
     /// Returns the block number if it is [BlockId::Number] and not a tag
-    pub const fn as_block_number(&self) -> Option<u64> {
+    pub const fn as_u64(&self) -> Option<u64> {
         match self {
             Self::Number(x) => x.as_number(),
             _ => None,
