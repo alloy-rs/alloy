@@ -921,6 +921,26 @@ impl<T> FilterChanges<T> {
             None
         }
     }
+
+    /// Check if the filter changes are empty.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    /// Check if the filter changes contain logs.
+    pub fn is_logs(&self) -> bool {
+        matches!(self, Self::Logs(_))
+    }
+
+    /// Check if the filter changes contain hashes.
+    pub fn is_hashes(&self) -> bool {
+        matches!(self, Self::Hashes(_))
+    }
+
+    /// Check if the filter changes contain transactions.
+    pub fn is_transactions(&self) -> bool {
+        matches!(self, Self::Transactions(_))
+    }
 }
 
 mod empty_array {
