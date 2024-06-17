@@ -1,5 +1,6 @@
 [package]
 name = "alloy-rpc-types-beacon"
+description = "Ethereum RPC-related types for the Beacon API."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
