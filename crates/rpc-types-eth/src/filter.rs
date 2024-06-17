@@ -230,8 +230,7 @@ impl FilterBlockOption {
 
     /// Pins the block hash this filter should target.
     #[must_use]
-    #[doc(alias = "set_block_hash")]
-    pub const fn set_hash(&self, hash: B256) -> Self {
+    pub const fn set_block_hash(&self, hash: B256) -> Self {
         Self::AtBlockHash(hash)
     }
 }
@@ -400,7 +399,7 @@ impl Filter {
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
-        self.block_option = self.block_option.set_hash(hash.into());
+        self.block_option = self.block_option.set_block_hash(hash.into());
         self
     }
     /// Sets the inner filter object
