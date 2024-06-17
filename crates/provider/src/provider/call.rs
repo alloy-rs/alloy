@@ -293,7 +293,10 @@ mod test {
         assert_eq!(params.data, &data);
         assert_eq!(params.block, None);
         assert_eq!(params.overrides, None);
-        assert_eq!(serde_json::to_string(&params).unwrap(), "[{\"from\":\"0x0000000000000000000000000000000000000001\",\"to\":\"0x0000000000000000000000000000000000000002\",\"maxFeePerGas\":\"0x4a817c800\",\"maxPriorityFeePerGas\":\"0x3b9aca00\",\"gas\":\"0x5208\",\"value\":\"0x64\",\"nonce\":\"0x0\",\"chainId\":\"0x1\"}]");
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"}]"#
+        );
 
         // Expected: [data, block, overrides]
         let params: EthCallParams<'_, '_, Ethereum> =
@@ -302,7 +305,10 @@ mod test {
         assert_eq!(params.data, &data);
         assert_eq!(params.block, Some(block));
         assert_eq!(params.overrides, Some(&overrides));
-        assert_eq!(serde_json::to_string(&params).unwrap(), "[{\"from\":\"0x0000000000000000000000000000000000000001\",\"to\":\"0x0000000000000000000000000000000000000002\",\"maxFeePerGas\":\"0x4a817c800\",\"maxPriorityFeePerGas\":\"0x3b9aca00\",\"gas\":\"0x5208\",\"value\":\"0x64\",\"nonce\":\"0x0\",\"chainId\":\"0x1\"},\"0x1\",{}]");
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1",{}]"#
+        );
 
         // Expected: [data, (default), overrides]
         let params: EthCallParams<'_, '_, Ethereum> =
@@ -311,7 +317,10 @@ mod test {
         assert_eq!(params.data, &data);
         assert_eq!(params.block, None);
         assert_eq!(params.overrides, Some(&overrides));
-        assert_eq!(serde_json::to_string(&params).unwrap(), "[{\"from\":\"0x0000000000000000000000000000000000000001\",\"to\":\"0x0000000000000000000000000000000000000002\",\"maxFeePerGas\":\"0x4a817c800\",\"maxPriorityFeePerGas\":\"0x3b9aca00\",\"gas\":\"0x5208\",\"value\":\"0x64\",\"nonce\":\"0x0\",\"chainId\":\"0x1\"},\"latest\",{}]");
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"latest",{}]"#
+        );
 
         // Expected: [data, block]
         let params: EthCallParams<'_, '_, Ethereum> =
@@ -320,6 +329,9 @@ mod test {
         assert_eq!(params.data, &data);
         assert_eq!(params.block, Some(block));
         assert_eq!(params.overrides, None);
-        assert_eq!(serde_json::to_string(&params).unwrap(), "[{\"from\":\"0x0000000000000000000000000000000000000001\",\"to\":\"0x0000000000000000000000000000000000000002\",\"maxFeePerGas\":\"0x4a817c800\",\"maxPriorityFeePerGas\":\"0x3b9aca00\",\"gas\":\"0x5208\",\"value\":\"0x64\",\"nonce\":\"0x0\",\"chainId\":\"0x1\"},\"0x1\"]");
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1"]"#
+        );
     }
 }
