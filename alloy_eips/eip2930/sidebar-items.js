@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["_IMPL_ARBITRARY_FOR_AccessList","_IMPL_ARBITRARY_FOR_AccessListItem"],"struct":["AccessList","AccessListItem","AccessListWithGasUsed"]};

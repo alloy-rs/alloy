@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TransportErrorKind"],"struct":["HttpError"],"type":["TransportError","TransportResult"]};

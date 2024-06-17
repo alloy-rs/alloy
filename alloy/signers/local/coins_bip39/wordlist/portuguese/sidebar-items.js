@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RAW_PORTUGUESE"],"static":["PARSED"],"struct":["Portuguese"]};

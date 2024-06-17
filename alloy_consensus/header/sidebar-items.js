@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EMPTY_OMMER_ROOT_HASH","EMPTY_ROOT_HASH"],"struct":["Header"]};

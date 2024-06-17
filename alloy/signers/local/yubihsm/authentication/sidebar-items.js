@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_AUTHENTICATION_KEY_ID"],"enum":["Algorithm","ErrorKind"],"mod":["commands","key"],"struct":["Credentials","Key"],"type":["Error"]};

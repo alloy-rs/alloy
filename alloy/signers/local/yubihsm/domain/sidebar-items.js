@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DOMAINS"],"enum":["ErrorKind"],"struct":["Domain"],"type":["Error"]};

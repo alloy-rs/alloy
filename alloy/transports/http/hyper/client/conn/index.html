@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Lower-level client connection API."><title>alloy::transports::http::hyper::client::conn - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../../../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../../../../../" data-static-root-path="../../../../../../static.files/" data-current-crate="alloy" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (d7f6ebace 2024-06-16)" data-channel="nightly" data-search-js="search-0fe7219eb170c82e.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../../../../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../../../../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button><a class="logo-container" href="../../../../../../alloy/index.html"><img src="https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg" alt=""></a></nav><nav class="sidebar"><div class="sidebar-crate"><a class="logo-container" href="../../../../../../alloy/index.html"><img src="https://raw.githubusercontent.com/alloy-rs/core/main/assets/alloy.jpg" alt="logo"></a><h2><a href="../../../../../../alloy/index.html">alloy</a><span class="version">0.1.1</span></h2></div><h2 class="location"><a href="#">Module conn</a></h2><div class="sidebar-elems"><section><ul class="block"><li><a href="#modules">Modules</a></li></ul></section><h2><a href="../index.html">In alloy::transports::http::hyper::client</a></h2></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Module <a href="../../../../../index.html">alloy</a>::<wbr><a href="../../../../index.html">transports</a>::<wbr><a href="../../../index.html">http</a>::<wbr><a href="../../index.html">hyper</a>::<wbr><a href="../index.html">client</a>::<wbr><a class="mod" href="#">conn</a><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><span class="out-of-band"><button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><span class="item-info"><div class="stab portability">Available on <strong>crate feature <code>transports</code> and crate feature <code>transport-http</code> and crate feature <code>client</code> and (crate features <code>http1</code> or <code>http2</code>)</strong> only.</div></span><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Lower-level client connection API.</p>
+<p>The types in this module are to provide a lower-level API based around a
+single connection. Connecting to a host, pooling connections, and the like
+are not handled at this level. This module provides the building blocks to
+customize those things externally.</p>
+<p>If you are looking for a convenient HTTP client,
+then you may wish to consider <a href="https://github.com/seanmonstar/reqwest">reqwest</a>
+for a high level client or <a href="https://docs.rs/hyper-util/latest/hyper_util/client/index.html"><code>hyper-util</code>’s client</a>
+if you want to keep it more low level / basic.</p>
+<h3 id="example"><a class="doc-anchor" href="#example">§</a>Example</h3>
+<p>A simple example that uses the <code>SendRequest</code> struct to talk HTTP over some TCP stream.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>bytes::Bytes;
+<span class="kw">use </span>http::{Request, StatusCode};
+<span class="kw">use </span>http_body_util::Empty;
+<span class="kw">use </span>hyper::client::conn;
+<span class="kw">let </span>(<span class="kw-2">mut </span>request_sender, connection) = conn::http1::handshake(tcp).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// spawn a task to poll the connection and drive the HTTP state
+</span>tokio::spawn(<span class="kw">async move </span>{
+    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = connection.<span class="kw">await </span>{
+        <span class="macro">eprintln!</span>(<span class="string">"Error in connection: {}"</span>, e);
+    }
+});
+
+<span class="kw">let </span>request = Request::builder()
+    <span class="comment">// We need to manually add the host header because SendRequest does not
+    </span>.header(<span class="string">"Host"</span>, <span class="string">"example.com"</span>)
+    .method(<span class="string">"GET"</span>)
+    .body(Empty::&lt;Bytes&gt;::new())<span class="question-mark">?</span>;
+
+<span class="kw">let </span>response = request_sender.send_request(request).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="macro">assert!</span>(response.status() == StatusCode::OK);
+
+<span class="kw">let </span>request = Request::builder()
+    .header(<span class="string">"Host"</span>, <span class="string">"example.com"</span>)
+    .method(<span class="string">"GET"</span>)
+    .body(Empty::&lt;Bytes&gt;::new())<span class="question-mark">?</span>;
+
+<span class="kw">let </span>response = request_sender.send_request(request).<span class="kw">await</span><span class="question-mark">?</span>;
+<span class="macro">assert!</span>(response.status() == StatusCode::OK);</code></pre></div>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="http1/index.html" title="mod alloy::transports::http::hyper::client::conn::http1">http1</a><span class="stab portability" title="Available on crate feature `http1` only"><code>http1</code></span></div><div class="desc docblock-short">HTTP/1 client connections</div></li><li><div class="item-name"><a class="mod" href="http2/index.html" title="mod alloy::transports::http::hyper::client::conn::http2">http2</a><span class="stab portability" title="Available on crate feature `http2` only"><code>http2</code></span></div><div class="desc docblock-short">HTTP/2 client connections</div></li></ul></section></div></main></body></html>

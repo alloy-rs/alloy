@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HDPath","TrezorError"],"struct":["TrezorSigner"]};

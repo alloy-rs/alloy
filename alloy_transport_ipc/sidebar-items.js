@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CAPACITY"],"mod":["connect","mock"],"struct":["IpcBackend","IpcConnect","ReadJsonStream"],"type":["Result"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResponsePayload"],"type":["BorrowedResponsePayload"]};

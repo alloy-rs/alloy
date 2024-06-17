@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CAPABILITIES","INCLUSION_LIST_MAX_GAS"]};

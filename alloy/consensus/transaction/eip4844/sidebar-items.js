@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BlobTransactionValidationError","TxEip4844Variant"],"struct":["BlobTransactionSidecar","TxEip4844","TxEip4844WithSidecar"]};

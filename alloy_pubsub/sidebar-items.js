@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SubscriptionItem"],"mod":["connect","frontend","handle","ix","managers","service","sub"],"struct":["ConnectionHandle","ConnectionInterface","PubSubFrontend","RawSubscription","Subscription"],"trait":["PubSubConnect"]};

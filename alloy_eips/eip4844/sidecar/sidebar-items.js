@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["_IMPL_ARBITRARY_FOR_BlobTransactionSidecar"],"enum":["BlobTransactionValidationError"],"fn":["deserialize_blobs"],"struct":["BlobTransactionSidecar"]};

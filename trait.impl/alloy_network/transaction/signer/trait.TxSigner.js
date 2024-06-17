@@ -1,0 +1,9 @@
+(function() {var implementors = {
+"alloy":[],
+"alloy_network":[],
+"alloy_signer_aws":[["impl TxSigner&lt;Signature&lt;Signature&lt;Secp256k1&gt;&gt;&gt; for <a class=\"struct\" href=\"alloy_signer_aws/signer/struct.AwsSigner.html\" title=\"struct alloy_signer_aws::signer::AwsSigner\">AwsSigner</a>"]],
+"alloy_signer_gcp":[["impl TxSigner&lt;Signature&lt;Signature&lt;Secp256k1&gt;&gt;&gt; for <a class=\"struct\" href=\"alloy_signer_gcp/signer/struct.GcpSigner.html\" title=\"struct alloy_signer_gcp::signer::GcpSigner\">GcpSigner</a>"]],
+"alloy_signer_ledger":[["impl TxSigner&lt;Signature&lt;Signature&lt;Secp256k1&gt;&gt;&gt; for <a class=\"struct\" href=\"alloy_signer_ledger/signer/struct.LedgerSigner.html\" title=\"struct alloy_signer_ledger::signer::LedgerSigner\">LedgerSigner</a>"]],
+"alloy_signer_local":[["impl&lt;C&gt; TxSigner&lt;Signature&lt;Signature&lt;Secp256k1&gt;&gt;&gt; for <a class=\"struct\" href=\"alloy_signer_local/struct.LocalSigner.html\" title=\"struct alloy_signer_local::LocalSigner\">LocalSigner</a>&lt;C&gt;<div class=\"where\">where\n    C: PrehashSigner&lt;(Signature, RecoveryId)&gt; + <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Send.html\" title=\"trait core::marker::Send\">Send</a> + <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.Sync.html\" title=\"trait core::marker::Sync\">Sync</a>,</div>"]],
+"alloy_signer_trezor":[["impl TxSigner&lt;Signature&lt;Signature&lt;Secp256k1&gt;&gt;&gt; for <a class=\"struct\" href=\"alloy_signer_trezor/signer/struct.TrezorSigner.html\" title=\"struct alloy_signer_trezor::signer::TrezorSigner\">TrezorSigner</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

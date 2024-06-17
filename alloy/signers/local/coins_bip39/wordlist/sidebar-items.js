@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["WordlistError"],"mod":["chinese_simplified","chinese_traditional","czech","english","french","italian","japanese","korean","portuguese","spanish"],"struct":["ChineseSimplified","ChineseTraditional","Czech","English","French","Italian","Japanese","Korean","Portuguese","Spanish"],"trait":["Wordlist"]};

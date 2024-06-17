@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Secp256k1"],"type":["RecoveryId","Signature","Signer"]};

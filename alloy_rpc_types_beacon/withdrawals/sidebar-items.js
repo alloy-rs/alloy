@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["beacon_withdrawals"],"struct":["BeaconWithdrawal"]};

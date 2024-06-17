@@ -1,0 +1,215 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `crates/rpc-types-beacon/src/sidecar.rs`."><title>sidecar.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-46f98efaafac5295.ttf.woff2,FiraSans-Regular-018c141bf0843ffd.woff2,FiraSans-Medium-8f9a781e4970d388.woff2,SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2,SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-dd39b87e5fcfba68.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="alloy_rpc_types_beacon" data-themes="" data-resource-suffix="" data-rustdoc-version="1.81.0-nightly (d7f6ebace 2024-06-16)" data-channel="nightly" data-search-js="search-0fe7219eb170c82e.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-118b08c4c78b968e.js"></script><script defer src="../../static.files/src-script-e66d777a5a92e9b2.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-20a3ad099b048cf2.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-df360f571f6edeae.css"></noscript><link rel="icon" href="https://raw.githubusercontent.com/alloy-rs/core/main/assets/favicon.ico"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<a href="#2" id="2">2</a>
+<a href="#3" id="3">3</a>
+<a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
+<a href="#8" id="8">8</a>
+<a href="#9" id="9">9</a>
+<a href="#10" id="10">10</a>
+<a href="#11" id="11">11</a>
+<a href="#12" id="12">12</a>
+<a href="#13" id="13">13</a>
+<a href="#14" id="14">14</a>
+<a href="#15" id="15">15</a>
+<a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
+<a href="#18" id="18">18</a>
+<a href="#19" id="19">19</a>
+<a href="#20" id="20">20</a>
+<a href="#21" id="21">21</a>
+<a href="#22" id="22">22</a>
+<a href="#23" id="23">23</a>
+<a href="#24" id="24">24</a>
+<a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+<a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
+<a href="#46" id="46">46</a>
+<a href="#47" id="47">47</a>
+<a href="#48" id="48">48</a>
+<a href="#49" id="49">49</a>
+<a href="#50" id="50">50</a>
+<a href="#51" id="51">51</a>
+<a href="#52" id="52">52</a>
+<a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><a href="header.rs.html#50-55"><span class="kw">crate</span>::header::Header</a>;
+<span class="kw">use </span>alloy_eips::eip4844::{Blob, BlobTransactionSidecar, Bytes48};
+<span class="kw">use </span>alloy_primitives::{Bytes, B256};
+<span class="kw">use </span>serde::{<a href="https://docs.rs/serde_derive/1.0.203/serde_derive/derive.Deserialize.html">Deserialize</a>, <a href="https://docs.rs/serde_derive/1.0.203/serde_derive/derive.Serialize.html">Serialize</a>};
+<span class="kw">use </span>serde_with::{<a href="https://docs.rs/serde_with_macros/3.8.1/serde_with_macros/attr.serde_as.html">serde_as</a>, <a href="https://docs.rs/serde_with/3.8.1/serde_with/struct.DisplayFromStr.html">DisplayFromStr</a>};
+<span class="kw">use </span><a href="https://doc.rust-lang.org/nightly/alloc/vec/into_iter/struct.IntoIter.html">std::vec::IntoIter</a>;
+
+<span class="doccomment">/// Bundle of blobs for a given block
+</span><span class="attr">#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+</span><span class="kw">pub struct </span><a href="../../alloy_rpc_types_beacon/sidecar/struct.BeaconBlobBundle.html">BeaconBlobBundle</a> {
+    <span class="doccomment">/// Vec of individual blob data
+    </span>data: Vec&lt;<a href="#65-80">BlobData</a>&gt;,
+}
+
+<span class="doccomment">/// Yields an iterator for BlobData
+</span><span class="kw">impl </span><a href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html">IntoIterator</a> <span class="kw">for </span><a href="#11-14">BeaconBlobBundle</a> {
+    <span class="kw">type </span>Item = <a href="#65-80">BlobData</a>;
+    <span class="kw">type </span>IntoIter = IntoIter&lt;<a href="#65-80">BlobData</a>&gt;;
+
+    <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
+        <a class="self" href="#21">self</a>.data.<a href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html#tymethod.into_iter">into_iter</a>()
+    }
+}
+
+<span class="doccomment">/// Intermediate type for BlobTransactionSidecar matching
+</span><span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span><a href="../../alloy_rpc_types_beacon/sidecar/struct.SidecarIterator.html">SidecarIterator</a> {
+    <span class="doccomment">/// The internal iterator over [`BlobData`].
+    </span><span class="kw">pub </span>iter: IntoIter&lt;<a href="#65-80">BlobData</a>&gt;,
+}
+
+<span class="kw">impl </span><a href="https://doc.rust-lang.org/nightly/core/iter/traits/iterator/trait.Iterator.html">Iterator</a> <span class="kw">for </span><a href="#28-31">SidecarIterator</a> {
+    <span class="kw">type </span>Item = <a href="#65-80">BlobData</a>;
+
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <a class="self" href="#36">self</a>.iter.<a href="https://doc.rust-lang.org/nightly/core/iter/traits/iterator/trait.Iterator.html#tymethod.next">next</a>()
+    }
+}
+
+<span class="kw">impl </span><a href="#28-31">SidecarIterator</a> {
+    <span class="doccomment">/// Creates a new [`SidecarIterator`] from a given [`BeaconBlobBundle`].
+    </span><span class="kw">pub fn </span>new(bundle: <a href="#11-14">BeaconBlobBundle</a>) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ iter: <a href="#43">bundle</a>.<a href="https://doc.rust-lang.org/nightly/core/iter/traits/collect/trait.IntoIterator.html#tymethod.into_iter">into_iter</a>() }
+    }
+
+    <span class="doccomment">/// Returns a BlobTransactionSidecar of len num_hashes.
+    </span><span class="kw">pub fn </span>next_sidecar(<span class="kw-2">&amp;mut </span><span class="self">self</span>, num_hashes: <a href="https://doc.rust-lang.org/nightly/std/primitive.usize.html">usize</a>) -&gt; <span class="prelude-ty">Option</span>&lt;BlobTransactionSidecar&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>blobs = <a href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html#method.with_capacity">Vec::with_capacity</a>(<a href="#48">num_hashes</a>);
+        <span class="kw">let </span><span class="kw-2">mut </span>commitments = <a href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html#method.with_capacity">Vec::with_capacity</a>(<a href="#48">num_hashes</a>);
+        <span class="kw">let </span><span class="kw-2">mut </span>proofs = <a href="https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html#method.with_capacity">Vec::with_capacity</a>(<a href="#48">num_hashes</a>);
+        <span class="kw">for _ in </span><span class="number">0</span>..num_hashes {
+            <span class="kw">let </span>next = <span class="self">self</span>.next()<span class="question-mark">?</span>;
+            blobs.push(<span class="kw-2">*</span>next.blob);
+            commitments.push(next.kzg_commitment);
+            proofs.push(next.kzg_proof);
+        }
+        <span class="prelude-val">Some</span>(BlobTransactionSidecar { <a href="#49">blobs</a>, <a href="#50">commitments</a>, <a href="#51">proofs</a> })
+    }
+}
+
+<span class="doccomment">/// Individual Blob data that belongs to a 4844 transaction.
+</span><span class="attr">#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+</span><span class="kw">pub struct </span><a href="../../alloy_rpc_types_beacon/sidecar/struct.BlobData.html">BlobData</a> {
+    <span class="doccomment">/// Blob index
+    </span><span class="attr">#[serde_as(<span class="kw">as </span>= <span class="string">"DisplayFromStr"</span>)]
+    </span><span class="kw">pub </span>index: <a href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>,
+    <span class="attr">#[serde(deserialize_with = <span class="string">"deserialize_blob"</span>)]
+    </span><span class="doccomment">/// Blob data
+    </span><span class="kw">pub </span>blob: Box&lt;Blob&gt;,
+    <span class="doccomment">/// The blob's commitment
+    </span><span class="kw">pub </span>kzg_commitment: Bytes48,
+    <span class="doccomment">/// The blob's proof
+    </span><span class="kw">pub </span>kzg_proof: Bytes48,
+    <span class="doccomment">/// The block header containing the blob
+    </span><span class="kw">pub </span>signed_block_header: <a href="header.rs.html#50-55">Header</a>,
+    <span class="doccomment">/// The blob's inclusion proofs
+    </span><span class="kw">pub </span>kzg_commitment_inclusion_proof: Vec&lt;B256&gt;,
+}
+
+<span class="doccomment">/// Helper function to deserialize boxed blobs
+</span><span class="kw">fn </span><a href="../../alloy_rpc_types_beacon/sidecar/fn.deserialize_blob.html">deserialize_blob</a>&lt;<span class="lifetime">'de</span>, D&gt;(deserializer: D) -&gt; <span class="prelude-ty">Result</span>&lt;Box&lt;Blob&gt;, D::Error&gt;
+<span class="kw">where
+    </span>D: serde::de::Deserializer&lt;<span class="lifetime">'de</span>&gt;,
+{
+    <span class="kw">let </span>raw_blob = &lt;Bytes&gt;::deserialize(<a href="#83">deserializer</a>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>blob = <a href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html#method.new">Box::new</a>(<a href="https://doc.rust-lang.org/nightly/core/convert/trait.TryFrom.html#tymethod.try_from">Blob::try_from</a>(<a href="#87">raw_blob</a>.<a href="https://doc.rust-lang.org/nightly/core/convert/trait.AsRef.html#tymethod.as_ref">as_ref</a>()).<a href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html#method.map_err">map_err</a>(<a href="https://docs.rs/serde/1.0.203/serde/de/trait.Error.html#tymethod.custom">serde::de::Error::custom</a>)<span class="question-mark">?</span>);
+
+    <span class="prelude-val">Ok</span>(<a href="#89">blob</a>)
+}
+
+<span class="attr">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="doccomment">/// Should deserialize json containing 6 blobs
+    </span><span class="attr">#[test]
+    </span><span class="kw">fn </span>serde_sidecar_bundle() {
+        <span class="kw">let </span>s = <span class="macro">include_str!</span>(<span class="string">"examples/sidecar.json"</span>);
+        <span class="kw">let </span>resp: BeaconBlobBundle = serde_json::from_str(s).unwrap();
+        <span class="kw">let </span>json: serde_json::Value = serde_json::from_str(s).unwrap();
+        <span class="macro">assert_eq!</span>(json, serde_json::to_value(resp.clone()).unwrap());
+        <span class="macro">assert_eq!</span>(<span class="number">6</span>, resp.data.len());
+    }
+}
+</code></pre></div></section></main></body></html>

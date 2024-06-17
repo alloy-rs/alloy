@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["pubsub_impl"],"struct":["RpcClient","RpcClientInner"],"type":["ClientRef","WeakClient"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Algorithm","ErrorKind"],"struct":["Key","Message","Nonce"],"type":["Error"]};

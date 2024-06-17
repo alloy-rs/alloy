@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["_IMPL_ARBITRARY_FOR_TransactionReceipt"],"struct":["TransactionReceipt"],"type":["AnyTransactionReceipt"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["to_name"],"macro":["impl_connect"],"struct":["IpcConnect"]};

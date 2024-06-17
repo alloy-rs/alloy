@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["beacon_api_payload_attributes","beacon_api_payload_attributes_optimism","beacon_payload","beacon_payload_v1","beacon_payload_v2","beacon_payload_v3","beacon_payload_v4"],"struct":["ExecutionPayloadHeader","ExecutionPayloadHeaderData","ExecutionPayloadHeaderMessage","GetExecutionPayloadHeaderResponse"]};

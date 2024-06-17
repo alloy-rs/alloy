@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RAW_CODER"],"mod":["private"],"struct":["EthCall","EthCallFut"],"trait":["CallDecoder"]};

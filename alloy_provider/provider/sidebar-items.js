@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["call","root","sendable","trait","wallet","with_block"]};
