@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
+- Add EIP-7251 request types ([#919](https://github.com/alloy-rs/alloy/issues/919))
 - Derive serde for header ([#902](https://github.com/alloy-rs/alloy/issues/902))
 - Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
 - Add as_ is_ functions to envelope ([#872](https://github.com/alloy-rs/alloy/issues/872))
