@@ -67,6 +67,7 @@ alloy-transport-http = { workspace = true, features = ["reqwest"] }
 
 itertools.workspace = true
 reqwest.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
