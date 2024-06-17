@@ -15,15 +15,23 @@ We also have a [book](https://alloy.rs/) on all things Alloy and many [examples]
 
 ## Installation
 
-Currently, Alloy is not hosted on [crates.io](https://crates.io), the Rust package registry.
+Alloy consists of a number of crates that provide a range of functionality essential for interfacing with any Ethereum-based blockchain.
 
-To incorporate Alloy into your project, you will need to specify the GitHub repository as the source. This can be achieved by executing the following command in your terminal:
+The easiest way to get started is to add the `alloy` crate with the `full` feature flag from the command-line using Cargo:
 
 ```sh
-cargo add alloy --git https://github.com/alloy-rs/alloy
+cargo add alloy --features full
 ```
 
-After incorporating Alloy, you may wish to utilize specific features of the crate. These features can be enabled through modifications in your project's `Cargo.toml` file. A comprehensive list of available features can be found at [this GitHub link](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
+Alternatively, you can add the following to your `Cargo.toml` file:
+
+```toml
+alloy = { version = "0.1", features = ["full"] }
+```
+
+For a more fine-grained control over the features you wish to include, you can add the individual crates to your `Cargo.toml` file, or use the `alloy` crate with the features you need.
+
+A comprehensive list of available features can be found on [docs.rs](https://docs.rs/crate/alloy/latest/features) or in the [`alloy` crate's `Cargo.toml`](https://github.com/alloy-rs/alloy/blob/main/crates/alloy/Cargo.toml).
 
 ## Overview
 
@@ -41,12 +49,14 @@ This repository contains the following crates:
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
 - [`alloy-rpc-client`] - Low-level Ethereum JSON-RPC client implementation
 - [`alloy-rpc-types`] - Meta-crate for all Ethereum JSON-RPC types
-  - [`alloy-rpc-types-anvil`] - RPC types for the Anvil development node.
-  - [`alloy-rpc-types-beacon`] - Ethereum RPC-related types for the Beacon API.
-  - [`alloy-rpc-types-engine`] - Ethereum execution-consensus layer (engine) API RPC types
-  - [`alloy-rpc-types-eth`] - Ethereum RPC-related types for Alloy.
-  - [`alloy-rpc-types-trace`] - Ethereum RPC trace types
-- [`alloy-serde`] - Serde related helpers for Alloy.
+  - [`alloy-rpc-types-admin`] - Types for the `admin` Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-anvil`] - Types for the [Anvil] development node's Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
+  - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-trace`] - Types for the `trace` Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-txpool`] - Types for the `txpool` Ethereum JSON-RPC namespace
+- [`alloy-serde`] - [Serde]-related utilities
 - [`alloy-signer`] - Ethereum signer abstraction
   - [`alloy-signer-aws`] - [AWS KMS] signer implementation
   - [`alloy-signer-gcp`] - [GCP KMS] signer implementation
@@ -71,11 +81,13 @@ This repository contains the following crates:
 [`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub
 [`alloy-rpc-client`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-client
 [`alloy-rpc-types`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types
+[`alloy-rpc-types-admin`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-admin
 [`alloy-rpc-types-anvil`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-anvil
 [`alloy-rpc-types-beacon`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon
 [`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
 [`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
 [`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
+[`alloy-rpc-types-txpool`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-txpool
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde
 [`alloy-signer`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer
 [`alloy-signer-aws`]: https://github.com/alloy-rs/alloy/tree/main/crates/signer-aws
@@ -93,22 +105,27 @@ This repository contains the following crates:
 [GCP KMS]: https://cloud.google.com/kms
 [Ledger]: https://www.ledger.com
 [Trezor]: https://trezor.io
+[Serde]: https://serde.rs
+[beacon-apis]: https://ethereum.github.io/beacon-APIs
+[Anvil]: https://github.com/foundry-rs/foundry
 
-## Supported Rust Versions
+## Supported Rust Versions (MSRV)
 
 <!--
 When updating this, also update:
-- .clippy.toml
+- clippy.toml
 - Cargo.toml
 - .github/workflows/ci.yml
 -->
 
-Alloy will keep a rolling MSRV (minimum supported rust version) policy of **at
-least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.76.
+The current MSRV (minimum supported rust version) is 1.76.
 
-Note that the MSRV is not increased automatically, and only as part of a minor
-release.
+Alloy will keep a rolling MSRV policy of **at least** two versions behind the
+latest stable release (so if the latest stable release is 1.58, we would
+support 1.56).
+
+Note that the MSRV is not increased automatically, and only as part of a patch
+(pre-1.0) or minor (post-1.0) release.
 
 ## Contributing
 

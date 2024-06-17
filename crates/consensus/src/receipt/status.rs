@@ -102,6 +102,14 @@ impl<'de> serde::Deserialize<'de> for Eip658Value {
                 Ok(Eip658Value::Eip658(v))
             }
 
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                match v {
+                    "0x" | "0x0" | "false" => Ok(Eip658Value::Eip658(false)),
+                    "0x1" | "true" => Ok(Eip658Value::Eip658(true)),
+                    _ => v.parse::<B256>().map(Eip658Value::PostState).map_err(de::Error::custom),
+                }
+            }
+
             fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
                 B256::try_from(v).map(Eip658Value::PostState).map_err(de::Error::custom)
             }
@@ -119,14 +127,6 @@ impl<'de> serde::Deserialize<'de> for Eip658Value {
                 }
 
                 Ok(Eip658Value::PostState(bytes.into()))
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                match v {
-                    "0x" | "0x0" | "false" => Ok(Eip658Value::Eip658(false)),
-                    "0x1" | "true" => Ok(Eip658Value::Eip658(true)),
-                    _ => v.parse::<B256>().map(Eip658Value::PostState).map_err(de::Error::custom),
-                }
             }
         }
 

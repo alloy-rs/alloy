@@ -114,7 +114,7 @@ pub mod u128_opt_via_ruint {
     where
         D: Deserializer<'de>,
     {
-        (Option::<U128>::deserialize(deserializer)?)
+        Option::<U128>::deserialize(deserializer)?
             .map_or_else(|| Ok(None), |val| Ok(Some(val.to())))
     }
 
@@ -165,7 +165,7 @@ pub mod u128_vec_vec_opt_via_ruint {
     where
         D: Deserializer<'de>,
     {
-        (Option::<Vec<Vec<U128>>>::deserialize(deserializer)?).map_or_else(
+        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
             || Ok(None),
             |vec| {
                 Ok(Some(

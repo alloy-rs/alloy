@@ -202,7 +202,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         // if the base fee of the Latest block is 0 then we need check if the latest block even has
         // a base fee/supports EIP1559
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
-            Some(base_fee) if (base_fee != 0) => base_fee,
+            Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
@@ -653,7 +653,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///

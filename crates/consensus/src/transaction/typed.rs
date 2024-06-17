@@ -124,6 +124,15 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    fn nonce(&self) -> u64 {
+        match self {
+            Self::Legacy(tx) => tx.nonce(),
+            Self::Eip2930(tx) => tx.nonce(),
+            Self::Eip1559(tx) => tx.nonce(),
+            Self::Eip4844(tx) => tx.nonce(),
+        }
+    }
+
     fn gas_limit(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.gas_limit(),
@@ -142,24 +151,6 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn input(&self) -> &[u8] {
-        match self {
-            Self::Legacy(tx) => tx.input(),
-            Self::Eip2930(tx) => tx.input(),
-            Self::Eip1559(tx) => tx.input(),
-            Self::Eip4844(tx) => tx.input(),
-        }
-    }
-
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.nonce(),
-            Self::Eip2930(tx) => tx.nonce(),
-            Self::Eip1559(tx) => tx.nonce(),
-            Self::Eip4844(tx) => tx.nonce(),
-        }
-    }
-
     fn to(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.to(),
@@ -175,6 +166,15 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.value(),
             Self::Eip1559(tx) => tx.value(),
             Self::Eip4844(tx) => tx.value(),
+        }
+    }
+
+    fn input(&self) -> &[u8] {
+        match self {
+            Self::Legacy(tx) => tx.input(),
+            Self::Eip2930(tx) => tx.input(),
+            Self::Eip1559(tx) => tx.input(),
+            Self::Eip4844(tx) => tx.input(),
         }
     }
 }

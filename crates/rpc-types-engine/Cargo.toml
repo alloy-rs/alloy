@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-engine"
-description = "Ethereum execution-consensus layer (engine) API RPC types"
+description = "Types for the `engine` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true
@@ -10,6 +10,10 @@ homepage.workspace = true
 authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true

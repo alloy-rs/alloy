@@ -42,12 +42,12 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.to
     }
 
-    fn set_kind(&mut self, kind: TxKind) {
-        self.to = Some(kind);
-    }
-
     fn clear_kind(&mut self) {
         self.to = None;
+    }
+
+    fn set_kind(&mut self, kind: TxKind) {
+        self.to = Some(kind);
     }
 
     fn value(&self) -> Option<U256> {

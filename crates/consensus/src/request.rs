@@ -3,6 +3,7 @@
 use alloy_eips::{
     eip6110::DepositRequest,
     eip7002::WithdrawalRequest,
+    eip7251::ConsolidationRequest,
     eip7685::{Decodable7685, Eip7685Error, Encodable7685},
 };
 use alloy_rlp::{Decodable, Encodable};
@@ -27,6 +28,10 @@ pub enum Request {
     ///
     /// [EIP-7002]: https://eips.ethereum.org/EIPS/eip-7002
     WithdrawalRequest(WithdrawalRequest),
+    /// An [EIP-7251] consolidation request.
+    ///
+    /// [EIP-7251]: https://eips.ethereum.org/EIPS/eip-7002
+    ConsolidationRequest(ConsolidationRequest),
 }
 
 impl From<DepositRequest> for Request {
@@ -52,6 +57,11 @@ impl Request {
         matches!(self, Self::WithdrawalRequest(_))
     }
 
+    /// Whether this is a [`ConsolidationRequest`].
+    pub const fn is_consolidation_request(&self) -> bool {
+        matches!(self, Self::ConsolidationRequest(_))
+    }
+
     /// Return the inner [`DepositRequest`], or `None` of this is not a deposit request.
     pub const fn as_deposit_request(&self) -> Option<&DepositRequest> {
         match self {
@@ -67,6 +77,14 @@ impl Request {
             _ => None,
         }
     }
+
+    /// Return the inner [`ConsolidationRequest`], or `None` if this is not a consolidation request.
+    pub const fn as_consolidation_request(&self) -> Option<&ConsolidationRequest> {
+        match self {
+            Self::ConsolidationRequest(req) => Some(req),
+            _ => None,
+        }
+    }
 }
 
 impl Encodable7685 for Request {
@@ -74,6 +92,7 @@ impl Encodable7685 for Request {
         match self {
             Self::DepositRequest(_) => 0,
             Self::WithdrawalRequest(_) => 1,
+            Self::ConsolidationRequest(_) => 2,
         }
     }
 
@@ -81,6 +100,7 @@ impl Encodable7685 for Request {
         match self {
             Self::DepositRequest(deposit) => deposit.encode(out),
             Self::WithdrawalRequest(withdrawal) => withdrawal.encode(out),
+            Self::ConsolidationRequest(consolidation) => consolidation.encode(out),
         }
     }
 }
@@ -90,6 +110,7 @@ impl Decodable7685 for Request {
         Ok(match ty {
             0 => Self::DepositRequest(DepositRequest::decode(buf)?),
             1 => Self::WithdrawalRequest(WithdrawalRequest::decode(buf)?),
+            2 => Self::ConsolidationRequest(ConsolidationRequest::decode(buf)?),
             ty => return Err(Eip7685Error::UnexpectedType(ty)),
         })
     }

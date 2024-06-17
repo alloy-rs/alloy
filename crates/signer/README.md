@@ -6,15 +6,14 @@ You can implement the [`Signer`][Signer] trait to extend functionality to other 
 such as Hardware Security Modules, KMS etc. See [its documentation][Signer] for more.
 
 Signer implementations in Alloy:
-- [K256 private key](../signer-local/src/private_key.rs)
-- [YubiHSM2](../signer-local/src/yubi.rs)
-- [Ledger](../signer-ledger/)
-- [Trezor](../signer-trezor/)
-- [AWS KMS](../signer-aws/)
-- [GCP KMS](../signer-gcp/)
+- [K256 private key](https://docs.rs/alloy-signer-local)
+- [YubiHSM2](https://docs.rs/alloy-signer-local)
+- [Ledger](https://docs.rs/alloy-signer-ledger)
+- [Trezor](https://docs.rs/alloy-signer-trezor)
+- [AWS KMS](https://docs.rs/alloy-signer-aws)
+- [GCP KMS](https://docs.rs/alloy-signer-gcp)
 
-<!-- TODO: docs.rs -->
-[Signer]: https://alloy-rs.github.io/alloy/alloy_signer/trait.Signer.html
+[Signer]: https://docs.rs/alloy-signer/latest/alloy_signer/trait.Signer.html
 
 ## Examples
 

@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-eth"
-description = "Ethereum RPC-related types"
+description = "Types for the `eth` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true
@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -18,7 +22,6 @@ workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
-alloy-genesis.workspace = true
 
 alloy-consensus = { workspace = true, features = ["std", "serde"] }
 alloy-eips = { workspace = true, features = ["std", "serde"] }

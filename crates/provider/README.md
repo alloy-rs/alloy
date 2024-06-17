@@ -28,8 +28,8 @@ The `ProviderBuilder` struct can quickly create a stacked provider, similar to
 ## Feature flags
 
 - `pubsub` - Enable support for subscription methods.
-- `ws` - Enable WebSocket support. Implictly enables `pubsub`.
-- `ipc` - Enable IPC support. Implictly enables `pubsub`.
+- `ws` - Enable WebSocket support. Implicitly enables `pubsub`.
+- `ipc` - Enable IPC support. Implicitly enables `pubsub`.
 
 ## Usage
 

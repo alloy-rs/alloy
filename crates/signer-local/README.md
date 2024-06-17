@@ -2,9 +2,10 @@
 
 Local signer implementations:
 
-- [K256 private key](./src/private_key.rs)
-- [Mnemonic phrase](./src/mnemonic.rs)
-- [YubiHSM2](./src/yubi.rs)
+- [K256 private key](https://docs.rs/alloy-signer-local/latest/alloy_signer_local/struct.LocalSigner.html)
+<!-- TODO: use the struct URL in these once it appears on docs.rs -->
+- [Mnemonic phrase](https://docs.rs/alloy-signer-local/)
+- [YubiHSM2](https://docs.rs/alloy-signer-local/)
 
 ## Features
 

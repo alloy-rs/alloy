@@ -257,11 +257,10 @@ impl GenesisAccount {
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
-    #[serde(default = "mainnet_id")]
     pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
@@ -520,10 +519,40 @@ impl ChainConfig {
     }
 }
 
-// used only for serde
-#[inline]
-const fn mainnet_id() -> u64 {
-    1
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self {
+            // mainnet
+            chain_id: 1,
+            homestead_block: None,
+            dao_fork_block: None,
+            dao_fork_support: false,
+            eip150_block: None,
+            eip150_hash: None,
+            eip155_block: None,
+            eip158_block: None,
+            byzantium_block: None,
+            constantinople_block: None,
+            petersburg_block: None,
+            istanbul_block: None,
+            muir_glacier_block: None,
+            berlin_block: None,
+            london_block: None,
+            arrow_glacier_block: None,
+            gray_glacier_block: None,
+            merge_netsplit_block: None,
+            shanghai_time: None,
+            cancun_time: None,
+            prague_time: None,
+            terminal_total_difficulty: None,
+            terminal_total_difficulty_passed: false,
+            ethash: None,
+            clique: None,
+            parlia: None,
+            extra_fields: Default::default(),
+            deposit_contract_address: None,
+        }
+    }
 }
 
 /// Empty consensus configuration for proof-of-work networks.
@@ -563,6 +592,13 @@ mod tests {
     use alloc::vec;
     use alloy_primitives::hex;
     use core::str::FromStr;
+
+    #[test]
+    fn genesis_defaults_config() {
+        let s = r#"{}"#;
+        let genesis: Genesis = serde_json::from_str(s).unwrap();
+        assert_eq!(genesis.config.chain_id, 1);
+    }
 
     #[test]
     fn test_genesis() {

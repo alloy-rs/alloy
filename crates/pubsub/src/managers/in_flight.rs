@@ -59,13 +59,13 @@ impl InFlight {
         if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
                 let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
-                match sub_id {
-                    Ok(alias) => return Some((alias, self)),
+                return match sub_id {
+                    Ok(alias) => Some((alias, self)),
                     Err(e) => {
                         let _ = self.tx.send(Err(TransportError::deser_err(e, val.get())));
-                        return None;
+                        None
                     }
-                }
+                };
             }
         }
 
