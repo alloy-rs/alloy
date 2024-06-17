@@ -170,7 +170,7 @@ pub enum FilterBlockOption {
 }
 
 impl FilterBlockOption {
-    /// Returns the `fromBlock` value, if any
+    /// Returns the `from_block` value, if any
     pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { to_block, .. } => to_block.as_ref(),
@@ -178,7 +178,7 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the `toBlock` value, if any
+    /// Returns the `to_block` value, if any
     pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { from_block, .. } => from_block.as_ref(),
@@ -186,12 +186,48 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
+    /// Returns the range (`from_block`, `to_block`) if this is a range filter.
     pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
             Self::Range { from_block, to_block } => (from_block.as_ref(), to_block.as_ref()),
             Self::AtBlockHash(_) => (None, None),
         }
+    }
+
+    /// Returns the block hash if this is a block hash filter.
+    pub const fn as_block_hash(&self) -> Option<&BlockHash> {
+        match self {
+            Self::AtBlockHash(hash) => Some(hash),
+            Self::Range { .. } => None,
+        }
+    }
+
+    /// Returns true if this is a range filter.
+    pub const fn is_range(&self) -> bool {
+        matches!(self, Self::Range { .. })
+    }
+
+    /// Returns true if this is a block hash filter.
+    pub const fn is_block_hash(&self) -> bool {
+        matches!(self, Self::AtBlockHash(_))
+    }
+
+    /// Sets the block number this range filter should start at.
+    #[must_use]
+    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+        Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
+    }
+
+    /// Sets the block number this range filter should end at.
+    #[must_use]
+    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+        Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
+    }
+
+    /// Pins the block hash this filter should target.
+    #[must_use]
+    pub const fn with_block_hash(&self, hash: B256) -> Self {
+        Self::AtBlockHash(hash)
     }
 }
 
@@ -245,31 +281,6 @@ impl From<B256> for FilterBlockOption {
 impl Default for FilterBlockOption {
     fn default() -> Self {
         Self::Range { from_block: None, to_block: None }
-    }
-}
-
-impl FilterBlockOption {
-    /// Sets the block number this range filter should start at.
-    #[must_use]
-    pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
-        let to_block = if let Self::Range { to_block, .. } = self { *to_block } else { None };
-
-        Self::Range { from_block: Some(block), to_block }
-    }
-
-    /// Sets the block number this range filter should end at.
-    #[must_use]
-    pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
-        let from_block = if let Self::Range { from_block, .. } = self { *from_block } else { None };
-
-        Self::Range { from_block, to_block: Some(block) }
-    }
-
-    /// Pins the block hash this filter should target.
-    #[must_use]
-    #[doc(alias = "set_block_hash")]
-    pub const fn set_hash(&self, hash: B256) -> Self {
-        Self::AtBlockHash(hash)
     }
 }
 
@@ -363,14 +374,14 @@ impl Filter {
     /// Sets the from block number
     #[must_use]
     pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.set_from_block(block.into());
+        self.block_option = self.block_option.with_from_block(block.into());
         self
     }
 
     /// Sets the to block number
     #[must_use]
     pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.set_to_block(block.into());
+        self.block_option = self.block_option.with_to_block(block.into());
         self
     }
 
@@ -384,7 +395,7 @@ impl Filter {
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
-        self.block_option = self.block_option.set_hash(hash.into());
+        self.block_option = self.block_option.with_block_hash(hash.into());
         self
     }
     /// Sets the inner filter object
