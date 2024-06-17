@@ -280,6 +280,14 @@ impl BlockId {
         }
     }
 
+    /// Returns the block number if it is [BlockId::Number] and not a tag
+    pub const fn as_block_number(&self) -> Option<u64> {
+        match self {
+            Self::Number(x) => x.as_number(),
+            _ => None,
+        }
+    }
+
     /// Returns true if this is [BlockNumberOrTag::Latest]
     pub const fn is_latest(&self) -> bool {
         matches!(self, Self::Number(BlockNumberOrTag::Latest))
