@@ -3,7 +3,9 @@ use crate::{Provider, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_trace::parity::{LocalizedTransactionTrace, TraceResults, TraceType};
+use alloy_rpc_types_trace::parity::{
+    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
+};
 use alloy_transport::{Transport, TransportResult};
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
@@ -47,6 +49,13 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
+    /// Trace the given raw transaction.
+    async fn trace_raw_transaction(
+        &self,
+        data: &[u8],
+        trace_type: &[TraceType],
+    ) -> TransportResult<TraceResults>;
+
     /// Trace all transactions in the given block.
     ///
     /// # Note
@@ -63,6 +72,13 @@ where
         hash: TxHash,
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults>;
+
+    /// Replays all transactions in the given block.
+    async fn trace_replay_block_transactions(
+        &self,
+        block: BlockNumberOrTag,
+        trace_type: &[TraceType],
+    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -96,6 +112,14 @@ where
         self.client().request("trace_transaction", (hash,)).await
     }
 
+    async fn trace_raw_transaction(
+        &self,
+        data: &[u8],
+        trace_type: &[TraceType],
+    ) -> TransportResult<TraceResults> {
+        self.client().request("trace_rawTransaction", (data, trace_type)).await
+    }
+
     async fn trace_block(
         &self,
         block: BlockNumberOrTag,
@@ -109,6 +133,14 @@ where
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults> {
         self.client().request("trace_replayTransaction", (hash, trace_type)).await
+    }
+
+    async fn trace_replay_block_transactions(
+        &self,
+        block: BlockNumberOrTag,
+        trace_type: &[TraceType],
+    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>> {
+        self.client().request("trace_replayBlockTransactions", (block, trace_type)).await
     }
 }
 
