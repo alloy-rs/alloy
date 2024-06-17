@@ -280,6 +280,14 @@ impl BlockId {
         }
     }
 
+    /// Returns the block number if it is [`BlockId::Number`] and not a tag
+    pub const fn as_u64(&self) -> Option<u64> {
+        match self {
+            Self::Number(x) => x.as_number(),
+            _ => None,
+        }
+    }
+
     /// Returns true if this is [BlockNumberOrTag::Latest]
     pub const fn is_latest(&self) -> bool {
         matches!(self, Self::Number(BlockNumberOrTag::Latest))
@@ -748,6 +756,18 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    fn block_id_as_u64() {
+        assert_eq!(BlockId::number(123).as_u64(), Some(123));
+        assert_eq!(BlockId::number(0).as_u64(), Some(0));
+        assert_eq!(BlockId::earliest().as_u64(), None);
+        assert_eq!(BlockId::latest().as_u64(), None);
+        assert_eq!(BlockId::pending().as_u64(), None);
+        assert_eq!(BlockId::safe().as_u64(), None);
+        assert_eq!(BlockId::hash(BlockHash::ZERO).as_u64(), None);
+        assert_eq!(BlockId::hash_canonical(BlockHash::ZERO).as_u64(), None);
     }
 
     #[test]
