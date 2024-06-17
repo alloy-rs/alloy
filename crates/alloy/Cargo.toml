@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -81,10 +85,10 @@ full = [
     "kzg",
     "network",
     "provider-http", # includes `providers`
-    "provider-ws",   # includes `providers`
-    "provider-ipc",  # includes `providers`
-    "rpc-types",     # includes `rpc-types-eth`
-    "signer-local",  # includes `signers`
+    "provider-ws", # includes `providers`
+    "provider-ipc", # includes `providers`
+    "rpc-types", # includes `rpc-types-eth`
+    "signer-local", # includes `signers`
 ]
 
 # configuration
