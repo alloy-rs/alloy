@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-anvil"
-description = "Anvil RPC types"
+description = "Types for the Anvil development node's Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true

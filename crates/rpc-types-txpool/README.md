@@ -1,3 +1,3 @@
 # alloy-rpc-types-txpool
 
-Ethereum RPC `txpool` types.
+Types for the `txpool` Ethereum JSON-RPC namespace.

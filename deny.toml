@@ -1,9 +1,6 @@
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
-unsound = "warn"
+version = 2
 yanked = "warn"
-notice = "warn"
 
 [bans]
 multiple-versions = "warn"
@@ -11,9 +8,8 @@ wildcards = "deny"
 highlight = "all"
 
 [licenses]
-unlicensed = "deny"
-confidence-threshold = 0.9
-# copyleft = "deny"
+version = 2
+confidence-threshold = 0.8
 
 allow = [
     "MIT",
@@ -28,17 +24,13 @@ allow = [
     "MPL-2.0",
     # https://github.com/briansmith/ring/issues/902
     "LicenseRef-ring",
-    "Unicode-3.0",
 ]
 
 exceptions = [
     # CC0 is a permissive license but somewhat unclear status for source code
     # so we prefer to not have dependencies using it
     # https://tldrlegal.com/license/creative-commons-cc0-1.0-universal
-    { allow = ["CC0-1.0"], name = "secp256k1" },
-    { allow = ["CC0-1.0"], name = "secp256k1-sys" },
     { allow = ["CC0-1.0"], name = "tiny-keccak" },
-    { allow = ["CC0-1.0"], name = "to_method" },
     { allow = ["CC0-1.0"], name = "trezor-client" },
 ]
 
@@ -55,5 +47,3 @@ license-files = [{ path = "LICENSE", hash = 0x001c7e6c }]
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# TODO: Remove once alloy-contract is stable. This is only used in tests for `sol!`.
-allow-git = ["https://github.com/alloy-rs/core"]

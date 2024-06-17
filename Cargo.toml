@@ -62,8 +62,6 @@ alloy-transport-http = { version = "0.1.1", default-features = false, path = "cr
 alloy-transport-ipc = { version = "0.1.1", default-features = false, path = "crates/transport-ipc" }
 alloy-transport-ws = { version = "0.1.1", default-features = false, path = "crates/transport-ws" }
 
-test-utils = { version = "0.1.0", default-features = false, path = "crates/internal-test-utils", package = "alloy-internal-test-utils" }
-
 alloy-core = { version = "0.7.6", default-features = false }
 alloy-dyn-abi = { version = "0.7.6", default-features = false }
 alloy-json-abi = { version = "0.7.6", default-features = false }
@@ -100,7 +98,7 @@ tokio-util = "0.7"
 tokio-stream = "0.1"
 rustls = { version = "0.23", default-features = false, features = ["std"] }
 tokio-test = "0.4"
-tokio-tungstenite = { version = "0.23" }
+tokio-tungstenite = "0.23"
 tower = { version = "0.4", features = ["util"] }
 
 # tracing

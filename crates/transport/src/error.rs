@@ -72,7 +72,7 @@ impl TransportErrorKind {
         RpcError::Transport(Self::PubsubUnavailable)
     }
 
-    /// Instantiate a new `TrasnportError::HttpError`.
+    /// Instantiate a new `TransportError::HttpError`.
     pub const fn http_error(status: u16, body: String) -> TransportError {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }

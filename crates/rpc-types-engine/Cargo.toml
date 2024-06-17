@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-engine"
-description = "Ethereum execution-consensus layer (engine) API RPC types"
+description = "Types for the `engine` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true
