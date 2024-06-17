@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/...HEAD)
+## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
+
+### Features
+
+- Add EIP-7251 request types ([#919](https://github.com/alloy-rs/alloy/issues/919))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
 ### Bug Fixes
 
@@ -38,7 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Add EIP-7251 request types ([#919](https://github.com/alloy-rs/alloy/issues/919))
 - Derive serde for header ([#902](https://github.com/alloy-rs/alloy/issues/902))
 - Move `{,With}OtherFields` to serde crate ([#892](https://github.com/alloy-rs/alloy/issues/892))
 - Add as_ is_ functions to envelope ([#872](https://github.com/alloy-rs/alloy/issues/872))
