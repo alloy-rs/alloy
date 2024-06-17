@@ -668,6 +668,36 @@ pub enum ValueOrArray<T> {
     Array(Vec<T>),
 }
 
+impl<T> ValueOrArray<T> {
+    /// Get the value if present.
+    pub fn as_value(&self) -> Option<&T> {
+        if let Self::Value(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Get the array if present.
+    pub fn as_array(&self) -> Option<&[T]> {
+        if let Self::Array(array) = self {
+            Some(array)
+        } else {
+            None
+        }
+    }
+
+    /// Check if the enum is a single value.
+    pub fn is_value(&self) -> bool {
+        matches!(self, Self::Value(_))
+    }
+
+    /// Check if the enum is an array.
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
+    }
+}
+
 impl From<Address> for ValueOrArray<Address> {
     fn from(src: Address) -> Self {
         Self::Value(src)
