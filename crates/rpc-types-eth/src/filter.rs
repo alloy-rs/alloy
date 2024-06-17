@@ -670,7 +670,7 @@ pub enum ValueOrArray<T> {
 
 impl<T> ValueOrArray<T> {
     /// Get the value if present.
-    pub fn as_value(&self) -> Option<&T> {
+    pub const fn as_value(&self) -> Option<&T> {
         if let Self::Value(value) = self {
             Some(value)
         } else {
@@ -688,12 +688,12 @@ impl<T> ValueOrArray<T> {
     }
 
     /// Check if the enum is a single value.
-    pub fn is_value(&self) -> bool {
+    pub const fn is_value(&self) -> bool {
         matches!(self, Self::Value(_))
     }
 
     /// Check if the enum is an array.
-    pub fn is_array(&self) -> bool {
+    pub const fn is_array(&self) -> bool {
         matches!(self, Self::Array(_))
     }
 }
