@@ -143,6 +143,7 @@ pub struct ForkedNetwork {
 /// Additional `evm_mine` options
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum MineOptions {
     /// The options for mining
     Options {
@@ -151,6 +152,7 @@ pub enum MineOptions {
         timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
+        #[serde(with = "alloy_serde::quantity::opt")]
         blocks: Option<u64>,
     },
     /// The timestamp the block should be mined with
