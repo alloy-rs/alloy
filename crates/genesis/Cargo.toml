@@ -24,6 +24,8 @@ alloy-serde.workspace = true
 
 # serde
 serde.workspace = true
+
+[dev-dependencies]
 serde_json.workspace = true
 
 [features]
