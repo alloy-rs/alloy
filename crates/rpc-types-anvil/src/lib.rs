@@ -142,7 +142,7 @@ pub struct ForkedNetwork {
 
 /// Additional `evm_mine` options
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum MineOptions {
     /// The options for mining
     Options {
@@ -164,23 +164,196 @@ impl Default for MineOptions {
     }
 }
 
+/// A hex encoded or decimal index
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Index(usize);
+
+impl From<Index> for usize {
+    fn from(idx: Index) -> Self {
+        idx.0
+    }
+}
+
+impl<'a> serde::Deserialize<'a> for Index {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        use std::fmt;
+
+        struct IndexVisitor;
+
+        impl<'a> serde::de::Visitor<'a> for IndexVisitor {
+            type Value = Index;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(formatter, "hex-encoded or decimal index")
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Index(value as usize))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                value.strip_prefix("0x").map_or_else(
+                    || {
+                        value.parse::<usize>().map(Index).map_err(|e| {
+                            serde::de::Error::custom(format!("Failed to parse numeric index: {e}"))
+                        })
+                    },
+                    |val| {
+                        usize::from_str_radix(val, 16).map(Index).map_err(|e| {
+                            serde::de::Error::custom(format!(
+                                "Failed to parse hex encoded index value: {e}"
+                            ))
+                        })
+                    },
+                )
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_str(value.as_ref())
+            }
+        }
+
+        deserializer.deserialize_any(IndexVisitor)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
-    fn serde_forking() {
-        let s = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com",
-        "blockNumber": "18441649"
-      }
-    }"#;
-        let f: Forking = serde_json::from_str(s).unwrap();
+    fn test_forking_deserialization() {
+        // Test full forking object
+        let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com","blockNumber": "18441649"}}"#;
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
         assert_eq!(
-            f,
+            forking,
             Forking {
                 json_rpc_url: Some("https://ethereumpublicnode.com".into()),
                 block_number: Some(18441649)
             }
         );
+
+        // Test forking object with only jsonRpcUrl
+        let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com"}}"#;
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
+        assert_eq!(
+            forking,
+            Forking {
+                json_rpc_url: Some("https://ethereumpublicnode.com".into()),
+                block_number: None
+            }
+        );
+
+        // Test forking object with only blockNumber
+        let json_data = r#"{"forking": {"blockNumber": "18441649"}}"#;
+        let forking: Forking =
+            serde_json::from_str(json_data).expect("Failed to deserialize forking object");
+        assert_eq!(forking, Forking { json_rpc_url: None, block_number: Some(18441649) });
+    }
+
+    #[test]
+    fn test_index_deserialization() {
+        // Test decimal index
+        let json_data = json!(42);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize decimal index");
+        assert_eq!(index, Index(42));
+
+        // Test hex index
+        let json_data = json!("0x2A");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize hex index");
+        assert_eq!(index, Index(42));
+
+        // Test invalid hex index
+        let json_data = json!("0xGHI");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test invalid decimal index
+        let json_data = json!("abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test string decimal index
+        let json_data = json!("123");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize string decimal index");
+        assert_eq!(index, Index(123));
+
+        // Test invalid numeric string
+        let json_data = json!("123abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test negative index
+        let json_data = json!(-1);
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test large index
+        let json_data = json!(u64::MAX);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize large index");
+        assert_eq!(index, Index(u64::MAX as usize));
+    }
+
+    #[test]
+    fn test_deserialize_options_with_values() {
+        let data = r#"{"timestamp": 1620000000, "blocks": 10}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+        );
+
+        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_options_with_timestamp() {
+        let data = r#"{"timestamp":"1620000000"}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+        );
+
+        let data = r#"{"timestamp":"0x608f3d00"}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_timestamp() {
+        let data = r#""1620000000""#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+
+        let data = r#""0x608f3d00""#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
     }
 }
