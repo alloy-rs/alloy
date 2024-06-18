@@ -153,6 +153,15 @@ impl From<U256> for Topic {
     }
 }
 
+/// Represents errors that can occur when setting block filters in `FilterBlockOption`.
+#[derive(Debug, PartialEq, Eq)]
+pub enum FilterBlockError {
+    /// Error indicating that the `from_block` is greater than the `to_block`.
+    FromBlockGreaterThanToBlock,
+    /// Error indicating that the `to_block` is less than the `from_block`.
+    ToBlockLessThanFromBlock,
+}
+
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FilterBlockOption {
@@ -213,8 +222,7 @@ impl FilterBlockOption {
     }
 
     /// Sets the block number this range filter should start at.
-    #[must_use]
-    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Result<Self, FilterBlockError> {
         // Check if from_block is greater than to_block
         if self
             .get_to_block()
@@ -222,15 +230,14 @@ impl FilterBlockOption {
             .zip(block.as_number())
             .map_or(false, |(to, from)| from > to)
         {
-            panic!("from_block cannot be greater than to_block");
+            return Err(FilterBlockError::FromBlockGreaterThanToBlock);
         }
 
-        Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
+        Ok(Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() })
     }
 
     /// Sets the block number this range filter should end at.
-    #[must_use]
-    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Result<Self, FilterBlockError> {
         // Check if to_block is less than from_block
         if self
             .get_from_block()
@@ -238,9 +245,21 @@ impl FilterBlockOption {
             .zip(block.as_number())
             .map_or(false, |(from, to)| to < from)
         {
-            panic!("to_block cannot be less than from_block");
+            return Err(FilterBlockError::ToBlockLessThanFromBlock);
         }
 
+        Ok(Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) })
+    }
+
+    /// Sets the block number this range filter should start at.
+    #[must_use]
+    pub fn with_from_block_unchecked(&self, block: BlockNumberOrTag) -> Self {
+        Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
+    }
+
+    /// Sets the block number this range filter should end at.
+    #[must_use]
+    pub fn with_to_block_unchecked(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
     }
 
@@ -394,14 +413,14 @@ impl Filter {
     /// Sets the from block number
     #[must_use]
     pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.with_from_block(block.into());
+        self.block_option = self.block_option.with_from_block_unchecked(block.into());
         self
     }
 
     /// Sets the to block number
     #[must_use]
     pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.with_to_block(block.into());
+        self.block_option = self.block_option.with_to_block_unchecked(block.into());
         self
     }
 
@@ -1181,7 +1200,7 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Number(1)),
             to_block: Some(BlockNumberOrTag::Number(10)),
         };
-        let updated = original.with_from_block(BlockNumberOrTag::Number(5));
+        let updated = original.with_from_block(BlockNumberOrTag::Number(5)).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, Some(BlockNumberOrTag::Number(5)));
@@ -1192,14 +1211,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "from_block cannot be greater than to_block")]
     fn test_with_from_block_failure() {
         // Test scenario where from_block is greater than to_block
         let original = FilterBlockOption::Range {
             from_block: Some(BlockNumberOrTag::Number(10)),
             to_block: Some(BlockNumberOrTag::Number(5)),
         };
-        let _ = original.with_from_block(BlockNumberOrTag::Number(6));
+        assert_eq!(
+            original.with_from_block(BlockNumberOrTag::Number(6)),
+            Err(FilterBlockError::FromBlockGreaterThanToBlock)
+        );
     }
 
     #[test]
@@ -1209,7 +1230,7 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Number(1)),
             to_block: None,
         };
-        let updated = original.with_from_block(BlockNumberOrTag::Number(5));
+        let updated = original.with_from_block(BlockNumberOrTag::Number(5)).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, Some(BlockNumberOrTag::Number(5)));
@@ -1226,7 +1247,7 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Earliest),
             to_block: Some(BlockNumberOrTag::Latest),
         };
-        let updated = original.with_from_block(BlockNumberOrTag::Pending);
+        let updated = original.with_from_block(BlockNumberOrTag::Pending).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, Some(BlockNumberOrTag::Pending));
@@ -1243,7 +1264,7 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Number(1)),
             to_block: Some(BlockNumberOrTag::Number(10)),
         };
-        let updated = original.with_to_block(BlockNumberOrTag::Number(15));
+        let updated = original.with_to_block(BlockNumberOrTag::Number(15)).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, Some(BlockNumberOrTag::Number(1)));
@@ -1254,14 +1275,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "to_block cannot be less than from_block")]
     fn test_with_to_block_failure() {
         // Test scenario where to_block is less than from_block
         let original = FilterBlockOption::Range {
             from_block: Some(BlockNumberOrTag::Number(10)),
             to_block: Some(BlockNumberOrTag::Number(15)),
         };
-        let _ = original.with_to_block(BlockNumberOrTag::Number(5));
+        assert_eq!(
+            original.with_to_block(BlockNumberOrTag::Number(5)),
+            Err(FilterBlockError::ToBlockLessThanFromBlock)
+        );
     }
 
     #[test]
@@ -1271,7 +1294,7 @@ mod tests {
             from_block: None,
             to_block: Some(BlockNumberOrTag::Number(10)),
         };
-        let updated = original.with_to_block(BlockNumberOrTag::Number(5));
+        let updated = original.with_to_block(BlockNumberOrTag::Number(5)).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, None);
@@ -1288,7 +1311,7 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Earliest),
             to_block: Some(BlockNumberOrTag::Latest),
         };
-        let updated = original.with_to_block(BlockNumberOrTag::Pending);
+        let updated = original.with_to_block(BlockNumberOrTag::Pending).unwrap();
         match updated {
             FilterBlockOption::Range { from_block, to_block } => {
                 assert_eq!(from_block, Some(BlockNumberOrTag::Earliest));
