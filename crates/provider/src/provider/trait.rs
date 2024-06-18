@@ -250,7 +250,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the balance of the account.
     ///
-    /// Defaults to the latest block. See also [RpcWithBlock::block_id].
+    /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
     fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
