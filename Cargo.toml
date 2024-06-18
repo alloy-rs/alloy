@@ -31,36 +31,36 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.dependencies]
-alloy-consensus = { version = "0.1.1", default-features = false, path = "crates/consensus" }
-alloy-contract = { version = "0.1.1", default-features = false, path = "crates/contract" }
-alloy-eips = { version = "0.1.1", default-features = false, path = "crates/eips" }
-alloy-eip7547 = { version = "0.1.1", default-features = false, path = "crates/eip7547" }
-alloy-genesis = { version = "0.1.1", default-features = false, path = "crates/genesis" }
-alloy-json-rpc = { version = "0.1.1", default-features = false, path = "crates/json-rpc" }
-alloy-network = { version = "0.1.1", default-features = false, path = "crates/network" }
-alloy-node-bindings = { version = "0.1.1", default-features = false, path = "crates/node-bindings" }
-alloy-provider = { version = "0.1.1", default-features = false, path = "crates/provider" }
-alloy-pubsub = { version = "0.1.1", default-features = false, path = "crates/pubsub" }
-alloy-rpc-client = { version = "0.1.1", default-features = false, path = "crates/rpc-client" }
-alloy-rpc-types-admin = { version = "0.1.1", default-features = false, path = "crates/rpc-types-admin" }
-alloy-rpc-types-anvil = { version = "0.1.1", default-features = false, path = "crates/rpc-types-anvil" }
-alloy-rpc-types-beacon = { version = "0.1.1", default-features = false, path = "crates/rpc-types-beacon" }
-alloy-rpc-types-engine = { version = "0.1.1", default-features = false, path = "crates/rpc-types-engine" }
-alloy-rpc-types-eth = { version = "0.1.1", default-features = false, path = "crates/rpc-types-eth" }
-alloy-rpc-types-trace = { version = "0.1.1", default-features = false, path = "crates/rpc-types-trace" }
-alloy-rpc-types-txpool = { version = "0.1.1", default-features = false, path = "crates/rpc-types-txpool" }
-alloy-rpc-types = { version = "0.1.1", default-features = false, path = "crates/rpc-types" }
-alloy-serde = { version = "0.1.1", default-features = false, path = "crates/serde" }
-alloy-signer = { version = "0.1.1", default-features = false, path = "crates/signer" }
-alloy-signer-aws = { version = "0.1.1", default-features = false, path = "crates/signer-aws" }
-alloy-signer-gcp = { version = "0.1.1", default-features = false, path = "crates/signer-gcp" }
-alloy-signer-ledger = { version = "0.1.1", default-features = false, path = "crates/signer-ledger" }
-alloy-signer-local = { version = "0.1.1", default-features = false, path = "crates/signer-local" }
-alloy-signer-trezor = { version = "0.1.1", default-features = false, path = "crates/signer-trezor" }
-alloy-transport = { version = "0.1.1", default-features = false, path = "crates/transport" }
-alloy-transport-http = { version = "0.1.1", default-features = false, path = "crates/transport-http" }
-alloy-transport-ipc = { version = "0.1.1", default-features = false, path = "crates/transport-ipc" }
-alloy-transport-ws = { version = "0.1.1", default-features = false, path = "crates/transport-ws" }
+alloy-consensus = { version = "0.1", path = "crates/consensus", default-features = false }
+alloy-contract = { version = "0.1", path = "crates/contract", default-features = false }
+alloy-eips = { version = "0.1", path = "crates/eips", default-features = false }
+alloy-eip7547 = { version = "0.1", path = "crates/eip7547", default-features = false }
+alloy-genesis = { version = "0.1", path = "crates/genesis", default-features = false }
+alloy-json-rpc = { version = "0.1", path = "crates/json-rpc", default-features = false }
+alloy-network = { version = "0.1", path = "crates/network", default-features = false }
+alloy-node-bindings = { version = "0.1", path = "crates/node-bindings", default-features = false }
+alloy-provider = { version = "0.1", path = "crates/provider", default-features = false }
+alloy-pubsub = { version = "0.1", path = "crates/pubsub", default-features = false }
+alloy-rpc-client = { version = "0.1", path = "crates/rpc-client", default-features = false }
+alloy-rpc-types-admin = { version = "0.1", path = "crates/rpc-types-admin", default-features = false }
+alloy-rpc-types-anvil = { version = "0.1", path = "crates/rpc-types-anvil", default-features = false }
+alloy-rpc-types-beacon = { version = "0.1", path = "crates/rpc-types-beacon", default-features = false }
+alloy-rpc-types-engine = { version = "0.1", path = "crates/rpc-types-engine", default-features = false }
+alloy-rpc-types-eth = { version = "0.1", path = "crates/rpc-types-eth", default-features = false }
+alloy-rpc-types-trace = { version = "0.1", path = "crates/rpc-types-trace", default-features = false }
+alloy-rpc-types-txpool = { version = "0.1", path = "crates/rpc-types-txpool", default-features = false }
+alloy-rpc-types = { version = "0.1", path = "crates/rpc-types", default-features = false }
+alloy-serde = { version = "0.1", path = "crates/serde", default-features = false }
+alloy-signer = { version = "0.1", path = "crates/signer", default-features = false }
+alloy-signer-aws = { version = "0.1", path = "crates/signer-aws", default-features = false }
+alloy-signer-gcp = { version = "0.1", path = "crates/signer-gcp", default-features = false }
+alloy-signer-ledger = { version = "0.1", path = "crates/signer-ledger", default-features = false }
+alloy-signer-local = { version = "0.1", path = "crates/signer-local", default-features = false }
+alloy-signer-trezor = { version = "0.1", path = "crates/signer-trezor", default-features = false }
+alloy-transport = { version = "0.1", path = "crates/transport", default-features = false }
+alloy-transport-http = { version = "0.1", path = "crates/transport-http", default-features = false }
+alloy-transport-ipc = { version = "0.1", path = "crates/transport-ipc", default-features = false }
+alloy-transport-ws = { version = "0.1", path = "crates/transport-ws", default-features = false }
 
 alloy-core = { version = "0.7.6", default-features = false }
 alloy-dyn-abi = { version = "0.7.6", default-features = false }
