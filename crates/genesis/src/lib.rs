@@ -11,9 +11,9 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
+use alloc::collections::BTreeMap;
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt};
+use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use serde::{Deserialize, Serialize};
 
 /// The genesis block specification.
@@ -421,7 +421,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
-    pub extra_fields: BTreeMap<String, serde_json::Value>,
+    pub extra_fields: OtherFields,
 
     /// The deposit contract address
     #[serde(default, skip_serializing_if = "Option::is_none")]
