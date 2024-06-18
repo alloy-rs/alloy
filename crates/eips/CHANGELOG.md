@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
 
+### Changes
+
+- Updated EIP-2935 address and bytecode in line with latest EIP changes ([#934](https://github.com/alloy-rs/alloy/issues/934))
+
 ## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
 ### Bug Fixes
