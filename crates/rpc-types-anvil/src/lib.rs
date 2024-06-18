@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_primitives::{BlockHash, ChainId, TxHash, B256, U256};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
 /// Represents the params to set forking which can take various forms:
@@ -161,6 +161,67 @@ pub enum MineOptions {
 impl Default for MineOptions {
     fn default() -> Self {
         Self::Options { timestamp: None, blocks: None }
+    }
+}
+
+/// A hex encoded or decimal index
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Index(usize);
+
+impl From<Index> for usize {
+    fn from(idx: Index) -> Self {
+        idx.0
+    }
+}
+
+impl<'a> serde::Deserialize<'a> for Index {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        use std::fmt;
+
+        struct IndexVisitor;
+
+        impl<'a> serde::de::Visitor<'a> for IndexVisitor {
+            type Value = Index;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(formatter, "hex-encoded or decimal index")
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Ok(Index(value as usize))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                if let Some(val) = value.strip_prefix("0x") {
+                    usize::from_str_radix(val, 16).map(Index).map_err(|e| {
+                        Error::custom(format!("Failed to parse hex encoded index value: {e}"))
+                    })
+                } else {
+                    value
+                        .parse::<usize>()
+                        .map(Index)
+                        .map_err(|e| Error::custom(format!("Failed to parse numeric index: {e}")))
+                }
+            }
+
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                self.visit_str(value.as_ref())
+            }
+        }
+
+        deserializer.deserialize_any(IndexVisitor)
     }
 }
 
