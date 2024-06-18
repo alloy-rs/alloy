@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `FilterChanges::is_logs` ([#923](https://github.com/alloy-rs/alloy/issues/923))
 - Add `FilterChanges::is_hashes` ([#923](https://github.com/alloy-rs/alloy/issues/923))
 - Add `FilterChanges::is_transactions` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+- Add `ValueOrArray::as_values` ([#924](https://github.com/alloy-rs/alloy/issues/924))
+- Add `ValueOrArray::as_array` ([#924](https://github.com/alloy-rs/alloy/issues/924))
+- Add `ValueOrArray::is_value` ([#924](https://github.com/alloy-rs/alloy/issues/924))
+- Add `ValueOrArray::is_array` ([#924](https://github.com/alloy-rs/alloy/issues/924))
 
 ## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
