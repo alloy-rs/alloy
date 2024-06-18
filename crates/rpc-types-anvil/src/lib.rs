@@ -238,9 +238,9 @@ mod tests {
     fn test_forking_deserialization() {
         // Test full forking object
         let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com","blockNumber": "18441649"}}"#;
-        let deserialized: Forking = serde_json::from_str(json_data).unwrap();
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
         assert_eq!(
-            deserialized,
+            forking,
             Forking {
                 json_rpc_url: Some("https://ethereumpublicnode.com".into()),
                 block_number: Some(18441649)
@@ -249,9 +249,9 @@ mod tests {
 
         // Test forking object with only jsonRpcUrl
         let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com"}}"#;
-        let deserialized: Forking = serde_json::from_str(json_data).unwrap();
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
         assert_eq!(
-            deserialized,
+            forking,
             Forking {
                 json_rpc_url: Some("https://ethereumpublicnode.com".into()),
                 block_number: None
@@ -260,9 +260,9 @@ mod tests {
 
         // Test forking object with only blockNumber
         let json_data = r#"{"forking": {"blockNumber": "18441649"}}"#;
-        let deserialized: Forking =
+        let forking: Forking =
             serde_json::from_str(json_data).expect("Failed to deserialize forking object");
-        assert_eq!(deserialized, Forking { json_rpc_url: None, block_number: Some(18441649) });
+        assert_eq!(forking, Forking { json_rpc_url: None, block_number: Some(18441649) });
     }
 
     #[test]
