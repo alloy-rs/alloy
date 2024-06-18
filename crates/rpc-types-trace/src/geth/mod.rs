@@ -176,7 +176,7 @@ impl From<MuxFrame> for GethTrace {
 impl TryFrom<GethTrace> for DefaultFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<DefaultFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::Default(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -187,7 +187,7 @@ impl TryFrom<GethTrace> for DefaultFrame {
 impl TryFrom<GethTrace> for CallFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<CallFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::CallTracer(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -198,7 +198,7 @@ impl TryFrom<GethTrace> for CallFrame {
 impl TryFrom<GethTrace> for FourByteFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<FourByteFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::FourByteTracer(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -209,7 +209,7 @@ impl TryFrom<GethTrace> for FourByteFrame {
 impl TryFrom<GethTrace> for PreStateFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<PreStateFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::PreStateTracer(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -220,7 +220,7 @@ impl TryFrom<GethTrace> for PreStateFrame {
 impl TryFrom<GethTrace> for NoopFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<NoopFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::NoopTracer(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -231,7 +231,7 @@ impl TryFrom<GethTrace> for NoopFrame {
 impl TryFrom<GethTrace> for MuxFrame {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<MuxFrame, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::MuxTracer(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
@@ -242,7 +242,7 @@ impl TryFrom<GethTrace> for MuxFrame {
 impl TryFrom<GethTrace> for serde_json::Value {
     type Error = ConversionError;
 
-    fn try_from(value: GethTrace) -> Result<serde_json::Value, ConversionError> {
+    fn try_from(value: GethTrace) -> Result<Self, ConversionError> {
         match value {
             GethTrace::JS(inner) => Ok(inner),
             _ => Err(ConversionError::UnexpectedTracer(value)),
