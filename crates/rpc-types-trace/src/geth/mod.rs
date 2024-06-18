@@ -132,7 +132,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [DefaultFrame]
     pub fn try_into_default(self) -> Result<DefaultFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::Default(inner) => Ok(inner),
+            Self::Default(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -140,7 +140,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [CallFrame]
     pub fn try_into_call(self) -> Result<CallFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::CallTracer(inner) => Ok(inner),
+            Self::CallTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -148,7 +148,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [FourByteFrame]
     pub fn try_into_four_byte(self) -> Result<FourByteFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::FourByteTracer(inner) => Ok(inner),
+            Self::FourByteTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -156,7 +156,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [PreStateFrame]
     pub fn try_into_pre_state(self) -> Result<PreStateFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::PreStateTracer(inner) => Ok(inner),
+            Self::PreStateTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -164,7 +164,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [NoopFrame]
     pub fn try_into_noop(self) -> Result<NoopFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::NoopTracer(inner) => Ok(inner),
+            Self::NoopTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -172,7 +172,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [MuxFrame]
     pub fn try_into_mux(self) -> Result<MuxFrame, UnexpectedTracerError> {
         match self {
-            GethTrace::MuxTracer(inner) => Ok(inner),
+            Self::MuxTracer(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
@@ -180,7 +180,7 @@ impl GethTrace {
     /// Try to convert the inner tracer to [serde_json::Value]
     pub fn try_into_js(self) -> Result<serde_json::Value, UnexpectedTracerError> {
         match self {
-            GethTrace::JS(inner) => Ok(inner),
+            Self::JS(inner) => Ok(inner),
             _ => Err(UnexpectedTracerError(self)),
         }
     }
