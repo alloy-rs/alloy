@@ -7,7 +7,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use alloy_primitives::{BlockHash, ChainId, TxHash, B256, U256};
-use serde::{de::Error, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 
 /// Represents the params to set forking which can take various forms:
@@ -192,24 +192,26 @@ impl<'a> serde::Deserialize<'a> for Index {
 
             fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
             where
-                E: Error,
+                E: serde::de::Error,
             {
                 Ok(Index(value as usize))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where
-                E: Error,
+                E: serde::de::Error,
             {
                 value.strip_prefix("0x").map_or_else(
                     || {
                         value.parse::<usize>().map(Index).map_err(|e| {
-                            Error::custom(format!("Failed to parse numeric index: {e}"))
+                            serde::de::Error::custom(format!("Failed to parse numeric index: {e}"))
                         })
                     },
                     |val| {
                         usize::from_str_radix(val, 16).map(Index).map_err(|e| {
-                            Error::custom(format!("Failed to parse hex encoded index value: {e}"))
+                            serde::de::Error::custom(format!(
+                                "Failed to parse hex encoded index value: {e}"
+                            ))
                         })
                     },
                 )
@@ -217,7 +219,7 @@ impl<'a> serde::Deserialize<'a> for Index {
 
             fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
             where
-                E: Error,
+                E: serde::de::Error,
             {
                 self.visit_str(value.as_ref())
             }
