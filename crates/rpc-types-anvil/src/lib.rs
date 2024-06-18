@@ -31,7 +31,7 @@ impl<'de> serde::Deserialize<'de> for Forking {
         #[serde(rename_all = "camelCase")]
         struct ForkOpts {
             json_rpc_url: Option<String>,
-            #[serde(default, with = "alloy_serde::num::u64_opt_via_ruint")]
+            #[serde(default, with = "alloy_serde::quantity::opt")]
             block_number: Option<u64>,
         }
 
@@ -147,15 +147,14 @@ pub enum MineOptions {
     /// The options for mining
     Options {
         /// The timestamp the block should be mined with
-        #[serde(with = "alloy_serde::num::u64_opt_via_ruint")]
+        #[serde(with = "alloy_serde::quantity::opt")]
         timestamp: Option<u64>,
         /// If `blocks` is given, it will mine exactly blocks number of blocks, regardless of any
         /// other blocks mined or reverted during it's operation
-        #[serde(with = "alloy_serde::num::u64_opt_via_ruint")]
         blocks: Option<u64>,
     },
     /// The timestamp the block should be mined with
-    #[serde(with = "alloy_serde::num::u64_opt_via_ruint")]
+    #[serde(with = "alloy_serde::quantity::opt")]
     Timestamp(Option<u64>),
 }
 
@@ -322,7 +321,7 @@ mod tests {
             MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
         );
 
-        let data = r#"{"timestamp": "0x608f3d00", "blocks": "0xa"}"#;
+        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
         let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
         assert_eq!(
             deserialized,
