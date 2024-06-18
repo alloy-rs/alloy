@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
 
+### Features
+
+- Add `FilterChanges::is_empty` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+- Add `FilterChanges::is_logs` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+- Add `FilterChanges::is_hashes` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+- Add `FilterChanges::is_transactions` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+
 ## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
 ### Dependencies
