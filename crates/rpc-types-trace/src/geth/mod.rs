@@ -835,7 +835,7 @@ mod tests {
     fn test_inner_try_from_geth_trace_wrong_tracer() {
         let geth_trace = GethTrace::Default(DefaultFrame::default());
         let inner = CallFrame::try_from(geth_trace);
-        assert!(!inner.is_ok());
+        assert!(inner.is_err());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
 
@@ -874,7 +874,7 @@ mod tests {
     fn test_geth_trace_into_tracer_wrong_tracer() {
         let geth_trace = GethTrace::Default(DefaultFrame::default());
         let inner = geth_trace.try_into_call();
-        assert!(!inner.is_ok());
+        assert!(inner.is_err());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
 }
