@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
 
+### Changes
+
+- Replace `FilterBlockOption::set_from_block` with `FilterBlockOption::with_from_block` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+- Replace `FilterBlockOption::set_from_block` with `FilterBlockOption::set_to_block` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+- Replace `FilterBlockOption::set_hash` with  `FilterBlockOption::with_block_hash` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+
 ### Features
 
 - Add `FilterChanges::is_empty` ([#923](https://github.com/alloy-rs/alloy/issues/923))
@@ -17,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ValueOrArray::as_array` ([#924](https://github.com/alloy-rs/alloy/issues/924))
 - Add `ValueOrArray::is_value` ([#924](https://github.com/alloy-rs/alloy/issues/924))
 - Add `ValueOrArray::is_array` ([#924](https://github.com/alloy-rs/alloy/issues/924))
+- Add `FilterBlockOption::as_block_hash` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+- Add `FilterBlockOption::is_range` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+- Add `FilterBlockOption::is_block_hash` ([#927](https://github.com/alloy-rs/alloy/issues/927))
 
 ## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
