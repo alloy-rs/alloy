@@ -221,45 +221,29 @@ impl FilterBlockOption {
         matches!(self, Self::AtBlockHash(_))
     }
 
-    /// Sets the block number this range filter should start at.
-    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Result<Self, FilterBlockError> {
+    /// Ensure block range validity
+    pub fn ensure_block_range(&self) -> Result<(), FilterBlockError> {
         // Check if from_block is greater than to_block
-        if self
-            .get_to_block()
-            .and_then(|to| to.as_number())
-            .zip(block.as_number())
-            .map_or(false, |(to, from)| from > to)
-        {
-            return Err(FilterBlockError::FromBlockGreaterThanToBlock);
+        if let (Some(from), Some(to)) = (
+            self.get_from_block().as_ref().and_then(|from| from.as_number()),
+            self.get_to_block().as_ref().and_then(|to| to.as_number()),
+        ) {
+            if from > to {
+                return Err(FilterBlockError::FromBlockGreaterThanToBlock);
+            }
         }
-
-        Ok(Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() })
-    }
-
-    /// Sets the block number this range filter should end at.
-    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Result<Self, FilterBlockError> {
-        // Check if to_block is less than from_block
-        if self
-            .get_from_block()
-            .and_then(|from| from.as_number())
-            .zip(block.as_number())
-            .map_or(false, |(from, to)| to < from)
-        {
-            return Err(FilterBlockError::ToBlockLessThanFromBlock);
-        }
-
-        Ok(Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) })
+        Ok(())
     }
 
     /// Sets the block number this range filter should start at.
     #[must_use]
-    pub fn with_from_block_unchecked(&self, block: BlockNumberOrTag) -> Self {
+    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
     }
 
     /// Sets the block number this range filter should end at.
     #[must_use]
-    pub fn with_to_block_unchecked(&self, block: BlockNumberOrTag) -> Self {
+    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
         Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
     }
 
@@ -413,14 +397,14 @@ impl Filter {
     /// Sets the from block number
     #[must_use]
     pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.with_from_block_unchecked(block.into());
+        self.block_option = self.block_option.with_from_block(block.into());
         self
     }
 
     /// Sets the to block number
     #[must_use]
     pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.with_to_block_unchecked(block.into());
+        self.block_option = self.block_option.with_to_block(block.into());
         self
     }
 
@@ -1194,20 +1178,14 @@ mod tests {
     }
 
     #[test]
-    fn test_with_from_block_success() {
+    fn test_with_from_block_correct_range() {
         // Test scenario where from_block is less than to_block
         let original = FilterBlockOption::Range {
             from_block: Some(BlockNumberOrTag::Number(1)),
             to_block: Some(BlockNumberOrTag::Number(10)),
         };
-        let updated = original.with_from_block(BlockNumberOrTag::Number(5)).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, Some(BlockNumberOrTag::Number(5)));
-                assert_eq!(to_block, Some(BlockNumberOrTag::Number(10)));
-            }
-            _ => panic!("Expected Range variant"),
-        }
+        let updated = original.with_from_block(BlockNumberOrTag::Number(5));
+        assert!(updated.ensure_block_range().is_ok());
     }
 
     #[test]
@@ -1217,108 +1195,11 @@ mod tests {
             from_block: Some(BlockNumberOrTag::Number(10)),
             to_block: Some(BlockNumberOrTag::Number(5)),
         };
-        assert_eq!(
-            original.with_from_block(BlockNumberOrTag::Number(6)),
+
+        assert!(matches!(
+            original.ensure_block_range(),
             Err(FilterBlockError::FromBlockGreaterThanToBlock)
-        );
-    }
-
-    #[test]
-    fn test_with_from_block_no_to_block() {
-        // Test scenario where there is no to_block
-        let original = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Number(1)),
-            to_block: None,
-        };
-        let updated = original.with_from_block(BlockNumberOrTag::Number(5)).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, Some(BlockNumberOrTag::Number(5)));
-                assert_eq!(to_block, None);
-            }
-            _ => panic!("Expected Range variant"),
-        }
-    }
-
-    #[test]
-    fn test_with_from_block_with_non_numeric_blocks() {
-        // Test scenario where from_block and to_block are non-numeric
-        let original = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Earliest),
-            to_block: Some(BlockNumberOrTag::Latest),
-        };
-        let updated = original.with_from_block(BlockNumberOrTag::Pending).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, Some(BlockNumberOrTag::Pending));
-                assert_eq!(to_block, Some(BlockNumberOrTag::Latest));
-            }
-            _ => panic!("Expected Range variant"),
-        }
-    }
-
-    #[test]
-    fn test_with_to_block_success() {
-        // Test scenario where to_block is greater than from_block
-        let original = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Number(1)),
-            to_block: Some(BlockNumberOrTag::Number(10)),
-        };
-        let updated = original.with_to_block(BlockNumberOrTag::Number(15)).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, Some(BlockNumberOrTag::Number(1)));
-                assert_eq!(to_block, Some(BlockNumberOrTag::Number(15)));
-            }
-            _ => panic!("Expected Range variant"),
-        }
-    }
-
-    #[test]
-    fn test_with_to_block_failure() {
-        // Test scenario where to_block is less than from_block
-        let original = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Number(10)),
-            to_block: Some(BlockNumberOrTag::Number(15)),
-        };
-        assert_eq!(
-            original.with_to_block(BlockNumberOrTag::Number(5)),
-            Err(FilterBlockError::ToBlockLessThanFromBlock)
-        );
-    }
-
-    #[test]
-    fn test_with_to_block_no_from_block() {
-        // Test scenario where there is no from_block
-        let original = FilterBlockOption::Range {
-            from_block: None,
-            to_block: Some(BlockNumberOrTag::Number(10)),
-        };
-        let updated = original.with_to_block(BlockNumberOrTag::Number(5)).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, None);
-                assert_eq!(to_block, Some(BlockNumberOrTag::Number(5)));
-            }
-            _ => panic!("Expected Range variant"),
-        }
-    }
-
-    #[test]
-    fn test_with_to_block_with_non_numeric_blocks() {
-        // Test scenario where from_block and to_block are non-numeric
-        let original = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Earliest),
-            to_block: Some(BlockNumberOrTag::Latest),
-        };
-        let updated = original.with_to_block(BlockNumberOrTag::Pending).unwrap();
-        match updated {
-            FilterBlockOption::Range { from_block, to_block } => {
-                assert_eq!(from_block, Some(BlockNumberOrTag::Earliest));
-                assert_eq!(to_block, Some(BlockNumberOrTag::Pending));
-            }
-            _ => panic!("Expected Range variant"),
-        }
+        ));
     }
 
     #[test]
