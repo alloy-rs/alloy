@@ -128,6 +128,64 @@ pub enum GethTrace {
     JS(serde_json::Value),
 }
 
+impl GethTrace {
+    /// Try to convert the inner tracer to [DefaultFrame]
+    pub fn try_into_default(self) -> Result<DefaultFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::Default(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [CallFrame]
+    pub fn try_into_call(self) -> Result<CallFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::CallTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [FourByteFrame]
+    pub fn try_into_four_byte(self) -> Result<FourByteFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::FourByteTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [PreStateFrame]
+    pub fn try_into_pre_state(self) -> Result<PreStateFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::PreStateTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [NoopFrame]
+    pub fn try_into_noop(self) -> Result<NoopFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::NoopTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [MuxFrame]
+    pub fn try_into_mux(self) -> Result<MuxFrame, UnexpectedTracerError> {
+        match self {
+            GethTrace::MuxTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [serde_json::Value]
+    pub fn try_into_js(self) -> Result<serde_json::Value, UnexpectedTracerError> {
+        match self {
+            GethTrace::JS(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+}
+
 impl Default for GethTrace {
     fn default() -> Self {
         Self::Default(DefaultFrame::default())
@@ -777,6 +835,45 @@ mod tests {
     fn test_inner_try_from_geth_trace_wrong_tracer() {
         let geth_trace = GethTrace::Default(DefaultFrame::default());
         let inner = CallFrame::try_from(geth_trace);
+        assert!(!inner.is_ok());
+        assert!(matches!(inner, Err(UnexpectedTracerError(_))));
+    }
+
+    #[test]
+    fn test_geth_trace_into_tracer() {
+        let geth_trace = GethTrace::Default(DefaultFrame::default());
+        let inner = geth_trace.try_into_default();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::CallTracer(CallFrame::default());
+        let inner = geth_trace.try_into_call();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::FourByteTracer(FourByteFrame::default());
+        let inner = geth_trace.try_into_four_byte();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::PreStateTracer(PreStateFrame::Default(PreStateMode::default()));
+        let inner = geth_trace.try_into_pre_state();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::NoopTracer(NoopFrame::default());
+        let inner = geth_trace.try_into_noop();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
+        let inner = geth_trace.try_into_mux();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::JS(serde_json::Value::Null);
+        let inner = geth_trace.try_into_js();
+        assert!(inner.is_ok());
+    }
+
+    #[test]
+    fn test_geth_trace_into_tracer_wrong_tracer() {
+        let geth_trace = GethTrace::Default(DefaultFrame::default());
+        let inner = geth_trace.try_into_call();
         assert!(!inner.is_ok());
         assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
