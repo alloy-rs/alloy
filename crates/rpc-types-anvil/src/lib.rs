@@ -228,20 +228,65 @@ impl<'a> serde::Deserialize<'a> for Index {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
-    fn serde_forking() {
-        let s = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com",
-        "blockNumber": "18441649"
-      }
-    }"#;
-        let f: Forking = serde_json::from_str(s).unwrap();
+    fn test_forking_deserialization() {
+        let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com","blockNumber": "18441649"}}"#;
+        let deserialized: Forking = serde_json::from_str(json_data).unwrap();
         assert_eq!(
-            f,
+            deserialized,
             Forking {
                 json_rpc_url: Some("https://ethereumpublicnode.com".into()),
                 block_number: Some(18441649)
             }
         );
+    }
+
+    #[test]
+    fn test_index_deserialization() {
+        // Test decimal index
+        let json_data = json!(42);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize decimal index");
+        assert_eq!(index, Index(42));
+
+        // Test hex index
+        let json_data = json!("0x2A");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize hex index");
+        assert_eq!(index, Index(42));
+
+        // Test invalid hex index
+        let json_data = json!("0xGHI");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test invalid decimal index
+        let json_data = json!("abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test string decimal index
+        let json_data = json!("123");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize string decimal index");
+        assert_eq!(index, Index(123));
+
+        // Test invalid numeric string
+        let json_data = json!("123abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test negative index
+        let json_data = json!(-1);
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test large index
+        let json_data = json!(u64::MAX);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize large index");
+        assert_eq!(index, Index(u64::MAX as usize));
     }
 }
