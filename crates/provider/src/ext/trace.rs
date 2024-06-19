@@ -3,8 +3,9 @@ use crate::{Provider, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_trace::parity::{
-    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
+use alloy_rpc_types_trace::{
+    filter::TraceFilter,
+    parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -55,6 +56,12 @@ where
         data: &[u8],
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults>;
+
+    /// Traces matching given filter.
+    async fn trace_filter(
+        &self,
+        tracer: &TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Trace all transactions in the given block.
     ///
@@ -118,6 +125,13 @@ where
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults> {
         self.client().request("trace_rawTransaction", (data, trace_type)).await
+    }
+
+    async fn trace_filter(
+        &self,
+        tracer: &TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+        self.client().request("trace_filter", (tracer,)).await
     }
 
     async fn trace_block(
