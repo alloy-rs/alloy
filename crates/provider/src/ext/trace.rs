@@ -3,8 +3,9 @@ use crate::{Provider, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_trace::parity::{
-    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
+use alloy_rpc_types_trace::{
+    filter::TraceFilter,
+    parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
 use alloy_transport::{Transport, TransportResult};
 
