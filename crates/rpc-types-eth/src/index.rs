@@ -92,6 +92,7 @@ impl<'a> Deserialize<'a> for Index {
 mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
+    use serde_json::json;
 
     #[test]
     fn test_serde_index_rand() {
@@ -102,5 +103,52 @@ mod tests {
             let de: Index = serde_json::from_str(&val).unwrap();
             assert_eq!(index, de);
         }
+    }
+
+    #[test]
+    fn test_serde_index_deserialization() {
+        // Test decimal index
+        let json_data = json!(42);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize decimal index");
+        assert_eq!(index, Index::from(42));
+
+        // Test hex index
+        let json_data = json!("0x2A");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize hex index");
+        assert_eq!(index, Index::from(42));
+
+        // Test invalid hex index
+        let json_data = json!("0xGHI");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test invalid decimal index
+        let json_data = json!("abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test string decimal index
+        let json_data = json!("123");
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize string decimal index");
+        assert_eq!(index, Index::from(123));
+
+        // Test invalid numeric string
+        let json_data = json!("123abc");
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test negative index
+        let json_data = json!(-1);
+        let result: Result<Index, _> = serde_json::from_value(json_data);
+        assert!(result.is_err());
+
+        // Test large index
+        let json_data = json!(u64::MAX);
+        let index: Index =
+            serde_json::from_value(json_data).expect("Failed to deserialize large index");
+        assert_eq!(index, Index::from(u64::MAX as usize));
     }
 }
