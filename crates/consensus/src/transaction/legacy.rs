@@ -250,7 +250,6 @@ impl SignableTransaction<Signature> for TxLegacy {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
-        debug_assert_eq!(signature.v().chain_id(), self.chain_id);
         let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature));
         self.encode_with_signature_fields(&signature, &mut buf);
         let hash = keccak256(&buf);
