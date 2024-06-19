@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
 
+- Add `try_into_{variant}()` for all inner `GethTrace` variants ([#929](https://github.com/alloy-rs/alloy/issues/929))
+
+
 ## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
 
 ### Features
