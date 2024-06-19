@@ -5,9 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
+## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
-## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
+### Documentation
+
+- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+
+### Miscellaneous Tasks
+
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Features
 
@@ -19,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Add rpc types beacon pkg description
 - [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
 
 ### Other

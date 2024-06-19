@@ -5,10 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/...HEAD)
+## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
+
+### Dependencies
+
+- Relax version in workspace dependencies ([#940](https://github.com/alloy-rs/alloy/issues/940))
+
+### Documentation
+
+- Update alloy-eips supported eip list ([#942](https://github.com/alloy-rs/alloy/issues/942))
+- Update get_balance docs ([#938](https://github.com/alloy-rs/alloy/issues/938))
+- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+
+### Features
+
+- Add TryFrom for GethTrace for all inner variants ([#933](https://github.com/alloy-rs/alloy/issues/933))
+- [genesis] Update `extra_fields` to use `OtherFields` ([#936](https://github.com/alloy-rs/alloy/issues/936))
+- [rpc-types-anvil] Add `Index`, fix compatibility ([#931](https://github.com/alloy-rs/alloy/issues/931))
+- Add trace_raw_transaction and trace_replay_block_transactions ([#925](https://github.com/alloy-rs/alloy/issues/925))
+- Add `is_` and `as_` utils for `FilterBlockOption` ([#927](https://github.com/alloy-rs/alloy/issues/927))
+- [provider] Support ethCall optional blockId serialization ([#900](https://github.com/alloy-rs/alloy/issues/900))
+- Add utils to `ValueOrArray` ([#924](https://github.com/alloy-rs/alloy/issues/924))
+- Add `is_` utils to `FilterChanges` ([#923](https://github.com/alloy-rs/alloy/issues/923))
+- Add eip-7251 consolidation request ([#919](https://github.com/alloy-rs/alloy/issues/919))
+- Add `BlockId::as_u64` ([#916](https://github.com/alloy-rs/alloy/issues/916))
+
+### Miscellaneous Tasks
+
+- [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
+- Update eip-2935 bytecode and address ([#934](https://github.com/alloy-rs/alloy/issues/934))
+- Don't self-host documentation anymore ([#920](https://github.com/alloy-rs/alloy/issues/920))
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Use 'dep:' syntax in rpc-types ([#921](https://github.com/alloy-rs/alloy/issues/921))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
+- Remove bad serde default and replace with manual default for chainconfig ([#915](https://github.com/alloy-rs/alloy/issues/915))
 - [contract] Set `to` when calling with ContractInstance ([#913](https://github.com/alloy-rs/alloy/issues/913))
 - Downgrade tokio-tungstenite ([#881](https://github.com/alloy-rs/alloy/issues/881))
 - Make test compile ([#873](https://github.com/alloy-rs/alloy/issues/873))
@@ -412,6 +448,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.1
+- Add rpc types beacon pkg description
 - [clippy] Apply lint suggestions ([#903](https://github.com/alloy-rs/alloy/issues/903))
 - [alloy] Add link to book and alloy ([#891](https://github.com/alloy-rs/alloy/issues/891))
 - [general] Add release configuration ([#888](https://github.com/alloy-rs/alloy/issues/888))

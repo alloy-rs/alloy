@@ -5,13 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/alloy-rs/alloy/compare/v0.1.1...HEAD)
+## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
-### Changes
+### Documentation
 
-- Updated EIP-2935 address and bytecode in line with latest EIP changes ([#934](https://github.com/alloy-rs/alloy/issues/934))
+- Update alloy-eips supported eip list ([#942](https://github.com/alloy-rs/alloy/issues/942))
+- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
 
-## [0.1.1](https://github.com/alloy-rs/alloy/tree/v0.1.1)
+### Features
+
+- Add eip-7251 consolidation request ([#919](https://github.com/alloy-rs/alloy/issues/919))
+- Add `BlockId::as_u64` ([#916](https://github.com/alloy-rs/alloy/issues/916))
+
+### Miscellaneous Tasks
+
+- Update eip-2935 bytecode and address ([#934](https://github.com/alloy-rs/alloy/issues/934))
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
 
 ### Bug Fixes
 
