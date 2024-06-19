@@ -56,6 +56,12 @@ where
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults>;
 
+    /// Traces matching given filter.
+    async fn trace_filter(
+        &self,
+        tracer: TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
+
     /// Trace all transactions in the given block.
     ///
     /// # Note
@@ -110,6 +116,13 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.client().request("trace_transaction", (hash,)).await
+    }
+
+    async fn trace_filter(
+        &self,
+        tracer: TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+        self.client().request("trace_filter", (tracer,)).await
     }
 
     async fn trace_raw_transaction(
