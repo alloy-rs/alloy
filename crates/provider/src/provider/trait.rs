@@ -464,6 +464,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getFilterChanges", (id,)).await
     }
 
+    /// Traces matching given filter.
+    async fn trace_filter(
+        &self,
+        tracer: TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+        self.client().request("trace_filter", (tracer,)).await
+    }
+
     /// Get a list of values that have been added since the last poll.
     ///
     /// This returns an enum over all possible return values. You probably want to use
