@@ -91,7 +91,7 @@ impl SignedAuthorization<Signature> {
     ///
     /// Implementers should check that the authority has no code.
     pub fn recover_authority(&self) -> Result<Address, SignatureError> {
-        self.signature.recover_address_from_prehash(&self.inner.authority_prehash())
+        self.signature.recover_address_from_prehash(&self.inner.signature_hash())
     }
 }
 
