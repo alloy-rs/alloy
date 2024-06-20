@@ -99,7 +99,7 @@ tokio-util = "0.7"
 tokio-stream = "0.1"
 rustls = { version = "0.23", default-features = false, features = [
     "std",
-    "tls12",
+    # "tls12",
 ] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.23"
