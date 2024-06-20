@@ -25,12 +25,12 @@ impl Authorization {
     /// # Note
     ///
     /// Implementers should check that this matches the current `chain_id` *or* is 0.
-    pub fn chain_id(&self) -> ChainId {
+    pub const fn chain_id(&self) -> ChainId {
         self.chain_id
     }
 
     /// Get the `address` for the authorization.
-    pub fn address(&self) -> &Address {
+    pub const fn address(&self) -> &Address {
         &self.address
     }
 
@@ -45,7 +45,7 @@ impl Authorization {
     }
 
     /// Get the `signature` for the authorization.
-    pub fn signature(&self) -> &Signature {
+    pub const fn signature(&self) -> &Signature {
         &self.signature
     }
 
