@@ -110,7 +110,7 @@ impl<S> Deref for SignedAuthorization<S> {
 /// nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
 ///
 /// The wrapper type is used for RLP encoding and decoding.
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct OptionalNonce(Option<u64>);
 
 impl OptionalNonce {
