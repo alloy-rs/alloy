@@ -54,6 +54,7 @@ impl Authorization {
     ///
     /// The authority prehash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
     #[inline]
+    #[cfg(feature = "k256")]
     fn authority_prehash(&self) -> B256 {
         #[derive(RlpEncodable)]
         struct Auth {
@@ -75,6 +76,7 @@ impl Authorization {
     /// # Note
     ///
     /// Implementers should check that the authority has no code.
+    #[cfg(feature = "k256")]
     pub fn recover_authority(&self) -> Result<Address, SignatureError> {
         self.signature.recover_address_from_prehash(&self.authority_prehash())
     }
