@@ -140,11 +140,18 @@ impl Encodable for OptionalNonce {
 
 impl Decodable for OptionalNonce {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let list: Vec<u64> = Vec::decode(buf)?;
-        if list.len() > 1 {
+        let mut bytes = Header::decode_bytes(buf, true)?;
+        if bytes.is_empty() {
+            return Ok(Self(None));
+        }
+
+        let payload_view = &mut bytes;
+        let nonce = u64::decode(payload_view)?;
+        if !payload_view.is_empty() {
+            // if there's more than 1 item in the nonce list we error
             Err(alloy_rlp::Error::UnexpectedLength)
         } else {
-            Ok(Self(list.first().copied()))
+            Ok(Self(Some(nonce)))
         }
     }
 }
