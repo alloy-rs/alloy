@@ -3,15 +3,16 @@ use core::ops::Deref;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use alloy_primitives::{keccak256, Address, ChainId, B256};
-#[cfg(feature = "k256")]
-use alloy_primitives::{Signature, SignatureError};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
 
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
 pub struct Authorization {
+    /// The chain ID of the authorization.
     pub chain_id: ChainId,
+    /// The address of the authorization.
     pub address: Address,
+    /// The nonce for the authorization.
     pub nonce: OptionalNonce,
 }
 
@@ -84,13 +85,13 @@ impl<S> SignedAuthorization<S> {
 }
 
 #[cfg(feature = "k256")]
-impl SignedAuthorization<Signature> {
+impl SignedAuthorization<alloy_primitives::Signature> {
     /// Recover the authority for the authorization.
     ///
     /// # Note
     ///
     /// Implementers should check that the authority has no code.
-    pub fn recover_authority(&self) -> Result<Address, SignatureError> {
+    pub fn recover_authority(&self) -> Result<Address, alloy_primitives::SignatureError> {
         self.signature.recover_address_from_prehash(&self.inner.signature_hash())
     }
 }
