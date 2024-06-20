@@ -36,7 +36,8 @@ impl Authorization {
     ///
     /// # Note
     ///
-    /// If this is `Some`, implementers should check that the nonce of the authority (see [`Self::recover_authority`]) is equal to this nonce.
+    /// If this is `Some`, implementers should check that the nonce of the authority (see
+    /// [`Self::recover_authority`]) is equal to this nonce.
     pub fn nonce(&self) -> Option<u64> {
         *self.nonce
     }
@@ -46,7 +47,8 @@ impl Authorization {
         &self.signature
     }
 
-    /// Computes the authority prehash used to recover the authority from an authorization list item.
+    /// Computes the authority prehash used to recover the authority from an authorization list
+    /// item.
     ///
     /// The authority prehash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
     #[inline]
@@ -78,7 +80,8 @@ impl Authorization {
 
 /// An internal wrapper around an `Option<u64>` for optional nonces.
 ///
-/// In EIP-7702 the nonce is encoded as a list of either 0 or 1 items, where 0 items means that no nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
+/// In EIP-7702 the nonce is encoded as a list of either 0 or 1 items, where 0 items means that no
+/// nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
 ///
 /// The wrapper type is used for RLP encoding and decoding.
 #[derive(Debug, Copy, Clone)]
