@@ -7,9 +7,6 @@ use alloy_primitives::{keccak256, SignatureError, B256};
 use alloy_primitives::{Address, ChainId, Signature};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable};
 
-/// An EIP-7702 authorization list.
-pub type AuthorizationList = Vec<Authorization>;
-
 /// An EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable)]
 pub struct Authorization {
