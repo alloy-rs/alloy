@@ -64,7 +64,7 @@ impl Authorization {
     }
 
     /// Convert to a signed authorization by adding a signature.
-    pub fn into_signed<S>(self, signature: S) -> SignedAuthorization<S> {
+    pub const fn into_signed<S>(self, signature: S) -> SignedAuthorization<S> {
         SignedAuthorization { inner: self, signature }
     }
 }
