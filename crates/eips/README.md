@@ -18,3 +18,4 @@ Contains constants, helpers, and basic data structures for consensus EIPs.
 - [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002)
 - [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251)
 - [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685)
+- [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)
