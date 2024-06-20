@@ -22,16 +22,15 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 
-sha2.workspace = true
-
 # serde
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 # kzg
-derive_more = { workspace = true, optional = true }
 c-kzg = { workspace = true, optional = true }
+derive_more = { workspace = true, optional = true }
 once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
+sha2 = { workspace = true, optional = true }
 
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
@@ -54,7 +53,7 @@ proptest-derive.workspace = true
 serde_json.workspace = true
 
 [features]
-default = ["std"]
+default = ["std", "kzg-sidecar"]
 std = [
     "alloy-primitives/std",
     "alloy-rlp/std",
@@ -68,7 +67,9 @@ serde = [
     "alloy-primitives/serde",
     "c-kzg?/serde",
 ]
-kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg-sidecar = ["sha2"]
+sha2 = ["dep:sha2"]
 ssz = [
     "std",
     "dep:ethereum_ssz",
@@ -77,9 +78,10 @@ ssz = [
 ]
 arbitrary = [
     "std",
+    "kzg-sidecar",
     "dep:arbitrary",
     "dep:proptest-derive",
     "dep:proptest",
     "alloy-primitives/arbitrary",
-    "alloy-serde/arbitrary",
+    "alloy-serde?/arbitrary",
 ]
