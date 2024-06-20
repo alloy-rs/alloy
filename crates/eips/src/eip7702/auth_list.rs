@@ -1,5 +1,7 @@
 use core::ops::Deref;
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 use alloy_primitives::{keccak256, Address, ChainId, Signature, SignatureError, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable};
 
