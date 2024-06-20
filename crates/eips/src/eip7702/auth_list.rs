@@ -2,18 +2,17 @@ use core::ops::Deref;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use alloy_primitives::{keccak256, Address, ChainId, B256};
 #[cfg(feature = "k256")]
-use alloy_primitives::{keccak256, SignatureError, B256};
-use alloy_primitives::{Address, ChainId, Signature};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable};
+use alloy_primitives::{Signature, SignatureError};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
 
-/// An EIP-7702 authorization.
-#[derive(Debug, Clone, RlpEncodable)]
+/// An unsigned EIP-7702 authorization.
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
 pub struct Authorization {
     chain_id: ChainId,
     address: Address,
     nonce: OptionalNonce,
-    signature: Signature,
 }
 
 impl Authorization {
@@ -41,18 +40,12 @@ impl Authorization {
         *self.nonce
     }
 
-    /// Get the `signature` for the authorization.
-    pub const fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    /// Computes the authority prehash used to recover the authority from an authorization list
+    /// Computes the signature hash used to sign the authorization, or recover the authority from a signed authorization list
     /// item.
     ///
-    /// The authority prehash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
+    /// The signature hash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
     #[inline]
-    #[cfg(feature = "k256")]
-    fn authority_prehash(&self) -> B256 {
+    pub fn signature_hash(&self) -> B256 {
         use super::constants::MAGIC;
 
         #[derive(RlpEncodable)]
@@ -70,14 +63,43 @@ impl Authorization {
         keccak256(buf)
     }
 
+    /// Convert to a signed authorization by adding a signature.
+    pub fn into_signed<S>(self, signature: S) -> SignedAuthorization<S> {
+        SignedAuthorization { inner: self, signature }
+    }
+}
+
+/// A signed EIP-7702 authorization.
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
+pub struct SignedAuthorization<S> {
+    inner: Authorization,
+    signature: S,
+}
+
+impl<S> SignedAuthorization<S> {
+    /// Get the `signature` for the authorization.
+    pub const fn signature(&self) -> &S {
+        &self.signature
+    }
+}
+
+#[cfg(feature = "k256")]
+impl SignedAuthorization<Signature> {
     /// Recover the authority for the authorization.
     ///
     /// # Note
     ///
     /// Implementers should check that the authority has no code.
-    #[cfg(feature = "k256")]
     pub fn recover_authority(&self) -> Result<Address, SignatureError> {
-        self.signature.recover_address_from_prehash(&self.authority_prehash())
+        self.signature.recover_address_from_prehash(&self.inner.authority_prehash())
+    }
+}
+
+impl<S> Deref for SignedAuthorization<S> {
+    type Target = Authorization;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
