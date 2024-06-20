@@ -21,11 +21,11 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
-alloy-serde.workspace = true
 
 sha2.workspace = true
 
 # serde
+alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 # kzg
@@ -62,7 +62,12 @@ std = [
     "c-kzg?/std",
     "once_cell?/std",
 ]
-serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
+serde = [
+    "dep:alloy-serde",
+    "dep:serde",
+    "alloy-primitives/serde",
+    "c-kzg?/serde",
+]
 kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 ssz = [
     "std",
