@@ -139,7 +139,7 @@ impl<T, N> Clone for RootProviderInner<T, N> {
 }
 
 impl<T, N> RootProviderInner<T, N> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
+    pub(crate) const fn new(client: RpcClient<T>) -> Self {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
     }
 

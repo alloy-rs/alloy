@@ -18,11 +18,10 @@ use tokio::sync::Mutex;
 ///
 /// # Note
 ///
-/// - If the transaction request does not have a sender set, this layer will
-///  not fill nonces.
-/// - Using two providers with their own nonce layer can potentially fill
-///  invalid nonces if transactions are sent from the same address, as the next
-///  nonce to be used is cached internally in the layer.
+/// - If the transaction request does not have a sender set, this layer will not fill nonces.
+/// - Using two providers with their own nonce layer can potentially fill invalid nonces if
+///   transactions are sent from the same address, as the next nonce to be used is cached internally
+///   in the layer.
 ///
 /// # Example
 ///

@@ -35,8 +35,8 @@ pub struct OtherFields {
 }
 
 impl OtherFields {
-    /// Creates a new instance
-    pub fn new(inner: BTreeMap<String, serde_json::Value>) -> Self {
+    /// Creates a new [`OtherFields`] instance.
+    pub const fn new(inner: BTreeMap<String, serde_json::Value>) -> Self {
         Self { inner }
     }
 

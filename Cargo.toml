@@ -13,18 +13,19 @@ repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/"]
 
 [workspace.lints]
-rust.missing_debug_implementations = "warn"
-rust.missing_docs = "warn"
-rust.unreachable_pub = "warn"
-rust.unused_must_use = "deny"
-rust.rust_2018_idioms = "deny"
+rust.missing-debug-implementations = "warn"
+rust.missing-docs = "warn"
+rust.unreachable-pub = "warn"
+rust.unused-must-use = "deny"
+rust.rust-2018-idioms = "deny"
 rustdoc.all = "warn"
 
 [workspace.lints.clippy]
 all = "warn"
-missing_const_for_fn = "warn"
-use_self = "warn"
-option_if_let_else = "warn"
+missing-const-for-fn = "warn"
+use-self = "warn"
+option-if-let-else = "warn"
+redundant-clone = "warn"
 
 [workspace.metadata.docs.rs]
 all-features = true

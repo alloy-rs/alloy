@@ -31,11 +31,11 @@ impl fmt::Display for PayloadId {
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
-///  - `executionPayload`: `ExecutionPayloadV1` | `ExecutionPayloadV2` where:
-///    - `ExecutionPayloadV1` **MUST** be returned if the payload `timestamp` is lower than the
-///    Shanghai timestamp
-///    - `ExecutionPayloadV2` **MUST** be returned if the payload `timestamp` is greater or equal
-///    to the Shanghai timestamp
+/// - `executionPayload`: `ExecutionPayloadV1` | `ExecutionPayloadV2` where:
+///   - `ExecutionPayloadV1` **MUST** be returned if the payload `timestamp` is lower than the
+///     Shanghai timestamp
+///   - `ExecutionPayloadV2` **MUST** be returned if the payload `timestamp` is greater or equal to
+///     the Shanghai timestamp
 ///
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
