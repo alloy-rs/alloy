@@ -141,7 +141,11 @@ impl Encodable for OptionalNonce {
 impl Decodable for OptionalNonce {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let list: Vec<u64> = Vec::decode(buf)?;
-        Ok(Self(list.first().copied()))
+        if list.len() > 1 {
+            Err(alloy_rlp::Error::UnexpectedLength)
+        } else {
+            Ok(Self(list.first().copied()))
+        }
     }
 }
 
