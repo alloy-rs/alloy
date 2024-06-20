@@ -10,9 +10,9 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
 pub struct Authorization {
-    chain_id: ChainId,
-    address: Address,
-    nonce: OptionalNonce,
+    pub chain_id: ChainId,
+    pub address: Address,
+    pub nonce: OptionalNonce,
 }
 
 impl Authorization {
@@ -110,7 +110,20 @@ impl<S> Deref for SignedAuthorization<S> {
 ///
 /// The wrapper type is used for RLP encoding and decoding.
 #[derive(Debug, Copy, Clone)]
-struct OptionalNonce(Option<u64>);
+pub struct OptionalNonce(Option<u64>);
+
+impl OptionalNonce {
+    /// Create a new [`OptionalNonce`]
+    pub fn new(nonce: Option<u64>) -> Self {
+        Self(nonce)
+    }
+}
+
+impl From<Option<u64>> for OptionalNonce {
+    fn from(value: Option<u64>) -> Self {
+        Self::new(value)
+    }
+}
 
 impl Encodable for OptionalNonce {
     fn encode(&self, out: &mut dyn BufMut) {
