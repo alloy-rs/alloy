@@ -40,8 +40,8 @@ impl Authorization {
         *self.nonce
     }
 
-    /// Computes the signature hash used to sign the authorization, or recover the authority from a signed authorization list
-    /// item.
+    /// Computes the signature hash used to sign the authorization, or recover the authority from a
+    /// signed authorization list item.
     ///
     /// The signature hash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
     #[inline]
