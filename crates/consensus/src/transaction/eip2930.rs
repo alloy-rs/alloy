@@ -225,18 +225,6 @@ impl TxEip2930 {
 }
 
 impl Transaction for TxEip2930 {
-    fn input(&self) -> &[u8] {
-        &self.input
-    }
-
-    fn to(&self) -> TxKind {
-        self.to
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
@@ -251,6 +239,18 @@ impl Transaction for TxEip2930 {
 
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 

@@ -24,7 +24,7 @@ pub const WITHDRAWAL_REQUEST_TYPE: u8 = 0x01;
 /// Represents an execution layer triggerable withdrawal request.
 ///
 /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(
@@ -35,7 +35,7 @@ pub struct WithdrawalRequest {
     /// Address of the source of the exit.
     pub source_address: Address,
     /// Validator public key.
-    pub validator_public_key: FixedBytes<48>,
+    pub validator_pubkey: FixedBytes<48>,
     /// Amount of withdrawn ether in gwei.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,

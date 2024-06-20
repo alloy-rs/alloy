@@ -2,7 +2,7 @@ use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
     Transaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType,
 };
-use alloy_primitives::TxKind;
+use alloy_primitives::{ChainId, TxKind};
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
 ///
@@ -115,12 +115,21 @@ impl TypedTransaction {
 }
 
 impl Transaction for TypedTransaction {
-    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+    fn chain_id(&self) -> Option<ChainId> {
         match self {
             Self::Legacy(tx) => tx.chain_id(),
             Self::Eip2930(tx) => tx.chain_id(),
             Self::Eip1559(tx) => tx.chain_id(),
             Self::Eip4844(tx) => tx.chain_id(),
+        }
+    }
+
+    fn nonce(&self) -> u64 {
+        match self {
+            Self::Legacy(tx) => tx.nonce(),
+            Self::Eip2930(tx) => tx.nonce(),
+            Self::Eip1559(tx) => tx.nonce(),
+            Self::Eip4844(tx) => tx.nonce(),
         }
     }
 
@@ -142,24 +151,6 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn input(&self) -> &[u8] {
-        match self {
-            Self::Legacy(tx) => tx.input(),
-            Self::Eip2930(tx) => tx.input(),
-            Self::Eip1559(tx) => tx.input(),
-            Self::Eip4844(tx) => tx.input(),
-        }
-    }
-
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.nonce(),
-            Self::Eip2930(tx) => tx.nonce(),
-            Self::Eip1559(tx) => tx.nonce(),
-            Self::Eip4844(tx) => tx.nonce(),
-        }
-    }
-
     fn to(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.to(),
@@ -176,5 +167,28 @@ impl Transaction for TypedTransaction {
             Self::Eip1559(tx) => tx.value(),
             Self::Eip4844(tx) => tx.value(),
         }
+    }
+
+    fn input(&self) -> &[u8] {
+        match self {
+            Self::Legacy(tx) => tx.input(),
+            Self::Eip2930(tx) => tx.input(),
+            Self::Eip1559(tx) => tx.input(),
+            Self::Eip4844(tx) => tx.input(),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: From<TypedTransaction>> From<TypedTransaction> for alloy_serde::WithOtherFields<T> {
+    fn from(value: TypedTransaction) -> Self {
+        Self::new(value.into())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
+    fn from(value: TxEnvelope) -> Self {
+        Self::new(value.into())
     }
 }

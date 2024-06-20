@@ -1,14 +1,16 @@
 use crate::{
     fillers::{
         ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
-        SignerFiller, TxFiller,
+        TxFiller, WalletFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
 };
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
+use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
+
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -160,7 +162,7 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// that the provider reports via [`Provider::get_chain_id`].
     pub fn with_chain_id(
         self,
-        chain_id: u64,
+        chain_id: ChainId,
     ) -> ProviderBuilder<L, JoinFill<Identity, ChainIdFiller>, N> {
         self.filler(ChainIdFiller::new(Some(chain_id)))
     }
@@ -197,11 +199,11 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
         }
     }
 
-    /// Add a signer layer to the stack being built.
+    /// Add a wallet layer to the stack being built.
     ///
-    /// See [`SignerFiller`].
-    pub fn signer<S>(self, signer: S) -> ProviderBuilder<L, JoinFill<F, SignerFiller<S>>, N> {
-        self.filler(SignerFiller::new(signer))
+    /// See [`WalletFiller`].
+    pub fn wallet<W>(self, wallet: W) -> ProviderBuilder<L, JoinFill<F, WalletFiller<W>>, N> {
+        self.filler(WalletFiller::new(wallet))
     }
 
     /// Change the network.
@@ -366,11 +368,11 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. This
-    /// function configures a signer backed by anvil keys, and is intended for
+    /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_signer(
+    pub fn on_anvil_with_wallet(
         self,
-    ) -> <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
         L::Provider,
         alloy_transport_http::Http<reqwest::Client>,
     >>::Provider
@@ -385,7 +387,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             alloy_transport_http::Http<reqwest::Client>,
         >,
     {
-        self.on_anvil_with_signer_and_config(std::convert::identity)
+        self.on_anvil_with_wallet_and_config(std::convert::identity)
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. The
@@ -413,12 +415,12 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
 
     /// Build this provider with anvil, using an Reqwest HTTP transport. The
     /// given function is used to configure the anvil instance. This
-    /// function configures a signer backed by anvil keys, and is intended for
+    /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_signer_and_config(
+    pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> <JoinFill<F, SignerFiller<alloy_network::EthereumSigner>> as ProviderLayer<
+    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
         L::Provider,
         alloy_transport_http::Http<reqwest::Client>,
     >>::Provider
@@ -436,11 +438,17 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
-        let wallet = alloy_signer_wallet::Wallet::from(anvil_layer.instance().keys()[0].clone());
+        let default_keys = anvil_layer.instance().keys().to_vec();
+        let (default_key, remaining_keys) = default_keys.split_first().expect("no keys available");
 
-        let signer = crate::network::EthereumSigner::from(wallet);
+        let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone());
+        let mut wallet = alloy_network::EthereumWallet::from(default_signer);
 
-        self.signer(signer).layer(anvil_layer).on_http(url)
+        remaining_keys.iter().for_each(|key| {
+            wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
+        });
+
+        self.wallet(wallet).layer(anvil_layer).on_http(url)
     }
 }
 

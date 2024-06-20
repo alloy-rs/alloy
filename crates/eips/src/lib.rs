@@ -6,6 +6,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[allow(unused_imports)]
 #[macro_use]
 extern crate alloc;
 
@@ -34,5 +35,7 @@ pub mod eip6110;
 pub mod merge;
 
 pub mod eip7002;
+
+pub mod eip7251;
 
 pub mod eip7685;

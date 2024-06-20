@@ -1,0 +1,134 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
+
+### Documentation
+
+- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+
+### Miscellaneous Tasks
+
+- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
+- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
+
+## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
+
+### Bug Fixes
+
+- Enable reqwest default-tls feature in transport-http ([#248](https://github.com/alloy-rs/alloy/issues/248))
+- Clippy all-features
+
+### Dependencies
+
+- [deps] Update to hyper 1.0 ([#55](https://github.com/alloy-rs/alloy/issues/55))
+
+### Documentation
+
+- Resolve broken links
+
+### Features
+
+- [transport] HttpError ([#882](https://github.com/alloy-rs/alloy/issues/882))
+- HttpConnect ([#786](https://github.com/alloy-rs/alloy/issues/786))
+- Re-export and more http aliases ([#716](https://github.com/alloy-rs/alloy/issues/716))
+- Tracing for http transports ([#681](https://github.com/alloy-rs/alloy/issues/681))
+- Add Http::new for reqwest::Client ([#434](https://github.com/alloy-rs/alloy/issues/434))
+- [providers] Event, polling and streaming methods ([#274](https://github.com/alloy-rs/alloy/issues/274))
+- Add `alloy` prelude crate ([#203](https://github.com/alloy-rs/alloy/issues/203))
+
+### Miscellaneous Tasks
+
+- [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
+- Improve hyper http error messages ([#469](https://github.com/alloy-rs/alloy/issues/469))
+- Rm unused file ([#234](https://github.com/alloy-rs/alloy/issues/234))
+- Misc improvements ([#26](https://github.com/alloy-rs/alloy/issues/26))
+- More lints and warns and errors
+
+### Other
+
+- Add clippy at workspace level ([#766](https://github.com/alloy-rs/alloy/issues/766))
+- Convert non-200 http responses into errors ([#254](https://github.com/alloy-rs/alloy/issues/254))
+- Avoid allocation when convert Box<RawValue> into a hyper request ([#48](https://github.com/alloy-rs/alloy/issues/48))
+- Merge pull request [#21](https://github.com/alloy-rs/alloy/issues/21) from alloy-rs/prestwich/new-pubsub
+
+### Performance
+
+- Use raw response bytes ([#233](https://github.com/alloy-rs/alloy/issues/233))
+
+### Refactor
+
+- RpcError and RpcResult and TransportError and TransportResult ([#28](https://github.com/alloy-rs/alloy/issues/28))
+- Break transports into several crates
+
+### Styling
+
+- Sort derives ([#499](https://github.com/alloy-rs/alloy/issues/499))
+- Sync with core ([#27](https://github.com/alloy-rs/alloy/issues/27))
+
+[`alloy`]: https://crates.io/crates/alloy
+[alloy]: https://crates.io/crates/alloy
+[`alloy-core`]: https://crates.io/crates/alloy-core
+[alloy-core]: https://crates.io/crates/alloy-core
+[`alloy-consensus`]: https://crates.io/crates/alloy-consensus
+[alloy-consensus]: https://crates.io/crates/alloy-consensus
+[`alloy-contract`]: https://crates.io/crates/alloy-contract
+[alloy-contract]: https://crates.io/crates/alloy-contract
+[`alloy-eips`]: https://crates.io/crates/alloy-eips
+[alloy-eips]: https://crates.io/crates/alloy-eips
+[`alloy-genesis`]: https://crates.io/crates/alloy-genesis
+[alloy-genesis]: https://crates.io/crates/alloy-genesis
+[`alloy-json-rpc`]: https://crates.io/crates/alloy-json-rpc
+[alloy-json-rpc]: https://crates.io/crates/alloy-json-rpc
+[`alloy-network`]: https://crates.io/crates/alloy-network
+[alloy-network]: https://crates.io/crates/alloy-network
+[`alloy-node-bindings`]: https://crates.io/crates/alloy-node-bindings
+[alloy-node-bindings]: https://crates.io/crates/alloy-node-bindings
+[`alloy-provider`]: https://crates.io/crates/alloy-provider
+[alloy-provider]: https://crates.io/crates/alloy-provider
+[`alloy-pubsub`]: https://crates.io/crates/alloy-pubsub
+[alloy-pubsub]: https://crates.io/crates/alloy-pubsub
+[`alloy-rpc-client`]: https://crates.io/crates/alloy-rpc-client
+[alloy-rpc-client]: https://crates.io/crates/alloy-rpc-client
+[`alloy-rpc-types`]: https://crates.io/crates/alloy-rpc-types
+[alloy-rpc-types]: https://crates.io/crates/alloy-rpc-types
+[`alloy-rpc-types-anvil`]: https://crates.io/crates/alloy-rpc-types-anvil
+[alloy-rpc-types-anvil]: https://crates.io/crates/alloy-rpc-types-anvil
+[`alloy-rpc-types-beacon`]: https://crates.io/crates/alloy-rpc-types-beacon
+[alloy-rpc-types-beacon]: https://crates.io/crates/alloy-rpc-types-beacon
+[`alloy-rpc-types-engine`]: https://crates.io/crates/alloy-rpc-types-engine
+[alloy-rpc-types-engine]: https://crates.io/crates/alloy-rpc-types-engine
+[`alloy-rpc-types-eth`]: https://crates.io/crates/alloy-rpc-types-eth
+[alloy-rpc-types-eth]: https://crates.io/crates/alloy-rpc-types-eth
+[`alloy-rpc-types-trace`]: https://crates.io/crates/alloy-rpc-types-trace
+[alloy-rpc-types-trace]: https://crates.io/crates/alloy-rpc-types-trace
+[`alloy-serde`]: https://crates.io/crates/alloy-serde
+[alloy-serde]: https://crates.io/crates/alloy-serde
+[`alloy-signer`]: https://crates.io/crates/alloy-signer
+[alloy-signer]: https://crates.io/crates/alloy-signer
+[`alloy-signer-aws`]: https://crates.io/crates/alloy-signer-aws
+[alloy-signer-aws]: https://crates.io/crates/alloy-signer-aws
+[`alloy-signer-gcp`]: https://crates.io/crates/alloy-signer-gcp
+[alloy-signer-gcp]: https://crates.io/crates/alloy-signer-gcp
+[`alloy-signer-ledger`]: https://crates.io/crates/alloy-signer-ledger
+[alloy-signer-ledger]: https://crates.io/crates/alloy-signer-ledger
+[`alloy-signer-local`]: https://crates.io/crates/alloy-signer-local
+[alloy-signer-local]: https://crates.io/crates/alloy-signer-local
+[`alloy-signer-trezor`]: https://crates.io/crates/alloy-signer-trezor
+[alloy-signer-trezor]: https://crates.io/crates/alloy-signer-trezor
+[`alloy-signer-wallet`]: https://crates.io/crates/alloy-signer-wallet
+[alloy-signer-wallet]: https://crates.io/crates/alloy-signer-wallet
+[`alloy-transport`]: https://crates.io/crates/alloy-transport
+[alloy-transport]: https://crates.io/crates/alloy-transport
+[`alloy-transport-http`]: https://crates.io/crates/alloy-transport-http
+[alloy-transport-http]: https://crates.io/crates/alloy-transport-http
+[`alloy-transport-ipc`]: https://crates.io/crates/alloy-transport-ipc
+[alloy-transport-ipc]: https://crates.io/crates/alloy-transport-ipc
+[`alloy-transport-ws`]: https://crates.io/crates/alloy-transport-ws
+[alloy-transport-ws]: https://crates.io/crates/alloy-transport-ws
+
+<!-- generated by git-cliff -->

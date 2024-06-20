@@ -1,5 +1,5 @@
 [package]
-name = "alloy-signer-wallet"
+name = "alloy-signer-local"
 description = "sepc256k1 ECDSA and YubiHSM signer implementations"
 
 version.workspace = true
@@ -10,6 +10,10 @@ license.workspace = true
 homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
 workspace = true

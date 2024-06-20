@@ -2,8 +2,8 @@
 
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig, RootProvider,
-    RpcWithBlock, SendableTx,
+    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -69,6 +69,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 {
     /// Returns the root provider.
     fn root(&self) -> &RootProvider<T, N>;
+
+    /// Returns the [`ProviderBuilder`](crate::ProviderBuilder) to build on.
+    fn builder() -> ProviderBuilder<Identity, Identity, N>
+    where
+        Self: Sized,
+    {
+        ProviderBuilder::default()
+    }
 
     /// Returns the RPC client used to send requests.
     ///
@@ -194,7 +202,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         // if the base fee of the Latest block is 0 then we need check if the latest block even has
         // a base fee/supports EIP1559
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
-            Some(base_fee) if (base_fee != 0) => base_fee,
+            Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
@@ -240,7 +248,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
-    /// Gets the balance of the account at the specified tag, which defaults to latest.
+    /// Gets the balance of the account.
+    ///
+    /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
     fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
@@ -645,7 +655,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///
@@ -948,13 +958,41 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, WalletProvider};
+    use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
     use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
+    }
+
+    #[tokio::test]
+    async fn test_provider_builder() {
+        init_tracing();
+        let provider =
+            RootProvider::<BoxTransport, Ethereum>::builder().with_recommended_fillers().on_anvil();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn test_builder_helper_fn() {
+        init_tracing();
+        let provider = builder().with_recommended_fillers().on_anvil();
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn test_builder_helper_fn_any_network() {
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+        let provider =
+            builder::<AnyNetwork>().with_recommended_fillers().on_http(anvil.endpoint_url());
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[cfg(feature = "reqwest")]
@@ -1004,6 +1042,17 @@ mod tests {
         let alloy_json_rpc::RpcError::Transport(TransportErrorKind::PubsubUnavailable) = err else {
             panic!("{err:?}");
         };
+    }
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn websocket_tls_setup() {
+        let url = "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F";
+        // we don't care about the response, only that it doesn't panic on the TLS setup
+        let _provider = ProviderBuilder::<_, _, Ethereum>::default()
+            .with_recommended_fillers()
+            .on_builtin(url)
+            .await;
     }
 
     #[cfg(feature = "ws")]
@@ -1216,7 +1265,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let req = TransactionRequest::default()
             .from(provider.default_signer_address())

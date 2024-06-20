@@ -73,7 +73,7 @@ impl TransportErrorKind {
         RpcError::Transport(Self::PubsubUnavailable)
     }
 
-    /// Instantiate a new `TrasnportError::HttpError`.
+    /// Instantiate a new `TransportError::HttpError`.
     pub const fn http_error(status: u16, body: String) -> TransportError {
         RpcError::Transport(Self::HttpError(HttpError { status, body }))
     }
@@ -89,8 +89,6 @@ impl TransportErrorKind {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
             }
-            // If the backend is gone, or there's a completely custom error, we should assume it's
-            // not retryable.
             _ => false,
         }
     }

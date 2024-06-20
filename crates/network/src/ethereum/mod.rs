@@ -2,8 +2,8 @@ use crate::{Network, ReceiptResponse, TransactionResponse};
 
 mod builder;
 
-mod signer;
-pub use signer::EthereumSigner;
+mod wallet;
+pub use wallet::EthereumWallet;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +34,10 @@ impl Network for Ethereum {
 impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.inner.status()
     }
 }
 

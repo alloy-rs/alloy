@@ -1,3 +1,3 @@
 # alloy-rpc-types-eth
 
-Ethereum RPC-related types for Alloy.
+Types for the `eth` Ethereum JSON-RPC namespace.

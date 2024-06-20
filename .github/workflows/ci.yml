@@ -96,8 +96,8 @@ jobs:
             --exclude alloy-signer-aws \
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
+            --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
-            --exclude alloy-signer-wallet \
             --exclude alloy-transport-ipc
 
   wasm-wasi:
@@ -180,15 +180,6 @@ jobs:
         run: cargo doc --workspace --all-features --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
-      - name: Doc index page redirection
-        run: echo '<meta http-equiv="refresh" content="1; url=alloy/index.html">' > target/doc/index.html
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: target/doc
-          force_orphan: true
 
   fmt:
     runs-on: ubuntu-latest

@@ -1,13 +1,15 @@
 //! Block RPC types.
 
-use crate::{other::OtherFields, Transaction, Withdrawal};
+use crate::{Transaction, Withdrawal};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256, U64};
+use alloy_serde::OtherFields;
+use serde::{ser::Error, Deserialize, Serialize, Serializer};
+use std::{collections::BTreeMap, ops::Deref};
+
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
     BlockNumberOrTag, ForkBlock, RpcBlockHash,
 };
-use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256, U64};
-use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
 
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,7 +52,7 @@ impl Block {
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
-    pub hash: Option<B256>,
+    pub hash: Option<BlockHash>,
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles

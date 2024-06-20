@@ -14,7 +14,7 @@ const FIRMWARE_2_MIN_VERSION: &str = ">=2.5.1";
 ///
 /// This is a simple wrapper around the [Trezor transport](Trezor).
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 pub struct TrezorSigner {
     derivation: DerivationType,
@@ -187,7 +187,7 @@ impl TrezorSigner {
         let data = tx.input().to_vec();
         let chain_id = tx.chain_id();
 
-        // TODO: Uncomment in 1.76
+        // TODO: Uncomment once dyn trait upcasting is stable
         /*
         let signature = if let Some(tx) = (tx as &dyn std::any::Any).downcast_ref::<TxEip1559>() {
         */
@@ -282,7 +282,7 @@ fn signature_from_trezor(x: trezor_client::client::Signature) -> Result<Signatur
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_network::{EthereumSigner, TransactionBuilder};
+    use alloy_network::{EthereumWallet, TransactionBuilder};
     use alloy_primitives::{address, b256};
     use alloy_rpc_types_eth::{AccessList, AccessListItem, TransactionRequest};
 
@@ -326,7 +326,7 @@ mod tests {
             .with_nonce(5)
             .with_input(data)
             .with_value(U256::from(100e18 as u128))
-            .build(&EthereumSigner::new(trezor))
+            .build(&EthereumWallet::new(trezor))
             .await
             .unwrap();
     }
@@ -345,7 +345,7 @@ mod tests {
             .with_nonce(5)
             .with_input(big_data)
             .with_value(U256::from(100e18 as u128))
-            .build(&EthereumSigner::new(trezor))
+            .build(&EthereumWallet::new(trezor))
             .await
             .unwrap();
     }
@@ -357,7 +357,7 @@ mod tests {
         TransactionRequest::default()
             .to(address!("2ed7afa17473e17ac59908f088b4371d28585476"))
             .with_gas_price(1)
-            .build(&EthereumSigner::new(trezor))
+            .build(&EthereumWallet::new(trezor))
             .await
             .unwrap();
 
@@ -372,7 +372,7 @@ mod tests {
                 .into_create()
                 .with_input(data)
                 .with_gas_price(1)
-                .build(&EthereumSigner::new(trezor))
+                .build(&EthereumWallet::new(trezor))
                 .await
                 .unwrap();
         }
@@ -412,7 +412,7 @@ mod tests {
             .with_input(data)
             .with_access_list(lst)
             .with_value(U256::from(100e18 as u128))
-            .build(&EthereumSigner::new(trezor))
+            .build(&EthereumWallet::new(trezor))
             .await
             .unwrap();
     }

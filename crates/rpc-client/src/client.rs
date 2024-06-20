@@ -118,8 +118,8 @@ impl<T: Transport + Clone> RpcClient<T> {
     pub fn boxed(self) -> RpcClient<BoxTransport> {
         let inner = match Arc::try_unwrap(self.0) {
             Ok(inner) => inner,
-            // TODO: `id` is discarded.
-            Err(inner) => RpcClientInner::new(inner.transport.clone(), inner.is_local),
+            Err(inner) => RpcClientInner::new(inner.transport.clone(), inner.is_local)
+                .with_id(inner.id.load(Ordering::Relaxed)),
         };
         RpcClient::from_inner(inner.boxed())
     }
@@ -178,6 +178,12 @@ impl<T> RpcClientInner<T> {
             id: AtomicU64::new(0),
             poll_interval: if is_local { AtomicU64::new(250) } else { AtomicU64::new(7000) },
         }
+    }
+
+    /// Sets the starting ID for the client.
+    #[inline]
+    pub fn with_id(self, id: u64) -> Self {
+        Self { id: AtomicU64::new(id), ..self }
     }
 
     /// Returns the default poll interval (milliseconds) for the client.

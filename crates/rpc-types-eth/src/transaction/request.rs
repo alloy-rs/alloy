@@ -772,8 +772,8 @@ pub struct TransactionInputError;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::WithOtherFields;
     use alloy_primitives::b256;
+    use alloy_serde::WithOtherFields;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]
@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn serde_tx_chain_id_field() {
-        let chain_id: u64 = 12345678;
+        let chain_id: ChainId = 12345678;
 
         let chain_id_as_num = format!(r#"{{"chainId": {} }}"#, chain_id);
         let req1 = serde_json::from_str::<TransactionRequest>(&chain_id_as_num).unwrap();

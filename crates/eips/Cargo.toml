@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -72,4 +76,5 @@ arbitrary = [
     "dep:proptest-derive",
     "dep:proptest",
     "alloy-primitives/arbitrary",
+    "alloy-serde/arbitrary",
 ]

@@ -13,14 +13,17 @@ body:
       description: What component is the feature for?
       multiple: true
       options:
+        - meta-crate
         - contract
         - consensus, eips, genesis
         - network, json-rpc
-        - nodes
+        - node-bindings
         - provider, pubsub
         - rpc
+        - serde
         - signers
         - transports
+        - other
     validations:
       required: true
   - type: textarea

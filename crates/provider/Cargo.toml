@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -20,11 +24,13 @@ alloy-consensus.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
-alloy-signer-wallet = { workspace = true, optional = true }
+alloy-signer-local = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
+alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth.workspace = true
-alloy-rpc-types-trace.workspace = true
+alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -50,14 +56,16 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
 alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 alloy-signer.workspace = true
-alloy-signer-wallet.workspace = true
+alloy-signer-local.workspace = true
 alloy-transport-http = { workspace = true, features = ["reqwest"] }
 
+itertools.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
@@ -78,11 +86,15 @@ ipc = ["pubsub", "alloy-rpc-client/ipc", "alloy-transport-ipc"]
 reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
 reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
 reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
+admin-api = ["dep:alloy-rpc-types-admin"]
 anvil-api = ["dep:alloy-rpc-types-anvil"]
 anvil-node = [
     "anvil-api",
     "reqwest",
     "dep:alloy-node-bindings",
-    "dep:alloy-signer-wallet",
+    "dep:alloy-signer-local",
 ]
+debug-api = ["dep:alloy-rpc-types-trace"]
 engine-api = ["dep:alloy-rpc-types-engine"]
+trace-api = ["dep:alloy-rpc-types-trace"]
+txpool-api = ["dep:alloy-rpc-types-txpool"]

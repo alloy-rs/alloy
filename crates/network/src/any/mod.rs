@@ -1,11 +1,9 @@
-use core::fmt;
-
 use crate::{Network, ReceiptResponse, TransactionResponse};
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
-use alloy_rpc_types_eth::{
-    AnyTransactionReceipt, Header, Transaction, TransactionRequest, WithOtherFields,
-};
+use alloy_rpc_types_eth::{AnyTransactionReceipt, Header, Transaction, TransactionRequest};
+use alloy_serde::WithOtherFields;
+use core::fmt;
 
 mod builder;
 
@@ -80,6 +78,10 @@ impl Network for AnyNetwork {
 impl ReceiptResponse for AnyTransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.inner.inner.status()
     }
 }
 

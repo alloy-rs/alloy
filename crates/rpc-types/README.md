@@ -1,3 +1,3 @@
 # alloy-rpc-types
 
-Ethereum RPC-related types for Alloy.
+Meta-crate for all Ethereum JSON-RPC types.

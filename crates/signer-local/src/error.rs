@@ -2,9 +2,9 @@ use alloy_primitives::hex;
 use k256::ecdsa;
 use thiserror::Error;
 
-/// Error thrown by [`Wallet`](crate::Wallet).
+/// Error thrown by [`LocalSigner`](crate::LocalSigner).
 #[derive(Debug, Error)]
-pub enum WalletError {
+pub enum LocalSignerError {
     /// [`ecdsa`] error.
     #[error(transparent)]
     EcdsaError(#[from] ecdsa::Error),

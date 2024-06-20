@@ -1,54 +1,54 @@
 use crate::{
-    fillers::{FillProvider, JoinFill, SignerFiller, TxFiller},
+    fillers::{FillProvider, JoinFill, TxFiller, WalletFiller},
     Provider,
 };
-use alloy_network::{Ethereum, Network, NetworkSigner};
+use alloy_network::{Ethereum, Network, NetworkWallet};
 use alloy_primitives::Address;
 use alloy_transport::Transport;
 
-/// Trait for Providers, Fill stacks, etc, which contain [`NetworkSigner`].
+/// Trait for Providers, Fill stacks, etc, which contain [`NetworkWallet`].
 pub trait WalletProvider<N: Network = Ethereum> {
-    /// The underlying [`NetworkSigner`] type contained in this stack.
-    type Signer: NetworkSigner<N>;
+    /// The underlying [`NetworkWallet`] type contained in this stack.
+    type Wallet: NetworkWallet<N>;
 
-    /// Get a reference to the underlying signer.
-    fn signer(&self) -> &Self::Signer;
+    /// Get a reference to the underlying wallet.
+    fn wallet(&self) -> &Self::Wallet;
 
-    /// Get a mutable reference to the underlying signer.
-    fn signer_mut(&mut self) -> &mut Self::Signer;
+    /// Get a mutable reference to the underlying wallet.
+    fn wallet_mut(&mut self) -> &mut Self::Wallet;
 
     /// Get the default signer address.
     fn default_signer_address(&self) -> Address {
-        self.signer().default_signer_address()
+        self.wallet().default_signer_address()
     }
 
     /// Check if the signer can sign for the given address.
     fn has_signer_for(&self, address: &Address) -> bool {
-        self.signer().has_signer_for(address)
+        self.wallet().has_signer_for(address)
     }
 
     /// Get an iterator of all signer addresses. Note that because the signer
     /// always has at least one address, this iterator will always have at least
     /// one element.
     fn signer_addresses(&self) -> impl Iterator<Item = Address> {
-        self.signer().signer_addresses()
+        self.wallet().signer_addresses()
     }
 }
 
-impl<S, N> WalletProvider<N> for SignerFiller<S>
+impl<W, N> WalletProvider<N> for WalletFiller<W>
 where
-    S: NetworkSigner<N> + Clone,
+    W: NetworkWallet<N> + Clone,
     N: Network,
 {
-    type Signer = S;
+    type Wallet = W;
 
     #[inline(always)]
-    fn signer(&self) -> &Self::Signer {
+    fn wallet(&self) -> &Self::Wallet {
         self.as_ref()
     }
 
     #[inline(always)]
-    fn signer_mut(&mut self) -> &mut Self::Signer {
+    fn wallet_mut(&mut self) -> &mut Self::Wallet {
         self.as_mut()
     }
 }
@@ -58,16 +58,16 @@ where
     R: WalletProvider<N>,
     N: Network,
 {
-    type Signer = R::Signer;
+    type Wallet = R::Wallet;
 
     #[inline(always)]
-    fn signer(&self) -> &Self::Signer {
-        self.right().signer()
+    fn wallet(&self) -> &Self::Wallet {
+        self.right().wallet()
     }
 
     #[inline(always)]
-    fn signer_mut(&mut self) -> &mut Self::Signer {
-        self.right_mut().signer_mut()
+    fn wallet_mut(&mut self) -> &mut Self::Wallet {
+        self.right_mut().wallet_mut()
     }
 }
 
@@ -78,16 +78,16 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    type Signer = F::Signer;
+    type Wallet = F::Wallet;
 
     #[inline(always)]
-    fn signer(&self) -> &Self::Signer {
-        self.filler.signer()
+    fn wallet(&self) -> &Self::Wallet {
+        self.filler.wallet()
     }
 
     #[inline(always)]
-    fn signer_mut(&mut self) -> &mut Self::Signer {
-        self.filler.signer_mut()
+    fn wallet_mut(&mut self) -> &mut Self::Wallet {
+        self.filler.wallet_mut()
     }
 }
 
@@ -95,18 +95,19 @@ where
 mod test {
     use super::*;
     use crate::ProviderBuilder;
+    use itertools::Itertools;
 
     #[test]
     fn basic_usage() {
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
-        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
+        assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 
     #[test]
     fn bubbles_through_fillers() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
-        assert_eq!(provider.default_signer_address(), provider.signer_addresses().next().unwrap());
+        assert!(provider.signer_addresses().contains(&provider.default_signer_address()));
     }
 }
