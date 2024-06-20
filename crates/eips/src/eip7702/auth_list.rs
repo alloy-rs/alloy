@@ -115,7 +115,7 @@ pub struct OptionalNonce(Option<u64>);
 
 impl OptionalNonce {
     /// Create a new [`OptionalNonce`]
-    pub fn new(nonce: Option<u64>) -> Self {
+    pub const fn new(nonce: Option<u64>) -> Self {
         Self(nonce)
     }
 }
