@@ -111,17 +111,62 @@ wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
 # general
 consensus = ["dep:alloy-consensus"]
-contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
+contract = [
+    "dep:alloy-contract",
+    "providers",
+    "dyn-abi",
+    "json-abi",
+    "json",
+    "sol-types",
+]
 eips = ["dep:alloy-eips"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider"]
+providers = ["dep:alloy-provider", "rpc-client", "eips"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
+
+provider-admin-api = [
+    "providers",
+    "alloy-provider?/admin-api",
+    "rpc-types-admin",
+]
+provider-anvil-api = [
+    "providers",
+    "alloy-provider?/anvil-api",
+    "rpc-types-anvil",
+]
+provider-debug-api = [
+    "providers",
+    "alloy-provider?/debug-api",
+    "rpc-types-trace",
+]
+provider-engine-api = [
+    "providers",
+    "alloy-provider?/engine-api",
+    "rpc-types-engine",
+]
+provider-trace-api = [
+    "providers",
+    "alloy-provider?/trace-api",
+    "rpc-types-trace",
+]
+provider-txpool-api = [
+    "providers",
+    "alloy-provider?/txpool-api",
+    "rpc-types-txpool",
+]
+
+provider-anvil-node = [
+    "providers",
+    "provider-anvil-api",
+    "alloy-provider?/anvil-node",
+    "node-bindings",
+]
 
 # pubsub
 pubsub = [
