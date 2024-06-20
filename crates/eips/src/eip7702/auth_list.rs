@@ -2,10 +2,10 @@ use core::ops::Deref;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use alloy_primitives::{keccak256, Address, ChainId, Signature, SignatureError, B256};
+#[cfg(feature = "k256")]
+use alloy_primitives::{keccak256, SignatureError, B256};
+use alloy_primitives::{Address, ChainId, Signature};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpEncodable};
-
-use super::constants::MAGIC;
 
 /// An EIP-7702 authorization list.
 pub type AuthorizationList = Vec<Authorization>;
@@ -56,6 +56,8 @@ impl Authorization {
     #[inline]
     #[cfg(feature = "k256")]
     fn authority_prehash(&self) -> B256 {
+        use super::constants::MAGIC;
+
         #[derive(RlpEncodable)]
         struct Auth {
             chain_id: ChainId,
