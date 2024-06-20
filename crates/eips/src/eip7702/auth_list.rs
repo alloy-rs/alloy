@@ -34,7 +34,8 @@ impl Authorization {
     ///
     /// # Note
     ///
-    /// If this is `Some`, implementers should check that the nonce of the authority is equal to this nonce.
+    /// If this is `Some`, implementers should check that the nonce of the authority is equal to
+    /// this nonce.
     pub fn nonce(&self) -> Option<u64> {
         *self.nonce
     }
