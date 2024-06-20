@@ -364,10 +364,8 @@ impl TransactionRequest {
     ///
     /// # Returns
     ///
-    /// - Ok(type) if all necessary keys are present to build the preferred
-    /// type.
-    /// - Err((type, missing)) if some keys are missing to build the preferred
-    /// type.
+    /// - Ok(type) if all necessary keys are present to build the preferred type.
+    /// - Err((type, missing)) if some keys are missing to build the preferred type.
     pub fn missing_keys(&self) -> Result<TxType, (TxType, Vec<&'static str>)> {
         let pref = self.preferred_type();
         if let Err(missing) = match pref {

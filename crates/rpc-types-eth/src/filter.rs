@@ -130,10 +130,9 @@ impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
 
 impl<T: Clone + Eq + Hash> FilterSet<T> {
     /// Returns a ValueOrArray inside an Option, so that:
-    ///   - If the filter is empty, it returns None
-    ///   - If the filter has only 1 value, it returns the single value
-    ///   - Otherwise it returns an array of values
-    /// This should be useful for serialization
+    /// - If the filter is empty, it returns None
+    /// - If the filter has only 1 value, it returns the single value
+    /// - Otherwise it returns an array of values
     pub fn to_value_or_array(&self) -> Option<ValueOrArray<T>> {
         let mut values = self.0.iter().cloned().collect::<Vec<T>>();
         match values.len() {
