@@ -31,7 +31,7 @@ pub struct AccessListItem {
         )
     )]
     // In JSON, we have to accept `null` for storage key, which is interpreted as an empty array.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::optional::or_default"))]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::optional::null_as_default"))]
     pub storage_keys: Vec<B256>,
 }
 
