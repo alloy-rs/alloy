@@ -7,7 +7,7 @@
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
-/// The address for the EIP-7251 consolidation requests contract.
+/// The address for the EIP-7251 consolidation requests contract: `0x00b42dbF2194e931E80326D950320f7d9Dbeac02`
 pub const CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS: Address =
     address!("00b42dbF2194e931E80326D950320f7d9Dbeac02");
 
