@@ -6,7 +6,7 @@ use alloy_primitives::{keccak256, Address, ChainId, B256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
 
 /// An unsigned EIP-7702 authorization.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 pub struct Authorization {
     /// The chain ID of the authorization.
     pub chain_id: ChainId,
@@ -110,7 +110,7 @@ impl<S> Deref for SignedAuthorization<S> {
 /// nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
 ///
 /// The wrapper type is used for RLP encoding and decoding.
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct OptionalNonce(Option<u64>);
 
 impl OptionalNonce {
@@ -161,5 +161,46 @@ impl Deref for OptionalNonce {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_encode_decode_roundtrip(auth: Authorization) {
+        let mut buf = Vec::new();
+        auth.encode(&mut buf);
+        let decoded = Authorization::decode(&mut buf.as_ref()).unwrap();
+        assert_eq!(buf.len(), auth.length());
+        assert_eq!(decoded, auth);
+    }
+
+    #[test]
+    fn test_encode_decode_auth() {
+        // fully filled
+        test_encode_decode_roundtrip(Authorization {
+            chain_id: 1u64,
+            address: Address::left_padding_from(&[6]),
+            nonce: Some(1u64).into(),
+        });
+
+        // no nonce
+        test_encode_decode_roundtrip(Authorization {
+            chain_id: 1u64,
+            address: Address::left_padding_from(&[6]),
+            nonce: None.into(),
+        });
+    }
+
+    #[test]
+    fn opt_nonce_too_many_elements() {
+        let mut buf = Vec::new();
+        vec![1u64, 2u64].encode(&mut buf);
+
+        assert_eq!(
+            OptionalNonce::decode(&mut buf.as_ref()),
+            Err(alloy_rlp::Error::UnexpectedLength)
+        )
     }
 }
