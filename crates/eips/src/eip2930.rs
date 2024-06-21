@@ -30,6 +30,7 @@ pub struct AccessListItem {
             strategy = "proptest::collection::vec(proptest::arbitrary::any::<B256>(), 0..=20)"
         )
     )]
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::optional::or_default"))]
     pub storage_keys: Vec<B256>,
 }
 

@@ -18,6 +18,8 @@ use serde::Serializer;
 mod bool;
 pub use self::bool::*;
 
+pub mod optional;
+
 #[cfg_attr(not(test), deprecated = "use `quantity::{self, opt, vec}` instead")]
 pub mod num;
 #[allow(deprecated)]
