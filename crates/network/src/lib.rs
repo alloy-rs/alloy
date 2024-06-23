@@ -74,6 +74,7 @@ pub trait TransactionResponse {
     fn gas(&self) -> u128;
 
     /// Input data
+    #[doc(alias = "calldata")]
     fn input(&self) -> Bytes;
 }
 
