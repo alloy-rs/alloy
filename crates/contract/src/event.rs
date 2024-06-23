@@ -84,21 +84,18 @@ impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, 
     /// Sets the inner filter object
     ///
     /// See [`Filter::select`].
-    #[must_use]
     pub fn select(mut self, filter: impl Into<FilterBlockOption>) -> Self {
         self.filter.block_option = filter.into();
         self
     }
 
     /// Sets the from block number
-    #[must_use]
     pub fn from_block<B: Into<BlockNumberOrTag>>(mut self, block: B) -> Self {
         self.filter.block_option = self.filter.block_option.with_from_block(block.into());
         self
     }
 
     /// Sets the to block number
-    #[must_use]
     pub fn to_block<B: Into<BlockNumberOrTag>>(mut self, block: B) -> Self {
         self.filter.block_option = self.filter.block_option.with_to_block(block.into());
         self
@@ -114,7 +111,6 @@ impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, 
     }
 
     /// Pins the block hash for the filter
-    #[must_use]
     pub fn at_block_hash<A: Into<B256>>(mut self, hash: A) -> Self {
         self.filter.block_option = self.filter.block_option.with_block_hash(hash.into());
         self
@@ -123,57 +119,42 @@ impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, 
     /// Sets the address to query with this filter.
     ///
     /// See [`Filter::address`].
-    #[must_use]
     pub fn address<A: Into<ValueOrArray<Address>>>(mut self, address: A) -> Self {
         self.filter.address = address.into().into();
         self
     }
 
     /// Given the event signature in string form, it hashes it and adds it to the topics to monitor
-    #[must_use]
     pub fn event(mut self, event_name: &str) -> Self {
         self.filter = self.filter.event(event_name);
         self
     }
 
     /// Hashes all event signatures and sets them as array to event_signature(topic0)
-    #[must_use]
     pub fn events(mut self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
         self.filter = self.filter.events(events);
         self
     }
 
     /// Sets event_signature(topic0) (the event name for non-anonymous events)
-    #[must_use]
     pub fn event_signature<TO: Into<Topic>>(mut self, topic: TO) -> Self {
         self.filter.topics[0] = topic.into();
         self
     }
 
-    /// Sets topic0 (the event name for non-anonymous events)
-    #[must_use]
-    #[deprecated(note = "use `event_signature` instead")]
-    pub fn topic0<TO: Into<Topic>>(mut self, topic: TO) -> Self {
-        self.filter.topics[0] = topic.into();
-        self
-    }
-
     /// Sets the 1st indexed topic
-    #[must_use]
     pub fn topic1<TO: Into<Topic>>(mut self, topic: TO) -> Self {
         self.filter.topics[1] = topic.into();
         self
     }
 
     /// Sets the 2nd indexed topic
-    #[must_use]
     pub fn topic2<TO: Into<Topic>>(mut self, topic: TO) -> Self {
         self.filter.topics[2] = topic.into();
         self
     }
 
     /// Sets the 3rd indexed topic
-    #[must_use]
     pub fn topic3<TO: Into<Topic>>(mut self, topic: TO) -> Self {
         self.filter.topics[3] = topic.into();
         self
