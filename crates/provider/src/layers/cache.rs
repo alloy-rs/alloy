@@ -2,6 +2,7 @@ use crate::{Provider, ProviderLayer, RootProvider};
 use alloy_json_rpc::{Request, RpcParam};
 use alloy_network::Ethereum;
 use alloy_primitives::B256;
+use alloy_rpc_client::ClientRef;
 use alloy_rpc_types_eth::{Block, BlockNumberOrTag};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
@@ -89,8 +90,7 @@ where
     pub fn new(inner: P, max_items: usize) -> Self {
         let cache =
             RwLock::new(LruCache::<B256, String>::new(NonZeroUsize::new(max_items).unwrap()));
-        let provider = Self { inner, cache, _pd: PhantomData };
-        provider
+        Self { inner, cache, _pd: PhantomData }
     }
 
     /// `keccak256` hash the request params.
@@ -145,7 +145,6 @@ where
             cache.put(entry.key, entry.value);
         }
 
-        println!("Loaded {} cache entries", cache.len());
         Ok(())
     }
 }
@@ -167,19 +166,16 @@ where
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        let req = self.inner.client().make_request("eth_getBlockByNumber", (number, hydrate));
-
+        let req =
+            RequestType::GetBlockByNumber((number, hydrate)).make_request(self.inner.client());
         let hash = self.hash_request(req)?;
-
         // Try to get from cache
         if let Some(block) = self.get(&hash).await? {
-            println!("Returned from cache!");
             let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
             return Ok(Some(block));
         }
 
         let rpc_res = self.inner.get_block_by_number(number, hydrate).await?;
-        println!("Returned from RPC!");
         if let Some(ref block) = rpc_res {
             let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
             let _old_val = self.put(hash, json_str).await?;
@@ -190,6 +186,24 @@ where
 
     // TODO: Add other commonly used methods such as eth_getTransactionByHash, eth_getProof,
     // eth_getStorage etc.
+}
+
+/// Enum representing different RPC requests.
+///
+/// Useful for handling hashing of various request parameters.
+enum RequestType<Params: RpcParam> {
+    /// Get block by number.
+    GetBlockByNumber(Params),
+}
+
+impl<Params: RpcParam> RequestType<Params> {
+    fn make_request<T: Transport>(&self, client: ClientRef<'_, T>) -> Request<Params> {
+        match self {
+            Self::GetBlockByNumber(params) => {
+                client.make_request("eth_getBlockByNumber", params.to_owned())
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
