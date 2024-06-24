@@ -98,7 +98,8 @@ impl SignedAuthorization<alloy_primitives::Signature> {
     /// Recover the authority and transform the signed authorization into a
     /// [`RecoveredAuthorization`].
     pub fn into_recovered(self) -> RecoveredAuthorization {
-        RecoveredAuthorization { inner: self.inner, authority: self.recover_authority().ok() }
+        let authority = self.recover_authority().ok();
+        RecoveredAuthorization { inner: self.inner, authority }
     }
 }
 
