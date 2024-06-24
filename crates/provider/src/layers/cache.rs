@@ -7,7 +7,7 @@ use alloy_rpc_types_eth::{Block, BlockNumberOrTag};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf};
+use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 // TODO: Populate load cache from file on initialization.
 // TODO: Add method to dump cache to file.
@@ -71,12 +71,12 @@ where
 }
 
 /// A provider that caches responses to RPC requests.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CacheProvider<P, T> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
-    cache: RwLock<LruCache<B256, String>>,
+    cache: Arc<RwLock<LruCache<B256, String>>>,
     /// Phantom data
     _pd: PhantomData<T>,
 }
@@ -88,16 +88,10 @@ where
 {
     /// Instantiate a new cache provider.
     pub fn new(inner: P, max_items: usize) -> Self {
-        let cache =
-            RwLock::new(LruCache::<B256, String>::new(NonZeroUsize::new(max_items).unwrap()));
+        let cache = Arc::new(RwLock::new(LruCache::<B256, String>::new(
+            NonZeroUsize::new(max_items).unwrap(),
+        )));
         Self { inner, cache, _pd: PhantomData }
-    }
-
-    /// `keccak256` hash the request params.
-    pub fn hash_request<Params: RpcParam>(&self, req: Request<Params>) -> TransportResult<B256> {
-        let ser_req = req.serialize().map_err(TransportErrorKind::custom)?;
-
-        Ok(ser_req.params_hash())
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
@@ -177,7 +171,7 @@ where
         let rpc_res = self.inner.get_block_by_number(number, hydrate).await?;
         if let Some(ref block) = rpc_res {
             let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
-            let _old_val = self.put(hash, json_str).await?;
+            let _ = self.put(hash, json_str).await?;
         }
 
         Ok(rpc_res)
@@ -204,6 +198,7 @@ impl<Params: RpcParam> RequestType<Params> {
         }
     }
 
+    /// `keccak256` hash the request params.
     fn params_hash<T: Transport>(&self, client: ClientRef<'_, T>) -> TransportResult<B256> {
         let req = self.make_request(client);
         let ser_req = req.serialize().map_err(TransportErrorKind::custom)?;
