@@ -1,5 +1,3 @@
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Log<T = LogData> {

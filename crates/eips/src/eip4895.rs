@@ -2,8 +2,6 @@
 //!
 //! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -14,7 +12,7 @@ pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
