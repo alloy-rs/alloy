@@ -8,6 +8,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Authorization {
     /// The chain ID of the authorization.
     pub chain_id: ChainId,
@@ -75,6 +76,7 @@ impl Authorization {
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedAuthorization<S> {
+    #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
     signature: S,
 }
@@ -117,6 +119,7 @@ impl<S> Deref for SignedAuthorization<S> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RecoveredAuthorization {
+    #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
     authority: Option<Address>,
 }
