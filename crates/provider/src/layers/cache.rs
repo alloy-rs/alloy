@@ -1,9 +1,9 @@
 use crate::{Provider, ProviderLayer, RootProvider};
 use alloy_json_rpc::{Request, RpcParam};
 use alloy_network::Ethereum;
-use alloy_primitives::B256;
+use alloy_primitives::{BlockHash, B256};
 use alloy_rpc_client::ClientRef;
-use alloy_rpc_types_eth::{Block, BlockNumberOrTag};
+use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, BlockTransactionsKind};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -162,19 +162,62 @@ where
     ) -> TransportResult<Option<Block>> {
         let hash =
             RequestType::GetBlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
-        // Try to get from cache
+
         if let Some(block) = self.get(&hash).await? {
             let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
+            println!("Cache hit");
             return Ok(Some(block));
         }
 
-        let rpc_res = self.inner.get_block_by_number(number, hydrate).await?;
-        if let Some(ref block) = rpc_res {
+        println!("Cache miss");
+        let block = self.inner.get_block_by_number(number, hydrate).await?;
+        if let Some(ref block) = block {
             let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
             let _ = self.put(hash, json_str).await?;
         }
 
-        Ok(rpc_res)
+        Ok(block)
+    }
+
+    /// Gets a block by its [BlockHash], with full transactions or only hashes.
+    async fn get_block_by_hash(
+        &self,
+        hash: BlockHash,
+        kind: BlockTransactionsKind,
+    ) -> TransportResult<Option<Block>> {
+        let full = match kind {
+            BlockTransactionsKind::Full => true,
+            BlockTransactionsKind::Hashes => false,
+        };
+
+        let req_hash =
+            RequestType::GetBlockByHash((hash, full)).params_hash(self.inner.client())?;
+
+        if let Some(block) = self.get(&req_hash).await? {
+            let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
+            println!("Cache hit");
+            return Ok(Some(block));
+        }
+
+        println!("Cache miss");
+        let block = self
+            .client()
+            .request::<_, Option<Block>>("eth_getBlockByHash", (hash, full))
+            .await?
+            .map(|mut block| {
+                if !full {
+                    // this ensures an empty response for `Hashes` has the expected form
+                    // this is required because deserializing [] is ambiguous
+                    block.transactions.convert_to_hashes();
+                }
+                block
+            });
+        if let Some(ref block) = block {
+            let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
+            let _ = self.put(req_hash, json_str).await?;
+        }
+
+        Ok(block)
     }
 
     // TODO: Add other commonly used methods such as eth_getTransactionByHash, eth_getProof,
@@ -187,15 +230,17 @@ where
 enum RequestType<Params: RpcParam> {
     /// Get block by number.
     GetBlockByNumber(Params),
+    /// Get block by hash.
+    GetBlockByHash(Params),
 }
 
 impl<Params: RpcParam> RequestType<Params> {
     fn make_request<T: Transport>(&self, client: ClientRef<'_, T>) -> Request<Params> {
-        match self {
-            Self::GetBlockByNumber(params) => {
-                client.make_request("eth_getBlockByNumber", params.to_owned())
-            }
-        }
+        let (method, params) = match self {
+            Self::GetBlockByNumber(params) => ("eth_getBlockByNumber", params),
+            Self::GetBlockByHash(params) => ("eth_getBlockByHash", params),
+        };
+        client.make_request(method, params.to_owned())
     }
 
     /// `keccak256` hash the request params.
@@ -240,16 +285,46 @@ mod tests {
 
         let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
         provider.load_cache(path.clone()).await.unwrap();
+
         let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
         let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap();
+        assert_eq!(blk, blk2);
 
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
         let latest_block_num = provider.get_block_number().await.unwrap();
         let blk3 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
         let blk4 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
+        assert_eq!(blk3, blk4);
 
         provider.save_cache(path).await.unwrap();
-        assert_eq!(blk, blk2);
-        assert_eq!(blk3, blk4);
+    }
+
+    #[tokio::test]
+    async fn test_get_block() {
+        let cache = CacheLayer::new(100);
+        let anvil = Anvil::new().block_time_f64(0.3).spawn();
+        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+
+        let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
+        provider.load_cache(path.clone()).await.unwrap();
+
+        let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+        let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+        assert_eq!(block, block2);
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        let latest_block =
+            provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+        let latest_hash = latest_block.unwrap().header.hash.unwrap();
+
+        let block3 =
+            provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+        let block4 =
+            provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+        assert_eq!(block3, block4);
+
+        provider.save_cache(path).await.unwrap();
     }
 }
