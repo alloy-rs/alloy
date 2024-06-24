@@ -1,9 +1,11 @@
-use crate::{Provider, ProviderLayer, RootProvider};
+use crate::{Provider, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_json_rpc::{Request, RpcParam};
 use alloy_network::Ethereum;
-use alloy_primitives::{BlockHash, B256};
+use alloy_primitives::{Address, BlockHash, StorageKey, StorageValue, B256, U256};
 use alloy_rpc_client::ClientRef;
-use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, BlockTransactionsKind};
+use alloy_rpc_types_eth::{
+    Block, BlockId, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
+};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -200,18 +202,7 @@ where
         }
 
         println!("Cache miss");
-        let block = self
-            .client()
-            .request::<_, Option<Block>>("eth_getBlockByHash", (hash, full))
-            .await?
-            .map(|mut block| {
-                if !full {
-                    // this ensures an empty response for `Hashes` has the expected form
-                    // this is required because deserializing [] is ambiguous
-                    block.transactions.convert_to_hashes();
-                }
-                block
-            });
+        let block = self.inner.get_block_by_hash(hash, kind).await?;
         if let Some(ref block) = block {
             let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
             let _ = self.put(req_hash, json_str).await?;
@@ -220,8 +211,30 @@ where
         Ok(block)
     }
 
-    // TODO: Add other commonly used methods such as eth_getTransactionByHash, eth_getProof,
-    // eth_getStorage etc.
+    // TODO: Add other commonly used methods such as eth_getTransactionByHash
+    // TODO: Any methods returning RpcWithBlock or RpcCall are blocked by https://github.com/alloy-rs/alloy/pull/788
+
+    /// Get the account and storage values of the specified account including the merkle proofs.
+    ///
+    /// This call can be used to verify that the data has not been tampered with.
+    fn get_proof(
+        &self,
+        address: Address,
+        keys: Vec<StorageKey>,
+    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+        todo!()
+        // Blocked by https://github.com/alloy-rs/alloy/pull/788
+    }
+
+    /// Gets the specified storage value from [Address].
+    fn get_storage_at(
+        &self,
+        address: Address,
+        key: U256,
+    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+        todo!()
+        // Blocked by https://github.com/alloy-rs/alloy/pull/788
+    }
 }
 
 /// Enum representing different RPC requests.
@@ -232,6 +245,10 @@ enum RequestType<Params: RpcParam> {
     GetBlockByNumber(Params),
     /// Get block by hash.
     GetBlockByHash(Params),
+    /// Get proof.
+    GetProof(Params),
+    /// Get storage at.
+    GetStorageAt(Params),
 }
 
 impl<Params: RpcParam> RequestType<Params> {
@@ -239,6 +256,8 @@ impl<Params: RpcParam> RequestType<Params> {
         let (method, params) = match self {
             Self::GetBlockByNumber(params) => ("eth_getBlockByNumber", params),
             Self::GetBlockByHash(params) => ("eth_getBlockByHash", params),
+            Self::GetProof(params) => ("eth_getProof", params),
+            Self::GetStorageAt(params) => ("eth_getStorageAt", params),
         };
         client.make_request(method, params.to_owned())
     }
