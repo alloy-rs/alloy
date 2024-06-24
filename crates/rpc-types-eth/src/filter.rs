@@ -397,9 +397,8 @@ impl Filter {
         self.block_option = self.block_option.with_block_hash(hash.into());
         self
     }
-    /// Sets the inner filter object
-    ///
-    /// *NOTE:* ranges are always inclusive
+
+    /// Sets the address to query with this filter.
     ///
     /// # Examples
     ///
