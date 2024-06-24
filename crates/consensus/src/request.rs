@@ -1,5 +1,3 @@
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_eips::{
     eip6110::DepositRequest,
     eip7002::WithdrawalRequest,
@@ -15,7 +13,7 @@ use alloy_rlp::{Decodable, Encodable};
 #[non_exhaustive]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]

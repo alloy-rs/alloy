@@ -1,7 +1,5 @@
 //! EIP-4844 sidecar type
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
@@ -20,7 +18,6 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(proptest_derive::Arbitrary))]
 #[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.

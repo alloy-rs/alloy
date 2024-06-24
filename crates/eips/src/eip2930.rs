@@ -2,8 +2,6 @@
 //!
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -16,7 +14,7 @@ use core::{mem, ops::Deref};
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodable, RlpEncodable)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -24,12 +22,6 @@ pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
-    #[cfg_attr(
-        any(test, feature = "arbitrary"),
-        proptest(
-            strategy = "proptest::collection::vec(proptest::arbitrary::any::<B256>(), 0..=20)"
-        )
-    )]
     // In JSON, we have to accept `null` for storage key, which is interpreted as an empty array.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub storage_keys: Vec<B256>,
@@ -47,16 +39,10 @@ impl AccessListItem {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodableWrapper, RlpEncodableWrapper)]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccessList(
-    #[cfg_attr(
-        any(test, feature = "arbitrary"),
-        proptest(
-            strategy = "proptest::collection::vec(proptest::arbitrary::any::<AccessListItem>(), 0..=20)"
-        )
-    )]
     pub Vec<AccessListItem>,
 );
 

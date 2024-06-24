@@ -36,7 +36,5 @@ alloy-primitives = { workspace = true, features = [
 ] }
 
 arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
 rand.workspace = true
 similar-asserts.workspace = true
