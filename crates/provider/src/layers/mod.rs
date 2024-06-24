@@ -11,4 +11,4 @@ mod chain;
 pub use chain::ChainLayer;
 
 mod cache;
-pub use cache::{CacheLayer, CacheProvider};
+pub use cache::{CacheConfig, CacheLayer, CacheProvider};

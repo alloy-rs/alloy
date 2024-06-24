@@ -11,16 +11,49 @@ use tokio::sync::RwLock;
 // TODO: Populate load cache from file on initialization.
 // TODO: Add method to dump cache to file.
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
+///
+/// In order to initialize the caching layer, the path to the cache file is provided along with the
+/// max number of items that are stored in the in-memory LRU cache.
+///
+/// One can load the cache from the file system by calling `load_cache` and save the cache to the
+/// file system by calling `save_cache`.
+///
+/// Example usage:
+/// ```
+/// use alloy_node_bindings::Anvil;
+/// use alloy_provider::ProviderBuilder;
+/// use std::path::PathBuf;
+///
+/// let cache = CacheLayer::new(100);
+/// let anvil = Anvil::new().block_time_f64(0.3).spawn();
+/// let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+/// let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
+/// provider.load_cache(path).await.unwrap(); // Load cache from file if it exists.
+///
+/// let blk = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from RPC and saved to in-memory cache
+///
+/// let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from in-memory cache
+/// assert_eq!(blk, blk2);
+///
+/// provider.save_cache(path).await.unwrap(); // Save cache to file
+/// ```
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
-    path: PathBuf,
-    max_items: usize,
+    config: CacheConfig,
 }
 
 impl CacheLayer {
-    /// Instantiate a new cache layer.
-    pub const fn new(path: PathBuf, max_items: usize) -> Self {
-        Self { path, max_items }
+    /// Instantiate a new cache layer with the the maximum number of
+    /// items to store.
+    #[inline]
+    pub const fn new(max_items: usize) -> Self {
+        Self { config: CacheConfig { max_items } }
+    }
+
+    /// Returns the maximum number of items that can be stored in the cache, set at initialization.
+    #[inline]
+    pub const fn max_items(&self) -> usize {
+        self.config.max_items
     }
 }
 
@@ -32,7 +65,7 @@ where
     type Provider = CacheProvider<P, T>;
 
     fn layer(&self, inner: P) -> Self::Provider {
-        CacheProvider::new(inner, self.path.clone(), self.max_items)
+        CacheProvider::new(inner, self.max_items())
     }
 }
 
@@ -43,8 +76,6 @@ pub struct CacheProvider<P, T> {
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
     cache: RwLock<LruCache<B256, String>>,
-    /// Path to the cache file.
-    path: PathBuf,
     /// Phantom data
     _pd: PhantomData<T>,
 }
@@ -55,10 +86,11 @@ where
     T: Transport + Clone,
 {
     /// Instantiate a new cache provider.
-    pub fn new(inner: P, path: PathBuf, max_items: usize) -> Self {
+    pub fn new(inner: P, max_items: usize) -> Self {
         let cache =
             RwLock::new(LruCache::<B256, String>::new(NonZeroUsize::new(max_items).unwrap()));
-        Self { inner, path, cache, _pd: PhantomData }
+        let provider = Self { inner, cache, _pd: PhantomData };
+        provider
     }
 
     /// `keccak256` hash the request params.
@@ -66,11 +98,6 @@ where
         let ser_req = req.serialize().map_err(TransportErrorKind::custom)?;
 
         Ok(ser_req.params_hash())
-    }
-
-    /// Gets the path to the cache file.
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
@@ -87,17 +114,17 @@ where
         Ok(val)
     }
 
-    /// Dumps the cache to a file specified by the path.
+    /// Saves the cache to a file specified by the path.
     /// If the files does not exist, it creates one.
     /// If the file exists, it overwrites it.
-    pub async fn dump_cache(&self) -> TransportResult<()> {
+    pub async fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
         let cache = self.cache.read().await;
-        let file = std::fs::File::create(self.path.clone()).map_err(TransportErrorKind::custom)?;
+        let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
 
         // Iterate over the cache and dump to the file.
         let entries = cache
             .iter()
-            .map(|(key, value)| FsCacheEntry { key: key.clone(), value: value.clone() })
+            .map(|(key, value)| FsCacheEntry { key: *key, value: value.clone() })
             .collect::<Vec<_>>();
         serde_json::to_writer(file, &entries).map_err(TransportErrorKind::custom)?;
         Ok(())
@@ -105,11 +132,11 @@ where
 
     /// Loads the cache from a file specified by the path.
     /// If the file does not exist, it returns without error.
-    pub async fn load_cache(&self) -> TransportResult<()> {
-        if !self.path.exists() {
+    pub async fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
+        if !path.exists() {
             return Ok(());
         };
-        let file = std::fs::File::open(self.path.clone()).map_err(TransportErrorKind::custom)?;
+        let file = std::fs::File::open(path).map_err(TransportErrorKind::custom)?;
         let file = BufReader::new(file);
         let entries: Vec<FsCacheEntry> =
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
@@ -173,6 +200,14 @@ struct FsCacheEntry {
     value: String,
 }
 
+/// Configuration for the cache layer.
+/// For future extensibility of the configurations.
+#[derive(Debug, Clone)]
+pub struct CacheConfig {
+    /// Maximum number of items to store in the cache.
+    pub max_items: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -184,11 +219,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_provider() {
-        let cache = CacheLayer::new(PathBuf::from_str("./rpc-cache.txt").unwrap(), 100);
+        let cache = CacheLayer::new(100);
         let anvil = Anvil::new().block_time_f64(0.3).spawn();
         let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
-        provider.load_cache().await.unwrap();
+        let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
+        provider.load_cache(path.clone()).await.unwrap();
         let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
         let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap();
 
@@ -197,7 +233,7 @@ mod tests {
         let blk3 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
         let blk4 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
 
-        provider.dump_cache().await.unwrap();
+        provider.save_cache(path).await.unwrap();
         assert_eq!(blk, blk2);
         assert_eq!(blk3, blk4);
     }
