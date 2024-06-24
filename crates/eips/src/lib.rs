@@ -27,10 +27,10 @@ pub mod eip2935;
 
 pub mod eip4788;
 
-pub mod eip4895;
-
 pub mod eip4844;
 pub use eip4844::{calc_blob_gasprice, calc_excess_blob_gas};
+
+pub mod eip4895;
 
 pub mod eip6110;
 pub mod merge;
@@ -40,3 +40,5 @@ pub mod eip7002;
 pub mod eip7251;
 
 pub mod eip7685;
+
+pub mod eip7702;

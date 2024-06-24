@@ -70,6 +70,7 @@ serde = [
 kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
 sha2 = ["dep:sha2"]
+k256 = ["alloy-primitives/k256"]
 ssz = [
     "std",
     "dep:ethereum_ssz",
