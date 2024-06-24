@@ -7,6 +7,7 @@ use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable
 
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Authorization {
     /// The chain ID of the authorization.
     pub chain_id: ChainId,
@@ -72,6 +73,7 @@ impl Authorization {
 
 /// A signed EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedAuthorization<S> {
     inner: Authorization,
     signature: S,
@@ -113,6 +115,7 @@ impl<S> Deref for SignedAuthorization<S> {
 
 /// A recovered authorization.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RecoveredAuthorization {
     inner: Authorization,
     authority: Option<Address>,
@@ -142,6 +145,7 @@ impl Deref for RecoveredAuthorization {
 ///
 /// The wrapper type is used for RLP encoding and decoding.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OptionalNonce(Option<u64>);
 
 impl OptionalNonce {
