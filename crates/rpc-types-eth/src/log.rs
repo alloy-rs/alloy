@@ -3,10 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 pub struct Log<T = LogData> {
     #[serde(flatten)]

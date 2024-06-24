@@ -9,10 +9,7 @@ use serde::{Deserialize, Serialize};
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {

@@ -614,10 +614,7 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 /// Either a block hash _or_ a block number
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum BlockHashOrNumber {
     /// A block hash
     Hash(B256),
