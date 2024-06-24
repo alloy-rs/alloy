@@ -7,7 +7,7 @@ use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 // TODO: Populate load cache from file on initialization.
 // TODO: Add method to dump cache to file.
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
@@ -42,7 +42,7 @@ pub struct CacheProvider<P, T> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
-    cache: Mutex<LruCache<B256, String>>,
+    cache: RwLock<LruCache<B256, String>>,
     /// Path to the cache file.
     path: PathBuf,
     /// Phantom data
@@ -57,7 +57,7 @@ where
     /// Instantiate a new cache provider.
     pub fn new(inner: P, path: PathBuf, max_items: usize) -> Self {
         let cache =
-            Mutex::new(LruCache::<B256, String>::new(NonZeroUsize::new(max_items).unwrap()));
+            RwLock::new(LruCache::<B256, String>::new(NonZeroUsize::new(max_items).unwrap()));
         Self { inner, path, cache, _pd: PhantomData }
     }
 
@@ -75,19 +75,20 @@ where
 
     /// Puts a value into the cache, and returns the old value if it existed.
     pub async fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
-        let mut cache = self.cache.lock().await;
+        let mut cache = self.cache.write().await;
         Ok(cache.put(key, value))
     }
 
     /// Gets a value from the cache, if it exists.
     pub async fn get(&self, key: &B256) -> TransportResult<Option<String>> {
-        let mut cache = self.cache.lock().await;
+        // Need to acquire a write guard to change the order of keys in LRU cache.
+        let mut cache = self.cache.write().await;
         let val = cache.get(key).cloned();
         Ok(val)
     }
 
     pub async fn dump_cache(&self) -> TransportResult<()> {
-        let cache = self.cache.lock().await;
+        let cache = self.cache.read().await;
         let file = std::fs::File::create(self.path.clone()).map_err(TransportErrorKind::custom)?;
 
         // Iterate over the cache and dump to the file.
@@ -107,7 +108,7 @@ where
         let file = BufReader::new(file);
         let entries: Vec<FsCacheEntry> =
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
-        let mut cache = self.cache.lock().await;
+        let mut cache = self.cache.write().await;
         for entry in entries {
             cache.put(entry.key, entry.value);
         }
