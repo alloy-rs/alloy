@@ -94,9 +94,39 @@ impl SignedAuthorization<alloy_primitives::Signature> {
     pub fn recover_authority(&self) -> Result<Address, alloy_primitives::SignatureError> {
         self.signature.recover_address_from_prehash(&self.inner.signature_hash())
     }
+
+    /// Recover the authority and transform the signed authorization into a
+    /// [`RecoveredAuthorization`].
+    pub fn into_recovered(self) -> RecoveredAuthorization {
+        RecoveredAuthorization { inner: self.inner, authority: self.recover_authority().ok() }
+    }
 }
 
 impl<S> Deref for SignedAuthorization<S> {
+    type Target = Authorization;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+/// A recovered authorization.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RecoveredAuthorization {
+    inner: Authorization,
+    authority: Option<Address>,
+}
+
+impl RecoveredAuthorization {
+    /// Get the `authority` for the authorization.
+    ///
+    /// If this is `None`, then the authority could not be recovered.
+    pub const fn authority(&self) -> Option<Address> {
+        self.authority
+    }
+}
+
+impl Deref for RecoveredAuthorization {
     type Target = Authorization;
 
     fn deref(&self) -> &Self::Target {
