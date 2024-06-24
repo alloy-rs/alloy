@@ -72,7 +72,7 @@ impl Authorization {
 }
 
 /// A signed EIP-7702 authorization.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
+#[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedAuthorization<S> {
     inner: Authorization,
