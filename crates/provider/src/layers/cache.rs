@@ -87,6 +87,9 @@ where
         Ok(val)
     }
 
+    /// Dumps the cache to a file specified by the path.
+    /// If the files does not exist, it creates one.
+    /// If the file exists, it overwrites it.
     pub async fn dump_cache(&self) -> TransportResult<()> {
         let cache = self.cache.read().await;
         let file = std::fs::File::create(self.path.clone()).map_err(TransportErrorKind::custom)?;
@@ -100,6 +103,8 @@ where
         Ok(())
     }
 
+    /// Loads the cache from a file specified by the path.
+    /// If the file does not exist, it returns without error.
     pub async fn load_cache(&self) -> TransportResult<()> {
         if !self.path.exists() {
             return Ok(());
