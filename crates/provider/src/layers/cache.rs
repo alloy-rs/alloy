@@ -166,9 +166,8 @@ where
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        let req =
-            RequestType::GetBlockByNumber((number, hydrate)).make_request(self.inner.client());
-        let hash = self.hash_request(req)?;
+        let hash =
+            RequestType::GetBlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
         // Try to get from cache
         if let Some(block) = self.get(&hash).await? {
             let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
@@ -203,6 +202,13 @@ impl<Params: RpcParam> RequestType<Params> {
                 client.make_request("eth_getBlockByNumber", params.to_owned())
             }
         }
+    }
+
+    fn params_hash<T: Transport>(&self, client: ClientRef<'_, T>) -> TransportResult<B256> {
+        let req = self.make_request(client);
+        let ser_req = req.serialize().map_err(TransportErrorKind::custom)?;
+
+        Ok(ser_req.params_hash())
     }
 }
 
