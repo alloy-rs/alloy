@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Move mev.rs from reth to rpc-types-mev ([#970](https://github.com/alloy-rs/alloy/issues/970))
 
+### Miscellaneous Tasks
+
+- Release 0.1.3
+
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy
 [`alloy-core`]: https://crates.io/crates/alloy-core

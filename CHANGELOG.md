@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.3
 - [eips] Add serde to Authorization types ([#964](https://github.com/alloy-rs/alloy/issues/964))
 - Add more features to meta crate ([#953](https://github.com/alloy-rs/alloy/issues/953))
 - [eips] Make `sha2` optional, add `kzg-sidecar` feature ([#949](https://github.com/alloy-rs/alloy/issues/949))
