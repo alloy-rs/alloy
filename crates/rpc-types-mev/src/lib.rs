@@ -6,12 +6,12 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-use alloy_primitives::{Address, Bytes, TxHash, B256, U256, Log};
+use alloy_eips::{BlockId, BlockNumberOrTag};
+use alloy_primitives::{Address, Bytes, Log, TxHash, B256, U256};
 use serde::{
     ser::{SerializeSeq, Serializer},
     Deserialize, Deserializer, Serialize,
 };
-use alloy_eips::{BlockId, BlockNumberOrTag};
 
 /// A bundle of transactions to send to the matchmaker.
 ///
@@ -762,7 +762,7 @@ mod u256_numeric_string {
         match val {
             serde_json::Value::String(s) => {
                 if let Ok(val) = s.parse::<u128>() {
-                    return Ok(U256::from(val))
+                    return Ok(U256::from(val));
                 }
                 U256::from_str(&s).map_err(de::Error::custom)
             }
