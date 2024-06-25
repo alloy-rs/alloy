@@ -417,8 +417,13 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
+    /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request).block(self.block).await.map_err(Into::into)
+        let mut estimate = self.provider.estimate_gas(&self.request);
+        if let Some(state) = &self.state {
+            estimate = estimate.overrides(state);
+        }
+        estimate.block(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
