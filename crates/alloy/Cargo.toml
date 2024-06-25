@@ -98,9 +98,9 @@ reqwest = [
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
 ]
-reqwest-default-tls = ["alloy-transport-http?/reqwest-default-tls"]
-reqwest-rustls-tls = ["alloy-transport-http?/reqwest-rustls-tls"]
-reqwest-native-tls = ["alloy-transport-http?/reqwest-native-tls"]
+reqwest-default-tls = ["reqwest", "alloy-transport-http?/reqwest-default-tls"]
+reqwest-rustls-tls = ["reqwest", "alloy-transport-http?/reqwest-rustls-tls"]
+reqwest-native-tls = ["reqwest", "alloy-transport-http?/reqwest-native-tls"]
 hyper = [
     "dep:hyper",
     "alloy-rpc-client?/hyper",
@@ -131,7 +131,6 @@ providers = ["dep:alloy-provider", "rpc-client", "eips"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
-
 provider-admin-api = [
     "providers",
     "alloy-provider?/admin-api",
@@ -162,7 +161,6 @@ provider-txpool-api = [
     "alloy-provider?/txpool-api",
     "rpc-types-txpool",
 ]
-
 provider-anvil-node = [
     "providers",
     "provider-anvil-api",
