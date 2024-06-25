@@ -36,6 +36,7 @@ anvil = ["dep:alloy-rpc-types-anvil"]
 beacon = ["dep:alloy-rpc-types-beacon"]
 engine = ["dep:alloy-rpc-types-engine"]
 eth = ["dep:alloy-rpc-types-eth"]
+mev = ["dep:alloy-rpc-types-mev"]
 trace = ["dep:alloy-rpc-types-trace"]
 txpool = ["dep:alloy-rpc-types-txpool"]
 
