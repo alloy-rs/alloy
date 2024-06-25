@@ -1,7 +1,7 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
-use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{hex, Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
@@ -869,6 +869,56 @@ pub struct PayloadAttributes {
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_beacon_block_root: Option<B256>,
+
+    /// EIP1559 base fee
+    #[cfg(feature = "taiko")]
+    pub base_fee_per_gas: Option<U256>,
+    /// Data from l1 contract
+    #[cfg(feature = "taiko")]
+    pub block_metadata: Option<BlockMetadata>,
+    /// l1 anchor information
+    #[cfg(feature = "taiko")]
+    pub l1_origin: Option<L1Origin>,
+}
+
+/// This structure contains the information from l1 contract storage
+#[cfg(feature = "taiko")]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockMetadata {
+    /// The Keccak 256-bit hash of the parent
+    /// block’s header, in its entirety; formally Hp.
+    pub beneficiary: Address,
+    /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+    pub gas_limit: u128,
+    /// Timestamp in l1
+    #[serde(with = "alloy_serde::quantity")]
+    pub timestamp: u64,
+    /// A 256-bit hash which, combined with the
+    /// nonce, proves that a sufficient amount of computation has been carried out on this block;
+    /// formally Hm.
+    pub mix_hash: B256,
+    /// The origin transactions data
+    #[serde(with = "hex::serde")]
+    pub tx_list: Bytes,
+    /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
+    /// fewer; formally Hx.
+    pub extra_data: Bytes,
+}
+
+/// The anchor information
+#[cfg(feature = "taiko")]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct L1Origin {
+    /// The block number of the l2 block
+    pub block_id: U256,
+    /// The hash of the l2 block
+    pub l2_block_hash: B256,
+    /// The height of the l1 block
+    pub l1_block_height: U256,
+    /// The hash of the l1 block
+    pub l1_block_hash: B256,
 }
 
 /// This structure contains the result of processing a payload or fork choice update.
