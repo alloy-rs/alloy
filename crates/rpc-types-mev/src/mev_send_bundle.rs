@@ -102,9 +102,8 @@ pub enum BundleItem {
 mod tests {
     use std::str::FromStr;
 
-    use crate::common::PrivacyHint;
+    use crate::{common::PrivacyHint, RefundConfig};
     use alloy_primitives::Bytes;
-    use crate::RefundConfig;
 
     use super::*;
 
