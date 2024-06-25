@@ -65,7 +65,7 @@ hyper = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest", "reqwest-default-tls"]
+default = ["std", "reqwest-default-tls"]
 
 # std
 std = [
