@@ -14,6 +14,7 @@ use std::{
     hash::Hash,
     ops::{Range, RangeFrom, RangeTo},
 };
+use thiserror::Error;
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -152,6 +153,19 @@ impl From<U256> for Topic {
     }
 }
 
+/// Represents errors that can occur when setting block filters in `FilterBlockOption`.
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum FilterBlockError {
+    /// Error indicating that the `from_block` is greater than the `to_block`.
+    #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
+    FromBlockGreaterThanToBlock {
+        /// The starting block number, which is greater than `to`.
+        from: u64,
+        /// The ending block number, which is less than `from`.
+        to: u64,
+    },
+}
+
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FilterBlockOption {
@@ -209,6 +223,20 @@ impl FilterBlockOption {
     /// Returns true if this is a block hash filter.
     pub const fn is_block_hash(&self) -> bool {
         matches!(self, Self::AtBlockHash(_))
+    }
+
+    /// Ensure block range validity
+    pub fn ensure_valid_block_range(&self) -> Result<(), FilterBlockError> {
+        // Check if from_block is greater than to_block
+        if let (Some(from), Some(to)) = (
+            self.get_from_block().as_ref().and_then(|from| from.as_number()),
+            self.get_to_block().as_ref().and_then(|to| to.as_number()),
+        ) {
+            if from > to {
+                return Err(FilterBlockError::FromBlockGreaterThanToBlock { from, to });
+            }
+        }
+        Ok(())
     }
 
     /// Sets the block number this range filter should start at.
@@ -1150,6 +1178,31 @@ mod tests {
                 Default::default(),
             ]
         );
+    }
+
+    #[test]
+    fn test_with_from_block_correct_range() {
+        // Test scenario where from_block is less than to_block
+        let original = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(1)),
+            to_block: Some(BlockNumberOrTag::Number(10)),
+        };
+        let updated = original.with_from_block(BlockNumberOrTag::Number(5));
+        assert!(updated.ensure_valid_block_range().is_ok());
+    }
+
+    #[test]
+    fn test_with_from_block_failure() {
+        // Test scenario where from_block is greater than to_block
+        let original = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(10)),
+            to_block: Some(BlockNumberOrTag::Number(5)),
+        };
+
+        assert!(matches!(
+            original.ensure_valid_block_range(),
+            Err(FilterBlockError::FromBlockGreaterThanToBlock { .. })
+        ));
     }
 
     #[test]
