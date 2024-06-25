@@ -5,46 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Documentation
-
-- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
 
 ### Features
 
-- [rpc-types-anvil] Add `Index`, fix compatibility ([#931](https://github.com/alloy-rs/alloy/issues/931))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
-
-### Features
-
-- [serde] Deprecate individual num::* for a generic `quantity` module ([#855](https://github.com/alloy-rs/alloy/issues/855))
-- [rpc] Add remaining anvil rpc methods to provider ([#831](https://github.com/alloy-rs/alloy/issues/831))
-- Add rpc-types-anvil ([#526](https://github.com/alloy-rs/alloy/issues/526))
-
-### Miscellaneous Tasks
-
-- [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
-- [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
-- [docs] Add doc aliases ([#843](https://github.com/alloy-rs/alloy/issues/843))
-
-### Other
-
-- Implement `Default` to `NodeForkConfig` ([#844](https://github.com/alloy-rs/alloy/issues/844))
-- Add clippy at workspace level ([#766](https://github.com/alloy-rs/alloy/issues/766))
-
-### Refactor
-
-- Clean up legacy serde helpers ([#624](https://github.com/alloy-rs/alloy/issues/624))
+- Move mev.rs from reth to rpc-types-mev ([#970](https://github.com/alloy-rs/alloy/issues/970))
 
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy

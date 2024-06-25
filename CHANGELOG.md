@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Bug Fixes
+
+- Continue reading ipc on large data ([#958](https://github.com/alloy-rs/alloy/issues/958))
+- Deserialization of null storage keys in AccessListItem ([#955](https://github.com/alloy-rs/alloy/issues/955))
+- Enable tls12 in rustls ([#952](https://github.com/alloy-rs/alloy/issues/952))
+
+### Dependencies
+
+- [eips] Make `alloy-serde` optional under `serde` ([#948](https://github.com/alloy-rs/alloy/issues/948))
+
+### Documentation
+
+- Copy/paste error of eip-7251 link ([#961](https://github.com/alloy-rs/alloy/issues/961))
+
+### Features
+
+- [network] Add `input` method to `TransactionResponse` ([#959](https://github.com/alloy-rs/alloy/issues/959))
+- Move mev.rs from reth to rpc-types-mev ([#970](https://github.com/alloy-rs/alloy/issues/970))
+- [alloy] Forward `rustls` & `native` reqwest TLS configuration to Alloy's metacrate ([#969](https://github.com/alloy-rs/alloy/issues/969))
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
+- Add eip-7251 system contract address/code ([#956](https://github.com/alloy-rs/alloy/issues/956))
+- Add trace_filter method ([#946](https://github.com/alloy-rs/alloy/issues/946))
+
+### Miscellaneous Tasks
+
+- [eips] Add serde to Authorization types ([#964](https://github.com/alloy-rs/alloy/issues/964))
+- Add more features to meta crate ([#953](https://github.com/alloy-rs/alloy/issues/953))
+- [eips] Make `sha2` optional, add `kzg-sidecar` feature ([#949](https://github.com/alloy-rs/alloy/issues/949))
+- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
+
+### Other
+
+- [contract] Support state overrides for gas estimation ([#967](https://github.com/alloy-rs/alloy/issues/967))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
 ### Dependencies
@@ -33,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
 - [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
 - Update eip-2935 bytecode and address ([#934](https://github.com/alloy-rs/alloy/issues/934))
 - Don't self-host documentation anymore ([#920](https://github.com/alloy-rs/alloy/issues/920))
