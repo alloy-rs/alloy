@@ -1,3 +1,3 @@
 # alloy-rpc-types-mev
 
-Types for the MEV JSON-RPC namespace.
+Types for the MEV bundle JSON-RPC namespace.
