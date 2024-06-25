@@ -1,10 +1,7 @@
 use alloy_primitives::{Bytes, TxHash};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    common::{Privacy, Validity},
-    ProtocolVersion,
-};
+use crate::common::{Privacy, ProtocolVersion, Validity};
 
 /// A bundle of transactions to send to the matchmaker.
 ///
