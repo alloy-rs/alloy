@@ -58,10 +58,6 @@ alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
-# optional
-reqwest = { workspace = true, optional = true }
-hyper = { workspace = true, optional = true }
-
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
@@ -85,36 +81,32 @@ full = [
     "kzg",
     "network",
     "provider-http", # includes `providers`
-    "provider-ws",   # includes `providers`
-    "provider-ipc",  # includes `providers`
-    "rpc-types",     # includes `rpc-types-eth`
-    "signer-local",  # includes `signers`
+    "provider-ws", # includes `providers`
+    "provider-ipc", # includes `providers`
+    "rpc-types", # includes `rpc-types-eth`
+    "signer-local", # includes `signers`
 ]
 
 # configuration
 reqwest = [
-    "dep:reqwest",
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
 ]
 reqwest-rustls-tls = [
-    "dep:reqwest",
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-rustls-tls",
 ]
 reqwest-native-tls = [
-    "dep:reqwest",
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-native-tls",
 ]
 hyper = [
-    "dep:hyper",
     "alloy-rpc-client?/hyper",
     "alloy-provider?/hyper",
     "alloy-transport-http?/hyper",
