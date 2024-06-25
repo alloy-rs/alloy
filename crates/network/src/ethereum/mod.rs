@@ -1,4 +1,5 @@
 use crate::{Network, ReceiptResponse, TransactionResponse};
+use alloy_primitives::Bytes;
 
 mod builder;
 
@@ -61,5 +62,9 @@ impl TransactionResponse for alloy_rpc_types_eth::Transaction {
 
     fn gas(&self) -> u128 {
         self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }
