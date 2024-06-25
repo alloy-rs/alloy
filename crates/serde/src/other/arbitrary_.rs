@@ -17,7 +17,7 @@ impl arbitrary::Arbitrary<'_> for OtherFields {
 /// Redefinition of `serde_json::Value` for the purpose of implementing `Arbitrary`.
 #[derive(Clone, Debug, arbitrary::Arbitrary)]
 #[allow(unnameable_types)]
-pub enum ArbitraryValue {
+enum ArbitraryValue {
     Null,
     Bool(bool),
     Number(u64),
