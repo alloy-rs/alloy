@@ -108,7 +108,7 @@ impl TransactionResponse for WithOtherFields<Transaction> {
         self.gas
     }
 
-    fn input(&self) -> Bytes {
-        self.input.clone()
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

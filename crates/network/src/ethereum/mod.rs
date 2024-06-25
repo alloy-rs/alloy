@@ -64,7 +64,7 @@ impl TransactionResponse for alloy_rpc_types_eth::Transaction {
         self.gas
     }
 
-    fn input(&self) -> Bytes {
-        self.input.clone()
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

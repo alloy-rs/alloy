@@ -75,7 +75,7 @@ pub trait TransactionResponse {
 
     /// Input data
     #[doc(alias = "calldata")]
-    fn input(&self) -> Bytes;
+    fn input(&self) -> &Bytes;
 }
 
 /// Captures type info for network-specific RPC requests/responses.
