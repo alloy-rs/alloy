@@ -14,6 +14,7 @@ use std::{
     hash::Hash,
     ops::{Range, RangeFrom, RangeTo},
 };
+use thiserror::Error;
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -154,12 +155,16 @@ impl From<U256> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
-    FromBlockGreaterThanToBlock,
-    /// Error indicating that the `to_block` is less than the `from_block`.
-    ToBlockLessThanFromBlock,
+    #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
+    FromBlockGreaterThanToBlock {
+        /// The starting block number, which is greater than `to`.
+        from: u64,
+        /// The ending block number, which is less than `from`.
+        to: u64,
+    },
 }
 
 /// Represents the target range of blocks for the filter
@@ -222,14 +227,14 @@ impl FilterBlockOption {
     }
 
     /// Ensure block range validity
-    pub fn ensure_block_range(&self) -> Result<(), FilterBlockError> {
+    pub fn ensure_valid_block_range(&self) -> Result<(), FilterBlockError> {
         // Check if from_block is greater than to_block
         if let (Some(from), Some(to)) = (
             self.get_from_block().as_ref().and_then(|from| from.as_number()),
             self.get_to_block().as_ref().and_then(|to| to.as_number()),
         ) {
             if from > to {
-                return Err(FilterBlockError::FromBlockGreaterThanToBlock);
+                return Err(FilterBlockError::FromBlockGreaterThanToBlock { from, to });
             }
         }
         Ok(())
@@ -1185,7 +1190,7 @@ mod tests {
             to_block: Some(BlockNumberOrTag::Number(10)),
         };
         let updated = original.with_from_block(BlockNumberOrTag::Number(5));
-        assert!(updated.ensure_block_range().is_ok());
+        assert!(updated.ensure_valid_block_range().is_ok());
     }
 
     #[test]
@@ -1197,8 +1202,8 @@ mod tests {
         };
 
         assert!(matches!(
-            original.ensure_block_range(),
-            Err(FilterBlockError::FromBlockGreaterThanToBlock)
+            original.ensure_valid_block_range(),
+            Err(FilterBlockError::FromBlockGreaterThanToBlock { .. })
         ));
     }
 
