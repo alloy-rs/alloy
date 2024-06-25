@@ -1,5 +1,5 @@
 use crate::{ConsideredByBuildersAt, SealedByBuildersAt};
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 // TODO(@optimiz-r): Revisit after <https://github.com/flashbots/flashbots-docs/issues/424> is closed.
 /// Response for `flashbots_getBundleStatsV2` represents stats for a single bundle
