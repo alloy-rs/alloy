@@ -65,7 +65,7 @@ hyper = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest-default-tls"]
+default = ["std", "reqwest"]
 
 # std
 std = [
@@ -97,10 +97,22 @@ reqwest = [
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-default-tls",
 ]
-reqwest-default-tls = ["reqwest", "alloy-transport-http?/reqwest-default-tls"]
-reqwest-rustls-tls = ["reqwest", "alloy-transport-http?/reqwest-rustls-tls"]
-reqwest-native-tls = ["reqwest", "alloy-transport-http?/reqwest-native-tls"]
+reqwest-rustls-tls = [
+    "dep:reqwest",
+    "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
+    "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-rustls-tls",
+]
+reqwest-native-tls = [
+    "dep:reqwest",
+    "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
+    "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-native-tls",
+]
 hyper = [
     "dep:hyper",
     "alloy-rpc-client?/hyper",
