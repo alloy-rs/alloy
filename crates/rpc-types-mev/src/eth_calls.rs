@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 /// Bundle of transactions for `eth_callBundle`
 ///
 /// <https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint#eth_callBundle>
+/// <https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2049>
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EthCallBundle {
@@ -20,6 +21,15 @@ pub struct EthCallBundle {
     /// the timestamp to use for this bundle simulation, in seconds since the unix epoch
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<u64>,
+    /// gas limit of the block to use for this simulation
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub gas_limit: Option<u64>,
+    /// difficulty of the block to use for this simulation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<U256>,
+    /// basefee of the block to use for this simulation
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub base_fee: Option<u128>,
 }
 
 /// Response for `eth_callBundle`
