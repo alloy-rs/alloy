@@ -170,7 +170,7 @@ impl TrezorSigner {
         let nonce = tx.nonce();
         let nonce = u64_to_trezor(nonce);
 
-        let gas_price = 0_u128;
+        let gas_price = tx.gas_price().unwrap_or(0);
         let gas_price = u128_to_trezor(gas_price);
 
         let gas_limit = tx.gas_limit();
