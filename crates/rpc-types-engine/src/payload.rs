@@ -1,7 +1,7 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
-use alloy_primitives::{hex, Address, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
@@ -174,6 +174,12 @@ pub struct ExecutionPayloadV1 {
     pub block_hash: B256,
     /// The transactions of the block.
     pub transactions: Vec<Bytes>,
+    /// The tx list hash of the block.
+    #[cfg(feature = "taiko")]
+    pub tx_hash: B256,
+    /// the withdrawals hash of the block.
+    #[cfg(feature = "taiko")]
+    pub withdrawals_hash: B256,
 }
 
 /// This structure maps on the ExecutionPayloadV2 structure of the beacon chain spec.
@@ -899,7 +905,6 @@ pub struct BlockMetadata {
     /// formally Hm.
     pub mix_hash: B256,
     /// The origin transactions data
-    #[serde(with = "hex::serde")]
     pub tx_list: Bytes,
     /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
     /// fewer; formally Hx.
