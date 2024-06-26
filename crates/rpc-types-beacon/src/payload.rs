@@ -11,6 +11,8 @@
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
 use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
+#[cfg(feature = "taiko")]
+use alloy_rpc_types_engine::{BlockMetadata, L1Origin};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
     ExecutionPayloadV4,
@@ -109,6 +111,15 @@ struct BeaconPayloadAttributes {
     withdrawals: Option<Vec<Withdrawal>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parent_beacon_block_root: Option<B256>,
+    /// EIP1559 base fee
+    #[cfg(feature = "taiko")]
+    pub base_fee_per_gas: Option<U256>,
+    /// Data from l1 contract
+    #[cfg(feature = "taiko")]
+    pub block_metadata: BlockMetadata,
+    /// l1 anchor information
+    #[cfg(feature = "taiko")]
+    pub l1_origin: L1Origin,
 }
 
 /// Optimism Payload Attributes
@@ -150,6 +161,12 @@ pub mod beacon_api_payload_attributes_optimism {
             parent_beacon_block_root: payload_attributes
                 .payload_attributes
                 .parent_beacon_block_root,
+            #[cfg(feature = "taiko")]
+            base_fee_per_gas: payload_attributes.payload_attributes.base_fee_per_gas,
+            #[cfg(feature = "taiko")]
+            block_metadata: payload_attributes.payload_attributes.block_metadata.clone(),
+            #[cfg(feature = "taiko")]
+            l1_origin: payload_attributes.payload_attributes.l1_origin.clone(),
         };
 
         let op_beacon_api_payload_attributes = BeaconOptimismPayloadAttributes {
@@ -180,6 +197,12 @@ pub mod beacon_api_payload_attributes_optimism {
                 parent_beacon_block_root: beacon_api_payload_attributes
                     .payload_attributes
                     .parent_beacon_block_root,
+                #[cfg(feature = "taiko")]
+                base_fee_per_gas: beacon_api_payload_attributes.payload_attributes.base_fee_per_gas,
+                #[cfg(feature = "taiko")]
+                block_metadata: beacon_api_payload_attributes.payload_attributes.block_metadata,
+                #[cfg(feature = "taiko")]
+                l1_origin: beacon_api_payload_attributes.payload_attributes.l1_origin,
             },
             transactions: beacon_api_payload_attributes.transactions,
             no_tx_pool: beacon_api_payload_attributes.no_tx_pool,
@@ -212,6 +235,12 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: payload_attributes.suggested_fee_recipient,
             withdrawals: payload_attributes.withdrawals.clone(),
             parent_beacon_block_root: payload_attributes.parent_beacon_block_root,
+            #[cfg(feature = "taiko")]
+            base_fee_per_gas: payload_attributes.base_fee_per_gas,
+            #[cfg(feature = "taiko")]
+            block_metadata: payload_attributes.block_metadata.clone(),
+            #[cfg(feature = "taiko")]
+            l1_origin: payload_attributes.l1_origin.clone(),
         };
         beacon_api_payload_attributes.serialize(serializer)
     }
@@ -228,6 +257,12 @@ pub mod beacon_api_payload_attributes {
             suggested_fee_recipient: beacon_api_payload_attributes.suggested_fee_recipient,
             withdrawals: beacon_api_payload_attributes.withdrawals,
             parent_beacon_block_root: beacon_api_payload_attributes.parent_beacon_block_root,
+            #[cfg(feature = "taiko")]
+            base_fee_per_gas: beacon_api_payload_attributes.base_fee_per_gas,
+            #[cfg(feature = "taiko")]
+            block_metadata: beacon_api_payload_attributes.block_metadata,
+            #[cfg(feature = "taiko")]
+            l1_origin: beacon_api_payload_attributes.l1_origin,
         })
     }
 }
@@ -254,6 +289,12 @@ struct BeaconExecutionPayloadV1<'a> {
     base_fee_per_gas: U256,
     block_hash: Cow<'a, B256>,
     transactions: Cow<'a, Vec<Bytes>>,
+    /// The tx list hash of the block.
+    #[cfg(feature = "taiko")]
+    tx_hash: Cow<'a, B256>,
+    /// the withdrawals hash of the block.
+    #[cfg(feature = "taiko")]
+    withdrawals_hash: Cow<'a, B256>,
 }
 
 impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
@@ -273,6 +314,10 @@ impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
             base_fee_per_gas,
             block_hash,
             transactions,
+            #[cfg(feature = "taiko")]
+            tx_hash,
+            #[cfg(feature = "taiko")]
+            withdrawals_hash,
         } = payload;
         Self {
             parent_hash: parent_hash.into_owned(),
@@ -289,6 +334,10 @@ impl<'a> From<BeaconExecutionPayloadV1<'a>> for ExecutionPayloadV1 {
             base_fee_per_gas,
             block_hash: block_hash.into_owned(),
             transactions: transactions.into_owned(),
+            #[cfg(feature = "taiko")]
+            tx_hash: tx_hash.into_owned(),
+            #[cfg(feature = "taiko")]
+            withdrawals_hash: withdrawals_hash.into_owned(),
         }
     }
 }
@@ -310,6 +359,10 @@ impl<'a> From<&'a ExecutionPayloadV1> for BeaconExecutionPayloadV1<'a> {
             base_fee_per_gas,
             block_hash,
             transactions,
+            #[cfg(feature = "taiko")]
+            tx_hash,
+            #[cfg(feature = "taiko")]
+            withdrawals_hash,
         } = value;
 
         BeaconExecutionPayloadV1 {
@@ -327,6 +380,10 @@ impl<'a> From<&'a ExecutionPayloadV1> for BeaconExecutionPayloadV1<'a> {
             base_fee_per_gas: *base_fee_per_gas,
             block_hash: Cow::Borrowed(block_hash),
             transactions: Cow::Borrowed(transactions),
+            #[cfg(feature = "taiko")]
+            tx_hash: Cow::Borrowed(tx_hash),
+            #[cfg(feature = "taiko")]
+            withdrawals_hash: Cow::Borrowed(withdrawals_hash),
         }
     }
 }

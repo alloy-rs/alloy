@@ -38,3 +38,4 @@ ssz = [
     "alloy-primitives/ssz",
     "alloy-rpc-types-engine/ssz",
 ]
+taiko = ["alloy-rpc-types-engine/taiko"]
