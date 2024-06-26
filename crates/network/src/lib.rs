@@ -9,17 +9,17 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, TxHash, U256};
+use alloy_primitives::{Address, Bytes, TxHash, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkSigner, TransactionBuilder, TransactionBuilderError, TxSigner,
+    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilderError, TxSigner,
     TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
-pub use ethereum::{Ethereum, EthereumSigner};
+pub use ethereum::{Ethereum, EthereumWallet};
 
 mod any;
 pub use any::AnyNetwork;
@@ -72,6 +72,10 @@ pub trait TransactionResponse {
 
     /// Gas limit
     fn gas(&self) -> u128;
+
+    /// Input data
+    #[doc(alias = "calldata")]
+    fn input(&self) -> &Bytes;
 }
 
 /// Captures type info for network-specific RPC requests/responses.

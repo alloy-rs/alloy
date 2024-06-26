@@ -22,13 +22,13 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .with_chain_id(1)
-///     .signer(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;

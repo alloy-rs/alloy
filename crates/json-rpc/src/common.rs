@@ -66,13 +66,6 @@ impl<'de> Deserialize<'de> for Id {
                 write!(formatter, "a string, a number, or null")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                Ok(Id::String(v.to_owned()))
-            }
-
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
@@ -80,14 +73,21 @@ impl<'de> Deserialize<'de> for Id {
                 Ok(Id::Number(v))
             }
 
-            fn visit_unit<E>(self) -> Result<Self::Value, E>
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(Id::String(v.to_owned()))
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
                 Ok(Id::None)
             }
 
-            fn visit_none<E>(self) -> Result<Self::Value, E>
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {

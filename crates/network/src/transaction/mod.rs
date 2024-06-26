@@ -4,4 +4,4 @@ pub use builder::{
 };
 
 mod signer;
-pub use signer::{NetworkSigner, TxSigner, TxSignerSync};
+pub use signer::{NetworkWallet, TxSigner, TxSignerSync};

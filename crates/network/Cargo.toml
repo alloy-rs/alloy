@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -21,6 +25,7 @@ alloy-json-rpc.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-signer.workspace = true
+alloy-serde.workspace = true
 alloy-sol-types.workspace = true
 
 auto_impl.workspace = true
@@ -29,7 +34,7 @@ futures-utils-wasm.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-alloy-signer-wallet.workspace = true
+alloy-signer-local.workspace = true
 tokio.workspace = true
 
 [features]

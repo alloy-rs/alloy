@@ -65,7 +65,7 @@ impl KeySpecifier {
 /// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
 /// that the new function is `async` and must be called within some runtime.
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 ///
 /// # Examples

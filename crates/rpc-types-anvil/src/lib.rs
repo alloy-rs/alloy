@@ -142,7 +142,7 @@ pub struct ForkedNetwork {
 
 /// Additional `evm_mine` options
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
 pub enum MineOptions {
     /// The options for mining
     Options {
@@ -169,18 +169,78 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serde_forking() {
-        let s = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com",
-        "blockNumber": "18441649"
-      }
-    }"#;
-        let f: Forking = serde_json::from_str(s).unwrap();
+    fn test_serde_forking_deserialization() {
+        // Test full forking object
+        let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com","blockNumber": "18441649"}}"#;
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
         assert_eq!(
-            f,
+            forking,
             Forking {
                 json_rpc_url: Some("https://ethereumpublicnode.com".into()),
                 block_number: Some(18441649)
             }
         );
+
+        // Test forking object with only jsonRpcUrl
+        let json_data = r#"{"forking": {"jsonRpcUrl": "https://ethereumpublicnode.com"}}"#;
+        let forking: Forking = serde_json::from_str(json_data).unwrap();
+        assert_eq!(
+            forking,
+            Forking {
+                json_rpc_url: Some("https://ethereumpublicnode.com".into()),
+                block_number: None
+            }
+        );
+
+        // Test forking object with only blockNumber
+        let json_data = r#"{"forking": {"blockNumber": "18441649"}}"#;
+        let forking: Forking =
+            serde_json::from_str(json_data).expect("Failed to deserialize forking object");
+        assert_eq!(forking, Forking { json_rpc_url: None, block_number: Some(18441649) });
+    }
+
+    #[test]
+    fn test_serde_deserialize_options_with_values() {
+        let data = r#"{"timestamp": 1620000000, "blocks": 10}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+        );
+
+        let data = r#"{"timestamp": "0x608f3d00", "blocks": 10}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: Some(10) }
+        );
+    }
+
+    #[test]
+    fn test_serde_deserialize_options_with_timestamp() {
+        let data = r#"{"timestamp":"1620000000"}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+        );
+
+        let data = r#"{"timestamp":"0x608f3d00"}"#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(
+            deserialized,
+            MineOptions::Options { timestamp: Some(1620000000), blocks: None }
+        );
+    }
+
+    #[test]
+    fn test_serde_deserialize_timestamp() {
+        let data = r#""1620000000""#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
+
+        let data = r#""0x608f3d00""#;
+        let deserialized: MineOptions = serde_json::from_str(data).expect("Deserialization failed");
+        assert_eq!(deserialized, MineOptions::Timestamp(Some(1620000000)));
     }
 }

@@ -1,3 +1,3 @@
 # alloy-rpc-types-trace
 
-Ethereum RPC trace types.
+Types for the `trace` Ethereum JSON-RPC namespace.

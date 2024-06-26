@@ -14,6 +14,7 @@ use std::{
     hash::Hash,
     ops::{Range, RangeFrom, RangeTo},
 };
+use thiserror::Error;
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -130,10 +131,9 @@ impl<T: AsRef<[u8]> + Eq + Hash> FilterSet<T> {
 
 impl<T: Clone + Eq + Hash> FilterSet<T> {
     /// Returns a ValueOrArray inside an Option, so that:
-    ///   - If the filter is empty, it returns None
-    ///   - If the filter has only 1 value, it returns the single value
-    ///   - Otherwise it returns an array of values
-    /// This should be useful for serialization
+    /// - If the filter is empty, it returns None
+    /// - If the filter has only 1 value, it returns the single value
+    /// - Otherwise it returns an array of values
     pub fn to_value_or_array(&self) -> Option<ValueOrArray<T>> {
         let mut values = self.0.iter().cloned().collect::<Vec<T>>();
         match values.len() {
@@ -153,6 +153,19 @@ impl From<U256> for Topic {
     }
 }
 
+/// Represents errors that can occur when setting block filters in `FilterBlockOption`.
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum FilterBlockError {
+    /// Error indicating that the `from_block` is greater than the `to_block`.
+    #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
+    FromBlockGreaterThanToBlock {
+        /// The starting block number, which is greater than `to`.
+        from: u64,
+        /// The ending block number, which is less than `from`.
+        to: u64,
+    },
+}
+
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FilterBlockOption {
@@ -170,7 +183,7 @@ pub enum FilterBlockOption {
 }
 
 impl FilterBlockOption {
-    /// Returns the `fromBlock` value, if any
+    /// Returns the `from_block` value, if any
     pub const fn get_to_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { to_block, .. } => to_block.as_ref(),
@@ -178,7 +191,7 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the `toBlock` value, if any
+    /// Returns the `to_block` value, if any
     pub const fn get_from_block(&self) -> Option<&BlockNumberOrTag> {
         match self {
             Self::Range { from_block, .. } => from_block.as_ref(),
@@ -186,12 +199,62 @@ impl FilterBlockOption {
         }
     }
 
-    /// Returns the range (`fromBlock`, `toBlock`) if this is a range filter.
+    /// Returns the range (`from_block`, `to_block`) if this is a range filter.
     pub const fn as_range(&self) -> (Option<&BlockNumberOrTag>, Option<&BlockNumberOrTag>) {
         match self {
             Self::Range { from_block, to_block } => (from_block.as_ref(), to_block.as_ref()),
             Self::AtBlockHash(_) => (None, None),
         }
+    }
+
+    /// Returns the block hash if this is a block hash filter.
+    pub const fn as_block_hash(&self) -> Option<&BlockHash> {
+        match self {
+            Self::AtBlockHash(hash) => Some(hash),
+            Self::Range { .. } => None,
+        }
+    }
+
+    /// Returns true if this is a range filter.
+    pub const fn is_range(&self) -> bool {
+        matches!(self, Self::Range { .. })
+    }
+
+    /// Returns true if this is a block hash filter.
+    pub const fn is_block_hash(&self) -> bool {
+        matches!(self, Self::AtBlockHash(_))
+    }
+
+    /// Ensure block range validity
+    pub fn ensure_valid_block_range(&self) -> Result<(), FilterBlockError> {
+        // Check if from_block is greater than to_block
+        if let (Some(from), Some(to)) = (
+            self.get_from_block().as_ref().and_then(|from| from.as_number()),
+            self.get_to_block().as_ref().and_then(|to| to.as_number()),
+        ) {
+            if from > to {
+                return Err(FilterBlockError::FromBlockGreaterThanToBlock { from, to });
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets the block number this range filter should start at.
+    #[must_use]
+    pub fn with_from_block(&self, block: BlockNumberOrTag) -> Self {
+        Self::Range { from_block: Some(block), to_block: self.get_to_block().copied() }
+    }
+
+    /// Sets the block number this range filter should end at.
+    #[must_use]
+    pub fn with_to_block(&self, block: BlockNumberOrTag) -> Self {
+        Self::Range { from_block: self.get_from_block().copied(), to_block: Some(block) }
+    }
+
+    /// Pins the block hash this filter should target.
+    #[must_use]
+    pub const fn with_block_hash(&self, hash: B256) -> Self {
+        Self::AtBlockHash(hash)
     }
 }
 
@@ -245,31 +308,6 @@ impl From<B256> for FilterBlockOption {
 impl Default for FilterBlockOption {
     fn default() -> Self {
         Self::Range { from_block: None, to_block: None }
-    }
-}
-
-impl FilterBlockOption {
-    /// Sets the block number this range filter should start at.
-    #[must_use]
-    pub const fn set_from_block(&self, block: BlockNumberOrTag) -> Self {
-        let to_block = if let Self::Range { to_block, .. } = self { *to_block } else { None };
-
-        Self::Range { from_block: Some(block), to_block }
-    }
-
-    /// Sets the block number this range filter should end at.
-    #[must_use]
-    pub const fn set_to_block(&self, block: BlockNumberOrTag) -> Self {
-        let from_block = if let Self::Range { from_block, .. } = self { *from_block } else { None };
-
-        Self::Range { from_block, to_block: Some(block) }
-    }
-
-    /// Pins the block hash this filter should target.
-    #[must_use]
-    #[doc(alias = "set_block_hash")]
-    pub const fn set_hash(&self, hash: B256) -> Self {
-        Self::AtBlockHash(hash)
     }
 }
 
@@ -363,14 +401,14 @@ impl Filter {
     /// Sets the from block number
     #[must_use]
     pub fn from_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.set_from_block(block.into());
+        self.block_option = self.block_option.with_from_block(block.into());
         self
     }
 
     /// Sets the to block number
     #[must_use]
     pub fn to_block<T: Into<BlockNumberOrTag>>(mut self, block: T) -> Self {
-        self.block_option = self.block_option.set_to_block(block.into());
+        self.block_option = self.block_option.with_to_block(block.into());
         self
     }
 
@@ -384,12 +422,11 @@ impl Filter {
     /// Pins the block hash for the filter
     #[must_use]
     pub fn at_block_hash<T: Into<B256>>(mut self, hash: T) -> Self {
-        self.block_option = self.block_option.set_hash(hash.into());
+        self.block_option = self.block_option.with_block_hash(hash.into());
         self
     }
-    /// Sets the inner filter object
-    ///
-    /// *NOTE:* ranges are always inclusive
+
+    /// Sets the address to query with this filter.
     ///
     /// # Examples
     ///
@@ -668,6 +705,36 @@ pub enum ValueOrArray<T> {
     Array(Vec<T>),
 }
 
+impl<T> ValueOrArray<T> {
+    /// Get the value if present.
+    pub const fn as_value(&self) -> Option<&T> {
+        if let Self::Value(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Get the array if present.
+    pub fn as_array(&self) -> Option<&[T]> {
+        if let Self::Array(array) = self {
+            Some(array)
+        } else {
+            None
+        }
+    }
+
+    /// Check if the enum is a single value.
+    pub const fn is_value(&self) -> bool {
+        matches!(self, Self::Value(_))
+    }
+
+    /// Check if the enum is an array.
+    pub const fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
+    }
+}
+
 impl From<Address> for ValueOrArray<Address> {
     fn from(src: Address) -> Self {
         Self::Value(src)
@@ -894,6 +961,55 @@ impl From<Vec<Transaction>> for FilterChanges {
     }
 }
 
+impl<T> FilterChanges<T> {
+    /// Get the hashes if present.
+    pub fn as_hashes(&self) -> Option<&[B256]> {
+        if let Self::Hashes(hashes) = self {
+            Some(hashes)
+        } else {
+            None
+        }
+    }
+
+    /// Get the logs if present.
+    pub fn as_logs(&self) -> Option<&[RpcLog]> {
+        if let Self::Logs(logs) = self {
+            Some(logs)
+        } else {
+            None
+        }
+    }
+
+    /// Get the transactions if present.
+    pub fn as_transactions(&self) -> Option<&[T]> {
+        if let Self::Transactions(transactions) = self {
+            Some(transactions)
+        } else {
+            None
+        }
+    }
+
+    /// Check if the filter changes are empty.
+    pub const fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    /// Check if the filter changes contain logs.
+    pub const fn is_logs(&self) -> bool {
+        matches!(self, Self::Logs(_))
+    }
+
+    /// Check if the filter changes contain hashes.
+    pub const fn is_hashes(&self) -> bool {
+        matches!(self, Self::Hashes(_))
+    }
+
+    /// Check if the filter changes contain transactions.
+    pub const fn is_transactions(&self) -> bool {
+        matches!(self, Self::Transactions(_))
+    }
+}
+
 mod empty_array {
     use serde::{Serialize, Serializer};
 
@@ -1062,6 +1178,31 @@ mod tests {
                 Default::default(),
             ]
         );
+    }
+
+    #[test]
+    fn test_with_from_block_correct_range() {
+        // Test scenario where from_block is less than to_block
+        let original = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(1)),
+            to_block: Some(BlockNumberOrTag::Number(10)),
+        };
+        let updated = original.with_from_block(BlockNumberOrTag::Number(5));
+        assert!(updated.ensure_valid_block_range().is_ok());
+    }
+
+    #[test]
+    fn test_with_from_block_failure() {
+        // Test scenario where from_block is greater than to_block
+        let original = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(10)),
+            to_block: Some(BlockNumberOrTag::Number(5)),
+        };
+
+        assert!(matches!(
+            original.ensure_valid_block_range(),
+            Err(FilterBlockError::FromBlockGreaterThanToBlock { .. })
+        ));
     }
 
     #[test]

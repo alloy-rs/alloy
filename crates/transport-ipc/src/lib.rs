@@ -155,12 +155,6 @@ impl<T: AsyncRead> futures::stream::Stream for ReadJsonStream<T> {
                                 "IPC buffer contains invalid JSON data",
                             );
 
-                            if this.buf.len() > CAPACITY {
-                                // buffer is full, we can't decode any more
-                                error!("IPC response too large to decode");
-                                return Ready(None);
-                            }
-
                             // this happens if the deserializer is unable to decode a partial object
                             *this.drained = true;
                         } else if err.is_eof() {
@@ -253,5 +247,37 @@ mod tests {
         .await;
         let obj = reader.next().await;
         assert!(obj.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_large_valid() {
+        let header = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x";
+        let filling_zeros = header
+            .iter()
+            .chain(vec![b'0'; CAPACITY - header.len()].iter())
+            .copied()
+            .collect::<Vec<_>>();
+
+        let first_page = filling_zeros.as_ref();
+        let second_page = b"\"}";
+
+        let mock = tokio_test::io::Builder::new()
+            // partial object
+            .read(first_page)
+            // trigger pending read
+            .wait(std::time::Duration::from_millis(1))
+            // complete object
+            .read(second_page)
+            .build();
+
+        let mut reader = ReadJsonStream::new(mock);
+        poll_fn(|cx| {
+            let res = reader.poll_next_unpin(cx);
+            assert!(res.is_pending());
+            Ready(())
+        })
+        .await;
+        let obj = reader.next().await;
+        assert!(obj.is_some());
     }
 }

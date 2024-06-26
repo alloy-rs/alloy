@@ -1,9 +1,10 @@
 use crate::{Network, ReceiptResponse, TransactionResponse};
+use alloy_primitives::Bytes;
 
 mod builder;
 
-mod signer;
-pub use signer::EthereumSigner;
+mod wallet;
+pub use wallet::EthereumWallet;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]
@@ -61,5 +62,9 @@ impl TransactionResponse for alloy_rpc_types_eth::Transaction {
 
     fn gas(&self) -> u128 {
         self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

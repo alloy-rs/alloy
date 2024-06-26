@@ -1,5 +1,5 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
@@ -42,12 +42,12 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.to
     }
 
-    fn set_kind(&mut self, kind: TxKind) {
-        self.to = Some(kind);
-    }
-
     fn clear_kind(&mut self) {
         self.to = None;
+    }
+
+    fn set_kind(&mut self, kind: TxKind) {
+        self.to = Some(kind);
     }
 
     fn value(&self) -> Option<U256> {
@@ -171,11 +171,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: NetworkSigner<Ethereum>>(
+    async fn build<W: NetworkWallet<Ethereum>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
-        Ok(signer.sign_request(self).await?)
+        Ok(wallet.sign_request(self).await?)
     }
 }
 

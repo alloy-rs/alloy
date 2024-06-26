@@ -202,7 +202,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         // if the base fee of the Latest block is 0 then we need check if the latest block even has
         // a base fee/supports EIP1559
         let base_fee_per_gas = match fee_history.latest_block_base_fee() {
-            Some(base_fee) if (base_fee != 0) => base_fee,
+            Some(base_fee) if base_fee != 0 => base_fee,
             _ => {
                 // empty response, fetch basefee from latest block directly
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
@@ -248,7 +248,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
-    /// Gets the balance of the account at the specified tag, which defaults to latest.
+    /// Gets the balance of the account.
+    ///
+    /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
     fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
@@ -653,7 +655,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
-    /// This method allows [`ProviderLayer`] and [`TxFiller`] to bulid the
+    /// This method allows [`ProviderLayer`] and [`TxFiller`] to build the
     /// transaction and send it to the network without changing user-facing
     /// APIs. Generally implementors should NOT override this method.
     ///
@@ -1042,15 +1044,16 @@ mod tests {
         };
     }
 
+    // Ensures we can connect to a websocket using `wss`.
     #[cfg(feature = "ws")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        let url = "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F";
-        // we don't care about the response, only that it doesn't panic on the TLS setup
-        let _provider = ProviderBuilder::<_, _, Ethereum>::default()
-            .with_recommended_fillers()
-            .on_builtin(url)
-            .await;
+        for url in [
+            "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F",
+            "wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754",
+        ] {
+            let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
+        }
     }
 
     #[cfg(feature = "ws")]
@@ -1263,7 +1266,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let req = TransactionRequest::default()
             .from(provider.default_signer_address())

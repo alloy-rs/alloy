@@ -1,10 +1,12 @@
-use std::ops::{Deref, DerefMut};
-
+use crate::{
+    any::AnyNetwork, BuildResult, Network, NetworkWallet, TransactionBuilder,
+    TransactionBuilderError,
+};
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types_eth::{AccessList, TransactionRequest, WithOtherFields};
-
-use crate::{any::AnyNetwork, BuildResult, Network, TransactionBuilder, TransactionBuilderError};
+use alloy_rpc_types_eth::{AccessList, TransactionRequest};
+use alloy_serde::WithOtherFields;
+use std::ops::{Deref, DerefMut};
 
 impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
     fn chain_id(&self) -> Option<ChainId> {
@@ -121,12 +123,12 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         self.deref().complete_type(ty.try_into().map_err(|_| vec!["supported tx type"])?)
     }
 
-    fn can_build(&self) -> bool {
-        self.deref().can_build()
-    }
-
     fn can_submit(&self) -> bool {
         self.deref().can_submit()
+    }
+
+    fn can_build(&self) -> bool {
+        self.deref().can_build()
     }
 
     #[doc(alias = "output_transaction_type")]
@@ -154,10 +156,10 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
         Ok(self.inner.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: crate::NetworkSigner<AnyNetwork>>(
+    async fn build<W: NetworkWallet<AnyNetwork>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> Result<<AnyNetwork as Network>::TxEnvelope, TransactionBuilderError<AnyNetwork>> {
-        Ok(signer.sign_request(self).await?)
+        Ok(wallet.sign_request(self).await?)
     }
 }

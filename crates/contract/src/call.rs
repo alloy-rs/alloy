@@ -139,12 +139,18 @@ impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, 
 
 // See [`ContractInstance`].
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
-    pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
+    pub(crate) fn new_dyn(
+        provider: P,
+        address: &Address,
+        function: &Function,
+        args: &[DynSolValue],
+    ) -> Result<Self> {
         Ok(Self::new_inner_call(
             provider,
             function.abi_encode_input(args)?.into(),
             function.clone(),
-        ))
+        )
+        .to(*address))
     }
 
     /// Clears the decoder, returning a raw call builder.
@@ -411,8 +417,13 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
+    /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request).block(self.block).await.map_err(Into::into)
+        let mut estimate = self.provider.estimate_gas(&self.request);
+        if let Some(state) = &self.state {
+            estimate = estimate.overrides(state);
+        }
+        estimate.block(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -709,7 +720,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();

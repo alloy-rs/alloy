@@ -14,14 +14,16 @@ pub mod builder;
 pub mod utils;
 
 /// Contains sidecar related types
+#[cfg(feature = "kzg-sidecar")]
 mod sidecar;
+#[cfg(feature = "kzg-sidecar")]
 pub use sidecar::*;
 
 use alloy_primitives::{b256, FixedBytes, B256, U256};
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
 /// elements contained in a blob MUST be STRICTLY LESS than this value.
-pub const BLS_MODULUS_BYTES: FixedBytes<32> =
+pub const BLS_MODULUS_BYTES: B256 =
     b256!("73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001");
 
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
@@ -90,6 +92,7 @@ pub type Bytes48 = FixedBytes<48>;
 /// # Panics
 ///
 /// If the given commitment is not 48 bytes long.
+#[cfg(feature = "sha2")]
 pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
     use sha2::Digest;
 

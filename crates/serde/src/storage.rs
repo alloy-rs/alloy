@@ -19,8 +19,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 /// `eth_getProof` also takes storage keys up to 32 bytes as input, so the `keys` field is
 /// similarly deserialized. However, geth populates the storage proof `key` fields in the response
 /// by mirroring the `key` field used in the input.
-///  * See how `storageKey`s (the input) are populated in the `StorageResult` (the output):
-///  <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
+///
+/// See how `storageKey`s (the input) are populated in the `StorageResult` (the output):
+/// <https://github.com/ethereum/go-ethereum/blob/00a73fbcce3250b87fc4160f3deddc44390848f4/internal/ethapi/api.go#L658-L690>
 ///
 /// The contained [B256] and From implementation for String are used to preserve the input and
 /// implement this behavior from geth.

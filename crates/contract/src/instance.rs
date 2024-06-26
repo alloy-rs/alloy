@@ -87,7 +87,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P,
         args: &[DynSolValue],
     ) -> Result<CallBuilder<T, &P, Function, N>> {
         let function = self.interface.get_from_name(name)?;
-        CallBuilder::new_dyn(&self.provider, function, args)
+        CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
     /// Returns a transaction builder for the provided function selector.
@@ -97,7 +97,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, N: Network> ContractInstance<T, P,
         args: &[DynSolValue],
     ) -> Result<CallBuilder<T, &P, Function, N>> {
         let function = self.interface.get_from_selector(selector)?;
-        CallBuilder::new_dyn(&self.provider, function, args)
+        CallBuilder::new_dyn(&self.provider, &self.address, function, args)
     }
 
     /// Returns an [`Event`] builder with the provided filter.
@@ -117,5 +117,44 @@ impl<T, P, N> std::ops::Deref for ContractInstance<T, P, N> {
 impl<T, P, N> std::fmt::Debug for ContractInstance<T, P, N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractInstance").field("address", &self.address).finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_network::TransactionBuilder;
+    use alloy_primitives::{hex, U256};
+    use alloy_provider::ProviderBuilder;
+    use alloy_rpc_types_eth::TransactionRequest;
+
+    #[tokio::test]
+    async fn contract_interface() {
+        let provider = ProviderBuilder::new().on_anvil();
+
+        let abi_str = r#"[{"inputs":[],"name":"counter","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"increment","outputs":[],"stateMutability":"nonpayable","type":"function"}]"#;
+        let abi = serde_json::from_str::<JsonAbi>(abi_str).unwrap();
+        let bytecode = hex::decode("6080806040523460135760b2908160188239f35b5f80fdfe60808060405260043610156011575f80fd5b5f3560e01c90816361bc221a146065575063d09de08a14602f575f80fd5b346061575f3660031901126061575f5460018101809111604d575f55005b634e487b7160e01b5f52601160045260245ffd5b5f80fd5b346061575f3660031901126061576020905f548152f3fea2646970667358221220d802267a5f574e54a87a63d0ff8d733fdb275e6e6c502831d9e14f957bbcd7a264736f6c634300081a0033").unwrap();
+        let deploy_tx = TransactionRequest::default().with_deploy_code(bytecode);
+        let address = provider
+            .send_transaction(deploy_tx)
+            .await
+            .unwrap()
+            .get_receipt()
+            .await
+            .unwrap()
+            .contract_address
+            .unwrap();
+
+        let contract = ContractInstance::new(address, provider, Interface::new(abi));
+        assert_eq!(contract.abi().functions().count(), 2);
+
+        let result = contract.function("counter", &[]).unwrap().call().await.unwrap();
+        assert_eq!(result[0].as_uint().unwrap().0, U256::from(0));
+
+        contract.function("increment", &[]).unwrap().send().await.unwrap().watch().await.unwrap();
+
+        let result = contract.function("counter", &[]).unwrap().call().await.unwrap();
+        assert_eq!(result[0].as_uint().unwrap().0, U256::from(1));
     }
 }

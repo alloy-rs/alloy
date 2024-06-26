@@ -1,11 +1,10 @@
-use core::fmt;
-
 use crate::{Network, ReceiptResponse, TransactionResponse};
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
-use alloy_rpc_types_eth::{
-    AnyTransactionReceipt, Header, Transaction, TransactionRequest, WithOtherFields,
-};
+use alloy_primitives::Bytes;
+use alloy_rpc_types_eth::{AnyTransactionReceipt, Header, Transaction, TransactionRequest};
+use alloy_serde::WithOtherFields;
+use core::fmt;
 
 mod builder;
 
@@ -107,5 +106,9 @@ impl TransactionResponse for WithOtherFields<Transaction> {
 
     fn gas(&self) -> u128 {
         self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

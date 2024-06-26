@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types"
-description = "Alloy RPC types"
+description = "Meta-crate for all Ethereum JSON-RPC types"
 
 version.workspace = true
 edition.workspace = true
@@ -11,26 +11,36 @@ authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
 [dependencies]
 alloy-serde.workspace = true
+alloy-rpc-types-admin = { workspace = true, optional = true }
+alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
-alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, optional = true }
+alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-txpool = { workspace = true, optional = true }
 
 [features]
 default = ["eth"]
-anvil = ["alloy-rpc-types-anvil"]
-beacon = ["alloy-rpc-types-beacon"]
-engine = ["alloy-rpc-types-engine"]
-eth = ["alloy-rpc-types-eth"]
-trace = ["alloy-rpc-types-trace"]
+admin = ["dep:alloy-rpc-types-admin"]
+anvil = ["dep:alloy-rpc-types-anvil"]
+beacon = ["dep:alloy-rpc-types-beacon"]
+engine = ["dep:alloy-rpc-types-engine"]
+eth = ["dep:alloy-rpc-types-eth"]
+mev = ["dep:alloy-rpc-types-mev"]
+trace = ["dep:alloy-rpc-types-trace"]
+txpool = ["dep:alloy-rpc-types-txpool"]
 
-arbitrary = ["alloy-rpc-types-eth?/arbitrary"]
+arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
 jsonrpsee-types = [
     "alloy-rpc-types-eth?/jsonrpsee-types",
     "alloy-rpc-types-engine?/jsonrpsee-types",

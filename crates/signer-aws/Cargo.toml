@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -23,7 +27,7 @@ alloy-signer.workspace = true
 async-trait.workspace = true
 aws-sdk-kms = { version = "1", default-features = false }
 k256.workspace = true
-spki = { workspace = true, features = ["std"]}
+spki = { workspace = true, features = ["std"] }
 thiserror.workspace = true
 tracing.workspace = true
 

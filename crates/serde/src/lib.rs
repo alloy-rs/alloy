@@ -11,11 +11,16 @@
 
 extern crate alloc;
 
-/// Helpers for dealing with booleans.
+use alloc::format;
+use alloy_primitives::{hex, B256};
+use serde::Serializer;
+
 mod bool;
 pub use self::bool::*;
 
-/// Helpers for dealing with numbers.
+mod optional;
+pub use self::optional::*;
+
 #[cfg_attr(not(test), deprecated = "use `quantity::{self, opt, vec}` instead")]
 pub mod num;
 #[allow(deprecated)]
@@ -30,10 +35,8 @@ pub use storage::JsonStorageKey;
 pub mod ttd;
 pub use ttd::*;
 
-use alloc::format;
-use serde::Serializer;
-
-use alloy_primitives::{hex, B256};
+mod other;
+pub use other::{OtherFields, WithOtherFields};
 
 /// Serialize a byte vec as a hex string _without_ the "0x" prefix.
 ///
