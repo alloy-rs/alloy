@@ -875,10 +875,10 @@ pub struct PayloadAttributes {
     pub base_fee_per_gas: Option<U256>,
     /// Data from l1 contract
     #[cfg(feature = "taiko")]
-    pub block_metadata: Option<BlockMetadata>,
+    pub block_metadata: BlockMetadata,
     /// l1 anchor information
     #[cfg(feature = "taiko")]
-    pub l1_origin: Option<L1Origin>,
+    pub l1_origin: L1Origin,
 }
 
 /// This structure contains the information from l1 contract storage
