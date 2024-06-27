@@ -2,8 +2,9 @@
 
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, EthCallParams, Identity, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
+    SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -150,8 +151,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
-        EthCall::new(self.weak_client(), tx)
+    fn call<'req>(
+        &'req self,
+        tx: &'req N::TransactionRequest,
+    ) -> ProviderCall<T, EthCallParams<'req, 'req, N>, Bytes, Bytes> {
+        let call = self.call_internal(tx);
+        call.into_provider_call()
+    }
+
+    /// This method returns `EthCall` struct.
+    /// It is useful when we have to set the block or state overrides after generating the struct.
+    fn call_internal<'req>(
+        &'req self,
+        tx: &'req N::TransactionRequest,
+    ) -> EthCall<'req, 'req, T, N, Bytes, Bytes> {
+        EthCall::new(self.client(), tx)
     }
 
     /// Gets the chain ID.
@@ -183,10 +197,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
     fn estimate_gas<'req>(
-        &self,
+        &'req self,
+        tx: &'req N::TransactionRequest,
+    ) -> ProviderCall<T, EthCallParams<'req, 'req, N>, U128, u128> {
+        let call = self.estimate_gas_internal(tx);
+        call.into_provider_call()
+    }
+
+    /// This method returns `EthCall` struct.
+    /// It is useful when we have to set the block or state overrides after generating the struct.
+    fn estimate_gas_internal<'req>(
+        &'req self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, 'static, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.client(), tx)
+            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -1426,7 +1451,11 @@ mod tests {
         let req = TransactionRequest::default()
             .with_to(address!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")) // WETH
             .with_input(bytes!("06fdde03")); // `name()`
-        let result = provider.call(&req).await.unwrap();
+        let provider_call = provider.call(&req);
+
+        assert!(matches!(provider_call, ProviderCall::RpcCall(_)));
+
+        let result = provider_call.await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
     }
 

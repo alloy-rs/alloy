@@ -1,9 +1,10 @@
+use crate::ProviderCall;
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
-use alloy_rpc_client::{RpcCall, WeakClient};
+use alloy_rpc_client::{ClientRef, RpcCall};
 use alloy_rpc_types_eth::state::StateOverride;
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
 use std::{future::Future, marker::PhantomData, task::Poll};
@@ -12,7 +13,8 @@ type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
     RpcCall<T, EthCallParams<'req, 'state, N>, Resp, Output, Map>;
 
 #[derive(Clone, Debug)]
-struct EthCallParams<'req, 'state, N: Network> {
+#[doc(hidden)] // Not public API.
+pub struct EthCallParams<'req, 'state, N: Network> {
     data: &'req N::TransactionRequest,
     block: Option<BlockId>,
     overrides: Option<&'state StateOverride>,
@@ -58,7 +60,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        client: WeakClient<T>,
+        client: ClientRef<'req, T>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'state StateOverride>,
         block: Option<BlockId>,
@@ -92,11 +94,6 @@ where
             std::mem::replace(self, Self::Polling)
         else {
             unreachable!("bad state")
-        };
-
-        let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-            Ok(client) => client,
-            Err(e) => return Poll::Ready(Err(e)),
         };
 
         let params = EthCallParams { data, block, overrides };
@@ -153,8 +150,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    client: WeakClient<T>,
-
+    client: ClientRef<'req, T>,
     data: &'req N::TransactionRequest,
     overrides: Option<&'state StateOverride>,
     block: Option<BlockId>,
@@ -170,7 +166,7 @@ where
     Resp: RpcReturn,
 {
     /// Create a new CallBuilder.
-    pub const fn new(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+    pub const fn new(client: ClientRef<'req, T>, data: &'req N::TransactionRequest) -> Self {
         Self {
             client,
             data,
@@ -183,7 +179,10 @@ where
     }
 
     /// Create new EthCall for gas estimates.
-    pub const fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+    pub const fn gas_estimate(
+        client: ClientRef<'req, T>,
+        data: &'req N::TransactionRequest,
+    ) -> Self {
         Self {
             client,
             data,
@@ -242,6 +241,25 @@ where
     pub const fn block(mut self, block: BlockId) -> Self {
         self.block = Some(block);
         self
+    }
+}
+
+impl<'req, T, N, Resp, Output, Map> EthCall<'req, 'req, T, N, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    N: Network,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
+    /// Convert EthCall into a ProviderCall
+    pub(crate) fn into_provider_call(
+        self,
+    ) -> ProviderCall<T, EthCallParams<'req, 'req, N>, Resp, Output, Map> {
+        let EthCall { client, data, overrides, block, method, map, .. } = self;
+        let params = EthCallParams { data, overrides, block };
+
+        let fut = client.request(method, params).map_resp(map);
+        fut.into()
     }
 }
 

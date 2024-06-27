@@ -419,7 +419,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u128> {
-        let mut estimate = self.provider.estimate_gas(&self.request);
+        let mut estimate = self.provider.estimate_gas_internal(&self.request);
         if let Some(state) = &self.state {
             estimate = estimate.overrides(state);
         }
@@ -444,7 +444,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// See [`call`](Self::call) for more information.
     pub fn call_raw(&self) -> EthCall<'_, '_, '_, (), T, N> {
-        let call = self.provider.call(&self.request).block(self.block);
+        let call = self.provider.call_internal(&self.request).block(self.block);
         let call = match &self.state {
             Some(state) => call.overrides(state),
             None => call,
