@@ -117,10 +117,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Execute a smart contract call with a transaction request and state
     /// overrides, without publishing a transaction.
     ///
-    /// This function returns [`EthCall`] which can be used to execute the
-    /// call, or to add [`StateOverride`] or a [`BlockId`]. If no overrides
-    /// or block ID is provided, the call will be executed on the latest block
-    /// with the current state.
+    /// This function returns [`ProviderCall`] which can be used to execute the
+    /// call. This method executes the call on the latest block with the current state.
+    /// Use [`call_internal`] to set the block or [`StateOverride`] if you want to
+    /// execute the call on a different block or with overriden state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
@@ -186,10 +186,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
-    /// This function returns an [`EthCall`] which can be used to get a gas estimate,
-    /// or to add [`StateOverride`] or a [`BlockId`]. If no overrides
-    /// or block ID is provided, the gas estimate will be computed for the latest block
-    /// with the current state.
+    /// This function returns an [`ProviderCall`] which can be used to get a gas estimate,
+    /// The gas estimate will be computed for the latest block with the current state.
+    /// Use [`estimate_gas_internal`] to set the block or [`StateOverride`] if you want to
+    /// calculate the gas on a different block or with overriden state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
     ///
