@@ -131,6 +131,13 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     transport: PhantomData<T>,
 }
 
+impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
+    /// Converts the call builder to the inner transaction request
+    pub fn into_transaction_request(self) -> N::TransactionRequest {
+        self.request
+    }
+}
+
 impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
     fn as_ref(&self) -> &N::TransactionRequest {
         &self.request
