@@ -1,6 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
 use alloy_network::{Network, TransactionBuilder};
+use alloy_primitives::ChainId;
 use alloy_transport::TransportResult;
 
 use crate::{
@@ -21,13 +22,13 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
-/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .with_chain_id(1)
-///     .signer(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -35,7 +36,7 @@ use crate::{
 /// # }
 /// ```
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ChainIdFiller(Arc<OnceLock<u64>>);
+pub struct ChainIdFiller(Arc<OnceLock<ChainId>>);
 
 impl ChainIdFiller {
     /// Create a new [`ChainIdFiller`] with an optional chain ID.
@@ -43,7 +44,7 @@ impl ChainIdFiller {
     /// If a chain ID is provided, it will be used for filling. If a chain ID
     /// is not provided, the filler will attempt to fetch the chain ID from the
     /// provider the first time a transaction is prepared.
-    pub fn new(chain_id: Option<u64>) -> Self {
+    pub fn new(chain_id: Option<ChainId>) -> Self {
         let lock = OnceLock::new();
         if let Some(chain_id) = chain_id {
             lock.set(chain_id).expect("brand new");
@@ -53,13 +54,23 @@ impl ChainIdFiller {
 }
 
 impl<N: Network> TxFiller<N> for ChainIdFiller {
-    type Fillable = u64;
+    type Fillable = ChainId;
 
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         if tx.chain_id().is_some() {
             FillerControlFlow::Finished
         } else {
             FillerControlFlow::Ready
+        }
+    }
+
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        if let Some(chain_id) = self.0.get() {
+            if let Some(builder) = tx.as_mut_builder() {
+                if builder.chain_id().is_none() {
+                    builder.set_chain_id(*chain_id)
+                }
+            };
         }
     }
 
@@ -76,22 +87,17 @@ impl<N: Network> TxFiller<N> for ChainIdFiller {
             Some(chain_id) => Ok(chain_id),
             None => {
                 let chain_id = provider.get_chain_id().await?;
-                let chain_id = *self.0.get_or_init(|| chain_id);
-                Ok(chain_id)
+                Ok(*self.0.get_or_init(|| chain_id))
             }
         }
     }
 
     async fn fill(
         &self,
-        fillable: Self::Fillable,
+        _fillable: Self::Fillable,
         mut tx: SendableTx<N>,
     ) -> TransportResult<SendableTx<N>> {
-        if let Some(builder) = tx.as_mut_builder() {
-            if builder.chain_id().is_none() {
-                builder.set_chain_id(fillable)
-            }
-        };
+        self.fill_sync(&mut tx);
         Ok(tx)
     }
 }

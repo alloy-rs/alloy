@@ -1,12 +1,12 @@
 use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
-use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol merkle tree may commit to EITHER 0-prefixed or raw. Therefore
+/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
 /// we must ensure that encoding returns the precise byte-array that was
 /// decoded, preserving the presence or absence of the `TransactionType` flag.
 ///
@@ -17,6 +17,7 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
+#[doc(alias = "TransactionReceiptEnvelope", alias = "TxReceiptEnvelope")]
 pub enum ReceiptEnvelope<T = Log> {
     /// Receipt envelope with no type flag.
     #[cfg_attr(feature = "serde", serde(rename = "0x0", alias = "0x00"))]
@@ -40,6 +41,7 @@ pub enum ReceiptEnvelope<T = Log> {
 
 impl<T> ReceiptEnvelope<T> {
     /// Return the [`TxType`] of the inner receipt.
+    #[doc(alias = "transaction_type")]
     pub const fn tx_type(&self) -> TxType {
         match self {
             Self::Legacy(_) => TxType::Legacy,
@@ -56,7 +58,7 @@ impl<T> ReceiptEnvelope<T> {
 
     /// Returns the success status of the receipt's transaction.
     pub fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Returns the cumulative gas used at this receipt.
@@ -94,8 +96,12 @@ impl<T> ReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
+    fn status_or_post_state(&self) -> &crate::Eip658Value {
+        &self.as_receipt().unwrap().status
+    }
+
     fn status(&self) -> bool {
-        self.as_receipt().unwrap().status
+        self.as_receipt().unwrap().status.coerce_status()
     }
 
     /// Return the receipt's bloom.
@@ -179,19 +185,17 @@ impl Encodable2718 for ReceiptEnvelope {
 }
 
 impl Decodable2718 for ReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         let receipt = Decodable::decode(buf)?;
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("Unexpected type"))? {
             TxType::Eip2930 => Ok(Self::Eip2930(receipt)),
             TxType::Eip1559 => Ok(Self::Eip1559(receipt)),
             TxType::Eip4844 => Ok(Self::Eip4844(receipt)),
-            TxType::Legacy => {
-                Err(alloy_rlp::Error::Custom("type-0 eip2718 transactions are not supported"))
-            }
+            TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
         }
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Ok(Self::Legacy(Decodable::decode(buf)?))
     }
 }

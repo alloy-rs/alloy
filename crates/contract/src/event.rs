@@ -1,8 +1,8 @@
 use crate::Error;
 use alloy_network::Ethereum;
-use alloy_primitives::{Address, LogData};
+use alloy_primitives::{Address, LogData, B256};
 use alloy_provider::{FilterPollerBuilder, Network, Provider};
-use alloy_rpc_types::{Filter, Log};
+use alloy_rpc_types_eth::{BlockNumberOrTag, Filter, FilterBlockOption, Log, Topic, ValueOrArray};
 use alloy_sol_types::SolEvent;
 use alloy_transport::{Transport, TransportResult};
 use futures::Stream;
@@ -79,6 +79,85 @@ impl<T: Transport + Clone, P: Provider<T, N>, E: SolEvent, N: Network> Event<T, 
     pub async fn subscribe(&self) -> TransportResult<subscription::EventSubscription<E>> {
         let sub = self.provider.subscribe_logs(&self.filter).await?;
         Ok(sub.into())
+    }
+
+    /// Sets the inner filter object
+    ///
+    /// See [`Filter::select`].
+    pub fn select(mut self, filter: impl Into<FilterBlockOption>) -> Self {
+        self.filter.block_option = filter.into();
+        self
+    }
+
+    /// Sets the from block number
+    pub fn from_block<B: Into<BlockNumberOrTag>>(mut self, block: B) -> Self {
+        self.filter.block_option = self.filter.block_option.with_from_block(block.into());
+        self
+    }
+
+    /// Sets the to block number
+    pub fn to_block<B: Into<BlockNumberOrTag>>(mut self, block: B) -> Self {
+        self.filter.block_option = self.filter.block_option.with_to_block(block.into());
+        self
+    }
+
+    /// Return `true` if filter configured to match pending block.
+    ///
+    /// This means that both `from_block` and `to_block` are set to the pending
+    /// tag.
+    pub fn is_pending_block_filter(&self) -> bool {
+        self.filter.block_option.get_from_block().map_or(false, BlockNumberOrTag::is_pending)
+            && self.filter.block_option.get_to_block().map_or(false, BlockNumberOrTag::is_pending)
+    }
+
+    /// Pins the block hash for the filter
+    pub fn at_block_hash<A: Into<B256>>(mut self, hash: A) -> Self {
+        self.filter.block_option = self.filter.block_option.with_block_hash(hash.into());
+        self
+    }
+
+    /// Sets the address to query with this filter.
+    ///
+    /// See [`Filter::address`].
+    pub fn address<A: Into<ValueOrArray<Address>>>(mut self, address: A) -> Self {
+        self.filter.address = address.into().into();
+        self
+    }
+
+    /// Given the event signature in string form, it hashes it and adds it to the topics to monitor
+    pub fn event(mut self, event_name: &str) -> Self {
+        self.filter = self.filter.event(event_name);
+        self
+    }
+
+    /// Hashes all event signatures and sets them as array to event_signature(topic0)
+    pub fn events(mut self, events: impl IntoIterator<Item = impl AsRef<[u8]>>) -> Self {
+        self.filter = self.filter.events(events);
+        self
+    }
+
+    /// Sets event_signature(topic0) (the event name for non-anonymous events)
+    pub fn event_signature<TO: Into<Topic>>(mut self, topic: TO) -> Self {
+        self.filter.topics[0] = topic.into();
+        self
+    }
+
+    /// Sets the 1st indexed topic
+    pub fn topic1<TO: Into<Topic>>(mut self, topic: TO) -> Self {
+        self.filter.topics[1] = topic.into();
+        self
+    }
+
+    /// Sets the 2nd indexed topic
+    pub fn topic2<TO: Into<Topic>>(mut self, topic: TO) -> Self {
+        self.filter.topics[2] = topic.into();
+        self
+    }
+
+    /// Sets the 3rd indexed topic
+    pub fn topic3<TO: Into<Topic>>(mut self, topic: TO) -> Self {
+        self.filter.topics[3] = topic.into();
+        self
     }
 }
 
@@ -290,6 +369,108 @@ mod tests {
 
             let contract = MyContract::new(*contract.address(), provider);
             let event = contract.MyEvent_filter();
+
+            let sub = event.subscribe().await.unwrap();
+
+            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+
+            let mut stream = sub.into_stream();
+
+            let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+            assert_eq!(
+                MyContract::MyEvent::SIGNATURE_HASH.0,
+                stream_log.topics().first().unwrap().0
+            );
+            assert_eq!(stream_event, expected_event);
+            assert_eq!(stream_log.address(), *contract.address());
+            assert_eq!(stream_log.block_number, Some(4));
+
+            // send the request to emit the wrong event
+            contract
+                .doEmitWrongEvent()
+                .send()
+                .await
+                .unwrap()
+                .get_receipt()
+                .await
+                .expect("no receipt");
+
+            // we sent the wrong event
+            // so no events should be returned when querying event.query() (MyEvent)
+            let all = event.query().await.unwrap();
+            assert_eq!(all.len(), 0);
+        }
+    }
+
+    /// Same test as above, but using builder methods.
+    #[tokio::test]
+    async fn event_builder_filters() {
+        let _ = tracing_subscriber::fmt::try_init();
+
+        let anvil = alloy_node_bindings::Anvil::new().spawn();
+        let provider = alloy_provider::ProviderBuilder::new().on_http(anvil.endpoint_url());
+
+        let contract = MyContract::deploy(&provider).await.unwrap();
+
+        let event: Event<_, _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+            .address(*contract.address())
+            .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
+        let all = event.query().await.unwrap();
+        assert_eq!(all.len(), 0);
+
+        let poller = event.watch().await.unwrap();
+
+        let _receipt =
+            contract.doEmit().send().await.unwrap().get_receipt().await.expect("no receipt");
+
+        let expected_event = MyContract::MyEvent {
+            _0: 42,
+            _1: "hello".to_string(),
+            _2: true,
+            _3: U256::from(0xdeadbeefu64).into(),
+        };
+
+        let mut stream = poller.into_stream();
+        let (stream_event, stream_log) = stream.next().await.unwrap().unwrap();
+        assert_eq!(MyContract::MyEvent::SIGNATURE_HASH.0, stream_log.topics().first().unwrap().0); // add check that the received event signature is the same as the one we expect
+        assert_eq!(stream_event, expected_event);
+        assert_eq!(stream_log.inner.address, *contract.address());
+        assert_eq!(stream_log.block_number, Some(2));
+
+        // This is not going to return `None`
+        // assert!(stream.next().await.is_none());
+
+        let all = event.query().await.unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, expected_event);
+        assert_eq!(all[0].1, stream_log);
+
+        // send the wrong event and make sure it is NOT picked up by the event filter
+        let _wrong_receipt = contract
+            .doEmitWrongEvent()
+            .send()
+            .await
+            .unwrap()
+            .get_receipt()
+            .await
+            .expect("no receipt");
+
+        // we sent the wrong event
+        // so no events should be returned when querying event.query() (MyEvent)
+        let all = event.query().await.unwrap();
+        assert_eq!(all.len(), 0);
+
+        #[cfg(feature = "pubsub")]
+        {
+            let provider = alloy_provider::ProviderBuilder::new()
+                .on_builtin(&anvil.ws_endpoint())
+                .await
+                .unwrap();
+
+            let contract = MyContract::new(*contract.address(), &provider);
+            let event: Event<_, _, MyContract::MyEvent, _> = Event::new(&provider, Filter::new())
+                .address(*contract.address())
+                .event_signature(MyContract::MyEvent::SIGNATURE_HASH);
 
             let sub = event.subscribe().await.unwrap();
 

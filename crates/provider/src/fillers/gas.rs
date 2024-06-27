@@ -8,7 +8,7 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_rpc_types::BlockNumberOrTag;
+use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
@@ -34,28 +34,27 @@ pub enum GasFillable {
 /// ## Note:
 ///
 /// The layer will populate gas fields based on the following logic:
-/// - if `gas_price` is set, it will process as a legacy tx and populate the
-///  `gas_limit` field if unset.
-/// - if `access_list` is set, it will process as a 2930 tx and populate the
-///  `gas_limit` and `gas_price` field if unset.
-/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the
-///  `gas_limit`, `max_fee_per_gas`, `max_priority_fee_per_gas` and
-///  `max_fee_per_blob_gas` fields if unset.
-/// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`,
-///  `max_fee_per_gas` and `max_priority_fee_per_gas` fields if unset.
-/// - If the network does not support EIP-1559, it will fallback to the legacy
-///  tx and populate the `gas_limit` and `gas_price` fields if unset.
+/// - if `gas_price` is set, it will process as a legacy tx and populate the `gas_limit` field if
+///   unset.
+/// - if `access_list` is set, it will process as a 2930 tx and populate the `gas_limit` and
+///   `gas_price` field if unset.
+/// - if `blob_sidecar` is set, it will process as a 4844 tx and populate the `gas_limit`,
+///   `max_fee_per_gas`, `max_priority_fee_per_gas` and `max_fee_per_blob_gas` fields if unset.
+/// - Otherwise, it will process as a EIP-1559 tx and populate the `gas_limit`, `max_fee_per_gas`
+///   and `max_priority_fee_per_gas` fields if unset.
+/// - If the network does not support EIP-1559, it will fallback to the legacy tx and populate the
+///   `gas_limit` and `gas_price` fields if unset.
 ///
 /// # Example
 ///
 /// ```
-/// # use alloy_network::{NetworkSigner, EthereumSigner, Ethereum};
-/// # use alloy_rpc_types::TransactionRequest;
+/// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
+/// # use alloy_rpc_types_eth::TransactionRequest;
 /// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
-/// # async fn test<S: NetworkSigner<Ethereum> + Clone>(url: url::Url, signer: S) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
 ///     .with_gas_estimation()
-///     .signer(signer)
+///     .wallet(wallet)
 ///     .on_http(url);
 ///
 /// provider.send_transaction(TransactionRequest::default()).await;
@@ -197,6 +196,8 @@ impl<N: Network> TxFiller<N> for GasFiller {
         FillerControlFlow::Ready
     }
 
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
     async fn prepare<P, T>(
         &self,
         provider: &P,
@@ -254,11 +255,11 @@ mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
-    use alloy_rpc_types::TransactionRequest;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
         let from = provider.default_signer_address();
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -273,13 +274,13 @@ mod tests {
 
         let tx = tx.get_receipt().await.unwrap();
 
-        assert_eq!(tx.effective_gas_price, 0x3b9aca00);
+        assert_eq!(tx.effective_gas_price, 0x3b9aca01);
         assert_eq!(tx.gas_used, 0x5208);
     }
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let from = provider.default_signer_address();
 

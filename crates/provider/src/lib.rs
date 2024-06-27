@@ -41,11 +41,17 @@ pub mod layers;
 
 mod provider;
 pub use provider::{
-    EthCall, FilterPollerBuilder, Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
-    TraceCallList, WalletProvider,
+    builder, EthCall, FilterPollerBuilder, Provider, ProviderCall, RootProvider, RpcWithBlock,
+    SendableTx, WalletProvider,
 };
 
 pub mod utils;
 
 #[doc(no_inline)]
 pub use alloy_network::{self as network, Network};
+
+#[cfg(feature = "ws")]
+pub use alloy_rpc_client::WsConnect;
+
+#[cfg(feature = "ipc")]
+pub use alloy_rpc_client::IpcConnect;

@@ -4,7 +4,7 @@ use alloy_json_abi::Function;
 use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
+use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
 use alloy_sol_types::SolCall;
 use alloy_transport::Transport;
 use std::{
@@ -131,14 +131,26 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     transport: PhantomData<T>,
 }
 
+impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
+    fn as_ref(&self) -> &N::TransactionRequest {
+        &self.request
+    }
+}
+
 // See [`ContractInstance`].
 impl<T: Transport + Clone, P: Provider<T, N>, N: Network> DynCallBuilder<T, P, N> {
-    pub(crate) fn new_dyn(provider: P, function: &Function, args: &[DynSolValue]) -> Result<Self> {
+    pub(crate) fn new_dyn(
+        provider: P,
+        address: &Address,
+        function: &Function,
+        args: &[DynSolValue],
+    ) -> Result<Self> {
         Ok(Self::new_inner_call(
             provider,
             function.abi_encode_input(args)?.into(),
             function.clone(),
-        ))
+        )
+        .to(*address))
     }
 
     /// Clears the decoder, returning a raw call builder.
@@ -405,8 +417,13 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
+    /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request).block(self.block).await.map_err(Into::into)
+        let mut estimate = self.provider.estimate_gas(&self.request);
+        if let Some(state) = &self.state {
+            estimate = estimate.overrides(state);
+        }
+        estimate.block(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.
@@ -540,7 +557,7 @@ mod tests {
     use alloy_provider::{
         layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
     };
-    use alloy_rpc_types::AccessListItem;
+    use alloy_rpc_types_eth::AccessListItem;
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
@@ -703,7 +720,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn deploy_and_call() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let expected_address = provider.default_signer_address().create(0);
         let my_contract = MyContract::deploy(provider, true).await.unwrap();
@@ -712,7 +729,7 @@ mod tests {
         let my_state_builder = my_contract.myState();
         assert_eq!(my_state_builder.calldata()[..], MyContract::myStateCall {}.abi_encode(),);
         let result: MyContract::myStateReturn = my_state_builder.call().await.unwrap();
-        assert!(result._0);
+        assert!(result.myState);
 
         let do_stuff_builder = my_contract.doStuff(U256::from(0x69), true);
         assert_eq!(

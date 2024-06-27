@@ -2,7 +2,7 @@
 
 use crate::geth::mux::{MuxConfig, MuxFrame};
 use alloy_primitives::{Bytes, B256, U256};
-use alloy_rpc_types::{state::StateOverride, BlockOverrides};
+use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides};
 use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, time::Duration};
 
@@ -22,6 +22,11 @@ pub mod four_byte;
 pub mod mux;
 pub mod noop;
 pub mod pre_state;
+
+/// Error when the inner tracer from [GethTrace] is mismatching to the target tracer.
+#[derive(Debug, thiserror::Error)]
+#[error("unexpected tracer")]
+pub struct UnexpectedTracerError(pub GethTrace);
 
 /// Result type for geth style transaction trace
 pub type TraceResult = crate::common::TraceResult<GethTrace, String>;
@@ -121,6 +126,70 @@ pub enum GethTrace {
     MuxTracer(MuxFrame),
     /// Any other trace response, such as custom javascript response objects
     JS(serde_json::Value),
+}
+
+impl GethTrace {
+    /// Try to convert the inner tracer to [DefaultFrame]
+    pub fn try_into_default_frame(self) -> Result<DefaultFrame, UnexpectedTracerError> {
+        match self {
+            Self::Default(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [CallFrame]
+    pub fn try_into_call_frame(self) -> Result<CallFrame, UnexpectedTracerError> {
+        match self {
+            Self::CallTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [FourByteFrame]
+    pub fn try_into_four_byte_frame(self) -> Result<FourByteFrame, UnexpectedTracerError> {
+        match self {
+            Self::FourByteTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [PreStateFrame]
+    pub fn try_into_pre_state_frame(self) -> Result<PreStateFrame, UnexpectedTracerError> {
+        match self {
+            Self::PreStateTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [NoopFrame]
+    pub fn try_into_noop_frame(self) -> Result<NoopFrame, UnexpectedTracerError> {
+        match self {
+            Self::NoopTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [MuxFrame]
+    pub fn try_into_mux_frame(self) -> Result<MuxFrame, UnexpectedTracerError> {
+        match self {
+            Self::MuxTracer(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+
+    /// Try to convert the inner tracer to [serde_json::Value]
+    pub fn try_into_json_value(self) -> Result<serde_json::Value, UnexpectedTracerError> {
+        match self {
+            Self::JS(inner) => Ok(inner),
+            _ => Err(UnexpectedTracerError(self)),
+        }
+    }
+}
+
+impl Default for GethTrace {
+    fn default() -> Self {
+        Self::Default(DefaultFrame::default())
+    }
 }
 
 impl From<DefaultFrame> for GethTrace {
@@ -351,7 +420,7 @@ impl GethDebugTracingOptions {
     }
 }
 
-/// Default tracing options for the struct looger.
+/// Default tracing options for the struct logger.
 ///
 /// These are all known general purpose tracer options that may or not be supported by a given
 /// tracer. For example, the `enableReturnData` option is a noop on regular
@@ -367,7 +436,7 @@ pub struct GethDefaultTracingOptions {
     /// This is the opposite of `enable_memory`.
     ///
     /// Note: memory capture used to be enabled by default on geth, but has since been flipped <https://github.com/ethereum/go-ethereum/pull/23558> and is now disabled by default.
-    /// However, at the time of writing this, erigon still defaults to enabled and supports the
+    /// However, at the time of writing this, Erigon still defaults to enabled and supports the
     /// `disableMemory` option. So we keep this option for compatibility, but if it's missing
     /// OR `enableMemory` is present `enableMemory` takes precedence.
     ///
@@ -652,5 +721,44 @@ mod tests {
         let de = serde_json::to_value(&result).unwrap();
         let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
         similar_asserts::assert_eq!(val, de);
+    }
+
+    #[test]
+    fn test_geth_trace_into_tracer() {
+        let geth_trace = GethTrace::Default(DefaultFrame::default());
+        let inner = geth_trace.try_into_default_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::CallTracer(CallFrame::default());
+        let inner = geth_trace.try_into_call_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::FourByteTracer(FourByteFrame::default());
+        let inner = geth_trace.try_into_four_byte_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::PreStateTracer(PreStateFrame::Default(PreStateMode::default()));
+        let inner = geth_trace.try_into_pre_state_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::NoopTracer(NoopFrame::default());
+        let inner = geth_trace.try_into_noop_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::MuxTracer(MuxFrame::default());
+        let inner = geth_trace.try_into_mux_frame();
+        assert!(inner.is_ok());
+
+        let geth_trace = GethTrace::JS(serde_json::Value::Null);
+        let inner = geth_trace.try_into_json_value();
+        assert!(inner.is_ok());
+    }
+
+    #[test]
+    fn test_geth_trace_into_tracer_wrong_tracer() {
+        let geth_trace = GethTrace::Default(DefaultFrame::default());
+        let inner = geth_trace.try_into_call_frame();
+        assert!(inner.is_err());
+        assert!(matches!(inner, Err(UnexpectedTracerError(_))));
     }
 }

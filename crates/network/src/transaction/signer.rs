@@ -5,22 +5,22 @@ use async_trait::async_trait;
 use auto_impl::auto_impl;
 use futures_utils_wasm::impl_future;
 
-/// A signer capable of signing any transaction for the given network.
+/// A wallet capable of signing any transaction for the given network.
 ///
 /// Network crate authors should implement this trait on a type capable of
 /// signing any transaction (regardless of signature type) on a given network.
 /// Signer crate authors should instead implement [`TxSigner`] to signify
 /// signing capability for specific signature types.
 ///
-/// Network signers are expected to contain one or more signing credentials,
+/// Network wallets are expected to contain one or more signing credentials,
 /// keyed by signing address. The default signer address should be used when
 /// no specific signer address is specified.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&, &mut, Box, Rc, Arc)]
-pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
+pub trait NetworkWallet<N: Network>: std::fmt::Debug + Send + Sync {
     /// Get the default signer address. This address should be used
-    /// in [`NetworkSigner::sign_transaction_from`] when no specific signer is
+    /// in [`NetworkWallet::sign_transaction_from`] when no specific signer is
     /// specified.
     fn default_signer_address(&self) -> Address;
 
@@ -32,6 +32,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
 
     /// Asynchronously sign an unsigned transaction, with a specified
     /// credential.
+    #[doc(alias = "sign_tx_from")]
     async fn sign_transaction_from(
         &self,
         sender: Address,
@@ -39,6 +40,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
     ) -> alloy_signer::Result<N::TxEnvelope>;
 
     /// Asynchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx")]
     fn sign_transaction(
         &self,
         tx: N::UnsignedTx,
@@ -53,7 +55,7 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
         request: N::TransactionRequest,
     ) -> alloy_signer::Result<N::TxEnvelope> {
         let sender = request.from().unwrap_or_else(|| self.default_signer_address());
-        let tx = request.build_unsigned().map_err(|(_, e)| alloy_signer::Error::other(e))?;
+        let tx = request.build_unsigned().map_err(alloy_signer::Error::other)?;
         self.sign_transaction_from(sender, tx).await
     }
 }
@@ -75,11 +77,13 @@ pub trait NetworkSigner<N: Network>: std::fmt::Debug + Send + Sync {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[auto_impl(&, &mut, Box, Rc, Arc)]
+#[doc(alias = "TransactionSigner")]
 pub trait TxSigner<Signature> {
     /// Get the address of the signer.
     fn address(&self) -> Address;
 
     /// Asynchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -102,11 +106,13 @@ pub trait TxSigner<Signature> {
 /// [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 /// [`ChainId`]: alloy_primitives::ChainId
 #[auto_impl(&, &mut, Box, Rc, Arc)]
+#[doc(alias = "TransactionSignerSync")]
 pub trait TxSignerSync<Signature> {
     /// Get the address of the signer.
     fn address(&self) -> Address;
 
     /// Synchronously sign an unsigned transaction.
+    #[doc(alias = "sign_tx_sync")]
     fn sign_transaction_sync(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,

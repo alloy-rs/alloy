@@ -2,7 +2,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{TxHash, B256};
-use alloy_rpc_types::{BlockNumberOrTag, TransactionRequest};
+use alloy_rpc_types_eth::{BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -157,7 +157,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         init_tracing();
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
         let from = provider.default_signer_address();
 
         let gas_price = provider.get_gas_price().await.unwrap();
@@ -183,7 +183,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_call() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_anvil_with_signer();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let from = provider.default_signer_address();
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()

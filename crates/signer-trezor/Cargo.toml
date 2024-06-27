@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -30,5 +34,5 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-alloy-rpc-types.workspace = true
+alloy-rpc-types-eth.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

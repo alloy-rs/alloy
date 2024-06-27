@@ -2,7 +2,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_rpc_client::{RpcCall, WeakClient};
-use alloy_rpc_types::state::StateOverride;
+use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
@@ -14,19 +14,24 @@ type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
 #[derive(Clone, Debug)]
 struct EthCallParams<'req, 'state, N: Network> {
     data: &'req N::TransactionRequest,
-    block: BlockId,
+    block: Option<BlockId>,
     overrides: Option<&'state StateOverride>,
 }
 
 impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let len = if self.overrides.is_some() { 3 } else { 2 };
+
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&self.data)?;
-        seq.serialize_element(&self.block)?;
+
         if let Some(overrides) = self.overrides {
+            seq.serialize_element(&self.block.unwrap_or_default())?;
             seq.serialize_element(overrides)?;
+        } else if let Some(block) = self.block {
+            seq.serialize_element(&block)?;
         }
+
         seq.end()
     }
 }
@@ -94,7 +99,7 @@ where
             Err(e) => return Poll::Ready(Err(e)),
         };
 
-        let params = EthCallParams { data, block: block.unwrap_or_default(), overrides };
+        let params = EthCallParams { data, block, overrides };
 
         let fut = client.request(method, params).map_resp(map);
 
@@ -262,5 +267,81 @@ where
             method: self.method,
             map: self.map,
         })
+    }
+}
+
+#[cfg(test)]
+
+mod test {
+    use super::*;
+    use alloy_eips::BlockNumberOrTag;
+    use alloy_network::{Ethereum, TransactionBuilder};
+    use alloy_primitives::{address, U256};
+    use alloy_rpc_types_eth::{state::StateOverride, TransactionRequest};
+
+    #[test]
+    fn test_serialize_eth_call_params() {
+        let alice = address!("0000000000000000000000000000000000000001");
+        let bob = address!("0000000000000000000000000000000000000002");
+        let data = TransactionRequest::default()
+            .with_from(alice)
+            .with_to(bob)
+            .with_nonce(0)
+            .with_chain_id(1)
+            .value(U256::from(100))
+            .with_gas_limit(21_000)
+            .with_max_priority_fee_per_gas(1_000_000_000)
+            .with_max_fee_per_gas(20_000_000_000);
+
+        let block = BlockId::Number(BlockNumberOrTag::Number(1));
+        let overrides = StateOverride::default();
+
+        // Expected: [data]
+        let params: EthCallParams<'_, '_, Ethereum> =
+            EthCallParams { data: &data, block: None, overrides: None };
+
+        assert_eq!(params.data, &data);
+        assert_eq!(params.block, None);
+        assert_eq!(params.overrides, None);
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"}]"#
+        );
+
+        // Expected: [data, block, overrides]
+        let params: EthCallParams<'_, '_, Ethereum> =
+            EthCallParams { data: &data, block: Some(block), overrides: Some(&overrides) };
+
+        assert_eq!(params.data, &data);
+        assert_eq!(params.block, Some(block));
+        assert_eq!(params.overrides, Some(&overrides));
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1",{}]"#
+        );
+
+        // Expected: [data, (default), overrides]
+        let params: EthCallParams<'_, '_, Ethereum> =
+            EthCallParams { data: &data, block: None, overrides: Some(&overrides) };
+
+        assert_eq!(params.data, &data);
+        assert_eq!(params.block, None);
+        assert_eq!(params.overrides, Some(&overrides));
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"latest",{}]"#
+        );
+
+        // Expected: [data, block]
+        let params: EthCallParams<'_, '_, Ethereum> =
+            EthCallParams { data: &data, block: Some(block), overrides: None };
+
+        assert_eq!(params.data, &data);
+        assert_eq!(params.block, Some(block));
+        assert_eq!(params.overrides, None);
+        assert_eq!(
+            serde_json::to_string(&params).unwrap(),
+            r#"[{"from":"0x0000000000000000000000000000000000000001","to":"0x0000000000000000000000000000000000000002","maxFeePerGas":"0x4a817c800","maxPriorityFeePerGas":"0x3b9aca00","gas":"0x5208","value":"0x64","nonce":"0x0","chainId":"0x1"},"0x1"]"#
+        );
     }
 }

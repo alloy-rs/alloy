@@ -1,9 +1,9 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkSigner, TransactionBuilder, TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types::{request::TransactionRequest, AccessList};
+use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
 impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn chain_id(&self) -> Option<ChainId> {
@@ -42,12 +42,12 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.to
     }
 
-    fn set_kind(&mut self, kind: TxKind) {
-        self.to = Some(kind);
-    }
-
     fn clear_kind(&mut self) {
         self.to = None;
+    }
+
+    fn set_kind(&mut self, kind: TxKind) {
+        self.to = Some(kind);
     }
 
     fn value(&self) -> Option<U256> {
@@ -147,10 +147,12 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         common && (legacy || eip2930 || eip1559 || eip4844)
     }
 
+    #[doc(alias = "output_transaction_type")]
     fn output_tx_type(&self) -> TxType {
         self.preferred_type()
     }
 
+    #[doc(alias = "output_transaction_type_checked")]
     fn output_tx_type_checked(&self) -> Option<TxType> {
         self.buildable_type()
     }
@@ -163,19 +165,17 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
     fn build_unsigned(self) -> BuildResult<TypedTransaction, Ethereum> {
         if let Err((tx_type, missing)) = self.missing_keys() {
-            return Err((
-                self,
-                TransactionBuilderError::InvalidTransactionRequest(tx_type, missing),
-            ));
+            return Err(TransactionBuilderError::InvalidTransactionRequest(tx_type, missing)
+                .into_unbuilt(self));
         }
         Ok(self.build_typed_tx().expect("checked by missing_keys"))
     }
 
-    async fn build<S: NetworkSigner<Ethereum>>(
+    async fn build<W: NetworkWallet<Ethereum>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> Result<<Ethereum as Network>::TxEnvelope, TransactionBuilderError<Ethereum>> {
-        Ok(signer.sign_request(self).await?)
+        Ok(wallet.sign_request(self).await?)
     }
 }
 
@@ -184,7 +184,7 @@ mod tests {
     use crate::{TransactionBuilder, TransactionBuilderError};
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_primitives::Address;
-    use alloy_rpc_types::{AccessList, TransactionRequest};
+    use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 
     #[test]
     fn from_eip1559_to_tx_req() {
@@ -263,7 +263,7 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        assert!(matches!(error.1, TransactionBuilderError::InvalidTransactionRequest(_, _)));
+        assert!(matches!(error.error, TransactionBuilderError::InvalidTransactionRequest(_, _)));
     }
 
     #[test]
@@ -272,7 +272,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -289,7 +290,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -310,7 +312,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 
@@ -328,7 +331,8 @@ mod tests {
 
         let error = request.build_unsigned().unwrap_err();
 
-        let (_, TransactionBuilderError::InvalidTransactionRequest(tx_type, errors)) = error else {
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
             panic!("wrong variant")
         };
 

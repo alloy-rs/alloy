@@ -64,11 +64,11 @@ pub struct BeaconBlockHeader {
     /// Index of validator in validator registry.
     #[serde_as(as = "DisplayFromStr")]
     pub proposer_index: u64,
-    /// The signing merkle root of the parent BeaconBlock.
+    /// The signing Merkle root of the parent BeaconBlock.
     pub parent_root: B256,
-    /// The tree hash merkle root of the BeaconState for the BeaconBlock.
+    /// The tree hash Merkle root of the BeaconState for the BeaconBlock.
     pub state_root: B256,
-    /// The tree hash merkle root of the BeaconBlockBody for the BeaconBlock
+    /// The tree hash Merkle root of the BeaconBlockBody for the BeaconBlock
     pub body_root: B256,
 }
 

@@ -10,19 +10,20 @@ use alloc::vec::Vec;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[doc(alias = "LegacyTransaction", alias = "TransactionLegacy", alias = "LegacyTx")]
 pub struct TxLegacy {
     /// Added as EIP-155: Simple replay attack protection
     #[cfg_attr(
         feature = "serde",
         serde(
             default,
-            with = "alloy_serde::u64_opt_via_ruint",
+            with = "alloy_serde::quantity::opt",
             skip_serializing_if = "Option::is_none",
         )
     )]
     pub chain_id: Option<ChainId>,
     /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
     /// A scalar value equal to the number of
     /// Wei to be paid per unit of gas for all computation
@@ -31,14 +32,14 @@ pub struct TxLegacy {
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
     /// 340282366920938463463374607431768211455
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_price: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u128_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_limit: u128,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
@@ -197,18 +198,6 @@ impl TxLegacy {
 }
 
 impl Transaction for TxLegacy {
-    fn input(&self) -> &[u8] {
-        &self.input
-    }
-
-    fn to(&self) -> TxKind {
-        self.to
-    }
-
-    fn value(&self) -> U256 {
-        self.value
-    }
-
     fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
@@ -223,6 +212,18 @@ impl Transaction for TxLegacy {
 
     fn gas_price(&self) -> Option<u128> {
         Some(self.gas_price)
+    }
+
+    fn to(&self) -> TxKind {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn input(&self) -> &[u8] {
+        &self.input
     }
 }
 

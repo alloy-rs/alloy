@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types"
-description = "Alloy RPC types"
+description = "Meta-crate for all Ethereum JSON-RPC types"
 
 version.workspace = true
 edition.workspace = true
@@ -11,57 +11,44 @@ authors.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
 [dependencies]
-# ethereum
-alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
-alloy-genesis.workspace = true
-
-alloy-consensus = { workspace = true, features = ["std", "serde"] }
-alloy-eips = { workspace = true, features = ["std", "serde"] }
-
-itertools.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-thiserror.workspace = true
-
-
-# arbitrary
-arbitrary = { version = "1.3", features = ["derive"], optional = true }
-proptest = { version = "1.4", optional = true }
-proptest-derive = { version = "0.4", optional = true }
-
-# jsonrpsee
-jsonrpsee-types = { version = "0.22", optional = true }
-alloy-sol-types.workspace = true
+alloy-rpc-types-admin = { workspace = true, optional = true }
+alloy-rpc-types-anvil = { workspace = true, optional = true }
+alloy-rpc-types-beacon = { workspace = true, optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true }
+alloy-rpc-types-eth = { workspace = true, optional = true }
+alloy-rpc-types-mev = { workspace = true, optional = true }
+alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-txpool = { workspace = true, optional = true }
 
 [features]
-arbitrary = [
-    "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
-    "alloy-primitives/arbitrary",
-    "alloy-eips/arbitrary",
+default = ["eth"]
+admin = ["dep:alloy-rpc-types-admin"]
+anvil = ["dep:alloy-rpc-types-anvil"]
+beacon = ["dep:alloy-rpc-types-beacon"]
+engine = ["dep:alloy-rpc-types-engine"]
+eth = ["dep:alloy-rpc-types-eth"]
+mev = ["dep:alloy-rpc-types-mev"]
+trace = ["dep:alloy-rpc-types-trace"]
+txpool = ["dep:alloy-rpc-types-txpool"]
+
+arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
+jsonrpsee-types = [
+    "alloy-rpc-types-eth?/jsonrpsee-types",
+    "alloy-rpc-types-engine?/jsonrpsee-types",
 ]
-jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
-k256 = ["alloy-consensus/k256"]
-
-[dev-dependencies]
-alloy-primitives = { workspace = true, features = [
-    "rand",
-    "rlp",
-    "serde",
-    "arbitrary",
-] }
-alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
-
-arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
-rand.workspace = true
-similar-asserts.workspace = true
+ssz = [
+    "alloy-rpc-types-beacon?/ssz",
+    "alloy-rpc-types-engine?/ssz",
+    "alloy-rpc-types-eth?/ssz",
+]
+k256 = ["alloy-rpc-types-eth?/k256"]
+kzg = ["alloy-rpc-types-engine?/kzg"]

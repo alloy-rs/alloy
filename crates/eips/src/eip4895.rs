@@ -2,6 +2,8 @@
 //!
 //! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -18,18 +20,18 @@ pub const GWEI_TO_WEI: u64 = 1_000_000_000;
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct Withdrawal {
     /// Monotonically increasing identifier issued by consensus layer.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub index: u64,
     /// Index of validator associated with withdrawal.
     #[cfg_attr(
         feature = "serde",
-        serde(with = "alloy_serde::u64_via_ruint", rename = "validatorIndex")
+        serde(with = "alloy_serde::quantity", rename = "validatorIndex")
     )]
     pub validator_index: u64,
     /// Target address for withdrawn ether.
     pub address: Address,
     /// Value of the withdrawal in gwei.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::u64_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,
 }
 
@@ -40,7 +42,7 @@ impl Withdrawal {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 

@@ -87,13 +87,13 @@ where
                 trace!(body = %String::from_utf8_lossy(&body), "response body");
 
                 if status != hyper::StatusCode::OK {
-                    return Err(TransportErrorKind::custom_str(&format!(
-                        "HTTP error {status} with body: {}",
-                        String::from_utf8_lossy(&body)
-                    )));
+                    return Err(TransportErrorKind::http_error(
+                        status.as_u16(),
+                        String::from_utf8_lossy(&body).into_owned(),
+                    ));
                 }
 
-                // Deser a Box<RawValue> from the body. If deser fails, return
+                // Deserialize a Box<RawValue> from the body. If deserialization fails, return
                 // the body as a string in the error. The conversion to String
                 // is lossy and may not cover all the bytes in the body.
                 serde_json::from_slice(&body).map_err(|err| {

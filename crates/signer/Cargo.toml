@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -25,12 +29,15 @@ thiserror.workspace = true
 
 # eip712
 alloy-sol-types = { workspace = true, optional = true, features = ["std"] }
-alloy-dyn-abi = { workspace = true, optional = true, features = ["std", "eip712"] }
+alloy-dyn-abi = { workspace = true, optional = true, features = [
+    "std",
+    "eip712",
+] }
 
 [dev-dependencies]
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-network.workspace = true
-alloy-signer-wallet.workspace = true
+alloy-signer-local.workspace = true
 assert_matches.workspace = true
 serde_json.workspace = true
 serde.workspace = true

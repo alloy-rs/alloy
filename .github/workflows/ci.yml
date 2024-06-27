@@ -21,27 +21,21 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
-        rust: [
-          "stable",
-          "nightly",
-          "1.76" # MSRV
-        ]
-        flags: [
+        rust:
+          - "stable"
+          - "nightly"
+          - "1.76" # MSRV
+        flags:
           # No features
-          "--no-default-features",
+          - "--no-default-features"
           # Default features
-          "",
-        ]
-        include:
-          # All features
-          - os: "ubuntu-latest"
-            rust: "stable"
-            flags: "--all-features"
-          - os: "ubuntu-latest"
-            rust: "nightly"
+          - ""
+        exclude:
+          # All features on MSRV
+          - rust: "1.76" # MSRV
             flags: "--all-features"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
@@ -83,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: wasm32-unknown-unknown
@@ -95,7 +89,6 @@ jobs:
         run: |
           cargo hack build --workspace --target wasm32-unknown-unknown \
             --exclude alloy-contract \
-            --exclude alloy-internal-test-utils \
             --exclude alloy-network \
             --exclude alloy-node-bindings \
             --exclude alloy-provider \
@@ -103,15 +96,15 @@ jobs:
             --exclude alloy-signer-aws \
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
+            --exclude alloy-signer-local \
             --exclude alloy-signer-trezor \
-            --exclude alloy-signer-wallet \
             --exclude alloy-transport-ipc
 
   wasm-wasi:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: wasm32-wasi
@@ -134,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: riscv32imac-unknown-none-elf
@@ -149,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
@@ -178,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
@@ -187,21 +180,12 @@ jobs:
         run: cargo doc --workspace --all-features --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition -Zunstable-options
-      - name: Doc index page redirection
-        run: echo '<meta http-equiv="refresh" content="1; url=alloy/index.html">' > target/doc/index.html
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: target/doc
-          force_orphan: true
 
   fmt:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
@@ -211,7 +195,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly

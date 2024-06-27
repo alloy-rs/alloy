@@ -19,12 +19,16 @@ const TX_TYPE_BYTE_MAX: u8 = 0x7f;
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive] // NB: non-exhaustive allows us to add a Custom variant later
 pub enum Eip2718Error {
     /// Rlp error from [`alloy_rlp`].
     RlpError(alloy_rlp::Error),
     /// Got an unexpected type flag while decoding.
     UnexpectedType(u8),
 }
+
+/// Result type for [EIP-2718] decoding.
+pub type Eip2718Result<T, E = Eip2718Error> = core::result::Result<T, E>;
 
 impl Display for Eip2718Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -47,6 +51,15 @@ impl std::error::Error for Eip2718Error {}
 /// Decoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
 /// or a receipt with a type flag.
 ///
+/// Users should rarely import this trait, and should instead prefer letting the
+/// alloy `Provider` methods handle encoding
+///
+/// ## Implementing
+///
+/// Implement this trait when you need to make custom TransactionEnvelope
+/// and ReceiptEnvelope types for your network. These types should be enums
+/// over the accepted transaction types.
+///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Decodable2718: Sized {
     /// Extract the type byte from the buffer, if any. The type byte is the
@@ -57,33 +70,46 @@ pub trait Decodable2718: Sized {
 
     /// Decode the appropriate variant, based on the type flag.
     ///
-    /// This function is invoked by [`Self::decode_2718`] with the type byte, and the tail of the
-    /// buffer.
+    /// This function is invoked by [`Self::decode_2718`] with the type byte,
+    /// and the tail of the buffer.
     ///
-    /// ## Note
+    /// ## Implementing
     ///
-    /// This should be a simple match block that invokes an inner type's RLP decoder.
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
+    /// This should be a simple match block that invokes an inner type's
+    /// specific decoder.
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self>;
 
     /// Decode the default variant.
     ///
-    /// This function is invoked by [`Self::decode_2718`] when no type byte can be extracted.
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self>;
+    /// ## Implementing
+    ///
+    /// This function is invoked by [`Self::decode_2718`] when no type byte can
+    /// be extracted. It should be a simple wrapper around the default type's
+    /// decoder.
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self>;
 
-    /// Decode an EIP-2718 transaction into a concrete instance
-    fn decode_2718(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    /// Encode the transaction according to [EIP-2718] rules. First a 1-byte
+    /// type flag in the range 0x0-0x7f, then the body of the transaction.
+    ///
+    /// [EIP-2718] inner encodings are unspecified, and produce an opaque
+    /// bytestring.
+    ///
+    /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+    fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Self::extract_type_byte(buf)
             .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
-    /// Decode an EIP-2718 transaction in the network format.
+    /// Decode an [EIP-2718] transaction in the network format. The network
+    /// format is used ONLY by the Ethereum p2p protocol. Do not call this
+    /// method unless you are building a p2p protocol client.
     ///
-    /// The network format is the RLP encoded string consisting of the
-    /// type-flag prepended to an opaque inner encoding. The inner encoding is
-    /// RLP for all current Ethereum transaction types, but may not be in future
-    /// versions of the protocol.
-    fn network_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    /// The network encoding is the RLP encoding of the eip2718-encoded
+    /// envelope.
+    ///
+    /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
+    fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         // Keep the original buffer around by copying it.
         let mut h_decode = *buf;
         let h = Header::decode(&mut h_decode)?;
@@ -98,7 +124,7 @@ pub trait Decodable2718: Sized {
         let remaining_len = buf.len();
 
         if remaining_len == 0 || remaining_len < h.payload_length {
-            return Err(alloy_rlp::Error::InputTooShort);
+            return Err(alloy_rlp::Error::InputTooShort.into());
         }
 
         let ty = buf[0];
@@ -110,7 +136,7 @@ pub trait Decodable2718: Sized {
         // string Header with payload_length of 1, we need to make sure this check is only
         // performed for transactions with a string header
         if bytes_consumed != h.payload_length && h_decode[0] > EMPTY_STRING_CODE {
-            return Err(alloy_rlp::Error::UnexpectedLength);
+            return Err(alloy_rlp::Error::UnexpectedLength.into());
         }
 
         Ok(tx)
@@ -118,7 +144,18 @@ pub trait Decodable2718: Sized {
 }
 
 /// Encoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
-/// or a receipt with a type flag.
+/// or a receipt with a type flag. [EIP-2718] encodings are used by the
+/// `eth_sendRawTransaction` RPC call, the Ethereum block header's tries, and the
+/// peer-to-peer protocol.
+///
+/// Users should rarely import this trait, and should instead prefer letting the
+/// alloy `Provider` methods handle encoding
+///
+/// ## Implementing
+///
+/// Implement this trait when you need to make custom TransactionEnvelope
+/// and ReceiptEnvelope types for your network. These types should be enums
+/// over the accepted transaction types.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Encodable2718: Sized + Send + Sync + 'static {
@@ -134,14 +171,14 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     }
 
     /// The length of the 2718 encoded envelope. This is the length of the type
-    /// flag + the length of the inner transaction RLP.
+    /// flag + the length of the inner encoding.
     fn encode_2718_len(&self) -> usize;
 
     /// Encode the transaction according to [EIP-2718] rules. First a 1-byte
     /// type flag in the range 0x0-0x7f, then the body of the transaction.
     ///
-    /// This implementation uses RLP for the transaction body. Non-standard
-    /// users can override this to use some other serialization scheme.
+    /// [EIP-2718] inner encodings are unspecified, and produce an opaque
+    /// bytestring.
     ///
     /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn encode_2718(&self, out: &mut dyn BufMut);
@@ -157,7 +194,11 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         out
     }
 
-    /// Compute the hash as committed to in the MPT trie.
+    /// Compute the hash as committed to in the MPT trie. This hash is used
+    /// ONLY by the Ethereum merkle-patricia trie and associated proofs. Do not
+    /// call this method unless you are building a full or light client.
+    ///
+    /// The trie hash is the keccak256 hash of the 2718-encoded envelope.
     fn trie_hash(&self) -> B256 {
         keccak256(self.encoded_2718())
     }
@@ -168,9 +209,12 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         Sealed::new_unchecked(self, hash)
     }
 
-    /// Return the network encoding. For non-legacy items, this is the RLP
-    /// encoding of the bytestring of the 2718 encoding. For legacy items it is
-    /// simply the legacy encoding.
+    /// Encode in the network format. The network format is used ONLY by the
+    /// Ethereum p2p protocol. Do not call this method unless you are building
+    /// a p2p protocol client.
+    ///
+    /// The network encoding is the RLP encoding of the eip2718-encoded
+    /// envelope.
     fn network_encode(&self, out: &mut dyn BufMut) {
         if !self.is_legacy() {
             Header { list: false, payload_length: self.encode_2718_len() }.encode(out);

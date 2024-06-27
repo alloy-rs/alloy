@@ -1,15 +1,15 @@
+use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{BlockHash, B256};
 use alloy_rpc_types_engine::{
-    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadInputV2, ExecutionPayloadV1,
-    ExecutionPayloadV2, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
-    PayloadId, PayloadStatus,
+    ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
+    ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
+    ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated,
+    PayloadAttributes, PayloadId, PayloadStatus,
 };
 use alloy_transport::{Transport, TransportResult};
 
-use crate::Provider;
-
-/// Extension trait that gives access to engine api RPC methods.
+/// Extension trait that gives access to engine API RPC methods.
 ///
 /// Note:
 /// > The provider should use a JWT authentication layer.
@@ -37,6 +37,16 @@ pub trait EngineApi<N, T>: Send + Sync {
     async fn new_payload_v3(
         &self,
         payload: ExecutionPayloadV3,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+    ) -> TransportResult<PayloadStatus>;
+
+    /// Sends the given payload to the execution layer client, as specified for the Prague fork.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/03911ffc053b8b806123f1fc237184b0092a485a/src/engine/prague.md#engine_newpayloadv4>
+    async fn new_payload_v4(
+        &self,
+        payload: ExecutionPayloadV4,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
     ) -> TransportResult<PayloadStatus>;
@@ -75,7 +85,7 @@ pub trait EngineApi<N, T>: Send + Sync {
         payload_attributes: Option<PayloadAttributes>,
     ) -> TransportResult<ForkchoiceUpdated>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Paris fork.
     ///
     /// Caution: This should not return the `withdrawals` field
@@ -86,23 +96,41 @@ pub trait EngineApi<N, T>: Send + Sync {
     /// > Provider software MAY stop the corresponding build process after serving this call.
     async fn get_payload_v1(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV1>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Shanghai fork.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#engine_getpayloadv2>
     ///
     /// Note:
     /// > Provider software MAY stop the corresponding build process after serving this call.
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2>;
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2>;
 
-    /// Retrieves an executionpayload from a previously started build process, as specified for the
+    /// Retrieves an execution payload from a previously started build process, as specified for the
     /// Cancun fork.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#engine_getpayloadv3>
     ///
     /// Note:
     /// > Provider software MAY stop the corresponding build process after serving this call.
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3>;
+    async fn get_payload_v3(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3>;
+
+    /// Returns the most recent version of the payload that is available in the corresponding
+    /// payload build process at the time of receiving this call.
+    ///
+    /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#engine_getpayloadv4>
+    ///
+    /// Note:
+    /// > Provider software MAY stop the corresponding build process after serving this call.
+    async fn get_payload_v4(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4>;
 
     /// Returns the execution payload bodies by the given hash.
     ///
@@ -141,7 +169,7 @@ pub trait EngineApi<N, T>: Send + Sync {
         client_version: ClientVersionV1,
     ) -> TransportResult<Vec<ClientVersionV1>>;
 
-    /// Returns the list of Engine api methods supported by the execution layer client software.
+    /// Returns the list of Engine API methods supported by the execution layer client software.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/common.md#capabilities>
     async fn exchange_capabilities(
@@ -180,6 +208,17 @@ where
             .await
     }
 
+    async fn new_payload_v4(
+        &self,
+        payload: ExecutionPayloadV4,
+        versioned_hashes: Vec<B256>,
+        parent_beacon_block_root: B256,
+    ) -> TransportResult<PayloadStatus> {
+        self.client()
+            .request("engine_newPayloadV4", (payload, versioned_hashes, parent_beacon_block_root))
+            .await
+    }
+
     async fn fork_choice_updated_v1(
         &self,
         fork_choice_state: ForkchoiceState,
@@ -214,12 +253,25 @@ where
         self.client().request("engine_getPayloadV1", (payload_id,)).await
     }
 
-    async fn get_payload_v2(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV2> {
+    async fn get_payload_v2(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV2> {
         self.client().request("engine_getPayloadV2", (payload_id,)).await
     }
 
-    async fn get_payload_v3(&self, payload_id: PayloadId) -> TransportResult<ExecutionPayloadV3> {
+    async fn get_payload_v3(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV3> {
         self.client().request("engine_getPayloadV3", (payload_id,)).await
+    }
+
+    async fn get_payload_v4(
+        &self,
+        payload_id: PayloadId,
+    ) -> TransportResult<ExecutionPayloadEnvelopeV4> {
+        self.client().request("engine_getPayloadV4", (payload_id,)).await
     }
 
     async fn get_payload_bodies_by_hash_v1(

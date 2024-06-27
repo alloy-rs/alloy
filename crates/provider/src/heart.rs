@@ -3,8 +3,8 @@
 use crate::{Provider, RootProvider};
 use alloy_json_rpc::RpcError;
 use alloy_network::Network;
-use alloy_primitives::B256;
-use alloy_rpc_types::Block;
+use alloy_primitives::{TxHash, B256};
+use alloy_rpc_types_eth::Block;
 use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
@@ -25,7 +25,7 @@ use tokio::{
 /// Send and wait for a transaction to be confirmed 2 times, with a timeout of 60 seconds:
 ///
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// // Send a transaction, and configure the pending transaction.
 /// let builder = provider.send_transaction(tx)
 ///     .await?
@@ -41,7 +41,7 @@ use tokio::{
 ///
 /// This can also be more concisely written using `watch`:
 /// ```no_run
-/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
+/// # async fn example<N: alloy_network::Network>(provider: impl alloy_provider::Provider, tx: alloy_rpc_types_eth::transaction::TransactionRequest) -> Result<(), Box<dyn std::error::Error>> {
 /// let tx_hash = provider.send_transaction(tx)
 ///     .await?
 ///     .with_required_confirmations(2)
@@ -53,6 +53,7 @@ use tokio::{
 /// ```
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
+#[doc(alias = "PendingTxBuilder")]
 pub struct PendingTransactionBuilder<'a, T, N> {
     config: PendingTransactionConfig,
     provider: &'a RootProvider<T, N>,
@@ -60,7 +61,7 @@ pub struct PendingTransactionBuilder<'a, T, N> {
 
 impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: &'a RootProvider<T, N>, tx_hash: B256) -> Self {
+    pub const fn new(provider: &'a RootProvider<T, N>, tx_hash: TxHash) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
@@ -93,17 +94,20 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     }
 
     /// Returns the transaction hash.
-    pub const fn tx_hash(&self) -> &B256 {
+    #[doc(alias = "transaction_hash")]
+    pub const fn tx_hash(&self) -> &TxHash {
         self.config.tx_hash()
     }
 
     /// Sets the transaction hash.
-    pub fn set_tx_hash(&mut self, tx_hash: B256) {
+    #[doc(alias = "set_transaction_hash")]
+    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.config.set_tx_hash(tx_hash);
     }
 
     /// Sets the transaction hash.
-    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+    #[doc(alias = "with_transaction_hash")]
+    pub const fn with_tx_hash(mut self, tx_hash: TxHash) -> Self {
         self.config.tx_hash = tx_hash;
         self
     }
@@ -164,7 +168,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     ///   confirmed.
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
-    pub async fn watch(self) -> TransportResult<B256> {
+    pub async fn watch(self) -> TransportResult<TxHash> {
         self.register().await?.await
     }
 
@@ -191,11 +195,11 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
             let mut confirmed = false;
 
             select! {
-                 _ = interval.tick() => {},
-                 res = &mut pending_tx => {
-                        let _ = res?;
-                        confirmed = true;
-                    }
+                _ = interval.tick() => {},
+                res = &mut pending_tx => {
+                    let _ = res?;
+                    confirmed = true;
+                }
             }
 
             // try to fetch the receipt
@@ -217,9 +221,11 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
 /// internally.
 #[must_use = "this type does nothing unless you call `with_provider`"]
 #[derive(Clone, Debug)]
+#[doc(alias = "PendingTxConfig", alias = "TxPendingConfig")]
 pub struct PendingTransactionConfig {
     /// The transaction hash to watch for.
-    tx_hash: B256,
+    #[doc(alias = "transaction_hash")]
+    tx_hash: TxHash,
 
     /// Require a number of confirmations.
     required_confirmations: u64,
@@ -230,22 +236,25 @@ pub struct PendingTransactionConfig {
 
 impl PendingTransactionConfig {
     /// Create a new watch for a transaction.
-    pub const fn new(tx_hash: B256) -> Self {
+    pub const fn new(tx_hash: TxHash) -> Self {
         Self { tx_hash, required_confirmations: 1, timeout: None }
     }
 
     /// Returns the transaction hash.
-    pub const fn tx_hash(&self) -> &B256 {
+    #[doc(alias = "transaction_hash")]
+    pub const fn tx_hash(&self) -> &TxHash {
         &self.tx_hash
     }
 
     /// Sets the transaction hash.
-    pub fn set_tx_hash(&mut self, tx_hash: B256) {
+    #[doc(alias = "set_transaction_hash")]
+    pub fn set_tx_hash(&mut self, tx_hash: TxHash) {
         self.tx_hash = tx_hash;
     }
 
     /// Sets the transaction hash.
-    pub const fn with_tx_hash(mut self, tx_hash: B256) -> Self {
+    #[doc(alias = "with_transaction_hash")]
+    pub const fn with_tx_hash(mut self, tx_hash: TxHash) -> Self {
         self.tx_hash = tx_hash;
         self
     }
@@ -294,6 +303,7 @@ impl PendingTransactionConfig {
     }
 }
 
+#[doc(alias = "TransactionWatcher")]
 struct TxWatcher {
     config: PendingTransactionConfig,
     tx: oneshot::Sender<()>,
@@ -312,9 +322,11 @@ impl TxWatcher {
 /// This struct is a future created by [`PendingTransactionBuilder`] that resolves to the
 /// transaction hash once the underlying transaction has been confirmed the specified number of
 /// times in the network.
+#[doc(alias = "PendingTx", alias = "TxPending")]
 pub struct PendingTransaction {
     /// The transaction hash.
-    pub(crate) tx_hash: B256,
+    #[doc(alias = "transaction_hash")]
+    pub(crate) tx_hash: TxHash,
     /// The receiver for the notification.
     // TODO: send a receipt?
     pub(crate) rx: oneshot::Receiver<()>,
@@ -328,13 +340,14 @@ impl fmt::Debug for PendingTransaction {
 
 impl PendingTransaction {
     /// Returns this transaction's hash.
-    pub const fn tx_hash(&self) -> &B256 {
+    #[doc(alias = "transaction_hash")]
+    pub const fn tx_hash(&self) -> &TxHash {
         &self.tx_hash
     }
 }
 
 impl Future for PendingTransaction {
-    type Output = TransportResult<B256>;
+    type Output = TransportResult<TxHash>;
 
     fn poll(
         mut self: std::pin::Pin<&mut Self>,
@@ -355,6 +368,7 @@ pub(crate) struct HeartbeatHandle {
 
 impl HeartbeatHandle {
     /// Watch for a transaction to be confirmed with the given config.
+    #[doc(alias = "watch_transaction")]
     pub(crate) async fn watch_tx(
         &self,
         config: PendingTransactionConfig,

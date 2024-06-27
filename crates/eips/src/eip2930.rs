@@ -2,6 +2,8 @@
 //!
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -28,6 +30,8 @@ pub struct AccessListItem {
             strategy = "proptest::collection::vec(proptest::arbitrary::any::<B256>(), 0..=20)"
         )
     )]
+    // In JSON, we have to accept `null` for storage key, which is interpreted as an empty array.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub storage_keys: Vec<B256>,
 }
 
@@ -162,9 +166,25 @@ pub struct AccessListWithGasUsed {
     pub gas_used: U256,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
+    use serde_json::json;
+
     use super::*;
+
+    #[test]
+    fn access_list_null_storage_keys() {
+        let json = json!([
+            {
+                "address": "0x81b7bdd5b89c90b63f604fc7cdd17035cb939707",
+                "storageKeys": null,
+            }
+        ]);
+
+        let access_list = serde_json::from_value::<AccessList>(json).unwrap();
+        assert_eq!(access_list.len(), 1);
+        assert_eq!(access_list[0].storage_keys, Vec::<B256>::default());
+    }
 
     #[test]
     fn access_list_serde() {

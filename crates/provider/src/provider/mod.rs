@@ -5,13 +5,13 @@ mod prov_call;
 pub use prov_call::ProviderCall;
 
 mod root;
-pub use root::RootProvider;
+pub use root::{builder, RootProvider};
 
 mod sendable;
 pub use sendable::SendableTx;
 
 mod r#trait;
-pub use r#trait::{FilterPollerBuilder, Provider, TraceCallList};
+pub use r#trait::{FilterPollerBuilder, Provider};
 
 mod wallet;
 pub use wallet::WalletProvider;

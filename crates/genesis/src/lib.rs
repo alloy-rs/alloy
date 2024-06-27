@@ -11,14 +11,9 @@
 
 extern crate alloc;
 
-use alloc::{collections::BTreeMap, string::String};
-
+use alloc::collections::BTreeMap;
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_serde::{
-    num::{u128_opt_via_ruint, u128_via_ruint, u64_opt_via_ruint, u64_via_ruint},
-    storage::deserialize_storage_map,
-    ttd::deserialize_json_ttd_opt,
-};
+use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use serde::{Deserialize, Serialize};
 
 /// The genesis block specification.
@@ -29,15 +24,15 @@ pub struct Genesis {
     #[serde(default)]
     pub config: ChainConfig,
     /// The genesis header nonce.
-    #[serde(with = "u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub nonce: u64,
     /// The genesis header timestamp.
-    #[serde(with = "u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// The genesis header extra data.
     pub extra_data: Bytes,
     /// The genesis header gas limit.
-    #[serde(with = "u128_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_limit: u128,
     /// The genesis header difficulty.
     pub difficulty: U256,
@@ -55,16 +50,16 @@ pub struct Genesis {
     // should NOT be set in a real genesis file, but are included here for compatibility with
     // consensus tests, which have genesis files with these fields populated.
     /// The genesis header base fee
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_opt_via_ruint")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_opt_via_ruint")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub excess_blob_gas: Option<u128>,
     /// The genesis header blob gas used
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u128_opt_via_ruint")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub blob_gas_used: Option<u128>,
     /// The genesis block number
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "u64_opt_via_ruint")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
 }
 
@@ -206,7 +201,7 @@ impl Genesis {
 #[serde(deny_unknown_fields)]
 pub struct GenesisAccount {
     /// The nonce of the account at genesis.
-    #[serde(skip_serializing_if = "Option::is_none", with = "u64_opt_via_ruint", default)]
+    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
     pub nonce: Option<u64>,
     /// The balance of the account at genesis.
     pub balance: U256,
@@ -262,24 +257,23 @@ impl GenesisAccount {
 /// See [geth's `ChainConfig`
 /// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
 /// for the source of each field.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ChainConfig {
     /// The network's chain ID.
-    #[serde(default = "mainnet_id")]
     pub chain_id: u64,
 
     /// The homestead switch block (None = no fork, 0 = already homestead).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub homestead_block: Option<u64>,
 
     /// The DAO fork switch block (None = no fork).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub dao_fork_block: Option<u64>,
 
@@ -289,7 +283,7 @@ pub struct ChainConfig {
     /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork block (None = no fork).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub eip150_block: Option<u64>,
 
@@ -300,105 +294,105 @@ pub struct ChainConfig {
     /// The [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) hard fork block.
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub eip155_block: Option<u64>,
 
     /// The [EIP-158](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-158.md) hard fork block.
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub eip158_block: Option<u64>,
 
     /// The Byzantium hard fork block (None = no fork, 0 = already on byzantium).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub byzantium_block: Option<u64>,
 
     /// The Constantinople hard fork block (None = no fork, 0 = already on constantinople).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub constantinople_block: Option<u64>,
 
     /// The Petersburg hard fork block (None = no fork, 0 = already on petersburg).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub petersburg_block: Option<u64>,
 
     /// The Istanbul hard fork block (None = no fork, 0 = already on istanbul).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub istanbul_block: Option<u64>,
 
     /// The Muir Glacier hard fork block (None = no fork, 0 = already on muir glacier).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub muir_glacier_block: Option<u64>,
 
     /// The Berlin hard fork block (None = no fork, 0 = already on berlin).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub berlin_block: Option<u64>,
 
     /// The London hard fork block (None = no fork, 0 = already on london).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub london_block: Option<u64>,
 
     /// The Arrow Glacier hard fork block (None = no fork, 0 = already on arrow glacier).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub arrow_glacier_block: Option<u64>,
 
     /// The Gray Glacier hard fork block (None = no fork, 0 = already on gray glacier).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub gray_glacier_block: Option<u64>,
 
     /// Virtual fork after the merge to use as a network splitter.
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub merge_netsplit_block: Option<u64>,
 
     /// Shanghai switch time (None = no fork, 0 = already on shanghai).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub shanghai_time: Option<u64>,
 
     /// Cancun switch time (None = no fork, 0 = already on cancun).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub cancun_time: Option<u64>,
 
     /// Prague switch time (None = no fork, 0 = already on prague).
     #[serde(
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "u64_opt_via_ruint::deserialize"
+        deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub prague_time: Option<u64>,
 
@@ -427,7 +421,7 @@ pub struct ChainConfig {
 
     /// Additional fields specific to each chain.
     #[serde(flatten, default)]
-    pub extra_fields: BTreeMap<String, serde_json::Value>,
+    pub extra_fields: OtherFields,
 
     /// The deposit contract address
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -525,10 +519,40 @@ impl ChainConfig {
     }
 }
 
-// used only for serde
-#[inline]
-const fn mainnet_id() -> u64 {
-    1
+impl Default for ChainConfig {
+    fn default() -> Self {
+        Self {
+            // mainnet
+            chain_id: 1,
+            homestead_block: None,
+            dao_fork_block: None,
+            dao_fork_support: false,
+            eip150_block: None,
+            eip150_hash: None,
+            eip155_block: None,
+            eip158_block: None,
+            byzantium_block: None,
+            constantinople_block: None,
+            petersburg_block: None,
+            istanbul_block: None,
+            muir_glacier_block: None,
+            berlin_block: None,
+            london_block: None,
+            arrow_glacier_block: None,
+            gray_glacier_block: None,
+            merge_netsplit_block: None,
+            shanghai_time: None,
+            cancun_time: None,
+            prague_time: None,
+            terminal_total_difficulty: None,
+            terminal_total_difficulty_passed: false,
+            ethash: None,
+            clique: None,
+            parlia: None,
+            extra_fields: Default::default(),
+            deposit_contract_address: None,
+        }
+    }
 }
 
 /// Empty consensus configuration for proof-of-work networks.
@@ -568,6 +592,13 @@ mod tests {
     use alloc::vec;
     use alloy_primitives::hex;
     use core::str::FromStr;
+
+    #[test]
+    fn genesis_defaults_config() {
+        let s = r#"{}"#;
+        let genesis: Genesis = serde_json::from_str(s).unwrap();
+        assert_eq!(genesis.config.chain_id, 1);
+    }
 
     #[test]
     fn test_genesis() {

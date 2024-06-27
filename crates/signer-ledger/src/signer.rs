@@ -20,7 +20,7 @@ use alloy_sol_types::{Eip712Domain, SolStruct};
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 #[derive(Debug)]
 pub struct LedgerSigner {
@@ -38,6 +38,7 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -109,9 +110,9 @@ impl LedgerSigner {
     ///
     /// ```
     /// # async fn foo() -> Result<(), Box<dyn std::error::Error>> {
-    /// use alloy_signer_ledger::{HDPath, Ledger};
+    /// use alloy_signer_ledger::{HDPath, LedgerSigner};
     ///
-    /// let ledger = Ledger::new(HDPath::LedgerLive(0), Some(1)).await?;
+    /// let ledger = LedgerSigner::new(HDPath::LedgerLive(0), Some(1)).await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -197,6 +198,7 @@ impl LedgerSigner {
     /// Signs an Ethereum transaction's RLP bytes (requires confirmation on the ledger).
     ///
     /// Note that this does not apply EIP-155.
+    #[doc(alias = "sign_transaction_rlp")]
     pub async fn sign_tx_rlp(&self, tx_rlp: &[u8]) -> Result<Signature, LedgerError> {
         let mut payload = Self::path_to_bytes(&self.derivation);
         payload.extend_from_slice(tx_rlp);

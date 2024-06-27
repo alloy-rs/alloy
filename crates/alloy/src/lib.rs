@@ -56,12 +56,6 @@ macro_rules! sol {
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
-#[cfg(feature = "reqwest")]
-use reqwest as _;
-
-#[cfg(feature = "hyper")]
-use hyper as _;
-
 #[cfg(feature = "contract")]
 #[doc(inline)]
 pub use alloy_contract as contract;
@@ -126,23 +120,8 @@ pub mod rpc {
 
     /// Ethereum JSON-RPC type definitions.
     #[cfg(feature = "rpc-types")]
-    pub mod types {
-        #[cfg(feature = "rpc-types-eth")]
-        #[doc(inline)]
-        pub use alloy_rpc_types as eth;
-
-        #[cfg(feature = "rpc-types-beacon")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_beacon as beacon;
-
-        #[cfg(feature = "rpc-types-engine")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_engine as engine;
-
-        #[cfg(feature = "rpc-types-trace")]
-        #[doc(inline)]
-        pub use alloy_rpc_types_trace as trace;
-    }
+    #[doc(inline)]
+    pub use alloy_rpc_types as types;
 }
 
 #[cfg(feature = "serde")]
@@ -169,13 +148,13 @@ pub mod signers {
     #[doc(inline)]
     pub use alloy_signer_ledger as ledger;
 
+    #[cfg(feature = "signer-local")]
+    #[doc(inline)]
+    pub use alloy_signer_local as local;
+
     #[cfg(feature = "signer-trezor")]
     #[doc(inline)]
     pub use alloy_signer_trezor as trezor;
-
-    #[cfg(feature = "signer-wallet")]
-    #[doc(inline)]
-    pub use alloy_signer_wallet as wallet;
 }
 
 /// Low-level Ethereum JSON-RPC transport abstraction and implementations.

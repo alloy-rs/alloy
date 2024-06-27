@@ -1,6 +1,6 @@
 [package]
 name = "alloy-rpc-types-trace"
-description = "Ethereum RPC trace types"
+description = "Types for the `trace` Ethereum JSON-RPC namespace"
 
 version.workspace = true
 edition.workspace = true
@@ -11,19 +11,29 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-rpc-types.workspace = true
+alloy-rpc-types-eth.workspace = true
 alloy-serde.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "rlp", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "rlp",
+    "serde",
+    "arbitrary",
+] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true

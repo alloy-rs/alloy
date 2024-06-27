@@ -1,16 +1,24 @@
-use super::signer::NetworkSigner;
+use super::signer::NetworkWallet;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
-use alloy_rpc_types::AccessList;
+use alloy_rpc_types_eth::AccessList;
 use alloy_sol_types::SolCall;
 use futures_utils_wasm::impl_future;
 
 /// Result type for transaction builders
-pub type BuildResult<T, N> = Result<T, Unbuilt<N>>;
+pub type BuildResult<T, N> = Result<T, UnbuiltTransactionError<N>>;
 
 /// An unbuilt transaction, along with some error.
-pub type Unbuilt<N> = (<N as Network>::TransactionRequest, TransactionBuilderError<N>);
+#[derive(Debug, thiserror::Error)]
+#[error("Failed to build transaction: {error}")]
+pub struct UnbuiltTransactionError<N: Network> {
+    /// The original request that failed to build.
+    pub request: N::TransactionRequest,
+    /// The error that occurred.
+    #[source]
+    pub error: TransactionBuilderError<N>,
+}
 
 /// Error type for transaction builders.
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +48,11 @@ impl<N: Network> TransactionBuilderError<N> {
     {
         Self::Custom(Box::new(e))
     }
+
+    /// Convert the error into an unbuilt transaction error.
+    pub const fn into_unbuilt(self, request: N::TransactionRequest) -> UnbuiltTransactionError<N> {
+        UnbuiltTransactionError { request, error: self }
+    }
 }
 
 /// A Transaction builder for a network.
@@ -50,6 +63,7 @@ impl<N: Network> TransactionBuilderError<N> {
 ///
 /// Transaction builders should be able to construct all available transaction types on a given
 /// network.
+#[doc(alias = "TxBuilder")]
 pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'static {
     /// Get the chain ID for the transaction.
     fn chain_id(&self) -> Option<ChainId>;
@@ -58,7 +72,7 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn set_chain_id(&mut self, chain_id: ChainId);
 
     /// Builder-pattern method for setting the chain ID.
-    fn with_chain_id(mut self, chain_id: alloy_primitives::ChainId) -> Self {
+    fn with_chain_id(mut self, chain_id: ChainId) -> Self {
         self.set_chain_id(chain_id);
         self
     }
@@ -100,16 +114,16 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     }
 
     /// Get the kind of transaction.
-    fn kind(&self) -> Option<alloy_primitives::TxKind>;
+    fn kind(&self) -> Option<TxKind>;
 
     /// Clear the kind of transaction.
     fn clear_kind(&mut self);
 
     /// Set the kind of transaction.
-    fn set_kind(&mut self, kind: alloy_primitives::TxKind);
+    fn set_kind(&mut self, kind: TxKind);
 
     /// Builder-pattern method for setting the kind of transaction.
-    fn with_kind(mut self, kind: alloy_primitives::TxKind) -> Self {
+    fn with_kind(mut self, kind: TxKind) -> Self {
         self.set_kind(kind);
         self
     }
@@ -312,6 +326,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
 
+    /// Apply a function to the builder, returning the modified builder.
+    fn apply<F>(self, f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        f(self)
+    }
+
     /// True if the builder contains all necessary information to be submitted
     /// to the `eth_sendTransaction` endpoint.
     fn can_submit(&self) -> bool;
@@ -322,10 +344,12 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
 
     /// Returns the transaction type that this builder will attempt to build.
     /// This does not imply that the builder is ready to build.
+    #[doc(alias = "output_transaction_type")]
     fn output_tx_type(&self) -> N::TxType;
 
     /// Returns the transaction type that this builder will build. `None` if
     /// the builder is not ready to build.
+    #[doc(alias = "output_transaction_type_checked")]
     fn output_tx_type_checked(&self) -> Option<N::TxType>;
 
     /// Trim any conflicting keys and populate any computed fields (like blob
@@ -341,8 +365,8 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     fn build_unsigned(self) -> BuildResult<N::UnsignedTx, N>;
 
     /// Build a signed transaction.
-    fn build<S: NetworkSigner<N>>(
+    fn build<W: NetworkWallet<N>>(
         self,
-        signer: &S,
+        wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
 }

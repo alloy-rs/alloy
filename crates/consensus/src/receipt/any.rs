@@ -1,12 +1,12 @@
-use crate::{ReceiptWithBloom, TxReceipt};
-use alloy_eips::eip2718::{Decodable2718, Encodable2718};
+use crate::{Eip658Value, ReceiptWithBloom, TxReceipt};
+use alloy_eips::eip2718::{Decodable2718, Eip2718Result, Encodable2718};
 use alloy_primitives::{bytes::BufMut, Bloom, Log};
 use alloy_rlp::{Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
 /// This enum distinguishes between tagged and untagged legacy receipts, as the
-/// in-protocol merkle tree may commit to EITHER 0-prefixed or raw. Therefore
+/// in-protocol Merkle tree may commit to EITHER 0-prefixed or raw. Therefore
 /// we must ensure that encoding returns the precise byte-array that was
 /// decoded, preserving the presence or absence of the `TransactionType` flag.
 ///
@@ -15,12 +15,13 @@ use alloy_rlp::{Decodable, Encodable};
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[doc(alias = "AnyTransactionReceiptEnvelope", alias = "AnyTxReceiptEnvelope")]
 pub struct AnyReceiptEnvelope<T = Log> {
     /// The receipt envelope.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: ReceiptWithBloom<T>,
     /// The transaction type.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::num::u8_via_ruint"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub r#type: u8,
 }
 
@@ -46,13 +47,27 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 
     /// Return true if the transaction was successful.
+    ///
+    /// ## Note
+    ///
+    /// This method may not accurately reflect the status of the transaction
+    /// for transactions before [EIP-658].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     pub const fn is_success(&self) -> bool {
         self.status()
     }
 
     /// Returns the success status of the receipt's transaction.
+    ///
+    /// ## Note
+    ///
+    /// This method may not accurately reflect the status of the transaction
+    /// for transactions before [EIP-658].
+    ///
+    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     pub const fn status(&self) -> bool {
-        self.inner.receipt.status
+        matches!(self.inner.receipt.status, Eip658Value::Eip658(true) | Eip658Value::PostState(_))
     }
 
     /// Return the receipt's bloom.
@@ -72,22 +87,22 @@ impl<T> AnyReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
-    /// Returns the success status of the receipt's transaction.
-    fn status(&self) -> bool {
-        self.inner.receipt.status
+    fn status_or_post_state(&self) -> &Eip658Value {
+        self.inner.status_or_post_state()
     }
 
-    /// Return the receipt's bloom.
+    fn status(&self) -> bool {
+        self.inner.status()
+    }
+
     fn bloom(&self) -> Bloom {
         self.inner.logs_bloom
     }
 
-    /// Returns the cumulative gas used at this receipt.
     fn cumulative_gas_used(&self) -> u128 {
         self.inner.receipt.cumulative_gas_used
     }
 
-    /// Return the receipt logs.
     fn logs(&self) -> &[T] {
         &self.inner.receipt.logs
     }
@@ -115,12 +130,12 @@ impl Encodable2718 for AnyReceiptEnvelope {
 }
 
 impl Decodable2718 for AnyReceiptEnvelope {
-    fn typed_decode(ty: u8, buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         let receipt = Decodable::decode(buf)?;
         Ok(Self { inner: receipt, r#type: ty })
     }
 
-    fn fallback_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Self::typed_decode(0, buf)
     }
 }

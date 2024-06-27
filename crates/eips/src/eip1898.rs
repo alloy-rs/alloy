@@ -1,6 +1,6 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-#![allow(unknown_lints, non_local_definitions)]
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
 
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, BlockNumber, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
@@ -29,13 +29,14 @@ use serde::{
 #[cfg_attr(feature = "serde", serde(rename = "camelCase"))]
 pub struct RpcBlockHash {
     /// A block hash
-    pub block_hash: B256,
+    pub block_hash: BlockHash,
     /// Whether the block must be a canonical block
     pub require_canonical: Option<bool>,
 }
 
 impl RpcBlockHash {
     /// Returns an [RpcBlockHash] from a [B256].
+    #[doc(alias = "from_block_hash")]
     pub const fn from_hash(block_hash: B256, require_canonical: Option<bool>) -> Self {
         Self { block_hash, require_canonical }
     }
@@ -272,10 +273,18 @@ pub enum BlockId {
 
 impl BlockId {
     /// Returns the block hash if it is [BlockId::Hash]
-    pub const fn as_block_hash(&self) -> Option<B256> {
+    pub const fn as_block_hash(&self) -> Option<BlockHash> {
         match self {
             Self::Hash(hash) => Some(hash.block_hash),
             Self::Number(_) => None,
+        }
+    }
+
+    /// Returns the block number if it is [`BlockId::Number`] and not a tag
+    pub const fn as_u64(&self) -> Option<u64> {
+        match self {
+            Self::Number(x) => x.as_number(),
+            _ => None,
         }
     }
 
@@ -344,12 +353,12 @@ impl BlockId {
     }
 
     /// Create a new block hash instance.
-    pub const fn hash(block_hash: B256) -> Self {
+    pub const fn hash(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
     }
 
     /// Create a new block hash instance that requires the block to be canonical.
-    pub const fn hash_canonical(block_hash: B256) -> Self {
+    pub const fn hash_canonical(block_hash: BlockHash) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: Some(true) })
     }
 }
@@ -649,6 +658,12 @@ impl From<U64> for BlockHashOrNumber {
     }
 }
 
+impl From<RpcBlockHash> for BlockHashOrNumber {
+    fn from(value: RpcBlockHash) -> Self {
+        Self::Hash(value.into())
+    }
+}
+
 /// Allows for RLP encoding of either a block hash or block number
 impl Encodable for BlockHashOrNumber {
     fn encode(&self, out: &mut dyn bytes::BufMut) {
@@ -721,7 +736,9 @@ impl FromStr for BlockHashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        #[cfg(not(feature = "std"))]
         use alloc::string::ToString;
+
         match u64::from_str(s) {
             Ok(val) => Ok(val.into()),
             Err(parse_int_error) => match B256::from_str(s) {
@@ -736,7 +753,7 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 
@@ -745,6 +762,18 @@ mod tests {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
         assert_eq!(serialized, "\"0x1\"");
+    }
+
+    #[test]
+    fn block_id_as_u64() {
+        assert_eq!(BlockId::number(123).as_u64(), Some(123));
+        assert_eq!(BlockId::number(0).as_u64(), Some(0));
+        assert_eq!(BlockId::earliest().as_u64(), None);
+        assert_eq!(BlockId::latest().as_u64(), None);
+        assert_eq!(BlockId::pending().as_u64(), None);
+        assert_eq!(BlockId::safe().as_u64(), None);
+        assert_eq!(BlockId::hash(BlockHash::ZERO).as_u64(), None);
+        assert_eq!(BlockId::hash_canonical(BlockHash::ZERO).as_u64(), None);
     }
 
     #[test]

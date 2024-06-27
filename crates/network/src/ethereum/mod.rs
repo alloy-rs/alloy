@@ -1,9 +1,10 @@
-use crate::{Network, ReceiptResponse};
+use crate::{Network, ReceiptResponse, TransactionResponse};
+use alloy_primitives::Bytes;
 
 mod builder;
 
-mod signer;
-pub use signer::EthereumSigner;
+mod wallet;
+pub use wallet::EthereumWallet;
 
 /// Types for a mainnet-like Ethereum network.
 #[derive(Clone, Copy, Debug)]
@@ -22,17 +23,48 @@ impl Network for Ethereum {
 
     type Header = alloy_consensus::Header;
 
-    type TransactionRequest = alloy_rpc_types::transaction::TransactionRequest;
+    type TransactionRequest = alloy_rpc_types_eth::transaction::TransactionRequest;
 
-    type TransactionResponse = alloy_rpc_types::Transaction;
+    type TransactionResponse = alloy_rpc_types_eth::Transaction;
 
-    type ReceiptResponse = alloy_rpc_types::TransactionReceipt;
+    type ReceiptResponse = alloy_rpc_types_eth::TransactionReceipt;
 
-    type HeaderResponse = alloy_rpc_types::Header;
+    type HeaderResponse = alloy_rpc_types_eth::Header;
 }
 
-impl ReceiptResponse for alloy_rpc_types::TransactionReceipt {
+impl ReceiptResponse for alloy_rpc_types_eth::TransactionReceipt {
     fn contract_address(&self) -> Option<alloy_primitives::Address> {
         self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.inner.status()
+    }
+}
+
+impl TransactionResponse for alloy_rpc_types_eth::Transaction {
+    #[doc(alias = "transaction_hash")]
+    fn tx_hash(&self) -> alloy_primitives::B256 {
+        self.hash
+    }
+
+    fn from(&self) -> alloy_primitives::Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<alloy_primitives::Address> {
+        self.to
+    }
+
+    fn value(&self) -> alloy_primitives::U256 {
+        self.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

@@ -1,6 +1,6 @@
 //! Utilities for launching an Anvil instance.
 
-use alloy_primitives::{hex, Address};
+use alloy_primitives::{hex, Address, ChainId};
 use k256::{ecdsa::SigningKey, SecretKey as K256SecretKey};
 use std::{
     io::{BufRead, BufReader},
@@ -25,7 +25,7 @@ pub struct AnvilInstance {
     private_keys: Vec<K256SecretKey>,
     addresses: Vec<Address>,
     port: u16,
-    chain_id: Option<u64>,
+    chain_id: Option<ChainId>,
 }
 
 impl AnvilInstance {
@@ -55,12 +55,13 @@ impl AnvilInstance {
     }
 
     /// Returns the chain of the anvil instance
-    pub fn chain_id(&self) -> u64 {
-        const ANVIL_HARDHAT_CHAIN_ID: u64 = 31_337;
+    pub fn chain_id(&self) -> ChainId {
+        const ANVIL_HARDHAT_CHAIN_ID: ChainId = 31_337;
         self.chain_id.unwrap_or(ANVIL_HARDHAT_CHAIN_ID)
     }
 
     /// Returns the HTTP endpoint of this instance
+    #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
         format!("http://localhost:{}", self.port)
     }
@@ -71,6 +72,7 @@ impl AnvilInstance {
     }
 
     /// Returns the HTTP endpoint url of this instance
+    #[doc(alias = "http_endpoint_url")]
     pub fn endpoint_url(&self) -> Url {
         Url::parse(&self.endpoint()).unwrap()
     }
@@ -148,7 +150,7 @@ pub struct Anvil {
     // If the block_time is an integer, f64::to_string() will output without a decimal point
     // which allows this to be backwards compatible.
     block_time: Option<f64>,
-    chain_id: Option<u64>,
+    chain_id: Option<ChainId>,
     mnemonic: Option<String>,
     fork: Option<String>,
     fork_block_number: Option<u64>,

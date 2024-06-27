@@ -11,23 +11,26 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp"], default-features = false }
-alloy-rlp = { workspace = true, features = ["derive"], default-features = false }
-alloy-serde.workspace = true
-
-sha2 = { workspace = true, default-features = false }
+alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-rlp = { workspace = true, features = ["derive"] }
 
 # serde
-serde = { workspace = true, default-features = false, optional = true }
+alloy-serde = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 # kzg
-derive_more = { workspace = true, optional = true }
 c-kzg = { workspace = true, optional = true }
+derive_more = { workspace = true, optional = true }
 once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
+sha2 = { workspace = true, optional = true }
 
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
@@ -39,16 +42,47 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
-alloy-primitives = { workspace = true, features = ["rand", "serde", "arbitrary"] }
+alloy-primitives = { workspace = true, features = [
+    "rand",
+    "serde",
+    "arbitrary",
+] }
 arbitrary = { workspace = true, features = ["derive"] }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
+proptest.workspace = true
+proptest-derive.workspace = true
 serde_json.workspace = true
 
 [features]
-default = ["std"]
-std = ["alloy-primitives/std", "alloy-rlp/std", "serde?/std", "c-kzg?/std", "once_cell?/std"]
-serde = ["dep:serde", "alloy-primitives/serde", "c-kzg?/serde"]
-kzg = ["dep:derive_more", "dep:c-kzg", "dep:once_cell"]
-ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-primitives/ssz"]
-arbitrary = ["std", "dep:arbitrary", "dep:proptest-derive", "dep:proptest", "alloy-primitives/arbitrary"]
+default = ["std", "kzg-sidecar"]
+std = [
+    "alloy-primitives/std",
+    "alloy-rlp/std",
+    "serde?/std",
+    "c-kzg?/std",
+    "once_cell?/std",
+]
+serde = [
+    "dep:alloy-serde",
+    "dep:serde",
+    "alloy-primitives/serde",
+    "c-kzg?/serde",
+]
+kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg-sidecar = ["sha2"]
+sha2 = ["dep:sha2"]
+k256 = ["alloy-primitives/k256"]
+ssz = [
+    "std",
+    "dep:ethereum_ssz",
+    "dep:ethereum_ssz_derive",
+    "alloy-primitives/ssz",
+]
+arbitrary = [
+    "std",
+    "kzg-sidecar",
+    "dep:arbitrary",
+    "dep:proptest-derive",
+    "dep:proptest",
+    "alloy-primitives/arbitrary",
+    "alloy-serde?/arbitrary",
+]

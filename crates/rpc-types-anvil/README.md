@@ -1,3 +1,5 @@
 # alloy-rpc-types-anvil
 
-RPC types for Anvil, Hardhat, and Ganache dev nodes. 
+Types for the [Anvil] development node's Ethereum JSON-RPC namespace.
+
+[Anvil]: https://github.com/foundry-rs/foundry

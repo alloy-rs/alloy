@@ -2,7 +2,7 @@
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
-use alloy_rpc_types::{transaction::BlobTransactionSidecar, Withdrawal};
+use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -31,11 +31,11 @@ impl fmt::Display for PayloadId {
 /// This represents the `executionPayload` field in the return value of `engine_getPayloadV2`,
 /// specified as:
 ///
-///  - `executionPayload`: `ExecutionPayloadV1` | `ExecutionPayloadV2` where:
-///    - `ExecutionPayloadV1` **MUST** be returned if the payload `timestamp` is lower than the
-///    Shanghai timestamp
-///    - `ExecutionPayloadV2` **MUST** be returned if the payload `timestamp` is greater or equal
-///    to the Shanghai timestamp
+/// - `executionPayload`: `ExecutionPayloadV1` | `ExecutionPayloadV2` where:
+///   - `ExecutionPayloadV1` **MUST** be returned if the payload `timestamp` is lower than the
+///     Shanghai timestamp
+///   - `ExecutionPayloadV2` **MUST** be returned if the payload `timestamp` is greater or equal to
+///     the Shanghai timestamp
 ///
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
@@ -155,16 +155,16 @@ pub struct ExecutionPayloadV1 {
     /// The previous randao of the block.
     pub prev_randao: B256,
     /// The block number.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub block_number: u64,
     /// The gas limit of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_limit: u64,
     /// The gas used of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// The timestamp of the block.
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// The extra data of the block.
     pub extra_data: Bytes,
@@ -301,11 +301,11 @@ pub struct ExecutionPayloadV3 {
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub excess_blob_gas: u64,
 }
 
@@ -497,12 +497,12 @@ impl ssz::Encode for BlobsBundleV1 {
         BlobsBundleV1Ssz::wrap_ref(self).ssz_append(buf)
     }
 
-    fn ssz_bytes_len(&self) -> usize {
-        BlobsBundleV1Ssz::wrap_ref(self).ssz_bytes_len()
-    }
-
     fn ssz_fixed_len() -> usize {
         <BlobsBundleV1Ssz as ssz::Encode>::ssz_fixed_len()
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        BlobsBundleV1Ssz::wrap_ref(self).ssz_bytes_len()
     }
 
     fn as_ssz_bytes(&self) -> Vec<u8> {
@@ -516,12 +516,12 @@ impl ssz::Decode for BlobsBundleV1 {
         <BlobsBundleV1Ssz as ssz::Decode>::is_ssz_fixed_len()
     }
 
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        BlobsBundleV1Ssz::from_ssz_bytes(bytes).map(BlobsBundleV1Ssz::unwrap)
-    }
-
     fn ssz_fixed_len() -> usize {
         <BlobsBundleV1Ssz as ssz::Decode>::ssz_fixed_len()
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        BlobsBundleV1Ssz::from_ssz_bytes(bytes).map(BlobsBundleV1Ssz::unwrap)
     }
 }
 
@@ -854,7 +854,7 @@ pub struct ExecutionPayloadBodyV1 {
 #[serde(rename_all = "camelCase")]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
-    #[serde(with = "alloy_serde::u64_via_ruint")]
+    #[serde(with = "alloy_serde::quantity")]
     pub timestamp: u64,
     /// Value for the `prevRandao` field of the new payload
     pub prev_randao: B256,

@@ -11,7 +11,7 @@ use futures::try_join;
 /// information by joining two [`TxFiller`]s. This  struct is itself a
 /// [`TxFiller`], and can be nested to compose any number of fill layers.
 ///
-/// [`TransactionRequest`]: alloy_rpc_types::TransactionRequest
+/// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
 #[derive(Clone, Copy, Debug)]
 pub struct JoinFill<L, R> {
     left: L,
@@ -92,6 +92,11 @@ where
 
     fn status(&self, tx: &N::TransactionRequest) -> FillerControlFlow {
         self.left.status(tx).absorb(self.right.status(tx))
+    }
+
+    fn fill_sync(&self, tx: &mut SendableTx<N>) {
+        self.left.fill_sync(tx);
+        self.right.fill_sync(tx);
     }
 
     async fn prepare<P, T>(

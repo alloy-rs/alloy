@@ -1,6 +1,7 @@
 use crate::{
     chain::ChainStreamPoller,
     heart::{Heartbeat, HeartbeatHandle},
+    Identity, ProviderBuilder,
 };
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, ClientRef, RpcClient, WeakClient};
@@ -34,6 +35,12 @@ impl<T: fmt::Debug, N> fmt::Debug for RootProvider<T, N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RootProvider").field("client", &self.inner.client).finish_non_exhaustive()
     }
+}
+
+/// Helper function to directly access [`ProviderBuilder`] with minimal
+/// generics.
+pub fn builder<N: Network>() -> ProviderBuilder<Identity, Identity, N> {
+    ProviderBuilder::default()
 }
 
 #[cfg(feature = "reqwest")]
@@ -132,7 +139,7 @@ impl<T, N> Clone for RootProviderInner<T, N> {
 }
 
 impl<T, N> RootProviderInner<T, N> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
+    pub(crate) const fn new(client: RpcClient<T>) -> Self {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
     }
 

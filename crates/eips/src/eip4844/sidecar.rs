@@ -1,12 +1,14 @@
 //! EIP-4844 sidecar type
 
+#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
+
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
-#[cfg(feature = "arbitrary")]
+#[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
 #[cfg(not(feature = "std"))]
@@ -19,6 +21,7 @@ use alloc::vec::Vec;
 #[repr(C)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(proptest_derive::Arbitrary))]
+#[doc(alias = "BlobTxSidecar")]
 pub struct BlobTransactionSidecar {
     /// The blob data.
     #[cfg_attr(

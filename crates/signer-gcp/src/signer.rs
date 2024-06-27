@@ -1,5 +1,5 @@
 use alloy_consensus::SignableTransaction;
-use alloy_primitives::{hex, Address, B256};
+use alloy_primitives::{hex, Address, ChainId, B256};
 use alloy_signer::{sign_transaction_with_chain_id, Result, Signature, Signer};
 use async_trait::async_trait;
 use gcloud_sdk::{
@@ -65,7 +65,7 @@ impl KeySpecifier {
 /// Because the public key is unknown, we retrieve it on instantiation of the signer. This means
 /// that the new function is `async` and must be called within some runtime.
 ///
-/// Note that this signer only supports asynchronous operations. Calling a non-asynchronous method
+/// Note that this wallet only supports asynchronous operations. Calling a non-asynchronous method
 /// will always return an error.
 ///
 /// # Examples
@@ -109,7 +109,7 @@ impl KeySpecifier {
 pub struct GcpSigner {
     client: Client,
     key_name: String,
-    chain_id: Option<u64>,
+    chain_id: Option<ChainId>,
     pubkey: VerifyingKey,
     address: Address,
 }
@@ -153,6 +153,7 @@ impl alloy_network::TxSigner<Signature> for GcpSigner {
     }
 
     #[inline]
+    #[doc(alias = "sign_tx")]
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
@@ -176,12 +177,12 @@ impl Signer for GcpSigner {
     }
 
     #[inline]
-    fn chain_id(&self) -> Option<u64> {
+    fn chain_id(&self) -> Option<ChainId> {
         self.chain_id
     }
 
     #[inline]
-    fn set_chain_id(&mut self, chain_id: Option<u64>) {
+    fn set_chain_id(&mut self, chain_id: Option<ChainId>) {
         self.chain_id = chain_id;
     }
 }
@@ -194,7 +195,7 @@ impl GcpSigner {
     pub async fn new(
         client: Client,
         key_specifier: KeySpecifier,
-        chain_id: Option<u64>,
+        chain_id: Option<ChainId>,
     ) -> Result<Self, GcpSignerError> {
         let key_name = key_specifier.0;
         let resp = request_get_pubkey(&client, &key_name).await?;
@@ -274,7 +275,7 @@ fn decode_signature(raw: Vec<u8>) -> Result<ecdsa::Signature, GcpSignerError> {
     Ok(sig.normalize_s().unwrap_or(sig))
 }
 
-/// Recover an rsig from a signature under a known key by trial/error.
+/// Recover an RSig from a signature under a known key by trial/error.
 fn sig_from_digest_bytes_trial_recovery(
     sig: ecdsa::Signature,
     hash: &B256,

@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -25,9 +29,11 @@ tracing.workspace = true
 
 # non-WASM only
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-http = "0.2"
+http = "1.1"
 tokio = { workspace = true, features = ["sync", "rt", "time"] }
-tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
+# choose ring as the default TLS backend
+rustls = { workspace = true, features = ["ring"] }
 
 # WASM only
 [target.'cfg(target_arch = "wasm32")'.dependencies]

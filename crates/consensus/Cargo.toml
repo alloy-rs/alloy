@@ -11,13 +11,17 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
-alloy-eips.workspace = true
+alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-serde = { workspace = true, optional = true }
 
 # kzg
@@ -33,6 +37,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
+alloy-eips = { workspace = true, features = ["arbitrary"] }
 alloy-signer.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }
@@ -45,7 +50,7 @@ serde_json.workspace = true
 [features]
 default = ["std"]
 std = ["alloy-eips/std", "c-kzg?/std"]
-k256 = ["alloy-primitives/k256"]
+k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
     "std",

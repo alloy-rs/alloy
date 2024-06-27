@@ -11,6 +11,10 @@ homepage.workspace = true
 repository.workspace = true
 exclude.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [lints]
 workspace = true
 
@@ -21,7 +25,10 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-gcloud-sdk = { version = "0.24", features = ["google-cloud-kms-v1"] }
+gcloud-sdk = { version = "0.24", features = [
+    "google-cloud-kms-v1",
+    "google-longrunning",
+] }
 k256 = { workspace = true, features = ["pem"] }
 spki.workspace = true
 thiserror.workspace = true

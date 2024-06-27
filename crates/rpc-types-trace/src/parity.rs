@@ -2,7 +2,7 @@
 //!
 //! See <https://openethereum.github.io/JSONRPC-trace-module>
 
-use alloy_primitives::{Address, Bytes, B256, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256, U64};
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -10,10 +10,11 @@ use std::{
 };
 
 /// Different Trace diagnostic targets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TraceType {
     /// Default trace
+    #[default]
     Trace,
     /// Provides a full trace of the VM’s state throughout the execution of the transaction,
     /// including for any subcalls.
@@ -61,6 +62,7 @@ pub struct TraceResultsWithTransactionHash {
     #[serde(flatten)]
     pub full_trace: TraceResults,
     /// Hash of the traced transaction.
+    #[doc(alias = "tx_hash")]
     pub transaction_hash: B256,
 }
 
@@ -172,6 +174,12 @@ pub enum Action {
     Reward(RewardAction),
 }
 
+impl Default for Action {
+    fn default() -> Self {
+        Self::Call(CallAction::default())
+    }
+}
+
 impl Action {
     /// Returns true if this is a call action
     pub const fn is_call(&self) -> bool {
@@ -190,6 +198,38 @@ impl Action {
     /// Returns true if this is a reward action
     pub const fn is_reward(&self) -> bool {
         matches!(self, Self::Reward(_))
+    }
+
+    /// Returns the [`CallAction`] if it is [`Action::Call`]
+    pub const fn as_call(&self) -> Option<&CallAction> {
+        match self {
+            Self::Call(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`CreateAction`] if it is [`Action::Create`]
+    pub const fn as_create(&self) -> Option<&CreateAction> {
+        match self {
+            Self::Create(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SelfdestructAction`] if it is [`Action::Selfdestruct`]
+    pub const fn as_selfdestruct(&self) -> Option<&SelfdestructAction> {
+        match self {
+            Self::Selfdestruct(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`RewardAction`] if it is [`Action::Reward`]
+    pub const fn as_reward(&self) -> Option<&RewardAction> {
+        match self {
+            Self::Reward(action) => Some(action),
+            _ => None,
+        }
     }
 
     /// Returns what kind of action this is
@@ -240,7 +280,7 @@ pub enum CallType {
 }
 
 /// Represents a certain [CallType] of a _call_ or message transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CallAction {
     /// Address of the sending account.
@@ -358,8 +398,9 @@ impl TraceOutput {
 }
 
 /// A parity style trace of a transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "TxTrace")]
 pub struct TransactionTrace {
     /// Represents what kind of trace this is
     #[serde(flatten)]
@@ -381,6 +422,7 @@ pub struct TransactionTrace {
 /// A wrapper for [TransactionTrace] that includes additional information about the transaction.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[doc(alias = "LocalizedTxTrace")]
 pub struct LocalizedTransactionTrace {
     /// Trace of the transaction and its result.
     #[serde(flatten)]
@@ -388,14 +430,16 @@ pub struct LocalizedTransactionTrace {
     /// Hash of the block, if not pending.
     ///
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
-    pub block_hash: Option<B256>,
+    pub block_hash: Option<BlockHash>,
     /// Block number the transaction is included in, None if pending.
     ///
     /// Note: this deviates from <https://openethereum.github.io/JSONRPC-trace-module#trace_transaction> which always returns a block number
     pub block_number: Option<u64>,
     /// Hash of the transaction
-    pub transaction_hash: Option<B256>,
+    #[doc(alias = "tx_hash")]
+    pub transaction_hash: Option<TxHash>,
     /// Transaction index within the block, None if pending.
+    #[doc(alias = "tx_position", alias = "transaction_index", alias = "tx_index")]
     pub transaction_position: Option<u64>,
 }
 
