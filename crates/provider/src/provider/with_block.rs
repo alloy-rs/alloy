@@ -1,8 +1,8 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_primitives::B256;
-use alloy_rpc_client::{RpcCall, WeakClient};
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_rpc_client::{ClientRef, RpcCall};
+use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use std::{
     borrow::Cow,
@@ -13,7 +13,7 @@ use std::{
 
 /// States of the
 #[derive(Clone)]
-enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+enum States<'req, T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -22,7 +22,7 @@ where
 {
     Invalid,
     Preparing {
-        client: WeakClient<T>,
+        client: ClientRef<'req, T>,
         method: Cow<'static, str>,
         params: Params,
         block_id: BlockId,
@@ -31,9 +31,10 @@ where
     Running(RpcCall<T, serde_json::Value, Resp, Output, Map>),
 }
 
-impl<T, Params, Resp, Output, Map> core::fmt::Debug for States<T, Params, Resp, Output, Map>
+impl<'req, T, Params, Resp, Output, Map> core::fmt::Debug
+    for States<'req, T, Params, Resp, Output, Map>
 where
-    T: Transport + Clone,
+    T: Transport + Clone + std::fmt::Debug,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
@@ -56,17 +57,17 @@ where
 /// A future for [`RpcWithBlock`]. Simple wrapper around [`RpcCall`].
 #[derive(Debug, Clone)]
 #[pin_project::pin_project]
-pub struct RpcWithBlockFut<T, Params, Resp, Output, Map>
+pub struct RpcWithBlockFut<'req, T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    state: States<T, Params, Resp, Output, Map>,
+    state: States<'req, T, Params, Resp, Output, Map>,
 }
 
-impl<T, Params, Resp, Output, Map> RpcWithBlockFut<T, Params, Resp, Output, Map>
+impl<'req, T, Params, Resp, Output, Map> RpcWithBlockFut<'req, T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -86,12 +87,6 @@ where
         };
 
         let mut fut = {
-            // make sure the client still exists
-            let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-                Ok(client) => client,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
-
             // serialize the params
             let ser = serde_json::to_value(params).map_err(RpcError::ser_err);
             let mut ser = match ser {
@@ -137,7 +132,8 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> Future for RpcWithBlockFut<T, Params, Resp, Output, Map>
+impl<'req, T, Params, Resp, Output, Map> Future
+    for RpcWithBlockFut<'req, T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -161,14 +157,14 @@ where
 /// An [`RpcCall`] that takes an optional [`BlockId`] parameter. By default
 /// this will use "latest".
 #[derive(Debug, Clone)]
-pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+pub struct RpcWithBlock<'req, T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    client: WeakClient<T>,
+    client: ClientRef<'req, T>,
     method: Cow<'static, str>,
     params: Params,
     block_id: BlockId,
@@ -176,7 +172,7 @@ where
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<T, Params, Resp> RpcWithBlock<T, Params, Resp>
+impl<'req, T, Params, Resp> RpcWithBlock<'req, T, Params, Resp>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -184,7 +180,7 @@ where
 {
     /// Create a new [`RpcWithBlock`] instance.
     pub fn new(
-        client: WeakClient<T>,
+        client: ClientRef<'req, T>,
         method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> Self {
@@ -199,7 +195,7 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
+impl<'req, T, Params, Resp, Output, Map> RpcWithBlock<'req, T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -220,7 +216,7 @@ where
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
-    ) -> RpcWithBlock<T, Params, Resp, NewOutput, NewMap>
+    ) -> RpcWithBlock<'req, T, Params, Resp, NewOutput, NewMap>
     where
         NewMap: Fn(Resp) -> NewOutput,
     {
@@ -283,7 +279,8 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> IntoFuture for RpcWithBlock<T, Params, Resp, Output, Map>
+impl<'req, T, Params, Resp, Output, Map> IntoFuture
+    for RpcWithBlock<'req, T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -293,7 +290,7 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = RpcWithBlockFut<T, Params, Resp, Output, Map>;
+    type IntoFuture = RpcWithBlockFut<'req, T, Params, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         RpcWithBlockFut {
