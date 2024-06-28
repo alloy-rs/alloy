@@ -26,10 +26,10 @@ where
     ///
     /// Not all nodes support this call.
     fn trace_call<'a, 'b>(
-        &'a self,
+        &self,
         request: &'a N::TransactionRequest,
         trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<'a, T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -40,9 +40,9 @@ where
     ///
     /// Not all nodes support this call.
     fn trace_call_many<'a>(
-        &'a self,
+        &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<'a, T, TraceCallList<'a, N>, TraceResults>;
+    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -97,19 +97,19 @@ where
     P: Provider<T, N>,
 {
     fn trace_call<'a, 'b>(
-        &'a self,
+        &self,
         request: &'a <N as Network>::TransactionRequest,
         trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<'a, T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
+    ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
     {
-        RpcWithBlock::new(self.client(), "trace_call", (request, trace_type))
+        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
     }
 
     fn trace_call_many<'a>(
-        &'a self,
+        &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<'a, T, TraceCallList<'a, N>, TraceResults> {
-        RpcWithBlock::new(self.client(), "trace_callMany", request)
+    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
+        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
     async fn trace_transaction(
