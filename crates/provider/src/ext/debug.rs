@@ -27,14 +27,16 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Returns an array of recent bad blocks that the client has seen on the network.
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
 
-    /// Returns the structured logs created during the execution of EVM between two blocks (excluding start) as a JSON object.
+    /// Returns the structured logs created during the execution of EVM between two blocks
+    /// (excluding start) as a JSON object.
     async fn debug_trace_chain(
         &self,
         start_exclusive: BlockNumberOrTag,
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>>;
 
-    /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all transaction that were included in this block.
+    /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all
+    /// transaction that were included in this block.
     ///
     /// This expects an RLP-encoded block.
     ///
