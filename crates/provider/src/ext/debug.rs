@@ -1,7 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{TxHash, B256};
+use alloy_primitives::{Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
@@ -12,6 +12,9 @@ use alloy_transport::{Transport, TransportResult};
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait DebugApi<N, T>: Send + Sync {
+    /// Returns an RLP-encoded header.
+    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -99,6 +102,10 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
+    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawHeader", (block,)).await
+    }
+
     async fn debug_trace_transaction(
         &self,
         hash: TxHash,
@@ -148,6 +155,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
+    use alloy_node_bindings::Geth;
     use alloy_primitives::{address, U256};
 
     fn init_tracing() {
@@ -200,5 +208,20 @@ mod test {
         if let GethTrace::Default(trace) = trace {
             assert!(!trace.struct_logs.is_empty());
         }
+    }
+
+    #[tokio::test]
+    async fn test_debug_get_raw_header() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let block = BlockNumberOrTag::Latest;
+        let rlp_header = provider
+            .debug_get_raw_header(block)
+            .await
+            .expect("debug_getRawHeader call should succeed");
+
+        assert!(!rlp_header.is_empty());
     }
 }
