@@ -54,9 +54,10 @@ pub struct Privacy {
     /// Hints on what data should be shared about the bundle and its transactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hints: Option<PrivacyHint>,
-    /// The addresses of the builders that should be allowed to see the bundle/transaction.
+    /// Names of the builders that should be allowed to see the bundle/transaction.
+    /// <https://github.com/flashbots/dowg/blob/main/builder-registrations.json>
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub builders: Option<Vec<Address>>,
+    pub builders: Option<Vec<String>>,
 }
 
 /// Hints on what data should be shared about the bundle and its transactions
