@@ -15,6 +15,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Returns an RLP-encoded header.
     async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
 
+    /// Retrieves and returns the RLP encoded block by number, hash or tag.
+    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -104,6 +107,10 @@ where
 {
     async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
+    }
+
+    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawBlock", (block,)).await
     }
 
     async fn debug_trace_transaction(
@@ -223,5 +230,20 @@ mod test {
             .expect("debug_getRawHeader call should succeed");
 
         assert!(!rlp_header.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_debug_get_raw_block() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let block = BlockNumberOrTag::Latest;
+        let rlp_block = provider
+            .debug_get_raw_header(block)
+            .await
+            .expect("debug_getRawBlock call should succeed");
+
+        assert!(!rlp_block.is_empty());
     }
 }
