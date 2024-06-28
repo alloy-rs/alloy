@@ -50,6 +50,13 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
+    /// Traces of the transaction on the given positions
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: u64,
+    ) -> TransportResult<LocalizedTransactionTrace>;
+
     /// Trace the given raw transaction.
     async fn trace_raw_transaction(
         &self,
@@ -117,6 +124,15 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
         self.client().request("trace_transaction", (hash,)).await
+    }
+
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: u64,
+    ) -> TransportResult<LocalizedTransactionTrace> {
+        // We are using vec![indices] because API accepts a list, but in fact works only if list.len == 1
+        self.client().request("trace_get", (hash, vec![index])).await
     }
 
     async fn trace_raw_transaction(
