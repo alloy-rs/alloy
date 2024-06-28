@@ -190,6 +190,8 @@ impl<T> BlockTransactions<T> {
     }
 
     /// Fallibly cast to a slice of transactions.
+    ///
+    /// Returns `None` if the enum variant is not `Full`.
     pub fn as_transactions(&self) -> Option<&[T]> {
         match self {
             Self::Full(txs) => Some(txs),
@@ -209,6 +211,15 @@ impl<T> BlockTransactions<T> {
     #[doc(alias = "transactions")]
     pub fn txns(&self) -> impl Iterator<Item = &T> {
         self.as_transactions().map(|txs| txs.iter()).unwrap_or_else(|| [].iter())
+    }
+
+    /// Returns an iterator over the transactions (if any). This will be empty if the block is not
+    /// full.
+    pub fn into_transactions(self) -> std::vec::IntoIter<T> {
+        match self {
+            Self::Full(txs) => txs.into_iter(),
+            _ => std::vec::IntoIter::default(),
+        }
     }
 
     /// Returns an instance of BlockTransactions with the Uncle special case.
