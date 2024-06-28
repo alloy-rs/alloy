@@ -34,6 +34,19 @@ pub trait DebugApi<N, T>: Send + Sync {
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>>;
 
+    /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all transaction that were included in this block.
+    ///
+    /// This expects an RLP-encoded block.
+    ///
+    /// # Note
+    ///
+    /// The parent of this block must be present, or it will fail.
+    async fn debug_trace_block(
+        &self,
+        rlp_block: &[u8],
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>>;
+
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -147,6 +160,14 @@ where
         end_inclusive: BlockNumberOrTag,
     ) -> TransportResult<Vec<BlockTraceResult>> {
         self.client().request("debug_traceChain", (start_exclusive, end_inclusive)).await
+    }
+
+    async fn debug_trace_block(
+        &self,
+        rlp_block: &[u8],
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>> {
+        self.client().request("debug_traceBlock", (rlp_block, trace_options)).await
     }
 
     async fn debug_trace_transaction(
