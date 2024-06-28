@@ -18,8 +18,11 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Retrieves and returns the RLP encoded block by number, hash or tag.
     async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
 
-    /// Returns an EIP-2718 binary-encoded transaction..
+    /// Returns an EIP-2718 binary-encoded transaction.
     async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes>;
+
+    /// Returns an array of EIP-2718 binary-encoded receipts.
+    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>>;
 
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
@@ -118,6 +121,10 @@ where
 
     async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes> {
         self.client().request("debug_getRawTransaction", (hash,)).await
+    }
+
+    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>> {
+        self.client().request("debug_getRawReceipts", (block,)).await
     }
 
     async fn debug_trace_transaction(
