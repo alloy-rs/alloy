@@ -2,7 +2,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Bytes, TxHash, B256};
-use alloy_rpc_types_eth::{BlockNumberOrTag, TransactionRequest};
+use alloy_rpc_types_eth::{Block, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -23,6 +23,9 @@ pub trait DebugApi<N, T>: Send + Sync {
 
     /// Returns an array of EIP-2718 binary-encoded receipts.
     async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>>;
+
+    /// Returns an array of recent bad blocks that the client has seen on the network.
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
 
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
@@ -125,6 +128,10 @@ where
 
     async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>> {
         self.client().request("debug_getRawReceipts", (block,)).await
+    }
+
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
+        self.client().request("debug_getBadBlocks", ()).await
     }
 
     async fn debug_trace_transaction(
@@ -232,14 +239,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_debug_get_raw_header() {
+    async fn call_debug_get_raw_header() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let block = BlockNumberOrTag::Latest;
         let rlp_header = provider
-            .debug_get_raw_header(block)
+            .debug_get_raw_header(BlockNumberOrTag::default())
             .await
             .expect("debug_getRawHeader call should succeed");
 
@@ -247,17 +253,36 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_debug_get_raw_block() {
+    async fn call_debug_get_raw_block() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let block = BlockNumberOrTag::Latest;
         let rlp_block = provider
-            .debug_get_raw_block(block)
+            .debug_get_raw_block(BlockNumberOrTag::default())
             .await
             .expect("debug_getRawBlock call should succeed");
 
         assert!(!rlp_block.is_empty());
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_raw_receipts() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let result = provider.debug_get_raw_receipts(BlockNumberOrTag::default()).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_bad_blocks() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let result = provider.debug_get_bad_blocks().await;
+        assert!(result.is_ok());
     }
 }
