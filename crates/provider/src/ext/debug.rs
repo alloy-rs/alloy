@@ -1,7 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{Bytes, TxHash, B256};
+use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{Block, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
@@ -169,6 +169,7 @@ where
         rlp_block: &[u8],
         trace_options: GethDebugTracingOptions,
     ) -> TransportResult<Vec<TraceResult>> {
+        let rlp_block = hex::encode_prefixed(rlp_block);
         self.client().request("debug_traceBlock", (rlp_block, trace_options)).await
     }
 
