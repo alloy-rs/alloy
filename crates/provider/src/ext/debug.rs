@@ -18,6 +18,9 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Retrieves and returns the RLP encoded block by number, hash or tag.
     async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
 
+    /// Returns an EIP-2718 binary-encoded transaction..
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes>;
+
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -111,6 +114,10 @@ where
 
     async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
         self.client().request("debug_getRawBlock", (block,)).await
+    }
+
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawTransaction", (hash,)).await
     }
 
     async fn debug_trace_transaction(
@@ -240,7 +247,7 @@ mod test {
 
         let block = BlockNumberOrTag::Latest;
         let rlp_block = provider
-            .debug_get_raw_header(block)
+            .debug_get_raw_block(block)
             .await
             .expect("debug_getRawBlock call should succeed");
 
