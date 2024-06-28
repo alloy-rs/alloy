@@ -4,7 +4,7 @@ use alloy_network::Network;
 use alloy_primitives::{Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{Block, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
-    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
+    BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -26,6 +26,13 @@ pub trait DebugApi<N, T>: Send + Sync {
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
+
+    /// Returns the structured logs created during the execution of EVM between two blocks (excluding start) as a JSON object.
+    async fn debug_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+    ) -> TransportResult<Vec<BlockTraceResult>>;
 
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
@@ -132,6 +139,14 @@ where
 
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
         self.client().request("debug_getBadBlocks", ()).await
+    }
+
+    async fn debug_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+    ) -> TransportResult<Vec<BlockTraceResult>> {
+        self.client().request("debug_traceChain", (start_exclusive, end_inclusive)).await
     }
 
     async fn debug_trace_transaction(
