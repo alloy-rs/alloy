@@ -70,6 +70,6 @@ mod test {
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
         let listening = provider.net_listening().await.expect("net_listening call should succeed");
-        assert_eq!(listening, true);
+        assert!(listening);
     }
 }
