@@ -31,5 +31,8 @@ pub use alloy_rpc_types_mev as mev;
 #[cfg(feature = "trace")]
 pub use alloy_rpc_types_trace as trace;
 
+#[cfg(feature = "rpc")]
+pub use alloy_rpc_types_rpc as rpc;
+
 #[cfg(feature = "txpool")]
 pub use alloy_rpc_types_txpool as txpool;

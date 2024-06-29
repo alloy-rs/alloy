@@ -30,6 +30,7 @@ alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth.workspace = true
 alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-rpc = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
@@ -98,4 +99,5 @@ debug-api = ["dep:alloy-rpc-types-trace"]
 engine-api = ["dep:alloy-rpc-types-engine"]
 net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
+rpc-api = ["dep:alloy-rpc-types-rpc"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]

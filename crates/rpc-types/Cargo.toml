@@ -27,6 +27,7 @@ alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, optional = true }
 alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
+alloy-rpc-types-rpc = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 
 [features]
@@ -38,6 +39,7 @@ engine = ["dep:alloy-rpc-types-engine"]
 eth = ["dep:alloy-rpc-types-eth"]
 mev = ["dep:alloy-rpc-types-mev"]
 trace = ["dep:alloy-rpc-types-trace"]
+rpc = ["dep:alloy-rpc-types-rpc"]
 txpool = ["dep:alloy-rpc-types-txpool"]
 
 arbitrary = ["alloy-rpc-types-eth?/arbitrary", "alloy-serde/arbitrary"]
