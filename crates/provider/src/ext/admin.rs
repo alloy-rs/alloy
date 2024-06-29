@@ -1,7 +1,7 @@
 //! This module extends the Ethereum JSON-RPC provider with the Admin namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::U128;
+use alloy_pubsub::Subscription;
 use alloy_rpc_types_admin::{NodeInfo, PeerInfo};
 use alloy_transport::{Transport, TransportResult};
 
@@ -39,10 +39,10 @@ pub trait AdminApi<N, T>: Send + Sync {
     /// in all events subsequently.
     ///
     /// To unsubscribe from peer events, call `unsubscribe_peer_events`.
-    async fn subscribe_peer_events(&self) -> TransportResult<Option<U128>>;
-
-    /// Cancel subscription with `id`.
-    async fn unsubscribe_peer_events(&self, id: U128) -> TransportResult<bool>;
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_peer_events(
+        &self,
+    ) -> TransportResult<Subscription<alloy_rpc_types_admin::PeerEvent>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -77,13 +77,15 @@ where
         self.client().request("admin_nodeInfo", ()).await
     }
 
-    async fn subscribe_peer_events(&self) -> TransportResult<Option<U128>> {
-        self.client().request("admin_peerEvents_subscribe", ()).await
-    }
-
-    async fn unsubscribe_peer_events(&self, id: U128) -> TransportResult<bool> {
-        let id = format!("{id:#x}");
-        self.client().request("admin_peerEvents_unsubscribe", (id,)).await
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_peer_events(
+        &self,
+    ) -> TransportResult<Subscription<alloy_rpc_types_admin::PeerEvent>> {
+        self.root().pubsub_frontend()?;
+        let mut call = self.client().request("admin_peerEvents_subscribe", ());
+        call.set_is_subscription();
+        let id = call.await?;
+        self.root().get_subscription(id).await
     }
 }
 
