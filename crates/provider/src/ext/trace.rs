@@ -52,10 +52,10 @@ where
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Traces of the transaction on the given positions
-    /// 
+    ///
     /// # Note
-    /// 
-    /// This function accepts single index and build list with it under the hood because 
+    ///
+    /// This function accepts single index and build list with it under the hood because
     /// trace_get method accepts list of indices but limits this list to len == 1.
     async fn trace_get(
         &self,
