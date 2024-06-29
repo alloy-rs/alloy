@@ -81,10 +81,10 @@ full = [
     "kzg",
     "network",
     "provider-http", # includes `providers`
-    "provider-ws", # includes `providers`
-    "provider-ipc", # includes `providers`
-    "rpc-types", # includes `rpc-types-eth`
-    "signer-local", # includes `signers`
+    "provider-ws",   # includes `providers`
+    "provider-ipc",  # includes `providers`
+    "rpc-types",     # includes `rpc-types-eth`
+    "signer-local",  # includes `signers`
 ]
 
 # configuration
@@ -155,6 +155,7 @@ provider-engine-api = [
     "alloy-provider?/engine-api",
     "rpc-types-engine",
 ]
+provider-net-api = ["providers", "alloy-provider?/net-api"]
 provider-trace-api = [
     "providers",
     "alloy-provider?/trace-api",
