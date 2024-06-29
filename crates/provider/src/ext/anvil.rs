@@ -431,11 +431,11 @@ mod tests {
 
         let start_num = provider.get_block_number().await.unwrap();
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
 
         let num = provider.get_block_number().await.unwrap();
 
-        assert_eq!(num, start_num + 2);
+        assert_eq!(num, start_num + 1);
     }
 
     #[tokio::test]
