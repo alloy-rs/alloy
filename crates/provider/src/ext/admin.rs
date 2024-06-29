@@ -36,8 +36,6 @@ pub trait AdminApi<N, T>: Send + Sync {
     ///
     /// Like other subscription methods, this returns the ID of the subscription, which is then used
     /// in all events subsequently.
-    ///
-    /// To unsubscribe from peer events, call `unsubscribe_peer_events`.
     #[cfg(feature = "pubsub")]
     async fn subscribe_peer_events(
         &self,
