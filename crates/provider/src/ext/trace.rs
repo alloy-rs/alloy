@@ -86,6 +86,13 @@ where
         block: BlockNumberOrTag,
         trace_type: &[TraceType],
     ) -> TransportResult<Vec<TraceResultsWithTransactionHash>>;
+
+    /// Gets a specific trace by its hash and index.
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: &[u64],
+    ) -> TransportResult<LocalizedTransactionTrace>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -156,6 +163,14 @@ where
     ) -> TransportResult<Vec<TraceResultsWithTransactionHash>> {
         self.client().request("trace_replayBlockTransactions", (block, trace_type)).await
     }
+
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: &[u64],
+    ) -> TransportResult<LocalizedTransactionTrace> {
+        self.client().request("trace_get", (hash, index)).await
+    }
 }
 
 #[cfg(test)]
@@ -174,5 +189,15 @@ mod test {
         let provider = ProviderBuilder::new().on_anvil();
         let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
         assert_eq!(traces.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_trace_get() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+        let hash = TxHash::default();
+        let index = vec![0];
+        let trace_result = provider.trace_get(hash, &index).await;
+        assert(trace_result.is_ok());
     }
 }
