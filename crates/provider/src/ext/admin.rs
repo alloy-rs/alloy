@@ -31,6 +31,17 @@ pub trait AdminApi<N, T>: Send + Sync {
     /// Returns general information about the node as well as information about the running p2p
     /// protocols (e.g. `eth`, `snap`).
     async fn node_info(&self) -> TransportResult<NodeInfo>;
+
+    /// Subscribe to events received by peers over the network.
+    ///
+    /// Like other subscription methods, this returns the ID of the subscription, which is then used
+    /// in all events subsequently.
+    ///
+    /// To unsubscribe from peer events, call `unsubscribe_peer_events`.
+    async fn subscribe_peer_events(&self) -> TransportResult<Option<u16>>;
+
+    /// Cancel subscription with `id`.
+    async fn unsubscribe_peer_events(&self, id: u16) -> TransportResult<bool>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -63,6 +74,16 @@ where
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
         self.client().request("admin_nodeInfo", ()).await
+    }
+
+    async fn subscribe_peer_events(&self) -> TransportResult<Option<u16>> {
+        self.client().request("admin_peerEvents_subscribe", ()).await
+    }
+
+    async fn unsubscribe_peer_events(&self, id: u16) -> TransportResult<bool> {
+        // Id's have no leading zeroes and are `0x` prefixed.
+        let id = format!("{id:x}");
+        self.client().request("admin_peerEvents_unsubscribe", (id,)).await
     }
 }
 
