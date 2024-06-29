@@ -82,7 +82,7 @@ where
 
     async fn unsubscribe_peer_events(&self, id: u16) -> TransportResult<bool> {
         // Id's have no leading zeroes and are `0x` prefixed.
-        let id = format!("{id:x}");
+        let id = format!("{id:#x}");
         self.client().request("admin_peerEvents_unsubscribe", (id,)).await
     }
 }
