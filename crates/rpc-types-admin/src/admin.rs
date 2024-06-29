@@ -199,7 +199,8 @@ pub enum PeerEventType {
     MsgRecv,
 }
 
-/// An event emitted when peers are either added or dropped from a p2p server or when a message is sent or received on a peer connection.
+/// An event emitted when peers are either added or dropped from a p2p server or when a message is
+/// sent or received on a peer connection.
 ///
 /// See [geth's `PeerEvent` struct](https://github.com/ethereum/go-ethereum/blob/94579932b18931115f28aa7f87f02450bda084c9/p2p/peer.go#L94-L103) for the source of each field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
