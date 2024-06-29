@@ -137,7 +137,7 @@ where
         hash: TxHash,
         index: usize,
     ) -> TransportResult<LocalizedTransactionTrace> {
-        // We are using vec![indices] because API accepts a list, but in fact works only if list.len == 1
+        // We are using `[index]` because API accepts a list, but only supports a single index
         self.client().request("trace_get", (hash, (Index::from(index),))).await
     }
 
