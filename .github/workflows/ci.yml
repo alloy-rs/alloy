@@ -107,21 +107,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          target: wasm32-wasi
+          target: wasm32-wasip1
       - uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
       - name: cargo hack
         run: |
-          cargo hack build --workspace --target wasm32-wasi \
+          cargo hack build --workspace --target wasm32-wasip1 \
             --exclude alloy-signer-gcp \
             --exclude alloy-signer-ledger \
             --exclude alloy-signer-trezor \
             --exclude alloy-transport-ipc
       # Ledger signer requires one of `browser` or `node` features.
       - name: build ledger
-        run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasi
+        run: cargo build -p alloy-signer-ledger --features browser --target wasm32-wasip1
 
   no-std:
     runs-on: ubuntu-latest
