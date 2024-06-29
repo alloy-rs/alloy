@@ -41,7 +41,7 @@ pub trait AdminApi<N, T>: Send + Sync {
     #[cfg(feature = "pubsub")]
     async fn subscribe_peer_events(
         &self,
-    ) -> TransportResult<Subscription<alloy_rpc_types_admin::PeerEvent>>;
+    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
