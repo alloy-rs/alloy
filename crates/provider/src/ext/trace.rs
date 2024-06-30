@@ -138,7 +138,7 @@ where
         index: Vec<Index>,
     ) -> TransportResult<LocalizedTransactionTrace> {
         // We are using `[index]` because API accepts a list, but only supports a single index
-        self.client().request("trace_get", (hash, index,))).await
+        self.client().request("trace_get", (hash, index,)).await
     }
 
     async fn trace_raw_transaction(
