@@ -172,7 +172,6 @@ provider-anvil-node = [
     "alloy-provider?/anvil-node",
     "node-bindings",
 ]
-provider-web3-api = ["providers", "alloy-provider?/web3-api"]
 
 # pubsub
 pubsub = [

@@ -856,6 +856,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("web3_clientVersion", ()).await
     }
 
+    /// Gets the Keccak-256 hash of the given data.
+    async fn get_sha3(&self, data: &[u8]) -> TransportResult<B256> {
+        let rlp_data = hex::encode_prefixed(data);
+        self.client().request("web3_sha3", (rlp_data,)).await
+    }
+
     /// Gets the network ID. Same as `eth_chainId`.
     fn get_net_version(&self) -> RpcCall<T, (), U64, u64> {
         self.client().request("net_version", ()).map_resp(crate::utils::convert_u64)
@@ -1222,6 +1228,16 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let version = provider.get_client_version().await.unwrap();
         assert!(version.contains("anvil"));
+    }
+
+    #[tokio::test]
+    async fn gets_sha3() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+        let data = "alloy".as_bytes();
+        let hash = provider.get_sha3(data).await.unwrap();
+        println!("hash {:#?}", hash);
+        assert!(!hash.is_empty());
     }
 
     #[tokio::test]
