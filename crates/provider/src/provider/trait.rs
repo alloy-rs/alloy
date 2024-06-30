@@ -1236,7 +1236,6 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil();
         let data = "alloy".as_bytes();
         let hash = provider.get_sha3(data).await.unwrap();
-        println!("hash {:#?}", hash);
         assert!(!hash.is_empty());
     }
 
