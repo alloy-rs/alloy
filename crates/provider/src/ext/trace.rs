@@ -60,7 +60,7 @@ where
     async fn trace_get(
         &self,
         hash: TxHash,
-        index: usize,
+        index: Vec<Index>,
     ) -> TransportResult<LocalizedTransactionTrace>;
 
     /// Trace the given raw transaction.
@@ -135,10 +135,10 @@ where
     async fn trace_get(
         &self,
         hash: TxHash,
-        index: usize,
+        index: Vec<Index>,
     ) -> TransportResult<LocalizedTransactionTrace> {
         // We are using `[index]` because API accepts a list, but only supports a single index
-        self.client().request("trace_get", (hash, (Index::from(index),))).await
+        self.client().request("trace_get", (hash, index,))).await
     }
 
     async fn trace_raw_transaction(
