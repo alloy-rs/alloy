@@ -1,7 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Web3 namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::Bytes;
 use alloy_transport::{Transport, TransportResult};
 
 /// Web3 namespace rpc interface that provides access to web3 information of the node.
@@ -11,7 +10,7 @@ pub trait Web3Api<N, T>: Send + Sync {
     /// Gets the client version of the chain client.
     async fn web3_client_version(&self) -> TransportResult<String>;
     /// Gets the Keccak-256 hash of the given data.
-    async fn web3_sha3(&self, data: Bytes) -> TransportResult<String>;
+    async fn web3_sha3(&self, data: &[u8]) -> TransportResult<String>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -26,7 +25,7 @@ where
         self.client().request("web3_clientVersion", ()).await
     }
 
-    async fn web3_sha3(&self, data: Bytes) -> TransportResult<String> {
+    async fn web3_sha3(&self, data: &[u8]) -> TransportResult<String> {
         self.client().request("web3_sha3", (data,)).await
     }
 }
@@ -47,7 +46,7 @@ mod tests {
     #[tokio::test]
     async fn test_web3_sha3() {
         let provider = ProviderBuilder::new().on_anvil();
-        let data = Bytes::from("alloy");
+        let data = "alloy".as_bytes();
         let hash = provider.web3_sha3(data).await.unwrap();
         assert!(!hash.is_empty());
     }
