@@ -34,3 +34,8 @@ pub use trace::{TraceApi, TraceCallList};
 mod txpool;
 #[cfg(feature = "txpool-api")]
 pub use txpool::TxPoolApi;
+
+#[cfg(feature = "web3-api")]
+mod web3;
+#[cfg(feature = "web3-api")]
+pub use web3::Web3Api;
