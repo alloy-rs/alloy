@@ -30,3 +30,30 @@ where
         self.client().request("web3_sha3", (data,)).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ProviderBuilder;
+
+    use super::*;
+    use alloy_node_bindings::Geth;
+
+    #[tokio::test]
+    async fn test_web3_client_version() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        let version = provider.web3_client_version().await.unwrap();
+        assert!(!version.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_web3_sha3() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        let data = Bytes::from("alloy");
+        let hash = provider.web3_sha3(data).await.unwrap();
+        assert!(!hash.is_empty());
+    }
+}
