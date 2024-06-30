@@ -8,7 +8,7 @@ use alloy_rpc_types_eth::Block;
 use alloy_transport::{utils::Spawnable, Transport, TransportErrorKind, TransportResult};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, VecDeque},
     fmt,
     future::Future,
     time::{Duration, Instant},
@@ -339,6 +339,13 @@ impl fmt::Debug for PendingTransaction {
 }
 
 impl PendingTransaction {
+    /// Creates a ready pending transaction.
+    pub fn ready(tx_hash: TxHash) -> Self {
+        let (tx, rx) = oneshot::channel();
+        tx.send(()).ok(); // Make sure that the receiver is notified already.
+        Self { tx_hash, rx }
+    }
+
     /// Returns this transaction's hash.
     #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> &TxHash {
@@ -394,6 +401,9 @@ pub(crate) struct Heartbeat<S> {
     /// The stream of incoming blocks to watch.
     stream: futures::stream::Fuse<S>,
 
+    /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
+    past_blocks: VecDeque<(u64, Vec<B256>)>,
+
     /// Transactions to watch for.
     unconfirmed: HashMap<B256, TxWatcher>,
 
@@ -409,6 +419,7 @@ impl<S: Stream<Item = Block> + Unpin + 'static> Heartbeat<S> {
     pub(crate) fn new(stream: S) -> Self {
         Self {
             stream: stream.fuse(),
+            past_blocks: Default::default(),
             unconfirmed: Default::default(),
             waiting_confs: Default::default(),
             reap_at: Default::default(),
@@ -457,6 +468,24 @@ impl<S> Heartbeat<S> {
         if let Some(timeout) = to_watch.config.timeout {
             self.reap_at.insert(Instant::now() + timeout, to_watch.config.tx_hash);
         }
+        // Transaction may be confirmed already, check the lookbehind history first.
+        // If so, insert it into the waiting list.
+        for (block_height, txs) in self.past_blocks.iter().rev() {
+            if txs.contains(&to_watch.config.tx_hash) {
+                let confirmations = to_watch.config.required_confirmations;
+                let confirmed_at = *block_height + confirmations - 1;
+                let current_height = self.past_blocks.back().map(|(h, _)| *h).unwrap();
+
+                if confirmed_at <= current_height {
+                    to_watch.notify();
+                } else {
+                    debug!(tx=%to_watch.config.tx_hash, %block_height, confirmations, "adding to waiting list");
+                    self.waiting_confs.entry(confirmed_at).or_default().push(to_watch);
+                }
+                return;
+            }
+        }
+
         self.unconfirmed.insert(to_watch.config.tx_hash, to_watch);
     }
 
@@ -466,6 +495,26 @@ impl<S> Heartbeat<S> {
     fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Option<Block>>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
         let Some(block_height) = &block.header.number else { return };
+
+        // Add the block the lookbehind.
+        // The value is chosen arbitrarily to not have a huge memory footprint but still
+        // catch most cases where user subscribes for an already mined transaction.
+        // Note that we expect provider to check whether transaction is already mined
+        // before subscribing, so here we only need to consider time before sending a notification
+        // and processing it.
+        const MAX_BLOCKS_TO_RETAIN: usize = 10;
+        if self.past_blocks.len() >= MAX_BLOCKS_TO_RETAIN {
+            self.past_blocks.pop_front();
+        }
+        if let Some((last_height, _)) = self.past_blocks.back().as_ref() {
+            // Check that the chain is continuous.
+            if *last_height + 1 != *block_height {
+                // We cannot do anything about it, but we may at least log it.
+                warn!(%block_height, last_height, "non-continuous chain");
+            }
+        }
+        self.past_blocks.push_back((*block_height, block.transactions.hashes().copied().collect()));
+        error!(?self.past_blocks, "lookbehind");
 
         // Check if we are watching for any of the transactions in this block.
         let to_check =
@@ -479,7 +528,7 @@ impl<S> Heartbeat<S> {
             }
             // Otherwise add it to the waiting list.
             debug!(tx=%watcher.config.tx_hash, %block_height, confirmations, "adding to waiting list");
-            self.waiting_confs.entry(*block_height + confirmations - 1).or_default().push(watcher);
+            self.waiting_confs.entry(block_height + confirmations - 1).or_default().push(watcher);
         }
 
         self.check_confirmations(*block_height);
