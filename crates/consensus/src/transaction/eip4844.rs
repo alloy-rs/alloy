@@ -268,16 +268,18 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        let signature = signature.with_parity_bool();
+
         let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
         let mut buf = Vec::with_capacity(payload_length);
         // we use the inner tx to encode the fields
         self.tx().encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 
@@ -617,14 +619,16 @@ impl SignableTransaction<Signature> for TxEip4844 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        let signature = signature.with_parity_bool();
+
         let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
         self.encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 
@@ -847,6 +851,11 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self, Signature> {
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
+        // signature.
+        let signature = signature.with_parity_bool();
+
         let mut buf = Vec::with_capacity(self.tx.encoded_len_with_signature(&signature, false));
         // The sidecar is NOT included in the signed payload, only the transaction fields and the
         // type byte. Include the type byte.
@@ -856,10 +865,7 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         self.tx.encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-4844 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 
