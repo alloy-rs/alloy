@@ -3,7 +3,7 @@
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
-use alloy_primitives::{Address, Bloom, Bytes, U256};
+use alloy_primitives::{Address, Bloom, Bytes, TxHash, U256};
 use alloy_rpc_types_eth::{Block, Rich, Transaction, TransactionReceipt};
 use serde::{Deserialize, Serialize};
 
@@ -169,11 +169,10 @@ pub struct TransactionsWithReceipts {
 }
 
 /// Custom struct for otterscan `getContractCreator` RPC responses
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     /// The transaction used to create the contract.
-    #[doc(alias = "transaction")]
-    pub tx: Transaction,
+    pub hash: TxHash,
     /// The address of the contract creator.
     pub creator: Address,
 }
