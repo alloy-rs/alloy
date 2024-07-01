@@ -169,7 +169,7 @@ pub struct TransactionsWithReceipts {
 }
 
 /// Custom struct for otterscan `getContractCreator` RPC responses
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractCreator {
     /// The transaction used to create the contract.
     pub hash: TxHash,
