@@ -51,17 +51,9 @@ impl Authorization {
     pub fn signature_hash(&self) -> B256 {
         use super::constants::MAGIC;
 
-        #[derive(RlpEncodable)]
-        struct Auth {
-            chain_id: ChainId,
-            nonce: OptionalNonce,
-            address: Address,
-        }
-
         let mut buf = Vec::new();
         buf.put_u8(MAGIC);
-
-        Auth { chain_id: self.chain_id, nonce: self.nonce, address: self.address }.encode(&mut buf);
+        self.encode(&mut buf);
 
         keccak256(buf)
     }
