@@ -1,5 +1,4 @@
 //! Ethereum JSON-RPC provider.
-
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, EthCallParams, Identity, PendingTransaction, PendingTransactionBuilder,
@@ -285,8 +284,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
-    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
-        RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
+    fn get_balance(&self, address: Address) -> ProviderCall<T, Address, U256, U256> {
+        let call = RpcWithBlock::new(self.weak_client(), "eth_getBalance", address);
+
+        ProviderCall::from(call)
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -554,9 +555,13 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
-        RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64)
+    fn get_transaction_count(
+        &self,
+        address: Address,
+    ) -> ProviderCall<T, Address, U64, u64, fn(U64) -> u64> {
+        let call = RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64);
+        ProviderCall::from(call)
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -995,7 +1000,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ProviderBuilder, WalletProvider};
+    use crate::{builder, ext::AnvilApi, ProviderBuilder, WalletProvider};
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
@@ -1198,10 +1203,32 @@ mod tests {
     async fn gets_transaction_count() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let count = provider
-            .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
-            .await
-            .unwrap();
+        let accounts = provider.get_accounts().await.unwrap();
+        let sender = accounts[0];
+
+        // Initial tx count should be 0
+        let count = provider.get_transaction_count(sender).await.unwrap();
+        assert_eq!(count, 0);
+
+        let _ = provider.anvil_auto_impersonate_account(true);
+
+        // Send Tx
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            from: Some(sender),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+        let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await;
+
+        // Tx count should be 1
+        let count = provider.get_transaction_count(sender).await.unwrap();
+        assert_eq!(count, 1);
+
+        // Tx count should be 0 at block 0
+        let count = provider.get_transaction_count(sender).block_id(0.into()).await.unwrap();
         assert_eq!(count, 0);
     }
 
