@@ -1,7 +1,5 @@
 //! Support for capturing other fields.
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloc::collections::BTreeMap;
 use core::{
     fmt,
@@ -170,10 +168,7 @@ impl<'a> IntoIterator for &'a OtherFields {
 ///
 /// See [`OtherFields`] for more information.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct WithOtherFields<T> {
     /// The inner struct.
     #[serde(flatten)]

@@ -2,8 +2,6 @@
 //!
 //! See also [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251): Increase the MAX_EFFECTIVE_BALANCE
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -23,10 +21,7 @@ pub const CONSOLIDATION_REQUEST_TYPE: u8 = 0x02;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct ConsolidationRequest {
     /// Source address
     pub source_address: Address,
