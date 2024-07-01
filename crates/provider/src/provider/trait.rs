@@ -851,15 +851,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_syncing", ()).await
     }
 
-    /// Gets the client version of the chain client().
+    /// Gets the client version.
+    #[doc(alias = "web3_client_version")]
     async fn get_client_version(&self) -> TransportResult<String> {
         self.client().request("web3_clientVersion", ()).await
     }
 
-    /// Gets the Keccak-256 hash of the given data.
+    /// Gets the `Keccak-256` hash of the given data.
+    #[doc(alias = "web3_sha3")]
     async fn get_sha3(&self, data: &[u8]) -> TransportResult<B256> {
-        let rlp_data = hex::encode_prefixed(data);
-        self.client().request("web3_sha3", (rlp_data,)).await
+        self.client().request("web3_sha3", (hex::encode_prefixed(data),)).await
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
@@ -967,7 +968,7 @@ mod tests {
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, b256, bytes};
+    use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
@@ -1227,16 +1228,16 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let version = provider.get_client_version().await.unwrap();
-        assert!(version.contains("anvil"));
+        assert!(version.contains("anvil"), "{version}");
     }
 
     #[tokio::test]
     async fn gets_sha3() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let data = "alloy".as_bytes();
+        let data = b"alloy";
         let hash = provider.get_sha3(data).await.unwrap();
-        assert!(!hash.is_empty());
+        assert_eq!(hash, keccak256(data));
     }
 
     #[tokio::test]
