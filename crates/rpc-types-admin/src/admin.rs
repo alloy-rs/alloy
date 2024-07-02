@@ -185,6 +185,51 @@ pub struct PeerNetworkInfo {
     pub static_node: bool,
 }
 
+/// The type of a peer event.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PeerEventType {
+    /// A peer was added to the server.
+    Add,
+    /// A peer was dropped from the server.
+    Drop,
+    /// A message was successfully sent to the peer.
+    MsgSend,
+    /// A message was successfully received by the peer.
+    MsgRecv,
+}
+
+/// An event emitted when peers are either added or dropped from a p2p server or when a message is
+/// sent or received on a peer connection.
+///
+/// See [geth's `PeerEvent` struct](https://github.com/ethereum/go-ethereum/blob/94579932b18931115f28aa7f87f02450bda084c9/p2p/peer.go#L94-L103) for the source of each field.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PeerEvent {
+    /// The type of the event.
+    #[serde(rename = "type")]
+    pub kind: PeerEventType,
+    /// The peer's enode ID.
+    pub peer: String,
+    /// An error ocurred on the peer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// The protocol of the peer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    /// The message code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg_code: Option<u64>,
+    /// The message size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg_size: Option<u32>,
+    /// The local endpoint of the TCP connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_address: Option<SocketAddr>,
+    /// The remote endpoint of the TCP connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_address: Option<SocketAddr>,
+}
+
 mod handshake {
     use super::*;
 
