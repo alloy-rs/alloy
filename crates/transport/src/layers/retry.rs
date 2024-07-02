@@ -22,8 +22,6 @@ use tracing::trace;
 pub struct RetryBackoffLayer {
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
-    /// The maximum number of retries for timeout errors
-    max_timeout_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this provider
@@ -34,16 +32,10 @@ impl RetryBackoffLayer {
     /// Creates a new retry layer with the given parameters.
     pub const fn new(
         max_rate_limit_retries: u32,
-        max_timeout_retries: u32,
         initial_backoff: u64,
         compute_units_per_second: u64,
     ) -> Self {
-        Self {
-            max_rate_limit_retries,
-            max_timeout_retries,
-            initial_backoff,
-            compute_units_per_second,
-        }
+        Self { max_rate_limit_retries, initial_backoff, compute_units_per_second }
     }
 }
 
@@ -82,7 +74,6 @@ impl<S> Layer<S> for RetryBackoffLayer {
             inner,
             policy: RateLimitRetryPolicy,
             max_rate_limit_retries: self.max_rate_limit_retries,
-            max_timeout_retries: self.max_timeout_retries,
             initial_backoff: self.initial_backoff,
             compute_units_per_second: self.compute_units_per_second,
             requests_enqueued: Arc::new(AtomicU32::new(0)),
@@ -100,8 +91,6 @@ pub struct RetryBackoffService<S> {
     policy: RateLimitRetryPolicy,
     /// The maximum number of retries for rate limit errors
     max_rate_limit_retries: u32,
-    /// The maximum number of retries for timeout errors
-    max_timeout_retries: u32,
     /// The initial backoff in milliseconds
     initial_backoff: u64,
     /// The number of compute units per second for this service
@@ -141,7 +130,6 @@ where
         Box::pin(async move {
             let ahead_in_queue = this.requests_enqueued.fetch_add(1, Ordering::SeqCst) as u64;
             let mut rate_limit_retry_number: u32 = 0;
-            let mut timeout_retries: u32 = 0;
             loop {
                 let err;
                 let res = inner.call(request.clone()).await;
@@ -206,11 +194,6 @@ where
 
                     tokio::time::sleep(total_backoff).await;
                 } else {
-                    if timeout_retries < this.max_timeout_retries {
-                        timeout_retries += 1;
-                        continue;
-                    }
-
                     this.requests_enqueued.fetch_sub(1, Ordering::SeqCst);
                     return Err(err);
                 }
