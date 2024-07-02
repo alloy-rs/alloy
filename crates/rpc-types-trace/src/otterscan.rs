@@ -36,7 +36,7 @@ pub struct InternalOperation {
 /// Custom struct for otterscan `traceTransaction` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceEntry {
-    /// The type of trace entry.
+    /// The type of the trace entry.
     pub r#type: String,
     /// The depth of the trace entry.
     pub depth: u32,
@@ -48,6 +48,8 @@ pub struct TraceEntry {
     pub value: U256,
     /// The input data for the trace.
     pub input: Bytes,
+    /// The output data for the trace.
+    pub output: Bytes,
 }
 
 /// Internal issuance struct for `BlockDetails` struct
