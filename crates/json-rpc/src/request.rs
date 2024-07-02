@@ -112,11 +112,12 @@ where
 
 impl<Params> Request<&Params>
 where
-    Params: Clone,
+    Params: ToOwned,
+    Params::Owned: RpcParam,
 {
     /// Clone the request, including the request parameters.
-    pub fn into_owned_params(self) -> Request<Params> {
-        Request { meta: self.meta, params: self.params.clone() }
+    pub fn into_owned_params(self) -> Request<Params::Owned> {
+        Request { meta: self.meta, params: self.params.to_owned() }
     }
 }
 

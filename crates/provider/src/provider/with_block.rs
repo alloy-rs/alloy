@@ -54,7 +54,7 @@ where
 }
 
 /// A future for [`RpcWithBlock`]. Simple wrapper around [`RpcCall`].
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[pin_project::pin_project]
 pub struct RpcWithBlockFut<T, Params, Resp, Output, Map>
 where
@@ -64,6 +64,40 @@ where
     Map: Fn(Resp) -> Output,
 {
     state: States<T, Params, Resp, Output, Map>,
+}
+
+impl<Conn, Params, Resp, Output, Map> std::fmt::Debug
+    for RpcWithBlockFut<Conn, Params, Resp, Output, Map>
+where
+    Conn: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RpcCall").field("state", &self.state).finish()
+    }
+}
+
+impl<T, Params, Resp, Output, Map> RpcWithBlockFut<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
+{
+    pub fn block_id(mut self, block_id: BlockId) -> Self {
+        match std::mem::replace(&mut self.state, States::Invalid) {
+            States::Preparing { client, method, params, map, .. } => {
+                Self { state: States::Preparing { client, method, params, block_id, map } }
+            }
+            state => {
+                self.state = state;
+                self
+            }
+        }
+    }
 }
 
 impl<T, Params, Resp, Output, Map> RpcWithBlockFut<T, Params, Resp, Output, Map>
@@ -206,7 +240,17 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    /// Map the response.
+    /// Map the response to a different type. This is usable for converting
+    /// the response to a more usable type, e.g. changing `U64` to `u64`.
+    ///
+    /// ## Note
+    ///
+    /// Carefully review the rust documentation on [fn pointers] before passing
+    /// them to this function. Unless the pointer is specifically coerced to a
+    /// `fn(_) -> _`, the `NewMap` will be inferred as that function's unique
+    /// type. This can lead to confusing error messages.
+    ///
+    /// [fn pointers]: https://doc.rust-lang.org/std/primitive.fn.html#creating-function-pointers
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
