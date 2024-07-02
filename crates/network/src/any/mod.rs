@@ -84,6 +84,14 @@ impl ReceiptResponse for AnyTransactionReceipt {
     fn status(&self) -> bool {
         self.inner.inner.status()
     }
+
+    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+        self.inner.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.inner.block_number
+    }
 }
 
 impl TransactionResponse for WithOtherFields<Transaction> {
