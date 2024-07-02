@@ -1,4 +1,3 @@
-use crate::{Provider, RootProvider};
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{PollerBuilder, WeakClient};
@@ -27,8 +26,8 @@ pub(crate) struct ChainStreamPoller<T, N = Ethereum> {
 }
 
 impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
-    pub(crate) fn from_root(p: &RootProvider<T, N>) -> Self {
-        Self::new(p.weak_client())
+    pub(crate) fn from_weak_client(w: WeakClient<T>) -> Self {
+        Self::new(w)
     }
 
     pub(crate) fn new(client: WeakClient<T>) -> Self {
