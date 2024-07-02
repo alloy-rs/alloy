@@ -88,7 +88,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     pub fn block_id(mut self, block_id: BlockId) -> Self {
-        let call = match std::mem::replace(&mut self.state, States::Invalid) {
+        match std::mem::replace(&mut self.state, States::Invalid) {
             States::Preparing { client, method, params, map, .. } => {
                 Self { state: States::Preparing { client, method, params, block_id, map } }
             }
@@ -96,9 +96,7 @@ where
                 self.state = state;
                 self
             }
-        };
-
-        call
+        }
     }
 }
 

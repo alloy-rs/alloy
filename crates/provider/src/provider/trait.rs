@@ -118,7 +118,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// This function returns [`ProviderCall`] which can be used to execute the
     /// call. This method executes the call on the latest block with the current state.
-    /// Use [`call_internal`] to set the block or [`StateOverride`] if you want to
+    /// Use `call_internal` to set the block or [`StateOverride`] if you want to
     /// execute the call on a different block or with overriden state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
@@ -137,17 +137,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
     /// let output = provider.call(&tx).await?;
-    /// // Execute a call with a block ID.
-    /// let output = provider.call(&tx).block(1.into()).await?;
-    /// // Execute a call with state overrides.
-    /// let output = provider.call(&tx).overrides(&my_overrides).await?;
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Note
-    ///
-    /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(
@@ -160,6 +152,30 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// This method returns `EthCall` struct.
     /// It is useful when we have to set the block or state overrides after generating the struct.
+    ///
+    /// /// ## Example
+    ///
+    /// ```
+    /// # use alloy_provider::Provider;
+    /// # use alloy_eips::BlockId;
+    /// # use alloy_rpc_types_eth::state::StateOverride;
+    /// # use alloy_transport::BoxTransport;
+    /// # async fn example<P: Provider<BoxTransport>>(
+    /// #    provider: P,
+    /// #    my_overrides: StateOverride
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
+    /// // Execute a call with a block ID.
+    /// let output = provider.call_internal(&tx).block(1.into()).await?;
+    /// // Execute a call with state overrides.
+    /// let output = provider.call_internal(&tx).overrides(&my_overrides).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Not all client implementations support state overrides.
     fn call_internal<'req>(
         &'req self,
         tx: &'req N::TransactionRequest,
@@ -187,7 +203,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// This function returns an [`ProviderCall`] which can be used to get a gas estimate,
     /// The gas estimate will be computed for the latest block with the current state.
-    /// Use [`estimate_gas_internal`] to set the block or [`StateOverride`] if you want to
+    /// Use `estimate_gas_internal` to set the block or [`StateOverride`] if you want to
     /// calculate the gas on a different block or with overriden state.
     ///
     /// [`StateOverride`]: alloy_rpc_types_eth::state::StateOverride
@@ -1000,7 +1016,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builder, ext::AnvilApi, ProviderBuilder, WalletProvider};
+    use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes};
@@ -1199,6 +1215,7 @@ mod tests {
         assert_eq!(0, num.to::<u64>())
     }
 
+    #[cfg(feature = "anvil-api")]
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
@@ -1209,8 +1226,6 @@ mod tests {
         // Initial tx count should be 0
         let count = provider.get_transaction_count(sender).await.unwrap();
         assert_eq!(count, 0);
-
-        let _ = provider.anvil_auto_impersonate_account(true);
 
         // Send Tx
         let tx = TransactionRequest {
@@ -1228,7 +1243,7 @@ mod tests {
         assert_eq!(count, 1);
 
         // Tx count should be 0 at block 0
-        let count = provider.get_transaction_count(sender).block_id(0.into()).await.unwrap();
+        let count = provider.get_transaction_count(sender).block(0.into()).await.unwrap();
         assert_eq!(count, 0);
     }
 

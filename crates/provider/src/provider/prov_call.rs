@@ -134,10 +134,12 @@ where
         }
     }
 
+    /// True if this is a RPC call with block.
     pub const fn is_rpc_call_with_block(&self) -> bool {
         matches!(self, Self::RpcCallWithBlock(_))
     }
 
+    /// Fallible cast to mutable RPC call with block.
     pub fn as_mut_rpc_call_with_block(
         &mut self,
     ) -> Option<&mut RpcWithBlockFut<Conn, Params, Resp, Output, Map>> {
@@ -186,11 +188,12 @@ where
     Map: Fn(Resp) -> Output,
     Map: Clone,
 {
-    pub fn block_id(mut self, block_id: BlockId) -> Self {
+    /// Set the block id for a RPC call with block.
+    pub fn block(mut self, block_id: BlockId) -> Self {
         if let Some(call) = self.as_mut_rpc_call_with_block() {
             let call = call.clone();
 
-            return ProviderCall::RpcCallWithBlock(call.block_id(block_id));
+            return Self::RpcCallWithBlock(call.block_id(block_id));
         }
         self
     }
