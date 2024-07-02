@@ -113,7 +113,7 @@ impl HttpError {
 }
 
 /// Extension trait to implement methods for [`RpcError<TransportErrorKind, E>`].
-pub trait RpcErrorExt {
+pub(crate) trait RpcErrorExt {
     /// Analyzes whether to retry the request depending on the error.
     fn is_retryable(&self) -> bool;
 

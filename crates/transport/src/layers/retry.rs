@@ -1,6 +1,6 @@
 use crate::{
-    error::{TransportError, TransportErrorKind},
-    RpcErrorExt, TransportFut,
+    error::{RpcErrorExt, TransportError, TransportErrorKind},
+    TransportFut,
 };
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use std::{

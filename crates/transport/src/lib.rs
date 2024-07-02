@@ -18,7 +18,7 @@ pub use common::Authorization;
 mod error;
 #[doc(hidden)]
 pub use error::TransportErrorKind;
-pub use error::{RpcErrorExt, TransportError, TransportResult};
+pub use error::{TransportError, TransportResult};
 
 mod r#trait;
 pub use r#trait::Transport;
