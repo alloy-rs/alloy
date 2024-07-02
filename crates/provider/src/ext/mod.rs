@@ -30,6 +30,11 @@ mod trace;
 #[cfg(feature = "trace-api")]
 pub use trace::{TraceApi, TraceCallList};
 
+#[cfg(feature = "rpc-api")]
+mod rpc;
+#[cfg(feature = "rpc-api")]
+pub use rpc::RpcApi;
+
 #[cfg(feature = "txpool-api")]
 mod txpool;
 #[cfg(feature = "txpool-api")]
