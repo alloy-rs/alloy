@@ -2,6 +2,8 @@ use crate::{
     calc_next_block_base_fee,
     eip1559::constants::{
         DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR, DEFAULT_ELASTICITY_MULTIPLIER,
+        OP_MAINNET_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
+        OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
         OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
         OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
     },
@@ -30,6 +32,14 @@ impl BaseFeeParams {
         Self {
             max_change_denominator: DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR as u128,
             elasticity_multiplier: DEFAULT_ELASTICITY_MULTIPLIER as u128,
+        }
+    }
+
+    /// Get the base fee parameters for Optimism Mainnet
+    pub const fn optimism() -> Self {
+        Self {
+            max_change_denominator: OP_MAINNET_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
+            elasticity_multiplier: OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
         }
     }
 
