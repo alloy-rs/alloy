@@ -1,6 +1,7 @@
 use crate::{
     calc_next_block_base_fee,
     eip1559::constants::{
+        BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
         DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR, DEFAULT_ELASTICITY_MULTIPLIER,
         OP_MAINNET_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
         OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
@@ -48,6 +49,14 @@ impl BaseFeeParams {
         Self {
             max_change_denominator: OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
             elasticity_multiplier: OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
+        }
+    }
+
+    /// Get the base fee parameters for Base Sepolia
+    pub const fn base_sepolia() -> Self {
+        Self {
+            max_change_denominator: OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
+            elasticity_multiplier: BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
         }
     }
 
