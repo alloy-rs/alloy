@@ -25,3 +25,11 @@ pub const DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u64 = 8;
 
 /// Elasticity multiplier as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
 pub const DEFAULT_ELASTICITY_MULTIPLIER: u64 = 2;
+
+/// Base fee max change denominator for Optimism Sepolia as defined in the Optimism
+/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR: u128 = 50;
+
+/// Base fee max change denominator for Optimism Sepolia as defined in the Optimism
+/// [transaction costs](https://community.optimism.io/docs/developers/build/differences/#transaction-costs) doc.
+pub(crate) const OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER: u128 = 6;
