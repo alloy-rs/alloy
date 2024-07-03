@@ -33,9 +33,6 @@ pub trait AdminApi<N, T>: Send + Sync {
     async fn node_info(&self) -> TransportResult<NodeInfo>;
 
     /// Subscribe to events received by peers over the network.
-    ///
-    /// Like other subscription methods, this returns the ID of the subscription, which is then used
-    /// in all events subsequently.
     #[cfg(feature = "pubsub")]
     async fn subscribe_peer_events(
         &self,
