@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, Network, ReceiptResponse as _};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -962,19 +962,23 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
         &self,
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
-        if self.get_transaction_receipt(*config.tx_hash()).await?.is_some() {
-            // The transaction is already confirmed.
-            if config.required_confirmations() <= 1 {
-                return Ok(PendingTransaction::ready(*config.tx_hash()));
-            }
-            // TODO: There exists a corner case, if we subscribe to an already mined transaction and
-            // require a custom number of confirmations. The `TransactionReceipt` trait
-            // does not give us infomration on the block number, so we cannot
-            // decide if the transaction has enough confirmations. We hope that lookbehind buffer is
-            // big enough to still see the transaction and be able to process it.
-        }
+        let block_number =
+            if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
+                // The transaction is already confirmed.
+                if config.required_confirmations() <= 1 {
+                    return Ok(PendingTransaction::ready(*config.tx_hash()));
+                }
+                // Transaction has custom confirmations, so let the heart know about its block
+                // number and let it handle the situation.
+                receipt.block_number()
+            } else {
+                None
+            };
 
-        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
+        self.get_heart()
+            .watch_tx(config, block_number)
+            .await
+            .map_err(|_| TransportErrorKind::backend_gone())
     }
 }
 
