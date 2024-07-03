@@ -625,7 +625,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         options: ConditionalTxOptions,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         // Convert raw transaction to a hex string
-        let tx_hex = hex::encode_prefixed(&raw_tx);
+        let tx_hex = hex::encode_prefixed(raw_tx);
 
         // Prepare and send the RPC request
         let tx_hash =
