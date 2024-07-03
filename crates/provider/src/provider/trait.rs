@@ -14,8 +14,9 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types_eth::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, BlockTransactionsKind,
-    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    request::ConditionalTxOptions, AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag,
+    BlockTransactionsKind, EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log,
+    SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
@@ -614,6 +615,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         let rlp_hex = hex::encode_prefixed(encoded_tx);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
+        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+    }
+
+    /// Submits a raw transaction with conditions that must be met at the point of inclusion.
+    async fn send_raw_transaction_conditional(
+        &self,
+        raw_tx: &[u8],
+        options: ConditionalTxOptions,
+    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        // Convert raw transaction to a hex string
+        let tx_hex = hex::encode_prefixed(&raw_tx);
+
+        // Prepare and send the RPC request
+        let tx_hash =
+            self.client().request("eth_sendRawTransactionConditional", (tx_hex, options)).await?;
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
