@@ -78,7 +78,7 @@ full = [
     "contract",
     "eips",
     "k256",
-    "kzg",
+    "c-kzg",
     "network",
     "provider-http", # includes `providers`
     "provider-ws",   # includes `providers`
@@ -272,7 +272,7 @@ k256 = [
     "alloy-network?/k256",
     "alloy-rpc-types?/k256",
 ]
-kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
+c-kzg = ["alloy-consensus?/c-kzg", "alloy-rpc-types?/c-kzg"]
 eip712 = [
     "alloy-core/eip712",
     "alloy-signer?/eip712",

@@ -28,6 +28,7 @@ serde = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, optional = true }
+kzg-rs = { workspace = true, features = ["cache"], optional = true }
 derive_more = { workspace = true, optional = true }
 once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
 sha2 = { workspace = true, optional = true }
@@ -52,6 +53,9 @@ proptest.workspace = true
 proptest-derive.workspace = true
 serde_json.workspace = true
 
+# macros
+cfg-if.workspace = true
+
 [features]
 default = ["std", "kzg-sidecar"]
 std = [
@@ -67,7 +71,8 @@ serde = [
     "alloy-primitives/serde",
     "c-kzg?/serde",
 ]
-kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+c-kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg-rs = ["dep:kzg-rs"]
 kzg-sidecar = ["sha2"]
 sha2 = ["dep:sha2"]
 k256 = ["alloy-primitives/k256"]

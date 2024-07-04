@@ -26,6 +26,7 @@ alloy-serde = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }
+kzg-rs = { workspace = true, features = ["cache"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -51,7 +52,8 @@ serde_json.workspace = true
 default = ["std"]
 std = ["alloy-eips/std", "c-kzg?/std"]
 k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
-kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
+c-kzg = ["dep:c-kzg", "alloy-eips/c-kzg", "std"]
+kzg-rs = ["dep:kzg-rs", "alloy-eips/kzg-rs"]
 arbitrary = [
     "std",
     "dep:arbitrary",
