@@ -5,8 +5,10 @@ use crate::{
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
 };
-use alloy_eips::eip1559::{eip1559_default_estimator, Eip1559Estimation, EstimatorFunction};
-use alloy_eips::eip2718::Encodable2718;
+use alloy_eips::{
+    eip1559::{eip1559_default_estimator, Eip1559Estimation, EstimatorFunction},
+    eip2718::Encodable2718,
+};
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{
