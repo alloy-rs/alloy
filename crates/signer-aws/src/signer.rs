@@ -259,11 +259,13 @@ mod tests {
     #[tokio::test]
     async fn sign_message() {
         let Ok(key_id) = std::env::var("AWS_KEY_ID") else { return };
-        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+
+        let mut builder = aws_config::load_defaults(BehaviorVersion::latest()).await.to_builder();
+        builder.set_endpoint_url(Some("http://localhost:8080".to_string()));
+
+        let config = builder.build();
         let client = aws_sdk_kms::Client::new(&config);
-
         let signer = AwsSigner::new(client, key_id, Some(1)).await.unwrap();
-
         let message = vec![0, 1, 2, 3];
 
         let sig = signer.sign_message(&message).await.unwrap();

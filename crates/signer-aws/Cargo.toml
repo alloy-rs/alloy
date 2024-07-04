@@ -21,9 +21,9 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-aws-sdk-kms = { version = "1", default-features = false }
+aws-sdk-kms = { version = "1", default-features = true }
 k256.workspace = true
-spki = { workspace = true, features = ["std"]}
+spki = { workspace = true, features = ["std"] }
 thiserror.workspace = true
 tracing.workspace = true
 
