@@ -1,8 +1,8 @@
 use core::fmt;
 
-use crate::{Signed, TxEip1559, TxEip2930, TxLegacy};
+use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
-use alloy_primitives::B256;
+use alloy_primitives::{TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
@@ -357,6 +357,71 @@ impl Encodable2718 for TxEnvelope {
             Self::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
+        }
+    }
+}
+
+impl Transaction for TxEnvelope {
+    fn chain_id(&self) -> Option<alloy_primitives::ChainId> {
+        match self {
+            Self::Legacy(tx) => tx.tx().chain_id(),
+            Self::Eip2930(tx) => tx.tx().chain_id(),
+            Self::Eip1559(tx) => tx.tx().chain_id(),
+            Self::Eip4844(tx) => tx.tx().chain_id(),
+        }
+    }
+
+    fn gas_limit(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.tx().gas_limit(),
+            Self::Eip2930(tx) => tx.tx().gas_limit(),
+            Self::Eip1559(tx) => tx.tx().gas_limit(),
+            Self::Eip4844(tx) => tx.tx().gas_limit(),
+        }
+    }
+
+    fn gas_price(&self) -> Option<u128> {
+        match self {
+            Self::Legacy(tx) => tx.tx().gas_price(),
+            Self::Eip2930(tx) => tx.tx().gas_price(),
+            Self::Eip1559(tx) => tx.tx().gas_price(),
+            Self::Eip4844(tx) => tx.tx().gas_price(),
+        }
+    }
+
+    fn input(&self) -> &[u8] {
+        match self {
+            Self::Legacy(tx) => tx.tx().input(),
+            Self::Eip2930(tx) => tx.tx().input(),
+            Self::Eip1559(tx) => tx.tx().input(),
+            Self::Eip4844(tx) => tx.tx().input(),
+        }
+    }
+
+    fn nonce(&self) -> u64 {
+        match self {
+            Self::Legacy(tx) => tx.tx().nonce(),
+            Self::Eip2930(tx) => tx.tx().nonce(),
+            Self::Eip1559(tx) => tx.tx().nonce(),
+            Self::Eip4844(tx) => tx.tx().nonce(),
+        }
+    }
+
+    fn to(&self) -> TxKind {
+        match self {
+            Self::Legacy(tx) => tx.tx().to(),
+            Self::Eip2930(tx) => tx.tx().to(),
+            Self::Eip1559(tx) => tx.tx().to(),
+            Self::Eip4844(tx) => tx.tx().to(),
+        }
+    }
+
+    fn value(&self) -> alloy_primitives::U256 {
+        match self {
+            Self::Legacy(tx) => tx.tx().value(),
+            Self::Eip2930(tx) => tx.tx().value(),
+            Self::Eip1559(tx) => tx.tx().value(),
+            Self::Eip4844(tx) => tx.tx().value(),
         }
     }
 }
