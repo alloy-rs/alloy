@@ -767,7 +767,10 @@ impl From<TxEnvelope> for TransactionRequest {
 pub struct TransactionInputError;
 
 /// Options for conditional raw transaction submissions.
+// reference for the implementation https://notes.ethereum.org/@yoav/SkaX2lS9j#
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConditionalTxOptions {
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
