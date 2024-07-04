@@ -63,12 +63,23 @@ impl TransactionIndex {
         matches!(self, Self::All)
     }
 
+    /// Returns true if this is the index variant
+    pub const fn is_index(&self) -> bool {
+        matches!(self, Self::Index(_))
+    }
+
     /// Returns the index if this is the index variant
     pub const fn index(&self) -> Option<usize> {
         match self {
             Self::All => None,
             Self::Index(idx) => Some(*idx),
         }
+    }
+}
+
+impl From<usize> for TransactionIndex {
+    fn from(index: usize) -> Self {
+        Self::Index(index)
     }
 }
 
