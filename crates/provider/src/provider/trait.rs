@@ -1,13 +1,11 @@
 //! Ethereum JSON-RPC provider.
 
 use crate::{
+    utils::{EIP1559_FEE_ESTIMATION_PAST_BLOCKS, EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE},
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
 };
-use alloy_eips::eip1559::{
-    eip1559_default_estimator, Eip1559Estimation, EstimatorFunction, FEE_ESTIMATION_PAST_BLOCKS,
-    FEE_ESTIMATION_REWARD_PERCENTILE,
-};
+use alloy_eips::eip1559::{eip1559_default_estimator, Eip1559Estimation, EstimatorFunction};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
@@ -196,9 +194,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<Eip1559Estimation> {
         let fee_history = self
             .get_fee_history(
-                FEE_ESTIMATION_PAST_BLOCKS,
+                EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
                 BlockNumberOrTag::Latest,
-                &[FEE_ESTIMATION_REWARD_PERCENTILE],
+                &[EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
             .await?;
 
@@ -1352,9 +1350,9 @@ mod tests {
         let block_number = provider.get_block_number().await.unwrap();
         let fee_history = provider
             .get_fee_history(
-                FEE_ESTIMATION_PAST_BLOCKS,
+                EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
                 BlockNumberOrTag::Number(block_number),
-                &[FEE_ESTIMATION_REWARD_PERCENTILE],
+                &[EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
             )
             .await
             .unwrap();

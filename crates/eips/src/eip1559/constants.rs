@@ -23,12 +23,6 @@ pub const MIN_PROTOCOL_PRIORITY_FEE: u64 = 1;
 /// Same as [MIN_PRIORITY_FEE] but as a U256.
 pub const MIN_PROTOCOL_PRIORITY_FEE_U256: U256 = U256::from_limbs([1u64, 0, 0, 0]);
 
-/// The default percentile of gas premiums that are fetched for fee estimation.
-pub const FEE_ESTIMATION_REWARD_PERCENTILE: f64 = 20.0;
-
-/// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
-pub const FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
-
 /// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
 pub const INITIAL_BASE_FEE: u64 = 1_000_000_000;
 
