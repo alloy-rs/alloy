@@ -6,7 +6,7 @@
 #[cfg(feature = "kzg")]
 pub mod env_settings;
 /// This module contains functions and types used for parsing and utilizing the [Trusted Setup]( https://ceremony.ethereum.org/) for the `KzgSettings`.
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
 pub mod trusted_setup_points;
 
 /// Builder and utils for the [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
