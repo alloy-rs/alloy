@@ -1,6 +1,8 @@
 //! Payload types.
 use alloy_consensus::{Blob, Bytes48};
-use alloy_eips::{eip6110::DepositRequest, eip7002::WithdrawalRequest};
+use alloy_eips::{
+    eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
+};
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
@@ -439,6 +441,10 @@ pub struct ExecutionPayloadV4 {
     ///
     /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
     pub withdrawal_requests: Vec<WithdrawalRequest>,
+    /// Array of consolidation requests.
+    ///
+    /// See [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251).
+    pub consolidation_requests: Vec<ConsolidationRequest>,
 }
 
 impl ExecutionPayloadV4 {
