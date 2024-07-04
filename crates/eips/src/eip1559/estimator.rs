@@ -47,6 +47,7 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::vec;
 
     #[test]
     fn test_estimate_priority_fee() {
