@@ -3,9 +3,9 @@ use std::future::IntoFuture;
 use crate::{
     fillers::{FillerControlFlow, TxFiller},
     provider::SendableTx,
-    utils::Eip1559Estimation,
     Provider,
 };
+use alloy_eips::eip1559::Eip1559Estimation;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
 use alloy_rpc_types_eth::BlockNumberOrTag;
