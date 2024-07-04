@@ -618,21 +618,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
     }
 
-    /// Submits a raw transaction with conditions that must be met at the point of inclusion.
-    async fn send_raw_transaction_conditional(
-        &self,
-        raw_tx: &[u8],
-        options: ConditionalTxOptions,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
-        // Convert raw transaction to a hex string
-        let tx_hex = hex::encode_prefixed(raw_tx);
-
-        // Prepare and send the RPC request
-        let tx_hash =
-            self.client().request("eth_sendRawTransactionConditional", (tx_hex, options)).await?;
-        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
-    }
-
     /// Broadcasts a transaction to the network.
     ///
     /// Returns a [`PendingTransactionBuilder`] which can be used to configure
