@@ -11,6 +11,9 @@ use std::fmt;
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 
+/// The execution payload body response that allows for `null` values.
+pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
+
 /// And 8-byte identifier for an execution payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PayloadId(pub B64);
@@ -852,6 +855,33 @@ pub struct ExecutionPayloadBodyV1 {
     ///
     /// Will always be `None` if pre shanghai.
     pub withdrawals: Option<Vec<Withdrawal>>,
+}
+
+/// This structure has the syntax of [`ExecutionPayloadBodyV1`] and appends the new fields:
+/// depositRequests and withdrawalRequests.
+///
+/// See also: <https://github.com/ethereum/execution-apis/blob/3ae3d29fc9900e5c48924c238dff7643fdc3680e/src/engine/prague.md#executionpayloadbodyv2>
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPayloadBodyV2 {
+    /// Enveloped encoded transactions.
+    pub transactions: Vec<Bytes>,
+    /// All withdrawals in the block.
+    ///
+    /// Will always be `None` if pre shanghai.
+    pub withdrawals: Option<Vec<Withdrawal>>,
+    /// Array of deposits requests.
+    ///
+    /// Will always be `None` if pre prague.
+    pub deposit_requests: Option<Vec<DepositRequest>>,
+    /// Array of withdrawal requests.
+    ///
+    /// Will always be `None` if pre prague.
+    pub withdrawal_requests: Option<Vec<WithdrawalRequest>>,
+    /// Array of consolidation requests.
+    ///
+    /// Will always be `None` if pre prague.
+    pub consolidation_requests: Option<Vec<ConsolidationRequest>>,
 }
 
 /// This structure contains the attributes required to initiate a payload build process in the
