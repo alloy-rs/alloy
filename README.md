@@ -54,7 +54,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
-  - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace.
+  - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace
   - [`alloy-rpc-types-trace`] - Types for the `trace` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-txpool`] - Types for the `txpool` Ethereum JSON-RPC namespace
 - [`alloy-serde`] - [Serde]-related utilities
