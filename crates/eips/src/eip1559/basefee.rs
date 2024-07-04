@@ -10,6 +10,11 @@ use crate::{
     },
 };
 
+use super::constants::{
+    OP_MAINNET_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON,
+    OP_SEPOLIA_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON,
+};
+
 /// BaseFeeParams contains the config parameters that control block base fee computation
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -44,6 +49,14 @@ impl BaseFeeParams {
         }
     }
 
+    /// Get the base fee parameters for Optimism Mainnet (post Canyon)
+    pub const fn optimism_canyon() -> Self {
+        Self {
+            max_change_denominator: OP_MAINNET_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON,
+            elasticity_multiplier: OP_MAINNET_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
+        }
+    }
+
     /// Get the base fee parameters for Optimism Sepolia
     pub const fn optimism_sepolia() -> Self {
         Self {
@@ -52,10 +65,26 @@ impl BaseFeeParams {
         }
     }
 
+    /// Get the base fee parameters for Optimism Sepolia (post Canyon)
+    pub const fn optimism_sepolia_canyon() -> Self {
+        Self {
+            max_change_denominator: OP_SEPOLIA_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON,
+            elasticity_multiplier: OP_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
+        }
+    }
+
     /// Get the base fee parameters for Base Sepolia
     pub const fn base_sepolia() -> Self {
         Self {
             max_change_denominator: OP_SEPOLIA_EIP1559_DEFAULT_BASE_FEE_MAX_CHANGE_DENOMINATOR,
+            elasticity_multiplier: BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
+        }
+    }
+
+    /// Get the base fee parameters for Base Sepolia (post Canyon)
+    pub const fn base_sepolia_canyon() -> Self {
+        Self {
+            max_change_denominator: OP_SEPOLIA_EIP1559_BASE_FEE_MAX_CHANGE_DENOMINATOR_CANYON,
             elasticity_multiplier: BASE_SEPOLIA_EIP1559_DEFAULT_ELASTICITY_MULTIPLIER,
         }
     }
