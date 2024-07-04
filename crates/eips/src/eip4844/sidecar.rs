@@ -62,7 +62,7 @@ impl BlobTransactionSidecar {
     }
 
     /// Creates a new instance from the given KZG types.
-    #[cfg(feature = "kzg")]
+    #[cfg(feature = "c-kzg")]
     pub fn from_kzg(
         blobs: Vec<c_kzg::Blob>,
         commitments: Vec<c_kzg::Bytes48>,
@@ -96,7 +96,7 @@ impl BlobTransactionSidecar {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
-    #[cfg(feature = "kzg")]
+    #[cfg(feature = "c-kzg")]
     pub fn validate(
         &self,
         blob_versioned_hashes: &[B256],
@@ -228,12 +228,21 @@ where
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
 #[derive(Debug)]
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     InvalidProof,
-    /// An error returned by [`c_kzg`].
-    KZGError(c_kzg::Error),
+    
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "c-kzg")] {
+            /// An error returned by [`c_kzg`].
+            KZGError(c_kzg::Error),
+        } else if #[cfg(feature = "kzg-rs")] {
+            /// An error returned by [`kzg-rs`].
+            KZGError(kzg_rs::KzgError),
+        }
+    }
+
     /// The inner transaction is not a blob transaction.
     NotBlobTransaction(u8),
     /// Error variant for thrown by EIP-4844 tx variants without a sidecar.
@@ -247,7 +256,7 @@ pub enum BlobTransactionValidationError {
     },
 }
 
-#[cfg(all(feature = "kzg", feature = "std"))]
+#[cfg(all(any(feature = "c-kzg", feature = "kzg-rs"), feature = "std"))]
 impl std::error::Error for BlobTransactionValidationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -260,7 +269,7 @@ impl std::error::Error for BlobTransactionValidationError {
     }
 }
 
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
 impl core::fmt::Display for BlobTransactionValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -281,10 +290,19 @@ impl core::fmt::Display for BlobTransactionValidationError {
     }
 }
 
-#[cfg(feature = "kzg")]
-impl From<c_kzg::Error> for BlobTransactionValidationError {
-    fn from(source: c_kzg::Error) -> Self {
-        Self::KZGError(source)
+cfg_if::cfg_if! {
+    if #[cfg(feature = "c-kzg")] {
+        impl From<c_kzg::Error> for BlobTransactionValidationError {
+            fn from(source: c_kzg::Error) -> Self {
+                Self::KZGError(source)
+            }
+        }
+    } else if #[cfg(feature = "kzg-rs")] {
+        impl From<kzg_rs::KzgError> for BlobTransactionValidationError {
+            fn from(source: kzg_rs::KzgError) -> Self {
+                Self::KZGError(source)
+            }
+        }
     }
 }
 
