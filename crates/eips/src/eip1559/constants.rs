@@ -20,7 +20,7 @@ pub const MIN_PROTOCOL_BASE_FEE_U256: U256 = U256::from_limbs([7u64, 0, 0, 0]);
 /// The minimum priority fee to provide.
 pub const MIN_PROTOCOL_PRIORITY_FEE: u64 = 1;
 
-/// Same as [MIN_PRIORITY_FEE] but as a U256.
+/// Same as [MIN_PROTOCOL_PRIORITY_FEE] but as a U256.
 pub const MIN_PROTOCOL_PRIORITY_FEE_U256: U256 = U256::from_limbs([1u64, 0, 0, 0]);
 
 /// Initial base fee as defined in [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
