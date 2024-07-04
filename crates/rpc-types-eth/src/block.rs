@@ -177,7 +177,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             parent_beacon_block_root,
             requests_root,
         } = value;
-        Ok(alloy_consensus::Header {
+        Ok(Self {
             parent_hash,
             ommers_hash: uncles_hash,
             beneficiary: miner,
