@@ -1,7 +1,15 @@
 use crate::eip4844::trusted_setup_points::{G1_POINTS, G2_POINTS};
 use alloc::sync::Arc;
-use c_kzg::KzgSettings;
+
 use core::hash::{Hash, Hasher};
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "c-kzg")] {
+        use c_kzg::KzgSettings;
+    } else if #[cfg(feature = "kzg-rs")] {
+        use kzg_rs::trusted_setup::{get_kzg_settings, KzgSettings};
+    }
+}
 
 /// KZG settings.
 #[derive(Clone, Debug, Default, Eq)]
@@ -42,10 +50,18 @@ impl EnvKzgSettings {
     pub fn get(&self) -> &KzgSettings {
         match self {
             Self::Default => {
-                let load = || {
-                    KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
-                        .expect("failed to load default trusted setup")
-                };
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "c-kzg")] {
+                        let load = || {
+                            KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
+                                .expect("failed to load default trusted setup")
+                        };
+                    } else if #[cfg(feature = "kzg-rs")] {
+                        let load = || {
+                            get_kzg_settings().expect("failed to load default trusted setup")
+                        };
+                    }
+                }
                 #[cfg(feature = "std")]
                 {
                     use once_cell as _;
