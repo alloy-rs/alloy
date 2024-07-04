@@ -1,5 +1,8 @@
 use crate::eip1559::{DEFAULT_ELASTICITY_MULTIPLIER, MIN_PROTOCOL_PRIORITY_FEE};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 /// An estimator function for EIP1559 fees.
 pub type EstimatorFunction = fn(u128, &[Vec<u128>]) -> Eip1559Estimation;
 
@@ -41,7 +44,7 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     let median =
         if n % 2 == 0 { (*rewards[n / 2 - 1] + *rewards[n / 2]) / 2 } else { *rewards[n / 2] };
 
-    std::cmp::max(median, MIN_PROTOCOL_PRIORITY_FEE as u128)
+    core::cmp::max(median, MIN_PROTOCOL_PRIORITY_FEE as u128)
 }
 
 #[cfg(test)]
