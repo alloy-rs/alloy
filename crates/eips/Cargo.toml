@@ -42,6 +42,9 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
+# macros
+cfg-if.workspace = true
+
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
     "rand",
@@ -52,9 +55,6 @@ arbitrary = { workspace = true, features = ["derive"] }
 proptest.workspace = true
 proptest-derive.workspace = true
 serde_json.workspace = true
-
-# macros
-cfg-if.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]

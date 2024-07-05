@@ -9,6 +9,10 @@ pub mod env_settings;
 #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 pub mod trusted_setup_points;
 
+/// Contains KZG related types
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
+pub mod kzg;
+
 /// Builder and utils for the [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 pub mod builder;
 pub mod utils;

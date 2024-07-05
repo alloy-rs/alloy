@@ -11,6 +11,9 @@ use alloy_rlp::{Decodable, Encodable};
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
+use crate::eip4844::kgz::KzgError;
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -232,17 +235,8 @@ where
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     InvalidProof,
-    
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "kzg")] {
-            /// An error returned by [`c_kzg`].
-            KZGError(c_kzg::Error),
-        } else if #[cfg(feature = "kzg-rs")] {
-            /// An error returned by [`kzg-rs`].
-            KZGError(kzg_rs::KzgError),
-        }
-    }
-
+    /// An error returned by [`c_kzg`] or [`kzg_rs`].
+    KZGError(KzgError),
     /// The inner transaction is not a blob transaction.
     NotBlobTransaction(u8),
     /// Error variant for thrown by EIP-4844 tx variants without a sidecar.
@@ -290,19 +284,10 @@ impl core::fmt::Display for BlobTransactionValidationError {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "kzg")] {
-        impl From<c_kzg::Error> for BlobTransactionValidationError {
-            fn from(source: c_kzg::Error) -> Self {
-                Self::KZGError(source)
-            }
-        }
-    } else if #[cfg(feature = "kzg-rs")] {
-        impl From<kzg_rs::KzgError> for BlobTransactionValidationError {
-            fn from(source: kzg_rs::KzgError) -> Self {
-                Self::KZGError(source)
-            }
-        }
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
+impl From<KzgError> for BlobTransactionValidationError {
+    fn from(source: KzgError) -> Self {
+        Self::KZGError(source)
     }
 }
 
