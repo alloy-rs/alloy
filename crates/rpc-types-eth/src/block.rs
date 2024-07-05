@@ -1,6 +1,6 @@
 //! Block RPC types.
 
-use crate::{Transaction, Withdrawal};
+use crate::{ConversionError, Transaction, Withdrawal};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256, U64};
 use alloy_serde::OtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
@@ -150,10 +150,9 @@ impl Header {
 }
 
 impl TryFrom<Header> for alloy_consensus::Header {
-    type Error = String;
+    type Error = ConversionError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         let Header {
-            hash: _hash,
             parent_hash,
             uncles_hash,
             miner,
@@ -166,7 +165,6 @@ impl TryFrom<Header> for alloy_consensus::Header {
             gas_limit,
             gas_used,
             timestamp,
-            total_difficulty: _total_difficulty,
             extra_data,
             mix_hash,
             nonce,
@@ -176,6 +174,9 @@ impl TryFrom<Header> for alloy_consensus::Header {
             excess_blob_gas,
             parent_beacon_block_root,
             requests_root,
+            // not included in the consensus header
+            hash: _hash,
+            total_difficulty: _total_difficulty,
         } = value;
         Ok(Self {
             parent_hash,
@@ -187,12 +188,12 @@ impl TryFrom<Header> for alloy_consensus::Header {
             withdrawals_root,
             logs_bloom,
             difficulty,
-            number: number.ok_or("missing block number")?,
+            number: number.ok_or(ConversionError::MissingBlockNumber)?,
             gas_limit,
             gas_used,
             timestamp,
-            mix_hash: mix_hash.ok_or("missing block mix_hash")?,
-            nonce: nonce.ok_or("missing block nonce")?,
+            mix_hash: mix_hash.ok_or(ConversionError::Custom("missing block mix_hash".into()))?,
+            nonce: nonce.ok_or(ConversionError::Custom("missing block nonce".into()))?,
             base_fee_per_gas,
             blob_gas_used,
             excess_blob_gas,
