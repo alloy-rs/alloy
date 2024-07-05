@@ -12,7 +12,7 @@ use alloy_rlp::{Decodable, Encodable};
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
 #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
-use crate::eip4844::kgz::KzgError;
+use crate::eip4844::kzg::KzgError;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
