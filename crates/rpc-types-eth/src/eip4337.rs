@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, B256, U256};
+use alloy_primitives::{Address, BlockNumber, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 /// Options for conditional raw transaction submissions.
@@ -9,10 +9,10 @@ use std::collections::HashMap;
 pub struct ConditionalTxOptions {
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
-    pub block_number_min: Option<U256>,
+    pub block_number_min: Option<BlockNumber>,
     /// The maximal block number at which the transaction can be included.
     /// `None` indicates no maximum block number constraint.
-    pub block_number_max: Option<U256>,
+    pub block_number_max: Option<BlockNumber>,
     /// The minimal timestamp at which the transaction can be included.
     /// `None` indicates no minimum timestamp constraint.
     pub timestamp_min: Option<U256>,
