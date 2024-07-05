@@ -71,7 +71,7 @@ serde = [
     "alloy-primitives/serde",
     "c-kzg?/serde",
 ]
-c-kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
+kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-rs = ["dep:kzg-rs"]
 kzg-sidecar = ["sha2"]
 sha2 = ["dep:sha2"]

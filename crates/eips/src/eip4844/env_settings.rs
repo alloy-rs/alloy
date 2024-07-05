@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use core::hash::{Hash, Hasher};
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "c-kzg")] {
+    if #[cfg(feature = "kzg")] {
         use c_kzg::KzgSettings;
     } else if #[cfg(feature = "kzg-rs")] {
         use kzg_rs::trusted_setup::{get_kzg_settings, KzgSettings};
@@ -51,7 +51,7 @@ impl EnvKzgSettings {
         match self {
             Self::Default => {
                 cfg_if::cfg_if! {
-                    if #[cfg(feature = "c-kzg")] {
+                    if #[cfg(feature = "kzg")] {
                         let load = || {
                             KzgSettings::load_trusted_setup(&G1_POINTS.0, &G2_POINTS.0)
                                 .expect("failed to load default trusted setup")

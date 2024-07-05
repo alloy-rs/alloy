@@ -4,7 +4,7 @@ use core::fmt;
 use derive_more::{AsMut, AsRef, Deref, DerefMut};
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "c-kzg")] {
+    if #[cfg(feature = "kzg")] {
         pub use c_kzg::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};
     } else if #[cfg(feature = "kzg-rs")] {
         pub use kzg_rs::consts::{BYTES_PER_G1_POINT, BYTES_PER_G2_POINT};

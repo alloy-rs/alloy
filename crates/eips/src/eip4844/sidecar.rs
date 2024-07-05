@@ -62,7 +62,7 @@ impl BlobTransactionSidecar {
     }
 
     /// Creates a new instance from the given KZG types.
-    #[cfg(feature = "c-kzg")]
+    #[cfg(feature = "kzg")]
     pub fn from_kzg(
         blobs: Vec<c_kzg::Blob>,
         commitments: Vec<c_kzg::Bytes48>,
@@ -96,7 +96,7 @@ impl BlobTransactionSidecar {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
-    #[cfg(feature = "c-kzg")]
+    #[cfg(feature = "kzg")]
     pub fn validate(
         &self,
         blob_versioned_hashes: &[B256],
@@ -228,13 +228,13 @@ where
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
 #[derive(Debug)]
-#[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     InvalidProof,
     
     cfg_if::cfg_if! {
-        if #[cfg(feature = "c-kzg")] {
+        if #[cfg(feature = "kzg")] {
             /// An error returned by [`c_kzg`].
             KZGError(c_kzg::Error),
         } else if #[cfg(feature = "kzg-rs")] {
@@ -256,7 +256,7 @@ pub enum BlobTransactionValidationError {
     },
 }
 
-#[cfg(all(any(feature = "c-kzg", feature = "kzg-rs"), feature = "std"))]
+#[cfg(all(any(feature = "kzg", feature = "kzg-rs"), feature = "std"))]
 impl std::error::Error for BlobTransactionValidationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -269,7 +269,7 @@ impl std::error::Error for BlobTransactionValidationError {
     }
 }
 
-#[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 impl core::fmt::Display for BlobTransactionValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -291,7 +291,7 @@ impl core::fmt::Display for BlobTransactionValidationError {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "c-kzg")] {
+    if #[cfg(feature = "kzg")] {
         impl From<c_kzg::Error> for BlobTransactionValidationError {
             fn from(source: c_kzg::Error) -> Self {
                 Self::KZGError(source)
