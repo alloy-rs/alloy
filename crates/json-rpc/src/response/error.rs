@@ -20,6 +20,53 @@ pub struct ErrorPayload<ErrData = Box<RawValue>> {
     pub data: Option<ErrData>,
 }
 
+impl<E> ErrorPayload<E> {
+    /// Analyzes the [ErrorPayload] and decides if the request should be retried based on the
+    /// error code or the message.
+    pub fn is_retry_err(&self) -> bool {
+        // alchemy throws it this way
+        if self.code == 429 {
+            return true;
+        }
+
+        // This is an infura error code for `exceeded project rate limit`
+        if self.code == -32005 {
+            return true;
+        }
+
+        // alternative alchemy error for specific IPs
+        if self.code == -32016 && self.message.contains("rate limit") {
+            return true;
+        }
+
+        // quick node error `"credits limited to 6000/sec"`
+        // <https://github.com/foundry-rs/foundry/pull/6712#issuecomment-1951441240>
+        if self.code == -32012 && self.message.contains("credits") {
+            return true;
+        }
+
+        // quick node rate limit error: `100/second request limit reached - reduce calls per second
+        // or upgrade your account at quicknode.com` <https://github.com/foundry-rs/foundry/issues/4894>
+        if self.code == -32007 && self.message.contains("request limit reached") {
+            return true;
+        }
+
+        match self.message.as_str() {
+            // this is commonly thrown by infura and is apparently a load balancer issue, see also <https://github.com/MetaMask/metamask-extension/issues/7234>
+            "header not found" => true,
+            // also thrown by infura if out of budget for the day and ratelimited
+            "daily request count exceeded, request rate limited" => true,
+            msg => {
+                msg.contains("rate limit")
+                    || msg.contains("rate exceeded")
+                    || msg.contains("too many requests")
+                    || msg.contains("credits limited")
+                    || msg.contains("request limit")
+            }
+        }
+    }
+}
+
 impl<ErrData> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "error code {}: {}", self.code, self.message)
