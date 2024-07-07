@@ -8,9 +8,9 @@ use core::mem;
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobTransactionSidecar;
 
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 #[doc(inline)]
-pub use alloy_eips::eip4844::BlobTransactionValidationError;
+pub use alloy_eips::eip4844::{kzg::KzgSettings, BlobTransactionValidationError};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -79,10 +79,10 @@ impl TxEip4844Variant {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
-    #[cfg(feature = "kzg")]
+    #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
     pub fn validate(
         &self,
-        proof_settings: &c_kzg::KzgSettings,
+        proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         match self {
             Self::TxEip4844(_) => Err(BlobTransactionValidationError::MissingSidecar),
@@ -384,7 +384,8 @@ impl TxEip4844 {
     /// Verifies that the given blob data, commitments, and proofs are all valid for this
     /// transaction.
     ///
-    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
+    /// Takes as input the [c-kzg KzgSettings](c_kzg::KzgSettings) or
+    /// [kzg-rs KzgSettings](kzg_rs::KzgSettings), which should contain the parameters
     /// derived from the KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
@@ -394,11 +395,11 @@ impl TxEip4844 {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
-    #[cfg(feature = "kzg")]
+    #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
     pub fn validate_blob(
         &self,
         sidecar: &BlobTransactionSidecar,
-        proof_settings: &c_kzg::KzgSettings,
+        proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         sidecar.validate(&self.blob_versioned_hashes, proof_settings)
     }
@@ -723,10 +724,10 @@ impl TxEip4844WithSidecar {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
     /// See also [TxEip4844::validate_blob]
-    #[cfg(feature = "kzg")]
+    #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
     pub fn validate_blob(
         &self,
-        proof_settings: &c_kzg::KzgSettings,
+        proof_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         self.tx.validate_blob(&self.sidecar, proof_settings)
     }

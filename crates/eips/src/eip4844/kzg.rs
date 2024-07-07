@@ -1,17 +1,17 @@
 use super::{BlobTransactionSidecar, BlobTransactionValidationError};
 
-/// r
+/// Allows multiple `verify_blob_kzg_proof_batch` implementations.
 pub trait KzgProofVerifier {
-    /// f
+    /// The KZG settings type.
     type KzgSettings;
 
-    /// f
+    /// Verify a blob KZG proof batch.
     fn verify_blob_kzg_proof_batch(
         &self,
         kzg_settings: &KzgSettings,
     ) -> Result<bool, BlobTransactionValidationError>;
 
-    /// g
+    /// Checks the given versioned commitment hashes count matches the commitments count.
     fn check_blob_versioned_hashes_length(
         &self,
         blob_versioned_hashes_len: usize,
