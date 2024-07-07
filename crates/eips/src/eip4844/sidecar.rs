@@ -89,8 +89,8 @@ impl BlobTransactionSidecar {
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///
-    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
-    /// derived from the KZG trusted setup.
+    /// Takes as input the [KzgSettings], which should contain the parameters derived from the
+    /// KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
     /// commitments, and proofs. Each blob data element is verified against its commitment and

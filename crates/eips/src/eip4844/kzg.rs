@@ -59,6 +59,7 @@ cfg_if::cfg_if! {
             }
         }
     } else if #[cfg(feature = "kzg-rs")] {
+        use alloc::vec::Vec;
         pub use kzg_rs::{KzgError, KzgSettings};
 
         impl KzgProofVerifier for BlobTransactionSidecar {
