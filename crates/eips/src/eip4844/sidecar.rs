@@ -12,7 +12,7 @@ use alloy_rlp::{Decodable, Encodable};
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
 #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
-use crate::eip4844::kzg::KzgError;
+use crate::eip4844::kzg::{KzgError, KzgProofVerifier, KzgSettings};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -99,28 +99,20 @@ impl BlobTransactionSidecar {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
-    #[cfg(feature = "kzg")]
+    #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
     pub fn validate(
         &self,
         blob_versioned_hashes: &[B256],
-        proof_settings: &c_kzg::KzgSettings,
+        kzg_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         // Ensure the versioned hashes and commitments have the same length.
-        if blob_versioned_hashes.len() != self.commitments.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "There are {} versioned commitment hashes and {} commitments",
-                blob_versioned_hashes.len(),
-                self.commitments.len()
-            ))
-            .into());
-        }
+
+        self.check_blob_versioned_hashes_length(blob_versioned_hashes.len())?;
 
         // calculate versioned hashes by zipping & iterating
         for (versioned_hash, commitment) in
             blob_versioned_hashes.iter().zip(self.commitments.iter())
         {
-            let commitment = c_kzg::KzgCommitment::from(commitment.0);
-
             // calculate & verify versioned hash
             let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
@@ -131,19 +123,7 @@ impl BlobTransactionSidecar {
             }
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            c_kzg::KzgProof::verify_blob_kzg_proof_batch(
-                // blobs
-                core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
-                proof_settings,
-            )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
+        let res = self.verify_blob_kzg_proof_batch(kzg_settings)?;
 
         if res {
             Ok(())

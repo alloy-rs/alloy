@@ -144,3 +144,8 @@ proptest-derive = { version = "0.4", default-features = false }
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
+
+# TODO: Remove this once https://github.com/succinctlabs/kzg-rs/pull/3 is merged
+[patch.crates-io]
+kzg-rs = { git = "https://github.com/leruaa/kzg-rs", branch = "verify_blobs" }
+bls12_381 = { git = "https://github.com/leruaa/bls12_381", branch = "msm_variable_base" }
