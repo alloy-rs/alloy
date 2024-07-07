@@ -1,4 +1,4 @@
-use alloy_primitives::U256;
+use alloy_primitives::{U128, U256, U32, U64};
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -15,12 +15,19 @@ impl From<Index> for usize {
         idx.0
     }
 }
-
-impl From<Index> for U256 {
-    fn from(idx: Index) -> Self {
-        Self::from(idx.0)
-    }
+///implement `From<Index>` for primitive numeric type
+macro_rules! impl_from_index_for {
+    ($($t:ty),+) => {
+        $(
+            impl From<Index> for $t {
+                fn from(index: Index) -> Self {
+                    Self::from(index.0)
+                }
+            }
+        )+
+    };
 }
+impl_from_index_for!(U256, U128, U64, U32);
 
 impl From<usize> for Index {
     fn from(idx: usize) -> Self {
