@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
+
+### Features
+
+- Add missing eth bundle args ([#978](https://github.com/alloy-rs/alloy/issues/978))
+
+### Other
+
+- Update builders to vector of strings in privacy struct ([#983](https://github.com/alloy-rs/alloy/issues/983))
+- [hotfix] Typo change pub(crate) to pub ([#979](https://github.com/alloy-rs/alloy/issues/979))
+
 ## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
 
 ### Features
@@ -13,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.3
 - Release 0.1.3
 
 [`alloy`]: https://crates.io/crates/alloy
