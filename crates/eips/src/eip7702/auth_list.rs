@@ -78,6 +78,11 @@ impl<S> SignedAuthorization<S> {
     pub const fn signature(&self) -> &S {
         &self.signature
     }
+
+    /// Splits the authorization into parts.
+    pub fn into_parts(self) -> (Authorization, S) {
+        (self.inner, self.signature)
+    }
 }
 
 #[cfg(feature = "k256")]
@@ -122,6 +127,11 @@ impl RecoveredAuthorization {
     /// If this is `None`, then the authority could not be recovered.
     pub const fn authority(&self) -> Option<Address> {
         self.authority
+    }
+
+    /// Splits the authorization into parts.
+    pub const fn into_parts(self) -> (Authorization, Option<Address>) {
+        (self.inner, self.authority)
     }
 }
 
