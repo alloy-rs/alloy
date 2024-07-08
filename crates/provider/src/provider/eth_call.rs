@@ -249,8 +249,9 @@ where
     T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output,
+    Map: Fn(Resp) -> Output + Clone,
 {
+    // TODO: Remove this. Rethink design for EthCall x ProviderCall
     /// Convert EthCall into a ProviderCall
     pub(crate) fn into_provider_call(
         self,

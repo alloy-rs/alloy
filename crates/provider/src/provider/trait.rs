@@ -1243,7 +1243,7 @@ mod tests {
         assert_eq!(count, 1);
 
         // Tx count should be 0 at block 0
-        let count = provider.get_transaction_count(sender).block(0.into()).await.unwrap();
+        let count = provider.get_transaction_count(sender).block_id(0.into()).await.unwrap();
         assert_eq!(count, 0);
     }
 
