@@ -15,7 +15,7 @@ changed or not.
 
 - [ ] Make sure you're on the `main` branch.
 - [ ] (optional) Dry run `cargo-release`: `cargo release <version>`
-- [ ] Run `cargo-release`: `PUBLISH_GRACE_SLEEP=10 cargo release <version> --rate-limit.existing-packages 50 [--no-verify]`
+- [ ] Run `cargo-release`: `PUBLISH_GRACE_SLEEP=10 cargo release --execute [--no-verify] <version>`
   - Ignore these warnings:
     - `warning: updating <crate> to <version> despite no changes made since...`
     - `git-cliff` warning `there is already a tag (<tag>) for ...`
