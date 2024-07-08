@@ -430,8 +430,11 @@ impl Transaction for TxEnvelope {
 mod tests {
     use super::*;
     use crate::transaction::SignableTransaction;
-    use alloy_eips::eip2930::{AccessList, AccessListItem};
-    use alloy_primitives::{hex, Address, Signature, U256};
+    use alloy_eips::{
+        eip2930::{AccessList, AccessListItem},
+        eip4844::BlobTransactionSidecar,
+    };
+    use alloy_primitives::{hex, Address, Parity, Signature, U256};
     #[allow(unused_imports)]
     use alloy_primitives::{Bytes, TxKind};
     use std::{fs, path::PathBuf, vec};
@@ -525,11 +528,13 @@ mod tests {
         assert_eq!(from, address!("A83C816D4f9b2783761a22BA6FADB0eB0606D7B2"));
     }
 
-    fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(tx: T)
-    where
+    fn test_encode_decode_roundtrip<T: SignableTransaction<Signature>>(
+        tx: T,
+        signature: Option<Signature>,
+    ) where
         Signed<T>: Into<TxEnvelope>,
     {
-        let signature = Signature::test_signature();
+        let signature = signature.unwrap_or_else(Signature::test_signature);
         let tx_signed = tx.into_signed(signature);
         let tx_envelope: TxEnvelope = tx_signed.into();
         let encoded = tx_envelope.encoded_2718();
@@ -551,7 +556,113 @@ mod tests {
             input: vec![8].into(),
             access_list: Default::default(),
         };
-        test_encode_decode_roundtrip(tx);
+        test_encode_decode_roundtrip(tx, None);
+    }
+
+    #[test]
+    fn test_encode_decode_eip1559_parity_eip155() {
+        let tx = TxEip1559 {
+            chain_id: 1u64,
+            nonce: 2,
+            max_fee_per_gas: 3,
+            max_priority_fee_per_gas: 4,
+            gas_limit: 5,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            input: vec![8].into(),
+            access_list: Default::default(),
+        };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip2930_parity_eip155() {
+        let tx = TxEip2930 {
+            chain_id: 1u64,
+            nonce: 2,
+            gas_price: 3,
+            gas_limit: 4,
+            to: Address::left_padding_from(&[5]).into(),
+            value: U256::from(6_u64),
+            input: vec![7].into(),
+            access_list: Default::default(),
+        };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip4844_parity_eip155() {
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip4844_sidecar_parity_eip155() {
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        };
+        let sidecar = BlobTransactionSidecar {
+            blobs: vec![[2; 131072].into()],
+            commitments: vec![[3; 48].into()],
+            proofs: vec![[4; 48].into()],
+        };
+        let tx = TxEip4844WithSidecar { tx, sidecar };
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
+    }
+
+    #[test]
+    fn test_encode_decode_eip4844_variant_parity_eip155() {
+        let tx = TxEip4844 {
+            chain_id: 1,
+            nonce: 100,
+            max_fee_per_gas: 50_000_000_000,
+            max_priority_fee_per_gas: 1_000_000_000_000,
+            gas_limit: 1_000_000,
+            to: Address::random(),
+            value: U256::from(10e18),
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            blob_versioned_hashes: vec![B256::random()],
+            max_fee_per_blob_gas: 0,
+        };
+        let tx = TxEip4844Variant::TxEip4844(tx);
+        let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+        test_encode_decode_roundtrip(tx, Some(signature));
     }
 
     #[test]
@@ -569,7 +680,7 @@ mod tests {
                 storage_keys: vec![B256::left_padding_from(&[9])],
             }]),
         };
-        test_encode_decode_roundtrip(tx);
+        test_encode_decode_roundtrip(tx, None);
     }
 
     #[test]
