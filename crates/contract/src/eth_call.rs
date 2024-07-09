@@ -13,6 +13,7 @@ use crate::{Error, Result};
 /// Raw coder.
 const RAW_CODER: () = ();
 
+#[allow(unnameable_types)]
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Function {}
@@ -121,6 +122,7 @@ where
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Clone, Debug)]
+#[allow(unnameable_types)]
 pub struct EthCallFut<'req, 'state, 'coder, D, T, N>
 where
     T: Transport + Clone,

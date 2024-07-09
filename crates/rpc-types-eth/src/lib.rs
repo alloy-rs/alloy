@@ -15,7 +15,7 @@ mod block;
 pub use block::*;
 
 mod call;
-pub use call::{Bundle, EthCallResponse, StateContext};
+pub use call::{Bundle, EthCallResponse, StateContext, TransactionIndex};
 
 pub mod error;
 
