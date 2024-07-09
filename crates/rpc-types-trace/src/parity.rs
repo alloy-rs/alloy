@@ -377,14 +377,28 @@ pub enum TraceOutput {
     Create(CreateOutput),
 }
 
-// === impl TraceOutput ===
-
 impl TraceOutput {
-    /// Returns the gas used by this trace.
-    pub const fn gas_used(&self) -> U64 {
+    /// Returns the output of this trace.
+    pub const fn output(&self) -> &Bytes {
         match self {
-            Self::Call(call) => call.gas_used,
-            Self::Create(create) => create.gas_used,
+            Self::Call(call) => &call.output,
+            Self::Create(create) => &create.code,
+        }
+    }
+
+    /// Consumes the output of this trace.
+    pub fn into_output(self) -> Bytes {
+        match self {
+            Self::Call(call) => call.output,
+            Self::Create(create) => create.code,
+        }
+    }
+
+    /// Returns the gas used by this trace.
+    pub fn gas_used(&self) -> u64 {
+        match self {
+            Self::Call(call) => call.gas_used.to(),
+            Self::Create(create) => create.gas_used.to(),
         }
     }
 
