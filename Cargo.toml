@@ -12,13 +12,16 @@ homepage = "https://github.com/alloy-rs/alloy"
 repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/"]
 
-[workspace.lints]
-rust.missing-debug-implementations = "warn"
-rust.missing-docs = "warn"
-rust.unreachable-pub = "warn"
-rust.unused-must-use = "deny"
-rust.rust-2018-idioms = "deny"
-rustdoc.all = "warn"
+[workspace.lints.rust]
+missing-debug-implementations = "warn"
+missing-docs = "warn"
+unreachable-pub = "warn"
+unused-must-use = "deny"
+rust-2018-idioms = "deny"
+unnameable-types = "warn"
+
+[workspace.lints.rustdoc]
+all = "warn"
 
 [workspace.lints.clippy]
 all = "warn"

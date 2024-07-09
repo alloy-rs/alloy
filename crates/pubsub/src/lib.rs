@@ -25,4 +25,7 @@ mod managers;
 mod service;
 
 mod sub;
-pub use sub::{RawSubscription, Subscription, SubscriptionItem};
+pub use sub::{
+    RawSubscription, SubAnyStream, SubResultStream, Subscription, SubscriptionItem,
+    SubscriptionStream,
+};
