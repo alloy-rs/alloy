@@ -7,8 +7,8 @@ use alloy_network::{Network, TransactionBuilder};
 use alloy_primitives::Address;
 use alloy_transport::{Transport, TransportResult};
 use dashmap::DashMap;
+use futures::lock::Mutex;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 /// A [`TxFiller`] that fills nonces on transactions.
 ///
@@ -18,11 +18,10 @@ use tokio::sync::Mutex;
 ///
 /// # Note
 ///
-/// - If the transaction request does not have a sender set, this layer will
-///  not fill nonces.
-/// - Using two providers with their own nonce layer can potentially fill
-///  invalid nonces if transactions are sent from the same address, as the next
-///  nonce to be used is cached internally in the layer.
+/// - If the transaction request does not have a sender set, this layer will not fill nonces.
+/// - Using two providers with their own nonce layer can potentially fill invalid nonces if
+///   transactions are sent from the same address, as the next nonce to be used is cached internally
+///   in the layer.
 ///
 /// # Example
 ///
@@ -42,7 +41,7 @@ use tokio::sync::Mutex;
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct NonceFiller {
-    nonces: DashMap<Address, Arc<Mutex<Option<u64>>>>,
+    nonces: DashMap<Address, Arc<Mutex<u64>>>,
 }
 
 impl<N: Network> TxFiller<N> for NonceFiller {
@@ -87,29 +86,31 @@ impl<N: Network> TxFiller<N> for NonceFiller {
 
 impl NonceFiller {
     /// Get the next nonce for the given account.
-    async fn get_next_nonce<P, T, N>(&self, provider: &P, from: Address) -> TransportResult<u64>
+    async fn get_next_nonce<P, T, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
         P: Provider<T, N>,
         N: Network,
         T: Transport + Clone,
     {
-        // locks dashmap internally for a short duration to clone the `Arc`
-        let mutex = Arc::clone(self.nonces.entry(from).or_default().value());
+        // Use `u64::MAX` as a sentinel value to indicate that the nonce has not been fetched yet.
+        const NONE: u64 = u64::MAX;
 
-        // locks the value (does not lock dashmap)
-        let mut nonce = mutex.lock().await;
-        match *nonce {
-            Some(ref mut nonce) => {
-                *nonce += 1;
-                Ok(*nonce)
-            }
-            None => {
-                // initialize the nonce if we haven't seen this account before
-                let initial_nonce = provider.get_transaction_count(from).await?;
-                *nonce = Some(initial_nonce);
-                Ok(initial_nonce)
-            }
-        }
+        // Locks dashmap internally for a short duration to clone the `Arc`.
+        // We also don't want to hold the dashmap lock through the await point below.
+        let nonce = {
+            let rm = self.nonces.entry(address).or_insert_with(|| Arc::new(Mutex::new(NONE)));
+            Arc::clone(rm.value())
+        };
+
+        let mut nonce = nonce.lock().await;
+        let new_nonce = if *nonce == NONE {
+            // Initialize the nonce if we haven't seen this account before.
+            provider.get_transaction_count(address).await?
+        } else {
+            *nonce + 1
+        };
+        *nonce = new_nonce;
+        Ok(new_nonce)
     }
 }
 
@@ -119,6 +120,58 @@ mod tests {
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
+
+    async fn check_nonces<P, T, N>(filler: &NonceFiller, provider: &P, address: Address, start: u64)
+    where
+        P: Provider<T, N>,
+        N: Network,
+        T: Transport + Clone,
+    {
+        for i in start..start + 5 {
+            let nonce = filler.get_next_nonce(&provider, address).await.unwrap();
+            assert_eq!(nonce, i);
+        }
+    }
+
+    #[tokio::test]
+    async fn smoke_test() {
+        let filler = NonceFiller::default();
+        let provider = ProviderBuilder::new().on_anvil();
+        let address = Address::ZERO;
+        check_nonces(&filler, &provider, address, 0).await;
+
+        #[cfg(feature = "anvil-api")]
+        {
+            use crate::ext::AnvilApi;
+            filler.nonces.clear();
+            provider.anvil_set_nonce(address, U256::from(69)).await.unwrap();
+            check_nonces(&filler, &provider, address, 69).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrency() {
+        let filler = Arc::new(NonceFiller::default());
+        let provider = Arc::new(ProviderBuilder::new().on_anvil());
+        let address = Address::ZERO;
+        let tasks = (0..5)
+            .map(|_| {
+                let filler = Arc::clone(&filler);
+                let provider = Arc::clone(&provider);
+                tokio::spawn(async move { filler.get_next_nonce(&provider, address).await })
+            })
+            .collect::<Vec<_>>();
+
+        let mut ns = Vec::new();
+        for task in tasks {
+            ns.push(task.await.unwrap().unwrap());
+        }
+        ns.sort_unstable();
+        assert_eq!(ns, (0..5).collect::<Vec<_>>());
+
+        assert_eq!(filler.nonces.len(), 1);
+        assert_eq!(*filler.nonces.get(&address).unwrap().value().lock().await, 4);
+    }
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {

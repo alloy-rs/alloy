@@ -1,6 +1,7 @@
 use crate::{Network, ReceiptResponse, TransactionResponse};
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
+use alloy_primitives::Bytes;
 use alloy_rpc_types_eth::{AnyTransactionReceipt, Header, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use core::fmt;
@@ -83,6 +84,14 @@ impl ReceiptResponse for AnyTransactionReceipt {
     fn status(&self) -> bool {
         self.inner.inner.status()
     }
+
+    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+        self.inner.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.inner.block_number
+    }
 }
 
 impl TransactionResponse for WithOtherFields<Transaction> {
@@ -105,5 +114,9 @@ impl TransactionResponse for WithOtherFields<Transaction> {
 
     fn gas(&self) -> u128 {
         self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
     }
 }

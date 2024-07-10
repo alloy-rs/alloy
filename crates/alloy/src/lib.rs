@@ -56,12 +56,6 @@ macro_rules! sol {
 
 /* --------------------------------------- Main re-exports -------------------------------------- */
 
-#[cfg(feature = "reqwest")]
-use reqwest as _;
-
-#[cfg(feature = "hyper")]
-use hyper as _;
-
 #[cfg(feature = "contract")]
 #[doc(inline)]
 pub use alloy_contract as contract;

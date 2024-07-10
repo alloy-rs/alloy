@@ -29,12 +29,12 @@ serde.workspace = true
 thiserror.workspace = true
 tower.workspace = true
 url.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { workspace = true, features = ["rt"] }
-
 [features]
+
 wasm-bindgen = ["dep:wasm-bindgen-futures"]

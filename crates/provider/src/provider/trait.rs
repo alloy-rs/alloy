@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, Network, ReceiptResponse as _};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -667,6 +667,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        // Make sure to initialize heartbeat before we submit transaction, so that
+        // we don't miss it if user will subscriber to it immediately after sending.
+        let _handle = self.root().get_heart();
+
         match tx {
             SendableTx::Builder(mut tx) => {
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
@@ -851,9 +855,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_syncing", ()).await
     }
 
-    /// Gets the client version of the chain client().
+    /// Gets the client version.
+    #[doc(alias = "web3_client_version")]
     async fn get_client_version(&self) -> TransportResult<String> {
         self.client().request("web3_clientVersion", ()).await
+    }
+
+    /// Gets the `Keccak-256` hash of the given data.
+    #[doc(alias = "web3_sha3")]
+    async fn get_sha3(&self, data: &[u8]) -> TransportResult<B256> {
+        self.client().request("web3_sha3", (hex::encode_prefixed(data),)).await
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
@@ -951,17 +962,35 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
         &self,
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
-        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
+        let block_number =
+            if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
+                // The transaction is already confirmed.
+                if config.required_confirmations() <= 1 {
+                    return Ok(PendingTransaction::ready(*config.tx_hash()));
+                }
+                // Transaction has custom confirmations, so let the heart know about its block
+                // number and let it handle the situation.
+                receipt.block_number()
+            } else {
+                None
+            };
+
+        self.get_heart()
+            .watch_tx(config, block_number)
+            .await
+            .map_err(|_| TransportErrorKind::backend_gone())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
-    use alloy_primitives::{address, b256, bytes};
+    use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_types_eth::request::TransactionRequest;
 
     fn init_tracing() {
@@ -1044,15 +1073,16 @@ mod tests {
         };
     }
 
+    // Ensures we can connect to a websocket using `wss`.
     #[cfg(feature = "ws")]
     #[tokio::test]
     async fn websocket_tls_setup() {
-        let url = "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F";
-        // we don't care about the response, only that it doesn't panic on the TLS setup
-        let _provider = ProviderBuilder::<_, _, Ethereum>::default()
-            .with_recommended_fillers()
-            .on_builtin(url)
-            .await;
+        for url in [
+            "wss://eth-mainnet.ws.alchemyapi.io/v2/MdZcimFJ2yz2z6pw21UYL-KNA0zmgX-F",
+            "wss://mainnet.infura.io/ws/v3/b0f825787ba840af81e46c6a64d20754",
+        ] {
+            let _ = ProviderBuilder::<_, _, Ethereum>::default().on_builtin(url).await.unwrap();
+        }
     }
 
     #[cfg(feature = "ws")]
@@ -1141,6 +1171,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_watch_confirmed_tx() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let hash1 = *builder.tx_hash();
+
+        // Wait until tx is confirmed.
+        loop {
+            if provider
+                .get_transaction_receipt(hash1)
+                .await
+                .expect("failed to await pending tx")
+                .is_some()
+            {
+                break;
+            }
+        }
+
+        // Submit another tx.
+        let tx2 = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+        provider.send_transaction(tx2).await.expect("failed to send tx").watch().await.unwrap();
+
+        // Only subscribe for watching _after_ tx was confirmed and we submitted a new one.
+        let watch = builder.watch();
+        // Wrap watch future in timeout to prevent it from hanging.
+        let watch_with_timeout = tokio::time::timeout(Duration::from_secs(1), watch);
+        let hash2 = watch_with_timeout
+            .await
+            .expect("Watching tx timed out")
+            .expect("failed to await pending tx");
+        assert_eq!(hash1, hash2);
+    }
+
+    #[tokio::test]
     async fn gets_block_number() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
@@ -1220,7 +1298,16 @@ mod tests {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let version = provider.get_client_version().await.unwrap();
-        assert!(version.contains("anvil"));
+        assert!(version.contains("anvil"), "{version}");
+    }
+
+    #[tokio::test]
+    async fn gets_sha3() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+        let data = b"alloy";
+        let hash = provider.get_sha3(data).await.unwrap();
+        assert_eq!(hash, keccak256(data));
     }
 
     #[tokio::test]

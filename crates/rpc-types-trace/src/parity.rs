@@ -10,10 +10,11 @@ use std::{
 };
 
 /// Different Trace diagnostic targets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TraceType {
     /// Default trace
+    #[default]
     Trace,
     /// Provides a full trace of the VM’s state throughout the execution of the transaction,
     /// including for any subcalls.
@@ -197,6 +198,38 @@ impl Action {
     /// Returns true if this is a reward action
     pub const fn is_reward(&self) -> bool {
         matches!(self, Self::Reward(_))
+    }
+
+    /// Returns the [`CallAction`] if it is [`Action::Call`]
+    pub const fn as_call(&self) -> Option<&CallAction> {
+        match self {
+            Self::Call(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`CreateAction`] if it is [`Action::Create`]
+    pub const fn as_create(&self) -> Option<&CreateAction> {
+        match self {
+            Self::Create(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`SelfdestructAction`] if it is [`Action::Selfdestruct`]
+    pub const fn as_selfdestruct(&self) -> Option<&SelfdestructAction> {
+        match self {
+            Self::Selfdestruct(action) => Some(action),
+            _ => None,
+        }
+    }
+
+    /// Returns the [`RewardAction`] if it is [`Action::Reward`]
+    pub const fn as_reward(&self) -> Option<&RewardAction> {
+        match self {
+            Self::Reward(action) => Some(action),
+            _ => None,
+        }
     }
 
     /// Returns what kind of action this is

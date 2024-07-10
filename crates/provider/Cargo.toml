@@ -96,5 +96,6 @@ anvil-node = [
 ]
 debug-api = ["dep:alloy-rpc-types-trace"]
 engine-api = ["dep:alloy-rpc-types-engine"]
+net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
 txpool-api = ["dep:alloy-rpc-types-txpool"]

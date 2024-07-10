@@ -25,6 +25,9 @@ pub use alloy_rpc_types_eth as eth;
 #[cfg(feature = "eth")]
 pub use eth::*;
 
+#[cfg(feature = "mev")]
+pub use alloy_rpc_types_mev as mev;
+
 #[cfg(feature = "trace")]
 pub use alloy_rpc_types_trace as trace;
 

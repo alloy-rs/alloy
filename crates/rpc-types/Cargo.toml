@@ -25,6 +25,7 @@ alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, optional = true }
+alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
 
@@ -35,6 +36,7 @@ anvil = ["dep:alloy-rpc-types-anvil"]
 beacon = ["dep:alloy-rpc-types-beacon"]
 engine = ["dep:alloy-rpc-types-engine"]
 eth = ["dep:alloy-rpc-types-eth"]
+mev = ["dep:alloy-rpc-types-mev"]
 trace = ["dep:alloy-rpc-types-trace"]
 txpool = ["dep:alloy-rpc-types-txpool"]
 

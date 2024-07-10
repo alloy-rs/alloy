@@ -113,7 +113,7 @@ impl<T: DeserializeOwned> From<Box<RawValue>> for SubscriptionItem<T> {
 /// - The [`Subscription::recv_any`] and its variants will yield unexpected types as
 ///   [`SubscriptionItem::Other`].
 /// - The [`Subscription::recv_result`] and its variants will attempt to deserialize the
-///  notifications and yield the `serde_json::Result` of the deserialization.
+///   notifications and yield the `serde_json::Result` of the deserialization.
 #[derive(Debug)]
 #[must_use]
 pub struct Subscription<T> {

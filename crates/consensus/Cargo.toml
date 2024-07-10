@@ -21,7 +21,7 @@ workspace = true
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
-alloy-eips.workspace = true
+alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-serde = { workspace = true, optional = true }
 
 # kzg
@@ -50,7 +50,7 @@ serde_json.workspace = true
 [features]
 default = ["std"]
 std = ["alloy-eips/std", "c-kzg?/std"]
-k256 = ["alloy-primitives/k256"]
+k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
     "std",
