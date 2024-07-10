@@ -67,3 +67,4 @@ arbitrary = [
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
+sidecar = ["alloy-eips/kzg-sidecar"]
