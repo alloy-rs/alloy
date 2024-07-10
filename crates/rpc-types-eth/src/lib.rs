@@ -46,3 +46,6 @@ pub use transaction::*;
 
 mod work;
 pub use work::Work;
+
+mod sidecars;
+pub use sidecars::*;
