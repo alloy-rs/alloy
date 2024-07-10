@@ -206,6 +206,10 @@ impl Deref for OptionalNonce {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::hex;
+    use alloy_primitives::Signature;
+    use core::str::FromStr;
+
     use super::*;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
@@ -242,5 +246,24 @@ mod tests {
             OptionalNonce::decode(&mut buf.as_ref()),
             Err(alloy_rlp::Error::UnexpectedLength)
         )
+    }
+
+    #[test]
+    fn test_encode_decode_signed_auth() {
+        let expected = "f85b01940000000000000000000000000000000000000006c1011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
+        let auth = SignedAuthorization {
+            inner: Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[6]),
+                nonce: Some(1u64).into(),
+            },
+            signature: Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap(),
+        };
+        let mut buf = Vec::new();
+        auth.encode(&mut buf);
+        assert_eq!(hex::encode(&buf), expected);
+        let decoded = SignedAuthorization::<Signature>::decode(&mut buf.as_ref()).unwrap();
+        assert_eq!(buf.len(), auth.length());
+        assert_eq!(decoded, auth);
     }
 }
