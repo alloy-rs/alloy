@@ -8,6 +8,9 @@
 
 pub use alloy_serde as serde_helpers;
 
+mod rpc;
+pub use rpc::*;
+
 #[cfg(feature = "admin")]
 pub use alloy_rpc_types_admin as admin;
 
