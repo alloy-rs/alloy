@@ -121,7 +121,7 @@ impl GethInstance {
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: String) -> Result<(), GethInstanceError> {
+    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), GethInstanceError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(GethInstanceError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
@@ -132,7 +132,7 @@ impl GethInstance {
             err_reader.read_line(&mut line).map_err(GethInstanceError::ReadLineError)?;
 
             // geth ids are truncated
-            let truncated_id = &id[0..8];
+            let truncated_id = if id.len() > 16 { &id[..16] } else { id };
             if line.contains("Adding p2p peer") && line.contains(truncated_id) {
                 return Ok(());
             }
