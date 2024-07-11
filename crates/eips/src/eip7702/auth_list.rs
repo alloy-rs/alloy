@@ -83,7 +83,7 @@ impl SignedAuthorization {
     }
 
     /// Splits the authorization into parts.
-    pub fn into_parts(self) -> (Authorization, Signature) {
+    pub const fn into_parts(self) -> (Authorization, Signature) {
         (self.inner, self.signature)
     }
 
