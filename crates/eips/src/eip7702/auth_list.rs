@@ -12,6 +12,10 @@ use alloy_rlp::{
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 pub struct Authorization {
     /// The chain ID of the authorization.
     pub chain_id: ChainId,
@@ -160,6 +164,41 @@ impl Deref for SignedAuthorization {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use alloy_primitives::Parity;
+
+        let inner = u.arbitrary::<Authorization>()?;
+        let parity = u.arbitrary::<Parity>()?;
+
+        // TODO: find an easy way to generate random signatures
+        #[cfg(feature = "k256")]
+        let signature = Signature::from_scalars_and_parity(
+            <B256 as core::str::FromStr>::from_str(
+                "0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0",
+            )
+            .unwrap(),
+            <B256 as core::str::FromStr>::from_str(
+                "0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05",
+            )
+            .unwrap(),
+            parity,
+        )
+        .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+
+        #[cfg(not(feature = "k256"))]
+        let signature = Signature::from_rs_and_parity(
+            u.arbitrary::<alloy_primitives::U256>()?,
+            u.arbitrary::<alloy_primitives::U256>()?,
+            parity,
+        )
+        .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+
+        Ok(Self { inner, signature })
+    }
+}
+
 /// A recovered authorization.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -199,6 +238,10 @@ impl Deref for RecoveredAuthorization {
 /// The wrapper type is used for RLP encoding and decoding.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    any(test, feature = "arbitrary"),
+    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+)]
 pub struct OptionalNonce(Option<u64>);
 
 impl OptionalNonce {
@@ -258,10 +301,10 @@ impl Deref for OptionalNonce {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::{hex, Signature};
-    use core::str::FromStr;
-
     use super::*;
+    use alloy_primitives::{hex, Signature};
+    use arbitrary::Arbitrary;
+    use core::str::FromStr;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
         let mut buf = Vec::new();
@@ -318,5 +361,11 @@ mod tests {
         let decoded = SignedAuthorization::decode(&mut buf.as_ref()).unwrap();
         assert_eq!(buf.len(), auth.length());
         assert_eq!(decoded, auth);
+    }
+
+    #[test]
+    fn test_arbitrary_auth() {
+        let mut unstructured = arbitrary::Unstructured::new(b"unstructured auth");
+        let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
     }
 }
