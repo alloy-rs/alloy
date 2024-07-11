@@ -206,7 +206,7 @@ impl TxEip2930 {
         let tx = Self::decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
-        let signed = tx.into_signed(signature);
+        let signed: Signed<TxEip2930> = tx.into_signed(signature);
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
                 expected: header.payload_length,
