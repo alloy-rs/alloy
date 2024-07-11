@@ -2,7 +2,7 @@
 
 use crate::unused_port;
 use alloy_genesis::{CliqueConfig, Genesis};
-use alloy_primitives::{hex, Address, B256};
+use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
     borrow::Cow,
@@ -121,7 +121,7 @@ impl GethInstance {
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: B256) -> Result<(), GethInstanceError> {
+    pub fn wait_to_add_peer(&mut self, id: String) -> Result<(), GethInstanceError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(GethInstanceError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
@@ -132,8 +132,8 @@ impl GethInstance {
             err_reader.read_line(&mut line).map_err(GethInstanceError::ReadLineError)?;
 
             // geth ids are truncated
-            let truncated_id = hex::encode(&id.0[..8]);
-            if line.contains("Adding p2p peer") && line.contains(&truncated_id) {
+            let truncated_id = &id[0..8];
+            if line.contains("Adding p2p peer") && line.contains(truncated_id) {
                 return Ok(());
             }
         }
