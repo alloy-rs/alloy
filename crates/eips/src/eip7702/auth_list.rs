@@ -7,9 +7,10 @@ use alloy_rlp::{
     length_of_length, BufMut, Decodable, Encodable, Header, Result as RlpResult, RlpDecodable,
     RlpEncodable,
 };
+use core::hash::{Hash, Hasher};
 
 /// An unsigned EIP-7702 authorization.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Authorization {
@@ -108,6 +109,15 @@ impl SignedAuthorization {
     }
 }
 
+impl Hash for SignedAuthorization {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.hash(state);
+        self.signature.r().hash(state);
+        self.signature.s().hash(state);
+        self.signature.v().to_u64().hash(state);
+    }
+}
+
 impl Decodable for SignedAuthorization {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(buf)?;
@@ -161,7 +171,7 @@ impl Deref for SignedAuthorization {
 }
 
 /// A recovered authorization.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RecoveredAuthorization {
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -197,7 +207,7 @@ impl Deref for RecoveredAuthorization {
 /// nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
 ///
 /// The wrapper type is used for RLP encoding and decoding.
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OptionalNonce(Option<u64>);
 
