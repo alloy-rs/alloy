@@ -4,8 +4,6 @@
 //!
 //! Provides validator deposits as a list of deposit operations added to the Execution Layer block.
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_primitives::{address, Address, FixedBytes, B256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
@@ -18,10 +16,7 @@ pub const MAINNET_DEPOSIT_CONTRACT_ADDRESS: Address =
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct DepositRequest {
     /// Validator public key
     pub pubkey: FixedBytes<48>,

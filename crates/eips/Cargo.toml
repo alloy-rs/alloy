@@ -38,8 +38,6 @@ ethereum_ssz = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-proptest = { workspace = true, optional = true }
-proptest-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -48,8 +46,6 @@ alloy-primitives = { workspace = true, features = [
     "arbitrary",
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
 serde_json.workspace = true
 
 [features]
@@ -81,8 +77,6 @@ arbitrary = [
     "std",
     "kzg-sidecar",
     "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
 ]

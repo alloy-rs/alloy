@@ -15,7 +15,7 @@ use core::hash::{Hash, Hasher};
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 pub struct Authorization {
     /// The chain ID of the authorization.
@@ -235,7 +235,7 @@ impl Deref for RecoveredAuthorization {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 pub struct OptionalNonce(Option<u64>);
 
