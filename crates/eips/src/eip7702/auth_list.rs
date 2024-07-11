@@ -174,21 +174,21 @@ impl Deref for SignedAuthorization {
     }
 }
 
-#[cfg(any(test, feature = "arbitrary"))]
+#[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
 impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use alloy_primitives::{b256, Parity};
+        use k256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
+        let key_bytes = u.arbitrary::<[u8; 32]>()?;
+        let signing_key = SigningKey::from_bytes(&key_bytes.into())
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
 
         let inner = u.arbitrary::<Authorization>()?;
-        let parity = u.arbitrary::<Parity>()?;
+        let signature_hash = inner.signature_hash();
 
-        // TODO: find an easy way to generate random signatures
-        let signature = Signature::from_rs_and_parity(
-            b256!("c569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0").into(),
-            b256!("1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05").into(),
-            parity,
-        )
-        .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        let (recoverable_sig, recovery_id) =
+            signing_key.sign_prehash(signature_hash.as_ref()).unwrap();
+        let signature = Signature::from_signature_and_parity(recoverable_sig, recovery_id)
+            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
 
         Ok(Self { inner, signature })
     }
