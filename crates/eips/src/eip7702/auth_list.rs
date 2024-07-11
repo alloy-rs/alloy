@@ -2,8 +2,11 @@ use core::ops::Deref;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use alloy_primitives::{keccak256, Address, ChainId, B256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header, RlpDecodable, RlpEncodable};
+use alloy_primitives::{keccak256, Address, ChainId, Signature, B256};
+use alloy_rlp::{
+    length_of_length, BufMut, Decodable, Encodable, Header, Result as RlpResult, RlpDecodable,
+    RlpEncodable,
+};
 
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
@@ -59,34 +62,79 @@ impl Authorization {
     }
 
     /// Convert to a signed authorization by adding a signature.
-    pub const fn into_signed<S>(self, signature: S) -> SignedAuthorization<S> {
+    pub const fn into_signed(self, signature: Signature) -> SignedAuthorization {
         SignedAuthorization { inner: self, signature }
     }
 }
 
 /// A signed EIP-7702 authorization.
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SignedAuthorization<S> {
+pub struct SignedAuthorization {
     #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
-    signature: S,
+    signature: Signature,
 }
 
-impl<S> SignedAuthorization<S> {
+impl SignedAuthorization {
     /// Get the `signature` for the authorization.
-    pub const fn signature(&self) -> &S {
+    pub const fn signature(&self) -> &Signature {
         &self.signature
     }
 
     /// Splits the authorization into parts.
-    pub fn into_parts(self) -> (Authorization, S) {
+    pub const fn into_parts(self) -> (Authorization, Signature) {
         (self.inner, self.signature)
+    }
+
+    /// Decodes the transaction from RLP bytes, including the signature.
+    fn decode_fields(buf: &mut &[u8]) -> RlpResult<Self> {
+        Ok(Self {
+            inner: Authorization {
+                chain_id: Decodable::decode(buf)?,
+                address: Decodable::decode(buf)?,
+                nonce: Decodable::decode(buf)?,
+            },
+            signature: Signature::decode_rlp_vrs(buf)?,
+        })
+    }
+
+    /// Outputs the length of the transaction's fields, without a RLP header.
+    fn fields_len(&self) -> usize {
+        self.inner.chain_id.length()
+            + self.inner.address.length()
+            + self.inner.nonce.length()
+            + self.signature.rlp_vrs_len()
+    }
+}
+
+impl Decodable for SignedAuthorization {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
+        if !header.list {
+            return Err(alloy_rlp::Error::UnexpectedString);
+        }
+        Self::decode_fields(buf)
+    }
+}
+
+impl Encodable for SignedAuthorization {
+    fn encode(&self, buf: &mut dyn BufMut) {
+        Header { list: true, payload_length: self.fields_len() }.encode(buf);
+        self.inner.chain_id.encode(buf);
+        self.inner.address.encode(buf);
+        self.inner.nonce.encode(buf);
+        self.signature.write_rlp_vrs(buf)
+    }
+
+    fn length(&self) -> usize {
+        let len = self.fields_len();
+        len + length_of_length(len)
     }
 }
 
 #[cfg(feature = "k256")]
-impl SignedAuthorization<alloy_primitives::Signature> {
+impl SignedAuthorization {
     /// Recover the authority for the authorization.
     ///
     /// # Note
@@ -104,7 +152,7 @@ impl SignedAuthorization<alloy_primitives::Signature> {
     }
 }
 
-impl<S> Deref for SignedAuthorization<S> {
+impl Deref for SignedAuthorization {
     type Target = Authorization;
 
     fn deref(&self) -> &Self::Target {
@@ -176,6 +224,10 @@ impl Encodable for OptionalNonce {
             None => Header { list: true, payload_length: 0 }.encode(out),
         }
     }
+
+    fn length(&self) -> usize {
+        self.map(|nonce| nonce.length() + length_of_length(nonce.length())).unwrap_or(1)
+    }
 }
 
 impl Decodable for OptionalNonce {
@@ -206,6 +258,9 @@ impl Deref for OptionalNonce {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::{hex, Signature};
+    use core::str::FromStr;
+
     use super::*;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
@@ -242,5 +297,26 @@ mod tests {
             OptionalNonce::decode(&mut buf.as_ref()),
             Err(alloy_rlp::Error::UnexpectedLength)
         )
+    }
+
+    #[test]
+    fn test_encode_decode_signed_auth() {
+        let auth = SignedAuthorization {
+            inner: Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[6]),
+                nonce: Some(1u64).into(),
+            },
+            signature: Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap(),
+        };
+        let mut buf = Vec::new();
+        auth.encode(&mut buf);
+
+        let expected = "f85b01940000000000000000000000000000000000000006c1011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
+        assert_eq!(hex::encode(&buf), expected);
+
+        let decoded = SignedAuthorization::decode(&mut buf.as_ref()).unwrap();
+        assert_eq!(buf.len(), auth.length());
+        assert_eq!(decoded, auth);
     }
 }
