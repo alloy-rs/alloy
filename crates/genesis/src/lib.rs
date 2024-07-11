@@ -255,7 +255,7 @@ impl GenesisAccount {
 /// Encapsulates parameters shaping network evolution and behavior.
 ///
 /// See [geth's `ChainConfig`
-/// struct](https://github.com/ethereum/go-ethereum/blob/64dccf7aa411c5c7cd36090c3d9b9892945ae813/params/config.go#L349)
+/// struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/params/config.go#L326)
 /// for the source of each field.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -286,10 +286,6 @@ pub struct ChainConfig {
         deserialize_with = "alloy_serde::quantity::opt::deserialize"
     )]
     pub eip150_block: Option<u64>,
-
-    /// The [EIP-150](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md) hard fork hash.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip150_hash: Option<B256>,
 
     /// The [EIP-155](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md) hard fork block.
     #[serde(
@@ -528,7 +524,6 @@ impl Default for ChainConfig {
             dao_fork_block: None,
             dao_fork_support: false,
             eip150_block: None,
-            eip150_hash: None,
             eip155_block: None,
             eip158_block: None,
             byzantium_block: None,
@@ -987,7 +982,6 @@ mod tests {
         "chainId": 1337,
         "homesteadBlock": 0,
         "eip150Block": 0,
-        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "eip155Block": 0,
         "eip158Block": 0,
         "byzantiumBlock": 0,
@@ -1020,9 +1014,6 @@ mod tests {
         let expected_genesis = Genesis {
             config: ChainConfig {
                 chain_id: 1337,
-                eip150_hash: Some(
-                    hex!("0000000000000000000000000000000000000000000000000000000000000000").into(),
-                ),
                 homestead_block: Some(0),
                 eip150_block: Some(0),
                 eip155_block: Some(0),
@@ -1065,7 +1056,6 @@ mod tests {
         "chainId": 1337,
         "homesteadBlock": 0,
         "eip150Block": 0,
-        "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "eip155Block": 0,
         "eip158Block": 0,
         "byzantiumBlock": 0,
@@ -1097,9 +1087,6 @@ mod tests {
         let expected_genesis = Genesis {
             config: ChainConfig {
                 chain_id: 1337,
-                eip150_hash: Some(
-                    hex!("0000000000000000000000000000000000000000000000000000000000000000").into(),
-                ),
                 homestead_block: Some(0),
                 eip150_block: Some(0),
                 eip155_block: Some(0),
