@@ -88,7 +88,7 @@ impl SignedAuthorization {
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
-    fn decode_fields(buf: &mut &[u8]) -> RlpResult<SignedAuthorization> {
+    fn decode_fields(buf: &mut &[u8]) -> RlpResult<Self> {
         Ok(Self {
             inner: Authorization {
                 chain_id: Decodable::decode(buf)?,
@@ -114,7 +114,7 @@ impl Decodable for SignedAuthorization {
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        SignedAuthorization::decode_fields(buf)
+        Self::decode_fields(buf)
     }
 }
 
@@ -226,10 +226,7 @@ impl Encodable for OptionalNonce {
     }
 
     fn length(&self) -> usize {
-        match self.0 {
-            Some(nonce) => nonce.length() + length_of_length(nonce.length()),
-            None => 1,
-        }
+        self.map(|nonce| nonce.length() + length_of_length(nonce.length())).unwrap_or(1)
     }
 }
 
@@ -261,8 +258,7 @@ impl Deref for OptionalNonce {
 
 #[cfg(test)]
 mod tests {
-    use alloy_primitives::hex;
-    use alloy_primitives::Signature;
+    use alloy_primitives::{hex, Signature};
     use core::str::FromStr;
 
     use super::*;
