@@ -173,7 +173,6 @@ impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
         let parity = u.arbitrary::<Parity>()?;
 
         // TODO: find an easy way to generate random signatures
-        #[cfg(feature = "k256")]
         let signature = Signature::from_scalars_and_parity(
             <B256 as core::str::FromStr>::from_str(
                 "0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0",
@@ -183,14 +182,6 @@ impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
                 "0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05",
             )
             .unwrap(),
-            parity,
-        )
-        .map_err(|_| arbitrary::Error::IncorrectFormat)?;
-
-        #[cfg(not(feature = "k256"))]
-        let signature = Signature::from_rs_and_parity(
-            u.arbitrary::<alloy_primitives::U256>()?,
-            u.arbitrary::<alloy_primitives::U256>()?,
             parity,
         )
         .map_err(|_| arbitrary::Error::IncorrectFormat)?;
