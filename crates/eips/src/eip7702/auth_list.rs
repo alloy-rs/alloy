@@ -358,6 +358,7 @@ mod tests {
         assert_eq!(decoded, auth);
     }
 
+    #[cfg(feature = "k256")]
     #[test]
     fn test_arbitrary_auth() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured auth");
