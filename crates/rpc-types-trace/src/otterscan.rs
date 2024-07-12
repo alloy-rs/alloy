@@ -5,10 +5,13 @@
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{
+    de::{self, Unexpected},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 /// Operation type enum for `InternalOperation` struct
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OperationType {
     /// Operation Transfer
     OpTransfer = 0,
@@ -26,15 +29,28 @@ impl Serialize for OperationType {
     where
         S: Serializer,
     {
-        // Convert enum to u8, then to string
-        let value = match *self {
-            OperationType::OpTransfer => 0u8,
-            OperationType::OpSelfDestruct => 1u8,
-            OperationType::OpCreate => 2u8,
-            OperationType::OpCreate2 => 3u8,
-        };
+        serializer.serialize_u8(*self as u8)
+    }
+}
 
-        serializer.serialize_str(&value.to_string())
+// Implement Deserialize for OperationType
+impl<'de> Deserialize<'de> for OperationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize string, then parse it to u8
+        let value = u8::deserialize(deserializer)?;
+        match value {
+            0 => Ok(OperationType::OpTransfer),
+            1 => Ok(OperationType::OpSelfDestruct),
+            2 => Ok(OperationType::OpCreate),
+            3 => Ok(OperationType::OpCreate2),
+            other => Err(de::Error::invalid_value(
+                Unexpected::Unsigned(other as u64),
+                &"a valid OperationType",
+            )),
+        }
     }
 }
 
@@ -275,9 +291,20 @@ mod tests {
 
     #[test]
     fn test_serialize_operation_type() {
-        assert_eq!(serde_json::to_string(&OperationType::OpTransfer).unwrap(), "\"0\"");
-        assert_eq!(serde_json::to_string(&OperationType::OpSelfDestruct).unwrap(), "\"1\"");
-        assert_eq!(serde_json::to_string(&OperationType::OpCreate).unwrap(), "\"2\"");
-        assert_eq!(serde_json::to_string(&OperationType::OpCreate2).unwrap(), "\"3\"");
+        assert_eq!(serde_json::to_string(&OperationType::OpTransfer).unwrap(), "0");
+        assert_eq!(serde_json::to_string(&OperationType::OpSelfDestruct).unwrap(), "1");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate).unwrap(), "2");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate2).unwrap(), "3");
+    }
+
+    #[test]
+    fn test_deserialize_operation_type() {
+        assert_eq!(serde_json::from_str::<OperationType>("0").unwrap(), OperationType::OpTransfer);
+        assert_eq!(
+            serde_json::from_str::<OperationType>("1").unwrap(),
+            OperationType::OpSelfDestruct
+        );
+        assert_eq!(serde_json::from_str::<OperationType>("2").unwrap(), OperationType::OpCreate);
+        assert_eq!(serde_json::from_str::<OperationType>("3").unwrap(), OperationType::OpCreate2);
     }
 }
