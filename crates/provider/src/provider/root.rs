@@ -51,7 +51,7 @@ impl<N: Network> RootProvider<Http<reqwest::Client>, N> {
     }
 }
 
-impl<T: Transport, N: Network> RootProvider<T, N> {
+impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     /// Creates a new root provider from the given RPC client.
     pub fn new(client: RpcClient<T>) -> Self {
         Self { inner: Arc::new(RootProviderInner::new(client)) }
@@ -117,7 +117,8 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     #[inline]
     pub(crate) fn get_heart(&self) -> &HeartbeatHandle {
         self.inner.heart.get_or_init(|| {
-            let poller = ChainStreamPoller::from_root(self);
+            let poller: ChainStreamPoller<T, N> =
+                ChainStreamPoller::from_weak_client(self.inner.weak_client());
             // TODO: Can we avoid `Box::pin` here?
             Heartbeat::new(Box::pin(poller.into_stream())).spawn()
         })
@@ -138,8 +139,8 @@ impl<T, N> Clone for RootProviderInner<T, N> {
     }
 }
 
-impl<T, N> RootProviderInner<T, N> {
-    pub(crate) fn new(client: RpcClient<T>) -> Self {
+impl<T: Transport + Clone, N: Network> RootProviderInner<T, N> {
+    pub(crate) const fn new(client: RpcClient<T>) -> Self {
         Self { client, heart: OnceLock::new(), _network: PhantomData }
     }
 

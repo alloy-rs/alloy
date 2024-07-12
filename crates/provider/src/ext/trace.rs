@@ -3,8 +3,10 @@ use crate::{Provider, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_trace::parity::{
-    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
+use alloy_rpc_types_eth::Index;
+use alloy_rpc_types_trace::{
+    filter::TraceFilter,
+    parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -49,12 +51,30 @@ where
         hash: TxHash,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
+    /// Traces of the transaction on the given positions
+    ///
+    /// # Note
+    ///
+    /// This function accepts single index and build list with it under the hood because
+    /// trace_get method accepts list of indices but limits this list to len == 1.
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: usize,
+    ) -> TransportResult<LocalizedTransactionTrace>;
+
     /// Trace the given raw transaction.
     async fn trace_raw_transaction(
         &self,
         data: &[u8],
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults>;
+
+    /// Traces matching given filter.
+    async fn trace_filter(
+        &self,
+        tracer: &TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Trace all transactions in the given block.
     ///
@@ -112,12 +132,28 @@ where
         self.client().request("trace_transaction", (hash,)).await
     }
 
+    async fn trace_get(
+        &self,
+        hash: TxHash,
+        index: usize,
+    ) -> TransportResult<LocalizedTransactionTrace> {
+        // We are using `[index]` because API accepts a list, but only supports a single index
+        self.client().request("trace_get", (hash, (Index::from(index),))).await
+    }
+
     async fn trace_raw_transaction(
         &self,
         data: &[u8],
         trace_type: &[TraceType],
     ) -> TransportResult<TraceResults> {
         self.client().request("trace_rawTransaction", (data, trace_type)).await
+    }
+
+    async fn trace_filter(
+        &self,
+        tracer: &TraceFilter,
+    ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
+        self.client().request("trace_filter", (tracer,)).await
     }
 
     async fn trace_block(

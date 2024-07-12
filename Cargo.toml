@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 rust-version = "1.76"
 authors = ["Alloy Contributors"]
@@ -13,18 +13,19 @@ repository = "https://github.com/alloy-rs/alloy"
 exclude = ["benches/", "tests/"]
 
 [workspace.lints]
-rust.missing_debug_implementations = "warn"
-rust.missing_docs = "warn"
-rust.unreachable_pub = "warn"
-rust.unused_must_use = "deny"
-rust.rust_2018_idioms = "deny"
+rust.missing-debug-implementations = "warn"
+rust.missing-docs = "warn"
+rust.unreachable-pub = "warn"
+rust.unused-must-use = "deny"
+rust.rust-2018-idioms = "deny"
 rustdoc.all = "warn"
 
 [workspace.lints.clippy]
 all = "warn"
-missing_const_for_fn = "warn"
-use_self = "warn"
-option_if_let_else = "warn"
+missing-const-for-fn = "warn"
+use-self = "warn"
+option-if-let-else = "warn"
+redundant-clone = "warn"
 
 [workspace.metadata.docs.rs]
 all-features = true
@@ -47,6 +48,7 @@ alloy-rpc-types-anvil = { version = "0.1", path = "crates/rpc-types-anvil", defa
 alloy-rpc-types-beacon = { version = "0.1", path = "crates/rpc-types-beacon", default-features = false }
 alloy-rpc-types-engine = { version = "0.1", path = "crates/rpc-types-engine", default-features = false }
 alloy-rpc-types-eth = { version = "0.1", path = "crates/rpc-types-eth", default-features = false }
+alloy-rpc-types-mev = { version = "0.1", path = "crates/rpc-types-mev", default-features = false }
 alloy-rpc-types-trace = { version = "0.1", path = "crates/rpc-types-trace", default-features = false }
 alloy-rpc-types-txpool = { version = "0.1", path = "crates/rpc-types-txpool", default-features = false }
 alloy-rpc-types = { version = "0.1", path = "crates/rpc-types", default-features = false }
@@ -96,7 +98,10 @@ http-body-util = "0.1"
 tokio = "1"
 tokio-util = "0.7"
 tokio-stream = "0.1"
-rustls = { version = "0.23", default-features = false, features = ["std"] }
+rustls = { version = "0.23", default-features = false, features = [
+    "std",
+    "tls12",
+] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.23"
 tower = { version = "0.4", features = ["util"] }

@@ -20,6 +20,11 @@ mod debug;
 #[cfg(feature = "debug-api")]
 pub use debug::DebugApi;
 
+#[cfg(feature = "net-api")]
+mod net;
+#[cfg(feature = "net-api")]
+pub use net::NetApi;
+
 #[cfg(feature = "trace-api")]
 mod trace;
 #[cfg(feature = "trace-api")]

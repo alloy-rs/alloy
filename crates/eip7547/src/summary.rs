@@ -16,7 +16,7 @@ use std::fmt;
 /// follows:
 /// - `status`: `enum` - `"VALID" | "INVALID" | "SYNCING" | "ACCEPTED"`
 /// - `validationError`: `String|null` - a message providing additional details on the validation
-/// error if the payload is classified as `INVALID`.
+///   error if the payload is classified as `INVALID`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InclusionListStatusV1 {

@@ -7,6 +7,7 @@ sign-tag = true
 shared-version = true
 pre-release-commit-message = "chore: release {{version}}"
 tag-prefix = "" # tag only once instead of per every crate
+rate-limit.existing-packages = 50
 pre-release-hook = [
     "bash",
     "-c",

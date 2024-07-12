@@ -8,7 +8,7 @@ use std::fmt;
 /// A hex encoded or decimal index that's intended to be used as a rust index, hence it's
 /// deserialized into a `usize`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Index(usize);
+pub struct Index(pub usize);
 
 impl From<Index> for usize {
     fn from(idx: Index) -> Self {

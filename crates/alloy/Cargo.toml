@@ -58,10 +58,6 @@ alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
-# optional
-reqwest = { workspace = true, optional = true }
-hyper = { workspace = true, optional = true }
-
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
@@ -85,22 +81,32 @@ full = [
     "kzg",
     "network",
     "provider-http", # includes `providers`
-    "provider-ws", # includes `providers`
-    "provider-ipc", # includes `providers`
-    "rpc-types", # includes `rpc-types-eth`
-    "signer-local", # includes `signers`
+    "provider-ws",   # includes `providers`
+    "provider-ipc",  # includes `providers`
+    "rpc-types",     # includes `rpc-types-eth`
+    "signer-local",  # includes `signers`
 ]
 
 # configuration
 reqwest = [
-    "dep:reqwest",
     "alloy-rpc-client?/reqwest",
     "alloy-provider?/reqwest",
     "alloy-transport-http?/reqwest",
     "alloy-transport-http?/reqwest-default-tls",
 ]
+reqwest-rustls-tls = [
+    "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
+    "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-rustls-tls",
+]
+reqwest-native-tls = [
+    "alloy-rpc-client?/reqwest",
+    "alloy-provider?/reqwest",
+    "alloy-transport-http?/reqwest",
+    "alloy-transport-http?/reqwest-native-tls",
+]
 hyper = [
-    "dep:hyper",
     "alloy-rpc-client?/hyper",
     "alloy-provider?/hyper",
     "alloy-transport-http?/hyper",
@@ -111,17 +117,61 @@ wasm-bindgen = ["alloy-transport?/wasm-bindgen"]
 
 # general
 consensus = ["dep:alloy-consensus"]
-contract = ["dep:alloy-contract", "dyn-abi", "json-abi", "json", "sol-types"]
+contract = [
+    "dep:alloy-contract",
+    "providers",
+    "dyn-abi",
+    "json-abi",
+    "json",
+    "sol-types",
+]
 eips = ["dep:alloy-eips"]
 genesis = ["dep:alloy-genesis"]
 network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider"]
+providers = ["dep:alloy-provider", "rpc-client", "eips"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
+provider-admin-api = [
+    "providers",
+    "alloy-provider?/admin-api",
+    "rpc-types-admin",
+]
+provider-anvil-api = [
+    "providers",
+    "alloy-provider?/anvil-api",
+    "rpc-types-anvil",
+]
+provider-debug-api = [
+    "providers",
+    "alloy-provider?/debug-api",
+    "rpc-types-trace",
+]
+provider-engine-api = [
+    "providers",
+    "alloy-provider?/engine-api",
+    "rpc-types-engine",
+]
+provider-net-api = ["providers", "alloy-provider?/net-api"]
+provider-trace-api = [
+    "providers",
+    "alloy-provider?/trace-api",
+    "rpc-types-trace",
+]
+provider-txpool-api = [
+    "providers",
+    "alloy-provider?/txpool-api",
+    "rpc-types-txpool",
+]
+provider-anvil-node = [
+    "providers",
+    "provider-anvil-api",
+    "alloy-provider?/anvil-node",
+    "node-bindings",
+]
 
 # pubsub
 pubsub = [
@@ -218,6 +268,7 @@ arbitrary = [
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
+    "alloy-eips?/k256",
     "alloy-network?/k256",
     "alloy-rpc-types?/k256",
 ]

@@ -272,14 +272,16 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
+        // signature.
+        let signature = signature.with_parity_bool();
+
         let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
         self.encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 

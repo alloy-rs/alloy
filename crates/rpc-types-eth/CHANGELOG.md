@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
+
+### Features
+
+- Add helper to set both input and data fields ([#1019](https://github.com/alloy-rs/alloy/issues/1019))
+- [rpc-types-eth] Add more utils to `TransactionIndex` ([#1007](https://github.com/alloy-rs/alloy/issues/1007))
+- Add into transactions iterator ([#984](https://github.com/alloy-rs/alloy/issues/984))
+
+### Miscellaneous Tasks
+
+- Convert rcp-types-eth block Header to consensus Header ([#1014](https://github.com/alloy-rs/alloy/issues/1014))
+- Make wrapped index value pub ([#988](https://github.com/alloy-rs/alloy/issues/988))
+
+### Other
+
+- Add range test in `FilterBlockOption` ([#939](https://github.com/alloy-rs/alloy/issues/939))
+
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Features
+
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+- [contract] Implement Filter's builder methods on Event ([#960](https://github.com/alloy-rs/alloy/issues/960))
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+- Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
 ### Documentation
@@ -20,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
 - [rpc-types] Remove duplicate `Index` definition in `rpc-types-anvil` in favor of the one in `rpc-types-eth` ([#943](https://github.com/alloy-rs/alloy/issues/943))
 - Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
 - Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))

@@ -2,6 +2,7 @@
 //! [`SidecarCoder`].
 //!
 //! [`SidecarCoder`]: crate::eip4844::builder::SidecarCoder
+
 use crate::eip4844::USABLE_BITS_PER_FIELD_ELEMENT;
 
 /// Determine whether a slice of bytes can be contained in a field element.

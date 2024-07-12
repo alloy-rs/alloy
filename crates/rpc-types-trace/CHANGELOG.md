@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
+
+### Bug Fixes
+
+- Ots_getContractCreater has field hash instead of tx ([#999](https://github.com/alloy-rs/alloy/issues/999))
+
+### Features
+
+- [otterscan] Add output for TraceEntry ([#1001](https://github.com/alloy-rs/alloy/issues/1001))
+- Add helpers for trace action ([#982](https://github.com/alloy-rs/alloy/issues/982))
+
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
 ### Documentation
@@ -18,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
 - Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
 - Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
 

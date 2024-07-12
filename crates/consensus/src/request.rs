@@ -30,7 +30,7 @@ pub enum Request {
     WithdrawalRequest(WithdrawalRequest),
     /// An [EIP-7251] consolidation request.
     ///
-    /// [EIP-7251]: https://eips.ethereum.org/EIPS/eip-7002
+    /// [EIP-7251]: https://eips.ethereum.org/EIPS/eip-7251
     ConsolidationRequest(ConsolidationRequest),
 }
 

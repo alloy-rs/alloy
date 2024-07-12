@@ -9,7 +9,7 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, TxHash, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -49,6 +49,12 @@ pub trait ReceiptResponse {
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
     /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
     fn status(&self) -> bool;
+
+    /// Hash of the block this transaction was included within.
+    fn block_hash(&self) -> Option<BlockHash>;
+
+    /// Number of the block this transaction was included within.
+    fn block_number(&self) -> Option<u64>;
 }
 
 /// Transaction Response
@@ -72,6 +78,10 @@ pub trait TransactionResponse {
 
     /// Gas limit
     fn gas(&self) -> u128;
+
+    /// Input data
+    #[doc(alias = "calldata")]
+    fn input(&self) -> &Bytes;
 }
 
 /// Captures type info for network-specific RPC requests/responses.

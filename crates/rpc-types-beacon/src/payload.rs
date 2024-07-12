@@ -9,7 +9,10 @@
 //! See also <https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/beacon-chain.md#executionpayload>
 
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
-use alloy_eips::{eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest};
+use alloy_eips::{
+    eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest,
+    eip7251::ConsolidationRequest,
+};
 use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
@@ -473,23 +476,39 @@ struct BeaconExecutionPayloadV4<'a> {
     payload_inner: BeaconExecutionPayloadV3<'a>,
     deposit_requests: Vec<DepositRequest>,
     withdrawal_requests: Vec<WithdrawalRequest>,
+    consolidation_requests: Vec<ConsolidationRequest>,
 }
 
 impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
-        let BeaconExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } =
-            payload;
-        Self { payload_inner: payload_inner.into(), deposit_requests, withdrawal_requests }
+        let BeaconExecutionPayloadV4 {
+            payload_inner,
+            deposit_requests,
+            withdrawal_requests,
+            consolidation_requests,
+        } = payload;
+        Self {
+            payload_inner: payload_inner.into(),
+            deposit_requests,
+            withdrawal_requests,
+            consolidation_requests,
+        }
     }
 }
 
 impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
     fn from(value: &'a ExecutionPayloadV4) -> Self {
-        let ExecutionPayloadV4 { payload_inner, deposit_requests, withdrawal_requests } = value;
+        let ExecutionPayloadV4 {
+            payload_inner,
+            deposit_requests,
+            withdrawal_requests,
+            consolidation_requests,
+        } = value;
         BeaconExecutionPayloadV4 {
             payload_inner: payload_inner.into(),
             deposit_requests: deposit_requests.clone(),
             withdrawal_requests: withdrawal_requests.clone(),
+            consolidation_requests: consolidation_requests.clone(),
         }
     }
 }
