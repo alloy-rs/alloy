@@ -140,6 +140,12 @@ impl From<Rich<Block>> for BlockDetails {
     }
 }
 
+impl BlockDetails {
+    pub fn new(rich_block: Rich<Block>, issuance: InternalIssuance, total_fees: U256) -> Self {
+        Self { block: rich_block.inner.into(), issuance, total_fees }
+    }
+}
+
 /// Custom transaction receipt struct for otterscan `OtsBlockTransactions` struct
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
