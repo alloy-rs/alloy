@@ -3,8 +3,8 @@
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
-use alloy_primitives::{Address, Bloom, Bytes, TxHash, U256};
-use alloy_rpc_types_eth::{Block, Rich, Transaction, TransactionReceipt};
+use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
+use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
 use serde::{Deserialize, Serialize};
 
 /// Operation type enum for `InternalOperation` struct
@@ -83,12 +83,45 @@ impl From<Block> for OtsBlock {
     }
 }
 
+/// Custom `Block` struct that without transactions for Otterscan responses
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtsSlimBlock {
+    /// Header of the block.
+    #[serde(flatten)]
+    pub header: Header,
+    /// Uncles' hashes.
+    #[serde(default)]
+    pub uncles: Vec<B256>,
+    /// Integer the size of this block in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<U256>,
+    /// Withdrawals in the block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawals: Option<Vec<Withdrawal>>,
+    /// The number of transactions in the block.
+    #[doc(alias = "tx_count")]
+    pub transaction_count: usize,
+}
+
+impl From<Block> for OtsSlimBlock {
+    fn from(block: Block) -> Self {
+        Self {
+            header: block.header,
+            uncles: block.uncles,
+            size: block.size,
+            withdrawals: block.withdrawals,
+            transaction_count: block.transactions.len(),
+        }
+    }
+}
+
 /// Custom struct for otterscan `getBlockDetails` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockDetails {
     /// The block information with transaction count.
-    pub block: OtsBlock,
+    pub block: OtsSlimBlock,
     /// The issuance information for the block.
     pub issuance: InternalIssuance,
     /// The total fees for the block.
