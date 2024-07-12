@@ -1,3 +1,5 @@
+//! 'eth_simulateV1' Request / Response types
+
 use alloy_primitives::{Bytes, Log, B256, U64};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, Header, TransactionRequest};
 use serde::{Deserialize, Serialize};
@@ -61,7 +63,7 @@ pub struct Simulator {
     // state          *state.StateDB
     /// The base block header from which the simulation starts.
     pub base: Header,
-    /// 
+    /// Indicates whether ERC20/ERC721 token transfers are traced.
     pub trace_transfers: bool,
     /// Indicates whether transaction validation is performed.
     pub validate: bool,
