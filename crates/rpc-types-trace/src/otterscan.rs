@@ -42,10 +42,10 @@ impl<'de> Deserialize<'de> for OperationType {
         // Deserialize string, then parse it to u8
         let value = u8::deserialize(deserializer)?;
         match value {
-            0 => Ok(OperationType::OpTransfer),
-            1 => Ok(OperationType::OpSelfDestruct),
-            2 => Ok(OperationType::OpCreate),
-            3 => Ok(OperationType::OpCreate2),
+            0 => Ok(Self::OpTransfer),
+            1 => Ok(Self::OpSelfDestruct),
+            2 => Ok(Self::OpCreate),
+            3 => Ok(Self::OpCreate2),
             other => Err(de::Error::invalid_value(
                 Unexpected::Unsigned(other as u64),
                 &"a valid OperationType",
@@ -173,6 +173,7 @@ impl From<Rich<Block>> for BlockDetails {
 }
 
 impl BlockDetails {
+    /// Create a new `BlockDetails` struct.
     pub fn new(rich_block: Rich<Block>, issuance: InternalIssuance, total_fees: U256) -> Self {
         Self { block: rich_block.inner.into(), issuance, total_fees }
     }
