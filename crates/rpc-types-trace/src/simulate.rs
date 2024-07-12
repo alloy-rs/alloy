@@ -4,6 +4,9 @@ use alloy_primitives::{Bytes, Log, B256, U64};
 use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, Header, TransactionRequest};
 use serde::{Deserialize, Serialize};
 
+/// The maximum number of blocks that can be simulated in a single request,
+pub const MAX_SIMULATE_BLOCKS: U64 = U64::from_limbs([256_u64]);
+
 /// Represents a batch of calls to be simulated sequentially within a block.
 /// This struct includes block and state overrides as well as the transaction requests to be
 /// executed.
