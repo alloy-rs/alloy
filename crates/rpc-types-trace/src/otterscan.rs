@@ -5,10 +5,10 @@
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
 use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 /// Operation type enum for `InternalOperation` struct
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub enum OperationType {
     /// Operation Transfer
     OpTransfer = 0,
@@ -18,6 +18,24 @@ pub enum OperationType {
     OpCreate = 2,
     /// Operation Create2
     OpCreate2 = 3,
+}
+
+// Implement Serialize for OperationType
+impl Serialize for OperationType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Convert enum to u8, then to string
+        let value = match *self {
+            OperationType::OpTransfer => 0u8,
+            OperationType::OpSelfDestruct => 1u8,
+            OperationType::OpCreate => 2u8,
+            OperationType::OpCreate2 => 3u8,
+        };
+
+        serializer.serialize_str(&value.to_string())
+    }
 }
 
 /// Custom struct for otterscan `getInternalOperations` RPC response
@@ -242,5 +260,24 @@ mod tests {
         }"#;
 
         let _receipt: OtsTransactionReceipt = serde_json::from_str(s).unwrap();
+    }
+
+    #[test]
+    fn test_otterscan_interal_operation() {
+        let s = r#"{
+          "type": 0,
+          "from": "0xea593b730d745fb5fe01b6d20e6603915252c6bf",
+          "to": "0xcc3d455481967dc97346ef1771a112d7a14c8f12",
+          "value": "0xee846f9305c00"
+        }"#;
+        let _op: InternalOperation = serde_json::from_str(s).unwrap();
+    }
+
+    #[test]
+    fn test_serialize_operation_type() {
+        assert_eq!(serde_json::to_string(&OperationType::OpTransfer).unwrap(), "\"0\"");
+        assert_eq!(serde_json::to_string(&OperationType::OpSelfDestruct).unwrap(), "\"1\"");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate).unwrap(), "\"2\"");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate2).unwrap(), "\"3\"");
     }
 }
