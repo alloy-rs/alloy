@@ -25,7 +25,6 @@ alloy-serde.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true
-serde_repr.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
