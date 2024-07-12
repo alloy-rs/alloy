@@ -136,6 +136,7 @@ serde = { version = "1.0", default-features = false, features = [
 ] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = "3.3.0"
+serde_repr = "0.1"
 
 ## misc-testing
 arbitrary = "1.3"
