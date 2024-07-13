@@ -219,6 +219,7 @@ impl RecoveredAuthorization {
     }
 }
 
+#[cfg(feature = "k256")]
 impl TryFrom<SignedAuthorization> for RecoveredAuthorization {
     type Error = alloy_primitives::SignatureError;
 
