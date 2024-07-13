@@ -10,10 +10,13 @@ use std::{
 
 /// This includes general information about a running node, spanning networking and protocol
 /// details.
+///
+/// See [geth's `NodeInfo` struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/p2p/server.go#L1078)
+/// for the source of each field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInfo {
-    /// Unique node identifier.
-    pub id: B256,
+    /// Unique node identifier(also the encryption key).
+    pub id: String,
     /// The node's user agent, containing a client name, version, OS, and other metadata.
     pub name: String,
     /// The enode URL of the connected node.
