@@ -157,9 +157,11 @@ impl SignedAuthorization {
 
     /// Recover the authority and transform the signed authorization into a
     /// [`RecoveredAuthorization`].
-    pub fn into_recovered(self) -> RecoveredAuthorization {
-        let authority = self.recover_authority().ok();
-        RecoveredAuthorization { inner: self.inner, authority }
+    pub fn try_into_recovered(
+        self,
+    ) -> Result<RecoveredAuthorization, alloy_primitives::SignatureError> {
+        let authority = self.recover_authority()?;
+        Ok(RecoveredAuthorization { inner: self.inner, authority })
     }
 }
 
@@ -197,20 +199,31 @@ impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
 pub struct RecoveredAuthorization {
     #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
-    authority: Option<Address>,
+    authority: Address,
 }
 
 impl RecoveredAuthorization {
+    /// Instantiate without performing recovery. This should be used carefully.
+    pub const fn new_unchecked(inner: Authorization, authority: Address) -> Self {
+        Self { inner, authority }
+    }
+
     /// Get the `authority` for the authorization.
-    ///
-    /// If this is `None`, then the authority could not be recovered.
-    pub const fn authority(&self) -> Option<Address> {
+    pub const fn authority(&self) -> Address {
         self.authority
     }
 
     /// Splits the authorization into parts.
-    pub const fn into_parts(self) -> (Authorization, Option<Address>) {
+    pub const fn into_parts(self) -> (Authorization, Address) {
         (self.inner, self.authority)
+    }
+}
+
+impl TryFrom<SignedAuthorization> for RecoveredAuthorization {
+    type Error = alloy_primitives::SignatureError;
+
+    fn try_from(value: SignedAuthorization) -> Result<Self, Self::Error> {
+        value.try_into_recovered()
     }
 }
 
