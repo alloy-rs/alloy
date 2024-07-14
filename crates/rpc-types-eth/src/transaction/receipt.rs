@@ -59,7 +59,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub state_root: Option<B256>,
     /// The authorization list is a list of tuples that store the address to code which the signer
     /// desires to execute in the context of their EOA.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_list: Option<Vec<Authorization>>,
 }
 
