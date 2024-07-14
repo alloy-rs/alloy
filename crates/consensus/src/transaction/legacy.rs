@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "LegacyTransaction", alias = "TransactionLegacy", alias = "LegacyTx")]
