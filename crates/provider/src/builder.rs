@@ -346,6 +346,11 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
+type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
+
+#[cfg(any(test, feature = "anvil-node"))]
+type AnvilProviderResult<T> = Result<T, alloy_node_bindings::anvil::AnvilError>;
+
 // Enabled when the `anvil` feature is enabled, or when both in test and the
 // `reqwest` feature is enabled.
 #[cfg(any(test, feature = "anvil-node"))]
@@ -371,12 +376,11 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> Result<
-        <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
+    ) -> AnvilProviderResult<
+        <JoinedEthereumWalletFiller<F> as ProviderLayer<
             L::Provider,
             alloy_transport_http::Http<reqwest::Client>,
         >>::Provider,
-        alloy_node_bindings::anvil::AnvilError,
     >
     where
         F: TxFiller<Ethereum>
@@ -422,12 +426,11 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> Result<
-        <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
+    ) -> AnvilProviderResult<
+        <JoinedEthereumWalletFiller<F> as ProviderLayer<
             L::Provider,
             alloy_transport_http::Http<reqwest::Client>,
         >>::Provider,
-        alloy_node_bindings::anvil::AnvilError,
     >
     where
         F: TxFiller<Ethereum>
