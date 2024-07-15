@@ -39,7 +39,7 @@ impl Authorization {
     }
 
     /// Get the `nonce` for the authorization.
-    pub fn nonce(&self) -> u64 {
+    pub const fn nonce(&self) -> u64 {
         self.nonce
     }
 
