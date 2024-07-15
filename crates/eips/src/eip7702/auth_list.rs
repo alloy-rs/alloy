@@ -270,7 +270,7 @@ mod tests {
         let mut buf = Vec::new();
         auth.encode(&mut buf);
 
-        let expected = "f85b01940000000000000000000000000000000000000006c1011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
+        let expected = "f85a01940000000000000000000000000000000000000006011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
         assert_eq!(hex::encode(&buf), expected);
 
         let decoded = SignedAuthorization::decode(&mut buf.as_ref()).unwrap();
