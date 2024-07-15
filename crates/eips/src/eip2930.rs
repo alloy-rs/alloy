@@ -19,6 +19,7 @@ pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
+    #[serde(default)]
     pub storage_keys: Vec<B256>,
 }
 
