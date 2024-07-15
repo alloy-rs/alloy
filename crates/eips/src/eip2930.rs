@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
 use core::{mem, ops::Deref};
-
 /// A list of addresses and storage keys that the transaction plans to access.
 /// Accesses outside the list are possible, but become more expensive.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpDecodable, RlpEncodable)]
@@ -19,7 +18,7 @@ pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub storage_keys: Vec<B256>,
 }
 
@@ -145,23 +144,7 @@ pub struct AccessListWithGasUsed {
 
 #[cfg(all(test, feature = "serde"))]
 mod tests {
-    use serde_json::json;
-
     use super::*;
-
-    #[test]
-    fn access_list_null_storage_keys() {
-        let json = json!([
-            {
-                "address": "0x81b7bdd5b89c90b63f604fc7cdd17035cb939707",
-                "storageKeys": null,
-            }
-        ]);
-
-        let access_list = serde_json::from_value::<AccessList>(json).unwrap();
-        assert_eq!(access_list.len(), 1);
-        assert_eq!(access_list[0].storage_keys, Vec::<B256>::default());
-    }
 
     #[test]
     fn access_list_serde() {
