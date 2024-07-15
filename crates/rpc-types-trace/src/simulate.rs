@@ -5,7 +5,7 @@ use alloy_rpc_types_eth::{state::StateOverride, BlockOverrides, Header, Transact
 use serde::{Deserialize, Serialize};
 
 /// The maximum number of blocks that can be simulated in a single request,
-pub const MAX_SIMULATE_BLOCKS: U64 = U64::from_limbs([256_u64]);
+pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 
 /// Represents a batch of calls to be simulated sequentially within a block.
 /// This struct includes block and state overrides as well as the transaction requests to be
@@ -32,8 +32,9 @@ pub struct SimCallResult {
     pub logs: Vec<Log>,
     /// The amount of gas used by the transaction.
     pub gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
     /// The final status of the transaction, typically indicating success or failure.
-    pub status: U64,
+    pub status: u64,
     //what we should use here ?
     //Error       *callError     `json:"error,omitempty"`
 }
@@ -55,7 +56,8 @@ pub struct SimOpts {
 }
 
 /// Represents a simulator backend to handle state and transaction processing.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Simulator {
     //What we should use here for backend ?
     //b              Backend
