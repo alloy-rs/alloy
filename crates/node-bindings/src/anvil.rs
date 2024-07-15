@@ -119,6 +119,10 @@ pub enum AnvilError {
     /// An error occurred while parsing a hex string.
     #[error(transparent)]
     FromHexError(#[from] hex::FromHexError),
+
+    /// No keys available in anvil instance.
+    #[error("no keys available in anvil instance")]
+    NoKeysAvailable,
 }
 
 /// Builder for launching `anvil`.
