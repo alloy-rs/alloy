@@ -1,7 +1,7 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256, U64};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::OtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
@@ -608,11 +608,16 @@ pub struct BlockOverrides {
     pub difficulty: Option<U256>,
     /// Overrides the timestamp of the block.
     // Note: geth uses `time`, erigon uses `timestamp`
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timestamp")]
-    pub time: Option<U64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timestamp",
+        with = "alloy_serde::quantity::opt"
+    )]
+    pub time: Option<u64>,
     /// Overrides the gas limit of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub gas_limit: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
