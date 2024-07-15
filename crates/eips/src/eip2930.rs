@@ -19,8 +19,6 @@ pub struct AccessListItem {
     /// Account addresses that would be loaded at the start of execution
     pub address: Address,
     /// Keys of storage that would be loaded at the start of execution
-    // In JSON, we have to accept `null` for storage key, which is interpreted as an empty array.
-    #[cfg_attr(feature = "serde", serde(deserialize_with = "alloy_serde::null_as_default"))]
     pub storage_keys: Vec<B256>,
 }
 
