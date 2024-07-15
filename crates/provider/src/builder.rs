@@ -418,7 +418,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     }
 
     /// Build this provider with anvil, using an Reqwest HTTP transport.
-    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.`
+    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
