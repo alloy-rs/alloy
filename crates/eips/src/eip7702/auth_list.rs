@@ -236,6 +236,7 @@ impl Deref for RecoveredAuthorization {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, Signature};
+    use arbitrary::Arbitrary;
     use core::str::FromStr;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
