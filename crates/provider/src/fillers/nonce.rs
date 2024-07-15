@@ -191,7 +191,8 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let provider = ProviderBuilder::new().with_nonce_management().on_anvil_with_wallet();
+        let provider =
+            ProviderBuilder::new().with_nonce_management().on_anvil_with_wallet().unwrap();
 
         let from = provider.default_signer_address();
         let tx = TransactionRequest {

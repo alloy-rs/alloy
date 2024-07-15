@@ -1352,7 +1352,8 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_by_hash() {
         init_tracing();
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet().unwrap();
 
         let req = TransactionRequest::default()
             .from(provider.default_signer_address())

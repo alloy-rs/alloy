@@ -259,7 +259,8 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet().unwrap();
         let from = provider.default_signer_address();
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
@@ -280,7 +281,8 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        let provider =
+            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet().unwrap();
 
         let from = provider.default_signer_address();
 
