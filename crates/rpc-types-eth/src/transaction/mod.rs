@@ -322,7 +322,7 @@ mod tests {
             authorization_list: Some(vec![(Authorization {
                 chain_id: 1u64,
                 address: Address::left_padding_from(&[6]),
-                nonce: Some(1u64).into(),
+                nonce: 1u64,
             })
             .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
             other: Default::default(),
@@ -366,7 +366,7 @@ mod tests {
             authorization_list: Some(vec![(Authorization {
                 chain_id: 1u64,
                 address: Address::left_padding_from(&[6]),
-                nonce: Some(1u64).into(),
+                nonce: 1u64,
             })
             .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
             other: Default::default(),
