@@ -1,6 +1,6 @@
 //! Misc Optimism-specific types.
 
-use alloy_primitives::{B256, U128};
+use alloy_primitives::B256;
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
@@ -12,8 +12,13 @@ pub struct OptimismTransactionFields {
     #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
     pub source_hash: Option<B256>,
     /// The ETH value to mint on L2
-    #[serde(rename = "mint", skip_serializing_if = "Option::is_none")]
-    pub mint: Option<U128>,
+    #[serde(
+        default,
+        rename = "mint",
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::quantity::opt"
+    )]
+    pub mint: Option<u128>,
     /// Field indicating whether the transaction is a system transaction, and therefore
     /// exempt from the L2 gas limit.
     #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
