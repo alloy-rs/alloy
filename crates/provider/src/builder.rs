@@ -8,7 +8,6 @@ use crate::{
 };
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
-use alloy_node_bindings::anvil::AnvilError;
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
@@ -377,7 +376,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             L::Provider,
             alloy_transport_http::Http<reqwest::Client>,
         >>::Provider,
-        AnvilError,
+        alloy_node_bindings::anvil::AnvilError,
     >
     where
         F: TxFiller<Ethereum>
@@ -428,7 +427,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             L::Provider,
             alloy_transport_http::Http<reqwest::Client>,
         >>::Provider,
-        AnvilError,
+        alloy_node_bindings::anvil::AnvilError,
     >
     where
         F: TxFiller<Ethereum>
@@ -445,8 +444,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let url = anvil_layer.endpoint_url();
 
         let default_keys = anvil_layer.instance().keys().to_vec();
-        let (default_key, remaining_keys) =
-            default_keys.split_first().ok_or(AnvilError::NoKeysAvailable)?;
+        let (default_key, remaining_keys) = default_keys
+            .split_first()
+            .ok_or(alloy_node_bindings::anvil::AnvilError::NoKeysAvailable)?;
 
         let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone());
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);
