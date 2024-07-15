@@ -75,6 +75,7 @@ impl Authorization {
 pub struct SignedAuthorization {
     #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
+    #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Signature,
 }
 
