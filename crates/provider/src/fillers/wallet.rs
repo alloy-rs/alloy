@@ -113,7 +113,7 @@ mod tests {
 
     #[tokio::test]
     async fn poc() {
-        let provider = ProviderBuilder::new().on_anvil_with_wallet().unwrap();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
 
         let tx = TransactionRequest {
             nonce: Some(0),

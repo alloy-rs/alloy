@@ -232,8 +232,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_transaction() {
         init_tracing();
-        let provider =
-            ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet().unwrap();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
         let from = provider.default_signer_address();
 
         let gas_price = provider.get_gas_price().await.unwrap();
@@ -259,7 +258,7 @@ mod test {
     #[tokio::test]
     async fn test_debug_trace_call() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_anvil_with_wallet().unwrap();
+        let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let from = provider.default_signer_address();
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest::default()
