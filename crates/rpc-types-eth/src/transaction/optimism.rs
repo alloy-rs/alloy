@@ -1,6 +1,6 @@
 //! Misc Optimism-specific types.
 
-use alloy_primitives::{B256, U128, U64};
+use alloy_primitives::{B256, U128};
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
@@ -27,11 +27,11 @@ pub struct OptimismTransactionFields {
 #[doc(alias = "OptimismTxReceiptFields")]
 pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposit_nonce: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub deposit_nonce: Option<u64>,
     /// Deposit receipt version for deposit transactions post-canyon
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposit_receipt_version: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub deposit_receipt_version: Option<u64>,
     /// L1 fee for the transaction
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub l1_fee: Option<u128>,
