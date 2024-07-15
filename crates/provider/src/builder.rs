@@ -8,9 +8,9 @@ use crate::{
 };
 use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
+use alloy_node_bindings::anvil::AnvilError;
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
-
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -372,10 +372,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
-        L::Provider,
-        alloy_transport_http::Http<reqwest::Client>,
-    >>::Provider
+    ) -> Result<
+        <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
+            L::Provider,
+            alloy_transport_http::Http<reqwest::Client>,
+        >>::Provider,
+        AnvilError,
+    >
     where
         F: TxFiller<Ethereum>
             + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
@@ -420,10 +423,13 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     pub fn on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
-    ) -> <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
-        L::Provider,
-        alloy_transport_http::Http<reqwest::Client>,
-    >>::Provider
+    ) -> Result<
+        <JoinFill<F, WalletFiller<alloy_network::EthereumWallet>> as ProviderLayer<
+            L::Provider,
+            alloy_transport_http::Http<reqwest::Client>,
+        >>::Provider,
+        AnvilError,
+    >
     where
         F: TxFiller<Ethereum>
             + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
@@ -439,7 +445,8 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let url = anvil_layer.endpoint_url();
 
         let default_keys = anvil_layer.instance().keys().to_vec();
-        let (default_key, remaining_keys) = default_keys.split_first().expect("no keys available");
+        let (default_key, remaining_keys) =
+            default_keys.split_first().ok_or(AnvilError::NoKeysAvailable)?;
 
         let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone());
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);
@@ -448,7 +455,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
         });
 
-        self.wallet(wallet).layer(anvil_layer).on_http(url)
+        Ok(self.wallet(wallet).layer(anvil_layer).on_http(url))
     }
 }
 
