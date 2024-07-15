@@ -376,12 +376,10 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
     /// use in tests.
     pub fn on_anvil_with_wallet(
         self,
-    ) -> AnvilProviderResult<
-        <JoinedEthereumWalletFiller<F> as ProviderLayer<
-            L::Provider,
-            alloy_transport_http::Http<reqwest::Client>,
-        >>::Provider,
-    >
+    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<
+        L::Provider,
+        alloy_transport_http::Http<reqwest::Client>,
+    >>::Provider
     where
         F: TxFiller<Ethereum>
             + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
@@ -419,11 +417,34 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         self.layer(anvil_layer).on_http(url)
     }
 
+    /// Build this provider with anvil, using an Reqwest HTTP transport.
+    /// This calls `try_on_anvil_with_wallet_and_config` and panics on error.`
+    pub fn on_anvil_with_wallet_and_config(
+        self,
+        f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
+    ) -> <JoinedEthereumWalletFiller<F> as ProviderLayer<
+        L::Provider,
+        alloy_transport_http::Http<reqwest::Client>,
+    >>::Provider
+    where
+        F: TxFiller<Ethereum>
+            + ProviderLayer<L::Provider, alloy_transport_http::Http<reqwest::Client>, Ethereum>,
+        L: crate::builder::ProviderLayer<
+            crate::layers::AnvilProvider<
+                crate::provider::RootProvider<alloy_transport_http::Http<reqwest::Client>>,
+                alloy_transport_http::Http<reqwest::Client>,
+            >,
+            alloy_transport_http::Http<reqwest::Client>,
+        >,
+    {
+        self.try_on_anvil_with_wallet_and_config(f).unwrap()
+    }
+
     /// Build this provider with anvil, using an Reqwest HTTP transport. The
     /// given function is used to configure the anvil instance. This
     /// function configures a wallet backed by anvil keys, and is intended for
     /// use in tests.
-    pub fn on_anvil_with_wallet_and_config(
+    pub fn try_on_anvil_with_wallet_and_config(
         self,
         f: impl FnOnce(alloy_node_bindings::Anvil) -> alloy_node_bindings::Anvil,
     ) -> AnvilProviderResult<
