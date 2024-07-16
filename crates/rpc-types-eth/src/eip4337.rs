@@ -8,6 +8,10 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConditionalOptions {
+    /// A map of account addresses to their expected storage states.
+    /// Each account can have a specified storage root or explicit slot-value pairs.
+    #[serde(default)]
+    pub known_accounts: HashMap<Address, AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -24,10 +28,6 @@ pub struct ConditionalOptions {
     /// `None` indicates no maximum timestamp constraint.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timestamp_max: Option<u64>,
-    /// A map of account addresses to their expected storage states.
-    /// Each account can have a specified storage root or explicit slot-value pairs.
-    #[serde(default)]
-    pub known_accounts: HashMap<Address, AccountStorage>,
 }
 
 /// Represents the expected state of an account for a transaction to be conditionally accepted.
