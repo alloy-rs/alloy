@@ -305,6 +305,16 @@ impl TransactionRequest {
         Ok(TxEip4844WithSidecar { sidecar, tx: self.build_4844_without_sidecar()? })
     }
 
+    /// Build an EIP-7702 transaction.
+    ///
+    /// # Panics
+    ///
+    /// If required fields are missing. Use `complete_7702` to check if the
+    /// request can be built.
+    fn build_7702(self) -> Result<TxEip7702, &'static str> {
+        todo!()
+    }
+
     fn check_reqd_fields(&self) -> Vec<&'static str> {
         let mut missing = Vec::with_capacity(12);
         if self.nonce.is_none() {
@@ -401,7 +411,7 @@ impl TransactionRequest {
             TxType::Eip2930 => self.complete_2930(),
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),
-            TxType::Eip7702 => todo!(),
+            TxType::Eip7702 => self.complete_7702(),
         } {
             Err((pref, missing))
         } else {
@@ -465,6 +475,12 @@ impl TransactionRequest {
         }
     }
 
+    /// Check if all necessary keys are present to build a 7702 transaction,
+    /// returning a list of keys that are missing.
+    pub fn complete_7702(&self) -> Result<(), Vec<&'static str>> {
+        todo!()
+    }
+
     /// Check if all necessary keys are present to build a legacy transaction,
     /// returning a list of keys that are missing.
     pub fn complete_legacy(&self) -> Result<(), Vec<&'static str>> {
@@ -487,7 +503,7 @@ impl TransactionRequest {
             TxType::Eip2930 => self.complete_2930().ok(),
             TxType::Eip1559 => self.complete_1559().ok(),
             TxType::Eip4844 => self.complete_4844().ok(),
-            TxType::Eip7702 => todo!(),
+            TxType::Eip7702 => self.complete_7702().ok(),
         }?;
         Some(pref)
     }
@@ -509,7 +525,7 @@ impl TransactionRequest {
             TxType::Eip1559 => self.build_1559().expect("checked)").into(),
             // `sidecar` is a hard requirement since this must be a _sendable_ transaction.
             TxType::Eip4844 => self.build_4844_with_sidecar().expect("checked)").into(),
-            TxType::Eip7702 => todo!(),
+            TxType::Eip7702 => self.build_7702().expect("checked)").into(),
         })
     }
 
