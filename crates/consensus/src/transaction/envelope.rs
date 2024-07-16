@@ -480,11 +480,12 @@ mod tests {
     use alloy_eips::{
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
+        eip7702::Authorization,
     };
     use alloy_primitives::{hex, Address, Parity, Signature, U256};
     #[allow(unused_imports)]
     use alloy_primitives::{Bytes, TxKind};
-    use std::{fs, path::PathBuf, vec};
+    use std::{fs, path::PathBuf, str::FromStr, vec};
 
     #[cfg(not(feature = "std"))]
     use std::vec::Vec;
@@ -730,7 +731,30 @@ mod tests {
         test_encode_decode_roundtrip(tx, None);
     }
 
-    // TODO: Test for EIP-7702
+    #[test]
+    fn test_encode_decode_eip7702() {
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 2,
+            gas_limit: 3,
+            max_fee_per_gas: 4,
+            max_priority_fee_per_gas: 5,
+            to: Address::left_padding_from(&[5]).into(),
+            value: U256::from(6_u64),
+            input: vec![7].into(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::left_padding_from(&[8]),
+                storage_keys: vec![B256::left_padding_from(&[9])],
+            }]),
+            authorization_list: vec![(Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[10]),
+                nonce: Some(1u64).into(),
+            })
+            .into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],
+        };
+        test_encode_decode_roundtrip(tx, None);
+    }
 
     #[test]
     fn test_encode_decode_transaction_list() {
@@ -874,6 +898,32 @@ mod tests {
             },
             sidecar: Default::default(),
         });
+        test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde_roundtrip_eip7702() {
+        let tx = TxEip7702 {
+            chain_id: u64::MAX,
+            nonce: u64::MAX,
+            gas_limit: u128::MAX,
+            max_fee_per_gas: u128::MAX,
+            max_priority_fee_per_gas: u128::MAX,
+            to: Address::random().into(),
+            value: U256::MAX,
+            input: Bytes::new(),
+            access_list: AccessList(vec![AccessListItem {
+                address: Address::random(),
+                storage_keys: vec![B256::random()],
+            }]),
+            authorization_list: vec![(Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[1]),
+                nonce: Some(1u64).into(),
+            })
+            .into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],
+        };
         test_serde_roundtrip(tx);
     }
 }
