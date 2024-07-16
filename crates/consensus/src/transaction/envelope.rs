@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::{transaction::TxEip7702, Signed, Transaction, TxEip1559, TxEip2930, TxLegacy};
+use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};

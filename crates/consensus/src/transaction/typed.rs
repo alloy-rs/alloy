@@ -1,9 +1,6 @@
 use crate::{
-    transaction::{
-        eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-        TxEip7702,
-    },
-    Transaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType,
+    transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+    Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_primitives::{ChainId, TxKind};
 
