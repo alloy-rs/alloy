@@ -15,7 +15,7 @@ with JSON-RPC servers that provide the standard Ethereum RPC endpoints, or the
 [alloy-rpc-client] crate, which provides a low-level JSON-RPC API without the
 specific Ethereum endpoints.
 
-[alloy-provider]: https://alloy-rs.github.io/alloy/alloy_provider/index.html
+[alloy-provider]: https://docs.rs/alloy_provider/
 [tower `Service`]: https://docs.rs/tower/latest/tower/trait.Service.html
 
 ### Transports
@@ -27,7 +27,7 @@ Alloy maintains the following transports:
     [alloy-pubsub].
 - [alloy-transport-ipc]: JSON-RPC via IPC, supports pubsub via [alloy-pubsub].
 
-[alloy-transport-http]: https://alloy-rs.github.io/alloy/alloy_transport_http/index.html
-[alloy-transport-ws]: https://alloy-rs.github.io/alloy/alloy_transport_ws/index.html
-[alloy-transport-ipc]: https://alloy-rs.github.io/alloy/alloy_transport_ipc/index.html
-[alloy-pubsub]: https://alloy-rs.github.io/alloy/alloy_pubsub/index.html
+[alloy-transport-http]: https://docs.rs/alloy_transport_http/
+[alloy-transport-ws]: https://docs.rs/alloy_transport_ws/
+[alloy-transport-ipc]: https://docs.rs/alloy_transport_ipc/
+[alloy-pubsub]: https://docs.rs/alloy_pubsub/
