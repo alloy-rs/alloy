@@ -1,8 +1,8 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
-    TxLegacy, TxType,
+    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
+    TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
@@ -98,7 +98,7 @@ pub struct Transaction {
     /// EIP2718
     ///
     /// Transaction type,
-    /// Some(3) for EIP-4844 transaction, Some(2) for EIP-1559 transaction,
+    /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559 transaction,
     /// Some(1) for AccessList transaction, None or Some(0) for Legacy
     #[serde(
         default,
@@ -265,6 +265,31 @@ impl TryFrom<Transaction> for Signed<TxEip4844Variant> {
     }
 }
 
+impl TryFrom<Transaction> for Signed<TxEip7702> {
+    type Error = ConversionError;
+
+    fn try_from(tx: Transaction) -> Result<Self, Self::Error> {
+        let signature = tx.signature.ok_or(ConversionError::MissingSignature)?.try_into()?;
+        let tx = TxEip7702 {
+            chain_id: tx.chain_id.ok_or(ConversionError::MissingChainId)?,
+            nonce: tx.nonce,
+            gas_limit: tx.gas,
+            max_fee_per_gas: tx.max_fee_per_gas.ok_or(ConversionError::MissingMaxFeePerGas)?,
+            max_priority_fee_per_gas: tx
+                .max_priority_fee_per_gas
+                .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
+            to: tx.to.into(),
+            value: tx.value,
+            access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
+            authorization_list: tx
+                .authorization_list
+                .ok_or(ConversionError::MissingAuthorizationList)?,
+            input: tx.input,
+        };
+        Ok(tx.into_signed(signature))
+    }
+}
+
 impl TryFrom<Transaction> for TxEnvelope {
     type Error = ConversionError;
 
@@ -274,6 +299,7 @@ impl TryFrom<Transaction> for TxEnvelope {
             TxType::Eip1559 => Ok(Self::Eip1559(tx.try_into()?)),
             TxType::Eip2930 => Ok(Self::Eip2930(tx.try_into()?)),
             TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
+            TxType::Eip7702 => Ok(Self::Eip7702(tx.try_into()?)),
         }
     }
 }
