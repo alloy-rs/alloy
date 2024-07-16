@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add `rpc-types-mev` feature to meta crate ([#1040](https://github.com/alloy-rs/alloy/issues/1040))
 
+### Miscellaneous Tasks
+
+- Release 0.2.0
+
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
 ### Dependencies
