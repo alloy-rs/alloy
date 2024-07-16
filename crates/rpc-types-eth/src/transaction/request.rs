@@ -2,8 +2,8 @@
 
 use crate::{transaction::AccessList, BlobTransactionSidecar, Transaction};
 use alloy_consensus::{
-    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
-    TxType, TypedTransaction,
+    TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEip7702, TxEnvelope,
+    TxLegacy, TxType, TypedTransaction,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
@@ -365,6 +365,7 @@ impl TransactionRequest {
             TxType::Eip4844 => {
                 self.gas_price = None;
             }
+            TxType::Eip7702 => todo!(),
         }
     }
 
@@ -400,6 +401,7 @@ impl TransactionRequest {
             TxType::Eip2930 => self.complete_2930(),
             TxType::Eip1559 => self.complete_1559(),
             TxType::Eip4844 => self.complete_4844(),
+            TxType::Eip7702 => todo!(),
         } {
             Err((pref, missing))
         } else {
@@ -485,6 +487,7 @@ impl TransactionRequest {
             TxType::Eip2930 => self.complete_2930().ok(),
             TxType::Eip1559 => self.complete_1559().ok(),
             TxType::Eip4844 => self.complete_4844().ok(),
+            TxType::Eip7702 => todo!(),
         }?;
         Some(pref)
     }
@@ -506,6 +509,7 @@ impl TransactionRequest {
             TxType::Eip1559 => self.build_1559().expect("checked)").into(),
             // `sidecar` is a hard requirement since this must be a _sendable_ transaction.
             TxType::Eip4844 => self.build_4844_with_sidecar().expect("checked)").into(),
+            TxType::Eip7702 => todo!(),
         })
     }
 
@@ -744,6 +748,12 @@ impl From<TxEip4844Variant> for TransactionRequest {
     }
 }
 
+impl From<TxEip7702> for TransactionRequest {
+    fn from(_tx: TxEip7702) -> Self {
+        todo!()
+    }
+}
+
 impl From<TypedTransaction> for TransactionRequest {
     fn from(tx: TypedTransaction) -> Self {
         match tx {
@@ -751,6 +761,7 @@ impl From<TypedTransaction> for TransactionRequest {
             TypedTransaction::Eip2930(tx) => tx.into(),
             TypedTransaction::Eip1559(tx) => tx.into(),
             TypedTransaction::Eip4844(tx) => tx.into(),
+            TypedTransaction::Eip7702(tx) => tx.into(),
         }
     }
 }
@@ -810,6 +821,23 @@ impl From<TxEnvelope> for TransactionRequest {
                 }
             }
             TxEnvelope::Eip4844(tx) => {
+                #[cfg(feature = "k256")]
+                {
+                    let from = tx.recover_signer().ok();
+                    let tx: Self = tx.strip_signature().into();
+                    if let Some(from) = from {
+                        tx.from(from)
+                    } else {
+                        tx
+                    }
+                }
+
+                #[cfg(not(feature = "k256"))]
+                {
+                    tx.strip_signature().into()
+                }
+            }
+            TxEnvelope::Eip7702(tx) => {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
