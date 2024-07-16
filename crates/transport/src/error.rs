@@ -44,6 +44,7 @@ pub enum TransportErrorKind {
 impl TransportErrorKind {
     /// Returns `true` if the error is potentially recoverable.
     /// This is a naive heuristic and should be used with caution.
+    #[deprecated = "Use `is_retry_err` instead. For HTTP transport, you can use `RetryBackoffLayer`"]
     pub const fn recoverable(&self) -> bool {
         matches!(self, Self::MissingBatchResponse(_))
     }
