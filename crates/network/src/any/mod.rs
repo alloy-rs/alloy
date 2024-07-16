@@ -8,6 +8,7 @@ use core::fmt;
 
 mod builder;
 
+/// Transaction type for a catch-all network.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[doc(alias = "AnyTransactionType")]
 pub struct AnyTxType(u8);

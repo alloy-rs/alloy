@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network};
+use alloy_network::{Ethereum, Network, ReceiptResponse as _};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
@@ -667,6 +667,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        // Make sure to initialize heartbeat before we submit transaction, so that
+        // we don't miss it if user will subscriber to it immediately after sending.
+        let _handle = self.root().get_heart();
+
         match tx {
             SendableTx::Builder(mut tx) => {
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
@@ -958,12 +962,30 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
         &self,
         config: PendingTransactionConfig,
     ) -> TransportResult<PendingTransaction> {
-        self.get_heart().watch_tx(config).await.map_err(|_| TransportErrorKind::backend_gone())
+        let block_number =
+            if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
+                // The transaction is already confirmed.
+                if config.required_confirmations() <= 1 {
+                    return Ok(PendingTransaction::ready(*config.tx_hash()));
+                }
+                // Transaction has custom confirmations, so let the heart know about its block
+                // number and let it handle the situation.
+                receipt.block_number()
+            } else {
+                None
+            };
+
+        self.get_heart()
+            .watch_tx(config, block_number)
+            .await
+            .map_err(|_| TransportErrorKind::backend_gone())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
     use alloy_network::AnyNetwork;
@@ -1145,6 +1167,54 @@ mod tests {
         let hash1 = *builder.tx_hash();
         let hash2 =
             builder.get_receipt().await.expect("failed to await pending tx").transaction_hash;
+        assert_eq!(hash1, hash2);
+    }
+
+    #[tokio::test]
+    async fn test_watch_confirmed_tx() {
+        init_tracing();
+        let provider = ProviderBuilder::new().on_anvil();
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+
+        let builder = provider.send_transaction(tx.clone()).await.expect("failed to send tx");
+        let hash1 = *builder.tx_hash();
+
+        // Wait until tx is confirmed.
+        loop {
+            if provider
+                .get_transaction_receipt(hash1)
+                .await
+                .expect("failed to await pending tx")
+                .is_some()
+            {
+                break;
+            }
+        }
+
+        // Submit another tx.
+        let tx2 = TransactionRequest {
+            value: Some(U256::from(100)),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+        provider.send_transaction(tx2).await.expect("failed to send tx").watch().await.unwrap();
+
+        // Only subscribe for watching _after_ tx was confirmed and we submitted a new one.
+        let watch = builder.watch();
+        // Wrap watch future in timeout to prevent it from hanging.
+        let watch_with_timeout = tokio::time::timeout(Duration::from_secs(1), watch);
+        let hash2 = watch_with_timeout
+            .await
+            .expect("Watching tx timed out")
+            .expect("failed to await pending tx");
         assert_eq!(hash1, hash2);
     }
 

@@ -6,14 +6,14 @@ use core::mem;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use alloy_eips::eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization};
 
-/// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
+/// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[doc(alias = "Eip1559Transaction", alias = "TransactionEip1559", alias = "Eip1559Tx")]
-pub struct TxEip1559 {
+#[doc(alias = "Eip7702Transaction", alias = "TransactionEip7702", alias = "Eip7702Tx")]
+pub struct TxEip7702 {
     /// EIP-155: Simple replay attack protection
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub chain_id: ChainId,
@@ -64,6 +64,10 @@ pub struct TxEip1559 {
     /// A gas cost is charged, though at a discount relative to the cost of
     /// accessing outside the list.
     pub access_list: AccessList,
+    /// Authorizations are used to temporarily set the code of its signer to
+    /// the code referenced by `address`. These also include a `chain_id` (which
+    /// can be set to zero and not evaluated) as well as an optional `nonce`.
+    pub authorization_list: Vec<SignedAuthorization>,
     /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
     /// Some). pub init: An unlimited size byte array specifying the
     /// EVM-code for the account initialisation procedure CREATE,
@@ -72,7 +76,7 @@ pub struct TxEip1559 {
     pub input: Bytes,
 }
 
-impl TxEip1559 {
+impl TxEip7702 {
     /// Returns the effective gas price for the given `base_fee`.
     pub const fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
         match base_fee {
@@ -91,7 +95,7 @@ impl TxEip1559 {
         }
     }
 
-    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    /// Decodes the inner [TxEip7702] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_ decodes the following
     /// RLP fields in the following order:
@@ -105,6 +109,7 @@ impl TxEip1559 {
     /// - `value`
     /// - `data` (`input`)
     /// - `access_list`
+    /// - `authorization_list`
     pub(crate) fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
@@ -116,6 +121,7 @@ impl TxEip1559 {
             value: Decodable::decode(buf)?,
             input: Decodable::decode(buf)?,
             access_list: Decodable::decode(buf)?,
+            authorization_list: Decodable::decode(buf)?,
         })
     }
 
@@ -132,6 +138,7 @@ impl TxEip1559 {
         len += self.value.length();
         len += self.input.0.length();
         len += self.access_list.length();
+        len += self.authorization_list.length();
         len
     }
 
@@ -146,6 +153,7 @@ impl TxEip1559 {
         self.value.encode(out);
         self.input.0.encode(out);
         self.access_list.encode(out);
+        self.authorization_list.encode(out);
     }
 
     /// Returns what the encoded length should be, if the transaction were RLP encoded with the
@@ -190,7 +198,7 @@ impl TxEip1559 {
             }
             .encode(out);
         }
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(EIP7702_TX_TYPE_ID);
         self.encode_with_signature_fields(signature, out);
     }
 
@@ -238,11 +246,12 @@ impl TxEip1559 {
 
     /// Get transaction type
     #[doc(alias = "transaction_type")]
-    pub(crate) const fn tx_type(&self) -> TxType {
-        TxType::Eip1559
+    #[allow(unused)]
+    pub(crate) fn tx_type(&self) -> TxType {
+        unimplemented!("not yet added to tx type enum")
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip1559] transaction.
+    /// Calculates a heuristic for the in-memory size of the [TxEip7702] transaction.
     #[inline]
     pub fn size(&self) -> usize {
         mem::size_of::<ChainId>() + // chain_id
@@ -253,11 +262,12 @@ impl TxEip1559 {
         self.to.size() + // to
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
-        self.input.len() // input
+        self.input.len() + // input
+        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
     }
 }
 
-impl Transaction for TxEip1559 {
+impl Transaction for TxEip7702 {
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
     }
@@ -287,13 +297,13 @@ impl Transaction for TxEip1559 {
     }
 }
 
-impl SignableTransaction<Signature> for TxEip1559 {
+impl SignableTransaction<Signature> for TxEip7702 {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        out.put_u8(self.tx_type() as u8);
+        out.put_u8(EIP7702_TX_TYPE_ID);
         self.encode(out)
     }
 
@@ -303,7 +313,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
         // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-1559 transaction. V should indicate the y-parity of the
+        // combination for an EIP-7702 transaction. V should indicate the y-parity of the
         // signature.
         let signature = signature.with_parity_bool();
 
@@ -315,7 +325,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 }
 
-impl Encodable for TxEip1559 {
+impl Encodable for TxEip7702 {
     fn encode(&self, out: &mut dyn BufMut) {
         Header { list: true, payload_length: self.fields_len() }.encode(out);
         self.encode_fields(out);
@@ -327,7 +337,7 @@ impl Encodable for TxEip1559 {
     }
 }
 
-impl Decodable for TxEip1559 {
+impl Decodable for TxEip7702 {
     fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(data)?;
         let remaining_len = data.len();
@@ -342,17 +352,14 @@ impl Decodable for TxEip1559 {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use super::TxEip1559;
+    use super::TxEip7702;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, U256};
 
     #[test]
-    fn recover_signer_eip1559() {
-        let signer: Address = address!("dd6b8b3dc6b7ad97db52f08a275ff4483e024cea");
-        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
-
-        let tx =  TxEip1559 {
+    fn encode_decode_eip7702() {
+        let tx =  TxEip7702 {
             chain_id: 1,
             nonce: 0x42,
             gas_limit: 44386,
@@ -362,39 +369,7 @@ mod tests {
             max_fee_per_gas: 0x4a817c800,
             max_priority_fee_per_gas: 0x3b9aca00,
             access_list: AccessList::default(),
-        };
-
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
-
-        assert_eq!(
-            tx.signature_hash(),
-            hex!("0d5688ac3897124635b6cf1bc0e29d6dfebceebdc10a54d74f2ef8b56535b682")
-        );
-
-        let signed_tx = tx.into_signed(sig);
-        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
-        assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
-    }
-
-    #[test]
-    fn encode_decode_eip1559() {
-        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
-
-        let tx =  TxEip1559 {
-            chain_id: 1,
-            nonce: 0x42,
-            gas_limit: 44386,
-            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
-            value: U256::from(0_u64),
-            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            access_list: AccessList::default(),
+            authorization_list: vec![],
         };
 
         let sig = Signature::from_scalars_and_parity(
@@ -406,8 +381,62 @@ mod tests {
 
         let mut buf = vec![];
         tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
         assert_eq!(decoded, tx.into_signed(sig));
-        assert_eq!(*decoded.hash(), hash);
+    }
+
+    #[test]
+    fn test_decode_create() {
+        // tests that a contract creation tx encodes and decodes properly
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: TxKind::Create,
+            value: U256::ZERO,
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+    }
+
+    #[test]
+    fn test_decode_call() {
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: Address::default().into(),
+            value: U256::ZERO,
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
     }
 }

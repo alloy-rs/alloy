@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip2930Transaction", alias = "TransactionEip2930", alias = "Eip2930Tx")]
@@ -130,11 +131,7 @@ impl TxEip2930 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub(crate) fn encoded_len_with_signature(
-        &self,
-        signature: &Signature,
-        with_header: bool,
-    ) -> usize {
+    pub fn encoded_len_with_signature(&self, signature: &Signature, with_header: bool) -> usize {
         // this counts the tx fields and signature fields
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
 
@@ -272,14 +269,16 @@ impl SignableTransaction<Signature> for TxEip2930 {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
+        // Drop any v chain id value to ensure the signature format is correct at the time of
+        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
+        // signature.
+        let signature = signature.with_parity_bool();
+
         let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
         self.encode_with_signature(&signature, &mut buf, false);
         let hash = keccak256(&buf);
 
-        // Drop any v chain id value to ensure the signature format is correct at the time of
-        // combination for an EIP-2930 transaction. V should indicate the y-parity of the
-        // signature.
-        Signed::new_unchecked(self, signature.with_parity_bool(), hash)
+        Signed::new_unchecked(self, signature, hash)
     }
 }
 

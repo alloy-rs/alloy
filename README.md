@@ -3,7 +3,7 @@
 Alloy connects applications to blockchains.
 
 Alloy is a rewrite of [`ethers-rs`] from the ground up, with exciting new
-features, high performance, and excellent [docs](https://alloy-rs.github.io/alloy/).
+features, high performance, and excellent [docs](https://docs.rs/alloy).
 
 We also have a [book](https://alloy.rs/) on all things Alloy and many [examples](https://github.com/alloy-rs/examples) to help you get started.
 
@@ -54,6 +54,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
+  - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace
   - [`alloy-rpc-types-trace`] - Types for the `trace` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-txpool`] - Types for the `txpool` Ethereum JSON-RPC namespace
 - [`alloy-serde`] - [Serde]-related utilities
@@ -86,6 +87,7 @@ This repository contains the following crates:
 [`alloy-rpc-types-beacon`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon
 [`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
 [`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
+[`alloy-rpc-types-mev`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-mev
 [`alloy-rpc-types-trace`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-trace
 [`alloy-rpc-types-txpool`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-txpool
 [`alloy-serde`]: https://github.com/alloy-rs/alloy/tree/main/crates/serde

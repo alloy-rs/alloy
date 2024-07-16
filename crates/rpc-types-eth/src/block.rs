@@ -1,7 +1,7 @@
 //! Block RPC types.
 
-use crate::{Transaction, Withdrawal};
-use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256, U64};
+use crate::{ConversionError, Transaction, Withdrawal};
+use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::OtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
@@ -146,6 +146,61 @@ impl Header {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
+    }
+}
+
+impl TryFrom<Header> for alloy_consensus::Header {
+    type Error = ConversionError;
+    fn try_from(value: Header) -> Result<Self, Self::Error> {
+        let Header {
+            parent_hash,
+            uncles_hash,
+            miner,
+            state_root,
+            transactions_root,
+            receipts_root,
+            logs_bloom,
+            difficulty,
+            number,
+            gas_limit,
+            gas_used,
+            timestamp,
+            extra_data,
+            mix_hash,
+            nonce,
+            base_fee_per_gas,
+            withdrawals_root,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_root,
+            // not included in the consensus header
+            hash: _hash,
+            total_difficulty: _total_difficulty,
+        } = value;
+        Ok(Self {
+            parent_hash,
+            ommers_hash: uncles_hash,
+            beneficiary: miner,
+            state_root,
+            transactions_root,
+            receipts_root,
+            withdrawals_root,
+            logs_bloom,
+            difficulty,
+            number: number.ok_or(ConversionError::MissingBlockNumber)?,
+            gas_limit,
+            gas_used,
+            timestamp,
+            mix_hash: mix_hash.ok_or(ConversionError::Custom("missing block mix_hash".into()))?,
+            nonce: nonce.ok_or(ConversionError::Custom("missing block nonce".into()))?,
+            base_fee_per_gas,
+            blob_gas_used,
+            excess_blob_gas,
+            parent_beacon_block_root,
+            requests_root,
+            extra_data,
+        })
     }
 }
 
@@ -553,11 +608,16 @@ pub struct BlockOverrides {
     pub difficulty: Option<U256>,
     /// Overrides the timestamp of the block.
     // Note: geth uses `time`, erigon uses `timestamp`
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "timestamp")]
-    pub time: Option<U64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        alias = "timestamp",
+        with = "alloy_serde::quantity::opt"
+    )]
+    pub time: Option<u64>,
     /// Overrides the gas limit of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub gas_limit: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub coinbase: Option<Address>,
@@ -575,6 +635,7 @@ pub struct BlockOverrides {
 
 #[cfg(test)]
 mod tests {
+    use alloy_primitives::keccak256;
     use arbitrary::Arbitrary;
     use rand::Rng;
 
@@ -887,5 +948,72 @@ mod tests {
         let block = serde_json::from_str::<Block>(s).unwrap();
         assert!(block.transactions.is_empty());
         assert!(block.transactions.as_transactions().is_some());
+    }
+
+    #[test]
+    fn recompute_block_hash() {
+        let s = r#"{
+    "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
+    "parentHash": "0x9400ec9ef59689c157ac89eeed906f15ddd768f94e1575e0e27d37c241439a5d",
+    "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    "miner": "0x829bd824b016326a401d083b33d092293333a830",
+    "stateRoot": "0x546e330050c66d02923e7f1f3e925efaf64e4384eeecf2288f40088714a77a84",
+    "transactionsRoot": "0xd5eb3ad6d7c7a4798cc5fb14a6820073f44a941107c5d79dac60bd16325631fe",
+    "receiptsRoot": "0xb21c41cbb3439c5af25304e1405524c885e733b16203221900cb7f4b387b62f0",
+    "logsBloom": "0x1f304e641097eafae088627298685d20202004a4a59e4d8900914724e2402b028c9d596660581f361240816e82d00fa14250c9ca89840887a381efa600288283d170010ab0b2a0694c81842c2482457e0eb77c2c02554614007f42aaf3b4dc15d006a83522c86a240c06d241013258d90540c3008888d576a02c10120808520a2221110f4805200302624d22092b2c0e94e849b1e1aa80bc4cc3206f00b249d0a603ee4310216850e47c8997a20aa81fe95040a49ca5a420464600e008351d161dc00d620970b6a801535c218d0b4116099292000c08001943a225d6485528828110645b8244625a182c1a88a41087e6d039b000a180d04300d0680700a15794",
+    "difficulty": "0xc40faff9c737d",
+    "number": "0xa9a230",
+    "gasLimit": "0xbe5a66",
+    "gasUsed": "0xbe0fcc",
+    "timestamp": "0x5f93b749",
+    "totalDifficulty": "0x3dc957fd8167fb2684a",
+    "extraData": "0x7070796520e4b883e5bda9e7a59ee4bb99e9b1bc0103",
+    "mixHash": "0xd5e2b7b71fbe4ddfe552fb2377bf7cddb16bbb7e185806036cee86994c6e97fc",
+    "nonce": "0x4722f2acd35abe0f",
+    "uncles": [],
+    "transactions": [],
+    "size": "0xaeb6"
+}"#;
+        let block = serde_json::from_str::<Block>(s).unwrap();
+        let header: alloy_consensus::Header = block.clone().header.try_into().unwrap();
+        let recomputed_hash = keccak256(alloy_rlp::encode(&header));
+        assert_eq!(recomputed_hash, block.header.hash.unwrap());
+
+        let s2 = r#"{
+            "baseFeePerGas":"0x886b221ad",
+            "blobGasUsed":"0x0",
+            "difficulty":"0x0",
+            "excessBlobGas":"0x0",
+            "extraData":"0x6265617665726275696c642e6f7267",
+            "gasLimit":"0x1c9c380",
+            "gasUsed":"0xb0033c",
+            "hash":"0x85cdcbe36217fd57bf2c33731d8460657a7ce512401f49c9f6392c82a7ccf7ac",
+            "logsBloom":"0xc36919406572730518285284f2293101104140c0d42c4a786c892467868a8806f40159d29988002870403902413a1d04321320308da2e845438429e0012a00b419d8ccc8584a1c28f82a415d04eab8a5ae75c00d07761acf233414c08b6d9b571c06156086c70ea5186e9b989b0c2d55c0213c936805cd2ab331589c90194d070c00867549b1e1be14cb24500b0386cd901197c1ef5a00da453234fa48f3003dcaa894e3111c22b80e17f7d4388385a10720cda1140c0400f9e084ca34fc4870fb16b472340a2a6a63115a82522f506c06c2675080508834828c63defd06bc2331b4aa708906a06a560457b114248041e40179ebc05c6846c1e922125982f427",
+            "miner":"0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5",
+            "mixHash":"0x4c068e902990f21f92a2456fc75c59bec8be03b7f13682b6ebd27da56269beb5",
+            "nonce":"0x0000000000000000",
+            "number":"0x128c6df",
+            "parentBeaconBlockRoot":"0x2843cb9f7d001bd58816a915e685ed96a555c9aeec1217736bd83a96ebd409cc",
+            "parentHash":"0x90926e0298d418181bd20c23b332451e35fd7d696b5dcdc5a3a0a6b715f4c717",
+            "receiptsRoot":"0xd43aa19ecb03571d1b86d89d9bb980139d32f2f2ba59646cd5c1de9e80c68c90",
+            "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+            "size":"0xdcc3",
+            "stateRoot":"0x707875120a7103621fb4131df59904cda39de948dfda9084a1e3da44594d5404",
+            "timestamp":"0x65f5f4c3",
+            "transactionsRoot":"0x889a1c26dc42ba829dab552b779620feac231cde8a6c79af022bdc605c23a780",
+            "withdrawals":[
+               {
+                  "index":"0x24d80e6",
+                  "validatorIndex":"0x8b2b6",
+                  "address":"0x7cd1122e8e118b12ece8d25480dfeef230da17ff",
+                  "amount":"0x1161f10"
+               }
+            ],
+            "withdrawalsRoot":"0x360c33f20eeed5efbc7d08be46e58f8440af5db503e40908ef3d1eb314856ef7"
+         }"#;
+        let block2 = serde_json::from_str::<Block>(s2).unwrap();
+        let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
+        let recomputed_hash = keccak256(alloy_rlp::encode(&header));
+        assert_eq!(recomputed_hash, block2.header.hash.unwrap());
     }
 }

@@ -63,12 +63,23 @@ impl TransactionIndex {
         matches!(self, Self::All)
     }
 
+    /// Returns true if this is the index variant
+    pub const fn is_index(&self) -> bool {
+        matches!(self, Self::Index(_))
+    }
+
     /// Returns the index if this is the index variant
     pub const fn index(&self) -> Option<usize> {
         match self {
             Self::All => None,
             Self::Index(idx) => Some(*idx),
         }
+    }
+}
+
+impl From<usize> for TransactionIndex {
+    fn from(index: usize) -> Self {
+        Self::Index(index)
     }
 }
 
@@ -134,7 +145,7 @@ mod tests {
         let s = r#"{"transactions":[{"data":"0x70a08231000000000000000000000000000000dbc80bf780c6dc0ca16ed071b1f00cc000","to":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}],"blockOverride":{"timestamp":1711546233}}"#;
         let bundle = serde_json::from_str::<Bundle>(s).unwrap();
         assert_eq!(bundle.transactions.len(), 1);
-        assert_eq!(bundle.block_override.unwrap().time.unwrap().to::<u64>(), 1711546233);
+        assert_eq!(bundle.block_override.unwrap().time.unwrap(), 1711546233);
     }
 
     #[test]

@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+
+### Bug Fixes
+
+- [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
+- [provider] Do not overflow LRU cache capacity in ChainStreamPoller ([#1052](https://github.com/alloy-rs/alloy/issues/1052))
+- [admin] Id in NodeInfo is string instead of B256 ([#1038](https://github.com/alloy-rs/alloy/issues/1038))
+
+### Features
+
+- Add rpc namespace ([#994](https://github.com/alloy-rs/alloy/issues/994))
+
+### Miscellaneous Tasks
+
+- Release 0.2.0
+- Release 0.2.0
+- Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
+
+## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
+
+### Bug Fixes
+
+- Fix watching already mined transactions ([#997](https://github.com/alloy-rs/alloy/issues/997))
+
+### Features
+
+- Add missing admin_* methods ([#991](https://github.com/alloy-rs/alloy/issues/991))
+- Support web3_sha3 provider function ([#996](https://github.com/alloy-rs/alloy/issues/996))
+- Add trace_get ([#987](https://github.com/alloy-rs/alloy/issues/987))
+- Add net rpc namespace ([#989](https://github.com/alloy-rs/alloy/issues/989))
+- Add missing debug_* rpc methods ([#986](https://github.com/alloy-rs/alloy/issues/986))
+
+### Miscellaneous Tasks
+
+- Release 0.1.4
+- [provider] Simplify nonce filler ([#976](https://github.com/alloy-rs/alloy/issues/976))
+
+### Testing
+
+- Fix flaky anvil test ([#992](https://github.com/alloy-rs/alloy/issues/992))
+
 ## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
 
 ### Bug Fixes
@@ -17,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.3
 - Nightly clippy ([#947](https://github.com/alloy-rs/alloy/issues/947))
 
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19

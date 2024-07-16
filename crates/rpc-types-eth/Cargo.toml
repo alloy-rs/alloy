@@ -33,11 +33,9 @@ thiserror.workspace = true
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
-proptest = { version = "1.4", optional = true }
-proptest-derive = { version = "0.4", optional = true }
 
 # jsonrpsee
-jsonrpsee-types = { version = "0.23", optional = true }
+jsonrpsee-types = { version = "0.24", optional = true }
 alloy-sol-types.workspace = true
 
 [dev-dependencies]
@@ -48,21 +46,19 @@ alloy-primitives = { workspace = true, features = [
     "arbitrary",
 ] }
 alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
+alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
-proptest.workspace = true
-proptest-derive.workspace = true
 rand.workspace = true
 similar-asserts.workspace = true
 
 [features]
 arbitrary = [
     "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
     "alloy-primitives/arbitrary",
     "alloy-serde/arbitrary",
     "alloy-eips/arbitrary",
+    "alloy-eips/k256",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
