@@ -20,6 +20,7 @@ pub struct Authorization {
     /// The address of the authorization.
     pub address: Address,
     /// The nonce for the authorization.
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
 }
 
