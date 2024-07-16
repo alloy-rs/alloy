@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add 7702 tx type ([#1046](https://github.com/alloy-rs/alloy/issues/1046))
 - Impl `arbitrary` for tx structs ([#1050](https://github.com/alloy-rs/alloy/issues/1050))
 
+### Miscellaneous Tasks
+
+- Release 0.2.0
+
 ### Styling
 
 - Remove proptest in all crates and Arbitrary derives ([#966](https://github.com/alloy-rs/alloy/issues/966))
