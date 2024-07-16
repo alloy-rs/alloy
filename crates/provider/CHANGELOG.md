@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+
+### Bug Fixes
+
+- [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
+- [provider] Do not overflow LRU cache capacity in ChainStreamPoller ([#1052](https://github.com/alloy-rs/alloy/issues/1052))
+- [admin] Id in NodeInfo is string instead of B256 ([#1038](https://github.com/alloy-rs/alloy/issues/1038))
+
+### Features
+
+- Add rpc namespace ([#994](https://github.com/alloy-rs/alloy/issues/994))
+
+### Miscellaneous Tasks
+
+- Release 0.2.0
+- Release 0.2.0
+- Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
+
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
 ### Bug Fixes
@@ -21,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.4
 - [provider] Simplify nonce filler ([#976](https://github.com/alloy-rs/alloy/issues/976))
 
 ### Testing

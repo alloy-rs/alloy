@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+
+### Bug Fixes
+
+- Trim conflicting key `max_fee_per_blob_gas` from Eip1559 tx type ([#1064](https://github.com/alloy-rs/alloy/issues/1064))
+- [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
+- Require storageKeys value broken bincode serialization from [#955](https://github.com/alloy-rs/alloy/issues/955) ([#1058](https://github.com/alloy-rs/alloy/issues/1058))
+- [provider] Do not overflow LRU cache capacity in ChainStreamPoller ([#1052](https://github.com/alloy-rs/alloy/issues/1052))
+- [admin] Id in NodeInfo is string instead of B256 ([#1038](https://github.com/alloy-rs/alloy/issues/1038))
+- Cargo fmt ([#1044](https://github.com/alloy-rs/alloy/issues/1044))
+- [eip7702] Add correct rlp decode/encode ([#1034](https://github.com/alloy-rs/alloy/issues/1034))
+
+### Dependencies
+
+- [deps] Bump Trezor client to `=0.1.4` to fix signing bug ([#1045](https://github.com/alloy-rs/alloy/issues/1045))
+
+### Features
+
+- Expose encoded_len_with_signature() ([#1063](https://github.com/alloy-rs/alloy/issues/1063))
+- Add 7702 tx type ([#1046](https://github.com/alloy-rs/alloy/issues/1046))
+- [rpc-types-eth] Serde flatten `BlobTransactionSidecar` in tx req ([#1054](https://github.com/alloy-rs/alloy/issues/1054))
+- Add authorization list to rpc transaction and tx receipt types ([#1051](https://github.com/alloy-rs/alloy/issues/1051))
+- Impl `arbitrary` for tx structs ([#1050](https://github.com/alloy-rs/alloy/issues/1050))
+- [core] Update core version ([#1049](https://github.com/alloy-rs/alloy/issues/1049))
+- [otterscan] Add ots slim block and serialze OperationType to int ([#1043](https://github.com/alloy-rs/alloy/issues/1043))
+- Generate valid signed auth signatures ([#1041](https://github.com/alloy-rs/alloy/issues/1041))
+- Add `rpc-types-mev` feature to meta crate ([#1040](https://github.com/alloy-rs/alloy/issues/1040))
+- Add arbitrary to auth ([#1036](https://github.com/alloy-rs/alloy/issues/1036))
+- [genesis] Rm EIP150Hash ([#1039](https://github.com/alloy-rs/alloy/issues/1039))
+- Add hash for 7702 ([#1037](https://github.com/alloy-rs/alloy/issues/1037))
+- Add rpc namespace ([#994](https://github.com/alloy-rs/alloy/issues/994))
+
+### Miscellaneous Tasks
+
+- Release 0.2.0
+- Release 0.2.0
+- Make auth mandatory in recovered auth ([#1047](https://github.com/alloy-rs/alloy/issues/1047))
+- Trace output utils ([#1027](https://github.com/alloy-rs/alloy/issues/1027))
+- Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
+- Add payloadbodies v2 to capabilities set ([#1025](https://github.com/alloy-rs/alloy/issues/1025))
+
+### Refactor
+
+- Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
+
+### Styling
+
+- Remove proptest in all crates and Arbitrary derives ([#966](https://github.com/alloy-rs/alloy/issues/966))
+
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
 ### Bug Fixes
@@ -45,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.4
 - Update release config
 - Add helper functions for destructuring auth types ([#1022](https://github.com/alloy-rs/alloy/issues/1022))
 - Convert rcp-types-eth block Header to consensus Header ([#1014](https://github.com/alloy-rs/alloy/issues/1014))
