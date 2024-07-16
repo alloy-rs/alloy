@@ -193,8 +193,10 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 mod tests {
     use crate::{TransactionBuilder, TransactionBuilderError};
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
-    use alloy_primitives::Address;
+    use alloy_eips::eip7702::Authorization;
+    use alloy_primitives::{Address, Signature};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
+    use std::str::FromStr;
 
     #[test]
     fn from_eip1559_to_tx_req() {
@@ -245,6 +247,27 @@ mod tests {
         let tx = request.build_unsigned().unwrap();
 
         assert!(matches!(tx, TypedTransaction::Eip2930(_)));
+    }
+
+    #[test]
+    fn test_7702_when_authorization_list() {
+        let request = TransactionRequest::default()
+            .with_nonce(1)
+            .with_gas_limit(0)
+            .with_max_fee_per_gas(0)
+            .with_max_priority_fee_per_gas(0)
+            .with_to(Address::ZERO)
+            .with_access_list(AccessList::default())
+            .with_authorization_list(vec![(Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[1]),
+                nonce: Some(1u64).into(),
+            })
+            .into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],);
+
+        let tx = request.build_unsigned().unwrap();
+
+        assert!(matches!(tx, TypedTransaction::Eip7702(_)));
     }
 
     #[test]
@@ -355,5 +378,25 @@ mod tests {
         assert!(errors.contains(&"max_fee_per_gas"));
         assert!(errors.contains(&"to"));
         assert!(errors.contains(&"max_fee_per_blob_gas"));
+    }
+
+    #[test]
+    fn test_invalid_7702_fields() {
+        let request = TransactionRequest::default().with_authorization_list(vec![]);
+
+        let error = request.build_unsigned().unwrap_err();
+
+        let TransactionBuilderError::InvalidTransactionRequest(tx_type, errors) = error.error
+        else {
+            panic!("wrong variant")
+        };
+
+        assert_eq!(tx_type, TxType::Eip7702);
+        assert_eq!(errors.len(), 5);
+        assert!(errors.contains(&"to"));
+        assert!(errors.contains(&"nonce"));
+        assert!(errors.contains(&"gas_limit"));
+        assert!(errors.contains(&"max_priority_fee_per_gas"));
+        assert!(errors.contains(&"max_fee_per_gas"));
     }
 }
