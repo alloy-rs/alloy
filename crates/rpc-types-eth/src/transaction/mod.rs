@@ -98,8 +98,8 @@ pub struct Transaction {
     /// EIP2718
     ///
     /// Transaction type,
-    /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559 transaction,
-    /// Some(1) for AccessList transaction, None or Some(0) for Legacy
+    /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559
+    /// transaction, Some(1) for AccessList transaction, None or Some(0) for Legacy
     #[serde(
         default,
         rename = "type",
