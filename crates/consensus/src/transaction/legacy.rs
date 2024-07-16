@@ -118,7 +118,7 @@ impl TxLegacy {
 
     /// Returns what the encoded length should be, if the transaction were RLP encoded with the
     /// given signature.
-    pub(crate) fn encoded_len_with_signature(&self, signature: &Signature) -> usize {
+    pub fn encoded_len_with_signature(&self, signature: &Signature) -> usize {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         Header { list: true, payload_length }.length() + payload_length
     }
