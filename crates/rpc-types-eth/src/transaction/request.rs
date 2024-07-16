@@ -67,7 +67,7 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
-    /// Authorization list for for 7702 transactions.
+    /// Authorization list for for EIP-7702 transactions.
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
@@ -312,7 +312,24 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        todo!()
+        let checked_to = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?;
+
+        Ok(TxEip7702 {
+            chain_id: self.chain_id.unwrap_or(1),
+            nonce: self.nonce.ok_or("Missing 'nonce' field for Eip7702 transaction.")?,
+            gas_limit: self.gas.ok_or("Missing 'gas_limit' field for Eip7702 transaction.")?,
+            max_fee_per_gas: self
+                .max_fee_per_gas
+                .ok_or("Missing 'max_fee_per_gas' field for Eip7702 transaction.")?,
+            max_priority_fee_per_gas: self
+                .max_priority_fee_per_gas
+                .ok_or("Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.")?,
+            to: checked_to,
+            value: self.value.unwrap_or_default(),
+            input: self.input.into_input().unwrap_or_default(),
+            access_list: self.access_list.unwrap_or_default(),
+            authorization_list: self.authorization_list.unwrap_or_default(),
+        })
     }
 
     fn check_reqd_fields(&self) -> Vec<&'static str> {
@@ -358,6 +375,7 @@ impl TransactionRequest {
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
                 self.access_list = None;
+                self.authorization_list = None;
             }
             TxType::Eip2930 => {
                 self.max_fee_per_gas = None;
@@ -365,29 +383,40 @@ impl TransactionRequest {
                 self.max_fee_per_blob_gas = None;
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
+                self.authorization_list = None;
             }
             TxType::Eip1559 => {
                 self.gas_price = None;
                 self.max_fee_per_blob_gas = None;
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
+                self.authorization_list = None;
             }
             TxType::Eip4844 => {
                 self.gas_price = None;
+                self.authorization_list = None;
             }
-            TxType::Eip7702 => todo!(),
+            TxType::Eip7702 => {
+                self.gas_price = None;
+                self.max_fee_per_blob_gas = None;
+                self.blob_versioned_hashes = None;
+                self.sidecar = None;
+            }
         }
     }
 
     /// Check this builder's preferred type, based on the fields that are set.
     ///
     /// Types are preferred as follows:
+    /// - EIP-7702 if authorization_list is set
     /// - EIP-4844 if sidecar or max_blob_fee_per_gas is set
     /// - EIP-2930 if access_list is set
     /// - Legacy if gas_price is set and access_list is unset
     /// - EIP-1559 in all other cases
     pub const fn preferred_type(&self) -> TxType {
-        if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
+        if self.authorization_list.is_some() {
+            TxType::Eip7702
+        } else if self.sidecar.is_some() || self.max_fee_per_blob_gas.is_some() {
             TxType::Eip4844
         } else if self.access_list.is_some() && self.gas_price.is_some() {
             TxType::Eip2930
@@ -478,7 +507,18 @@ impl TransactionRequest {
     /// Check if all necessary keys are present to build a 7702 transaction,
     /// returning a list of keys that are missing.
     pub fn complete_7702(&self) -> Result<(), Vec<&'static str>> {
-        todo!()
+        let mut missing = self.check_reqd_fields();
+        self.check_1559_fields(&mut missing);
+
+        if self.authorization_list.is_none() {
+            missing.push("authorization_list");
+        }
+
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(missing)
+        }
     }
 
     /// Check if all necessary keys are present to build a legacy transaction,
@@ -765,8 +805,20 @@ impl From<TxEip4844Variant> for TransactionRequest {
 }
 
 impl From<TxEip7702> for TransactionRequest {
-    fn from(_tx: TxEip7702) -> Self {
-        todo!()
+    fn from(tx: TxEip7702) -> Self {
+        Self {
+            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
+            gas: Some(tx.gas_limit),
+            max_fee_per_gas: Some(tx.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
+            value: Some(tx.value),
+            input: tx.input.into(),
+            nonce: Some(tx.nonce),
+            chain_id: Some(tx.chain_id),
+            access_list: Some(tx.access_list),
+            transaction_type: Some(4),
+            ..Default::default()
+        }
     }
 }
 

@@ -158,7 +158,12 @@ impl Transaction {
             max_fee_per_blob_gas: self.max_fee_per_blob_gas,
             blob_versioned_hashes: self.blob_versioned_hashes,
             sidecar: None,
+<<<<<<< HEAD
             authorization_list: None,
+||||||| parent of a7f701019 (Support 7702 tx in TransactionRequest)
+=======
+            authorization_list: self.authorization_list,
+>>>>>>> a7f701019 (Support 7702 tx in TransactionRequest)
         }
     }
 }
