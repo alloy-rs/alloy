@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+
+### Features
+
+- [otterscan] Add ots slim block and serialze OperationType to int ([#1043](https://github.com/alloy-rs/alloy/issues/1043))
+
+### Miscellaneous Tasks
+
+- Trace output utils ([#1027](https://github.com/alloy-rs/alloy/issues/1027))
+
+### Refactor
+
+- Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
+
+### Styling
+
+- Remove proptest in all crates and Arbitrary derives ([#966](https://github.com/alloy-rs/alloy/issues/966))
+
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
 ### Bug Fixes
@@ -15,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [otterscan] Add output for TraceEntry ([#1001](https://github.com/alloy-rs/alloy/issues/1001))
 - Add helpers for trace action ([#982](https://github.com/alloy-rs/alloy/issues/982))
+
+### Miscellaneous Tasks
+
+- Release 0.1.4
 
 ## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
 

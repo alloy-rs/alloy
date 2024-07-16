@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [transport] Retry layer ([#849](https://github.com/alloy-rs/alloy/issues/849))
 
+### Miscellaneous Tasks
+
+- Release 0.1.4
+
 ## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
 
 ### Miscellaneous Tasks
