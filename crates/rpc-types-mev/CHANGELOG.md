@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add missing eth bundle args ([#978](https://github.com/alloy-rs/alloy/issues/978))
 
+### Miscellaneous Tasks
+
+- Release 0.1.4
+
 ### Other
 
 - Update builders to vector of strings in privacy struct ([#983](https://github.com/alloy-rs/alloy/issues/983))
