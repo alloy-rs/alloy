@@ -816,6 +816,7 @@ impl From<TxEip7702> for TransactionRequest {
             nonce: Some(tx.nonce),
             chain_id: Some(tx.chain_id),
             access_list: Some(tx.access_list),
+            authorization_list: Some(tx.authorization_list),
             transaction_type: Some(4),
             ..Default::default()
         }
