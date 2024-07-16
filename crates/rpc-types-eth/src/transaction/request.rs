@@ -332,6 +332,7 @@ impl TransactionRequest {
             }
             TxType::Eip1559 => {
                 self.gas_price = None;
+                self.max_fee_per_blob_gas = None;
                 self.blob_versioned_hashes = None;
                 self.sidecar = None;
             }
