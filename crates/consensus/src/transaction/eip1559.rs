@@ -153,7 +153,7 @@ impl TxEip1559 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub(crate) fn encoded_len_with_signature(
+    pub fn encoded_len_with_signature(
         &self,
         signature: &Signature,
         with_header: bool,
