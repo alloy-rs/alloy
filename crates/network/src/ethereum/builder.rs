@@ -2,6 +2,7 @@ use crate::{
     BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{request::TransactionRequest, AccessList};
 
@@ -113,6 +114,14 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
         self.sidecar = Some(sidecar);
         self.populate_blob_hashes();
+    }
+
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
+        self.authorization_list.as_ref()
+    }
+
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
+        self.authorization_list = Some(authorization_list);
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
