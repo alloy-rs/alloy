@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxLegacy};
+use crate::{transaction::TxEip7702, Signed, Transaction, TxEip1559, TxEip2930, TxLegacy};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
@@ -26,6 +26,8 @@ pub enum TxType {
     Eip1559 = 2,
     /// EIP-4844 transaction type.
     Eip4844 = 3,
+    /// EIP-7702 transaction type.
+    Eip7702 = 4,
 }
 
 impl From<TxType> for u8 {
@@ -41,6 +43,7 @@ impl fmt::Display for TxType {
             Self::Eip2930 => write!(f, "EIP-2930"),
             Self::Eip1559 => write!(f, "EIP-1559"),
             Self::Eip4844 => write!(f, "EIP-4844"),
+            Self::Eip7702 => write!(f, "EIP-7702"),
         }
     }
 }
@@ -61,6 +64,7 @@ impl TryFrom<u8> for TxType {
             1 => Self::Eip2930,
             2 => Self::Eip1559,
             3 => Self::Eip4844,
+            4 => Self::Eip7702,
             _ => return Err(Eip2718Error::UnexpectedType(value)),
         })
     }
@@ -101,6 +105,9 @@ pub enum TxEnvelope {
     /// send transactions to the network.
     #[cfg_attr(feature = "serde", serde(rename = "0x3", alias = "0x03"))]
     Eip4844(Signed<TxEip4844Variant>),
+    /// A [`TxEip7702`] tagged with type 4.
+    #[cfg_attr(feature = "serde", serde(rename = "0x4", alias = "0x04"))]
+    Eip7702(Signed<TxEip7702>),
 }
 
 impl From<Signed<TxLegacy>> for TxEnvelope {
@@ -141,6 +148,12 @@ impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
     }
 }
 
+impl From<Signed<TxEip7702>> for TxEnvelope {
+    fn from(v: Signed<TxEip7702>) -> Self {
+        Self::Eip7702(v)
+    }
+}
+
 impl TxEnvelope {
     /// Returns true if the transaction is a legacy transaction.
     #[inline]
@@ -164,6 +177,12 @@ impl TxEnvelope {
     #[inline]
     pub const fn is_eip4844(&self) -> bool {
         matches!(self, Self::Eip4844(_))
+    }
+
+    /// Returns true if the transaction is an EIP-7702 transaction.
+    #[inline]
+    pub const fn is_eip7702(&self) -> bool {
+        matches!(self, Self::Eip7702(_))
     }
 
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
@@ -198,6 +217,14 @@ impl TxEnvelope {
         }
     }
 
+    /// Returns the [`TxEip7702`] variant if the transaction is an EIP-7702 transaction.
+    pub const fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
+        match self {
+            Self::Eip7702(tx) => Some(tx),
+            _ => None,
+        }
+    }
+
     /// Recover the signer of the transaction.
     #[cfg(feature = "k256")]
     pub fn recover_signer(
@@ -208,6 +235,7 @@ impl TxEnvelope {
             Self::Eip2930(tx) => tx.recover_signer(),
             Self::Eip1559(tx) => tx.recover_signer(),
             Self::Eip4844(tx) => tx.recover_signer(),
+            Self::Eip7702(tx) => tx.recover_signer(),
         }
     }
 
@@ -218,6 +246,7 @@ impl TxEnvelope {
             Self::Eip2930(tx) => tx.signature_hash(),
             Self::Eip1559(tx) => tx.signature_hash(),
             Self::Eip4844(tx) => tx.signature_hash(),
+            Self::Eip7702(tx) => tx.signature_hash(),
         }
     }
 
@@ -229,6 +258,7 @@ impl TxEnvelope {
             Self::Eip2930(tx) => tx.hash(),
             Self::Eip1559(tx) => tx.hash(),
             Self::Eip4844(tx) => tx.hash(),
+            Self::Eip7702(tx) => tx.hash(),
         }
     }
 
@@ -240,6 +270,7 @@ impl TxEnvelope {
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
+            Self::Eip7702(_) => TxType::Eip7702,
         }
     }
 
@@ -271,6 +302,10 @@ impl TxEnvelope {
                     outer_header.length() + outer_payload_length
                 }
             },
+            Self::Eip7702(t) => {
+                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
+                Header { list: true, payload_length }.length() + payload_length
+            }
         }
     }
 
@@ -321,6 +356,7 @@ impl Decodable2718 for TxEnvelope {
             TxType::Eip2930 => Ok(TxEip2930::decode_signed_fields(buf)?.into()),
             TxType::Eip1559 => Ok(TxEip1559::decode_signed_fields(buf)?.into()),
             TxType::Eip4844 => Ok(TxEip4844Variant::decode_signed_fields(buf)?.into()),
+            TxType::Eip7702 => Ok(TxEip7702::decode_signed_fields(buf)?.into()),
             TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
         }
     }
@@ -337,6 +373,7 @@ impl Encodable2718 for TxEnvelope {
             Self::Eip2930(_) => Some(TxType::Eip2930.into()),
             Self::Eip1559(_) => Some(TxType::Eip1559.into()),
             Self::Eip4844(_) => Some(TxType::Eip4844.into()),
+            Self::Eip7702(_) => Some(TxType::Eip7702.into()),
         }
     }
 
@@ -357,6 +394,9 @@ impl Encodable2718 for TxEnvelope {
             Self::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
+            Self::Eip7702(tx) => {
+                tx.tx().encode_with_signature(tx.signature(), out, false);
+            }
         }
     }
 }
@@ -368,6 +408,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().chain_id(),
             Self::Eip1559(tx) => tx.tx().chain_id(),
             Self::Eip4844(tx) => tx.tx().chain_id(),
+            Self::Eip7702(tx) => tx.tx().chain_id(),
         }
     }
 
@@ -377,6 +418,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().gas_limit(),
             Self::Eip1559(tx) => tx.tx().gas_limit(),
             Self::Eip4844(tx) => tx.tx().gas_limit(),
+            Self::Eip7702(tx) => tx.tx().gas_limit(),
         }
     }
 
@@ -386,6 +428,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().gas_price(),
             Self::Eip1559(tx) => tx.tx().gas_price(),
             Self::Eip4844(tx) => tx.tx().gas_price(),
+            Self::Eip7702(tx) => tx.tx().gas_price(),
         }
     }
 
@@ -395,6 +438,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().input(),
             Self::Eip1559(tx) => tx.tx().input(),
             Self::Eip4844(tx) => tx.tx().input(),
+            Self::Eip7702(tx) => tx.tx().input(),
         }
     }
 
@@ -404,6 +448,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().nonce(),
             Self::Eip1559(tx) => tx.tx().nonce(),
             Self::Eip4844(tx) => tx.tx().nonce(),
+            Self::Eip7702(tx) => tx.tx().nonce(),
         }
     }
 
@@ -413,6 +458,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().to(),
             Self::Eip1559(tx) => tx.tx().to(),
             Self::Eip4844(tx) => tx.tx().to(),
+            Self::Eip7702(tx) => tx.tx().to(),
         }
     }
 
@@ -422,6 +468,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().value(),
             Self::Eip1559(tx) => tx.tx().value(),
             Self::Eip4844(tx) => tx.tx().value(),
+            Self::Eip7702(tx) => tx.tx().value(),
         }
     }
 }
@@ -682,6 +729,8 @@ mod tests {
         };
         test_encode_decode_roundtrip(tx, None);
     }
+
+    // TODO: Test for EIP-7702
 
     #[test]
     fn test_encode_decode_transaction_list() {
