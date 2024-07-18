@@ -1,9 +1,10 @@
-use crate::Sealable;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
 };
-use alloy_primitives::{b256, keccak256, Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+use alloy_primitives::{
+    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
+};
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
@@ -161,7 +162,7 @@ impl Default for Header {
 }
 
 impl Sealable for Header {
-    fn hash(&self) -> B256 {
+    fn hash_slow(&self) -> B256 {
         self.hash_slow()
     }
 }

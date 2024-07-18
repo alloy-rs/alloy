@@ -42,8 +42,7 @@ pub use alloy_eips::eip4844::{
 #[cfg(feature = "kzg")]
 pub use alloy_eips::eip4844::env_settings::EnvKzgSettings;
 
-mod sealed;
-pub use sealed::{Sealable, Sealed};
+pub use alloy_primitives::{Sealable, Sealed};
 
 mod signed;
 pub use signed::Signed;
