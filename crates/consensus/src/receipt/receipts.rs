@@ -107,7 +107,7 @@ impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
 /// This convenience type allows us to lazily calculate the bloom filter for a
 /// receipt, similar to [`Sealed`].
 ///
-/// [`Sealed`]: crate::sealed::Sealed
+/// [`Sealed`]: crate::Sealed
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
