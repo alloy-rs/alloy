@@ -178,10 +178,12 @@ impl Deref for SignedAuthorization {
 impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         use k256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
-        let key_bytes = u.arbitrary::<[u8; 32]>()?;
-        let signing_key = SigningKey::from_bytes(&key_bytes.into())
-            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
-
+        let signing_key = loop {
+            let key_bytes = u.arbitrary::<B256>()?;
+            if let Ok(signing_key) = SigningKey::from_bytes(&key_bytes.0.into()) {
+                break signing_key;
+            }
+        };
         let inner = u.arbitrary::<Authorization>()?;
         let signature_hash = inner.signature_hash();
 
@@ -371,6 +373,8 @@ mod tests {
     #[test]
     fn test_arbitrary_auth() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured auth");
-        let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
+        for _ in 0..10000 {
+            let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
+        }
     }
 }
