@@ -8,6 +8,6 @@ where
     T: Deserialize<'de> + Default,
     D: Deserializer<'de>,
 {
-    let s: Option<T> = Deserialize::deserialize(deserializer)?;
+    let s: Option<T> = Deserialize::deserialize(deserializer).ok();
     Ok(s.unwrap_or_default())
 }
