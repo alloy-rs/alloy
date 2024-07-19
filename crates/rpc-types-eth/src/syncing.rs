@@ -28,10 +28,10 @@ pub struct SyncInfo {
 pub struct Stage {
     /// The name of the sync stage.
     #[serde(alias = "stage_name")]
-    name: String,
+    pub name: String,
     /// Indicates the progress of the sync stage.
     #[serde(alias = "block_number", with = "alloy_serde::quantity")]
-    block: u64,
+    pub block: u64,
 }
 
 /// Peers info
