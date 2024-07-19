@@ -105,7 +105,7 @@ pub struct PipProtocolInfo {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyncStatus {
     /// Info when syncing
-    Info(SyncInfo),
+    Info(Box<SyncInfo>),
     /// Not syncing
     None,
 }
@@ -120,7 +120,7 @@ impl<'de> Deserialize<'de> for SyncStatus {
         enum Syncing {
             /// When client is synced to the highest block, eth_syncing with return "false"
             None(bool),
-            IsSyncing(SyncInfo),
+            IsSyncing(Box<SyncInfo>),
         }
 
         match Syncing::deserialize(deserializer)? {
