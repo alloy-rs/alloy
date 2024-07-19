@@ -445,12 +445,12 @@ impl Geth {
         Ok(GethInstance {
             pid: child,
             config: NodeConfig::default()
-                .port(port)
-                .p2p_port(p2p_port.unwrap())
-                .auth_port(self.authrpc_port.unwrap())
-                .data_dir(self.data_dir.unwrap())
-                .ipc(self.ipc_path.unwrap())
-                .genesis(self.genesis.unwrap()),
+                .port(Some(port))
+                .p2p_port(p2p_port)
+                .auth_port(Some(authrpc_port))
+                .data_dir(self.data_dir)
+                .ipc(self.ipc_path)
+                .genesis(self.genesis),
         })
     }
 }

@@ -60,38 +60,50 @@ impl Default for NodeConfig {
 
 impl NodeConfig {
     /// Sets the port of the node.
-    pub fn port(mut self, port: u16) -> Self {
-        self.port = port;
+    pub fn port(mut self, port: Option<u16>) -> Self {
+        if let Some(port) = port {
+            self.port = port;
+        }
         self
     }
 
     /// Sets the auth port of the node.
-    pub fn auth_port(mut self, auth_port: u16) -> Self {
-        self.auth_port = Some(auth_port);
+    pub fn auth_port(mut self, auth_port: Option<u16>) -> Self {
+        if let Some(auth_port) = auth_port {
+            self.auth_port = Some(auth_port);
+        }
         self
     }
 
     /// Sets the p2p port of the node.
-    pub fn p2p_port(mut self, p2p_port: u16) -> Self {
-        self.p2p_port = Some(p2p_port);
+    pub fn p2p_port(mut self, p2p_port: Option<u16>) -> Self {
+        if let Some(p2p_port) = p2p_port {
+            self.p2p_port = Some(p2p_port);
+        }
         self
     }
 
     /// Sets the data directory of the node.
-    pub fn data_dir(mut self, data_dir: PathBuf) -> Self {
-        self.data_dir = Some(data_dir);
+    pub fn data_dir(mut self, data_dir: Option<PathBuf>) -> Self {
+        if let Some(data_dir) = data_dir {
+            self.data_dir = Some(data_dir);
+        }
         self
     }
 
     /// Sets the genesis configuration of the node.
-    pub fn genesis(mut self, genesis: Genesis) -> Self {
-        self.genesis = Some(genesis);
+    pub fn genesis(mut self, genesis: Option<Genesis>) -> Self {
+        if let Some(genesis) = genesis {
+            self.genesis = Some(genesis);
+        }
         self
     }
 
     /// Sets the IPC path of the node.
-    pub fn ipc(mut self, ipc: PathBuf) -> Self {
-        self.ipc = Some(ipc);
+    pub fn ipc(mut self, ipc: Option<PathBuf>) -> Self {
+        if let Some(ipc) = ipc {
+            self.ipc = Some(ipc);
+        }
         self
     }
 }

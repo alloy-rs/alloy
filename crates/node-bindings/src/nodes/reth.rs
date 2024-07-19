@@ -2,7 +2,7 @@
 
 use crate::{
     extract_endpoint, DevOptions, NodeConfig, NodeError, NodeInstance, NodeInstanceError, NodeMode,
-    PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    PrivateNetOptions, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
 use std::{
@@ -12,7 +12,6 @@ use std::{
     process::{Child, Command, Stdio},
     time::Instant,
 };
-use tempfile::tempdir;
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,trace,rpc,reth,ots,admin,debug";
@@ -53,7 +52,7 @@ impl NodeInstance for RethInstance {
         self.config().ipc.as_ref().map(|ipc| ipc.display().to_string()).to_owned().unwrap()
     }
 
-    fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
+    fn wait_to_add_peer(&mut self, _id: &str) -> Result<(), NodeInstanceError> {
         unimplemented!()
     }
 }
@@ -369,12 +368,12 @@ impl Reth {
         Ok(RethInstance {
             pid: child,
             config: NodeConfig::default()
-                .port(port)
-                .p2p_port(p2p_port)
-                .auth_port(auth_port)
-                .data_dir(self.data_dir.unwrap())
-                .ipc(self.ipc_path.unwrap())
-                .genesis(self.genesis.unwrap()),
+                .port(Some(port))
+                .p2p_port(Some(p2p_port))
+                .auth_port(Some(auth_port))
+                .data_dir(self.data_dir)
+                .ipc(self.ipc_path)
+                .genesis(self.genesis),
         })
     }
 }
