@@ -65,8 +65,6 @@ pub struct SimCallResult {
     #[serde(with = "alloy_serde::quantity")]
     /// The final status of the transaction, typically indicating success or failure.
     pub status: u64,
-    // The error  of the transaction.
-    // error: SimulateV1Error,
 }
 
 /// Simulation options for executing multiple blocks and transactions.
