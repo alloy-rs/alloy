@@ -173,7 +173,10 @@ impl SignedAuthorization {
         self,
     ) -> Result<RecoveredAuthorization, alloy_primitives::SignatureError> {
         let authority = self.recover_authority()?;
-        Ok(RecoveredAuthorization { inner: self.inner, authority })
+        Ok(RecoveredAuthorization {
+            inner: self.inner,
+            authority: RecoveredAuthority::Valid(authority),
+        })
     }
 }
 
@@ -320,6 +323,7 @@ impl Deref for OptionalNonce {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, Signature};
+    use arbitrary::Arbitrary;
     use core::str::FromStr;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
