@@ -42,3 +42,9 @@ fn test_extract_address() {
     let line = "INFO [07-01|13:20:42.774] HTTP server started                      endpoint=127.0.0.1:8545 auth=false prefix= cors= vhosts=localhost";
     assert_eq!(extract_endpoint(line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
 }
+
+#[test]
+fn test_unused_port() {
+    let port = unused_port();
+    assert!(port > 0);
+}

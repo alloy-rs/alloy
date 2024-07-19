@@ -6,6 +6,7 @@ use std::{
     process::{Child, ChildStderr},
     time::Duration,
 };
+use thiserror::Error;
 use url::Url;
 
 /// How long we will wait for geth to indicate that it is ready.
@@ -112,6 +113,41 @@ pub trait NodeInstance {
     fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
         self.pid().stderr.take().ok_or(NodeInstanceError::NoStderr)
     }
+}
+
+/// Errors that can occur when working with the [`Node`].
+#[derive(Debug, Error)]
+pub enum NodeError {
+    /// The chain id was not set.
+    #[error("the chain ID was not set")]
+    ChainIdNotSet,
+    /// Could not create the data directory.
+    #[error("could not create directory: {0}")]
+    CreateDirError(std::io::Error),
+    /// No stderr was captured from the child process.
+    #[error("no stderr was captured from the process")]
+    NoStderr,
+    /// Timed out waiting for node to start.
+    #[error("timed out waiting for node to spawn; is it installed?")]
+    Timeout,
+    /// Encountered a fatal error.
+    #[error("fatal error: {0}")]
+    Fatal(String),
+    /// A line could not be read from the node stderr.
+    #[error("could not read line from node stderr: {0}")]
+    ReadLineError(std::io::Error),
+    /// Genesis error
+    #[error("genesis error occurred: {0}")]
+    GenesisError(String),
+    /// Node init error
+    #[error("node init error occurred")]
+    InitError,
+    /// Spawn node error
+    #[error("could not spawn node: {0}")]
+    SpawnError(std::io::Error),
+    /// Wait error
+    #[error("could not wait for node to exit: {0}")]
+    WaitError(std::io::Error),
 }
 
 /// Whether or not node is in `dev` mode and configuration options that depend on the mode.

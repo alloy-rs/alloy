@@ -1,7 +1,7 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, DevOptions, NodeConfig, NodeInstance,
+    extract_endpoint, extract_value, unused_port, DevOptions, NodeConfig, NodeError, NodeInstance,
     NodeInstanceError, NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -13,7 +13,6 @@ use std::{
     time::Instant,
 };
 use tempfile::tempdir;
-use thiserror::Error;
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
@@ -77,41 +76,6 @@ impl Drop for GethInstance {
     fn drop(&mut self) {
         self.pid.kill().expect("could not kill geth");
     }
-}
-
-/// Errors that can occur when working with the [`Geth`].
-#[derive(Debug, Error)]
-pub enum GethError {
-    /// The chain id was not set.
-    #[error("the chain ID was not set")]
-    ChainIdNotSet,
-    /// Could not create the data directory.
-    #[error("could not create directory: {0}")]
-    CreateDirError(std::io::Error),
-    /// No stderr was captured from the child process.
-    #[error("no stderr was captured from the process")]
-    NoStderr,
-    /// Timed out waiting for geth to start.
-    #[error("timed out waiting for geth to spawn; is geth installed?")]
-    Timeout,
-    /// Encountered a fatal error.
-    #[error("fatal error: {0}")]
-    Fatal(String),
-    /// A line could not be read from the geth stderr.
-    #[error("could not read line from geth stderr: {0}")]
-    ReadLineError(std::io::Error),
-    /// Genesis error
-    #[error("genesis error occurred: {0}")]
-    GenesisError(String),
-    /// Geth init error
-    #[error("geth init error occurred")]
-    InitError,
-    /// Spawn geth error
-    #[error("could not spawn geth: {0}")]
-    SpawnError(std::io::Error),
-    /// Wait error
-    #[error("could not wait for geth to exit: {0}")]
-    WaitError(std::io::Error),
 }
 
 /// Builder for launching `geth`.
@@ -292,7 +256,7 @@ impl Geth {
     }
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
-    pub fn try_spawn(self) -> Result<GethInstance, GethError> {
+    pub fn try_spawn(self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program
             .as_ref()
@@ -302,7 +266,7 @@ impl Geth {
         // geth uses stderr for its logs
         cmd.stderr(Stdio::piped());
 
-        // If no port provided, let the os chose it for us
+        // If no port provided, let the OS choose it for us.
         let mut port = self.port.unwrap_or(0);
         let port_s = port.to_string();
 
@@ -311,41 +275,40 @@ impl Geth {
             cmd.arg("--ipcdisable");
         }
 
-        // Open the HTTP API
+        // Open the HTTP API.
         cmd.arg("--http");
         cmd.arg("--http.port").arg(&port_s);
         cmd.arg("--http.api").arg(API);
 
-        // Open the WS API
+        // Open the WS API.
         cmd.arg("--ws");
         cmd.arg("--ws.port").arg(port_s);
         cmd.arg("--ws.api").arg(API);
 
-        // pass insecure unlock flag if set
-
+        // Pass insecure unlock flag if set.
         if self.insecure_unlock {
             cmd.arg("--allow-insecure-unlock");
         }
 
-        // Set the port for authenticated APIs
+        // Set the port for authenticated APIs.
         let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
         cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(GethError::CreateDirError)?.into_path();
+            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.into_path();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
 
             // create the genesis file
             let mut file = File::create(&temp_genesis_path).map_err(|_| {
-                GethError::GenesisError("could not create genesis file".to_string())
+                NodeError::GenesisError("could not create genesis file".to_string())
             })?;
 
             // serialize genesis and write to file
             serde_json::to_writer_pretty(&mut file, &genesis).map_err(|_| {
-                GethError::GenesisError("could not write genesis to file".to_string())
+                NodeError::GenesisError("could not write genesis to file".to_string())
             })?;
 
             let mut init_cmd = Command::new(bin_path);
@@ -359,17 +322,17 @@ impl Geth {
             init_cmd.arg("init").arg(temp_genesis_path);
             let res = init_cmd
                 .spawn()
-                .map_err(GethError::SpawnError)?
+                .map_err(NodeError::SpawnError)?
                 .wait()
-                .map_err(GethError::WaitError)?;
+                .map_err(NodeError::WaitError)?;
             // .expect("failed to wait for geth init to exit");
             if !res.success() {
-                return Err(GethError::InitError);
+                return Err(NodeError::InitError);
             }
 
             // clean up the temp dir which is now persisted
             std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
-                GethError::GenesisError("could not remove genesis temp dir".to_string())
+                NodeError::GenesisError("could not remove genesis temp dir".to_string())
             })?;
         }
 
@@ -378,7 +341,7 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(GethError::CreateDirError)?;
+                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
@@ -415,9 +378,9 @@ impl Geth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        let mut child = cmd.spawn().map_err(GethError::SpawnError)?;
+        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stderr = child.stderr.ok_or(GethError::NoStderr)?;
+        let stderr = child.stderr.ok_or(NodeError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
@@ -429,11 +392,11 @@ impl Geth {
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
-                return Err(GethError::Timeout);
+                return Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(GethError::ReadLineError)?;
+            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
@@ -465,7 +428,7 @@ impl Geth {
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                return Err(GethError::Fatal(line));
+                return Err(NodeError::Fatal(line));
             }
 
             if p2p_started && http_started {
