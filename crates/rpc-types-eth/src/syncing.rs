@@ -30,7 +30,7 @@ pub struct Stage {
     #[serde(rename = "stage_name", alias = "stage_name")]
     name: String,
     /// Indicates the progress of the sync stage.
-    #[serde(rename = "block_number", alias = "block_number", with = "alloy_serde::quantity")]
+    #[serde(alias = "block_number", with = "alloy_serde::quantity")]
     block: u64,
 }
 
