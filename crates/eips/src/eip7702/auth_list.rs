@@ -9,6 +9,17 @@ use alloy_rlp::{
 };
 use core::hash::{Hash, Hasher};
 
+/// Represents the outcome of an attempt to recover the authority from an authorization.
+/// It can either be valid (containing an Address) or invalid (indicating recovery failure).
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum RecoveredAuthority {
+    /// Indicates a successfully recovered authority address.
+    Valid(Address),
+    /// Indicates a failed recovery attempt where no valid address could be recovered.
+    Invalid,
+}
+
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, Hash, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -200,22 +211,24 @@ impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
 pub struct RecoveredAuthorization {
     #[cfg_attr(feature = "serde", serde(flatten))]
     inner: Authorization,
-    authority: Address,
+    /// The result of the authority recovery process, which can either be a valid address or
+    /// indicate a failure.
+    authority: RecoveredAuthority,
 }
 
 impl RecoveredAuthorization {
     /// Instantiate without performing recovery. This should be used carefully.
-    pub const fn new_unchecked(inner: Authorization, authority: Address) -> Self {
+    pub const fn new_unchecked(inner: Authorization, authority: RecoveredAuthority) -> Self {
         Self { inner, authority }
     }
 
     /// Get the `authority` for the authorization.
-    pub const fn authority(&self) -> Address {
-        self.authority
+    pub fn authority(&self) -> RecoveredAuthority {
+        self.authority.clone()
     }
 
     /// Splits the authorization into parts.
-    pub const fn into_parts(self) -> (Authorization, Address) {
+    pub const fn into_parts(self) -> (Authorization, RecoveredAuthority) {
         (self.inner, self.authority)
     }
 }
@@ -307,7 +320,6 @@ impl Deref for OptionalNonce {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, Signature};
-    use arbitrary::Arbitrary;
     use core::str::FromStr;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
