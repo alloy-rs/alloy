@@ -26,8 +26,12 @@ pub struct SyncInfo {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Stage {
+    /// The name of the sync stage.
+    #[serde(rename = "stage_name", alias = "stage_name")]
     name: String,
-    block: U64,
+    /// Indicates the progress of the sync stage.
+    #[serde(rename = "block_number", alias = "block_number", with = "alloy_serde::quantity")]
+    block: u64,
 }
 
 /// Peers info
