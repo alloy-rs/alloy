@@ -1,17 +1,19 @@
 //! Utilities for launching a Reth dev-mode instance.
 
 use crate::{
-    extract_endpoint, DevOptions, NodeConfig, NodeError, NodeInstance, NodeInstanceError, NodeMode,
-    PrivateNetOptions, NODE_STARTUP_TIMEOUT,
+    extract_endpoint, DevOptions, NodeError, NodeInstanceError, NodeMode, PrivateNetOptions,
+    NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
 use std::{
-    fs::{create_dir, File},
+    fs::create_dir,
     io::{BufRead, BufReader},
     path::PathBuf,
-    process::{Child, Command, Stdio},
+    process::{Child, ChildStderr, Command, Stdio},
     time::Instant,
 };
+
+use url::Url;
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,trace,rpc,reth,ots,admin,debug";
@@ -19,41 +21,74 @@ const API: &str = "eth,net,web3,txpool,trace,rpc,reth,ots,admin,debug";
 /// The reth command
 const RETH: &str = "reth";
 
-/// The Reth instance.
+/// A reth instance. Will close the instance when dropped.
+///
+/// Construct this using [`Reth`].
 #[derive(Debug)]
 pub struct RethInstance {
-    /// The configuration of the node.
-    config: NodeConfig,
-    /// The child process of the node.
     pid: Child,
+    port: u16,
+    ipc: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
+    p2p_port: Option<u16>,
+    auth_port: Option<u16>,
+    genesis: Option<Genesis>,
 }
 
 impl RethInstance {
-    /// Creates a new Reth instance.
-    pub fn new(config: NodeConfig, pid: Child) -> Self {
-        Self { config, pid }
-    }
-}
-
-impl NodeInstance for RethInstance {
-    fn config(&self) -> &NodeConfig {
-        &self.config
+    /// Returns the port of this instance
+    pub const fn port(&self) -> u16 {
+        self.port
     }
 
-    fn pid(&mut self) -> &mut Child {
-        &mut self.pid
+    /// Returns the p2p port of this instance
+    pub const fn p2p_port(&self) -> Option<u16> {
+        self.p2p_port
     }
 
-    fn p2p_port(&self) -> Option<u16> {
-        unimplemented!()
+    /// Returns the HTTP endpoint of this instance
+    #[doc(alias = "http_endpoint")]
+    pub fn endpoint(&self) -> String {
+        format!("http://localhost:{}", self.port)
     }
 
-    fn ipc_endpoint(&self) -> String {
-        self.config().ipc.as_ref().map(|ipc| ipc.display().to_string()).to_owned().unwrap()
+    /// Returns the Websocket endpoint of this instance
+    pub fn ws_endpoint(&self) -> String {
+        format!("ws://localhost:{}", self.port)
     }
 
-    fn wait_to_add_peer(&mut self, _id: &str) -> Result<(), NodeInstanceError> {
-        unimplemented!()
+    /// Returns the IPC endpoint of this instance
+    pub fn ipc_endpoint(&self) -> String {
+        self.ipc.clone().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
+    }
+
+    /// Returns the HTTP endpoint url of this instance
+    #[doc(alias = "http_endpoint_url")]
+    pub fn endpoint_url(&self) -> Url {
+        Url::parse(&self.endpoint()).unwrap()
+    }
+
+    /// Returns the Websocket endpoint url of this instance
+    pub fn ws_endpoint_url(&self) -> Url {
+        Url::parse(&self.ws_endpoint()).unwrap()
+    }
+
+    /// Returns the path to this instances' data directory
+    pub const fn data_dir(&self) -> &Option<PathBuf> {
+        &self.data_dir
+    }
+
+    /// Returns the genesis configuration used to configure this instance
+    pub const fn genesis(&self) -> &Option<Genesis> {
+        &self.genesis
+    }
+
+    /// Takes the stderr contained in the child process.
+    ///
+    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
+    /// will fail if called after this.
+    pub fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
+        self.pid.stderr.take().ok_or(NodeInstanceError::NoStderr)
     }
 }
 
@@ -367,13 +402,12 @@ impl Reth {
 
         Ok(RethInstance {
             pid: child,
-            config: NodeConfig::default()
-                .port(Some(port))
-                .p2p_port(Some(p2p_port))
-                .auth_port(Some(auth_port))
-                .data_dir(self.data_dir)
-                .ipc(self.ipc_path)
-                .genesis(self.genesis),
+            port,
+            ipc: self.ipc_path,
+            data_dir: self.data_dir,
+            p2p_port: Some(p2p_port),
+            auth_port: Some(auth_port),
+            genesis: self.genesis,
         })
     }
 }

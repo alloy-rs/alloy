@@ -1,184 +1,28 @@
-//! Generic node bindings to a node.
+//! Node-related types and constants.
 
-use alloy_genesis::Genesis;
-use std::{
-    path::PathBuf,
-    process::{Child, ChildStderr},
-    time::Duration,
-};
+use std::time::Duration;
 use thiserror::Error;
-use url::Url;
 
-/// How long we will wait for geth to indicate that it is ready.
+/// How long we will wait for the node to indicate that it is ready.
 pub const NODE_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Timeout for waiting for geth to add a peer.
+/// Timeout for waiting for the node to add a peer.
 pub const NODE_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Errors that can occur when working with the [`GethInstance`].
+/// Errors that can occur when working with a node instance.
 #[derive(Debug)]
 pub enum NodeInstanceError {
-    /// Timed out waiting for a message from geth's stderr.
+    /// Timed out waiting for a message from node's stderr.
     Timeout(String),
 
-    /// A line could not be read from the geth stderr.
+    /// A line could not be read from the node's stderr.
     ReadLineError(std::io::Error),
 
-    /// The child geth process's stderr was not captured.
+    /// The child node process's stderr was not captured.
     NoStderr,
 }
 
-/// Configuration for a node.
-#[derive(Debug)]
-pub struct NodeConfig {
-    /// The port of the node.
-    pub port: u16,
-    /// The auth token of the node.
-    pub auth_port: Option<u16>,
-    /// The p2p port of the node.
-    pub p2p_port: Option<u16>,
-    /// The data directory of the node.
-    pub data_dir: Option<PathBuf>,
-    /// The genesis configuration of the node.
-    pub genesis: Option<Genesis>,
-    /// The IPC path of the node.
-    pub ipc: Option<PathBuf>,
-}
-
-impl Default for NodeConfig {
-    fn default() -> Self {
-        Self {
-            port: 8545,
-            auth_port: None,
-            p2p_port: None,
-            data_dir: None,
-            genesis: None,
-            ipc: None,
-        }
-    }
-}
-
-impl NodeConfig {
-    /// Sets the port of the node.
-    pub fn port(mut self, port: Option<u16>) -> Self {
-        if let Some(port) = port {
-            self.port = port;
-        }
-        self
-    }
-
-    /// Sets the auth port of the node.
-    pub fn auth_port(mut self, auth_port: Option<u16>) -> Self {
-        if let Some(auth_port) = auth_port {
-            self.auth_port = Some(auth_port);
-        }
-        self
-    }
-
-    /// Sets the p2p port of the node.
-    pub fn p2p_port(mut self, p2p_port: Option<u16>) -> Self {
-        if let Some(p2p_port) = p2p_port {
-            self.p2p_port = Some(p2p_port);
-        }
-        self
-    }
-
-    /// Sets the data directory of the node.
-    pub fn data_dir(mut self, data_dir: Option<PathBuf>) -> Self {
-        if let Some(data_dir) = data_dir {
-            self.data_dir = Some(data_dir);
-        }
-        self
-    }
-
-    /// Sets the genesis configuration of the node.
-    pub fn genesis(mut self, genesis: Option<Genesis>) -> Self {
-        if let Some(genesis) = genesis {
-            self.genesis = Some(genesis);
-        }
-        self
-    }
-
-    /// Sets the IPC path of the node.
-    pub fn ipc(mut self, ipc: Option<PathBuf>) -> Self {
-        if let Some(ipc) = ipc {
-            self.ipc = Some(ipc);
-        }
-        self
-    }
-}
-
-/// A node instance. Will close the instance when dropped.
-///
-/// Construct this using [`Node`].
-pub trait NodeInstance {
-    /// Returns the configuration of this instance.
-    fn config(&self) -> &NodeConfig;
-
-    /// Returns the child process of this instance.
-    fn pid(&mut self) -> &mut Child;
-
-    /// Returns the port of this instance.
-    fn port(&self) -> u16 {
-        self.config().port
-    }
-
-    /// Returns the p2p port of this instance.
-    fn p2p_port(&self) -> Option<u16>;
-
-    /// Returns the path to this instances' data directory.
-    fn data_dir(&self) -> &Option<PathBuf> {
-        &self.config().data_dir
-    }
-
-    /// Returns the genesis configuration used to configure this instance.
-    fn genesis(&self) -> &Option<Genesis> {
-        &self.config().genesis
-    }
-
-    /// Returns the IPC path of this instance.
-    fn ipc(&self) -> &Option<PathBuf> {
-        &self.config().ipc
-    }
-
-    /// Returns the HTTP endpoint of this instance.
-    #[doc(alias = "http_endpoint")]
-    fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.config().port)
-    }
-
-    /// Returns the Websocket endpoint of this instance.
-    fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.config().port)
-    }
-
-    /// Returns the IPC endpoint of this instance.
-    fn ipc_endpoint(&self) -> String;
-
-    /// Returns the HTTP endpoint url of this instance.
-    #[doc(alias = "http_endpoint_url")]
-    fn endpoint_url(&self) -> Url {
-        Url::parse(&self.endpoint()).unwrap()
-    }
-
-    /// Returns the Websocket endpoint url of this instance.
-    fn ws_endpoint_url(&self) -> Url {
-        Url::parse(&self.ws_endpoint()).unwrap()
-    }
-
-    /// Blocks until the node has added specified peer.
-    fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError>;
-
-    /// Takes the stderr contained in the child process.
-    ///
-    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
-    /// will fail if called after this.
-    fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
-        self.pid().stderr.take().ok_or(NodeInstanceError::NoStderr)
-    }
-}
-
-/// Errors that can occur when working with the [`Node`].
+/// Errors that can occur when working with the node.
 #[derive(Debug, Error)]
 pub enum NodeError {
     /// The chain id was not set.
@@ -190,8 +34,8 @@ pub enum NodeError {
     /// No stderr was captured from the child process.
     #[error("no stderr was captured from the process")]
     NoStderr,
-    /// Timed out waiting for node to start.
-    #[error("timed out waiting for node to spawn; is it installed?")]
+    /// Timed out waiting for the node to start.
+    #[error("timed out waiting for node to spawn; is the node binary installed?")]
     Timeout,
     /// Encountered a fatal error.
     #[error("fatal error: {0}")]
@@ -211,6 +55,10 @@ pub enum NodeError {
     /// Wait error
     #[error("could not wait for node to exit: {0}")]
     WaitError(std::io::Error),
+
+    /// Clique private key error
+    #[error("clique address error: {0}")]
+    CliqueAddressError(String),
 }
 
 /// Whether or not node is in `dev` mode and configuration options that depend on the mode.
@@ -220,6 +68,12 @@ pub enum NodeMode {
     Dev(DevOptions),
     /// Options that cannot be set in dev mode
     NonDev(PrivateNetOptions),
+}
+
+impl Default for NodeMode {
+    fn default() -> Self {
+        Self::Dev(Default::default())
+    }
 }
 
 /// Configuration options that can be set in dev mode.
@@ -237,12 +91,6 @@ pub struct PrivateNetOptions {
 
     /// Whether or not peer discovery is enabled.
     pub discovery: bool,
-}
-
-impl Default for NodeMode {
-    fn default() -> Self {
-        Self::Dev(Default::default())
-    }
 }
 
 impl Default for PrivateNetOptions {

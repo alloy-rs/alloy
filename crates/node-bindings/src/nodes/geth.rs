@@ -1,18 +1,21 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, DevOptions, NodeConfig, NodeError, NodeInstance,
-    NodeInstanceError, NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    extract_endpoint, extract_value, unused_port, DevOptions, NodeError, NodeInstanceError,
+    NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
-use alloy_genesis::Genesis;
+use alloy_genesis::{CliqueConfig, Genesis};
+use alloy_primitives::Address;
+use k256::ecdsa::SigningKey;
 use std::{
     fs::{create_dir, File},
     io::{BufRead, BufReader},
     path::PathBuf,
-    process::{Child, Command, Stdio},
+    process::{Child, ChildStderr, Command, Stdio},
     time::Instant,
 };
 use tempfile::tempdir;
+use url::Url;
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
@@ -20,43 +23,87 @@ const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
 /// The geth command
 const GETH: &str = "geth";
 
-/// A Geth instance.
+/// A geth instance. Will close the instance when dropped.
+///
+/// Construct this using [`Geth`].
 #[derive(Debug)]
 pub struct GethInstance {
-    /// The configuration of the node.
-    config: NodeConfig,
-    /// The child process of the node.
     pid: Child,
+    port: u16,
+    ipc: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
+    p2p_port: Option<u16>,
+    auth_port: Option<u16>,
+    genesis: Option<Genesis>,
+    clique_private_key: Option<SigningKey>,
 }
 
 impl GethInstance {
-    /// Creates a new `GethInstance`.
-    pub fn new(config: NodeConfig, pid: Child) -> Self {
-        Self { config, pid }
-    }
-}
-
-impl NodeInstance for GethInstance {
-    fn config(&self) -> &NodeConfig {
-        &self.config
+    /// Returns the port of this instance
+    pub const fn port(&self) -> u16 {
+        self.port
     }
 
-    fn pid(&mut self) -> &mut Child {
-        &mut self.pid
+    /// Returns the p2p port of this instance
+    pub const fn p2p_port(&self) -> Option<u16> {
+        self.p2p_port
     }
 
-    fn p2p_port(&self) -> Option<u16> {
-        self.config.p2p_port
+    /// Returns the HTTP endpoint of this instance
+    #[doc(alias = "http_endpoint")]
+    pub fn endpoint(&self) -> String {
+        format!("http://localhost:{}", self.port)
     }
 
-    fn ipc_endpoint(&self) -> String {
-        self.ipc().clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
+    /// Returns the Websocket endpoint of this instance
+    pub fn ws_endpoint(&self) -> String {
+        format!("ws://localhost:{}", self.port)
     }
 
-    /// Blocks until Geth adds the specified peer, using 20s as the timeout.
+    /// Returns the IPC endpoint of this instance
+    pub fn ipc_endpoint(&self) -> String {
+        self.ipc.clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
+    }
+
+    /// Returns the HTTP endpoint url of this instance
+    #[doc(alias = "http_endpoint_url")]
+    pub fn endpoint_url(&self) -> Url {
+        Url::parse(&self.endpoint()).unwrap()
+    }
+
+    /// Returns the Websocket endpoint url of this instance
+    pub fn ws_endpoint_url(&self) -> Url {
+        Url::parse(&self.ws_endpoint()).unwrap()
+    }
+
+    /// Returns the path to this instances' data directory
+    pub const fn data_dir(&self) -> &Option<PathBuf> {
+        &self.data_dir
+    }
+
+    /// Returns the genesis configuration used to configure this instance
+    pub const fn genesis(&self) -> &Option<Genesis> {
+        &self.genesis
+    }
+
+    /// Returns the private key used to configure clique on this instance
+    #[deprecated = "clique support was removed in geth >=1.14"]
+    pub const fn clique_private_key(&self) -> &Option<SigningKey> {
+        &self.clique_private_key
+    }
+
+    /// Takes the stderr contained in the child process.
+    ///
+    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
+    /// will fail if called after this.
+    pub fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
+        self.pid.stderr.take().ok_or(NodeInstanceError::NoStderr)
+    }
+
+    /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
+    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
         let mut stderr = self.pid.stderr.as_mut().ok_or(NodeInstanceError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
@@ -113,6 +160,7 @@ pub struct Geth {
     insecure_unlock: bool,
     genesis: Option<Genesis>,
     mode: NodeMode,
+    clique_private_key: Option<SigningKey>,
 }
 
 impl Geth {
@@ -139,12 +187,33 @@ impl Geth {
         Self::new().path(path)
     }
 
+    /// Returns whether the node is launched in Clique consensus mode.
+    pub const fn is_clique(&self) -> bool {
+        self.clique_private_key.is_some()
+    }
+
+    /// Calculates the address of the Clique consensus address.
+    pub fn clique_address(&self) -> Option<Address> {
+        self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
+    }
+
     /// Sets the `path` to the `geth` executable
     ///
     /// By default, it's expected that `geth` is in `$PATH`, see also
     /// [`std::process::Command::new()`]
     pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.program = Some(path.into());
+        self
+    }
+
+    /// Sets the Clique Private Key to the `geth` executable, which will be later
+    /// loaded on the node.
+    ///
+    /// The address derived from this private key will be used to set the `miner.etherbase` field
+    /// on the node.
+    #[deprecated = "clique support was removed in geth >=1.14"]
+    pub fn set_clique_private_key<T: Into<SigningKey>>(mut self, private_key: T) -> Self {
+        self.clique_private_key = Some(private_key.into());
         self
     }
 
@@ -260,7 +329,7 @@ impl Geth {
     }
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
-    pub fn try_spawn(self) -> Result<GethInstance, NodeError> {
+    pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program
             .as_ref()
@@ -270,7 +339,7 @@ impl Geth {
         // geth uses stderr for its logs
         cmd.stderr(Stdio::piped());
 
-        // If no port provided, let the OS choose it for us.
+        // If no port provided, let the os chose it for us
         let mut port = self.port.unwrap_or(0);
         let port_s = port.to_string();
 
@@ -279,24 +348,67 @@ impl Geth {
             cmd.arg("--ipcdisable");
         }
 
-        // Open the HTTP API.
+        // Open the HTTP API
         cmd.arg("--http");
         cmd.arg("--http.port").arg(&port_s);
         cmd.arg("--http.api").arg(API);
 
-        // Open the WS API.
+        // Open the WS API
         cmd.arg("--ws");
         cmd.arg("--ws.port").arg(port_s);
         cmd.arg("--ws.api").arg(API);
 
-        // Pass insecure unlock flag if set.
-        if self.insecure_unlock {
+        // pass insecure unlock flag if set
+        let is_clique = self.is_clique();
+        if self.insecure_unlock || is_clique {
             cmd.arg("--allow-insecure-unlock");
         }
 
-        // Set the port for authenticated APIs.
+        if is_clique {
+            self.inner_disable_discovery();
+        }
+
+        // Set the port for authenticated APIs
         let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
         cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
+
+        // use geth init to initialize the datadir if the genesis exists
+        if is_clique {
+            let clique_addr = self.clique_address();
+            if let Some(genesis) = &mut self.genesis {
+                // set up a clique config with an instant sealing period and short (8 block) epoch
+                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
+                genesis.config.clique = Some(clique_config);
+
+                let clique_addr = clique_addr.ok_or(NodeError::CliqueAddressError(
+                    "could not calculates the address of the Clique consensus address.".to_string(),
+                ))?;
+
+                // set the extraData field
+                let extra_data_bytes =
+                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
+                genesis.extra_data = extra_data_bytes.into();
+
+                // we must set the etherbase if using clique
+                // need to use format! / Debug here because the Address Display impl doesn't show
+                // the entire address
+                cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
+            }
+
+            let clique_addr = self.clique_address().ok_or(NodeError::CliqueAddressError(
+                "could not calculates the address of the Clique consensus address.".to_string(),
+            ))?;
+
+            self.genesis = Some(Genesis::clique_genesis(
+                self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
+                clique_addr,
+            ));
+
+            // we must set the etherbase if using clique
+            // need to use format! / Debug here because the Address Display impl doesn't show the
+            // entire address
+            cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
+        }
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
@@ -444,13 +556,13 @@ impl Geth {
 
         Ok(GethInstance {
             pid: child,
-            config: NodeConfig::default()
-                .port(Some(port))
-                .p2p_port(p2p_port)
-                .auth_port(Some(authrpc_port))
-                .data_dir(self.data_dir)
-                .ipc(self.ipc_path)
-                .genesis(self.genesis),
+            port,
+            ipc: self.ipc_path,
+            data_dir: self.data_dir,
+            p2p_port,
+            auth_port: self.authrpc_port,
+            genesis: self.genesis,
+            clique_private_key: self.clique_private_key,
         })
     }
 }
@@ -508,6 +620,24 @@ mod tests {
             let geth = Geth::new().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
             assert!(p2p_port.is_none(), "{p2p_port:?}");
+        })
+    }
+
+    #[test]
+    #[ignore = "fails on geth >=1.14"]
+    #[allow(deprecated)]
+    fn clique_correctly_configured() {
+        run_with_tempdir(|temp_dir_path| {
+            let private_key = SigningKey::random(&mut rand::thread_rng());
+            let geth = Geth::new()
+                .set_clique_private_key(private_key)
+                .chain_id(1337u64)
+                .data_dir(temp_dir_path)
+                .spawn();
+
+            assert!(geth.p2p_port.is_some());
+            assert!(geth.clique_private_key().is_some());
+            assert!(geth.genesis().is_some());
         })
     }
 }
