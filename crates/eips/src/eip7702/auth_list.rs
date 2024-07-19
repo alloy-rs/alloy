@@ -177,10 +177,15 @@ impl Deref for SignedAuthorization {
 #[cfg(all(any(test, feature = "arbitrary"), feature = "k256"))]
 impl<'a> arbitrary::Arbitrary<'a> for SignedAuthorization {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        use k256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
-        let key_bytes = u.arbitrary::<[u8; 32]>()?;
-        let signing_key = SigningKey::from_bytes(&key_bytes.into())
-            .map_err(|_| arbitrary::Error::IncorrectFormat)?;
+        use k256::{
+            ecdsa::{signature::hazmat::PrehashSigner, SigningKey},
+            NonZeroScalar,
+        };
+        use rand::{rngs::StdRng, SeedableRng};
+
+        let rng_seed = u.arbitrary::<[u8; 32]>()?;
+        let mut rand_gen = StdRng::from_seed(rng_seed);
+        let signing_key: SigningKey = NonZeroScalar::random(&mut rand_gen).into();
 
         let inner = u.arbitrary::<Authorization>()?;
         let signature_hash = inner.signature_hash();
@@ -307,7 +312,6 @@ impl Deref for OptionalNonce {
 mod tests {
     use super::*;
     use alloy_primitives::{hex, Signature};
-    use arbitrary::Arbitrary;
     use core::str::FromStr;
 
     fn test_encode_decode_roundtrip(auth: Authorization) {
@@ -367,10 +371,15 @@ mod tests {
         assert_eq!(decoded, auth);
     }
 
-    #[cfg(feature = "k256")]
+    #[cfg(all(feature = "arbitrary", feature = "k256"))]
     #[test]
     fn test_arbitrary_auth() {
+        use arbitrary::Arbitrary;
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured auth");
+        // try this multiple times
+        let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
+        let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
+        let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
         let _auth = SignedAuthorization::arbitrary(&mut unstructured).unwrap();
     }
 }
