@@ -1,9 +1,9 @@
 use alloy_primitives::{B512, U256, U64};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// Syncing info
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
     /// Starting block
@@ -16,6 +16,9 @@ pub struct SyncInfo {
     pub warp_chunks_amount: Option<U256>,
     /// Warp sync snapshot chunks processed.
     pub warp_chunks_processed: Option<U256>,
+    /// The details of the sync stages as an hashmap
+    /// where the key is the name of the stage and the value is the block number.
+    pub stages: Option<HashMap<String, U256>>,
 }
 
 /// Peers info
@@ -99,7 +102,7 @@ pub struct PipProtocolInfo {
 }
 
 /// Sync status
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyncStatus {
     /// Info when syncing
     Info(SyncInfo),
