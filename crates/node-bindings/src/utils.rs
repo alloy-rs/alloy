@@ -32,21 +32,15 @@ pub(crate) fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
 }
 
 /// Extracts the endpoint from the given line.
-pub(crate) fn extract_endpoint(line: &str) -> Option<SocketAddr> {
-    let val = extract_value("endpoint=", line)?;
-    val.parse::<SocketAddr>().ok()
-}
-
-/// Extracts the url from the given line.
-pub(crate) fn extract_url(line: &str) -> Option<SocketAddr> {
-    let val = extract_value("url=", line)?;
+pub(crate) fn extract_endpoint(line: &str, key: &str) -> Option<SocketAddr> {
+    let val = extract_value(key, line)?;
     val.parse::<SocketAddr>().ok()
 }
 
 #[test]
 fn test_extract_address() {
     let line = "INFO [07-01|13:20:42.774] HTTP server started                      endpoint=127.0.0.1:8545 auth=false prefix= cors= vhosts=localhost";
-    assert_eq!(extract_endpoint(line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
+    assert_eq!(extract_endpoint("endpoint=", line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
 }
 
 #[test]

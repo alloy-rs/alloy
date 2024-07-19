@@ -1,8 +1,8 @@
 //! Utilities for launching a Reth dev-mode instance.
 
 use crate::{
-    extract_url, unused_port, DevOptions, NodeConfig, NodeError, NodeInstance, NodeInstanceError,
-    NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    extract_endpoint, DevOptions, NodeConfig, NodeError, NodeInstance, NodeInstanceError, NodeMode,
+    PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
 use std::{
@@ -241,7 +241,8 @@ impl Reth {
         let mut cmd = Command::new(&bin_path);
         // reth uses stderr for its logs
         cmd.stderr(Stdio::piped());
-        // use the node subcommand
+
+        // Use Reth's `node` subcommand.
         cmd.arg("node");
 
         // If IPC is not enabled on the builder, disable it.
@@ -265,11 +266,9 @@ impl Reth {
         // - `AUTH_PORT`: default + `instance` * 100 - 100
         // - `HTTP_RPC_PORT`: default - `instance` + 1
         // - `WS_RPC_PORT`: default + `instance` * 2 - 2
-        cmd.arg("--instance").arg(self.instance.to_string());
-
-        // Set the port for authenticated APIs.
-        let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
-        cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
+        if self.instance > 0 {
+            cmd.arg("--instance").arg(self.instance.to_string());
+        }
 
         if let Some(data_dir) = &self.data_dir {
             cmd.arg("--datadir").arg(data_dir);
@@ -301,7 +300,7 @@ impl Reth {
         }
 
         // debug verbosity is needed to check when peers are added
-        cmd.arg("--verbosity").arg("-vvv");
+        cmd.arg("--verbosity").arg("-vvvv");
 
         if let Some(ipc) = &self.ipc_path {
             cmd.arg("--ipcpath").arg(ipc);
@@ -314,8 +313,12 @@ impl Reth {
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
-        let mut port = 0;
+        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
         let mut http_started = false;
+
+        let mut port = 0;
+        let mut p2p_port = 0;
+        let mut auth_port = 0;
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
@@ -325,14 +328,33 @@ impl Reth {
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
+            if line.contains("RPC auth server started") {
+                if let Some(addr) = extract_endpoint("url=", &line) {
+                    auth_port = addr.port();
+                }
+            }
+
             if line.contains("HTTP server started") {
                 // Extracts the address from the output
-                if let Some(addr) = extract_url(&line) {
+                if let Some(addr) = extract_endpoint("url=", &line) {
                     // use the actual http port
                     port = addr.port();
                 }
 
                 http_started = true;
+            }
+
+            if line.contains("Started P2P networking") {
+                p2p_started = true;
+            }
+
+            if line.contains("opened UDP socket") {
+                if let Some(addr) = extract_endpoint("local_addr=", &line) {
+                    // use the actual p2p port
+                    p2p_port = addr.port();
+                }
+
+                p2p_started = true;
             }
 
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
@@ -341,24 +363,22 @@ impl Reth {
                 return Err(NodeError::Fatal(line));
             }
 
-            if http_started {
+            if p2p_started && http_started {
                 break;
             }
         }
-
-        println!("HTTP server started on port {}", port);
 
         child.stderr = Some(reader.into_inner());
 
         Ok(RethInstance {
             pid: child,
-            config: NodeConfig {
-                port,
-                p2p_port: None,
-                data_dir: self.data_dir,
-                ipc: self.ipc_path,
-                genesis: self.genesis,
-            },
+            config: NodeConfig::default()
+                .port(port)
+                .p2p_port(p2p_port)
+                .auth_port(auth_port)
+                .data_dir(self.data_dir.unwrap())
+                .ipc(self.ipc_path.unwrap())
+                .genesis(self.genesis.unwrap()),
         })
     }
 }
@@ -370,7 +390,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn port_0() {
+    fn instance_0() {
         run_with_tempdir(|_| {
             let _reth = Reth::new().disable_discovery().instance(0).spawn();
         });

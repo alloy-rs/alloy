@@ -33,6 +33,8 @@ pub enum NodeInstanceError {
 pub struct NodeConfig {
     /// The port of the node.
     pub port: u16,
+    /// The auth token of the node.
+    pub auth_port: Option<u16>,
     /// The p2p port of the node.
     pub p2p_port: Option<u16>,
     /// The data directory of the node.
@@ -41,6 +43,57 @@ pub struct NodeConfig {
     pub genesis: Option<Genesis>,
     /// The IPC path of the node.
     pub ipc: Option<PathBuf>,
+}
+
+impl Default for NodeConfig {
+    fn default() -> Self {
+        Self {
+            port: 8545,
+            auth_port: None,
+            p2p_port: None,
+            data_dir: None,
+            genesis: None,
+            ipc: None,
+        }
+    }
+}
+
+impl NodeConfig {
+    /// Sets the port of the node.
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = port;
+        self
+    }
+
+    /// Sets the auth port of the node.
+    pub fn auth_port(mut self, auth_port: u16) -> Self {
+        self.auth_port = Some(auth_port);
+        self
+    }
+
+    /// Sets the p2p port of the node.
+    pub fn p2p_port(mut self, p2p_port: u16) -> Self {
+        self.p2p_port = Some(p2p_port);
+        self
+    }
+
+    /// Sets the data directory of the node.
+    pub fn data_dir(mut self, data_dir: PathBuf) -> Self {
+        self.data_dir = Some(data_dir);
+        self
+    }
+
+    /// Sets the genesis configuration of the node.
+    pub fn genesis(mut self, genesis: Genesis) -> Self {
+        self.genesis = Some(genesis);
+        self
+    }
+
+    /// Sets the IPC path of the node.
+    pub fn ipc(mut self, ipc: PathBuf) -> Self {
+        self.ipc = Some(ipc);
+        self
+    }
 }
 
 /// A node instance. Will close the instance when dropped.

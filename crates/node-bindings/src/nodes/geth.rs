@@ -421,7 +421,7 @@ impl Geth {
                 || (line.contains("HTTP server started") && !line.contains("auth=true"))
             {
                 // Extracts the address from the output
-                if let Some(addr) = extract_endpoint(&line) {
+                if let Some(addr) = extract_endpoint("endpoint=", &line) {
                     // use the actual http port
                     port = addr.port();
                 }
@@ -444,13 +444,13 @@ impl Geth {
 
         Ok(GethInstance {
             pid: child,
-            config: NodeConfig {
-                port,
-                p2p_port,
-                data_dir: self.data_dir,
-                ipc: self.ipc_path,
-                genesis: self.genesis,
-            },
+            config: NodeConfig::default()
+                .port(port)
+                .p2p_port(p2p_port.unwrap())
+                .auth_port(self.authrpc_port.unwrap())
+                .data_dir(self.data_dir.unwrap())
+                .ipc(self.ipc_path.unwrap())
+                .genesis(self.genesis.unwrap()),
         })
     }
 }
