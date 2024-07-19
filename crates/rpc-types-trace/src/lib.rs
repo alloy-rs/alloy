@@ -21,5 +21,4 @@ pub mod geth;
 pub mod opcode;
 pub mod otterscan;
 pub mod parity;
-pub mod simulate;
 pub mod tracerequest;
