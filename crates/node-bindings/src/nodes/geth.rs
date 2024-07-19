@@ -45,6 +45,10 @@ impl NodeInstance for GethInstance {
         &mut self.pid
     }
 
+    fn p2p_port(&self) -> Option<u16> {
+        self.config.p2p_port
+    }
+
     fn ipc_endpoint(&self) -> String {
         self.ipc().clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
     }

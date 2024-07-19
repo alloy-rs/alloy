@@ -59,9 +59,7 @@ pub trait NodeInstance {
     }
 
     /// Returns the p2p port of this instance.
-    fn p2p_port(&self) -> Option<u16> {
-        self.config().p2p_port
-    }
+    fn p2p_port(&self) -> Option<u16>;
 
     /// Returns the path to this instances' data directory.
     fn data_dir(&self) -> &Option<PathBuf> {

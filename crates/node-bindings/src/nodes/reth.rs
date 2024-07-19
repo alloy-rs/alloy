@@ -1,8 +1,8 @@
 //! Utilities for launching a Reth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, DevOptions, NodeConfig, NodeError, NodeInstance,
-    NodeInstanceError, NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    extract_url, unused_port, DevOptions, NodeConfig, NodeError, NodeInstance, NodeInstanceError,
+    NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
 use std::{
@@ -45,30 +45,16 @@ impl NodeInstance for RethInstance {
         &mut self.pid
     }
 
+    fn p2p_port(&self) -> Option<u16> {
+        unimplemented!()
+    }
+
     fn ipc_endpoint(&self) -> String {
         self.config().ipc.as_ref().map(|ipc| ipc.display().to_string()).to_owned().unwrap()
     }
 
-    /// Blocks until Geth adds the specified peer, using 20s as the timeout.
-    ///
-    /// Requires the stderr to be present in the `GethInstance`.
     fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeInstanceError::NoStderr)?;
-        let mut err_reader = BufReader::new(&mut stderr);
-        let mut line = String::new();
-        let start = Instant::now();
-
-        while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
-            line.clear();
-            err_reader.read_line(&mut line).map_err(NodeInstanceError::ReadLineError)?;
-
-            // geth ids are truncated
-            let truncated_id = if id.len() > 16 { &id[..16] } else { id };
-            if line.contains("Adding p2p peer") && line.contains(truncated_id) {
-                return Ok(());
-            }
-        }
-        Err(NodeInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
+        unimplemented!()
     }
 }
 
@@ -99,6 +85,7 @@ impl Drop for RethInstance {
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
+    instance: u16,
     program: Option<PathBuf>,
     port: Option<u16>,
     authrpc_port: Option<u16>,
@@ -153,23 +140,6 @@ impl Reth {
         self
     }
 
-    /// Sets the port which will be used for incoming p2p connections.
-    ///
-    /// This will put the reth instance into non-dev mode, discarding any previously set dev-mode
-    /// options.
-    pub fn p2p_port(mut self, port: u16) -> Self {
-        match &mut self.mode {
-            NodeMode::Dev(_) => {
-                self.mode = NodeMode::NonDev(PrivateNetOptions {
-                    p2p_port: Some(port),
-                    ..Default::default()
-                })
-            }
-            NodeMode::NonDev(opts) => opts.p2p_port = Some(port),
-        }
-        self
-    }
-
     /// Sets the block-time which will be used when the `reth-cli` instance is launched.
     ///
     /// This will put the reth instance in `dev` mode, discarding any previously set options that
@@ -194,6 +164,12 @@ impl Reth {
     /// Enable IPC for the reth instance.
     pub const fn enable_ipc(mut self) -> Self {
         self.ipc_enabled = true;
+        self
+    }
+
+    /// Sets the instance number for the reth instance.
+    pub fn instance(mut self, instance: u16) -> Self {
+        self.instance = instance;
         self
     }
 
@@ -268,10 +244,6 @@ impl Reth {
         // use the node subcommand
         cmd.arg("node");
 
-        // If no port provided, let the OS choose it for us.
-        let mut port = self.port.unwrap_or(0);
-        let port_s = port.to_string();
-
         // If IPC is not enabled on the builder, disable it.
         if !self.ipc_enabled {
             cmd.arg("--ipcdisable");
@@ -279,64 +251,25 @@ impl Reth {
 
         // Open the HTTP API.
         cmd.arg("--http");
-        cmd.arg("--http.port").arg(&port_s);
         cmd.arg("--http.api").arg(API);
 
         // Open the WS API.
         cmd.arg("--ws");
-        cmd.arg("--ws.port").arg(port_s);
         cmd.arg("--ws.api").arg(API);
 
-        // Pass insecure unlock flag if set.
-        if self.insecure_unlock {
-            cmd.arg("--allow-insecure-unlock");
-        }
+        // Configures the ports of the node to avoid conflicts with the defaults. This is useful for
+        // running multiple nodes on the same machine.
+        //
+        // Changes to the following port numbers:
+        // - `DISCOVERY_PORT`: default + `instance` - 1
+        // - `AUTH_PORT`: default + `instance` * 100 - 100
+        // - `HTTP_RPC_PORT`: default - `instance` + 1
+        // - `WS_RPC_PORT`: default + `instance` * 2 - 2
+        cmd.arg("--instance").arg(self.instance.to_string());
 
         // Set the port for authenticated APIs.
         let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
         cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
-
-        if let Some(genesis) = &self.genesis {
-            // Create a temp dir to store the genesis file.
-            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.into_path();
-
-            // Create a temp dir to store the genesis file.
-            let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
-
-            // Create the genesis file.
-            let mut file = File::create(&temp_genesis_path).map_err(|_| {
-                NodeError::GenesisError("could not create genesis file".to_string())
-            })?;
-
-            // Serialize genesis and write to file.
-            serde_json::to_writer_pretty(&mut file, &genesis).map_err(|_| {
-                NodeError::GenesisError("could not write genesis to file".to_string())
-            })?;
-
-            let mut init_cmd = Command::new(bin_path);
-            if let Some(data_dir) = &self.data_dir {
-                init_cmd.arg("--datadir").arg(data_dir);
-            }
-
-            // Set the stderr to null so we don't pollute the test output.
-            init_cmd.stderr(Stdio::null());
-
-            init_cmd.arg("init").arg(temp_genesis_path);
-            let res = init_cmd
-                .spawn()
-                .map_err(NodeError::SpawnError)?
-                .wait()
-                .map_err(NodeError::WaitError)?;
-            // .expect("failed to wait for reth init to exit");
-            if !res.success() {
-                return Err(NodeError::InitError);
-            }
-
-            // Clean up the temp dir which is now persisted
-            std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
-                NodeError::GenesisError("could not remove genesis temp dir".to_string())
-            })?;
-        }
 
         if let Some(data_dir) = &self.data_dir {
             cmd.arg("--datadir").arg(data_dir);
@@ -348,29 +281,23 @@ impl Reth {
         }
 
         // Dev mode with custom block time
-        let mut p2p_port = match self.mode {
+        match self.mode {
             NodeMode::Dev(DevOptions { block_time }) => {
                 cmd.arg("--dev");
                 if let Some(block_time) = block_time {
-                    cmd.arg("--dev.period").arg(block_time.to_string());
+                    cmd.arg("--dev.block-time").arg(block_time.to_string());
                 }
-                None
             }
-            NodeMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
-                // if no port provided, let the os chose it for us
-                let port = p2p_port.unwrap_or(0);
-                cmd.arg("--port").arg(port.to_string());
-
+            NodeMode::NonDev(PrivateNetOptions { discovery, .. }) => {
                 // disable discovery if the flag is set
                 if !discovery {
                     cmd.arg("--disable-discovery");
                 }
-                Some(port)
             }
         };
 
         if let Some(chain_id) = self.chain_id {
-            cmd.arg("--networkid").arg(chain_id.to_string());
+            cmd.arg("--chain").arg(chain_id.to_string());
         }
 
         // debug verbosity is needed to check when peers are added
@@ -380,8 +307,6 @@ impl Reth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        println!("cmd: {:?}", cmd);
-
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
         let stderr = child.stderr.ok_or(NodeError::NoStderr)?;
@@ -389,9 +314,7 @@ impl Reth {
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
-        // we shouldn't need to wait for p2p to start if reth is in dev mode - p2p is disabled in
-        // dev mode
-        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
+        let mut port = 0;
         let mut http_started = false;
 
         loop {
@@ -402,24 +325,9 @@ impl Reth {
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
-            if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("pinging boot node") {
-                p2p_started = true;
-            }
-
-            if !matches!(self.mode, NodeMode::Dev(_)) {
-                // try to find the p2p port, if not in dev mode
-                if line.contains("New local node record") {
-                    if let Some(port) = extract_value("tcp=", &line) {
-                        p2p_port = port.parse::<u16>().ok();
-                    }
-                }
-            }
-
-            // reth 1.9.23 uses "server started" while 1.9.18 uses "endpoint opened"
-            // the unauthenticated api is used for regular non-engine API requests
             if line.contains("HTTP server started") {
                 // Extracts the address from the output
-                if let Some(addr) = extract_endpoint(&line) {
+                if let Some(addr) = extract_url(&line) {
                     // use the actual http port
                     port = addr.port();
                 }
@@ -433,10 +341,12 @@ impl Reth {
                 return Err(NodeError::Fatal(line));
             }
 
-            if p2p_started && http_started {
+            if http_started {
                 break;
             }
         }
+
+        println!("HTTP server started on port {}", port);
 
         child.stderr = Some(reader.into_inner());
 
@@ -444,7 +354,7 @@ impl Reth {
             pid: child,
             config: NodeConfig {
                 port,
-                p2p_port,
+                p2p_port: None,
                 data_dir: self.data_dir,
                 ipc: self.ipc_path,
                 genesis: self.genesis,
@@ -462,7 +372,7 @@ mod tests {
     #[test]
     fn port_0() {
         run_with_tempdir(|_| {
-            let _reth = Reth::new().disable_discovery().port(0u16).spawn();
+            let _reth = Reth::new().disable_discovery().instance(0).spawn();
         });
     }
 
@@ -478,34 +388,5 @@ mod tests {
         f(temp_dir_path);
         #[cfg(not(windows))]
         temp_dir.close().unwrap();
-    }
-
-    #[test]
-    fn p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
-            let reth = Reth::new().disable_discovery().data_dir(temp_dir_path).spawn();
-            let p2p_port = reth.p2p_port();
-            assert!(p2p_port.is_some());
-        });
-    }
-
-    #[test]
-    fn explicit_p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
-            // if a p2p port is explicitly set, it should be used
-            let reth = Reth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
-            let p2p_port = reth.p2p_port();
-            assert_eq!(p2p_port, Some(1234));
-        });
-    }
-
-    #[test]
-    fn dev_mode() {
-        run_with_tempdir(|temp_dir_path| {
-            // dev mode should not have a p2p port, and dev should be the default
-            let reth = Reth::new().data_dir(temp_dir_path).spawn();
-            let p2p_port = reth.p2p_port();
-            assert!(p2p_port.is_none(), "{p2p_port:?}");
-        })
     }
 }
