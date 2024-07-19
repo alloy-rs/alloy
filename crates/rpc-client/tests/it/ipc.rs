@@ -1,4 +1,4 @@
-use alloy_node_bindings::Geth;
+use alloy_node_bindings::{Geth, NodeInstance};
 use alloy_primitives::U64;
 use alloy_rpc_client::{ClientBuilder, RpcCall};
 use alloy_transport_ipc::IpcConnect;

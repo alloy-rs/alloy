@@ -1,27 +1,19 @@
-//! Utilities for launching a go-ethereum dev-mode instance.
+//! Utilities for launching a Geth dev-mode instance.
 
-use crate::unused_port;
-use alloy_genesis::{CliqueConfig, Genesis};
-use alloy_primitives::Address;
-use k256::ecdsa::SigningKey;
+use crate::{
+    extract_endpoint, extract_value, unused_port, DevOptions, NodeConfig, NodeInstance,
+    NodeInstanceError, NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+};
+use alloy_genesis::Genesis;
 use std::{
-    borrow::Cow,
     fs::{create_dir, File},
     io::{BufRead, BufReader},
-    net::SocketAddr,
     path::PathBuf,
-    process::{Child, ChildStderr, Command, Stdio},
-    time::{Duration, Instant},
+    process::{Child, Command, Stdio},
+    time::Instant,
 };
 use tempfile::tempdir;
 use thiserror::Error;
-use url::Url;
-
-/// How long we will wait for geth to indicate that it is ready.
-const GETH_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// Timeout for waiting for geth to add a peer.
-const GETH_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
@@ -29,107 +21,47 @@ const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
 /// The geth command
 const GETH: &str = "geth";
 
-/// Errors that can occur when working with the [`GethInstance`].
-#[derive(Debug)]
-pub enum GethInstanceError {
-    /// Timed out waiting for a message from geth's stderr.
-    Timeout(String),
-
-    /// A line could not be read from the geth stderr.
-    ReadLineError(std::io::Error),
-
-    /// The child geth process's stderr was not captured.
-    NoStderr,
-}
-
-/// A geth instance. Will close the instance when dropped.
-///
-/// Construct this using [`Geth`].
+/// A Geth instance.
 #[derive(Debug)]
 pub struct GethInstance {
+    /// The configuration of the node.
+    config: NodeConfig,
+    /// The child process of the node.
     pid: Child,
-    port: u16,
-    ipc: Option<PathBuf>,
-    data_dir: Option<PathBuf>,
-    p2p_port: Option<u16>,
-    genesis: Option<Genesis>,
-    clique_private_key: Option<SigningKey>,
 }
 
 impl GethInstance {
-    /// Returns the port of this instance
-    pub const fn port(&self) -> u16 {
-        self.port
+    /// Creates a new `GethInstance`.
+    pub fn new(config: NodeConfig, pid: Child) -> Self {
+        Self { config, pid }
+    }
+}
+
+impl NodeInstance for GethInstance {
+    fn config(&self) -> &NodeConfig {
+        &self.config
     }
 
-    /// Returns the p2p port of this instance
-    pub const fn p2p_port(&self) -> Option<u16> {
-        self.p2p_port
+    fn pid(&mut self) -> &mut Child {
+        &mut self.pid
     }
 
-    /// Returns the HTTP endpoint of this instance
-    #[doc(alias = "http_endpoint")]
-    pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+    fn ipc_endpoint(&self) -> String {
+        self.ipc().clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
-    /// Returns the Websocket endpoint of this instance
-    pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
-    }
-
-    /// Returns the IPC endpoint of this instance
-    pub fn ipc_endpoint(&self) -> String {
-        self.ipc.clone().map_or_else(|| "geth.ipc".to_string(), |ipc| ipc.display().to_string())
-    }
-
-    /// Returns the HTTP endpoint url of this instance
-    #[doc(alias = "http_endpoint_url")]
-    pub fn endpoint_url(&self) -> Url {
-        Url::parse(&self.endpoint()).unwrap()
-    }
-
-    /// Returns the Websocket endpoint url of this instance
-    pub fn ws_endpoint_url(&self) -> Url {
-        Url::parse(&self.ws_endpoint()).unwrap()
-    }
-
-    /// Returns the path to this instances' data directory
-    pub const fn data_dir(&self) -> &Option<PathBuf> {
-        &self.data_dir
-    }
-
-    /// Returns the genesis configuration used to configure this instance
-    pub const fn genesis(&self) -> &Option<Genesis> {
-        &self.genesis
-    }
-
-    /// Returns the private key used to configure clique on this instance
-    #[deprecated = "clique support was removed in geth >=1.14"]
-    pub const fn clique_private_key(&self) -> &Option<SigningKey> {
-        &self.clique_private_key
-    }
-
-    /// Takes the stderr contained in the child process.
-    ///
-    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
-    /// will fail if called after this.
-    pub fn stderr(&mut self) -> Result<ChildStderr, GethInstanceError> {
-        self.pid.stderr.take().ok_or(GethInstanceError::NoStderr)
-    }
-
-    /// Blocks until geth adds the specified peer, using 20s as the timeout.
+    /// Blocks until Geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), GethInstanceError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(GethInstanceError::NoStderr)?;
+    fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
+        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeInstanceError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
         let start = Instant::now();
 
-        while start.elapsed() < GETH_DIAL_LOOP_TIMEOUT {
+        while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
             line.clear();
-            err_reader.read_line(&mut line).map_err(GethInstanceError::ReadLineError)?;
+            err_reader.read_line(&mut line).map_err(NodeInstanceError::ReadLineError)?;
 
             // geth ids are truncated
             let truncated_id = if id.len() > 16 { &id[..16] } else { id };
@@ -137,7 +69,7 @@ impl GethInstance {
                 return Ok(());
             }
         }
-        Err(GethInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
+        Err(NodeInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
     }
 }
 
@@ -147,50 +79,9 @@ impl Drop for GethInstance {
     }
 }
 
-/// Whether or not geth is in `dev` mode and configuration options that depend on the mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GethMode {
-    /// Options that can be set in dev mode
-    Dev(DevOptions),
-    /// Options that cannot be set in dev mode
-    NonDev(PrivateNetOptions),
-}
-
-impl Default for GethMode {
-    fn default() -> Self {
-        Self::Dev(Default::default())
-    }
-}
-
-/// Configuration options that can be set in dev mode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct DevOptions {
-    /// The interval at which the dev chain will mine new blocks.
-    pub block_time: Option<u64>,
-}
-
-/// Configuration options that cannot be set in dev mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PrivateNetOptions {
-    /// The p2p port to use.
-    pub p2p_port: Option<u16>,
-
-    /// Whether or not peer discovery is enabled.
-    pub discovery: bool,
-}
-
-impl Default for PrivateNetOptions {
-    fn default() -> Self {
-        Self { p2p_port: None, discovery: true }
-    }
-}
-
 /// Errors that can occur when working with the [`Geth`].
 #[derive(Debug, Error)]
 pub enum GethError {
-    /// Clique private key error
-    #[error("clique address error: {0}")]
-    CliqueAddressError(String),
     /// The chain id was not set.
     #[error("the chain ID was not set")]
     ChainIdNotSet,
@@ -253,8 +144,7 @@ pub struct Geth {
     chain_id: Option<u64>,
     insecure_unlock: bool,
     genesis: Option<Genesis>,
-    mode: GethMode,
-    clique_private_key: Option<SigningKey>,
+    mode: NodeMode,
 }
 
 impl Geth {
@@ -281,33 +171,12 @@ impl Geth {
         Self::new().path(path)
     }
 
-    /// Returns whether the node is launched in Clique consensus mode.
-    pub const fn is_clique(&self) -> bool {
-        self.clique_private_key.is_some()
-    }
-
-    /// Calculates the address of the Clique consensus address.
-    pub fn clique_address(&self) -> Option<Address> {
-        self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
-    }
-
     /// Sets the `path` to the `geth` executable
     ///
     /// By default, it's expected that `geth` is in `$PATH`, see also
     /// [`std::process::Command::new()`]
     pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.program = Some(path.into());
-        self
-    }
-
-    /// Sets the Clique Private Key to the `geth` executable, which will be later
-    /// loaded on the node.
-    ///
-    /// The address derived from this private key will be used to set the `miner.etherbase` field
-    /// on the node.
-    #[deprecated = "clique support was removed in geth >=1.14"]
-    pub fn set_clique_private_key<T: Into<SigningKey>>(mut self, private_key: T) -> Self {
-        self.clique_private_key = Some(private_key.into());
         self
     }
 
@@ -326,13 +195,13 @@ impl Geth {
     /// options.
     pub fn p2p_port(mut self, port: u16) -> Self {
         match &mut self.mode {
-            GethMode::Dev(_) => {
-                self.mode = GethMode::NonDev(PrivateNetOptions {
+            NodeMode::Dev(_) => {
+                self.mode = NodeMode::NonDev(PrivateNetOptions {
                     p2p_port: Some(port),
                     ..Default::default()
                 })
             }
-            GethMode::NonDev(opts) => opts.p2p_port = Some(port),
+            NodeMode::NonDev(opts) => opts.p2p_port = Some(port),
         }
         self
     }
@@ -342,7 +211,7 @@ impl Geth {
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
     pub const fn block_time(mut self, block_time: u64) -> Self {
-        self.mode = GethMode::Dev(DevOptions { block_time: Some(block_time) });
+        self.mode = NodeMode::Dev(DevOptions { block_time: Some(block_time) });
         self
     }
 
@@ -375,11 +244,11 @@ impl Geth {
 
     fn inner_disable_discovery(&mut self) {
         match &mut self.mode {
-            GethMode::Dev(_) => {
+            NodeMode::Dev(_) => {
                 self.mode =
-                    GethMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
+                    NodeMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
             }
-            GethMode::NonDev(opts) => opts.discovery = false,
+            NodeMode::NonDev(opts) => opts.discovery = false,
         }
     }
 
@@ -423,7 +292,7 @@ impl Geth {
     }
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
-    pub fn try_spawn(mut self) -> Result<GethInstance, GethError> {
+    pub fn try_spawn(self) -> Result<GethInstance, GethError> {
         let bin_path = self
             .program
             .as_ref()
@@ -453,56 +322,14 @@ impl Geth {
         cmd.arg("--ws.api").arg(API);
 
         // pass insecure unlock flag if set
-        let is_clique = self.is_clique();
-        if self.insecure_unlock || is_clique {
-            cmd.arg("--allow-insecure-unlock");
-        }
 
-        if is_clique {
-            self.inner_disable_discovery();
+        if self.insecure_unlock {
+            cmd.arg("--allow-insecure-unlock");
         }
 
         // Set the port for authenticated APIs
         let authrpc_port = self.authrpc_port.unwrap_or_else(&mut unused_port);
         cmd.arg("--authrpc.port").arg(authrpc_port.to_string());
-
-        // use geth init to initialize the datadir if the genesis exists
-        if is_clique {
-            let clique_addr = self.clique_address();
-            if let Some(genesis) = &mut self.genesis {
-                // set up a clique config with an instant sealing period and short (8 block) epoch
-                let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
-                genesis.config.clique = Some(clique_config);
-
-                let clique_addr = clique_addr.ok_or(GethError::CliqueAddressError(
-                    "could not calculates the address of the Clique consensus address.".to_string(),
-                ))?;
-
-                // set the extraData field
-                let extra_data_bytes =
-                    [&[0u8; 32][..], clique_addr.as_ref(), &[0u8; 65][..]].concat();
-                genesis.extra_data = extra_data_bytes.into();
-
-                // we must set the etherbase if using clique
-                // need to use format! / Debug here because the Address Display impl doesn't show
-                // the entire address
-                cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
-            }
-
-            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddressError(
-                "could not calculates the address of the Clique consensus address.".to_string(),
-            ))?;
-
-            self.genesis = Some(Genesis::clique_genesis(
-                self.chain_id.ok_or(GethError::ChainIdNotSet)?,
-                clique_addr,
-            ));
-
-            // we must set the etherbase if using clique
-            // need to use format! / Debug here because the Address Display impl doesn't show the
-            // entire address
-            cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
-        }
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
@@ -557,14 +384,14 @@ impl Geth {
 
         // Dev mode with custom block time
         let mut p2p_port = match self.mode {
-            GethMode::Dev(DevOptions { block_time }) => {
+            NodeMode::Dev(DevOptions { block_time }) => {
                 cmd.arg("--dev");
                 if let Some(block_time) = block_time {
                     cmd.arg("--dev.period").arg(block_time.to_string());
                 }
                 None
             }
-            GethMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
+            NodeMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
                 // if no port provided, let the os chose it for us
                 let port = p2p_port.unwrap_or(0);
                 cmd.arg("--port").arg(port.to_string());
@@ -597,22 +424,22 @@ impl Geth {
 
         // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
         // dev mode
-        let mut p2p_started = matches!(self.mode, GethMode::Dev(_));
+        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
         let mut http_started = false;
 
         loop {
-            if start + GETH_STARTUP_TIMEOUT <= Instant::now() {
+            if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
                 return Err(GethError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(GethError::ReadLineError)?;
 
-            if matches!(self.mode, GethMode::NonDev(_)) && line.contains("Started P2P networking") {
+            if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
             }
 
-            if !matches!(self.mode, GethMode::Dev(_)) {
+            if !matches!(self.mode, NodeMode::Dev(_)) {
                 // try to find the p2p port, if not in dev mode
                 if line.contains("New local node record") {
                     if let Some(port) = extract_value("tcp=", &line) {
@@ -650,33 +477,15 @@ impl Geth {
 
         Ok(GethInstance {
             pid: child,
-            port,
-            ipc: self.ipc_path,
-            data_dir: self.data_dir,
-            p2p_port,
-            genesis: self.genesis,
-            clique_private_key: self.clique_private_key,
+            config: NodeConfig {
+                port,
+                p2p_port,
+                data_dir: self.data_dir,
+                ipc: self.ipc_path,
+                genesis: self.genesis,
+            },
         })
     }
-}
-
-// extracts the value for the given key and line
-fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
-    let mut key = Cow::from(key);
-    if !key.ends_with('=') {
-        key = format!("{}=", key).into();
-    }
-    line.find(key.as_ref()).map(|pos| {
-        let start = pos + key.len();
-        let end = line[start..].find(' ').map(|i| start + i).unwrap_or(line.len());
-        line[start..end].trim()
-    })
-}
-
-// extracts the value for the given key and line
-fn extract_endpoint(line: &str) -> Option<SocketAddr> {
-    let val = extract_value("endpoint=", line)?;
-    val.parse::<SocketAddr>().ok()
 }
 
 // These tests should use a different datadir for each `Geth` spawned
@@ -684,12 +493,6 @@ fn extract_endpoint(line: &str) -> Option<SocketAddr> {
 mod tests {
     use super::*;
     use std::path::Path;
-
-    #[test]
-    fn test_extract_address() {
-        let line = "INFO [07-01|13:20:42.774] HTTP server started                      endpoint=127.0.0.1:8545 auth=false prefix= cors= vhosts=localhost";
-        assert_eq!(extract_endpoint(line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
-    }
 
     #[test]
     fn port_0() {
@@ -738,24 +541,6 @@ mod tests {
             let geth = Geth::new().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
             assert!(p2p_port.is_none(), "{p2p_port:?}");
-        })
-    }
-
-    #[test]
-    #[ignore = "fails on geth >=1.14"]
-    #[allow(deprecated)]
-    fn clique_correctly_configured() {
-        run_with_tempdir(|temp_dir_path| {
-            let private_key = SigningKey::random(&mut rand::thread_rng());
-            let geth = Geth::new()
-                .set_clique_private_key(private_key)
-                .chain_id(1337u64)
-                .data_dir(temp_dir_path)
-                .spawn();
-
-            assert!(geth.p2p_port.is_some());
-            assert!(geth.clique_private_key().is_some());
-            assert!(geth.genesis().is_some());
         })
     }
 }
