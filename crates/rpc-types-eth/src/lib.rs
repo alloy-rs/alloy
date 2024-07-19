@@ -47,4 +47,8 @@ pub use transaction::*;
 mod work;
 pub use work::Work;
 
+/// This module provides implementations for EIP-4337.
+pub mod eip4337;
+
+
 pub mod simulate;
