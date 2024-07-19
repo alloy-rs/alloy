@@ -344,10 +344,6 @@ impl Reth {
                 http_started = true;
             }
 
-            if line.contains("Started P2P networking") {
-                p2p_started = true;
-            }
-
             if line.contains("opened UDP socket") {
                 if let Some(addr) = extract_endpoint("local_addr=", &line) {
                     // use the actual p2p port
