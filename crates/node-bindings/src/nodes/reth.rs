@@ -28,10 +28,10 @@ const RETH: &str = "reth";
 pub struct RethInstance {
     pid: Child,
     port: u16,
-    ipc: Option<PathBuf>,
-    data_dir: Option<PathBuf>,
     p2p_port: Option<u16>,
     auth_port: Option<u16>,
+    ipc: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
     genesis: Option<Genesis>,
 }
 
@@ -44,6 +44,11 @@ impl RethInstance {
     /// Returns the p2p port of this instance
     pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
+    }
+
+    /// Returns the auth port of this instance
+    pub const fn auth_port(&self) -> Option<u16> {
+        self.auth_port
     }
 
     /// Returns the HTTP endpoint of this instance
@@ -122,12 +127,10 @@ pub struct Reth {
     instance: u16,
     program: Option<PathBuf>,
     port: Option<u16>,
-    authrpc_port: Option<u16>,
     ipc_path: Option<PathBuf>,
     ipc_enabled: bool,
     data_dir: Option<PathBuf>,
     chain_id: Option<u64>,
-    insecure_unlock: bool,
     genesis: Option<Genesis>,
     mode: NodeMode,
 }
@@ -189,12 +192,6 @@ impl Reth {
         self
     }
 
-    /// Allow reth to unlock accounts when rpc apis are open.
-    pub const fn insecure_unlock(mut self) -> Self {
-        self.insecure_unlock = true;
-        self
-    }
-
     /// Enable IPC for the reth instance.
     pub const fn enable_ipc(mut self) -> Self {
         self.ipc_enabled = true;
@@ -246,12 +243,6 @@ impl Reth {
     /// This is destructive and will overwrite any existing data in the data directory.
     pub fn genesis(mut self, genesis: Genesis) -> Self {
         self.genesis = Some(genesis);
-        self
-    }
-
-    /// Sets the port for authenticated RPC connections.
-    pub const fn authrpc_port(mut self, port: u16) -> Self {
-        self.authrpc_port = Some(port);
         self
     }
 

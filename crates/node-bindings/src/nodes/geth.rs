@@ -30,10 +30,10 @@ const GETH: &str = "geth";
 pub struct GethInstance {
     pid: Child,
     port: u16,
-    ipc: Option<PathBuf>,
-    data_dir: Option<PathBuf>,
     p2p_port: Option<u16>,
     auth_port: Option<u16>,
+    ipc: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
     genesis: Option<Genesis>,
     clique_private_key: Option<SigningKey>,
 }
@@ -47,6 +47,11 @@ impl GethInstance {
     /// Returns the p2p port of this instance
     pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
+    }
+
+    /// Returns the auth port of this instance
+    pub const fn auth_port(&self) -> Option<u16> {
+        self.auth_port
     }
 
     /// Returns the HTTP endpoint of this instance
