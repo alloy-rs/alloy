@@ -20,6 +20,18 @@ pub enum RecoveredAuthority {
     Invalid,
 }
 
+impl RecoveredAuthority {
+    /// Returns the contained `Address` as an `Option`.
+    /// - Returns `Some(Address)` if the recovery was successful.
+    /// - Returns `None` if the recovery failed.
+    pub fn address(&self) -> Option<Address> {
+        match self {
+            RecoveredAuthority::Valid(address) => Some(*address),
+            RecoveredAuthority::Invalid => None,
+        }
+    }
+}
+
 /// An unsigned EIP-7702 authorization.
 #[derive(Debug, Clone, Hash, RlpEncodable, RlpDecodable, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -169,14 +181,15 @@ impl SignedAuthorization {
 
     /// Recover the authority and transform the signed authorization into a
     /// [`RecoveredAuthorization`].
-    pub fn try_into_recovered(
-        self,
-    ) -> Result<RecoveredAuthorization, alloy_primitives::SignatureError> {
-        let authority = self.recover_authority()?;
-        Ok(RecoveredAuthorization {
-            inner: self.inner,
-            authority: RecoveredAuthority::Valid(authority),
-        })
+    pub fn try_into_recovered(self) -> RecoveredAuthorization {
+        let authority_result = self.recover_authority();
+
+        let authority = match authority_result {
+            Ok(addr) => RecoveredAuthority::Valid(addr),
+            Err(_) => RecoveredAuthority::Invalid,
+        };
+
+        RecoveredAuthorization { inner: self.inner, authority }
     }
 }
 
@@ -225,9 +238,12 @@ impl RecoveredAuthorization {
         Self { inner, authority }
     }
 
-    /// Get the `authority` for the authorization.
-    pub fn authority(&self) -> RecoveredAuthority {
-        self.authority.clone()
+    /// Returns an optional address based on the current state of the authority.
+    pub fn authority(&self) -> Option<Address> {
+        match &self.authority {
+            RecoveredAuthority::Valid(address) => Some(address.clone()),
+            RecoveredAuthority::Invalid => None,
+        }
     }
 
     /// Splits the authorization into parts.
@@ -241,7 +257,7 @@ impl TryFrom<SignedAuthorization> for RecoveredAuthorization {
     type Error = alloy_primitives::SignatureError;
 
     fn try_from(value: SignedAuthorization) -> Result<Self, Self::Error> {
-        value.try_into_recovered()
+        Ok(value.try_into_recovered())
     }
 }
 
