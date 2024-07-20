@@ -236,7 +236,7 @@ impl RecoveredAuthorization {
     /// Returns an optional address based on the current state of the authority.
     pub fn authority(&self) -> Option<Address> {
         match &self.authority {
-            RecoveredAuthority::Valid(address) => Some(address.clone()),
+            RecoveredAuthority::Valid(address) => Some(*address),
             RecoveredAuthority::Invalid => None,
         }
     }
