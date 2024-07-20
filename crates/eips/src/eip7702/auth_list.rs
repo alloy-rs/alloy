@@ -21,13 +21,11 @@ pub enum RecoveredAuthority {
 }
 
 impl RecoveredAuthority {
-    /// Returns the contained `Address` as an `Option`.
-    /// - Returns `Some(Address)` if the recovery was successful.
-    /// - Returns `None` if the recovery failed.
-    pub fn address(&self) -> Option<Address> {
-        match self {
-            RecoveredAuthority::Valid(address) => Some(*address),
-            RecoveredAuthority::Invalid => None,
+    /// Returns an optional address if valid.
+    pub const fn address(&self) -> Option<Address> {
+        match *self {
+            Self::Valid(address) => Some(address),
+            Self::Invalid => None,
         }
     }
 }
@@ -183,11 +181,8 @@ impl SignedAuthorization {
     /// [`RecoveredAuthorization`].
     pub fn try_into_recovered(self) -> RecoveredAuthorization {
         let authority_result = self.recover_authority();
-
-        let authority = match authority_result {
-            Ok(addr) => RecoveredAuthority::Valid(addr),
-            Err(_) => RecoveredAuthority::Invalid,
-        };
+        let authority =
+            authority_result.map_or(RecoveredAuthority::Invalid, RecoveredAuthority::Valid);
 
         RecoveredAuthorization { inner: self.inner, authority }
     }
