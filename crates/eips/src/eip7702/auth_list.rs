@@ -179,7 +179,7 @@ impl SignedAuthorization {
 
     /// Recover the authority and transform the signed authorization into a
     /// [`RecoveredAuthorization`].
-    pub fn try_into_recovered(self) -> RecoveredAuthorization {
+    pub fn into_recovered(self) -> RecoveredAuthorization {
         let authority_result = self.recover_authority();
         let authority =
             authority_result.map_or(RecoveredAuthority::Invalid, RecoveredAuthority::Valid);
