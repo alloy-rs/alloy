@@ -160,10 +160,10 @@ impl RpcErrorExt for RpcError<TransportErrorKind> {
         if let Self::ErrorResp(resp) = self {
             let data = resp.try_data_as::<serde_json::Value>();
             if let Some(Ok(data)) = data {
-                // if daily rate limit exceeded, infra returns the requested backoff in the error
+                // if daily rate limit exceeded, infura returns the requested backoff in the error
                 // response
                 let backoff_seconds = &data["rate"]["backoff_seconds"];
-                // infra rate limit error
+                // infura rate limit error
                 if let Some(seconds) = backoff_seconds.as_u64() {
                     return Some(std::time::Duration::from_secs(seconds));
                 }
