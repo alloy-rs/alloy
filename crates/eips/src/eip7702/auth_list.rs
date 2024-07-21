@@ -235,10 +235,7 @@ impl RecoveredAuthorization {
 
     /// Returns an optional address based on the current state of the authority.
     pub const fn authority(&self) -> Option<Address> {
-        match &self.authority {
-            RecoveredAuthority::Valid(address) => Some(*address),
-            RecoveredAuthority::Invalid => None,
-        }
+        self.authority.address()
     }
 
     /// Splits the authorization into parts.
@@ -248,14 +245,17 @@ impl RecoveredAuthorization {
 }
 
 #[cfg(feature = "k256")]
-impl TryFrom<SignedAuthorization> for RecoveredAuthorization {
-    type Error = alloy_primitives::SignatureError;
-
-    fn try_from(value: SignedAuthorization) -> Result<Self, Self::Error> {
-        Ok(value.try_into_recovered())
+impl From<SignedAuthorization> for RecoveredAuthority {
+    fn from(value: SignedAuthorization) -> Self {
+        value.into_recovered().authority
     }
 }
-
+#[cfg(feature = "k256")]
+impl From<SignedAuthorization> for RecoveredAuthorization {
+    fn from(value: SignedAuthorization) -> Self {
+        value.into_recovered()
+    }
+}
 impl Deref for RecoveredAuthorization {
     type Target = Authorization;
 
