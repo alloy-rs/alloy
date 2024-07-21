@@ -3,7 +3,7 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
 use alloy_rpc_types_eth::{
-    state::StateOverride, Block, BlockNumberOrTag, EthCallResponse, StateContext,
+    state::StateOverride, Block, BlockNumberOrTag, Bundle, EthCallResponse, StateContext,
     TransactionRequest,
 };
 use alloy_rpc_types_trace::geth::{
@@ -134,7 +134,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// optionality of state overrides
     async fn call_many(
         &self,
-        tx: TransactionRequest,
+        tx: Bundle,
         state_context: Option<StateContext>,
         state_override: Option<StateOverride>,
     ) -> TransportResult<Vec<EthCallResponse>>;
@@ -150,7 +150,7 @@ where
 {
     async fn call_many(
         &self,
-        tx: TransactionRequest,
+        tx: Bundle,
         state_context: Option<StateContext>,
         state_override: Option<StateOverride>,
     ) -> TransportResult<Vec<EthCallResponse>> {
