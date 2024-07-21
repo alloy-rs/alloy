@@ -40,8 +40,8 @@ pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactio
 
 mod provider;
 pub use provider::{
-    builder, EthCall, FilterPollerBuilder, Provider, RootProvider, RpcWithBlock, SendableTx,
-    WalletProvider,
+    builder, EthCall, FilterPollerBuilder, Provider, RootProvider, RpcWithBlock, RpcWithBlockFut,
+    SendableTx, WalletProvider,
 };
 
 pub mod utils;
