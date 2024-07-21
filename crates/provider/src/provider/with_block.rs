@@ -353,11 +353,11 @@ where
 {
     fn from(trace_rpc: TraceRpcWithBlock<T, Params, Resp, Output, Map>) -> Self {
         let rpc = trace_rpc.deref();
-        RpcWithBlock {
+        Self {
             client: rpc.client.clone(),
             method: rpc.method.clone(),
             params: rpc.params.clone(),
-            block_id: rpc.block_id.clone(),
+            block_id: rpc.block_id,
             trace_types: trace_rpc.get_trace_types().clone(),
             map: rpc.map,
             _pd: rpc._pd,

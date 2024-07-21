@@ -1,5 +1,5 @@
-mod trace;
+mod api;
 mod with_block;
 
-pub use trace::*;
+pub use api::*;
 pub use with_block::*;

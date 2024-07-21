@@ -87,7 +87,7 @@ where
     }
 
     /// Get the trace types.
-    pub fn get_trace_types(&self) -> &HashSet<TraceType> {
+    pub const fn get_trace_types(&self) -> &HashSet<TraceType> {
         &self.trace_types
     }
 }
