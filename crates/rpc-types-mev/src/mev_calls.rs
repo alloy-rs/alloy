@@ -312,7 +312,7 @@ mod tests {
     }
 
     #[test]
-    fn can_dererialize_sim_response() {
+    fn can_deserialize_sim_response() {
         let expected = r#"
         {
             "success": true,
