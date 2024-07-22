@@ -213,7 +213,7 @@ pub struct PeerEvent {
     pub kind: PeerEventType,
     /// The peer's enode ID.
     pub peer: String,
-    /// An error ocurred on the peer.
+    /// An error occurred on the peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The protocol of the peer.

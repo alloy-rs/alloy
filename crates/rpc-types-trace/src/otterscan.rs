@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn test_otterscan_interal_operation() {
+    fn test_otterscan_internal_operation() {
         let s = r#"{
           "type": 0,
           "from": "0xea593b730d745fb5fe01b6d20e6603915252c6bf",
