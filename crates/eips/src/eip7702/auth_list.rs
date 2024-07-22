@@ -10,7 +10,7 @@ use alloy_rlp::{
 use core::hash::{Hash, Hasher};
 
 /// Represents the outcome of an attempt to recover the authority from an authorization.
-/// It can either be valid (containing an Address) or invalid (indicating recovery failure).
+/// It can either be valid (containing an [`Address`]) or invalid (indicating recovery failure).
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RecoveredAuthority {
