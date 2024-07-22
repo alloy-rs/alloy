@@ -255,7 +255,7 @@ impl<T> RpcClientInner<T> {
     /// Reserve a request ID u64.
     #[inline]
     pub fn next_id(&self) -> Id {
-        Id::Number(self.increment_id())
+        self.increment_id().into()
     }
 }
 
