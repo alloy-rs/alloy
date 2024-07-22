@@ -1,4 +1,8 @@
 //! `trace_filter` types and support
+use crate::parity::{
+    Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
+    TransactionTrace,
+};
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -93,31 +97,59 @@ pub enum TraceFilterMode {
     Intersection,
 }
 
+/// Address filter.
+/// This is a set of addresses to match against.
+/// An empty set matches all addresses.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AddressFilter(HashSet<Address>);
+
+impl AddressFilter {
+    /// Returns `true` if the given address is in the filter.
+    pub fn matches(&self, addr: &Address) -> bool {
+        self.0.is_empty() || self.0.contains(addr)
+    }
+
+    /// Returns `true` if the filter is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 /// Helper type for matching `from` and `to` addresses. Empty sets match all addresses.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TraceFilterMatcher {
     mode: TraceFilterMode,
-    from_addresses: HashSet<Address>,
-    to_addresses: HashSet<Address>,
+    from_addresses: AddressFilter,
+    to_addresses: AddressFilter,
 }
 
 impl TraceFilterMatcher {
-    /// Returns `true` if the given `from` and `to` addresses match this filter.
-    pub fn matches(&self, from: Address, to: Option<Address>) -> bool {
-        match (self.from_addresses.is_empty(), self.to_addresses.is_empty()) {
-            (true, true) => true,
-            (false, true) => self.from_addresses.contains(&from),
-            (true, false) => to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr)),
-            (false, false) => match self.mode {
-                TraceFilterMode::Union => {
-                    self.from_addresses.contains(&from)
-                        || to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
-                }
-                TraceFilterMode::Intersection => {
-                    self.from_addresses.contains(&from)
-                        && to.map_or(false, |to_addr| self.to_addresses.contains(&to_addr))
-                }
-            },
+    /// Returns `true` if the given `TransactionTrace` matches this filter.
+    pub fn matches(&self, trace: &TransactionTrace) -> bool {
+        let (from_matches, to_matches) = match trace.action {
+            Action::Call(CallAction { from, to, .. }) => {
+                (self.from_addresses.matches(&from), self.to_addresses.matches(&to))
+            }
+            Action::Create(CreateAction { from, .. }) => (
+                self.from_addresses.matches(&from),
+                match trace.result {
+                    Some(TraceOutput::Create(CreateOutput { address: to, .. })) => {
+                        self.to_addresses.matches(&to)
+                    }
+                    _ => self.to_addresses.is_empty(),
+                },
+            ),
+            Action::Reward(RewardAction { author, .. }) => {
+                (self.from_addresses.matches(&author), self.to_addresses.is_empty())
+            }
+            Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => {
+                (self.from_addresses.matches(&address), self.to_addresses.matches(&refund_address))
+            }
+        };
+
+        match self.mode {
+            TraceFilterMode::Union => from_matches || to_matches,
+            TraceFilterMode::Intersection => from_matches && to_matches,
         }
     }
 }
