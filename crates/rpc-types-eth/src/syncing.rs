@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 
 /// Syncing info
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncInfo {
     /// Starting block
@@ -16,6 +16,22 @@ pub struct SyncInfo {
     pub warp_chunks_amount: Option<U256>,
     /// Warp sync snapshot chunks processed.
     pub warp_chunks_processed: Option<U256>,
+    /// The details of the sync stages as an hashmap
+    /// where the key is the name of the stage and the value is the block number.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stages: Option<Vec<Stage>>,
+}
+
+/// The detail of the sync stages.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stage {
+    /// The name of the sync stage.
+    #[serde(alias = "stage_name")]
+    pub name: String,
+    /// Indicates the progress of the sync stage.
+    #[serde(alias = "block_number", with = "alloy_serde::quantity")]
+    pub block: u64,
 }
 
 /// Peers info
@@ -99,10 +115,10 @@ pub struct PipProtocolInfo {
 }
 
 /// Sync status
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyncStatus {
     /// Info when syncing
-    Info(SyncInfo),
+    Info(Box<SyncInfo>),
     /// Not syncing
     None,
 }
@@ -117,7 +133,7 @@ impl<'de> Deserialize<'de> for SyncStatus {
         enum Syncing {
             /// When client is synced to the highest block, eth_syncing with return "false"
             None(bool),
-            IsSyncing(SyncInfo),
+            IsSyncing(Box<SyncInfo>),
         }
 
         match Syncing::deserialize(deserializer)? {

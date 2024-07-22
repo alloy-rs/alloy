@@ -41,6 +41,12 @@ impl From<WithdrawalRequest> for Request {
     }
 }
 
+impl From<ConsolidationRequest> for Request {
+    fn from(v: ConsolidationRequest) -> Self {
+        Self::ConsolidationRequest(v)
+    }
+}
+
 impl Request {
     /// Whether this is a [`DepositRequest`].
     pub const fn is_deposit_request(&self) -> bool {
