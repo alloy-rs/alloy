@@ -104,18 +104,13 @@ pub enum TraceFilterMode {
 pub struct AddressFilter(HashSet<Address>);
 
 impl AddressFilter {
-    /// Creates a new `AddressFilter` from a list of addresses.
-    pub fn new(addresses: Vec<Address>) -> Self {
-        Self(addresses.into_iter().collect())
-    }
-
     /// Returns `true` if the given address is in the filter.
     pub fn matches(&self, addr: &Address) -> bool {
         self.0.is_empty() || self.0.contains(addr)
     }
 
     /// Returns `true` if the filter is empty.
-    pub fn is_empty(&self) -> bool {
+    pub fn matches_all(&self) -> bool {
         self.0.is_empty()
     }
 }
@@ -141,14 +136,14 @@ impl TraceFilterMatcher {
                     Some(TraceOutput::Create(CreateOutput { address: to, .. })) => {
                         self.to_addresses.matches(&to)
                     }
-                    _ => self.to_addresses.is_empty(),
+                    _ => self.to_addresses.matches_all(),
                 },
             ),
             Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => {
                 (self.from_addresses.matches(&address), self.to_addresses.matches(&refund_address))
             }
             Action::Reward(RewardAction { author, .. }) => {
-                (self.from_addresses.matches(&author), self.to_addresses.is_empty())
+                (self.from_addresses.matches_all(), self.to_addresses.matches(&author))
             }
         };
 
@@ -162,10 +157,7 @@ impl TraceFilterMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parity::RewardType;
-    use alloy_primitives::{Address, Bytes, TxHash, B256, U256, U64};
     use serde_json::json;
-    use std::str::FromStr;
 
     #[test]
     fn test_parse_filter() {
@@ -175,140 +167,90 @@ mod tests {
         assert_eq!(filter.to_block, Some(5));
     }
 
-    fn address(addr: &str) -> Address {
-        addr.parse().unwrap()
-    }
-
-    fn create_trace(action: Action, result: Option<TraceOutput>) -> TransactionTrace {
-        TransactionTrace { action, result, subtraces: 1, trace_address: vec![], error: None }
+    #[test]
+    fn test_filter_matcher_addresses_unspecified() {
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let filter_json = json!({
+            "fromBlock": "0x3",
+            "toBlock": "0x5",
+        });
+        let filter: TraceFilter =
+            serde_json::from_value(filter_json).expect("Failed to parse filter");
+        let matcher = filter.matcher();
+        assert!(matcher.matches(test_addr_d8, None));
+        assert!(matcher.matches(test_addr_16, None));
+        assert!(matcher.matches(test_addr_d8, Some(test_addr_16)));
+        assert!(matcher.matches(test_addr_16, Some(test_addr_d8)));
     }
 
     #[test]
-    fn test_matches_call_action_union_mode() {
-        let matcher = TraceFilterMatcher {
-            mode: TraceFilterMode::Union,
-            from_addresses: AddressFilter::new(vec![address(
-                "0xc77820eef59629fc8d88154977bc8de8a1b2f4ae",
-            )]),
-            to_addresses: AddressFilter::new(vec![address(
-                "0x4f4495243837681061c4743b74b3eedf548d56a5",
-            )]),
-        };
-
-        let trace = create_trace(
-            Action::Call(CallAction {
-                from: address("0xc77820eef59629fc8d88154977bc8de8a1b2f4ae"),
-                call_type: "call".to_string(),
-                gas: U256::from_str("0x4a0d00").unwrap(),
-                input: vec![0x12],
-                to: address("0x4f4495243837681061c4743b74b3eedf548d56a5"),
-                value: U256::zero(),
-            }),
-            Some(TraceOutput::Call(CallOutput {
-                gas_used: U256::from_str("0x17d337").unwrap(),
-                output: Bytes::new(),
-            })),
-        );
-
-        assert!(matcher.matches(&trace));
+    fn test_filter_matcher_from_address() {
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let filter_json = json!({
+            "fromBlock": "0x3",
+            "toBlock": "0x5",
+            "fromAddress": [test_addr_d8]
+        });
+        let filter: TraceFilter = serde_json::from_value(filter_json).unwrap();
+        let matcher = filter.matcher();
+        assert!(matcher.matches(test_addr_d8, None));
+        assert!(!matcher.matches(test_addr_16, None));
+        assert!(matcher.matches(test_addr_d8, Some(test_addr_16)));
+        assert!(!matcher.matches(test_addr_16, Some(test_addr_d8)));
     }
 
     #[test]
-    fn test_matches_create_action_intersection_mode() {
-        let matcher = TraceFilterMatcher {
-            mode: TraceFilterMode::Intersection,
-            from_addresses: AddressFilter::new(vec![address(
-                "0xc77820eef59629fc8d88154977bc8de8a1b2f4ae",
-            )]),
-            to_addresses: AddressFilter::new(vec![address(
-                "0x4f4495243837681061c4743b74b3eedf548d56a5",
-            )]),
-        };
-
-        let trace = create_trace(
-            Action::Create(CreateAction {
-                from: address("0xc77820eef59629fc8d88154977bc8de8a1b2f4ae"),
-                gas: U256::from_str("0x4a0d00").unwrap(),
-                init: vec![],
-                value: U256::zero(),
-            }),
-            Some(TraceOutput::Create(CreateOutput {
-                code: Bytes::new(),
-                address: address("0x4f4495243837681061c4743b74b3eedf548d56a5"),
-                gas_used: 0,
-            })),
-        );
-
-        assert!(matcher.matches(&trace));
+    fn test_filter_matcher_to_address() {
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let filter_json = json!({
+            "fromBlock": "0x3",
+            "toBlock": "0x5",
+            "toAddress": [test_addr_d8],
+        });
+        let filter: TraceFilter = serde_json::from_value(filter_json).unwrap();
+        let matcher = filter.matcher();
+        assert!(matcher.matches(test_addr_16, Some(test_addr_d8)));
+        assert!(!matcher.matches(test_addr_16, None));
+        assert!(!matcher.matches(test_addr_d8, Some(test_addr_16)));
     }
 
     #[test]
-    fn test_matches_reward_action_no_matches() {
-        let matcher = TraceFilterMatcher {
-            mode: TraceFilterMode::Union,
-            from_addresses: AddressFilter::new(vec![address(
-                "0xc77820eef59629fc8d88154977bc8de8a1b2f4ae",
-            )]),
-            to_addresses: AddressFilter::new(vec![address(
-                "0x4f4495243837681061c4743b74b3eedf548d56a5",
-            )]),
-        };
-
-        let trace = create_trace(
-            Action::Reward(RewardAction {
-                reward_type: RewardType::Block,
-                author: address("0x1234567890123456789012345678901234567890"),
-                value: U256::from_str("0x1").unwrap(),
-            }),
-            None,
-        );
-
-        assert!(!matcher.matches(&trace));
+    fn test_filter_matcher_both_addresses_union() {
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let filter_json = json!({
+            "fromBlock": "0x3",
+            "toBlock": "0x5",
+            "fromAddress": [test_addr_16],
+            "toAddress": [test_addr_d8],
+        });
+        let filter: TraceFilter = serde_json::from_value(filter_json).unwrap();
+        let matcher = filter.matcher();
+        assert!(matcher.matches(test_addr_16, Some(test_addr_d8)));
+        assert!(matcher.matches(test_addr_16, None));
+        assert!(matcher.matches(test_addr_d8, Some(test_addr_d8)));
+        assert!(!matcher.matches(test_addr_d8, Some(test_addr_16)));
     }
 
     #[test]
-    fn test_matches_selfdestruct_action_partial_match() {
-        let matcher = TraceFilterMatcher {
-            mode: TraceFilterMode::Union,
-            from_addresses: AddressFilter::new(vec![address(
-                "0xc77820eef59629fc8d88154977bc8de8a1b2f4ae",
-            )]),
-            to_addresses: AddressFilter::new(vec![]),
-        };
-
-        let trace = create_trace(
-            Action::Selfdestruct(SelfdestructAction {
-                address: address("0xc77820eef59629fc8d88154977bc8de8a1b2f4ae"),
-                refund_address: address("0x4f4495243837681061c4743b74b3eedf548d56a5"),
-                balance: U256::from_str("0x1").unwrap(),
-            }),
-            None,
-        );
-
-        assert!(matcher.matches(&trace));
-    }
-
-    #[test]
-    fn test_matches_selfdestruct_action_intersection_no_match() {
-        let matcher = TraceFilterMatcher {
-            mode: TraceFilterMode::Intersection,
-            from_addresses: AddressFilter::new(vec![address(
-                "0xc77820eef59629fc8d88154977bc8de8a1b2f4ae",
-            )]),
-            to_addresses: AddressFilter::new(vec![address(
-                "0x4f4495243837681061c4743b74b3eedf548d56a5",
-            )]),
-        };
-
-        let trace = create_trace(
-            Action::Selfdestruct(SelfdestructAction {
-                address: address("0xc77820eef59629fc8d88154977bc8de8a1b2f4ae"),
-                refund_address: address("0x1234567890123456789012345678901234567890"),
-                balance: U256::from_str("0x1").unwrap(),
-            }),
-            None,
-        );
-
-        assert!(!matcher.matches(&trace));
+    fn test_filter_matcher_both_addresses_intersection() {
+        let test_addr_d8 = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045".parse().unwrap();
+        let test_addr_16 = "0x160f5f00288e9e1cc8655b327e081566e580a71d".parse().unwrap();
+        let filter_json = json!({
+            "fromBlock": "0x3",
+            "toBlock": "0x5",
+            "fromAddress": [test_addr_16],
+            "toAddress": [test_addr_d8],
+            "mode": "intersection",
+        });
+        let filter: TraceFilter = serde_json::from_value(filter_json).unwrap();
+        let matcher = filter.matcher();
+        assert!(matcher.matches(test_addr_16, Some(test_addr_d8)));
+        assert!(!matcher.matches(test_addr_16, None));
+        assert!(!matcher.matches(test_addr_d8, Some(test_addr_d8)));
+        assert!(!matcher.matches(test_addr_d8, Some(test_addr_16)));
     }
 }
