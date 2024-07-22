@@ -250,6 +250,7 @@ impl From<SignedAuthorization> for RecoveredAuthority {
         value.into_recovered().authority
     }
 }
+
 #[cfg(feature = "k256")]
 impl From<SignedAuthorization> for RecoveredAuthorization {
     fn from(value: SignedAuthorization) -> Self {
