@@ -41,6 +41,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # for signed authorization list arbitrary
 k256 = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -80,6 +81,7 @@ arbitrary = [
     "std",
     "kzg-sidecar",
     "dep:arbitrary",
+    "dep:rand",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
 ]
