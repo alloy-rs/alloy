@@ -269,22 +269,20 @@ impl TransactionRequest {
         };
 
         TxEip4844 {
-                chain_id: self.chain_id.unwrap_or(1),
-                nonce: self.nonce.expect("checked in complete_4844"),
-                gas_limit: self.gas.expect("checked in complete_4844"),
-                max_fee_per_gas: self.max_fee_per_gas.expect("checked in complete_4844"),
-                max_priority_fee_per_gas: self
-                    .max_priority_fee_per_gas
-                    .expect("checked in complete_4844"),
-                to: to_address,
-                value: self.value.unwrap_or_default(),
-                access_list: self.access_list.unwrap_or_default(),
-                blob_versioned_hashes: self
-                    .blob_versioned_hashes
-                    .expect("populated at top of block"),
-                max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
-                input: self.input.into_input().unwrap_or_default(),
-            }
+            chain_id: self.chain_id.unwrap_or(1),
+            nonce: self.nonce.expect("checked in complete_4844"),
+            gas_limit: self.gas.expect("checked in complete_4844"),
+            max_fee_per_gas: self.max_fee_per_gas.expect("checked in complete_4844"),
+            max_priority_fee_per_gas: self
+                .max_priority_fee_per_gas
+                .expect("checked in complete_4844"),
+            to: to_address,
+            value: self.value.unwrap_or_default(),
+            access_list: self.access_list.unwrap_or_default(),
+            blob_versioned_hashes: self.blob_versioned_hashes.expect("populated at top of block"),
+            max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
+            input: self.input.into_input().unwrap_or_default(),
+        }
     }
 
     /// Build an EIP-4844 transaction with sidecar.
