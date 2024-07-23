@@ -116,18 +116,20 @@ impl From<Vec<Address>> for AddressFilter {
 }
 
 impl AddressFilter {
-    /// Returns `true` if the given address is in the filter.
+    /// Returns `true` if the given address is in the filter or the filter address set is empty.
     pub fn matches(&self, addr: &Address) -> bool {
-        self.0.is_empty() || self.0.contains(addr)
+        self.matches_all() || self.0.contains(addr)
     }
 
-    /// Returns `true` if the filter is empty.
+    /// Returns `true` if the address set is empty.
     pub fn matches_all(&self) -> bool {
         self.0.is_empty()
     }
 }
 
-/// Helper type for matching `from` and `to` addresses. Empty sets match all addresses.
+/// `TraceFilterMatcher` is a filter used for matching `TransactionTrace` based on
+/// it's action and result(if available). It allows filtering traces by their mode, from address
+/// set, and to address set, and empty address set means match all addresses.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TraceFilterMatcher {
     mode: TraceFilterMode,
@@ -137,6 +139,29 @@ pub struct TraceFilterMatcher {
 
 impl TraceFilterMatcher {
     /// Returns `true` if the given `TransactionTrace` matches this filter.
+    ///
+    /// # Arguments
+    ///
+    /// - `trace`: A reference to a `TransactionTrace` to be evaluated against the filter.
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the transaction trace matches the filter criteria; otherwise, `false`.
+    ///
+    /// # Behavior
+    ///
+    /// The function evaluates whether the `trace` matches based on its action type:
+    /// - `Call`: Matches if either the `from` or `to` addresses in the call action match the
+    ///   filter's address criteria.
+    /// - `Create`: Matches if the `from` address in action matches, and the result's address (if
+    ///   available) matches the filter's address criteria.
+    /// - `Selfdestruct`: Matches if the `address` and `refund_address` matches the filter's address
+    ///   criteria.
+    /// - `Reward`: Matches if the `author` address matches the filter's `to_addresses` criteria.
+    ///
+    /// The overall result depends on the filter mode:
+    /// - `Union` mode: The trace matches if either the `from` or `to` address matches.
+    /// - `Intersection` mode: The trace matches only if both the `from` and `to` addresses match.
     pub fn matches(&self, trace: &TransactionTrace) -> bool {
         let (from_matches, to_matches) = match trace.action {
             Action::Call(CallAction { from, to, .. }) => {
