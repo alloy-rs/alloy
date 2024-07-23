@@ -255,7 +255,7 @@ impl TransactionRequest {
         }
     }
 
-    /// Build an EIP-4844 transaction with sidecar.
+    /// Build an EIP-4844 transaction without sidecar.
     ///
     /// # Panics
     ///
@@ -279,7 +279,7 @@ impl TransactionRequest {
             to: to_address,
             value: self.value.unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
-            blob_versioned_hashes: self.blob_versioned_hashes.expect("populated at top of block"),
+            blob_versioned_hashes: self.blob_versioned_hashes.expect("checked in complete_4844"),
             max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
             input: self.input.into_input().unwrap_or_default(),
         }
