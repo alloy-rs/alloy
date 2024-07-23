@@ -247,7 +247,53 @@ impl TransactionRequest {
     ///
     /// If required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844(mut self) -> TxEip4844WithSidecar {
+    fn build_4844(self) -> TxEip4844Variant {
+        if self.sidecar.is_none() {
+            self.build_4844_without_sidecar().into()
+        } else {
+            self.build_4844_with_sidecar().into()
+        }
+    }
+
+    /// Build an EIP-4844 transaction with sidecar.
+    ///
+    /// # Panics
+    ///
+    /// If required fields are missing. Use `complete_4844` to check if the
+    /// request can be built.
+    fn build_4844_without_sidecar(self) -> TxEip4844 {
+        let checked_to = self.to.expect("checked in complete_4844.");
+        let to_address = match checked_to {
+            TxKind::Create => panic!("the field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Call(to) => to,
+        };
+
+        TxEip4844 {
+                chain_id: self.chain_id.unwrap_or(1),
+                nonce: self.nonce.expect("checked in complete_4844"),
+                gas_limit: self.gas.expect("checked in complete_4844"),
+                max_fee_per_gas: self.max_fee_per_gas.expect("checked in complete_4844"),
+                max_priority_fee_per_gas: self
+                    .max_priority_fee_per_gas
+                    .expect("checked in complete_4844"),
+                to: to_address,
+                value: self.value.unwrap_or_default(),
+                access_list: self.access_list.unwrap_or_default(),
+                blob_versioned_hashes: self
+                    .blob_versioned_hashes
+                    .expect("populated at top of block"),
+                max_fee_per_blob_gas: self.max_fee_per_blob_gas.expect("checked in complete_4844"),
+                input: self.input.into_input().unwrap_or_default(),
+            }
+    }
+
+    /// Build an EIP-4844 transaction with sidecar.
+    ///
+    /// # Panics
+    ///
+    /// If required fields are missing. Use `complete_4844` to check if the
+    /// request can be built.
+    fn build_4844_with_sidecar(mut self) -> TxEip4844WithSidecar {
         self.populate_blob_hashes();
 
         let checked_to = self.to.expect("checked in complete_4844.");
@@ -390,8 +436,10 @@ impl TransactionRequest {
             missing.push("to");
         }
 
-        if self.sidecar.is_none() {
+        // Either `sidecar` or `blob_versioned_hashes` must be set.
+        if self.sidecar.is_none() && self.blob_versioned_hashes.is_none() {
             missing.push("sidecar");
+            missing.push("blob_versioned_hashes");
         }
 
         if self.max_fee_per_blob_gas.is_none() {
