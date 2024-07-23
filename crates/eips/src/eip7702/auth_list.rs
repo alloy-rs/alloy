@@ -28,6 +28,16 @@ impl RecoveredAuthority {
             Self::Invalid => None,
         }
     }
+
+    /// Returns true if the authority is valid.
+    pub const fn is_valid(&self) -> bool {
+        matches!(self, Self::Valid(_))
+    }
+
+    /// Returns true if the authority is invalid.
+    pub const fn is_invalid(&self) -> bool {
+        matches!(self, Self::Invalid)
+    }
 }
 
 /// An unsigned EIP-7702 authorization.
