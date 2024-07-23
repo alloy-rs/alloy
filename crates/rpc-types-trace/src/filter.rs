@@ -101,7 +101,7 @@ pub enum TraceFilterMode {
 /// This is a set of addresses to match against.
 /// An empty set matches all addresses.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct AddressFilter(HashSet<Address>);
+pub struct AddressFilter(pub HashSet<Address>);
 
 impl FromIterator<Address> for AddressFilter {
     fn from_iter<I: IntoIterator<Item = Address>>(iter: I) -> Self {
