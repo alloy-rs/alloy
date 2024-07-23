@@ -15,7 +15,7 @@ pub struct Bundle {
 impl From<Vec<TransactionRequest>> for Bundle {
     /// Converts a `TransactionRequest` into a `Bundle`.
     fn from(tx_request: Vec<TransactionRequest>) -> Self {
-        Bundle { transactions: tx_request, block_override: None }
+        Self { transactions: tx_request, block_override: None }
     }
 }
 
