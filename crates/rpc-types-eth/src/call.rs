@@ -12,6 +12,13 @@ pub struct Bundle {
     pub block_override: Option<BlockOverrides>,
 }
 
+impl From<Vec<TransactionRequest>> for Bundle {
+    /// Converts a `TransactionRequest` into a `Bundle`.
+    fn from(tx_request: Vec<TransactionRequest>) -> Self {
+        Self { transactions: tx_request, block_override: None }
+    }
+}
+
 /// State context for callMany
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
