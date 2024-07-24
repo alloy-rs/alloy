@@ -36,5 +36,4 @@ tokio = { workspace = true, features = ["rt", "time"] }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [features]
-
 wasm-bindgen = ["dep:wasm-bindgen-futures"]
