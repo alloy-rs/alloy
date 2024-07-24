@@ -131,7 +131,7 @@ network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider", "rpc-client", "eips"]
+providers = ["dep:alloy-provider", "rpc-client", "transports", "eips"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
@@ -184,9 +184,9 @@ pubsub = [
 # rpc
 rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
-rpc-client = ["rpc", "dep:alloy-rpc-client"]
-rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
-rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
+rpc-client = ["rpc", "transports", "transport-http", "dep:alloy-rpc-client"]
+rpc-client-ws = ["rpc-client", "transport-ws", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc-client", "transport-ipc", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-admin = [
     "rpc-types",
