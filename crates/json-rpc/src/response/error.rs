@@ -76,7 +76,7 @@ impl<E> ErrorPayload<E> {
 fn spelunk_revert(value: &Value) -> Option<Bytes> {
     match value {
         Value::String(s) => s.parse().ok(),
-        Value::Object(o) => o.values().flat_map(spelunk_revert).next(),
+        Value::Object(o) => o.values().find_map(spelunk_revert),
         _ => None,
     }
 }
