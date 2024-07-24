@@ -1,5 +1,5 @@
 use crate::{SignableTransaction, Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, EncodableSignature, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
@@ -104,11 +104,10 @@ impl TxLegacy {
     /// tx type byte or string header.
     ///
     /// This __does__ encode a list header and include a signature.
-    pub fn encode_with_signature_fields(
-        &self,
-        signature: &Signature,
-        out: &mut dyn alloy_rlp::BufMut,
-    ) {
+    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn alloy_rlp::BufMut)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         let header = Header { list: true, payload_length };
         header.encode(out);
@@ -118,7 +117,10 @@ impl TxLegacy {
 
     /// Returns what the encoded length should be, if the transaction were RLP encoded with the
     /// given signature.
-    pub fn encoded_len_with_signature(&self, signature: &Signature) -> usize {
+    pub fn encoded_len_with_signature<S>(&self, signature: &S) -> usize
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         Header { list: true, payload_length }.length() + payload_length
     }

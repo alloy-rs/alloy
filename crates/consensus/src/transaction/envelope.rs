@@ -434,7 +434,7 @@ mod tests {
         eip2930::{AccessList, AccessListItem},
         eip4844::BlobTransactionSidecar,
     };
-    use alloy_primitives::{hex, Address, Parity, Signature, U256};
+    use alloy_primitives::{hex, Address, EncodableSignature, Parity, Signature, U256};
     #[allow(unused_imports)]
     use alloy_primitives::{Bytes, TxKind};
     use std::{fs, path::PathBuf, vec};
