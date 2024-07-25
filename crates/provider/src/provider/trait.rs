@@ -241,10 +241,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
-    async fn get_account(
-        &self,
-        address: Address,
-    ) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+    fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 

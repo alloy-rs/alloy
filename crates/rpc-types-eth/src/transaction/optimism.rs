@@ -1,6 +1,6 @@
 //! Misc Optimism-specific types.
 
-use alloy_primitives::{B256, U128, U64};
+use alloy_primitives::B256;
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
@@ -12,8 +12,13 @@ pub struct OptimismTransactionFields {
     #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
     pub source_hash: Option<B256>,
     /// The ETH value to mint on L2
-    #[serde(rename = "mint", skip_serializing_if = "Option::is_none")]
-    pub mint: Option<U128>,
+    #[serde(
+        default,
+        rename = "mint",
+        skip_serializing_if = "Option::is_none",
+        with = "alloy_serde::quantity::opt"
+    )]
+    pub mint: Option<u128>,
     /// Field indicating whether the transaction is a system transaction, and therefore
     /// exempt from the L2 gas limit.
     #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
@@ -27,11 +32,11 @@ pub struct OptimismTransactionFields {
 #[doc(alias = "OptimismTxReceiptFields")]
 pub struct OptimismTransactionReceiptFields {
     /// Deposit nonce for deposit transactions post-regolith
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposit_nonce: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub deposit_nonce: Option<u64>,
     /// Deposit receipt version for deposit transactions post-canyon
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deposit_receipt_version: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub deposit_receipt_version: Option<u64>,
     /// L1 fee for the transaction
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub l1_fee: Option<u128>,

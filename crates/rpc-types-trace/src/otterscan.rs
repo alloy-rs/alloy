@@ -3,12 +3,15 @@
 //! <https://www.quicknode.com/docs/ethereum/ots_getBlockTransactions>
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
-use alloy_primitives::{Address, Bloom, Bytes, TxHash, U256};
-use alloy_rpc_types_eth::{Block, Rich, Transaction, TransactionReceipt};
-use serde::{Deserialize, Serialize};
+use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
+use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
+use serde::{
+    de::{self, Unexpected},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 /// Operation type enum for `InternalOperation` struct
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OperationType {
     /// Operation Transfer
     OpTransfer = 0,
@@ -18,6 +21,37 @@ pub enum OperationType {
     OpCreate = 2,
     /// Operation Create2
     OpCreate2 = 3,
+}
+
+// Implement Serialize for OperationType
+impl Serialize for OperationType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u8(*self as u8)
+    }
+}
+
+// Implement Deserialize for OperationType
+impl<'de> Deserialize<'de> for OperationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize string, then parse it to u8
+        let value = u8::deserialize(deserializer)?;
+        match value {
+            0 => Ok(Self::OpTransfer),
+            1 => Ok(Self::OpSelfDestruct),
+            2 => Ok(Self::OpCreate),
+            3 => Ok(Self::OpCreate2),
+            other => Err(de::Error::invalid_value(
+                Unexpected::Unsigned(other as u64),
+                &"a valid OperationType",
+            )),
+        }
+    }
 }
 
 /// Custom struct for otterscan `getInternalOperations` RPC response
@@ -83,12 +117,45 @@ impl From<Block> for OtsBlock {
     }
 }
 
+/// Custom `Block` struct that without transactions for Otterscan responses
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OtsSlimBlock {
+    /// Header of the block.
+    #[serde(flatten)]
+    pub header: Header,
+    /// Uncles' hashes.
+    #[serde(default)]
+    pub uncles: Vec<B256>,
+    /// Integer the size of this block in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<U256>,
+    /// Withdrawals in the block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withdrawals: Option<Vec<Withdrawal>>,
+    /// The number of transactions in the block.
+    #[doc(alias = "tx_count")]
+    pub transaction_count: usize,
+}
+
+impl From<Block> for OtsSlimBlock {
+    fn from(block: Block) -> Self {
+        Self {
+            header: block.header,
+            uncles: block.uncles,
+            size: block.size,
+            withdrawals: block.withdrawals,
+            transaction_count: block.transactions.len(),
+        }
+    }
+}
+
 /// Custom struct for otterscan `getBlockDetails` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockDetails {
     /// The block information with transaction count.
-    pub block: OtsBlock,
+    pub block: OtsSlimBlock,
     /// The issuance information for the block.
     pub issuance: InternalIssuance,
     /// The total fees for the block.
@@ -102,6 +169,13 @@ impl From<Rich<Block>> for BlockDetails {
             issuance: Default::default(),
             total_fees: U256::default(),
         }
+    }
+}
+
+impl BlockDetails {
+    /// Create a new `BlockDetails` struct.
+    pub fn new(rich_block: Rich<Block>, issuance: InternalIssuance, total_fees: U256) -> Self {
+        Self { block: rich_block.inner.into(), issuance, total_fees }
     }
 }
 
@@ -203,5 +277,35 @@ mod tests {
         }"#;
 
         let _receipt: OtsTransactionReceipt = serde_json::from_str(s).unwrap();
+    }
+
+    #[test]
+    fn test_otterscan_internal_operation() {
+        let s = r#"{
+          "type": 0,
+          "from": "0xea593b730d745fb5fe01b6d20e6603915252c6bf",
+          "to": "0xcc3d455481967dc97346ef1771a112d7a14c8f12",
+          "value": "0xee846f9305c00"
+        }"#;
+        let _op: InternalOperation = serde_json::from_str(s).unwrap();
+    }
+
+    #[test]
+    fn test_serialize_operation_type() {
+        assert_eq!(serde_json::to_string(&OperationType::OpTransfer).unwrap(), "0");
+        assert_eq!(serde_json::to_string(&OperationType::OpSelfDestruct).unwrap(), "1");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate).unwrap(), "2");
+        assert_eq!(serde_json::to_string(&OperationType::OpCreate2).unwrap(), "3");
+    }
+
+    #[test]
+    fn test_deserialize_operation_type() {
+        assert_eq!(serde_json::from_str::<OperationType>("0").unwrap(), OperationType::OpTransfer);
+        assert_eq!(
+            serde_json::from_str::<OperationType>("1").unwrap(),
+            OperationType::OpSelfDestruct
+        );
+        assert_eq!(serde_json::from_str::<OperationType>("2").unwrap(), OperationType::OpCreate);
+        assert_eq!(serde_json::from_str::<OperationType>("3").unwrap(), OperationType::OpCreate2);
     }
 }

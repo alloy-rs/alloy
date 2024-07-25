@@ -1,5 +1,6 @@
 use crate::Log;
 use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,10 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// EIP98 makes this optional field, if it's missing then skip serializing it
     #[serde(skip_serializing_if = "Option::is_none", rename = "root")]
     pub state_root: Option<B256>,
+    /// The authorization list is a list of tuples that store the address to code which the signer
+    /// desires to execute in the context of their EOA.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -114,6 +119,7 @@ impl<T> TransactionReceipt<T> {
             to: self.to,
             contract_address: self.contract_address,
             state_root: self.state_root,
+            authorization_list: self.authorization_list,
         }
     }
 }

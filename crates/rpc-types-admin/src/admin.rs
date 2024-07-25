@@ -10,10 +10,13 @@ use std::{
 
 /// This includes general information about a running node, spanning networking and protocol
 /// details.
+///
+/// See [geth's `NodeInfo` struct](https://github.com/ethereum/go-ethereum/blob/v1.14.0/p2p/server.go#L1078)
+/// for the source of each field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeInfo {
-    /// Unique node identifier.
-    pub id: B256,
+    /// Unique node identifier(also the encryption key).
+    pub id: String,
     /// The node's user agent, containing a client name, version, OS, and other metadata.
     pub name: String,
     /// The enode URL of the connected node.
@@ -210,7 +213,7 @@ pub struct PeerEvent {
     pub kind: PeerEventType,
     /// The peer's enode ID.
     pub peer: String,
-    /// An error ocurred on the peer.
+    /// An error occurred on the peer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The protocol of the peer.

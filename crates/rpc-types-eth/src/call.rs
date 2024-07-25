@@ -12,6 +12,13 @@ pub struct Bundle {
     pub block_override: Option<BlockOverrides>,
 }
 
+impl From<Vec<TransactionRequest>> for Bundle {
+    /// Converts a `TransactionRequest` into a `Bundle`.
+    fn from(tx_request: Vec<TransactionRequest>) -> Self {
+        Self { transactions: tx_request, block_override: None }
+    }
+}
+
 /// State context for callMany
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -145,7 +152,7 @@ mod tests {
         let s = r#"{"transactions":[{"data":"0x70a08231000000000000000000000000000000dbc80bf780c6dc0ca16ed071b1f00cc000","to":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}],"blockOverride":{"timestamp":1711546233}}"#;
         let bundle = serde_json::from_str::<Bundle>(s).unwrap();
         assert_eq!(bundle.transactions.len(), 1);
-        assert_eq!(bundle.block_override.unwrap().time.unwrap().to::<u64>(), 1711546233);
+        assert_eq!(bundle.block_override.unwrap().time.unwrap(), 1711546233);
     }
 
     #[test]

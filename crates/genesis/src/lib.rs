@@ -64,8 +64,8 @@ pub struct Genesis {
 }
 
 impl Genesis {
-    /// Creates a chain config for Clique using the given chain id.
-    /// and funds the given address with max coins.
+    /// Creates a chain config for Clique using the given chain id and funds the given address with
+    /// max coins.
     ///
     /// Enables all hard forks up to London at genesis.
     pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {

@@ -39,6 +39,10 @@ ethereum_ssz = { workspace = true, optional = true }
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
+# for signed authorization list arbitrary
+k256 = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
     "rand",
@@ -66,7 +70,7 @@ serde = [
 kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
 sha2 = ["dep:sha2"]
-k256 = ["alloy-primitives/k256"]
+k256 = ["alloy-primitives/k256", "dep:k256"]
 ssz = [
     "std",
     "dep:ethereum_ssz",
@@ -77,6 +81,7 @@ arbitrary = [
     "std",
     "kzg-sidecar",
     "dep:arbitrary",
+    "dep:rand",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
 ]

@@ -32,6 +32,18 @@ pub enum Id {
     None,
 }
 
+impl From<u64> for Id {
+    fn from(value: u64) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<String> for Id {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -70,14 +82,14 @@ impl<'de> Deserialize<'de> for Id {
             where
                 E: serde::de::Error,
             {
-                Ok(Id::Number(v))
+                Ok(v.into())
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
-                Ok(Id::String(v.to_owned()))
+                Ok(v.to_owned().into())
             }
 
             fn visit_none<E>(self) -> Result<Self::Value, E>
