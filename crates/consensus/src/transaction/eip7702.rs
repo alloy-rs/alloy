@@ -1,4 +1,4 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
@@ -161,7 +161,10 @@ impl TxEip7702 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub fn encoded_len_with_signature(&self, signature: &Signature, with_header: bool) -> usize {
+    pub fn encoded_len_with_signature<S>(&self, signature: &S, with_header: bool) -> usize
+    where
+        S: EncodableSignature,
+    {
         // this counts the tx fields and signature fields
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
 
@@ -236,7 +239,10 @@ impl TxEip7702 {
     /// tx type byte or string header.
     ///
     /// This __does__ encode a list header and include a signature.
-    pub(crate) fn encode_with_signature_fields(&self, signature: &Signature, out: &mut dyn BufMut) {
+    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn BufMut)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         let header = Header { list: true, payload_length };
         header.encode(out);
