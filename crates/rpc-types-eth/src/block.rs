@@ -15,7 +15,7 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block {
+pub struct Block<T = Transaction> {
     /// Header of the block.
     #[serde(flatten)]
     pub header: Header,
@@ -28,7 +28,7 @@ pub struct Block {
         default = "BlockTransactions::uncle",
         skip_serializing_if = "BlockTransactions::is_uncle"
     )]
-    pub transactions: BlockTransactions<Transaction>,
+    pub transactions: BlockTransactions<T>,
     /// Integer the size of this block in bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<U256>,
