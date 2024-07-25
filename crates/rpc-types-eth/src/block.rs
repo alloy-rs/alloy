@@ -332,15 +332,6 @@ mod tests {
     }
 
     #[test]
-    fn test_full_conversion() {
-        let full = true;
-        assert_eq!(BlockTransactionsKind::Full, full.into());
-
-        let full = false;
-        assert_eq!(BlockTransactionsKind::Hashes, full.into());
-    }
-
-    #[test]
     #[cfg(feature = "jsonrpsee-types")]
     fn serde_json_header() {
         use jsonrpsee_types::SubscriptionResponse;

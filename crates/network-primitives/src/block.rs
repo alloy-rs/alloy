@@ -242,3 +242,17 @@ impl From<BlockTransactionsKind> for bool {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_full_conversion() {
+        let full = true;
+        assert_eq!(BlockTransactionsKind::Full, full.into());
+
+        let full = false;
+        assert_eq!(BlockTransactionsKind::Hashes, full.into());
+    }
+}
