@@ -1,5 +1,5 @@
-use crate::{SignableTransaction, Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, EncodableSignature, Signature, TxKind, U256};
+use crate::{EncodableSignature, SignableTransaction, Signed, Transaction};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 

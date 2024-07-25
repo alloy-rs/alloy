@@ -15,6 +15,9 @@ pub use account::Account;
 
 pub mod constants;
 
+mod encodable_signature;
+pub use encodable_signature::EncodableSignature;
+
 mod header;
 pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
