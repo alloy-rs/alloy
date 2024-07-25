@@ -1,11 +1,7 @@
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
 use alloy_serde::WithOtherFields;
 
-/// A receipt response.
-///
-/// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
-///
-/// [`TxReceipt`]: alloy_consensus::TxReceipt
+/// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
     fn contract_address(&self) -> Option<Address>;
@@ -18,11 +14,6 @@ pub trait ReceiptResponse {
     /// receipts, as it may not accurately reflect the status of the
     /// transaction. The transaction status is not knowable from the receipt
     /// for transactions before [EIP-658].
-    ///
-    /// This can be handled using [`TxReceipt::status_or_post_state`].
-    ///
-    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
     fn status(&self) -> bool;
 
     /// Hash of the block this transaction was included within.
@@ -32,11 +23,7 @@ pub trait ReceiptResponse {
     fn block_number(&self) -> Option<u64>;
 }
 
-/// Transaction Response
-///
-/// This is distinct from [`Transaction`], since this is a JSON-RPC response.
-///
-/// [`Transaction`]: alloy_consensus::Transaction
+/// Transaction JSON-RPC response.
 pub trait TransactionResponse {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]

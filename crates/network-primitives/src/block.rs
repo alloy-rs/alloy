@@ -211,7 +211,7 @@ impl<T: TransactionResponse> DoubleEndedIterator for BlockTransactionHashes<'_, 
 
 impl<'a, T: TransactionResponse> std::iter::FusedIterator for BlockTransactionHashes<'a, T> {}
 
-/// Determines how the `transactions` field of [Block] should be filled.
+/// Determines how the `transactions` field of block should be filled.
 ///
 /// This essentially represents the `full:bool` argument in RPC calls that determine whether the
 /// response should include full transaction objects or just the hashes.
