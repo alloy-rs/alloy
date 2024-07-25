@@ -241,17 +241,17 @@ impl TransactionRequest {
         }
     }
 
-    /// Build an EIP-4844 transaction.
+    /// Build an EIP-4844 transaction variant - either with or without sidecar.
     ///
     /// # Panics
     ///
     /// If required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844(self) -> TxEip4844Variant {
+    fn build_4844_variant(self) -> TxEip4844Variant {
         if self.sidecar.is_none() {
             self.build_4844_without_sidecar().into()
         } else {
-            self.build_4844_with_sidecar().into()
+            self.build_4844().into()
         }
     }
 
@@ -291,7 +291,7 @@ impl TransactionRequest {
     ///
     /// If required fields are missing. Use `complete_4844` to check if the
     /// request can be built.
-    fn build_4844_with_sidecar(mut self) -> TxEip4844WithSidecar {
+    fn build_4844(mut self) -> TxEip4844WithSidecar {
         self.populate_blob_hashes();
 
         let checked_to = self.to.expect("checked in complete_4844.");
@@ -518,7 +518,7 @@ impl TransactionRequest {
             TxType::Legacy => self.build_legacy().into(),
             TxType::Eip2930 => self.build_2930().into(),
             TxType::Eip1559 => self.build_1559().into(),
-            TxType::Eip4844 => self.build_4844().into(),
+            TxType::Eip4844 => self.build_4844_variant().into(),
         })
     }
 }
