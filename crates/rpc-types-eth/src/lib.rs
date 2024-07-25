@@ -14,6 +14,10 @@ pub use account::*;
 mod block;
 pub use block::*;
 
+pub use alloy_network_primitives::{
+    BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,
+};
+
 mod call;
 pub use call::{Bundle, EthCallResponse, StateContext, TransactionIndex};
 
