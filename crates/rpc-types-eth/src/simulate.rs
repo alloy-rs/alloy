@@ -110,7 +110,7 @@ pub struct SimulateError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Address, TxKind, U64};
+    use alloy_primitives::{Address, TxKind};
     use serde_json::json;
 
     #[test]
@@ -168,10 +168,7 @@ mod tests {
 
         let block_state_call_1 = &sim_opts.block_state_calls[0];
         assert!(block_state_call_1.state_overrides.contains_key(&address_1));
-        assert_eq!(
-            block_state_call_1.state_overrides.get(&address_1).unwrap().nonce.unwrap(),
-            U64::from(5)
-        );
+        assert_eq!(block_state_call_1.state_overrides.get(&address_1).unwrap().nonce.unwrap(), 5);
 
         let block_state_call_2 = &sim_opts.block_state_calls[1];
         assert!(block_state_call_2.state_overrides.contains_key(&address_1));
