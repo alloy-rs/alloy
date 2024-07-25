@@ -20,6 +20,7 @@ workspace = true
 
 [dependencies]
 alloy-network.workspace = true
+alloy-network-primitives.workspace = true
 alloy-provider.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-transport.workspace = true

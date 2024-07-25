@@ -555,13 +555,13 @@ impl<S> Heartbeat<S> {
                 self.past_blocks.retain(|(h, _)| h < block_height);
             }
         }
-        self.past_blocks.push_back((*block_height, block.transactions.hashes().copied().collect()));
+        self.past_blocks.push_back((*block_height, block.transactions.hashes().collect()));
 
         // Check if we are watching for any of the transactions in this block.
         let to_check: Vec<_> = block
             .transactions
             .hashes()
-            .filter_map(|tx_hash| self.unconfirmed.remove(tx_hash))
+            .filter_map(|tx_hash| self.unconfirmed.remove(&tx_hash))
             .collect();
         for mut watcher in to_check {
             // If `confirmations` is not more than 1 we can notify the watcher immediately.

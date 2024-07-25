@@ -5,6 +5,7 @@ use alloy_consensus::{
     TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
@@ -276,6 +277,31 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+impl TransactionResponse for Transaction {
+    fn tx_hash(&self) -> B256 {
+        self.hash
+    }
+
+    fn from(&self) -> Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
