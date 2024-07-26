@@ -413,7 +413,6 @@ impl TransactionRequest {
             missing.push("to");
         }
 
-        // Either `sidecar` or `blob_versioned_hashes` must be set.
         if self.sidecar.is_none() {
             missing.push("sidecar");
         }
