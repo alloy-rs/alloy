@@ -51,6 +51,7 @@ alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
 similar-asserts.workspace = true
+assert_matches.workspace = true
 
 [features]
 arbitrary = [
