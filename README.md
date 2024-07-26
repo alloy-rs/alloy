@@ -44,6 +44,7 @@ This repository contains the following crates:
 - [`alloy-genesis`] - Ethereum genesis file definitions
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
 - [`alloy-network`] - Network abstraction for RPC types
+  - [`alloy-network-primitives`] - Primitive types for the network abstraction
 - [`alloy-node-bindings`] - Ethereum execution-layer client bindings
 - [`alloy-provider`] - Interface with an Ethereum blockchain
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
@@ -77,6 +78,7 @@ This repository contains the following crates:
 [`alloy-genesis`]: https://github.com/alloy-rs/alloy/tree/main/crates/genesis
 [`alloy-json-rpc`]: https://github.com/alloy-rs/alloy/tree/main/crates/json-rpc
 [`alloy-network`]: https://github.com/alloy-rs/alloy/tree/main/crates/network
+[`alloy-network-primitives`]: https://github.com/alloy-rs/alloy/tree/main/crates/network-primitives
 [`alloy-node-bindings`]: https://github.com/alloy-rs/alloy/tree/main/crates/node-bindings
 [`alloy-provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider
 [`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub

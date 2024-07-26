@@ -24,7 +24,7 @@ mod any;
 pub use any::{AnyNetwork, AnyTxType};
 
 pub use alloy_eips::eip2718;
-pub use alloy_network_primitives::{ReceiptResponse, TransactionResponse};
+pub use alloy_network_primitives::{self as primitives, ReceiptResponse, TransactionResponse};
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
