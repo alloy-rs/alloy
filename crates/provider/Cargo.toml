@@ -23,6 +23,7 @@ alloy-eips.workspace = true
 alloy-consensus.workspace = true
 alloy-json-rpc.workspace = true
 alloy-network.workspace = true
+alloy-network-primitives.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true

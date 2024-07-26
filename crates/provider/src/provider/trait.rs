@@ -7,15 +7,16 @@ use crate::{
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
-use alloy_network::{Ethereum, Network, ReceiptResponse as _};
+use alloy_network::{Ethereum, Network};
+use alloy_network_primitives::{BlockTransactionsKind, ReceiptResponse};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types_eth::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, BlockTransactionsKind,
-    EIP1186AccountProofResponse, FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
+    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;

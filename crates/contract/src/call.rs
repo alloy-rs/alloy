@@ -1,7 +1,8 @@
 use crate::{CallDecoder, Error, EthCall, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
+use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};

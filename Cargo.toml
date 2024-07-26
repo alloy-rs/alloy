@@ -42,6 +42,7 @@ alloy-eip7547 = { version = "0.2", path = "crates/eip7547", default-features = f
 alloy-genesis = { version = "0.2", path = "crates/genesis", default-features = false }
 alloy-json-rpc = { version = "0.2", path = "crates/json-rpc", default-features = false }
 alloy-network = { version = "0.2", path = "crates/network", default-features = false }
+alloy-network-primitives = { version = "0.2", path = "crates/network-primitives", default-features = false }
 alloy-node-bindings = { version = "0.2", path = "crates/node-bindings", default-features = false }
 alloy-provider = { version = "0.2", path = "crates/provider", default-features = false }
 alloy-pubsub = { version = "0.2", path = "crates/pubsub", default-features = false }

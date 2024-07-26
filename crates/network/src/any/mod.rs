@@ -1,7 +1,6 @@
-use crate::{Network, ReceiptResponse, TransactionResponse};
+use crate::Network;
 use alloy_consensus::TxType;
 use alloy_eips::eip2718::Eip2718Error;
-use alloy_primitives::Bytes;
 use alloy_rpc_types_eth::{AnyTransactionReceipt, Header, Transaction, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use core::fmt;
@@ -75,49 +74,4 @@ impl Network for AnyNetwork {
     type ReceiptResponse = AnyTransactionReceipt;
 
     type HeaderResponse = WithOtherFields<Header>;
-}
-
-impl ReceiptResponse for AnyTransactionReceipt {
-    fn contract_address(&self) -> Option<alloy_primitives::Address> {
-        self.contract_address
-    }
-
-    fn status(&self) -> bool {
-        self.inner.inner.status()
-    }
-
-    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
-        self.inner.block_hash
-    }
-
-    fn block_number(&self) -> Option<u64> {
-        self.inner.block_number
-    }
-}
-
-impl TransactionResponse for WithOtherFields<Transaction> {
-    #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> alloy_primitives::B256 {
-        self.hash
-    }
-
-    fn from(&self) -> alloy_primitives::Address {
-        self.from
-    }
-
-    fn to(&self) -> Option<alloy_primitives::Address> {
-        self.to
-    }
-
-    fn value(&self) -> alloy_primitives::U256 {
-        self.value
-    }
-
-    fn gas(&self) -> u128 {
-        self.gas
-    }
-
-    fn input(&self) -> &Bytes {
-        &self.input
-    }
 }
