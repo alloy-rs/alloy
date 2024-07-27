@@ -1,7 +1,7 @@
 use crate::{
     fillers::{
-        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
-        TxFiller, WalletFiller,
+        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, NonceManager,
+        RecommendedFiller, TxFiller, WalletFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -144,8 +144,11 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add nonce management to the stack being built.
     ///
     /// See [`NonceFiller`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
-        self.filler(NonceFiller::default())
+    pub fn with_nonce_management<M: NonceManager>(
+        self,
+        nonce_manager: M,
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<M>>, N> {
+        self.filler(NonceFiller::new(nonce_manager))
     }
 
     /// Add a chain ID filler to the stack being built. The filler will attempt
@@ -346,6 +349,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
+#[cfg(any(test, feature = "anvil-node"))]
 type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
 
 #[cfg(any(test, feature = "anvil-node"))]

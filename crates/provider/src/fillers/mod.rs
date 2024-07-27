@@ -13,7 +13,7 @@ mod wallet;
 pub use wallet::WalletFiller;
 
 mod nonce;
-pub use nonce::NonceFiller;
+pub use nonce::{CachedNonceManager, NonceFiller, NonceManager, SimpleNonceManager};
 
 mod gas;
 pub use gas::{GasFillable, GasFiller};
@@ -35,8 +35,10 @@ use std::marker::PhantomData;
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
-pub type RecommendedFiller =
-    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
+pub type RecommendedFiller = JoinFill<
+    JoinFill<JoinFill<Identity, GasFiller>, NonceFiller<SimpleNonceManager>>,
+    ChainIdFiller,
+>;
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]

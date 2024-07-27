@@ -302,10 +302,12 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
+        use crate::fillers::{ChainIdFiller, GasFiller, NonceFiller, SimpleNonceManager};
+
         let provider = ProviderBuilder::new()
-            .filler(crate::fillers::GasFiller)
-            .filler(crate::fillers::NonceFiller::default())
-            .filler(crate::fillers::ChainIdFiller::default())
+            .filler(GasFiller)
+            .filler(NonceFiller::<SimpleNonceManager>::default())
+            .filler(ChainIdFiller::default())
             .on_anvil();
 
         let tx = TransactionRequest {
