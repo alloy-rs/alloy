@@ -130,15 +130,17 @@ impl AccessList {
     }
 }
 
-/// Access list with gas used appended.
+/// `AccessListResult` for handling errors from `eth_createAccessList`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct AccessListWithGasUsed {
+pub struct AccessListResult {
     /// List with accounts accessed during transaction.
     pub access_list: AccessList,
     /// Estimated gas used with access list.
     pub gas_used: U256,
+    /// Optional error message if the transaction failed.
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub error: Option<String>,
 }
 
 #[cfg(all(test, feature = "serde"))]
@@ -158,15 +160,16 @@ mod tests {
 
     #[test]
     fn access_list_with_gas_used() {
-        let list = AccessListWithGasUsed {
+        let list = AccessListResult {
             access_list: AccessList(vec![
                 AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
                 AccessListItem { address: Address::ZERO, storage_keys: vec![B256::ZERO] },
             ]),
             gas_used: U256::from(100),
+            error: None,
         };
         let json = serde_json::to_string(&list).unwrap();
-        let list2 = serde_json::from_str::<AccessListWithGasUsed>(&json).unwrap();
+        let list2 = serde_json::from_str(&json).unwrap();
         assert_eq!(list, list2);
     }
 }
