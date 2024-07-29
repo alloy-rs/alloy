@@ -2,7 +2,7 @@ use core::ops::Deref;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use alloy_primitives::{keccak256, Address, ChainId, Signature, B256};
+use alloy_primitives::{keccak256, Address, Signature, B256, U256};
 use alloy_rlp::{
     length_of_length, BufMut, Decodable, Encodable, Header, Result as RlpResult, RlpDecodable,
     RlpEncodable,
@@ -16,7 +16,7 @@ use core::hash::{Hash, Hasher};
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct Authorization {
     /// The chain ID of the authorization.
-    pub chain_id: ChainId,
+    pub chain_id: U256,
     /// The address of the authorization.
     pub address: Address,
     /// The nonce for the authorization.
@@ -30,7 +30,7 @@ impl Authorization {
     /// # Note
     ///
     /// Implementers should check that this matches the current `chain_id` *or* is 0.
-    pub const fn chain_id(&self) -> ChainId {
+    pub const fn chain_id(&self) -> U256 {
         self.chain_id
     }
 
@@ -252,7 +252,7 @@ mod tests {
     fn test_encode_decode_auth() {
         // fully filled
         test_encode_decode_roundtrip(Authorization {
-            chain_id: 1u64,
+            chain_id: U256::from(1u64),
             address: Address::left_padding_from(&[6]),
             nonce: 1,
         });
@@ -262,7 +262,7 @@ mod tests {
     fn test_encode_decode_signed_auth() {
         let auth = SignedAuthorization {
             inner: Authorization {
-                chain_id: 1u64,
+                chain_id: U256::from(1u64),
                 address: Address::left_padding_from(&[6]),
                 nonce: 1,
             },

@@ -320,7 +320,7 @@ mod tests {
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             authorization_list: Some(vec![(Authorization {
-                chain_id: 1u64,
+                chain_id: U256::from(1u64),
                 address: Address::left_padding_from(&[6]),
                 nonce: 1u64,
             })
@@ -364,7 +364,7 @@ mod tests {
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
             authorization_list: Some(vec![(Authorization {
-                chain_id: 1u64,
+                chain_id: U256::from(1u64),
                 address: Address::left_padding_from(&[6]),
                 nonce: 1u64,
             })
