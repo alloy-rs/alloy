@@ -1,7 +1,7 @@
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use crate::Log;
-use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxType};
+use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxReceipt, TxType};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
@@ -11,10 +11,7 @@ use serde::{Deserialize, Serialize};
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains
 /// consensus data and metadata.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "TxReceipt")]
 pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
@@ -61,6 +58,10 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// EIP98 makes this optional field, if it's missing then skip serializing it
     #[serde(skip_serializing_if = "Option::is_none", rename = "root")]
     pub state_root: Option<B256>,
+    /// The authorization list is a list of tuples that store the address to code which the signer
+    /// desires to execute in the context of their EOA.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl AsRef<ReceiptEnvelope<Log>> for TransactionReceipt {
@@ -119,6 +120,7 @@ impl<T> TransactionReceipt<T> {
             to: self.to,
             contract_address: self.contract_address,
             state_root: self.state_root,
+            authorization_list: self.authorization_list,
         }
     }
 }
@@ -126,6 +128,24 @@ impl<T> TransactionReceipt<T> {
 /// Alias for a catch-all receipt type.
 #[doc(alias = "AnyTxReceipt")]
 pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+
+impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
+    fn contract_address(&self) -> Option<alloy_primitives::Address> {
+        self.contract_address
+    }
+
+    fn status(&self) -> bool {
+        self.inner.status()
+    }
+
+    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+        self.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.block_number
+    }
+}
 
 #[cfg(test)]
 mod test {

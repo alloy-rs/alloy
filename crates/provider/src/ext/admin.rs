@@ -31,6 +31,12 @@ pub trait AdminApi<N, T>: Send + Sync {
     /// Returns general information about the node as well as information about the running p2p
     /// protocols (e.g. `eth`, `snap`).
     async fn node_info(&self) -> TransportResult<NodeInfo>;
+
+    /// Subscribe to events received by peers over the network.
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_peer_events(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -63,6 +69,17 @@ where
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
         self.client().request("admin_nodeInfo", ()).await
+    }
+
+    #[cfg(feature = "pubsub")]
+    async fn subscribe_peer_events(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>> {
+        self.root().pubsub_frontend()?;
+        let mut call = self.client().request("admin_peerEvents_subscribe", ());
+        call.set_is_subscription();
+        let id = call.await?;
+        self.root().get_subscription(id).await
     }
 }
 
@@ -99,7 +116,7 @@ mod test {
 
         let added = provider2.add_peer(&node1_enode).await.unwrap();
         assert!(added);
-        geth2.wait_to_add_peer(node1_id).unwrap();
+        geth2.wait_to_add_peer(&node1_id).unwrap();
         let peers = provider2.peers().await.unwrap();
         assert_eq!(peers[0].enode, node1_enode);
     }

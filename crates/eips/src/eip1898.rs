@@ -1,7 +1,5 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, BlockNumber, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use core::{
@@ -616,10 +614,7 @@ impl From<(BlockHash, BlockNumber)> for BlockNumHash {
 /// Either a block hash _or_ a block number
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum BlockHashOrNumber {
     /// A block hash
     Hash(B256),
@@ -655,6 +650,12 @@ impl From<u64> for BlockHashOrNumber {
 impl From<U64> for BlockHashOrNumber {
     fn from(value: U64) -> Self {
         value.to::<u64>().into()
+    }
+}
+
+impl From<RpcBlockHash> for BlockHashOrNumber {
+    fn from(value: RpcBlockHash) -> Self {
+        Self::Hash(value.into())
     }
 }
 

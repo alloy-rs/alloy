@@ -29,8 +29,6 @@ c-kzg = { workspace = true, features = ["serde"], optional = true }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
-proptest = { workspace = true, optional = true }
-proptest-derive = { workspace = true, optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
@@ -41,8 +39,6 @@ alloy-eips = { workspace = true, features = ["arbitrary"] }
 alloy-signer.workspace = true
 
 arbitrary = { workspace = true, features = ["derive"] }
-proptest = { workspace = true }
-proptest-derive = { workspace = true }
 k256.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 serde_json.workspace = true
@@ -50,13 +46,11 @@ serde_json.workspace = true
 [features]
 default = ["std"]
 std = ["alloy-eips/std", "c-kzg?/std"]
-k256 = ["alloy-primitives/k256"]
+k256 = ["alloy-primitives/k256", "alloy-eips/k256"]
 kzg = ["dep:c-kzg", "alloy-eips/kzg", "std"]
 arbitrary = [
     "std",
     "dep:arbitrary",
-    "dep:proptest-derive",
-    "dep:proptest",
     "alloy-eips/arbitrary",
 ]
 serde = [

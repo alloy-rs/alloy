@@ -4,12 +4,17 @@ use alloy_consensus::{
     SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
     TxLegacy, TxType,
 };
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
-pub use alloy_eips::eip2930::{AccessList, AccessListItem, AccessListWithGasUsed};
+pub use alloy_eips::{
+    eip2930::{AccessList, AccessListItem, AccessListWithGasUsed},
+    eip7702::Authorization,
+};
 
 mod common;
 pub use common::TransactionInfo;
@@ -103,7 +108,10 @@ pub struct Transaction {
     )]
     #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
-
+    /// The signed authorization list is a list of tuples that store the address to code which the
+    /// signer desires to execute in the context of their EOA and their signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<Vec<SignedAuthorization>>,
     /// Arbitrary extra fields.
     ///
     /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
@@ -269,11 +277,38 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+impl TransactionResponse for Transaction {
+    fn tx_hash(&self) -> B256 {
+        self.hash
+    }
+
+    fn from(&self) -> Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.to
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.input
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy_primitives::Signature as AlloySignature;
     use arbitrary::Arbitrary;
     use rand::Rng;
+    use std::str::FromStr;
 
     #[test]
     fn arbitrary_transaction() {
@@ -310,12 +345,18 @@ mod tests {
             max_fee_per_gas: Some(21),
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
+            authorization_list: Some(vec![(Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[6]),
+                nonce: Some(1u64).into(),
+            })
+            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
             other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":1,"address":"0x0000000000000000000000000000000000000006","nonce":1,"r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
@@ -348,12 +389,18 @@ mod tests {
             max_fee_per_gas: Some(21),
             max_priority_fee_per_gas: Some(22),
             max_fee_per_blob_gas: None,
+            authorization_list: Some(vec![(Authorization {
+                chain_id: 1u64,
+                address: Address::left_padding_from(&[6]),
+                nonce: Some(1u64).into(),
+            })
+            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
             other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14"}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":1,"address":"0x0000000000000000000000000000000000000006","nonce":1,"r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);

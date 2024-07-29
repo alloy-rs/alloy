@@ -1,7 +1,8 @@
 use crate::{CallDecoder, Error, EthCall, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, ReceiptResponse, TransactionBuilder};
+use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types_eth::{state::StateOverride, AccessList, BlobTransactionSidecar, BlockId};
@@ -129,6 +130,13 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     pub provider: P,
     decoder: D,
     transport: PhantomData<T>,
+}
+
+impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
+    /// Converts the call builder to the inner transaction request
+    pub fn into_transaction_request(self) -> N::TransactionRequest {
+        self.request
+    }
 }
 
 impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
@@ -417,8 +425,13 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
+    /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
     pub async fn estimate_gas(&self) -> Result<u128> {
-        self.provider.estimate_gas(&self.request).block(self.block).await.map_err(Into::into)
+        let mut estimate = self.provider.estimate_gas(&self.request);
+        if let Some(state) = &self.state {
+            estimate = estimate.overrides(state);
+        }
+        estimate.block(self.block).await.map_err(Into::into)
     }
 
     /// Queries the blockchain via an `eth_call` without submitting a transaction to the network.

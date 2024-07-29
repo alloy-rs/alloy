@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+
+### Bug Fixes
+
+- Require storageKeys value broken bincode serialization from [#955](https://github.com/alloy-rs/alloy/issues/955) ([#1058](https://github.com/alloy-rs/alloy/issues/1058))
+- Cargo fmt ([#1044](https://github.com/alloy-rs/alloy/issues/1044))
+- [eip7702] Add correct rlp decode/encode ([#1034](https://github.com/alloy-rs/alloy/issues/1034))
+
+### Features
+
+- Add authorization list to rpc transaction and tx receipt types ([#1051](https://github.com/alloy-rs/alloy/issues/1051))
+- Generate valid signed auth signatures ([#1041](https://github.com/alloy-rs/alloy/issues/1041))
+- Add arbitrary to auth ([#1036](https://github.com/alloy-rs/alloy/issues/1036))
+- Add hash for 7702 ([#1037](https://github.com/alloy-rs/alloy/issues/1037))
+
+### Miscellaneous Tasks
+
+- Make auth mandatory in recovered auth ([#1047](https://github.com/alloy-rs/alloy/issues/1047))
+
+### Styling
+
+- Remove proptest in all crates and Arbitrary derives ([#966](https://github.com/alloy-rs/alloy/issues/966))
+
+## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
+
+### Features
+
+- Add consolidation requests to v4 payload ([#1013](https://github.com/alloy-rs/alloy/issues/1013))
+- [eip1559] Support Optimism Canyon hardfork ([#1010](https://github.com/alloy-rs/alloy/issues/1010))
+- Impl `From<RpcBlockHash>` for `BlockHashOrNumber` ([#980](https://github.com/alloy-rs/alloy/issues/980))
+
+### Miscellaneous Tasks
+
+- Release 0.1.4
+- Add helper functions for destructuring auth types ([#1022](https://github.com/alloy-rs/alloy/issues/1022))
+- Clean up 7702 encoding ([#1000](https://github.com/alloy-rs/alloy/issues/1000))
+
+### Testing
+
+- Add missing unit test for op `calc_next_block_base_fee` ([#1008](https://github.com/alloy-rs/alloy/issues/1008))
+
+## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
+
+### Bug Fixes
+
+- Deserialization of null storage keys in AccessListItem ([#955](https://github.com/alloy-rs/alloy/issues/955))
+
+### Dependencies
+
+- [eips] Make `alloy-serde` optional under `serde` ([#948](https://github.com/alloy-rs/alloy/issues/948))
+
+### Features
+
+- Add eip-7702 helpers ([#950](https://github.com/alloy-rs/alloy/issues/950))
+- Add eip-7251 system contract address/code ([#956](https://github.com/alloy-rs/alloy/issues/956))
+
+### Miscellaneous Tasks
+
+- Release 0.1.3
+- [eips] Add serde to Authorization types ([#964](https://github.com/alloy-rs/alloy/issues/964))
+- [eips] Make `sha2` optional, add `kzg-sidecar` feature ([#949](https://github.com/alloy-rs/alloy/issues/949))
+
 ## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
 
 ### Documentation
@@ -20,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.1.2
 - Update eip-2935 bytecode and address ([#934](https://github.com/alloy-rs/alloy/issues/934))
 - Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
 - Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))

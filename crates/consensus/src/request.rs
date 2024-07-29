@@ -1,5 +1,3 @@
-#![allow(unknown_lints, non_local_definitions)] // TODO: remove when proptest-derive updates
-
 use alloy_eips::{
     eip6110::DepositRequest,
     eip7002::WithdrawalRequest,
@@ -13,10 +11,7 @@ use alloy_rlp::{Decodable, Encodable};
 /// See also [EIP-7685](https://eips.ethereum.org/EIPS/eip-7685).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-#[cfg_attr(
-    any(test, feature = "arbitrary"),
-    derive(proptest_derive::Arbitrary, arbitrary::Arbitrary)
-)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum Request {
@@ -30,7 +25,7 @@ pub enum Request {
     WithdrawalRequest(WithdrawalRequest),
     /// An [EIP-7251] consolidation request.
     ///
-    /// [EIP-7251]: https://eips.ethereum.org/EIPS/eip-7002
+    /// [EIP-7251]: https://eips.ethereum.org/EIPS/eip-7251
     ConsolidationRequest(ConsolidationRequest),
 }
 
@@ -43,6 +38,12 @@ impl From<DepositRequest> for Request {
 impl From<WithdrawalRequest> for Request {
     fn from(v: WithdrawalRequest) -> Self {
         Self::WithdrawalRequest(v)
+    }
+}
+
+impl From<ConsolidationRequest> for Request {
+    fn from(v: ConsolidationRequest) -> Self {
+        Self::ConsolidationRequest(v)
     }
 }
 

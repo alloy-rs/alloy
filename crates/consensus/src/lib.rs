@@ -15,6 +15,9 @@ pub use account::Account;
 
 pub mod constants;
 
+mod encodable_signature;
+pub use encodable_signature::EncodableSignature;
+
 mod header;
 pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
@@ -42,8 +45,7 @@ pub use alloy_eips::eip4844::{
 #[cfg(feature = "kzg")]
 pub use alloy_eips::eip4844::env_settings::EnvKzgSettings;
 
-mod sealed;
-pub use sealed::{Sealable, Sealed};
+pub use alloy_primitives::{Sealable, Sealed};
 
 mod signed;
 pub use signed::Signed;

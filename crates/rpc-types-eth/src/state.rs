@@ -1,7 +1,7 @@
 //! bindings for state overrides in eth_call
 
 use crate::BlockOverrides;
-use alloy_primitives::{Address, Bytes, B256, U256, U64};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -16,8 +16,8 @@ pub struct AccountOverride {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub balance: Option<U256>,
     /// Fake nonce to set for the account before executing the call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nonce: Option<U64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub nonce: Option<u64>,
     /// Fake EVM bytecode to inject into the account before executing the call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<Bytes>,
@@ -113,7 +113,7 @@ mod tests {
         let acc =
             state_override.get(&address!("1234567890123456789012345678901234567890")).unwrap();
         assert_eq!(acc.balance, Some(U256::MAX));
-        assert_eq!(acc.nonce, Some(U64::MAX));
+        assert_eq!(acc.nonce, Some(u64::MAX));
     }
 
     #[test]

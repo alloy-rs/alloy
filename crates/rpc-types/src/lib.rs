@@ -8,6 +8,9 @@
 
 pub use alloy_serde as serde_helpers;
 
+mod rpc;
+pub use rpc::*;
+
 #[cfg(feature = "admin")]
 pub use alloy_rpc_types_admin as admin;
 
@@ -24,6 +27,9 @@ pub use alloy_rpc_types_engine as engine;
 pub use alloy_rpc_types_eth as eth;
 #[cfg(feature = "eth")]
 pub use eth::*;
+
+#[cfg(feature = "mev")]
+pub use alloy_rpc_types_mev as mev;
 
 #[cfg(feature = "trace")]
 pub use alloy_rpc_types_trace as trace;
