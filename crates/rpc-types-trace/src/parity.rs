@@ -29,6 +29,7 @@ pub enum TraceType {
 #[serde(rename_all = "camelCase")]
 pub struct TraceResults {
     /// Output of the trace
+    #[serde(deserialize_with = "alloy_serde::null_as_default")]
     pub output: Bytes,
     /// Enabled if [TraceType::StateDiff] is provided
     pub state_diff: Option<StateDiff>,
@@ -133,6 +134,7 @@ pub struct AccountDiff {
     /// How the code changed, if at all
     pub code: Delta<Bytes>,
     /// How the nonce changed, if at all
+    // TODO: Change type to `u64` and write custom serde for `Delta`
     pub nonce: Delta<U64>,
     /// All touched/changed storage values
     pub storage: BTreeMap<B256, Delta<B256>>,
@@ -288,7 +290,8 @@ pub struct CallAction {
     /// The type of the call.
     pub call_type: CallType,
     /// The gas available for executing the call.
-    pub gas: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas: u64,
     /// The input data provided to the call.
     pub input: Bytes,
     /// Address of the destination/target account.
@@ -304,7 +307,8 @@ pub struct CreateAction {
     /// The address of the creator.
     pub from: Address,
     /// The gas available for the creation init code.
-    pub gas: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas: u64,
     /// The init code.
     pub init: Bytes,
     /// The value with which the new account is endowed.
@@ -350,7 +354,8 @@ pub struct SelfdestructAction {
 #[serde(rename_all = "camelCase")]
 pub struct CallOutput {
     /// Gas used by the call.
-    pub gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_used: u64,
     /// The output data of the call.
     pub output: Bytes,
 }
@@ -364,7 +369,8 @@ pub struct CreateOutput {
     /// Contract code.
     pub code: Bytes,
     /// Gas used by the call.
-    pub gas_used: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub gas_used: u64,
 }
 
 /// Represents the output of a trace.
@@ -377,11 +383,25 @@ pub enum TraceOutput {
     Create(CreateOutput),
 }
 
-// === impl TraceOutput ===
-
 impl TraceOutput {
+    /// Returns the output of this trace.
+    pub const fn output(&self) -> &Bytes {
+        match self {
+            Self::Call(call) => &call.output,
+            Self::Create(create) => &create.code,
+        }
+    }
+
+    /// Consumes the output of this trace.
+    pub fn into_output(self) -> Bytes {
+        match self {
+            Self::Call(call) => call.output,
+            Self::Create(create) => create.code,
+        }
+    }
+
     /// Returns the gas used by this trace.
-    pub const fn gas_used(&self) -> U64 {
+    pub const fn gas_used(&self) -> u64 {
         match self {
             Self::Call(call) => call.gas_used,
             Self::Create(create) => create.gas_used,
@@ -391,8 +411,8 @@ impl TraceOutput {
     /// Sets the gas used by this trace.
     pub fn set_gas_used(&mut self, gas_used: u64) {
         match self {
-            Self::Call(call) => call.gas_used = U64::from(gas_used),
-            Self::Create(create) => create.gas_used = U64::from(gas_used),
+            Self::Call(call) => call.gas_used = gas_used,
+            Self::Create(create) => create.gas_used = gas_used,
         }
     }
 }
@@ -646,13 +666,13 @@ mod tests {
                         action: Action::Call(CallAction {
                             from: "0x4f4495243837681061c4743b74b3eedf548d56a5".parse::<Address>().unwrap(),
                             call_type: CallType::DelegateCall,
-                            gas: U64::from(3148955),
+                            gas: 3148955,
                             input: Bytes::from_str("0x585a9fd40000000000000000000000000000000000000000000000000000000000000040a47c5ad9a4af285720eae6cc174a9c75c5bbaf973b00f1a0c191327445b6581000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000140000000000000000000000000ce16f69375520ab01377ce7b88f5ba8c48f8d666f61490331372e432315cd97447e3bc452d6c73a6e0536260a88ddab46f85c88d00000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000aab8cf0fbfb038751339cb61161fa11789b41a78f1b7b0e12cf8e467d403590b7a5f26f0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000646616e746f6d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a3078636531364636393337353532306162303133373763653742383866354241384334384638443636360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000045553444300000000000000000000000000000000000000000000000000000000").unwrap(),
                             to:  "0x99b5fa03a5ea4315725c43346e55a6a6fbd94098".parse::<Address>().unwrap(),
                             value: U256::from(0),
                         }),
                         error: None,
-                        result: Some(TraceOutput::Call(CallOutput { gas_used: U64::from(32364), output: Bytes::new() })),
+                        result: Some(TraceOutput::Call(CallOutput { gas_used: 32364, output: Bytes::new() })),
                         subtraces: 0,
                         trace_address: vec![0, 10, 0],
                     },
@@ -692,12 +712,12 @@ mod tests {
                     trace: TransactionTrace {
                         action: Action::Create(CreateAction{
                             from: "0x4f4495243837681061c4743b74b3eedf548d56a5".parse::<Address>().unwrap(),
-                            gas: U64::from(3438907),
+                            gas: 3438907,
                             init: Bytes::from_str("0x6080604052600160005534801561001557600080fd5b50610324806100256000396000f3fe608060405234801561001057600080fd5b50600436106100355760003560e01c8062f55d9d1461003a5780631cff79cd1461004f575b600080fd5b61004d6100483660046101da565b610079565b005b61006261005d3660046101fc565b6100bb565b60405161007092919061027f565b60405180910390f35b6002600054141561009d5760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff8116ff5b60006060600260005414156100e35760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff85163b610136576040517f6f7c43f100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b8473ffffffffffffffffffffffffffffffffffffffff16848460405161015d9291906102de565b6000604051808303816000865af19150503d806000811461019a576040519150601f19603f3d011682016040523d82523d6000602084013e61019f565b606091505b50600160005590969095509350505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146101d557600080fd5b919050565b6000602082840312156101ec57600080fd5b6101f5826101b1565b9392505050565b60008060006040848603121561021157600080fd5b61021a846101b1565b9250602084013567ffffffffffffffff8082111561023757600080fd5b818601915086601f83011261024b57600080fd5b81358181111561025a57600080fd5b87602082850101111561026c57600080fd5b6020830194508093505050509250925092565b821515815260006020604081840152835180604085015260005b818110156102b557858101830151858201606001528201610299565b818111156102c7576000606083870101525b50601f01601f191692909201606001949350505050565b818382376000910190815291905056fea264697066735822122032cb5e746816b7fac95205c068b30da37bd40119a57265be331c162cae74712464736f6c63430008090033").unwrap(),
                             value: U256::from(0),
                         }),
                         error: None,
-                        result: Some(TraceOutput::Create(CreateOutput { gas_used: U64::from(183114), address: "0x7eb6c6c1db08c0b9459a68cfdcedab64f319c138".parse::<Address>().unwrap(), code: Bytes::from_str("0x608060405234801561001057600080fd5b50600436106100355760003560e01c8062f55d9d1461003a5780631cff79cd1461004f575b600080fd5b61004d6100483660046101da565b610079565b005b61006261005d3660046101fc565b6100bb565b60405161007092919061027f565b60405180910390f35b6002600054141561009d5760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff8116ff5b60006060600260005414156100e35760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff85163b610136576040517f6f7c43f100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b8473ffffffffffffffffffffffffffffffffffffffff16848460405161015d9291906102de565b6000604051808303816000865af19150503d806000811461019a576040519150601f19603f3d011682016040523d82523d6000602084013e61019f565b606091505b50600160005590969095509350505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146101d557600080fd5b919050565b6000602082840312156101ec57600080fd5b6101f5826101b1565b9392505050565b60008060006040848603121561021157600080fd5b61021a846101b1565b9250602084013567ffffffffffffffff8082111561023757600080fd5b818601915086601f83011261024b57600080fd5b81358181111561025a57600080fd5b87602082850101111561026c57600080fd5b6020830194508093505050509250925092565b821515815260006020604081840152835180604085015260005b818110156102b557858101830151858201606001528201610299565b818111156102c7576000606083870101525b50601f01601f191692909201606001949350505050565b818382376000910190815291905056fea264697066735822122032cb5e746816b7fac95205c068b30da37bd40119a57265be331c162cae74712464736f6c63430008090033").unwrap() })),
+                        result: Some(TraceOutput::Create(CreateOutput { gas_used: 183114, address: "0x7eb6c6c1db08c0b9459a68cfdcedab64f319c138".parse::<Address>().unwrap(), code: Bytes::from_str("0x608060405234801561001057600080fd5b50600436106100355760003560e01c8062f55d9d1461003a5780631cff79cd1461004f575b600080fd5b61004d6100483660046101da565b610079565b005b61006261005d3660046101fc565b6100bb565b60405161007092919061027f565b60405180910390f35b6002600054141561009d5760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff8116ff5b60006060600260005414156100e35760405163caa30f5560e01b815260040160405180910390fd5b600260005573ffffffffffffffffffffffffffffffffffffffff85163b610136576040517f6f7c43f100000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b8473ffffffffffffffffffffffffffffffffffffffff16848460405161015d9291906102de565b6000604051808303816000865af19150503d806000811461019a576040519150601f19603f3d011682016040523d82523d6000602084013e61019f565b606091505b50600160005590969095509350505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146101d557600080fd5b919050565b6000602082840312156101ec57600080fd5b6101f5826101b1565b9392505050565b60008060006040848603121561021157600080fd5b61021a846101b1565b9250602084013567ffffffffffffffff8082111561023757600080fd5b818601915086601f83011261024b57600080fd5b81358181111561025a57600080fd5b87602082850101111561026c57600080fd5b6020830194508093505050509250925092565b821515815260006020604081840152835180604085015260005b818110156102b557858101830151858201606001528201610299565b818111156102c7576000606083870101525b50601f01601f191692909201606001949350505050565b818382376000910190815291905056fea264697066735822122032cb5e746816b7fac95205c068b30da37bd40119a57265be331c162cae74712464736f6c63430008090033").unwrap() })),
                         subtraces: 0,
                         trace_address: vec![0, 7, 0, 0],
                     },
@@ -801,5 +821,32 @@ mod tests {
         assert!(trace.trace.action.is_selfdestruct());
         let serialized = serde_json::to_string_pretty(&trace).unwrap();
         similar_asserts::assert_eq!(serialized, reference_data);
+    }
+    #[test]
+    fn test_nethermind_trace_result_null_output_value() {
+        let reference_data = r#"{
+  "output": null,
+  "stateDiff": {
+    "0x5e1d1eb61e1164d5a50b28c575da73a29595dff7": {
+      "balance": "=",
+      "code": "=",
+      "nonce": "=",
+      "storage": {
+        "0x0000000000000000000000000000000000000000000000000000000000000005": {
+          "*": {
+            "from": "0x0000000000000000000000000000000000000000000000000000000000042f66",
+            "to": "0x0000000000000000000000000000000000000000000000000000000000042f67"
+          }
+        }
+      }
+    }
+  },
+  "trace": [],
+  "vmTrace": null,
+  "transactionHash": "0xe56a5e7455c45b1842b35dbcab9d024b21870ee59820525091e183b573b4f9eb"
+}"#;
+        let trace =
+            serde_json::from_str::<TraceResultsWithTransactionHash>(reference_data).unwrap();
+        assert_eq!(trace.full_trace.output, Bytes::default());
     }
 }

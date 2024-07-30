@@ -41,6 +41,7 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
 #[derive(Clone, Debug)]
 #[doc(hidden)] // Not public API.
+#[allow(unnameable_types)]
 #[pin_project::pin_project]
 pub struct EthCallFut<'req, 'state, T, N, Resp, Output, Map>(
     EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>,

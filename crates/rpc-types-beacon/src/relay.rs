@@ -38,7 +38,6 @@ pub struct ValidatorRegistration {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatorRegistrationMessage {
     /// The fee recipient's address.
-    #[serde(rename = "fee_recipient")]
     pub fee_recipient: Address,
 
     /// The gas limit for the registration.
@@ -148,6 +147,23 @@ pub struct SubmitBlockRequest {
     pub execution_payload: ExecutionPayload,
     /// The signature associated with the block submission.
     pub signature: BlsSignature,
+}
+
+/// Query for the `/relay/v1/builder/blocks` endpoint
+#[serde_as]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubmitBlockRequestQuery {
+    /// If set to 1, opt into bid cancellations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<serde_with::BoolFromInt>")]
+    pub cancellations: Option<bool>,
+}
+
+impl SubmitBlockRequestQuery {
+    /// Opt into bid cancellations.
+    pub const fn cancellations() -> Self {
+        Self { cancellations: Some(true) }
+    }
 }
 
 /// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/03ee71cf0a344397204f65ff6d3a917ee8e06724/eth/block-validation/api.go#L132-L136>

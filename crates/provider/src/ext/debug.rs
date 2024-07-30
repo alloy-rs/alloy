@@ -1,10 +1,10 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{TxHash, B256};
-use alloy_rpc_types_eth::{BlockNumberOrTag, TransactionRequest};
+use alloy_primitives::{hex, Bytes, TxHash, B256};
+use alloy_rpc_types_eth::{Block, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
-    GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
+    BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -12,6 +12,43 @@ use alloy_transport::{Transport, TransportResult};
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait DebugApi<N, T>: Send + Sync {
+    /// Returns an RLP-encoded header.
+    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+
+    /// Retrieves and returns the RLP encoded block by number, hash or tag.
+    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+
+    /// Returns an EIP-2718 binary-encoded transaction.
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes>;
+
+    /// Returns an array of EIP-2718 binary-encoded receipts.
+    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>>;
+
+    /// Returns an array of recent bad blocks that the client has seen on the network.
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
+
+    /// Returns the structured logs created during the execution of EVM between two blocks
+    /// (excluding start) as a JSON object.
+    async fn debug_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+    ) -> TransportResult<Vec<BlockTraceResult>>;
+
+    /// The debug_traceBlock method will return a full stack trace of all invoked opcodes of all
+    /// transaction that were included in this block.
+    ///
+    /// This expects an RLP-encoded block.
+    ///
+    /// # Note
+    ///
+    /// The parent of this block must be present, or it will fail.
+    async fn debug_trace_block(
+        &self,
+        rlp_block: &[u8],
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>>;
+
     /// Reruns the transaction specified by the hash and returns the trace.
     ///
     /// It will replay any prior transactions to achieve the same state the transaction was executed
@@ -99,6 +136,43 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
+    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawHeader", (block,)).await
+    }
+
+    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawBlock", (block,)).await
+    }
+
+    async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes> {
+        self.client().request("debug_getRawTransaction", (hash,)).await
+    }
+
+    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>> {
+        self.client().request("debug_getRawReceipts", (block,)).await
+    }
+
+    async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
+        self.client().request("debug_getBadBlocks", ()).await
+    }
+
+    async fn debug_trace_chain(
+        &self,
+        start_exclusive: BlockNumberOrTag,
+        end_inclusive: BlockNumberOrTag,
+    ) -> TransportResult<Vec<BlockTraceResult>> {
+        self.client().request("debug_traceChain", (start_exclusive, end_inclusive)).await
+    }
+
+    async fn debug_trace_block(
+        &self,
+        rlp_block: &[u8],
+        trace_options: GethDebugTracingOptions,
+    ) -> TransportResult<Vec<TraceResult>> {
+        let rlp_block = hex::encode_prefixed(rlp_block);
+        self.client().request("debug_traceBlock", (rlp_block, trace_options)).await
+    }
+
     async fn debug_trace_transaction(
         &self,
         hash: TxHash,
@@ -148,6 +222,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
+    use alloy_node_bindings::Geth;
     use alloy_primitives::{address, U256};
 
     fn init_tracing() {
@@ -200,5 +275,53 @@ mod test {
         if let GethTrace::Default(trace) = trace {
             assert!(!trace.struct_logs.is_empty());
         }
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_raw_header() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let rlp_header = provider
+            .debug_get_raw_header(BlockNumberOrTag::default())
+            .await
+            .expect("debug_getRawHeader call should succeed");
+
+        assert!(!rlp_header.is_empty());
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_raw_block() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let rlp_block = provider
+            .debug_get_raw_block(BlockNumberOrTag::default())
+            .await
+            .expect("debug_getRawBlock call should succeed");
+
+        assert!(!rlp_block.is_empty());
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_raw_receipts() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let result = provider.debug_get_raw_receipts(BlockNumberOrTag::default()).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn call_debug_get_bad_blocks() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let result = provider.debug_get_bad_blocks().await;
+        assert!(result.is_ok());
     }
 }

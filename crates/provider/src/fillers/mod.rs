@@ -16,7 +16,7 @@ mod nonce;
 pub use nonce::NonceFiller;
 
 mod gas;
-pub use gas::GasFiller;
+pub use gas::{GasFillable, GasFiller};
 
 mod join_fill;
 pub use join_fill::JoinFill;

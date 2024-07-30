@@ -13,6 +13,9 @@ pub use eip1559::TxEip1559;
 mod eip2930;
 pub use eip2930::TxEip2930;
 
+mod eip7702;
+pub use eip7702::TxEip7702;
+
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
 

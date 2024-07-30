@@ -97,6 +97,7 @@ where
 
 #[pin_project::pin_project(project = CallStateProj)]
 #[derive(Debug)]
+#[allow(unnameable_types)]
 pub enum BatchFuture<Conn: Transport> {
     Prepared {
         transport: Conn,
