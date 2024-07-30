@@ -1,7 +1,5 @@
 use alloy_json_rpc::{RpcParam, RpcReturn};
-use alloy_primitives::B256;
 use alloy_rpc_client::{RpcCall, Waiter};
-use alloy_rpc_types_eth::BlockId;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use pin_project::pin_project;
@@ -12,10 +10,6 @@ use std::{
     task::{self, Poll},
 };
 use tokio::sync::oneshot;
-
-use std::future::IntoFuture;
-
-use super::with_block::RpcWithBlock;
 
 /// The primary future type for the [`Provider`].
 ///
@@ -37,8 +31,6 @@ where
 {
     /// An underlying call to an RPC server.
     RpcCall(RpcCall<Conn, Params, Resp, Output, Map>),
-    /// RpcWithBlock
-    RpcWithBlock(RpcWithBlock<Conn, Params, Resp, Output, Map>),
     /// A waiter for a batched call to a remote RPC server.
     Waiter(Waiter<Resp, Output, Map>),
     /// A boxed future.
@@ -134,21 +126,6 @@ where
         }
     }
 
-    /// True if this is a RPC call with block.
-    pub const fn is_rpc_with_block(&self) -> bool {
-        matches!(self, Self::RpcWithBlock(_))
-    }
-
-    /// Fallible cast to mutable RPC call with block.
-    pub fn as_mut_rpc_with_block(
-        &mut self,
-    ) -> Option<&mut RpcWithBlock<Conn, Params, Resp, Output, Map>> {
-        match self {
-            Self::RpcWithBlock(call) => Some(call),
-            _ => None,
-        }
-    }
-
     /// Set a function to map the response into a different type. This is
     /// useful for transforming the response into a more usable type, e.g.
     /// changing `U64` to `u64`.
@@ -176,68 +153,6 @@ where
             Self::Waiter(waiter) => Ok(ProviderCall::Waiter(waiter.map_resp(map))),
             _ => Err(self),
         }
-    }
-}
-
-impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, Params, Resp, Output, Map>
-where
-    Conn: Transport + Clone,
-    Params: RpcParam + Clone,
-    Resp: RpcReturn + Clone,
-    Output: 'static + Clone,
-    Map: Fn(Resp) -> Output,
-    Map: Clone,
-{
-    /// Set the block id for a RPC call with block.
-    pub fn block_id(mut self, block_id: BlockId) -> Self {
-        if let Some(call) = self.as_mut_rpc_with_block() {
-            let call = call.clone();
-
-            return Self::RpcWithBlock(call.block_id(block_id));
-        }
-        self
-    }
-
-    /// Set the block id to "pending".
-    pub fn pending(self) -> Self {
-        self.block_id(BlockId::pending())
-    }
-
-    /// Set the block id to "latest".
-    pub fn latest(self) -> Self {
-        self.block_id(BlockId::latest())
-    }
-
-    /// Set the block id to "earliest".
-    pub fn earliest(self) -> Self {
-        self.block_id(BlockId::earliest())
-    }
-
-    /// Set the block id to "finalized".
-    pub fn finalized(self) -> Self {
-        self.block_id(BlockId::finalized())
-    }
-
-    /// Set the block id to "safe".
-    pub fn safe(self) -> Self {
-        self.block_id(BlockId::safe())
-    }
-
-    /// Set the block id to a specific height.
-    pub fn number(self, number: u64) -> Self {
-        self.block_id(BlockId::number(number))
-    }
-
-    /// Set the block id to a specific hash, without requiring the hash be part
-    /// of the canonical chain.
-    pub fn hash(self, hash: B256) -> Self {
-        self.block_id(BlockId::hash(hash))
-    }
-
-    /// Set the block id to a specific hash and require the hash be part of the
-    /// canonical chain.
-    pub fn hash_canonical(self, hash: B256) -> Self {
-        self.block_id(BlockId::hash_canonical(hash))
     }
 }
 
@@ -275,7 +190,6 @@ where
             Self::Waiter { .. } => f.debug_struct("Waiter").finish_non_exhaustive(),
             Self::BoxedFuture(_) => f.debug_struct("BoxedFuture").finish_non_exhaustive(),
             Self::Ready(_) => f.debug_struct("Ready").finish_non_exhaustive(),
-            Self::RpcWithBlock(call) => f.debug_struct("RpcWithBlock").field("call", call).finish(),
         }
     }
 }
@@ -290,22 +204,6 @@ where
 {
     fn from(call: RpcCall<Conn, Params, Resp, Output, Map>) -> Self {
         Self::RpcCall(call)
-    }
-}
-
-// TODO: Remove this??
-impl<Conn, Params, Resp, Output, Map> From<RpcWithBlock<Conn, Params, Resp, Output, Map>>
-    for ProviderCall<Conn, Params, Resp, Output, Map>
-where
-    Conn: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
-{
-    fn from(call: RpcWithBlock<Conn, Params, Resp, Output, Map>) -> Self {
-        let fut = call.into_future();
-        Self::RpcWithBlock(fut)
     }
 }
 
@@ -365,7 +263,6 @@ where
             ProviderCallProj::Ready(output) => {
                 Poll::Ready(Ok(output.take().expect("output taken twice")))
             }
-            ProviderCallProj::RpcWithBlock(call) => call.poll_unpin(cx),
         }
     }
 }

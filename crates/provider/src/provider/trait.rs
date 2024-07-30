@@ -298,10 +298,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
-    fn get_balance(&self, address: Address) -> ProviderCall<T, Address, U256, U256> {
-        let call = RpcWithBlock::new(self.weak_client(), "eth_getBalance", address);
-
-        ProviderCall::from(call)
+    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256, U256> {
+        RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -572,10 +570,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_transaction_count(
         &self,
         address: Address,
-    ) -> ProviderCall<T, Address, U64, u64, fn(U64) -> u64> {
-        let call = RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64);
-        ProviderCall::from(call)
+    ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
+        RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
