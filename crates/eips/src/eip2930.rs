@@ -130,6 +130,18 @@ impl AccessList {
     }
 }
 
+/// Access list with gas used appended.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct AccessListWithGasUsed {
+    /// List with accounts accessed during transaction.
+    pub access_list: AccessList,
+    /// Estimated gas used with access list.
+    pub gas_used: U256,
+}
+
+
 /// `AccessListResult` for handling errors from `eth_createAccessList`
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -141,6 +153,17 @@ pub struct AccessListResult {
     /// Optional error message if the transaction failed.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub error: Option<String>,
+}
+
+impl AccessListResult {
+    pub fn ensure_ok(self) -> Result<AccessListWithGasUsed, String> {
+        unimplemented!()
+    }
+
+    #[inline]
+    pub fn is_err(&self) -> bool {
+        self.error.is_some()
+    }
 }
 
 #[cfg(all(test, feature = "serde"))]
