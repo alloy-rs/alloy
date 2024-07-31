@@ -156,7 +156,7 @@ pub struct AccessListResult {
 }
 
 impl AccessListResult {
-    /// Ensures the result is OK, returning `AccessListWithGasUsed` if so, or an error message if not.
+    /// Ensures the result is OK, returning [`AccessListWithGasUsed`] if so, or an error message if not.
     pub fn ensure_ok(self) -> Result<AccessListWithGasUsed, String> {
         match self.error {
             Some(err) => Err(err),
