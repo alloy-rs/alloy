@@ -1021,7 +1021,10 @@ mod empty_array {
     }
 }
 
-impl<'de> Deserialize<'de> for FilterChanges {
+impl<'de, T> Deserialize<'de> for FilterChanges<T>
+where
+    T: Deserialize<'de>,
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
