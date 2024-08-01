@@ -3,10 +3,7 @@
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
 #[cfg(not(feature = "std"))]
-use alloc::{
-    vec::Vec,
-    string::String
-};
+use alloc::{string::String, vec::Vec};
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
@@ -172,7 +169,7 @@ impl AccessListResult {
 
     /// Checks if there is an error in the result.
     #[inline]
-    pub fn is_err(&self) -> bool {
+    pub const fn is_err(&self) -> bool {
         self.error.is_some()
     }
 }
