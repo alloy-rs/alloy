@@ -813,6 +813,9 @@ pub enum PayloadError {
     /// cancun fields missing in post-cancun payload.
     #[error("cancun fields missing in post-cancun payload")]
     PostCancunWithoutCancunFields,
+    /// blob transactions present in pre-prague payload.
+    #[error("eip 7702 transactions present in pre-prague payload")]
+    PrePragueBlockWithEip7702Transactions,
 
     /// Invalid payload block hash.
     #[error("block hash mismatch: want {consensus}, got {execution}")]
