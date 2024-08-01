@@ -148,7 +148,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
+    fn call<'req, 'state>(
+        &self,
+        tx: &'req N::TransactionRequest,
+    ) -> EthCall<'req, 'state, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
