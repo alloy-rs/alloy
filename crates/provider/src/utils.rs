@@ -1,7 +1,12 @@
 //! Provider-related utilities.
 
+use crate::ProviderCall;
+use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_primitives::{U128, U64};
-
+use alloy_rpc_client::WeakClient;
+use alloy_rpc_types_eth::BlockId;
+use alloy_transport::{Transport, TransportResult};
+use std::borrow::Cow;
 /// The number of blocks from the past for which the fee rewards are fetched for fee estimation.
 pub const EIP1559_FEE_ESTIMATION_PAST_BLOCKS: u64 = 10;
 /// Multiplier for the current base fee to estimate max base fee for the next block.
@@ -62,6 +67,44 @@ pub(crate) fn convert_u128(r: U128) -> u128 {
 
 pub(crate) fn convert_u64(r: U64) -> u64 {
     r.to::<u64>()
+}
+
+/// Into ProviderCall::RpcCall
+///
+/// Note: This function is only used to converted to ProviderCall::RpcCall and not any other
+/// variant. Hence, client should always be Some.
+pub fn into_prov_rpc_call<T: Transport + Clone, Params: RpcParam, Resp: RpcReturn>(
+    method: Cow<'static, str>,
+    params: Params,
+    block_id: BlockId,
+    client: Option<WeakClient<T>>,
+) -> TransportResult<ProviderCall<T, Params, Resp>> {
+    // serialize the params
+    let mut ser = serde_json::to_value(params.clone()).map_err(RpcError::ser_err)?;
+
+    // serialize the block id
+    let block_id = serde_json::to_value(block_id).map_err(RpcError::ser_err)?;
+
+    // append the block id to the params
+    if let serde_json::Value::Array(ref mut arr) = ser {
+        arr.push(block_id);
+    } else if ser.is_null() {
+        ser = serde_json::Value::Array(vec![block_id]);
+    } else {
+        ser = serde_json::Value::Array(vec![ser, block_id]);
+    };
+
+    println!("Serialized Params {:#?}", ser);
+    client.map_or_else(
+        || unreachable!("WeakClient is None"),
+        |client| {
+            let client = client.upgrade().unwrap();
+
+            let rpc_call = client.request(method, params); // TODO: params should be ser. However using `ser` will throw type mismatch.
+
+            Ok(ProviderCall::from(rpc_call))
+        },
+    )
 }
 
 #[cfg(test)]

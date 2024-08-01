@@ -71,6 +71,7 @@ where
     type Output = TransportResult<Box<RawValue>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        tracing::info!("Polling CallState in RpcCall");
         loop {
             match self.as_mut().project() {
                 CallStateProj::Prepared { connection, request } => {
@@ -96,14 +97,18 @@ where
                             return Ready(RpcResult::Err(TransportError::ser_err(err)));
                         }
                     };
+                    tracing::info!("Set to AwaitingResponse");
                     self.set(Self::AwaitingResponse { fut });
                 }
                 CallStateProj::AwaitingResponse { fut } => {
+                    tracing::info!("CallState::AwaitingResponse");
                     let res = match task::ready!(fut.poll(cx)) {
                         Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
                         Err(e) => Ready(RpcResult::Err(e)),
                         _ => panic!("received batch response from single request"),
                     };
+
+                    tracing::info!("Result from CallState Poll {:#?}", res);
                     self.set(Self::Complete);
                     return res;
                 }
@@ -317,7 +322,6 @@ where
 
         let this = self.get_mut();
         let resp = try_deserialize_ok(ready!(this.state.poll_unpin(cx)));
-
         Ready(resp.map(this.map.take().expect("polled after completion")))
     }
 }

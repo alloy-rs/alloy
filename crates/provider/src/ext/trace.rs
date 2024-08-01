@@ -1,18 +1,24 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::{Provider, RpcWithBlock};
+use crate::{Provider, ProviderCall, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
-use alloy_rpc_types_eth::Index;
+use alloy_rpc_client::WeakClient;
+use alloy_rpc_types_eth::{BlockId, Index};
 use alloy_rpc_types_trace::{
     filter::TraceFilter,
     parity::{LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType},
 };
 use alloy_transport::{Transport, TransportResult};
-
+use std::borrow::Cow;
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
 pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
-
+type ProviderCallFn<T, Params, Resp> = fn(
+    Cow<'static, str>,
+    Params,
+    BlockId,
+    Option<WeakClient<T>>,
+) -> TransportResult<ProviderCall<T, Params, Resp>>;
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -30,7 +36,12 @@ where
         &self,
         request: &'a N::TransactionRequest,
         trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+    ) -> RpcWithBlock<
+        T,
+        (&'a N::TransactionRequest, &'b [TraceType]),
+        TraceResults,
+        ProviderCallFn<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>,
+    >;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -43,7 +54,12 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults>;
+    ) -> RpcWithBlock<
+        T,
+        TraceCallList<'a, N>,
+        TraceResults,
+        ProviderCallFn<T, TraceCallList<'a, N>, TraceResults>,
+    >;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -113,15 +129,24 @@ where
         &self,
         request: &'a <N as Network>::TransactionRequest,
         trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
-    {
+    ) -> RpcWithBlock<
+        T,
+        (&'a <N as Network>::TransactionRequest, &'b [TraceType]),
+        TraceResults,
+        ProviderCallFn<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>,
+    > {
         RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
+    ) -> RpcWithBlock<
+        T,
+        TraceCallList<'a, N>,
+        TraceResults,
+        ProviderCallFn<T, TraceCallList<'a, N>, TraceResults>,
+    > {
         RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 

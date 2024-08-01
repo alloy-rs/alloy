@@ -26,7 +26,12 @@ use std::borrow::Cow;
 ///
 /// See [`PollerBuilder`] for more details.
 pub type FilterPollerBuilder<T, R> = PollerBuilder<T, (U256,), Vec<R>>;
-
+type ProviderCallFn<T, Params, Resp> = fn(
+    Cow<'static, str>,
+    Params,
+    BlockId,
+    Option<WeakClient<T>>,
+) -> TransportResult<ProviderCall<T, Params, Resp>>;
 // todo: adjust docs
 // todo: reorder
 /// Provider is parameterized with a network and a transport. The default
@@ -198,7 +203,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn create_access_list<'a>(
         &self,
         request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+    ) -> RpcWithBlock<
+        T,
+        &'a N::TransactionRequest,
+        AccessListWithGasUsed,
+        ProviderCallFn<T, &'a N::TransactionRequest, AccessListWithGasUsed>,
+    > {
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
@@ -291,14 +301,25 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
-    fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
+    fn get_account(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<
+        T,
+        Address,
+        alloy_consensus::Account,
+        ProviderCallFn<T, Address, alloy_consensus::Account>,
+    > {
         RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
-    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256, U256> {
+    fn get_balance(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, U256, ProviderCallFn<T, Address, U256>> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
@@ -375,7 +396,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the bytecode located at the corresponding [Address].
-    fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
+    fn get_code_at(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, Bytes, ProviderCallFn<T, Address, Bytes>> {
         RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
@@ -543,7 +567,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         keys: Vec<StorageKey>,
-    ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
+    ) -> RpcWithBlock<
+        T,
+        (Address, Vec<StorageKey>),
+        EIP1186AccountProofResponse,
+        ProviderCallFn<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse>,
+    > {
         RpcWithBlock::new(self.weak_client(), "eth_getProof", (address, keys))
     }
 
@@ -552,7 +581,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
         key: U256,
-    ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
+    ) -> RpcWithBlock<
+        T,
+        (Address, U256),
+        StorageValue,
+        ProviderCallFn<T, (Address, U256), StorageValue>,
+    > {
         RpcWithBlock::new(self.weak_client(), "eth_getStorageAt", (address, key))
     }
 
@@ -570,9 +604,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_transaction_count(
         &self,
         address: Address,
-    ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
+    ) -> RpcWithBlock<T, Address, U64, ProviderCallFn<T, Address, U64>, u64, fn(U64) -> u64> {
         RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
             .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into_prov_call(crate::utils::into_prov_rpc_call)
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -1291,7 +1326,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
+        let provider = ProviderBuilder::new().on_http("http://127.0.0.1:8545".parse().unwrap());
         let accounts = provider.get_accounts().await.unwrap();
         let sender = accounts[0];
 
