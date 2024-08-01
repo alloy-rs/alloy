@@ -3,7 +3,10 @@
 //! [EIP-2930]: https://eips.ethereum.org/EIPS/eip-2930
 
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{
+    vec::Vec,
+    string::String
+};
 
 use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
@@ -156,7 +159,8 @@ pub struct AccessListResult {
 }
 
 impl AccessListResult {
-    /// Ensures the result is OK, returning [`AccessListWithGasUsed`] if so, or an error message if not.
+    /// Ensures the result is OK, returning [`AccessListWithGasUsed`] if so, or an error message if
+    /// not.
     pub fn ensure_ok(self) -> Result<AccessListWithGasUsed, String> {
         match self.error {
             Some(err) => Err(err),
