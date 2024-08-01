@@ -346,6 +346,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
+#[cfg(any(test, feature = "anvil-node"))]
 type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
 
 #[cfg(any(test, feature = "anvil-node"))]
