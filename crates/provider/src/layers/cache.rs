@@ -4,7 +4,7 @@ use alloy_network::Ethereum;
 use alloy_primitives::{Address, BlockHash, StorageKey, StorageValue, B256, U256};
 use alloy_rpc_client::ClientRef;
 use alloy_rpc_types_eth::{
-    Block, BlockId, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
+    Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
@@ -293,6 +293,7 @@ mod tests {
 
     use crate::ProviderBuilder;
     use alloy_node_bindings::Anvil;
+    use alloy_rpc_types_eth::BlockId;
 
     use super::*;
 

@@ -989,7 +989,9 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rpc_client::ClientBuilder;
     use alloy_rpc_types_eth::request::TransactionRequest;
+    use alloy_transport::layers::CacheLayer;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1020,6 +1022,25 @@ mod tests {
             builder::<AnyNetwork>().with_recommended_fillers().on_http(anvil.endpoint_url());
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn test_transport_cache_layer() {
+        init_tracing();
+        let anvil = Anvil::new().block_time_f64(0.3).spawn();
+        let cache_layer = CacheLayer::new(10, "./transport-rpc-cache.txt".into());
+        let client = ClientBuilder::default().layer(cache_layer).http(anvil.endpoint_url());
+        let provider = ProviderBuilder::new().on_client(client);
+        let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
+        let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap();
+        assert_eq!(blk, blk2);
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        let latest_block_num = provider.get_block_number().await.unwrap();
+        let blk3 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
+        let blk4 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
+        assert_eq!(blk3, blk4);
     }
 
     #[cfg(feature = "reqwest")]
