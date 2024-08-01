@@ -8,6 +8,7 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
+use alloy_network_primitives::{BlockResponse, HeaderResponse};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -150,7 +151,7 @@ impl GasFiller {
                         .get_block_by_number(BlockNumberOrTag::Latest, false)
                         .await?
                         .ok_or(RpcError::NullResp)?
-                        .header
+                        .header()
                         .next_block_blob_fee()
                         .ok_or(RpcError::UnsupportedFeature("eip4844"))
                 }

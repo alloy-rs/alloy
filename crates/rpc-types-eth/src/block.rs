@@ -1,7 +1,7 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::BlockTransactions;
+use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::OtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
@@ -205,6 +205,16 @@ impl TryFrom<Header> for alloy_consensus::Header {
     }
 }
 
+impl HeaderResponse for Header {
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_blob_fee()
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
@@ -314,6 +324,23 @@ pub struct BlockOverrides {
     /// solidity opcode BLOCKHASH.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_hash: Option<BTreeMap<u64, B256>>,
+}
+
+impl<T> BlockResponse for Block<T> {
+    type Transaction = T;
+    type Header = Header;
+
+    fn header(&self) -> &Self::Header {
+        &self.header
+    }
+
+    fn transactions(&self) -> &BlockTransactions<T> {
+        &self.transactions
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        &mut self.transactions
+    }
 }
 
 #[cfg(test)]

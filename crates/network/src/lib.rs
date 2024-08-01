@@ -9,6 +9,7 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
+use alloy_network_primitives::{BlockResponse, HeaderResponse};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -85,5 +86,9 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.
-    type HeaderResponse: RpcObject;
+    type HeaderResponse: RpcObject + HeaderResponse;
+
+    /// The JSON body of a block response.
+    type BlockResponse: RpcObject
+        + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }
