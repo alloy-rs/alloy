@@ -9,6 +9,3 @@ pub use anvil::{AnvilLayer, AnvilProvider};
 
 mod chain;
 pub use chain::ChainLayer;
-
-mod cache;
-pub use cache::{CacheConfig, CacheLayer, CacheProvider};
