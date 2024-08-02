@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
+### Miscellaneous Tasks
+
+- Release 0.2.1
+
 ### Refactor
 
 - Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))

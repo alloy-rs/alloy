@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.2.1
 - [rpc] Make `Deserialize` impl for `FilterChanges` generic over transaction ([#1118](https://github.com/alloy-rs/alloy/issues/1118))
 - Correctly cfg unused type ([#1117](https://github.com/alloy-rs/alloy/issues/1117))
 - Re-export and document network-primitives ([#1107](https://github.com/alloy-rs/alloy/issues/1107))
