@@ -5,18 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
 ### Features
 
+- Use EncodableSignature for tx encoding ([#1100](https://github.com/alloy-rs/alloy/issues/1100))
+- [consensus] Add `From<ConsolidationRequest>` for `Request` ([#1083](https://github.com/alloy-rs/alloy/issues/1083))
 - Expose encoded_len_with_signature() ([#1063](https://github.com/alloy-rs/alloy/issues/1063))
 - Add 7702 tx type ([#1046](https://github.com/alloy-rs/alloy/issues/1046))
 - Impl `arbitrary` for tx structs ([#1050](https://github.com/alloy-rs/alloy/issues/1050))
 
 ### Miscellaneous Tasks
 
+- Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))
 - Release 0.2.0
-- Release 0.2.0
+
+### Other
+
+- `alloy-consensus` should use `alloy_primitives::Sealable` ([#1072](https://github.com/alloy-rs/alloy/issues/1072))
 
 ### Styling
 

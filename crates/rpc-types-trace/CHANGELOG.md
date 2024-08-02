@@ -5,15 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+
+### Bug Fixes
+
+- Make Parity TraceResults output optional ([#1102](https://github.com/alloy-rs/alloy/issues/1102))
 
 ### Features
 
+- [rpc/trace] Filter matches with trace ([#1090](https://github.com/alloy-rs/alloy/issues/1090))
 - [otterscan] Add ots slim block and serialze OperationType to int ([#1043](https://github.com/alloy-rs/alloy/issues/1043))
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))
 - Release 0.2.0
 - Trace output utils ([#1027](https://github.com/alloy-rs/alloy/issues/1027))
 

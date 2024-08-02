@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
 ### Bug Fixes
 
@@ -19,9 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- Correctly cfg unused type ([#1117](https://github.com/alloy-rs/alloy/issues/1117))
 - Release 0.2.0
 - Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
+
+### Other
+
+- Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
+- Removing async get account ([#1080](https://github.com/alloy-rs/alloy/issues/1080))
+
+### Refactor
+
+- Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
 
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 
