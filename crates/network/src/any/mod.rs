@@ -69,7 +69,7 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction>;
+    type TransactionResponse = Transaction;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
