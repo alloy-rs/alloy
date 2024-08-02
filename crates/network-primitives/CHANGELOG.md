@@ -7,81 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
-### Features
-
-- Use EncodableSignature for tx encoding ([#1100](https://github.com/alloy-rs/alloy/issues/1100))
-
 ### Miscellaneous Tasks
 
 - Release 0.2.1
-- Release 0.2.0
-
-## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
-
-### Miscellaneous Tasks
-
-- Release 0.1.4
-
-## [0.1.3](https://github.com/alloy-rs/alloy/releases/tag/v0.1.3) - 2024-06-25
-
-### Miscellaneous Tasks
-
-- Release 0.1.3
-
-## [0.1.2](https://github.com/alloy-rs/alloy/releases/tag/v0.1.2) - 2024-06-19
-
-### Documentation
-
-- Touch up docs, TODOs ([#918](https://github.com/alloy-rs/alloy/issues/918))
-- Add per-crate changelogs ([#914](https://github.com/alloy-rs/alloy/issues/914))
-
-### Miscellaneous Tasks
-
-- Release 0.1.2
-- Update changelogs for v0.1.1 ([#922](https://github.com/alloy-rs/alloy/issues/922))
-- Add docs.rs metadata to all manifests ([#917](https://github.com/alloy-rs/alloy/issues/917))
-
-## [0.1.1](https://github.com/alloy-rs/alloy/releases/tag/v0.1.1) - 2024-06-17
-
-### Bug Fixes
-
-- Implement `sign_dynamic_typed_data` for ledger signers ([#701](https://github.com/alloy-rs/alloy/issues/701))
-- Signer implementations for object-safe smart pointers ([#334](https://github.com/alloy-rs/alloy/issues/334))
-- Add encode_for_signing to Transaction, fix Ledger sign_transaction ([#161](https://github.com/alloy-rs/alloy/issues/161))
-
-### Dependencies
-
-- Alloy-consensus crate ([#83](https://github.com/alloy-rs/alloy/issues/83))
-
-### Documentation
-
-- Update signer documentation ([#180](https://github.com/alloy-rs/alloy/issues/180))
-
-### Features
-
-- `std` feature flag for `alloy-consensus` ([#461](https://github.com/alloy-rs/alloy/issues/461))
-- Move local signers to a separate crate, fix wasm ([#306](https://github.com/alloy-rs/alloy/issues/306))
-- [`signer`] Sign dynamic typed data ([#235](https://github.com/alloy-rs/alloy/issues/235))
-- Network abstraction and transaction builder ([#190](https://github.com/alloy-rs/alloy/issues/190))
-- [signer] Re-export k256, add `Wallet::from_bytes(B256)` ([#173](https://github.com/alloy-rs/alloy/issues/173))
-- Add into_signer to Wallet ([#146](https://github.com/alloy-rs/alloy/issues/146))
-- Signers ([#44](https://github.com/alloy-rs/alloy/issues/44))
-
-### Miscellaneous Tasks
-
-- [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
-- Remove unused imports ([#224](https://github.com/alloy-rs/alloy/issues/224))
-- [`signers`] Fix errors from primitives upgrade, avoid passing `B256` by val ([#152](https://github.com/alloy-rs/alloy/issues/152))
-
-### Other
-
-- Add clippy at workspace level ([#766](https://github.com/alloy-rs/alloy/issues/766))
-- Correctly sign non legacy transaction without EIP155 ([#647](https://github.com/alloy-rs/alloy/issues/647))
-- Check no_std in CI ([#367](https://github.com/alloy-rs/alloy/issues/367))
 
 ### Refactor
 
-- [signers] Use `signer` for single credentials and `wallet` for credential stores  ([#883](https://github.com/alloy-rs/alloy/issues/883))
+- Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
 
 [`alloy`]: https://crates.io/crates/alloy
 [alloy]: https://crates.io/crates/alloy
