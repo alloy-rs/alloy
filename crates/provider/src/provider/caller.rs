@@ -6,12 +6,13 @@ use crate::ProviderCall;
 use std::borrow::Cow;
 
 /// A caller that helper convert `RpcWithBlock` and `EthCall` into a `ProviderCall`.
-pub trait Caller<T, Params, Resp>
+pub trait Caller<T, Params, Resp>: Send + Sync
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
 {
+    /// Methods that needs to be implemented to convert to a `ProviderCall`.
     fn call(
         &self,
         method: Cow<'static, str>,
@@ -26,6 +27,15 @@ where
     T: Transport + Clone,
 {
     client: WeakClient<T>,
+}
+
+impl<T> WithBlockCall<T>
+where
+    T: Transport + Clone,
+{
+    pub const fn new(client: WeakClient<T>) -> Self {
+        Self { client }
+    }
 }
 
 impl<T, Params, Resp> Caller<T, Params, Resp> for WithBlockCall<T>

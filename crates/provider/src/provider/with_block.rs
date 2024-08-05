@@ -4,7 +4,10 @@ use alloy_primitives::B256;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
-use std::{borrow::Cow, future::Future, marker::PhantomData, task::Poll};
+
+use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
+
+use crate::{provider::caller::WithBlockCall, Caller};
 /// States of the
 #[derive(Clone)]
 enum States<T, Resp, Output = Resp, Map = fn(Resp) -> Output>
@@ -35,7 +38,6 @@ where
 
 /// An [`RpcCall`] that takes an optional [`BlockId`] parameter. By default
 /// this will use "latest".
-#[derive(Clone)]
 #[pin_project::pin_project]
 pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
@@ -44,6 +46,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
+    caller: Option<Arc<dyn Caller<T, Params, Resp>>>,
     method: Cow<'static, str>,
     params: Params,
     block_id: BlockId,
@@ -80,6 +83,7 @@ where
         params: Params,
     ) -> Self {
         Self {
+            caller: None,
             method: method.into(),
             params,
             block_id: Default::default(),
@@ -87,6 +91,12 @@ where
             _pd: PhantomData,
             state: States::Preparing,
         }
+    }
+
+    /// Set the caller.
+    pub fn with_caller(mut self, caller: impl Caller<T, Params, Resp> + 'static) -> Self {
+        self.caller = Some(Arc::new(caller));
+        self
     }
 }
 
@@ -116,6 +126,7 @@ where
         NewMap: Fn(Resp) -> NewOutput + Clone,
     {
         RpcWithBlock {
+            caller: self.caller,
             method: self.method,
             params: self.params,
             block_id: self.block_id,
