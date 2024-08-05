@@ -80,3 +80,6 @@ pub const EIP1559_TX_TYPE_ID: u8 = 2;
 
 /// Identifier for an EIP4844 transaction.
 pub const EIP4844_TX_TYPE_ID: u8 = 3;
+
+/// Identifier for an EIP7702 transaction.
+pub const EIP7702_TX_TYPE_ID: u8 = 4;

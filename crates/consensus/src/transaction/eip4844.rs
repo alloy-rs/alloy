@@ -22,6 +22,7 @@ use alloc::vec::Vec;
 /// or a transaction with a sidecar, which is used when submitting a transaction to the network and
 /// when receiving and sending transactions during the gossip stage.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[doc(alias = "Eip4844TransactionVariant")]
@@ -287,6 +288,7 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
 ///
 /// A transaction with blob hashes and max blob fee. It does not have the Blob sidecar.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip4844Transaction", alias = "TransactionEip4844", alias = "Eip4844Tx")]
@@ -491,11 +493,7 @@ impl TxEip4844 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub(crate) fn encoded_len_with_signature(
-        &self,
-        signature: &Signature,
-        with_header: bool,
-    ) -> usize {
+    pub fn encoded_len_with_signature(&self, signature: &Signature, with_header: bool) -> usize {
         // this counts the tx fields and signature fields
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
 
@@ -704,6 +702,7 @@ impl From<TxEip4844WithSidecar> for TxEip4844 {
 /// of a `PooledTransactions` response, and is also used as the format for sending raw transactions
 /// through the network (eth_sendRawTransaction/eth_sendTransaction).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip4844TransactionWithSidecar", alias = "Eip4844TxWithSidecar")]

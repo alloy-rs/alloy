@@ -1,7 +1,6 @@
-use alloy_primitives::{Address, Bytes, B256, B512, U256, U64};
+use alloy_primitives::{Address, Bytes, B256, B512, U256};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
-
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountInfo {
@@ -32,7 +31,8 @@ pub struct EIP1186AccountProofResponse {
     /// The hash of the code of the account.
     pub code_hash: B256,
     /// The account nonce.
-    pub nonce: U64,
+    #[serde(with = "alloy_serde::quantity")]
+    pub nonce: u64,
     /// The hash of the storage of the account.
     pub storage_hash: B256,
     /// The account proof.

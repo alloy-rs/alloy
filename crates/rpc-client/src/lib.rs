@@ -22,7 +22,7 @@ mod call;
 pub use call::RpcCall;
 
 mod client;
-pub use client::{ClientRef, RpcClient, WeakClient};
+pub use client::{ClientRef, RpcClient, RpcClientInner, WeakClient};
 
 mod poller;
 pub use poller::{PollChannel, PollerBuilder};

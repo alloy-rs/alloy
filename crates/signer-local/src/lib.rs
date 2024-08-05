@@ -20,7 +20,7 @@ pub use error::LocalSignerError;
 #[cfg(feature = "mnemonic")]
 mod mnemonic;
 #[cfg(feature = "mnemonic")]
-pub use mnemonic::MnemonicBuilder;
+pub use mnemonic::{MnemonicBuilder, MnemonicBuilderError};
 
 mod private_key;
 

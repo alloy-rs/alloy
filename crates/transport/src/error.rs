@@ -98,7 +98,9 @@ impl TransportErrorKind {
 #[derive(Debug, thiserror::Error)]
 #[error("HTTP error {status} with body: {body}")]
 pub struct HttpError {
+    /// The HTTP status code.
     pub status: u16,
+    /// The HTTP response body.
     pub body: String,
 }
 

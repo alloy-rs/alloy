@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip2930Transaction", alias = "TransactionEip2930", alias = "Eip2930Tx")]
@@ -130,11 +131,7 @@ impl TxEip2930 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub(crate) fn encoded_len_with_signature(
-        &self,
-        signature: &Signature,
-        with_header: bool,
-    ) -> usize {
+    pub fn encoded_len_with_signature(&self, signature: &Signature, with_header: bool) -> usize {
         // this counts the tx fields and signature fields
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
 
