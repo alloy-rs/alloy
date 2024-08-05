@@ -5,6 +5,7 @@ use alloy_consensus::{
     TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip4844WithSidecar, TxEnvelope, TxLegacy,
     TxType, TypedTransaction,
 };
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -66,6 +67,9 @@ pub struct TransactionRequest {
     /// Blob sidecar for EIP-4844 transactions.
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
+    /// Authorization list for for 7702 transactions.
+    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
+    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl TransactionRequest {
