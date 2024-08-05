@@ -1300,7 +1300,7 @@ mod tests {
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
-        let provider = ProviderBuilder::new().on_http("http://localhost:8545".parse().unwrap());
+        let provider = ProviderBuilder::new().on_anvil();
         let accounts = provider.get_accounts().await.unwrap();
         let sender = accounts[0];
 
