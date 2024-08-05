@@ -15,8 +15,8 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
-    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse,
-    FeeHistory, Filter, FilterChanges, Log, SyncStatus,
+    AccessListResult, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory,
+    Filter, FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
 use serde_json::value::RawValue;
@@ -143,7 +143,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
+    fn call<'req, 'state>(
+        &self,
+        tx: &'req N::TransactionRequest,
+    ) -> EthCall<'req, 'state, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
@@ -161,7 +164,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn create_access_list<'a>(
         &self,
         request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListResult> {
         RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_createAccessList", request)
     }
 

@@ -5,10 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
 ### Bug Fixes
 
+- Make Parity TraceResults output optional ([#1102](https://github.com/alloy-rs/alloy/issues/1102))
+- Correctly trim eip7251 bytecode ([#1105](https://github.com/alloy-rs/alloy/issues/1105))
+- [eips] Make SignedAuthorizationList arbitrary less fallible ([#1084](https://github.com/alloy-rs/alloy/issues/1084))
+- [node-bindings] Backport fix from ethers-rs ([#1081](https://github.com/alloy-rs/alloy/issues/1081))
 - Trim conflicting key `max_fee_per_blob_gas` from Eip1559 tx type ([#1064](https://github.com/alloy-rs/alloy/issues/1064))
 - [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
 - Require storageKeys value broken bincode serialization from [#955](https://github.com/alloy-rs/alloy/issues/955) ([#1058](https://github.com/alloy-rs/alloy/issues/1058))
@@ -19,10 +23,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 
+- Bump jsonrpsee 0.24 ([#1067](https://github.com/alloy-rs/alloy/issues/1067))
 - [deps] Bump Trezor client to `=0.1.4` to fix signing bug ([#1045](https://github.com/alloy-rs/alloy/issues/1045))
+
+### Documentation
+
+- Readme fix ([#1114](https://github.com/alloy-rs/alloy/issues/1114))
+- Update links to use docs.rs ([#1066](https://github.com/alloy-rs/alloy/issues/1066))
 
 ### Features
 
+- [engine-types] `PayloadError::PrePragueBlockWithEip7702Transactions` ([#1116](https://github.com/alloy-rs/alloy/issues/1116))
+- Use EncodableSignature for tx encoding ([#1100](https://github.com/alloy-rs/alloy/issues/1100))
+- Eth_simulateV1 Request / Response types ([#1042](https://github.com/alloy-rs/alloy/issues/1042))
+- Add helper for decoding custom errors ([#1098](https://github.com/alloy-rs/alloy/issues/1098))
+- Enable more features transitively in meta crate ([#1097](https://github.com/alloy-rs/alloy/issues/1097))
+- [rpc/trace] Filter matches with trace ([#1090](https://github.com/alloy-rs/alloy/issues/1090))
+- Feat(rpc-type-eth) convert vec TxReq to bundle ([#1091](https://github.com/alloy-rs/alloy/issues/1091))
+- [eip] Make 7702 auth recovery fallible ([#1082](https://github.com/alloy-rs/alloy/issues/1082))
+- [json-rpc] Implement `From<u64> for Id` and `From<String> for Id` ([#1088](https://github.com/alloy-rs/alloy/issues/1088))
+- [consensus] Add `From<ConsolidationRequest>` for `Request` ([#1083](https://github.com/alloy-rs/alloy/issues/1083))
+- Feat(provider) : introduction to eth_sendRawTransactionConditional  RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
 - Expose encoded_len_with_signature() ([#1063](https://github.com/alloy-rs/alloy/issues/1063))
 - Add 7702 tx type ([#1046](https://github.com/alloy-rs/alloy/issues/1046))
 - [rpc-types-eth] Serde flatten `BlobTransactionSidecar` in tx req ([#1054](https://github.com/alloy-rs/alloy/issues/1054))
@@ -39,15 +60,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- Release 0.2.1
+- [rpc] Make `Deserialize` impl for `FilterChanges` generic over transaction ([#1118](https://github.com/alloy-rs/alloy/issues/1118))
+- Correctly cfg unused type ([#1117](https://github.com/alloy-rs/alloy/issues/1117))
+- Re-export and document network-primitives ([#1107](https://github.com/alloy-rs/alloy/issues/1107))
+- Allow override all group ([#1104](https://github.com/alloy-rs/alloy/issues/1104))
+- Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))
+- Export rpc account type ([#1075](https://github.com/alloy-rs/alloy/issues/1075))
 - Release 0.2.0
 - Make auth mandatory in recovered auth ([#1047](https://github.com/alloy-rs/alloy/issues/1047))
 - Trace output utils ([#1027](https://github.com/alloy-rs/alloy/issues/1027))
 - Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
 - Add payloadbodies v2 to capabilities set ([#1025](https://github.com/alloy-rs/alloy/issues/1025))
 
+### Other
+
+- Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
+- Derive arbitrary for `TransactionRequest` ([#1113](https://github.com/alloy-rs/alloy/issues/1113))
+- Fix typo in genesis ([#1096](https://github.com/alloy-rs/alloy/issues/1096))
+- Removing async get account ([#1080](https://github.com/alloy-rs/alloy/issues/1080))
+- Added stages to the sync info rpc type ([#1079](https://github.com/alloy-rs/alloy/issues/1079))
+- `alloy-consensus` should use `alloy_primitives::Sealable` ([#1072](https://github.com/alloy-rs/alloy/issues/1072))
+
 ### Refactor
 
+- Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
 - Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
 
 ### Styling
