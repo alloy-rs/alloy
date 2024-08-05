@@ -1,8 +1,8 @@
+use crate::ProviderCall;
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_rpc_client::WeakClient;
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
-
-use crate::ProviderCall;
+use alloy_rpc_types_eth::BlockId;
+use alloy_transport::{RpcError, Transport, TransportErrorKind, TransportResult};
 use std::borrow::Cow;
 
 /// A caller that helper convert `RpcWithBlock` and `EthCall` into a `ProviderCall`.
@@ -17,12 +17,13 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-    ) -> TransportResult<ProviderCall<T, Params, Resp>>;
+        block_id: BlockId,
+    ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>>;
 }
 
 /// A helper struct that implements the [`Caller`] trait and converts [`RpcWithBlock`] into a
 /// [`ProviderCall::RpcCall`].
-pub(crate) struct WithBlockCall<T>
+pub struct WithBlockCall<T>
 where
     T: Transport + Clone,
 {
@@ -48,10 +49,26 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-    ) -> TransportResult<ProviderCall<T, Params, Resp>> {
+        block_id: BlockId,
+    ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
         let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
 
-        let rpc_call = client.request(method, params);
+        // serialize the params
+        let mut ser = serde_json::to_value(params).map_err(RpcError::ser_err)?;
+
+        // serialize the block id
+        let block_id = serde_json::to_value(block_id).map_err(RpcError::ser_err)?;
+
+        // append the block id to the params
+        if let serde_json::Value::Array(ref mut arr) = ser {
+            arr.push(block_id);
+        } else if ser.is_null() {
+            ser = serde_json::Value::Array(vec![block_id]);
+        } else {
+            ser = serde_json::Value::Array(vec![ser, block_id]);
+        }
+
+        let rpc_call = client.request(method, ser);
 
         Ok(ProviderCall::from(rpc_call))
     }

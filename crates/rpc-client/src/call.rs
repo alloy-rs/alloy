@@ -96,9 +96,11 @@ where
                             return Ready(RpcResult::Err(TransportError::ser_err(err)));
                         }
                     };
+                    tracing::info!("Setting state to AwaitingResponse");
                     self.set(Self::AwaitingResponse { fut });
                 }
                 CallStateProj::AwaitingResponse { fut } => {
+                    tracing::info!("Awaiting Response in RpcCall::CallState");
                     let res = match task::ready!(fut.poll(cx)) {
                         Ok(ResponsePacket::Single(res)) => Ready(transform_response(res)),
                         Err(e) => Ready(RpcResult::Err(e)),

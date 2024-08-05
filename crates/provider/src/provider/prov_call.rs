@@ -257,7 +257,10 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         match self.as_mut().project() {
-            ProviderCallProj::RpcCall(call) => call.poll_unpin(cx),
+            ProviderCallProj::RpcCall(call) => {
+                tracing::info!("Polling RpcCall via ProviderCall");
+                call.poll_unpin(cx)
+            }
             ProviderCallProj::Waiter(waiter) => waiter.poll_unpin(cx),
             ProviderCallProj::BoxedFuture(fut) => fut.poll_unpin(cx),
             ProviderCallProj::Ready(output) => {
