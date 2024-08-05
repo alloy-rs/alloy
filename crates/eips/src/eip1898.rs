@@ -385,6 +385,17 @@ impl From<BlockNumberOrTag> for BlockId {
     }
 }
 
+impl From<BlockHashOrNumber> for BlockId {
+    fn from(block: BlockHashOrNumber) -> Self {
+        match block {
+            BlockHashOrNumber::Hash(hash) => {
+                Self::Hash(RpcBlockHash { block_hash: hash, require_canonical: None })
+            }
+            BlockHashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
+        }
+    }
+}
+
 impl From<B256> for BlockId {
     fn from(block_hash: B256) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
