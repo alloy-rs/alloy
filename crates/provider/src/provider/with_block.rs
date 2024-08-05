@@ -5,7 +5,6 @@ use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use std::{borrow::Cow, future::Future, marker::PhantomData, task::Poll};
-
 /// States of the
 #[derive(Clone)]
 enum States<T, Resp, Output = Resp, Map = fn(Resp) -> Output>
