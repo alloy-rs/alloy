@@ -44,7 +44,6 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    client: WeakClient<T>,
     method: Cow<'static, str>,
     params: Params,
     block_id: BlockId,
@@ -61,7 +60,6 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RpcWithBlock")
-            .field("client", &self.client)
             .field("method", &self.method)
             .field("params", &self.params)
             .field("block_id", &self.block_id)
@@ -77,12 +75,11 @@ where
 {
     /// Create a new [`RpcWithBlock`] instance.
     pub fn new(
-        client: WeakClient<T>,
+        _client: WeakClient<T>,
         method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> Self {
         Self {
-            client,
             method: method.into(),
             params,
             block_id: Default::default(),
@@ -119,7 +116,6 @@ where
         NewMap: Fn(Resp) -> NewOutput + Clone,
     {
         RpcWithBlock {
-            client: self.client,
             method: self.method,
             params: self.params,
             block_id: self.block_id,
@@ -197,52 +193,54 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Output>> {
-        let this = self.project();
-        let States::Preparing { .. } = std::mem::replace(this.state, States::Invalid) else {
-            unreachable!("bad state")
-        };
+        // let this = self.project();
+        // let States::Preparing { .. } = std::mem::replace(this.state, States::Invalid) else {
+        //     unreachable!("bad state")
+        // };
 
-        let mut fut = {
-            // make sure the client still exists
-            let client = match this.client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-                Ok(client) => client,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
+        // let mut fut = {
+        //     // make sure the client still exists
+        //     let client = match this.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)
+        // {         Ok(client) => client,
+        //         Err(e) => return Poll::Ready(Err(e)),
+        //     };
 
-            // serialize the params
-            let ser = serde_json::to_value(this.params).map_err(RpcError::ser_err);
-            let mut ser = match ser {
-                Ok(ser) => ser,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
+        //     // serialize the params
+        //     let ser = serde_json::to_value(this.params).map_err(RpcError::ser_err);
+        //     let mut ser = match ser {
+        //         Ok(ser) => ser,
+        //         Err(e) => return Poll::Ready(Err(e)),
+        //     };
 
-            // serialize the block id
-            let block_id = serde_json::to_value(this.block_id).map_err(RpcError::ser_err);
-            let block_id = match block_id {
-                Ok(block_id) => block_id,
-                Err(e) => return Poll::Ready(Err(e)),
-            };
+        //     // serialize the block id
+        //     let block_id = serde_json::to_value(this.block_id).map_err(RpcError::ser_err);
+        //     let block_id = match block_id {
+        //         Ok(block_id) => block_id,
+        //         Err(e) => return Poll::Ready(Err(e)),
+        //     };
 
-            // append the block id to the params
-            if let serde_json::Value::Array(ref mut arr) = ser {
-                arr.push(block_id);
-            } else if ser.is_null() {
-                ser = serde_json::Value::Array(vec![block_id]);
-            } else {
-                ser = serde_json::Value::Array(vec![ser, block_id]);
-            }
+        //     // append the block id to the params
+        //     if let serde_json::Value::Array(ref mut arr) = ser {
+        //         arr.push(block_id);
+        //     } else if ser.is_null() {
+        //         ser = serde_json::Value::Array(vec![block_id]);
+        //     } else {
+        //         ser = serde_json::Value::Array(vec![ser, block_id]);
+        //     }
 
-            // create the call
-            client.request(this.method.clone(), ser).map_resp(this.map.clone())
-        };
-        // poll the call immediately
-        match fut.poll_unpin(cx) {
-            Poll::Ready(value) => Poll::Ready(value),
-            Poll::Pending => {
-                *this.state = States::Running(fut);
-                Poll::Pending
-            }
-        }
+        //     // create the call
+        //     client.request(this.method.clone(), ser).map_resp(this.map.clone())
+        // };
+        // // poll the call immediately
+        // match fut.poll_unpin(cx) {
+        //     Poll::Ready(value) => Poll::Ready(value),
+        //     Poll::Pending => {
+        //         *this.state = States::Running(fut);
+        //         Poll::Pending
+        //     }
+        // }
+
+        todo!()
     }
 
     fn poll_running(
