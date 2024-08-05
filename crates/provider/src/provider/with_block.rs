@@ -54,8 +54,11 @@ where
     }
 }
 
-/// An [`RpcCall`] that takes an optional [`BlockId`] parameter. By default
-/// this will use "latest".
+/// A struct that takes an optional [`BlockId`] parameter.
+///
+/// This resolves to a [`ProviderCall`] that will execute the call on the specified block.
+///
+/// By default this will use "latest".
 #[pin_project::pin_project]
 pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where

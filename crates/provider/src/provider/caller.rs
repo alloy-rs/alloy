@@ -23,6 +23,8 @@ where
 
 /// A helper struct that implements the [`Caller`] trait and converts [`RpcWithBlock`] into a
 /// [`ProviderCall::RpcCall`].
+///
+/// [`RpcWithBlock`]: crate::RpcWithBlock
 #[derive(Debug)]
 pub struct WithBlockCall<T>
 where
