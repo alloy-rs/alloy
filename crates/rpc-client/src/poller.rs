@@ -57,13 +57,16 @@ const MAX_RETRIES: usize = 3;
 // TODO: make this be able to be spawned on the current thread instead of forcing a task.
 #[derive(Debug)]
 #[must_use = "this builder does nothing unless you call `spawn` or `into_stream`"]
-pub struct PollerBuilder<Conn, Params, Resp> {
+pub struct PollerBuilder<Conn, Params, Resp, PostPollParams> {
     /// The client to poll with.
     client: WeakClient<Conn>,
 
     /// Request Method
     method: Cow<'static, str>,
     params: Params,
+
+    // post poll execution
+    post_poll_execution: Option<PostPollExecution<PostPollParams>>,
 
     // config options
     channel_size: usize,
@@ -73,11 +76,18 @@ pub struct PollerBuilder<Conn, Params, Resp> {
     _pd: PhantomData<fn() -> Resp>,
 }
 
-impl<Conn, Params, Resp> PollerBuilder<Conn, Params, Resp>
+#[derive(Debug)]
+struct PostPollExecution<PostPollParams> {
+    method: Cow<'static, str>,
+    params: PostPollParams,
+}
+
+impl<Conn, Params, Resp, PostPollParams> PollerBuilder<Conn, Params, Resp, PostPollParams>
 where
     Conn: Transport + Clone,
     Params: RpcParam + 'static,
     Resp: RpcReturn + Clone,
+    PostPollParams: RpcParam + 'static,
 {
     /// Create a new poller task.
     pub fn new(
@@ -94,8 +104,19 @@ where
             channel_size: 16,
             poll_interval,
             limit: usize::MAX,
+            post_poll_execution: None,
             _pd: PhantomData,
         }
+    }
+
+    /// Add a post poll execution to the poller.
+    pub fn with_post_poll_execution(
+        mut self,
+        method: impl Into<Cow<'static, str>>,
+        params: PostPollParams,
+    ) -> Self {
+        self.post_poll_execution = Some(PostPollExecution { method: method.into(), params });
+        self
     }
 
     /// Returns the channel size for the poller task.
@@ -172,6 +193,35 @@ where
                     trace!("polling");
                     match client.request(self.method.clone(), params).await {
                         Ok(resp) => {
+                            if let Some(ref post_poll_execution) = self.post_poll_execution {
+                                trace!(method = %post_poll_execution.method, "executing post poll");
+                                let resp = match client
+                                    .request::<_, Resp>(
+                                        post_poll_execution.method.clone(),
+                                        (resp, post_poll_execution.params.clone()),
+                                    )
+                                    .await
+                                {
+                                    Ok(resp) => {
+                                        if tx.send(resp).is_err() {
+                                            debug!("channel closed");
+                                            break 'outer;
+                                        }
+                                    }
+                                    Err(RpcError::Transport(err))
+                                        if retries > 0 && err.recoverable() =>
+                                    {
+                                        debug!(%err, "failed to execute post poll");
+                                        retries -= 1;
+                                        continue;
+                                    }
+                                    Err(err) => {
+                                        error!(%err, "failed to execute post poll");
+                                        break 'outer;
+                                    }
+                                };
+                            }
+
                             if tx.send(resp).is_err() {
                                 debug!("channel closed");
                                 break 'outer;
@@ -296,4 +346,14 @@ impl<P: Serialize> ParamsOnce<P> {
 fn _assert_unpin() {
     fn _assert<T: Unpin>() {}
     _assert::<PollChannel<()>>();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_node_bindings::Anvil;
+    #[tokio::test]
+    async fn test_post_poll_execution() {
+        let anvil = Anvil::new().spawn();
+    }
 }

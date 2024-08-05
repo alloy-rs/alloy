@@ -333,7 +333,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
-    /// Watch for new blocks by polling the provider with
+    /// Watch for new block hashes by polling the provider with
     /// [`eth_getFilterChanges`](Self::get_filter_changes).
     ///
     /// Returns a builder that is used to configure the poller. See [`PollerBuilder`] for more
@@ -358,6 +358,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn watch_blocks(&self) -> TransportResult<FilterPollerBuilder<T, B256>> {
         let id = self.new_block_filter().await?;
         Ok(PollerBuilder::new(self.weak_client(), "eth_getFilterChanges", (id,)))
+    }
+
+    /// Watch for new blocks with the block bodies and transactions.
+    async fn watch_full_blocks(&self, _kind: BlockTransactionsKind) {
+        todo!()
     }
 
     /// Watch for new pending transaction by polling the provider with
@@ -993,6 +998,7 @@ mod tests {
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_types_eth::request::TransactionRequest;
+    use futures::StreamExt;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1059,6 +1065,32 @@ mod tests {
         let boxed_boxdyn = Box::new(boxed) as Box<dyn Provider<_>>;
         let num = boxed_boxdyn.get_block_number().await.unwrap();
         assert_eq!(0, num);
+    }
+
+    #[tokio::test]
+    async fn watch_blocks_http() {
+        init_tracing();
+
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
+
+        let watch = provider.watch_blocks().await.unwrap();
+
+        let mut stream = watch.into_stream().flat_map(futures::stream::iter).take(3);
+
+        while let Some(block_hash) = stream.next().await {
+            println!("{block_hash:?}");
+        }
+    }
+
+    async fn watch_full_blocks() {
+        init_tracing();
+
+        let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
+
+        let id = provider.new_block_filter().await.unwrap();
+
+        let poller = PollerBuilder::new(provider.weak_client(), "eth_getFilterChanges", (id,))
+            .with_post_poll_execution("eth_getBlockByHash", (true,));
     }
 
     #[cfg(feature = "ws")]
