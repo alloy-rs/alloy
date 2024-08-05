@@ -23,6 +23,7 @@ where
 
 /// A helper struct that implements the [`Caller`] trait and converts [`RpcWithBlock`] into a
 /// [`ProviderCall::RpcCall`].
+#[derive(Debug)]
 pub struct WithBlockCall<T>
 where
     T: Transport + Clone,
@@ -34,6 +35,7 @@ impl<T> WithBlockCall<T>
 where
     T: Transport + Clone,
 {
+    /// Create a new [`WithBlockCall`] instance using transport client.
     pub const fn new(client: WeakClient<T>) -> Self {
         Self { client }
     }
@@ -70,6 +72,6 @@ where
 
         let rpc_call = client.request(method, ser);
 
-        Ok(ProviderCall::from(rpc_call))
+        Ok(ProviderCall::RpcCall(rpc_call))
     }
 }

@@ -1,53 +1,55 @@
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_primitives::B256;
-use alloy_rpc_client::{RpcCall, WeakClient};
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc, task::Poll};
-
-use crate::{provider::caller::WithBlockCall, Caller};
+use crate::{Caller, ProviderCall};
+use std::{
+    borrow::Cow,
+    future::{Future, IntoFuture},
+    marker::PhantomData,
+    sync::OnceLock,
+    task::Poll,
+};
 /// States of the
-// #[derive(Clone)]
-// enum States<T, Resp, Output = Resp, Map = fn(Resp) -> Output>
-// where
-//     T: Transport + Clone,
-//     Resp: RpcReturn,
-//     Map: Fn(Resp) -> Output,
-// {
-//     Invalid,
-//     Preparing,
-//     Running(RpcCall<T, serde_json::Value, Resp, Output, Map>),
-// }
-#[derive(Clone)]
-enum States {
+enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
     Invalid,
-    Preparing,
-    Running,
+    Preparing {
+        caller: Box<dyn Caller<T, Params, Resp>>,
+        method: Cow<'static, str>,
+        params: Params,
+        block_id: BlockId,
+        map: Map,
+    },
+    Running {
+        map: Map,
+    },
 }
 
-// impl<T, Resp, Output, Map> core::fmt::Debug for States<T, Resp, Output, Map>
-// where
-//     T: Transport + Clone,
-//     Resp: RpcReturn,
-//     Map: Fn(Resp) -> Output,
-// {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::Invalid => f.debug_tuple("Invalid").finish(),
-//             Self::Preparing => f.debug_struct("Preparing").finish(),
-//             Self::Running(arg0) => f.debug_tuple("Running").field(arg0).finish(),
-//         }
-//     }
-// }
-
-impl core::fmt::Debug for States {
+impl<T, Params, Resp, Output, Map> core::fmt::Debug for States<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid => f.debug_tuple("Invalid").finish(),
-            Self::Preparing => f.debug_struct("Preparing").finish(),
-            Self::Running => f.debug_struct("Running").finish(),
+            Self::Preparing { caller: _, method, params, block_id, .. } => f
+                .debug_struct("Preparing")
+                .field("method", method)
+                .field("params", params)
+                .field("block_id", block_id)
+                .finish(),
+            Self::Running { map: _ } => f.debug_tuple("Running").finish(),
         }
     }
 }
@@ -68,7 +70,6 @@ where
     block_id: BlockId,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
-    state: States,
 }
 
 impl<T, Params, Resp> core::fmt::Debug for RpcWithBlock<T, Params, Resp>
@@ -105,7 +106,6 @@ where
             block_id: Default::default(),
             map: std::convert::identity,
             _pd: PhantomData,
-            state: States::Preparing,
         }
     }
 }
@@ -142,13 +142,6 @@ where
             block_id: self.block_id,
             map,
             _pd: PhantomData,
-            state: match self.state {
-                States::Invalid => States::Invalid,
-                States::Preparing => States::Preparing,
-                // TODO: Had to add the Clone bound on Map due to this. Can we find a way to remove
-                // this? .
-                States::Running => States::Running,
-            },
         }
     }
 
@@ -201,7 +194,7 @@ where
     }
 }
 
-impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
+impl<T, Params, Resp, Output, Map> IntoFuture for RpcWithBlock<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -209,28 +202,87 @@ where
     Output: 'static,
     Map: Fn(Resp) -> Output + Clone,
 {
-    fn poll_caller(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<TransportResult<Output>> {
-        let this = self.project();
-        let States::Preparing { .. } = std::mem::replace(this.state, States::Invalid) else {
-            unreachable!("bad state")
-        };
+    type Output = TransportResult<Output>;
 
-        let mut fut = this.caller.call(this.method.clone(), this.params.clone(), *this.block_id)?;
+    type IntoFuture = WithBlockFut<T, Params, Resp, Output, Map>;
 
-        match fut.poll_unpin(cx) {
-            Poll::Ready(value) => Poll::Ready(value.map(this.map.clone())),
-            Poll::Pending => {
-                *this.state = States::Running;
-                Poll::Pending
-            }
+    fn into_future(self) -> Self::IntoFuture {
+        WithBlockFut {
+            fut: OnceLock::new(),
+            state: States::Preparing {
+                caller: self.caller,
+                method: self.method,
+                params: self.params,
+                block_id: self.block_id,
+                map: self.map,
+            },
         }
     }
 }
 
-impl<T, Params, Resp, Output, Map> Future for RpcWithBlock<T, Params, Resp, Output, Map>
+/// Intermediate `Future` type between `RpcWithBlock` and `ProviderCall`, that helps poll
+/// the `ProviderCall` and map the response.
+#[derive(Debug)]
+#[pin_project::pin_project]
+pub struct WithBlockFut<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Output: 'static,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output + Clone,
+{
+    fut: OnceLock<ProviderCall<T, serde_json::Value, Resp>>,
+    state: States<T, Params, Resp, Output, Map>,
+}
+
+impl<T, Params, Resp, Output, Map> WithBlockFut<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output + Clone,
+{
+    fn poll_preparing(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<TransportResult<Output>> {
+        let this = self.project();
+        let States::Preparing { caller, params, method, block_id, map } =
+            std::mem::replace(this.state, States::Invalid)
+        else {
+            unreachable!("bad state")
+        };
+
+        let mut fut = caller.call(method, params, block_id)?;
+
+        match fut.poll_unpin(cx) {
+            Poll::Ready(value) => Poll::Ready(value.map(map)),
+            Poll::Pending => {
+                let _ = this.fut.set(fut);
+                *this.state = States::Running { map };
+                Poll::Pending
+            }
+        }
+    }
+
+    fn poll_running(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<TransportResult<Output>> {
+        let this = self.project();
+        let States::Running { map } = this.state else { unreachable!("bad state") };
+        this.fut.get_mut().map_or_else(
+            || {
+                unreachable!("ProviderCall not set");
+            },
+            |fut| fut.poll_unpin(cx).map(|value| value.map(map)),
+        )
+    }
+}
+
+impl<T, Params, Resp, Output, Map> Future for WithBlockFut<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -242,9 +294,9 @@ where
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         if matches!(self.state, States::Preparing { .. }) {
-            self.poll_caller(cx)
+            self.poll_preparing(cx)
         } else if matches!(self.state, States::Running { .. }) {
-            self.poll_caller(cx)
+            self.poll_running(cx)
         } else {
             panic!("bad state")
         }
