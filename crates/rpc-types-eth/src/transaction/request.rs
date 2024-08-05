@@ -69,7 +69,7 @@ pub struct TransactionRequest {
     pub sidecar: Option<BlobTransactionSidecar>,
     /// Authorization list for for 7702 transactions.
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
-    pub authorization_list: Option<SignedAuthorization>,
+    pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
 impl TransactionRequest {
