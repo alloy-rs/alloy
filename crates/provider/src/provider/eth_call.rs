@@ -1,5 +1,5 @@
 use alloy_eips::BlockId;
-use alloy_json_rpc::RpcReturn;
+use alloy_json_rpc::{RpcError, RpcReturn};
 use alloy_network::Network;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types_eth::state::StateOverride;
@@ -118,7 +118,7 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let Self::Preparing { client, caller: _, data, overrides, block, method, map } =
+        let Self::Preparing { client, caller, data, overrides, block, method, map } =
             std::mem::replace(self, Self::Polling)
         else {
             unreachable!("bad state")
@@ -130,6 +130,13 @@ where
         };
 
         let params = EthCallParams { data, block, overrides };
+
+        if let Some(caller) = caller {
+            let _res =
+                caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()));
+        } else {
+            unreachable!("caller not set");
+        }
 
         let fut = client.request(method, params).map_resp(map);
 
@@ -215,10 +222,14 @@ where
     Resp: RpcReturn,
 {
     /// Create a new CallBuilder.
-    pub const fn new(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+    pub fn new(
+        client: WeakClient<T>,
+        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        data: &'req N::TransactionRequest,
+    ) -> Self {
         Self {
             client,
-            caller: None,
+            caller: Some(Arc::new(caller)),
             data,
             overrides: None,
             block: None,
@@ -229,10 +240,14 @@ where
     }
 
     /// Create new EthCall for gas estimates.
-    pub const fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
+    pub fn gas_estimate(
+        client: WeakClient<T>,
+        caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
+        data: &'req N::TransactionRequest,
+    ) -> Self {
         Self {
             client,
-            caller: None,
+            caller: Some(Arc::new(caller)),
             data,
             overrides: None,
             block: None,

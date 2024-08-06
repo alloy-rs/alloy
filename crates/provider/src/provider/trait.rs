@@ -2,8 +2,9 @@
 use crate::{
     provider::caller::WithBlockCall,
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
+    EthCall, EthCaller, Identity, PendingTransaction, PendingTransactionBuilder,
+    PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
+    SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -144,7 +145,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
-        EthCall::new(self.weak_client(), tx)
+        EthCall::new(self.weak_client(), EthCaller::new(self.weak_client()), tx)
     }
 
     /// Gets the chain ID.  
@@ -179,7 +180,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.weak_client(), EthCaller::new(self.weak_client()), tx)
+            .map_resp(crate::utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -1536,6 +1538,9 @@ mod tests {
             .with_input(bytes!("06fdde03")); // `name()`
         let result = provider.call(&req).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
+
+        let result = provider.call(&req).block(0.into()).await.unwrap();
+        assert_eq!(result.to_string(), "0x");
     }
 
     #[tokio::test]

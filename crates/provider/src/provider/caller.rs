@@ -77,3 +77,48 @@ where
         Ok(ProviderCall::RpcCall(rpc_call))
     }
 }
+
+/// EthCaller
+#[derive(Debug)]
+pub struct EthCaller<T>
+where
+    T: Transport + Clone,
+{
+    client: WeakClient<T>,
+}
+
+impl<T> EthCaller<T>
+where
+    T: Transport + Clone,
+{
+    /// Create a new [`EthCaller`] instance using transport client.
+    pub const fn new(client: WeakClient<T>) -> Self {
+        Self { client }
+    }
+}
+
+impl<T, Params, Resp> Caller<T, Params, Resp> for EthCaller<T>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+{
+    fn call(
+        &self,
+        method: Cow<'static, str>,
+        params: Params,
+        _block_id: BlockId,
+    ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
+        let params = serde_json::to_value(params).map_err(RpcError::ser_err)?;
+
+        tracing::info!("params: {:#?}", params);
+
+        let rpc_call = self
+            .client
+            .upgrade()
+            .ok_or_else(TransportErrorKind::backend_gone)?
+            .request(method, params);
+
+        Ok(ProviderCall::RpcCall(rpc_call))
+    }
+}

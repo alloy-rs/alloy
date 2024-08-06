@@ -20,4 +20,4 @@ mod with_block;
 pub use with_block::{RpcWithBlock, WithBlockFut};
 
 mod caller;
-pub use caller::{Caller, WithBlockCall};
+pub use caller::{Caller, EthCaller, WithBlockCall};
