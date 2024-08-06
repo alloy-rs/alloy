@@ -143,11 +143,12 @@ where
     fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
         let EthCallFutInner::Running { ref map } = self.inner else { unreachable!("bad state") };
 
-        if let Some(fut) = self.fut.get_mut() {
-            fut.poll_unpin(cx).map(|res| res.map(map))
-        } else {
-            unreachable!("ProviderCall not set");
-        }
+        self.fut.get_mut().map_or_else(
+            || {
+                unreachable!("ProviderCall not set");
+            },
+            |fut| fut.poll_unpin(cx).map(|res| res.map(map)),
+        )
     }
 }
 
