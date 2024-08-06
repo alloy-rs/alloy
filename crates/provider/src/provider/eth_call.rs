@@ -6,20 +6,22 @@ use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{future::Future, marker::PhantomData, task::Poll};
+use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
-type RunningFut<'req, 'state, T, N, Resp, Output, Map> =
-    RpcCall<T, EthCallParams<'req, 'state, N>, Resp, Output, Map>;
+use crate::Caller;
+
+type RunningFut<'req, T, N, Resp, Output, Map> =
+    RpcCall<T, EthCallParams<'req, N>, Resp, Output, Map>;
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
-pub struct EthCallParams<'req, 'state, N: Network> {
+pub struct EthCallParams<'req, N: Network> {
     data: &'req N::TransactionRequest,
     block: Option<BlockId>,
-    overrides: Option<&'state StateOverride>,
+    overrides: Option<&'req StateOverride>,
 }
 
-impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
+impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let len = if self.overrides.is_some() { 3 } else { 2 };
 
@@ -42,17 +44,18 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, '_, N> {
 #[doc(hidden)] // Not public API.
 #[allow(unnameable_types)]
 #[pin_project::pin_project]
-pub struct EthCallFut<'req, 'state, T, N, Resp, Output, Map>(
-    EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>,
+pub struct EthCallFut<'req, T, N, Resp, Output, Map>(
+    EthCallFutInner<'req, T, N, Resp, Output, Map>,
 )
 where
     T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
+    Output: 'static,
     Map: Fn(Resp) -> Output;
 
-#[derive(Clone, Debug)]
-enum EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>
+#[derive(Clone)]
+enum EthCallFutInner<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -61,17 +64,42 @@ where
 {
     Preparing {
         client: WeakClient<T>,
+        caller: Option<Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>>,
         data: &'req N::TransactionRequest,
-        overrides: Option<&'state StateOverride>,
+        overrides: Option<&'req StateOverride>,
         block: Option<BlockId>,
         method: &'static str,
         map: Map,
     },
-    Running(RunningFut<'req, 'state, T, N, Resp, Output, Map>),
+    Running(RunningFut<'req, T, N, Resp, Output, Map>),
     Polling,
 }
 
-impl<'req, 'state, T, N, Resp, Output, Map> EthCallFutInner<'req, 'state, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> core::fmt::Debug
+    for EthCallFutInner<'req, T, N, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    N: Network,
+    Resp: RpcReturn,
+    Output: 'static,
+    Map: Fn(Resp) -> Output,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Preparing { client: _, caller: _, data, overrides, block, method, map: _ } => f
+                .debug_struct("Preparing")
+                .field("data", data)
+                .field("overrides", overrides)
+                .field("block", block)
+                .field("method", method)
+                .finish(),
+            Self::Running(_call) => f.debug_tuple("Running").finish(),
+            Self::Polling => f.debug_tuple("Polling").finish(),
+        }
+    }
+}
+
+impl<'req, T, N, Resp, Output, Map> EthCallFutInner<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -90,7 +118,7 @@ where
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let Self::Preparing { client, data, overrides, block, method, map } =
+        let Self::Preparing { client, caller: _, data, overrides, block, method, map } =
             std::mem::replace(self, Self::Polling)
         else {
             unreachable!("bad state")
@@ -116,8 +144,7 @@ where
     }
 }
 
-impl<'req, 'state, T, N, Resp, Output, Map> Future
-    for EthCallFut<'req, 'state, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> Future for EthCallFut<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -147,8 +174,8 @@ where
 ///
 /// [`Provider::call`]: crate::Provider::call
 #[must_use = "EthCall must be awaited to execute the call"]
-#[derive(Debug, Clone)]
-pub struct EthCall<'req, 'state, T, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
+#[derive(Clone)]
+pub struct EthCall<'req, T, N, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
     N: Network,
@@ -156,16 +183,32 @@ where
     Map: Fn(Resp) -> Output,
 {
     client: WeakClient<T>,
-
+    caller: Option<Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>>,
     data: &'req N::TransactionRequest,
-    overrides: Option<&'state StateOverride>,
+    overrides: Option<&'req StateOverride>,
     block: Option<BlockId>,
     method: &'static str,
     map: Map,
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<'req, T, N, Resp> EthCall<'req, 'static, T, N, Resp>
+impl<'req, T, N, Resp> core::fmt::Debug for EthCall<'req, T, N, Resp>
+where
+    T: Transport + Clone,
+    N: Network,
+    Resp: RpcReturn,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("EthCall")
+            .field("method", &self.method)
+            .field("data", &self.data)
+            .field("block", &self.block)
+            .field("overrides", &self.overrides)
+            .finish()
+    }
+}
+
+impl<'req, T, N, Resp> EthCall<'req, T, N, Resp>
 where
     T: Transport + Clone,
     N: Network,
@@ -175,6 +218,7 @@ where
     pub const fn new(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
         Self {
             client,
+            caller: None,
             data,
             overrides: None,
             block: None,
@@ -188,6 +232,7 @@ where
     pub const fn gas_estimate(client: WeakClient<T>, data: &'req N::TransactionRequest) -> Self {
         Self {
             client,
+            caller: None,
             data,
             overrides: None,
             block: None,
@@ -198,7 +243,7 @@ where
     }
 }
 
-impl<'req, 'state, T, N, Resp, Output, Map> EthCall<'req, 'state, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> EthCall<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -219,12 +264,13 @@ where
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
-    ) -> EthCall<'req, 'state, T, N, Resp, NewOutput, NewMap>
+    ) -> EthCall<'req, T, N, Resp, NewOutput, NewMap>
     where
         NewMap: Fn(Resp) -> NewOutput,
     {
         EthCall {
             client: self.client,
+            caller: self.caller,
             data: self.data,
             overrides: self.overrides,
             block: self.block,
@@ -235,7 +281,7 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub const fn overrides(mut self, overrides: &'state StateOverride) -> Self {
+    pub const fn overrides(mut self, overrides: &'req StateOverride) -> Self {
         self.overrides = Some(overrides);
         self
     }
@@ -247,8 +293,8 @@ where
     }
 }
 
-impl<'req, 'state, T, N, Resp, Output, Map> std::future::IntoFuture
-    for EthCall<'req, 'state, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> std::future::IntoFuture
+    for EthCall<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -258,11 +304,12 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = EthCallFut<'req, 'state, T, N, Resp, Output, Map>;
+    type IntoFuture = EthCallFut<'req, T, N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut(EthCallFutInner::Preparing {
             client: self.client,
+            caller: self.caller,
             data: self.data,
             overrides: self.overrides,
             block: self.block,
@@ -299,7 +346,7 @@ mod test {
         let overrides = StateOverride::default();
 
         // Expected: [data]
-        let params: EthCallParams<'_, '_, Ethereum> =
+        let params: EthCallParams<'_, Ethereum> =
             EthCallParams { data: &data, block: None, overrides: None };
 
         assert_eq!(params.data, &data);
@@ -311,7 +358,7 @@ mod test {
         );
 
         // Expected: [data, block, overrides]
-        let params: EthCallParams<'_, '_, Ethereum> =
+        let params: EthCallParams<'_, Ethereum> =
             EthCallParams { data: &data, block: Some(block), overrides: Some(&overrides) };
 
         assert_eq!(params.data, &data);
@@ -323,7 +370,7 @@ mod test {
         );
 
         // Expected: [data, (default), overrides]
-        let params: EthCallParams<'_, '_, Ethereum> =
+        let params: EthCallParams<'_, Ethereum> =
             EthCallParams { data: &data, block: None, overrides: Some(&overrides) };
 
         assert_eq!(params.data, &data);
@@ -335,7 +382,7 @@ mod test {
         );
 
         // Expected: [data, block]
-        let params: EthCallParams<'_, '_, Ethereum> =
+        let params: EthCallParams<'_, Ethereum> =
             EthCallParams { data: &data, block: Some(block), overrides: None };
 
         assert_eq!(params.data, &data);

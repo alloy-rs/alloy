@@ -24,18 +24,18 @@ mod private {
 /// An [`alloy_provider::EthCall`] with an abi decoder.
 #[must_use = "EthCall must be awaited to execute the call"]
 #[derive(Clone, Debug)]
-pub struct EthCall<'req, 'state, 'coder, D, T, N>
+pub struct EthCall<'req, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>,
+    inner: alloy_provider::EthCall<'req, T, N, Bytes>,
 
     decoder: &'coder D,
 }
 
-impl<'req, 'state, 'coder, D, T, N> EthCall<'req, 'state, 'coder, D, T, N>
+impl<'req, 'coder, D, T, N> EthCall<'req, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -43,25 +43,25 @@ where
 {
     /// Create a new [`EthCall`].
     pub const fn new(
-        inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>,
+        inner: alloy_provider::EthCall<'req, T, N, Bytes>,
         decoder: &'coder D,
     ) -> Self {
         Self { inner, decoder }
     }
 }
 
-impl<'req, 'state, T, N> EthCall<'req, 'state, 'static, (), T, N>
+impl<'req, T, N> EthCall<'req, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
     /// Create a new [`EthCall`].
-    pub const fn new_raw(inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>) -> Self {
+    pub const fn new_raw(inner: alloy_provider::EthCall<'req, T, N, Bytes>) -> Self {
         Self::new(inner, &RAW_CODER)
     }
 }
 
-impl<'req, 'state, 'coder, D, T, N> EthCall<'req, 'state, 'coder, D, T, N>
+impl<'req, 'coder, D, T, N> EthCall<'req, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
@@ -71,7 +71,7 @@ where
     pub fn with_decoder<'new_coder, E>(
         self,
         decoder: &'new_coder E,
-    ) -> EthCall<'req, 'state, 'new_coder, E, T, N>
+    ) -> EthCall<'req, 'new_coder, E, T, N>
     where
         E: CallDecoder,
     {
@@ -79,7 +79,7 @@ where
     }
 
     /// Set the state overrides for this call.
-    pub fn overrides(mut self, overrides: &'state StateOverride) -> Self {
+    pub fn overrides(mut self, overrides: &'req StateOverride) -> Self {
         self.inner = self.inner.overrides(overrides);
         self
     }
@@ -91,19 +91,18 @@ where
     }
 }
 
-impl<'req, 'state, T, N> From<alloy_provider::EthCall<'req, 'state, T, N, Bytes>>
-    for EthCall<'req, 'state, 'static, (), T, N>
+impl<'req, T, N> From<alloy_provider::EthCall<'req, T, N, Bytes>>
+    for EthCall<'req, 'static, (), T, N>
 where
     T: Transport + Clone,
     N: Network,
 {
-    fn from(inner: alloy_provider::EthCall<'req, 'state, T, N, Bytes>) -> Self {
+    fn from(inner: alloy_provider::EthCall<'req, T, N, Bytes>) -> Self {
         Self { inner, decoder: &RAW_CODER }
     }
 }
 
-impl<'req, 'state, 'coder, D, T, N> std::future::IntoFuture
-    for EthCall<'req, 'state, 'coder, D, T, N>
+impl<'req, 'coder, D, T, N> std::future::IntoFuture for EthCall<'req, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,
@@ -111,7 +110,7 @@ where
 {
     type Output = Result<D::CallOutput>;
 
-    type IntoFuture = EthCallFut<'req, 'state, 'coder, D, T, N>;
+    type IntoFuture = EthCallFut<'req, 'coder, D, T, N>;
 
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut { inner: self.inner.into_future(), decoder: self.decoder }
@@ -123,18 +122,17 @@ where
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[derive(Clone, Debug)]
 #[allow(unnameable_types)]
-pub struct EthCallFut<'req, 'state, 'coder, D, T, N>
+pub struct EthCallFut<'req, 'coder, D, T, N>
 where
     T: Transport + Clone,
     N: Network,
     D: CallDecoder,
 {
-    inner: <alloy_provider::EthCall<'req, 'state, T, N, Bytes> as IntoFuture>::IntoFuture,
+    inner: <alloy_provider::EthCall<'req, T, N, Bytes> as IntoFuture>::IntoFuture,
     decoder: &'coder D,
 }
 
-impl<'req, 'state, 'coder, D, T, N> std::future::Future
-    for EthCallFut<'req, 'state, 'coder, D, T, N>
+impl<'req, 'coder, D, T, N> std::future::Future for EthCallFut<'req, 'coder, D, T, N>
 where
     D: CallDecoder + Unpin,
     T: Transport + Clone,
