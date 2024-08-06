@@ -39,11 +39,11 @@ jsonrpsee-types = { version = "0.24", optional = true }
 
 # jwt
 jsonwebtoken = { version = "9.3.0", optional = true }
-rand.workspace = true
+rand = { workspace = true, optional = true }
 
 [features]
 default = ["jwt"]
-jwt = ["dep:jsonwebtoken"]
+jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = [
     "dep:ethereum_ssz",
