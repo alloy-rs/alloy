@@ -88,10 +88,7 @@ impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
             "error code {}: {}{}",
             self.code,
             self.message,
-            self.data
-                .as_ref()
-                .map(|data| format!(", data: {}",data.to_string()))
-                .unwrap_or_default()
+            self.data.as_ref().map(|data| format!(", data: {}", data)).unwrap_or_default()
         )
     }
 }
