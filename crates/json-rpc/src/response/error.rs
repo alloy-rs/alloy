@@ -85,12 +85,12 @@ impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "error code {}: {}, data: {}",
+            "error code {}: {}{}",
             self.code,
             self.message,
             self.data
                 .as_ref()
-                .map(|data| data.to_string())
+                .map(|data| format!(", data: {}",data.to_string()))
                 .unwrap_or_default()
         )
     }
