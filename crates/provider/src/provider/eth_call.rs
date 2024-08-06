@@ -71,7 +71,7 @@ where
 {
     Preparing {
         client: WeakClient<T>,
-        caller: Option<Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>>,
+        caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'req StateOverride>,
         block: Option<BlockId>,
@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> EthCallFutInner<'req, T, N, Resp, Output, Map>
+impl<'req, T, N, Resp, Output, Map> EthCallFut<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -116,17 +116,17 @@ where
 {
     /// Returns `true` if the future is in the preparing state.
     const fn is_preparing(&self) -> bool {
-        matches!(self, Self::Preparing { .. })
+        matches!(self.inner, EthCallFutInner::Preparing { .. })
     }
 
     /// Returns `true` if the future is in the running state.
     const fn is_running(&self) -> bool {
-        matches!(self, Self::Running(..))
+        matches!(self.inner, EthCallFutInner::Running(..))
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let Self::Preparing { client, caller, data, overrides, block, method, map } =
-            std::mem::replace(self, Self::Polling)
+        let EthCallFutInner::Preparing { client, caller, data, overrides, block, method, map } =
+            std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
         else {
             unreachable!("bad state")
         };
@@ -138,21 +138,20 @@ where
 
         let params = EthCallParams { data, block, overrides };
 
-        if let Some(caller) = caller {
-            let _res =
-                caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()));
-        } else {
-            unreachable!("caller not set");
-        }
+        let prov_call =
+            caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()))?;
+
+        let _ = self.fut.set(prov_call);
 
         let fut = client.request(method, params).map_resp(map);
 
-        *self = Self::Running(fut);
+        self.inner = EthCallFutInner::Running(fut);
+
         self.poll_running(cx)
     }
 
     fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let Self::Running(ref mut call) = self else { unreachable!("bad state") };
+        let EthCallFutInner::Running(ref mut call) = self.inner else { unreachable!("bad state") };
 
         call.poll_unpin(cx)
     }
@@ -172,7 +171,7 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let this = &mut self.get_mut().inner;
+        let this = self.get_mut();
         if this.is_preparing() {
             this.poll_preparing(cx)
         } else if this.is_running() {
@@ -197,7 +196,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     client: WeakClient<T>,
-    caller: Option<Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>>,
+    caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
     data: &'req N::TransactionRequest,
     overrides: Option<&'req StateOverride>,
     block: Option<BlockId>,
@@ -236,7 +235,7 @@ where
     ) -> Self {
         Self {
             client,
-            caller: Some(Arc::new(caller)),
+            caller: Arc::new(caller),
             data,
             overrides: None,
             block: None,
@@ -254,7 +253,7 @@ where
     ) -> Self {
         Self {
             client,
-            caller: Some(Arc::new(caller)),
+            caller: Arc::new(caller),
             data,
             overrides: None,
             block: None,
