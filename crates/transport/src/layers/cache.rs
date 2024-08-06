@@ -1,5 +1,7 @@
 use crate::{TransportError, TransportErrorKind, TransportFut, TransportResult};
-use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
+use alloy_json_rpc::{
+    Id, RequestPacket, Response, ResponsePacket, ResponsePayload, RpcError, SerializedRequest,
+};
 use alloy_primitives::B256;
 use lru::LruCache;
 use parking_lot::RwLock;
@@ -100,6 +102,27 @@ impl<S> CachingService<S> {
         Ok(val)
     }
 
+    /// Resolves a `SerializedRequest` into a `RawValue` if it exists in the cache.
+    pub fn resolve(&self, req: SerializedRequest) -> TransportResult<Option<Box<RawValue>>> {
+        let key = req.params_hash();
+        let value = self.get(&key)?;
+
+        match value {
+            Some(value) => {
+                let raw = RawValue::from_string(value).map_err(RpcError::ser_err)?;
+                Ok(Some(raw))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Handles a cache hit.
+    fn handle_cache_hit(&self, id: Id, raw: Box<RawValue>) -> ResponsePacket {
+        let payload = ResponsePayload::Success(raw);
+        let response = Response { id, payload };
+        ResponsePacket::Single(response)
+    }
+
     /// Saves the cache to a file specified by the path.
     /// If the files does not exist, it creates one.
     /// If the file exists, it overwrites it.
@@ -161,20 +184,14 @@ where
         match req.clone() {
             RequestPacket::Single(ser_req) => {
                 let params_hash = ser_req.params_hash();
-                let resp = this.get(&params_hash);
-                match resp {
-                    Ok(Some(resp)) => {
-                        let raw = RawValue::from_string(resp).unwrap();
-                        let payload: ResponsePayload<Box<RawValue>, Box<RawValue>> =
-                            ResponsePayload::Success(raw);
-                        let response = Response { id: ser_req.id().clone(), payload };
-
-                        Box::pin(async move { Ok(ResponsePacket::Single(response)) })
+                match this.resolve(ser_req) {
+                    Ok(Some(raw)) => {
+                        let resp = this.handle_cache_hit(ser_req.id().to_owned(), raw);
+                        Box::pin(async move { Ok(resp) })
                     }
                     Ok(None) => {
                         Box::pin(async move {
-                            let res = inner.call(req).await;
-                            match res {
+                            match inner.call(req).await {
                                 Ok(resp) => {
                                     // Store success response into cache.
                                     if let Some(res) = resp.single_response() {
@@ -191,9 +208,13 @@ where
                     Err(e) => Box::pin(async move { Err(e) }),
                 }
             }
-            RequestPacket::Batch(_reqs) => {
-                todo!()
-            }
+            RequestPacket::Batch(reqs) => Box::pin(async move {
+                // Ignores cache, forwards request.
+                match inner.call(req).await {
+                    Ok(resp) => Ok(resp),
+                    Err(e) => Err(e),
+                }
+            }),
         }
     }
 }
