@@ -145,7 +145,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
-        EthCall::new(self.weak_client(), EthCaller::new(self.weak_client()), tx)
+        EthCall::new(EthCaller::new(self.weak_client()), tx)
     }
 
     /// Gets the chain ID.  
@@ -180,7 +180,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), EthCaller::new(self.weak_client()), tx)
+        EthCall::gas_estimate(EthCaller::new(self.weak_client()), tx)
             .map_resp(crate::utils::convert_u128)
     }
 

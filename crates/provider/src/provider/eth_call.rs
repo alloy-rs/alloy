@@ -1,9 +1,8 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
-use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types_eth::state::StateOverride;
-use alloy_transport::{Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
 use std::{
@@ -14,9 +13,6 @@ use std::{
 };
 
 use crate::{Caller, ProviderCall};
-
-type RunningFut<'req, T, N, Resp, Output, Map> =
-    RpcCall<T, EthCallParams<'req, N>, Resp, Output, Map>;
 
 /// The parameters for an `"eth_call"` RPC request.
 #[derive(Clone, Debug)]
@@ -70,7 +66,6 @@ where
     Map: Fn(Resp) -> Output,
 {
     Preparing {
-        client: WeakClient<T>,
         caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
         data: &'req N::TransactionRequest,
         overrides: Option<&'req StateOverride>,
@@ -78,7 +73,9 @@ where
         method: &'static str,
         map: Map,
     },
-    Running(RunningFut<'req, T, N, Resp, Output, Map>),
+    Running {
+        map: Map,
+    },
     Polling,
 }
 
@@ -93,14 +90,14 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Preparing { client: _, caller: _, data, overrides, block, method, map: _ } => f
+            Self::Preparing { caller: _, data, overrides, block, method, map: _ } => f
                 .debug_struct("Preparing")
                 .field("data", data)
                 .field("overrides", overrides)
                 .field("block", block)
                 .field("method", method)
                 .finish(),
-            Self::Running(_call) => f.debug_tuple("Running").finish(),
+            Self::Running { .. } => f.debug_tuple("Running").finish(),
             Self::Polling => f.debug_tuple("Polling").finish(),
         }
     }
@@ -121,19 +118,14 @@ where
 
     /// Returns `true` if the future is in the running state.
     const fn is_running(&self) -> bool {
-        matches!(self.inner, EthCallFutInner::Running(..))
+        matches!(self.inner, EthCallFutInner::Running { .. })
     }
 
     fn poll_preparing(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Preparing { client, caller, data, overrides, block, method, map } =
+        let EthCallFutInner::Preparing { caller, data, overrides, block, method, map } =
             std::mem::replace(&mut self.inner, EthCallFutInner::Polling)
         else {
             unreachable!("bad state")
-        };
-
-        let client = match client.upgrade().ok_or_else(TransportErrorKind::backend_gone) {
-            Ok(client) => client,
-            Err(e) => return Poll::Ready(Err(e)),
         };
 
         let params = EthCallParams { data, block, overrides };
@@ -143,17 +135,19 @@ where
 
         let _ = self.fut.set(prov_call);
 
-        let fut = client.request(method, params).map_resp(map);
-
-        self.inner = EthCallFutInner::Running(fut);
+        self.inner = EthCallFutInner::Running { map };
 
         self.poll_running(cx)
     }
 
     fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Running(ref mut call) = self.inner else { unreachable!("bad state") };
+        let EthCallFutInner::Running { ref map } = self.inner else { unreachable!("bad state") };
 
-        call.poll_unpin(cx)
+        if let Some(fut) = self.fut.get_mut() {
+            fut.poll_unpin(cx).map(|res| res.map(map))
+        } else {
+            unreachable!("ProviderCall not set");
+        }
     }
 }
 
@@ -195,7 +189,6 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
-    client: WeakClient<T>,
     caller: Arc<dyn Caller<T, EthCallParams<'req, N>, Resp>>,
     data: &'req N::TransactionRequest,
     overrides: Option<&'req StateOverride>,
@@ -229,12 +222,10 @@ where
 {
     /// Create a new CallBuilder.
     pub fn new(
-        client: WeakClient<T>,
         caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
-            client,
             caller: Arc::new(caller),
             data,
             overrides: None,
@@ -247,12 +238,10 @@ where
 
     /// Create new EthCall for gas estimates.
     pub fn gas_estimate(
-        client: WeakClient<T>,
         caller: impl Caller<T, EthCallParams<'req, N>, Resp> + 'static,
         data: &'req N::TransactionRequest,
     ) -> Self {
         Self {
-            client,
             caller: Arc::new(caller),
             data,
             overrides: None,
@@ -290,7 +279,6 @@ where
         NewMap: Fn(Resp) -> NewOutput,
     {
         EthCall {
-            client: self.client,
             caller: self.caller,
             data: self.data,
             overrides: self.overrides,
@@ -330,7 +318,6 @@ where
     fn into_future(self) -> Self::IntoFuture {
         EthCallFut {
             inner: EthCallFutInner::Preparing {
-                client: self.client,
                 caller: self.caller,
                 data: self.data,
                 overrides: self.overrides,
