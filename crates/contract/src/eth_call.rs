@@ -120,7 +120,7 @@ where
 /// Future for the [`EthCall`] type. This future wraps an RPC call with an abi
 /// decoder.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[allow(unnameable_types)]
 pub struct EthCallFut<'req, 'coder, D, T, N>
 where

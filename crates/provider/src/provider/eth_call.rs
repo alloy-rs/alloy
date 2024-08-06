@@ -1,14 +1,19 @@
 use alloy_eips::BlockId;
-use alloy_json_rpc::{RpcError, RpcReturn};
+use alloy_json_rpc::RpcReturn;
 use alloy_network::Network;
 use alloy_rpc_client::{RpcCall, WeakClient};
 use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
+use std::{
+    future::Future,
+    marker::PhantomData,
+    sync::{Arc, OnceLock},
+    task::Poll,
+};
 
-use crate::Caller;
+use crate::{Caller, ProviderCall};
 
 type RunningFut<'req, T, N, Resp, Output, Map> =
     RpcCall<T, EthCallParams<'req, N>, Resp, Output, Map>;
@@ -40,19 +45,21 @@ impl<N: Network> serde::Serialize for EthCallParams<'_, N> {
 }
 
 /// The [`EthCallFut`] future is the future type for an `eth_call` RPC request.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[doc(hidden)] // Not public API.
 #[allow(unnameable_types)]
 #[pin_project::pin_project]
-pub struct EthCallFut<'req, T, N, Resp, Output, Map>(
-    EthCallFutInner<'req, T, N, Resp, Output, Map>,
-)
+pub struct EthCallFut<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output;
+    Map: Fn(Resp) -> Output,
+{
+    inner: EthCallFutInner<'req, T, N, Resp, Output, Map>,
+    fut: OnceLock<ProviderCall<T, serde_json::Value, Resp>>,
+}
 
 #[derive(Clone)]
 enum EthCallFutInner<'req, T, N, Resp, Output, Map>
@@ -165,7 +172,7 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let this = &mut self.get_mut().0;
+        let this = &mut self.get_mut().inner;
         if this.is_preparing() {
             this.poll_preparing(cx)
         } else if this.is_running() {
@@ -322,15 +329,18 @@ where
     type IntoFuture = EthCallFut<'req, T, N, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
-        EthCallFut(EthCallFutInner::Preparing {
-            client: self.client,
-            caller: self.caller,
-            data: self.data,
-            overrides: self.overrides,
-            block: self.block,
-            method: self.method,
-            map: self.map,
-        })
+        EthCallFut {
+            inner: EthCallFutInner::Preparing {
+                client: self.client,
+                caller: self.caller,
+                data: self.data,
+                overrides: self.overrides,
+                block: self.block,
+                method: self.method,
+                map: self.map,
+            },
+            fut: OnceLock::new(),
+        }
     }
 }
 
