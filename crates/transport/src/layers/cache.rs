@@ -103,7 +103,7 @@ impl<S> CachingService<S> {
     }
 
     /// Resolves a `SerializedRequest` into a `RawValue` if it exists in the cache.
-    pub fn resolve(&self, req: SerializedRequest) -> TransportResult<Option<Box<RawValue>>> {
+    pub fn resolve(&self, req: &SerializedRequest) -> TransportResult<Option<Box<RawValue>>> {
         let key = req.params_hash();
         let value = self.get(&key)?;
 
@@ -184,7 +184,7 @@ where
         match req.clone() {
             RequestPacket::Single(ser_req) => {
                 let params_hash = ser_req.params_hash();
-                match this.resolve(ser_req) {
+                match this.resolve(&ser_req) {
                     Ok(Some(raw)) => {
                         let resp = this.handle_cache_hit(ser_req.id().to_owned(), raw);
                         Box::pin(async move { Ok(resp) })
@@ -208,7 +208,7 @@ where
                     Err(e) => Box::pin(async move { Err(e) }),
                 }
             }
-            RequestPacket::Batch(reqs) => Box::pin(async move {
+            RequestPacket::Batch(_) => Box::pin(async move {
                 // Ignores cache, forwards request.
                 match inner.call(req).await {
                     Ok(resp) => Ok(resp),
