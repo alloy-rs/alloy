@@ -2,16 +2,18 @@ use crate::{TransportError, TransportErrorKind, TransportFut, TransportResult};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload};
 use alloy_primitives::B256;
 use lru::LruCache;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use std::{
     io::BufReader,
     num::NonZeroUsize,
     path::PathBuf,
-    sync::{Arc, RwLock},
+    sync::Arc,
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
+use tracing::trace;
 /// Cache Layer
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
@@ -77,29 +79,23 @@ impl<S> CachingService<S> {
         )));
         let service = Self { inner, config, cache };
 
-        let loaded = service.load_cache();
+        let _loaded = service.load_cache().inspect_err(|e| {
+            trace!(?e, "Error loading cache");
+        });
 
-        match loaded {
-            Ok(_) => {
-                tracing::info!("Loaded cache");
-            }
-            Err(e) => {
-                tracing::info!("Error loading cache: {:?}", e);
-            }
-        }
         service
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
     pub fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write();
         Ok(cache.put(key, value))
     }
 
     /// Gets a value from the cache, if it exists.
     pub fn get(&self, key: &B256) -> TransportResult<Option<String>> {
         // Need to acquire a write guard to change the order of keys in LRU cache.
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write();
         let val = cache.get(key).cloned();
         Ok(val)
     }
@@ -110,7 +106,7 @@ impl<S> CachingService<S> {
     pub fn save_cache(&self) -> TransportResult<()> {
         let path = self.config.path.clone();
         let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
-        let cache = self.cache.read().unwrap();
+        let cache = self.cache.read();
 
         // Iterate over the cache and dump to the file.
         let entries = cache
@@ -124,22 +120,21 @@ impl<S> CachingService<S> {
     /// Loads the cache from a file specified by the path.
     /// If the file does not exist, it returns without error.
     pub fn load_cache(&self) -> TransportResult<()> {
-        println!("Loading cache...");
+        trace!("Loading cache...");
         let path = self.config.path.clone();
         if !path.exists() {
-            println!("Cache file does not exist.");
+            trace!(?path, "Cache file does not exist.");
             return Ok(());
         };
         let file = std::fs::File::open(path).map_err(TransportErrorKind::custom)?;
         let file = BufReader::new(file);
         let entries: Vec<FsCacheEntry> =
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write();
         for entry in entries {
             cache.put(entry.key, entry.value);
         }
 
-        println!("Loaded from Cache");
         Ok(())
     }
 }
@@ -169,7 +164,6 @@ where
                 let resp = this.get(&params_hash);
                 match resp {
                     Ok(Some(resp)) => {
-                        println!("Cache hit!");
                         let raw = RawValue::from_string(resp).unwrap();
                         let payload: ResponsePayload<Box<RawValue>, Box<RawValue>> =
                             ResponsePayload::Success(raw);
@@ -178,7 +172,6 @@ where
                         Box::pin(async move { Ok(ResponsePacket::Single(response)) })
                     }
                     Ok(None) => {
-                        println!("Cache miss!");
                         Box::pin(async move {
                             let res = inner.call(req).await;
                             match res {
