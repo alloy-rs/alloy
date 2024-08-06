@@ -81,11 +81,17 @@ fn spelunk_revert(value: &Value) -> Option<Bytes> {
     }
 }
 
-impl<ErrData: Default + fmt::Display+ Clone > fmt::Display for ErrorPayload<ErrData> {
+impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error code {}: {}, data: {}", self.code, self.message,
-               <Option<ErrData> as Clone>::clone(&self.data).
-                   unwrap_or_else(|| ErrData::default()).to_string().trim_matches('"')
+        write!(
+            f,
+            "error code {}: {}, data: {}",
+            self.code,
+            self.message,
+            self.data
+                .as_ref()
+                .map(|data| data.to_string())
+                .unwrap_or_default()
         )
     }
 }
