@@ -9,10 +9,11 @@ use std::{
     borrow::Cow,
     future::{Future, IntoFuture},
     marker::PhantomData,
-    sync::OnceLock,
+    sync::{Arc, OnceLock},
     task::Poll,
 };
 /// States of the
+#[derive(Clone)]
 enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
@@ -22,7 +23,7 @@ where
 {
     Invalid,
     Preparing {
-        caller: Box<dyn Caller<T, Params, Resp>>,
+        caller: Arc<dyn Caller<T, Params, Resp>>,
         method: Cow<'static, str>,
         params: Params,
         block_id: BlockId,
@@ -60,6 +61,7 @@ where
 ///
 /// By default this will use "latest".
 #[pin_project::pin_project]
+#[derive(Clone)]
 pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
@@ -67,7 +69,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    caller: Box<dyn Caller<T, Params, Resp>>,
+    caller: Arc<dyn Caller<T, Params, Resp>>,
     method: Cow<'static, str>,
     params: Params,
     block_id: BlockId,
@@ -103,7 +105,7 @@ where
         params: Params,
     ) -> Self {
         Self {
-            caller: Box::new(caller),
+            caller: Arc::new(caller),
             method: method.into(),
             params,
             block_id: Default::default(),

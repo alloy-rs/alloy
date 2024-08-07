@@ -111,8 +111,6 @@ where
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
         let params = serde_json::to_value(params).map_err(RpcError::ser_err)?;
 
-        tracing::info!("params: {:#?}", params);
-
         let rpc_call = self
             .client
             .upgrade()
