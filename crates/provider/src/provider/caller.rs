@@ -19,29 +19,7 @@ where
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>>;
 }
 
-/// A helper struct that implements the [`Caller`] trait and converts [`RpcWithBlock`] into a
-/// [`ProviderCall::RpcCall`].
-///
-/// [`RpcWithBlock`]: crate::RpcWithBlock
-#[derive(Debug)]
-pub struct WithBlockCall<T>
-where
-    T: Transport + Clone,
-{
-    client: WeakClient<T>,
-}
-
-impl<T> WithBlockCall<T>
-where
-    T: Transport + Clone,
-{
-    /// Create a new [`WithBlockCall`] instance using transport client.
-    pub const fn new(client: WeakClient<T>) -> Self {
-        Self { client }
-    }
-}
-
-impl<T, Params, Resp> Caller<T, Params, Resp> for WithBlockCall<T>
+impl<T, Params, Resp> Caller<T, Params, Resp> for WeakClient<T>
 where
     T: Transport + Clone,
     Params: RpcParam,
@@ -52,54 +30,12 @@ where
         method: Cow<'static, str>,
         params: Params,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
-        let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
+        let client = self.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
 
         // serialize the params
         let ser = serde_json::to_value(params).map_err(RpcError::ser_err)?;
 
         let rpc_call = client.request(method, ser);
-
-        Ok(ProviderCall::RpcCall(rpc_call))
-    }
-}
-
-/// EthCaller
-#[derive(Debug)]
-pub struct EthCaller<T>
-where
-    T: Transport + Clone,
-{
-    client: WeakClient<T>,
-}
-
-impl<T> EthCaller<T>
-where
-    T: Transport + Clone,
-{
-    /// Create a new [`EthCaller`] instance using transport client.
-    pub const fn new(client: WeakClient<T>) -> Self {
-        Self { client }
-    }
-}
-
-impl<T, Params, Resp> Caller<T, Params, Resp> for EthCaller<T>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-{
-    fn call(
-        &self,
-        method: Cow<'static, str>,
-        params: Params,
-    ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
-        let params = serde_json::to_value(params).map_err(RpcError::ser_err)?;
-
-        let rpc_call = self
-            .client
-            .upgrade()
-            .ok_or_else(TransportErrorKind::backend_gone)?
-            .request(method, params);
 
         Ok(ProviderCall::RpcCall(rpc_call))
     }

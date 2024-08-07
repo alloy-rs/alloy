@@ -1,10 +1,8 @@
 //! Ethereum JSON-RPC provider.
 use crate::{
-    provider::caller::WithBlockCall,
     utils::{self, Eip1559Estimation, EstimatorFunction},
-    EthCall, EthCaller, Identity, PendingTransaction, PendingTransactionBuilder,
-    PendingTransactionConfig, ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock,
-    SendableTx,
+    EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -145,7 +143,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
-        EthCall::new(EthCaller::new(self.weak_client()), tx)
+        EthCall::new(self.weak_client(), tx)
     }
 
     /// Gets the chain ID.  
@@ -163,7 +161,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         request: &'a N::TransactionRequest,
     ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListResult> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_createAccessList", request)
+        RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
     /// This function returns an [`EthCall`] which can be used to get a gas estimate,
@@ -180,8 +178,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(EthCaller::new(self.weak_client()), tx)
-            .map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -246,14 +243,14 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
     /// at the particular [BlockId].
     fn get_account(&self, address: Address) -> RpcWithBlock<T, Address, alloy_consensus::Account> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_getAccount", address)
+        RpcWithBlock::new(self.weak_client(), "eth_getAccount", address)
     }
 
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
     fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256, U256> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_getBalance", address)
+        RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
@@ -330,7 +327,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the bytecode located at the corresponding [Address].
     fn get_code_at(&self, address: Address) -> RpcWithBlock<T, Address, Bytes> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_getCode", address)
+        RpcWithBlock::new(self.weak_client(), "eth_getCode", address)
     }
 
     /// Watch for new blocks by polling the provider with
@@ -498,7 +495,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         address: Address,
         keys: Vec<StorageKey>,
     ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "eth_getProof", (address, keys))
+        RpcWithBlock::new(self.weak_client(), "eth_getProof", (address, keys))
     }
 
     /// Gets the specified storage value from [Address].
@@ -507,11 +504,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         address: Address,
         key: U256,
     ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
-        RpcWithBlock::new(
-            WithBlockCall::new(self.weak_client()),
-            "eth_getStorageAt",
-            (address, key),
-        )
+        RpcWithBlock::new(self.weak_client(), "eth_getStorageAt", (address, key))
     }
 
     /// Gets a transaction by its [TxHash].
@@ -529,12 +522,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         address: Address,
     ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
-        RpcWithBlock::new(
-            WithBlockCall::new(self.weak_client()),
-            "eth_getTransactionCount",
-            address,
-        )
-        .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+        RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].

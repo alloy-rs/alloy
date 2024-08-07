@@ -41,9 +41,8 @@ pub mod layers;
 
 mod provider;
 pub use provider::{
-    builder, Caller, EthCall, EthCallParams, EthCaller, FilterPollerBuilder, ParamsWithBlock,
-    Provider, ProviderCall, RootProvider, RpcWithBlock, SendableTx, WalletProvider, WithBlockCall,
-    WithBlockFut,
+    builder, Caller, EthCall, EthCallParams, FilterPollerBuilder, ParamsWithBlock, Provider,
+    ProviderCall, RootProvider, RpcWithBlock, SendableTx, WalletProvider, WithBlockFut,
 };
 
 pub mod utils;

@@ -1,5 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::{provider::WithBlockCall, Provider, RpcWithBlock};
+use crate::{Provider, RpcWithBlock};
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
@@ -115,18 +115,14 @@ where
         trace_type: &'b [TraceType],
     ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
     {
-        RpcWithBlock::new(
-            WithBlockCall::new(self.weak_client()),
-            "trace_call",
-            (request, trace_type),
-        )
+        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
     ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
-        RpcWithBlock::new(WithBlockCall::new(self.weak_client()), "trace_callMany", request)
+        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
     async fn trace_transaction(
