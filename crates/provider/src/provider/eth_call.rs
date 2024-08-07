@@ -5,12 +5,7 @@ use alloy_rpc_types_eth::state::StateOverride;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
 use serde::ser::SerializeSeq;
-use std::{
-    future::Future,
-    marker::PhantomData,
-    sync::{Arc, OnceLock},
-    task::Poll,
-};
+use std::{future::Future, marker::PhantomData, sync::Arc, task::Poll};
 
 use crate::{Caller, ProviderCall};
 
@@ -54,10 +49,8 @@ where
     Map: Fn(Resp) -> Output,
 {
     inner: EthCallFutInner<'req, T, N, Resp, Output, Map>,
-    fut: OnceLock<ProviderCall<T, serde_json::Value, Resp>>,
 }
 
-#[derive(Clone)]
 enum EthCallFutInner<'req, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
@@ -75,6 +68,7 @@ where
     },
     Running {
         map: Map,
+        fut: ProviderCall<T, serde_json::Value, Resp>,
     },
     Polling,
 }
@@ -130,25 +124,19 @@ where
 
         let params = EthCallParams { data, block, overrides };
 
-        let prov_call =
-            caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()))?;
+        let fut = caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()))?;
 
-        let _ = self.fut.set(prov_call);
-
-        self.inner = EthCallFutInner::Running { map };
+        self.inner = EthCallFutInner::Running { map, fut };
 
         self.poll_running(cx)
     }
 
     fn poll_running(&mut self, cx: &mut std::task::Context<'_>) -> Poll<TransportResult<Output>> {
-        let EthCallFutInner::Running { ref map } = self.inner else { unreachable!("bad state") };
+        let EthCallFutInner::Running { ref map, ref mut fut } = self.inner else {
+            unreachable!("bad state")
+        };
 
-        self.fut.get_mut().map_or_else(
-            || {
-                unreachable!("ProviderCall not set");
-            },
-            |fut| fut.poll_unpin(cx).map(|res| res.map(map)),
-        )
+        fut.poll_unpin(cx).map(|res| res.map(map))
     }
 }
 
@@ -326,7 +314,6 @@ where
                 method: self.method,
                 map: self.map,
             },
-            fut: OnceLock::new(),
         }
     }
 }
