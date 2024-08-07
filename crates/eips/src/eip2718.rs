@@ -63,7 +63,7 @@ impl std::error::Error for Eip2718Error {}
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Decodable2718: Sized {
     /// Extract the type byte from the buffer, if any. The type byte is the
-    /// first byte, provided that that first byte is 0x7f or lower.
+    /// first byte, provided that first byte is 0x7f or lower.
     fn extract_type_byte(buf: &mut &[u8]) -> Option<u8> {
         buf.first().copied().filter(|b| *b <= TX_TYPE_BYTE_MAX)
     }
