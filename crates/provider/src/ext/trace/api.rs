@@ -1,5 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
-use crate::{Provider, RpcWithBlock};
+use super::TraceRpcWithBlock;
+use crate::Provider;
 use alloy_eips::BlockNumberOrTag;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
@@ -26,11 +27,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call<'a, 'b>(
+    fn trace_call(
         &self,
-        request: &'a N::TransactionRequest,
-        trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
+        request: N::TransactionRequest,
+    ) -> TraceRpcWithBlock<T, N::TransactionRequest, TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -40,10 +40,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call_many<'a>(
+    fn trace_call_many(
         &self,
-        request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults>;
+        requests: Vec<N::TransactionRequest>,
+    ) -> TraceRpcWithBlock<T, Vec<N::TransactionRequest>, Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -64,16 +64,12 @@ where
     ) -> TransportResult<LocalizedTransactionTrace>;
 
     /// Trace the given raw transaction.
-    async fn trace_raw_transaction(
-        &self,
-        data: &[u8],
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults>;
+    fn trace_raw_transaction(&self, data: Vec<u8>) -> TraceRpcWithBlock<T, Vec<u8>, TraceResults>;
 
     /// Traces matching given filter.
     async fn trace_filter(
         &self,
-        tracer: &TraceFilter,
+        filter: TraceFilter,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Trace all transactions in the given block.
@@ -87,18 +83,13 @@ where
     ) -> TransportResult<Vec<LocalizedTransactionTrace>>;
 
     /// Replays a transaction.
-    async fn trace_replay_transaction(
-        &self,
-        hash: TxHash,
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults>;
+    fn trace_replay_transaction(&self, hash: TxHash) -> TraceRpcWithBlock<T, TxHash, TraceResults>;
 
     /// Replays all transactions in the given block.
-    async fn trace_replay_block_transactions(
+    fn trace_replay_block_transactions(
         &self,
         block: BlockNumberOrTag,
-        trace_type: &[TraceType],
-    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>>;
+    ) -> TraceRpcWithBlock<T, BlockNumberOrTag, Vec<TraceResultsWithTransactionHash>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -109,20 +100,18 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
-    fn trace_call<'a, 'b>(
+    fn trace_call(
         &self,
-        request: &'a <N as Network>::TransactionRequest,
-        trace_type: &'b [TraceType],
-    ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
-    {
-        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_type))
+        request: N::TransactionRequest,
+    ) -> TraceRpcWithBlock<T, N::TransactionRequest, TraceResults> {
+        TraceRpcWithBlock::new(self.weak_client(), "trace_call", request)
     }
 
-    fn trace_call_many<'a>(
+    fn trace_call_many(
         &self,
-        request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
-        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
+        requests: Vec<N::TransactionRequest>,
+    ) -> TraceRpcWithBlock<T, Vec<N::TransactionRequest>, Vec<TraceResults>> {
+        TraceRpcWithBlock::new(self.weak_client(), "trace_callMany", requests)
     }
 
     async fn trace_transaction(
@@ -141,19 +130,15 @@ where
         self.client().request("trace_get", (hash, (Index::from(index),))).await
     }
 
-    async fn trace_raw_transaction(
-        &self,
-        data: &[u8],
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_rawTransaction", (data, trace_type)).await
+    fn trace_raw_transaction(&self, data: Vec<u8>) -> TraceRpcWithBlock<T, Vec<u8>, TraceResults> {
+        TraceRpcWithBlock::new(self.weak_client(), "trace_rawTransaction", data)
     }
 
     async fn trace_filter(
         &self,
-        tracer: &TraceFilter,
+        filter: TraceFilter,
     ) -> TransportResult<Vec<LocalizedTransactionTrace>> {
-        self.client().request("trace_filter", (tracer,)).await
+        self.client().request("trace_filter", (filter,)).await
     }
 
     async fn trace_block(
@@ -163,20 +148,15 @@ where
         self.client().request("trace_block", (block,)).await
     }
 
-    async fn trace_replay_transaction(
-        &self,
-        hash: TxHash,
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_replayTransaction", (hash, trace_type)).await
+    fn trace_replay_transaction(&self, hash: TxHash) -> TraceRpcWithBlock<T, TxHash, TraceResults> {
+        TraceRpcWithBlock::new(self.weak_client(), "trace_replayTransaction", hash)
     }
 
-    async fn trace_replay_block_transactions(
+    fn trace_replay_block_transactions(
         &self,
         block: BlockNumberOrTag,
-        trace_type: &[TraceType],
-    ) -> TransportResult<Vec<TraceResultsWithTransactionHash>> {
-        self.client().request("trace_replayBlockTransactions", (block, trace_type)).await
+    ) -> TraceRpcWithBlock<T, BlockNumberOrTag, Vec<TraceResultsWithTransactionHash>> {
+        TraceRpcWithBlock::new(self.weak_client(), "trace_replayBlockTransactions", block)
     }
 }
 
