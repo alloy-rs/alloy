@@ -1,9 +1,8 @@
 //! Ethereum JSON-RPC provider.
-
 use crate::{
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
-    ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
+    ProviderBuilder, ProviderCall, RootProvider, RpcWithBlock, SendableTx,
 };
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
@@ -13,7 +12,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
+use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     AccessListResult, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory,
     Filter, FilterChanges, Log, SyncStatus,
@@ -107,8 +106,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Get the last block number available.
-    fn get_block_number(&self) -> RpcCall<T, (), U64, BlockNumber> {
-        self.client().request("eth_blockNumber", ()).map_resp(crate::utils::convert_u64)
+    fn get_block_number(&self) -> ProviderCall<T, (), U64, BlockNumber> {
+        self.client()
+            .request("eth_blockNumber", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /// Execute a smart contract call with a transaction request and state
@@ -135,29 +137,21 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # let tx = alloy_rpc_types_eth::transaction::TransactionRequest::default();
     /// // Execute a call on the latest block, with no state overrides
     /// let output = provider.call(&tx).await?;
-    /// // Execute a call with a block ID.
-    /// let output = provider.call(&tx).block(1.into()).await?;
-    /// // Execute a call with state overrides.
-    /// let output = provider.call(&tx).overrides(&my_overrides).await?;
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Note
-    ///
-    /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req, 'state>(
-        &self,
-        tx: &'req N::TransactionRequest,
-    ) -> EthCall<'req, 'state, T, N, Bytes> {
+    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
-    /// Gets the chain ID.
-    fn get_chain_id(&self) -> RpcCall<T, (), U64, u64> {
-        self.client().request("eth_chainId", ()).map_resp(crate::utils::convert_u64)
+    /// Gets the chain ID.  
+    fn get_chain_id(&self) -> ProviderCall<T, (), U64, u64> {
+        self.client()
+            .request("eth_chainId", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /// Create an [EIP-2930] access list.
@@ -183,7 +177,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn estimate_gas<'req>(
         &self,
         tx: &'req N::TransactionRequest,
-    ) -> EthCall<'req, 'static, T, N, U128, u128> {
+    ) -> EthCall<'req, T, N, U128, u128> {
         EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
     }
 
@@ -239,8 +233,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    fn get_gas_price(&self) -> RpcCall<T, (), U128, u128> {
-        self.client().request("eth_gasPrice", ()).map_resp(crate::utils::convert_u128)
+    fn get_gas_price(&self) -> ProviderCall<T, (), U128, u128> {
+        self.client()
+            .request("eth_gasPrice", ())
+            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
+            .into()
     }
 
     /// Retrieves account information ([Account](alloy_consensus::Account)) for the given [Address]
@@ -252,7 +249,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the balance of the account.
     ///
     /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
-    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
+    fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
 
@@ -521,9 +518,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
-    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
+    fn get_transaction_count(
+        &self,
+        address: Address,
+    ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
         RpcWithBlock::new(self.weak_client(), "eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64)
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
@@ -869,8 +869,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    fn get_net_version(&self) -> RpcCall<T, (), U64, u64> {
-        self.client().request("net_version", ()).map_resp(crate::utils::convert_u64)
+    fn get_net_version(&self) -> ProviderCall<T, (), U64, u64> {
+        self.client()
+            .request("net_version", ())
+            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .into()
     }
 
     /* ---------------------------------------- raw calls --------------------------------------- */
@@ -1235,14 +1238,35 @@ mod tests {
         assert_eq!(0, num.to::<u64>())
     }
 
+    #[cfg(feature = "anvil-api")]
     #[tokio::test]
     async fn gets_transaction_count() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let count = provider
-            .get_transaction_count(address!("328375e18E7db8F1CA9d9bA8bF3E9C94ee34136A"))
-            .await
-            .unwrap();
+        let accounts = provider.get_accounts().await.unwrap();
+        let sender = accounts[0];
+
+        // Initial tx count should be 0
+        let count = provider.get_transaction_count(sender).await.unwrap();
+        assert_eq!(count, 0);
+
+        // Send Tx
+        let tx = TransactionRequest {
+            value: Some(U256::from(100)),
+            from: Some(sender),
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            gas_price: Some(20e9 as u128),
+            gas: Some(21000),
+            ..Default::default()
+        };
+        let _ = provider.send_transaction(tx).await.unwrap().get_receipt().await;
+
+        // Tx count should be 1
+        let count = provider.get_transaction_count(sender).await.unwrap();
+        assert_eq!(count, 1);
+
+        // Tx count should be 0 at block 0
+        let count = provider.get_transaction_count(sender).block_id(0.into()).await.unwrap();
         assert_eq!(count, 0);
     }
 
@@ -1503,6 +1527,9 @@ mod tests {
             .with_input(bytes!("06fdde03")); // `name()`
         let result = provider.call(&req).await.unwrap();
         assert_eq!(String::abi_decode(&result, true).unwrap(), "Wrapped Ether");
+
+        let result = provider.call(&req).block(0.into()).await.unwrap();
+        assert_eq!(result.to_string(), "0x");
     }
 
     #[tokio::test]
