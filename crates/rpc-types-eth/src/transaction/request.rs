@@ -483,11 +483,6 @@ impl TransactionRequest {
         Some(pref)
     }
 
-    // TODO: change the return type of `build_typed_tx` to `Result<TypedTransaction, &'static str>`?
-    // That way we eliminate all panics from the code.
-    //
-    // Question for the reviewer :)
-
     /// Build an [`TypedTransaction`]
     ///
     /// In case `Ok(...)` is returned, the `TypedTransaction` is guaranteed to be _complete_, e.g.
@@ -507,18 +502,30 @@ impl TransactionRequest {
             TxType::Eip4844 => self.build_4844_with_sidecar().expect("checked)").into(),
         })
     }
-}
 
-impl TryFrom<TransactionRequest> for TypedTransaction {
-    type Error = &'static str;
-
-    fn try_from(tx: TransactionRequest) -> Result<Self, Self::Error> {
-        match tx.preferred_type() {
-            TxType::Legacy => tx.build_legacy().map(Into::into),
-            TxType::Eip2930 => tx.build_2930().map(Into::into),
-            TxType::Eip1559 => tx.build_1559().map(Into::into),
-            TxType::Eip4844 => tx.build_4844_variant().map(Into::into),
+    /// Build an [`TypedTransaction`].
+    ///
+    /// In case `Ok(...)` is returned, the `TypedTransaction` does not guarantee to be _complete_,
+    /// e.g. sendable to the network.
+    ///
+    /// E.g. a particular case is when the transaction is of type `Eip4844` and the `sidecar` is not
+    /// set, in this case the transaction is not _complete_. It can still be used to calculate the
+    /// signature of the transaction though.
+    ///
+    /// In case the requirement is to build a _complete_ transaction, use `build_typed_tx` instead.
+    pub fn build_consensus_tx(self) -> Result<TypedTransaction, BuildTransactionErr> {
+        match self.preferred_type() {
+            TxType::Legacy => self.clone().build_legacy().map(Into::into),
+            TxType::Eip2930 => self.clone().build_2930().map(Into::into),
+            TxType::Eip1559 => self.clone().build_1559().map(Into::into),
+            TxType::Eip4844 => self.clone().build_4844_variant().map(Into::into),
         }
+        .map_err(|msg| self.into_tx_err(msg))
+    }
+
+    /// Converts the transaction request into a `BuildTransactionErr` with the given message.
+    fn into_tx_err(self, message: &'static str) -> BuildTransactionErr {
+        BuildTransactionErr { tx: self, error: message.to_string() }
     }
 }
 
@@ -824,6 +831,15 @@ impl From<TxEnvelope> for TransactionRequest {
 #[non_exhaustive]
 pub struct TransactionInputError;
 
+/// Error thrown when a transaction request cannot be built into a transaction.
+#[derive(Debug)]
+pub struct BuildTransactionErr {
+    /// Transaction request that failed to build into a transaction.
+    pub tx: TransactionRequest,
+    /// Error message.
+    pub error: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -948,7 +964,7 @@ mod tests {
     }
 
     #[test]
-    fn try_from_tx_args_into_typed_tx() {
+    fn build_consensus_tx_works() {
         // Legacy
         {
             // Positive case
@@ -961,7 +977,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let maybe_legacy_tx: Result<TypedTransaction, _> = legacy_request.try_into();
+            let maybe_legacy_tx: Result<TypedTransaction, _> = legacy_request.build_consensus_tx();
             assert_matches!(maybe_legacy_tx, Ok(TypedTransaction::Legacy(TxLegacy { gas_limit, .. })) if gas_limit == legacy_gas_limit);
 
             // Negative case
@@ -972,7 +988,7 @@ mod tests {
                 ..Default::default()
             };
             let maybe_legacy_tx: Result<TypedTransaction, _> =
-                legacy_request_missing_gas.try_into();
+                legacy_request_missing_gas.build_consensus_tx();
             assert_matches!(maybe_legacy_tx, Err(..));
         }
 
@@ -992,7 +1008,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let maybe_eip2930_tx: Result<TypedTransaction, _> = eip2930_request.try_into();
+            let maybe_eip2930_tx: Result<TypedTransaction, _> =
+                eip2930_request.build_consensus_tx();
             assert_matches!(maybe_eip2930_tx, Ok(TypedTransaction::Eip2930(TxEip2930 { access_list, .. })) if access_list == access_list);
 
             // Negative case
@@ -1005,7 +1022,7 @@ mod tests {
             };
 
             let maybe_eip2930_tx: Result<TypedTransaction, _> =
-                eip2930_request_missing_nonce.try_into();
+                eip2930_request_missing_nonce.build_consensus_tx();
             assert_matches!(maybe_eip2930_tx, Err(..));
         }
 
@@ -1022,7 +1039,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let maybe_eip1559_tx: Result<TypedTransaction, _> = eip1559_request.try_into();
+            let maybe_eip1559_tx: Result<TypedTransaction, _> =
+                eip1559_request.build_consensus_tx();
             assert_matches!(maybe_eip1559_tx, Ok(TypedTransaction::Eip1559(TxEip1559 { max_priority_fee_per_gas, .. })) if max_priority_fee_per_gas == max_prio_fee);
 
             // Negative case
@@ -1035,7 +1053,7 @@ mod tests {
             };
 
             let maybe_eip1559_tx: Result<TypedTransaction, _> =
-                eip1559_request_missing_max_fee.try_into();
+                eip1559_request_missing_max_fee.build_consensus_tx();
             assert_matches!(maybe_eip1559_tx, Err(..));
         }
 
@@ -1054,7 +1072,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let maybe_eip4844_tx: Result<TypedTransaction, _> = eip4844_request.try_into();
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 { max_fee_per_blob_gas, .. }))) if max_fee_per_blob_gas == max_fee_per_blob_gas);
 
             // Negative case
@@ -1070,7 +1089,7 @@ mod tests {
             };
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
-                eip4844_request_incorrect_to.try_into();
+                eip4844_request_incorrect_to.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
 
@@ -1093,7 +1112,8 @@ mod tests {
                 ..Default::default()
             };
 
-            let maybe_eip4844_tx: Result<TypedTransaction, _> = eip4844_request.try_into();
+            let maybe_eip4844_tx: Result<TypedTransaction, _> =
+                eip4844_request.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx,
             Ok(TypedTransaction::Eip4844(TxEip4844Variant::TxEip4844WithSidecar(TxEip4844WithSidecar {
             sidecar, .. }))) if sidecar == sidecar);
@@ -1112,7 +1132,7 @@ mod tests {
             };
 
             let maybe_eip4844_tx: Result<TypedTransaction, _> =
-                eip4844_request_incorrect_to.try_into();
+                eip4844_request_incorrect_to.build_consensus_tx();
             assert_matches!(maybe_eip4844_tx, Err(..));
         }
     }
