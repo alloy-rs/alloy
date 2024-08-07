@@ -124,7 +124,7 @@ where
 
         let params = EthCallParams { data, block, overrides };
 
-        let fut = caller.call(method.into(), params.clone(), block.unwrap_or(BlockId::latest()))?;
+        let fut = caller.call(method.into(), params)?;
 
         self.inner = EthCallFutInner::Running { map, fut };
 

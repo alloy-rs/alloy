@@ -1,7 +1,6 @@
 use crate::ProviderCall;
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_rpc_client::WeakClient;
-use alloy_rpc_types_eth::BlockId;
 use alloy_transport::{RpcError, Transport, TransportErrorKind, TransportResult};
 use std::borrow::Cow;
 
@@ -17,7 +16,6 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-        block_id: BlockId,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>>;
 }
 
@@ -53,7 +51,6 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-        _block_id: BlockId,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
         let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
 
@@ -95,7 +92,6 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-        _block_id: BlockId,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
         let params = serde_json::to_value(params).map_err(RpcError::ser_err)?;
 

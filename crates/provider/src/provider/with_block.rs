@@ -71,7 +71,7 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
         let mut ser = serde_json::to_value(&self.params).map_err(serde::ser::Error::custom)?;
 
         // serialize the block id
-        let block_id = serde_json::to_value(&self.block_id).map_err(serde::ser::Error::custom)?;
+        let block_id = serde_json::to_value(self.block_id).map_err(serde::ser::Error::custom)?;
 
         if let serde_json::Value::Array(ref mut arr) = ser {
             arr.push(block_id);
@@ -290,7 +290,7 @@ where
 
         let params = ParamsWithBlock { params, block_id };
 
-        let mut fut = caller.call(method, params, block_id)?;
+        let mut fut = caller.call(method, params)?;
 
         match fut.poll_unpin(cx) {
             Poll::Ready(value) => Poll::Ready(value.map(map)),
