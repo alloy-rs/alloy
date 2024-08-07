@@ -22,7 +22,7 @@ where
 {
     Invalid,
     Preparing {
-        caller: Arc<dyn Caller<T, Params, Resp>>,
+        caller: Arc<dyn Caller<T, ParamsWithBlock<Params>, Resp>>,
         method: Cow<'static, str>,
         params: Params,
         block_id: BlockId,
@@ -55,6 +55,36 @@ where
     }
 }
 
+/// Helper struct that houses the params along with the BlockId.
+#[derive(Debug, Clone)]
+pub struct ParamsWithBlock<Params: RpcParam> {
+    params: Params,
+    block_id: BlockId,
+}
+
+impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize params to a Value first
+        let mut ser = serde_json::to_value(&self.params).map_err(serde::ser::Error::custom)?;
+
+        // serialize the block id
+        let block_id = serde_json::to_value(&self.block_id).map_err(serde::ser::Error::custom)?;
+
+        if let serde_json::Value::Array(ref mut arr) = ser {
+            arr.push(block_id);
+        } else if ser.is_null() {
+            ser = serde_json::Value::Array(vec![block_id]);
+        } else {
+            ser = serde_json::Value::Array(vec![ser, block_id]);
+        }
+
+        ser.serialize(serializer)
+    }
+}
+
 /// A struct that takes an optional [`BlockId`] parameter.
 ///
 /// This resolves to a [`ProviderCall`] that will execute the call on the specified block.
@@ -69,7 +99,7 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    caller: Arc<dyn Caller<T, Params, Resp>>,
+    caller: Arc<dyn Caller<T, ParamsWithBlock<Params>, Resp>>,
     method: Cow<'static, str>,
     params: Params,
     block_id: BlockId,
@@ -100,7 +130,7 @@ where
 {
     /// Create a new [`RpcWithBlock`] instance.
     pub fn new(
-        caller: impl Caller<T, Params, Resp> + 'static,
+        caller: impl Caller<T, ParamsWithBlock<Params>, Resp> + 'static,
         method: impl Into<Cow<'static, str>>,
         params: Params,
     ) -> Self {
@@ -257,6 +287,8 @@ where
         else {
             unreachable!("bad state")
         };
+
+        let params = ParamsWithBlock { params, block_id };
 
         let mut fut = caller.call(method, params, block_id)?;
 

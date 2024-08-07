@@ -53,24 +53,12 @@ where
         &self,
         method: Cow<'static, str>,
         params: Params,
-        block_id: BlockId,
+        _block_id: BlockId,
     ) -> TransportResult<ProviderCall<T, serde_json::Value, Resp>> {
         let client = self.client.upgrade().ok_or_else(TransportErrorKind::backend_gone)?;
 
         // serialize the params
-        let mut ser = serde_json::to_value(params).map_err(RpcError::ser_err)?;
-
-        // serialize the block id
-        let block_id = serde_json::to_value(block_id).map_err(RpcError::ser_err)?;
-
-        // append the block id to the params
-        if let serde_json::Value::Array(ref mut arr) = ser {
-            arr.push(block_id);
-        } else if ser.is_null() {
-            ser = serde_json::Value::Array(vec![block_id]);
-        } else {
-            ser = serde_json::Value::Array(vec![ser, block_id]);
-        }
+        let ser = serde_json::to_value(params).map_err(RpcError::ser_err)?;
 
         let rpc_call = client.request(method, ser);
 
