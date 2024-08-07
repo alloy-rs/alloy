@@ -9,11 +9,10 @@ use std::{
     borrow::Cow,
     future::{Future, IntoFuture},
     marker::PhantomData,
-    sync::{Arc, OnceLock},
+    sync::Arc,
     task::Poll,
 };
-/// States of the
-#[derive(Clone)]
+/// States of WithBlockFut
 enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
@@ -31,6 +30,7 @@ where
     },
     Running {
         map: Map,
+        fut: ProviderCall<T, serde_json::Value, Resp>,
     },
 }
 
@@ -50,7 +50,7 @@ where
                 .field("params", params)
                 .field("block_id", block_id)
                 .finish(),
-            Self::Running { map: _ } => f.debug_tuple("Running").finish(),
+            Self::Running { map: _, fut: _ } => f.debug_tuple("Running").finish(),
         }
     }
 }
@@ -213,7 +213,6 @@ where
 
     fn into_future(self) -> Self::IntoFuture {
         WithBlockFut {
-            fut: OnceLock::new(),
             state: States::Preparing {
                 caller: self.caller,
                 method: self.method,
@@ -237,7 +236,6 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    fut: OnceLock<ProviderCall<T, serde_json::Value, Resp>>,
     state: States<T, Params, Resp, Output, Map>,
 }
 
@@ -265,8 +263,7 @@ where
         match fut.poll_unpin(cx) {
             Poll::Ready(value) => Poll::Ready(value.map(map)),
             Poll::Pending => {
-                let _ = this.fut.set(fut);
-                *this.state = States::Running { map };
+                *this.state = States::Running { map, fut };
                 Poll::Pending
             }
         }
@@ -276,14 +273,8 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<TransportResult<Output>> {
-        let this = self.project();
-        let States::Running { map } = this.state else { unreachable!("bad state") };
-        this.fut.get_mut().map_or_else(
-            || {
-                unreachable!("ProviderCall not set");
-            },
-            |fut| fut.poll_unpin(cx).map(|value| value.map(map)),
-        )
+        let States::Running { map, fut } = self.project().state else { unreachable!("bad state") };
+        fut.poll_unpin(cx).map(|value| value.map(map))
     }
 }
 
