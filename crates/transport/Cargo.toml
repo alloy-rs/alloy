@@ -32,8 +32,8 @@ tower.workspace = true
 url.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["rt", "time"] }
-lru = "0.12"
-parking_lot = "0.12.3"
+lru.workspace = true
+parking_lot.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
