@@ -2,7 +2,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
-use alloy_rpc_types_eth::{Block, BlockNumberOrTag, TransactionRequest};
+use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -268,7 +268,11 @@ mod test {
             .max_priority_fee_per_gas(gas_price + 1);
 
         let trace = provider
-            .debug_trace_call(tx, BlockNumberOrTag::Latest, GethDebugTracingCallOptions::default())
+            .debug_trace_call(
+                tx,
+                BlockNumberOrTag::Latest.into(),
+                GethDebugTracingCallOptions::default(),
+            )
             .await
             .unwrap();
 
@@ -284,7 +288,7 @@ mod test {
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
         let rlp_header = provider
-            .debug_get_raw_header(BlockNumberOrTag::default())
+            .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
             .await
             .expect("debug_getRawHeader call should succeed");
 
@@ -298,7 +302,7 @@ mod test {
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
         let rlp_block = provider
-            .debug_get_raw_block(BlockNumberOrTag::default())
+            .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
             .await
             .expect("debug_getRawBlock call should succeed");
 
@@ -311,7 +315,8 @@ mod test {
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let result = provider.debug_get_raw_receipts(BlockNumberOrTag::default()).await;
+        let result =
+            provider.debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await;
         assert!(result.is_ok());
     }
 

@@ -1,6 +1,6 @@
 //! This module extends the Ethereum JSON-RPC provider with the Trace namespace's RPC methods.
 use crate::{Provider, RpcWithBlock};
-use alloy_eips::BlockNumberOrTag;
+use alloy_eips::BlockId;
 use alloy_network::Network;
 use alloy_primitives::TxHash;
 use alloy_rpc_types_eth::Index;
@@ -177,6 +177,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::ProviderBuilder;
+    use alloy_eips::BlockNumberOrTag;
 
     use super::*;
 
@@ -188,7 +189,7 @@ mod test {
     async fn test_trace_block() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let traces = provider.trace_block(BlockNumberOrTag::Latest).await.unwrap();
+        let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert_eq!(traces.len(), 0);
     }
 }
