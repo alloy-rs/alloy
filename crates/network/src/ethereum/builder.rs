@@ -194,7 +194,7 @@ mod tests {
     use crate::{TransactionBuilder, TransactionBuilderError};
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_eips::eip7702::Authorization;
-    use alloy_primitives::{Address, Signature};
+    use alloy_primitives::{Address, Signature, U256};
     use alloy_rpc_types_eth::{AccessList, TransactionRequest};
     use std::str::FromStr;
 
