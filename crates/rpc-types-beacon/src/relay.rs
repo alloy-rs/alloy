@@ -3,7 +3,8 @@
 //! See also <https://flashbots.github.io/relay-specs/>
 
 use crate::{BlsPublicKey, BlsSignature};
-use alloy_primitives::{Address, B256, U256};
+use alloy_eips::{eip4844::builder, eip4895::Withdrawal};
+use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
 };
@@ -96,7 +97,6 @@ pub struct SignedBidTrace {
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Bellatrix).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 pub struct SignedBidSubmissionV1 {
     /// The BidTrace message associated with the submission.
     pub message: BidTrace,
@@ -107,10 +107,133 @@ pub struct SignedBidSubmissionV1 {
     pub signature: BlsSignature,
 }
 
+#[cfg(feature = "ssz")]
+impl ssz::Decode for SignedBidSubmissionV1 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<u64>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<U256>()?;
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+
+        builder.register_type::<BlsSignature>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            message: BidTrace {
+                slot: decoder.decode_next()?,
+                parent_hash: decoder.decode_next()?,
+                block_hash: decoder.decode_next()?,
+                builder_pubkey: decoder.decode_next()?,
+                proposer_pubkey: decoder.decode_next()?,
+                proposer_fee_recipient: decoder.decode_next()?,
+                gas_limit: decoder.decode_next()?,
+                gas_used: decoder.decode_next()?,
+                value: decoder.decode_next()?,
+            },
+            execution_payload: ExecutionPayloadV1 {
+                parent_hash: decoder.decode_next()?,
+                fee_recipient: decoder.decode_next()?,
+                state_root: decoder.decode_next()?,
+                receipts_root: decoder.decode_next()?,
+                logs_bloom: decoder.decode_next()?,
+                prev_randao: decoder.decode_next()?,
+                block_number: decoder.decode_next()?,
+                gas_limit: decoder.decode_next()?,
+                gas_used: decoder.decode_next()?,
+                timestamp: decoder.decode_next()?,
+                extra_data: decoder.decode_next()?,
+                base_fee_per_gas: decoder.decode_next()?,
+                block_hash: decoder.decode_next()?,
+                transactions: decoder.decode_next()?,
+            },
+            signature: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for SignedBidSubmissionV1 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 7
+            + <Address as ssz::Encode>::ssz_fixed_len() * 2
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 7
+            + <U256 as ssz::Encode>::ssz_fixed_len() * 2
+            + <BlsSignature as ssz::Encode>::ssz_fixed_len()
+            + <BlsPublicKey as ssz::Encode>::ssz_fixed_len() * 2
+            + ssz::BYTES_PER_LENGTH_OFFSET * 2;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.message.slot);
+        encoder.append(&self.message.parent_hash);
+        encoder.append(&self.message.block_hash);
+        encoder.append(&self.message.builder_pubkey);
+        encoder.append(&self.message.proposer_pubkey);
+        encoder.append(&self.message.proposer_fee_recipient);
+        encoder.append(&self.message.gas_limit);
+        encoder.append(&self.message.gas_used);
+        encoder.append(&self.message.value);
+        encoder.append(&self.execution_payload.parent_hash);
+        encoder.append(&self.execution_payload.fee_recipient);
+        encoder.append(&self.execution_payload.state_root);
+        encoder.append(&self.execution_payload.receipts_root);
+        encoder.append(&self.execution_payload.logs_bloom);
+        encoder.append(&self.execution_payload.prev_randao);
+        encoder.append(&self.execution_payload.block_number);
+        encoder.append(&self.execution_payload.gas_limit);
+        encoder.append(&self.execution_payload.gas_used);
+        encoder.append(&self.execution_payload.timestamp);
+        encoder.append(&self.execution_payload.extra_data);
+        encoder.append(&self.execution_payload.base_fee_per_gas);
+        encoder.append(&self.execution_payload.block_hash);
+        encoder.append(&self.execution_payload.transactions);
+        encoder.append(&self.signature);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <BidTrace as ssz::Encode>::ssz_bytes_len(&self.message)
+            + <ExecutionPayloadV1 as ssz::Encode>::ssz_bytes_len(&self.execution_payload)
+            + <BlsSignature as ssz::Encode>::ssz_bytes_len(&self.signature)
+    }
+}
+
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Capella).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 pub struct SignedBidSubmissionV2 {
     /// The BidTrace message associated with the submission.
     pub message: BidTrace,
@@ -121,10 +244,138 @@ pub struct SignedBidSubmissionV2 {
     pub signature: BlsSignature,
 }
 
+#[cfg(feature = "ssz")]
+impl ssz::Decode for SignedBidSubmissionV2 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<u64>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<U256>()?;
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+
+        builder.register_type::<BlsSignature>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            message: BidTrace {
+                slot: decoder.decode_next()?,
+                parent_hash: decoder.decode_next()?,
+                block_hash: decoder.decode_next()?,
+                builder_pubkey: decoder.decode_next()?,
+                proposer_pubkey: decoder.decode_next()?,
+                proposer_fee_recipient: decoder.decode_next()?,
+                gas_limit: decoder.decode_next()?,
+                gas_used: decoder.decode_next()?,
+                value: decoder.decode_next()?,
+            },
+            execution_payload: ExecutionPayloadV2 {
+                payload_inner: ExecutionPayloadV1 {
+                    parent_hash: decoder.decode_next()?,
+                    fee_recipient: decoder.decode_next()?,
+                    state_root: decoder.decode_next()?,
+                    receipts_root: decoder.decode_next()?,
+                    logs_bloom: decoder.decode_next()?,
+                    prev_randao: decoder.decode_next()?,
+                    block_number: decoder.decode_next()?,
+                    gas_limit: decoder.decode_next()?,
+                    gas_used: decoder.decode_next()?,
+                    timestamp: decoder.decode_next()?,
+                    extra_data: decoder.decode_next()?,
+                    base_fee_per_gas: decoder.decode_next()?,
+                    block_hash: decoder.decode_next()?,
+                    transactions: decoder.decode_next()?,
+                },
+                withdrawals: decoder.decode_next()?,
+            },
+            signature: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for SignedBidSubmissionV2 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 7
+            + <Address as ssz::Encode>::ssz_fixed_len() * 2
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 7
+            + <U256 as ssz::Encode>::ssz_fixed_len() * 2
+            + <BlsSignature as ssz::Encode>::ssz_fixed_len()
+            + <BlsPublicKey as ssz::Encode>::ssz_fixed_len() * 2
+            + ssz::BYTES_PER_LENGTH_OFFSET * 3;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.message.slot);
+        encoder.append(&self.message.parent_hash);
+        encoder.append(&self.message.block_hash);
+        encoder.append(&self.message.builder_pubkey);
+        encoder.append(&self.message.proposer_pubkey);
+        encoder.append(&self.message.proposer_fee_recipient);
+        encoder.append(&self.message.gas_limit);
+        encoder.append(&self.message.gas_used);
+        encoder.append(&self.message.value);
+        encoder.append(&self.execution_payload.payload_inner.parent_hash);
+        encoder.append(&self.execution_payload.payload_inner.fee_recipient);
+        encoder.append(&self.execution_payload.payload_inner.state_root);
+        encoder.append(&self.execution_payload.payload_inner.receipts_root);
+        encoder.append(&self.execution_payload.payload_inner.logs_bloom);
+        encoder.append(&self.execution_payload.payload_inner.prev_randao);
+        encoder.append(&self.execution_payload.payload_inner.block_number);
+        encoder.append(&self.execution_payload.payload_inner.gas_limit);
+        encoder.append(&self.execution_payload.payload_inner.gas_used);
+        encoder.append(&self.execution_payload.payload_inner.timestamp);
+        encoder.append(&self.execution_payload.payload_inner.extra_data);
+        encoder.append(&self.execution_payload.payload_inner.base_fee_per_gas);
+        encoder.append(&self.execution_payload.payload_inner.block_hash);
+        encoder.append(&self.execution_payload.payload_inner.transactions);
+        encoder.append(&self.execution_payload.withdrawals);
+        encoder.append(&self.signature);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <BidTrace as ssz::Encode>::ssz_bytes_len(&self.message)
+            + <ExecutionPayloadV2 as ssz::Encode>::ssz_bytes_len(&self.execution_payload)
+            + <BlsSignature as ssz::Encode>::ssz_bytes_len(&self.signature)
+    }
+}
+
 /// Submission for the `/relay/v1/builder/blocks` endpoint (Deneb).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 pub struct SignedBidSubmissionV3 {
     /// The BidTrace message associated with the submission.
     pub message: BidTrace,
@@ -135,6 +386,156 @@ pub struct SignedBidSubmissionV3 {
     pub blobs_bundle: BlobsBundleV1,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Decode for SignedBidSubmissionV3 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
+        let mut builder = ssz::SszDecoderBuilder::new(bytes);
+
+        builder.register_type::<u64>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<BlsPublicKey>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<U256>()?;
+
+        builder.register_type::<B256>()?;
+        builder.register_type::<Address>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Bloom>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<Bytes>()?;
+        builder.register_type::<U256>()?;
+        builder.register_type::<B256>()?;
+        builder.register_type::<Vec<Bytes>>()?;
+        builder.register_type::<Vec<Withdrawal>>()?;
+        builder.register_type::<u64>()?;
+        builder.register_type::<u64>()?;
+
+        builder.register_type::<Vec<alloy_consensus::Bytes48>>()?;
+        builder.register_type::<Vec<alloy_consensus::Bytes48>>()?;
+        builder.register_type::<Vec<alloy_consensus::Blob>>()?;
+
+        builder.register_type::<BlsSignature>()?;
+
+        let mut decoder = builder.build()?;
+
+        Ok(Self {
+            message: BidTrace {
+                slot: decoder.decode_next()?,
+                parent_hash: decoder.decode_next()?,
+                block_hash: decoder.decode_next()?,
+                builder_pubkey: decoder.decode_next()?,
+                proposer_pubkey: decoder.decode_next()?,
+                proposer_fee_recipient: decoder.decode_next()?,
+                gas_limit: decoder.decode_next()?,
+                gas_used: decoder.decode_next()?,
+                value: decoder.decode_next()?,
+            },
+            execution_payload: ExecutionPayloadV3 {
+                payload_inner: ExecutionPayloadV2 {
+                    payload_inner: ExecutionPayloadV1 {
+                        parent_hash: decoder.decode_next()?,
+                        fee_recipient: decoder.decode_next()?,
+                        state_root: decoder.decode_next()?,
+                        receipts_root: decoder.decode_next()?,
+                        logs_bloom: decoder.decode_next()?,
+                        prev_randao: decoder.decode_next()?,
+                        block_number: decoder.decode_next()?,
+                        gas_limit: decoder.decode_next()?,
+                        gas_used: decoder.decode_next()?,
+                        timestamp: decoder.decode_next()?,
+                        extra_data: decoder.decode_next()?,
+                        base_fee_per_gas: decoder.decode_next()?,
+                        block_hash: decoder.decode_next()?,
+                        transactions: decoder.decode_next()?,
+                    },
+                    withdrawals: decoder.decode_next()?,
+                },
+                blob_gas_used: decoder.decode_next()?,
+                excess_blob_gas: decoder.decode_next()?,
+            },
+            blobs_bundle: BlobsBundleV1 {
+                commitments: decoder.decode_next()?,
+                proofs: decoder.decode_next()?,
+                blobs: decoder.decode_next()?,
+            },
+            signature: decoder.decode_next()?,
+        })
+    }
+}
+
+#[cfg(feature = "ssz")]
+impl ssz::Encode for SignedBidSubmissionV3 {
+    fn is_ssz_fixed_len() -> bool {
+        false
+    }
+
+    fn ssz_append(&self, buf: &mut Vec<u8>) {
+        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 7
+            + <Address as ssz::Encode>::ssz_fixed_len() * 2
+            + <Bloom as ssz::Encode>::ssz_fixed_len()
+            + <u64 as ssz::Encode>::ssz_fixed_len() * 9
+            + <U256 as ssz::Encode>::ssz_fixed_len() * 2
+            + <BlsSignature as ssz::Encode>::ssz_fixed_len()
+            + <BlsPublicKey as ssz::Encode>::ssz_fixed_len() * 2
+            + ssz::BYTES_PER_LENGTH_OFFSET * 6;
+
+        let mut encoder = ssz::SszEncoder::container(buf, offset);
+
+        encoder.append(&self.message.slot);
+        encoder.append(&self.message.parent_hash);
+        encoder.append(&self.message.block_hash);
+        encoder.append(&self.message.builder_pubkey);
+        encoder.append(&self.message.proposer_pubkey);
+        encoder.append(&self.message.proposer_fee_recipient);
+        encoder.append(&self.message.gas_limit);
+        encoder.append(&self.message.gas_used);
+        encoder.append(&self.message.value);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.parent_hash);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.fee_recipient);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.state_root);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.receipts_root);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.logs_bloom);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.prev_randao);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.block_number);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.gas_limit);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.gas_used);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.timestamp);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.extra_data);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.base_fee_per_gas);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.block_hash);
+        encoder.append(&self.execution_payload.payload_inner.payload_inner.transactions);
+        encoder.append(&self.execution_payload.payload_inner.withdrawals);
+        encoder.append(&self.execution_payload.blob_gas_used);
+        encoder.append(&self.execution_payload.excess_blob_gas);
+        encoder.append(&self.blobs_bundle.commitments);
+        encoder.append(&self.blobs_bundle.proofs);
+        encoder.append(&self.blobs_bundle.blobs);
+        encoder.append(&self.signature);
+
+        encoder.finalize();
+    }
+
+    fn ssz_bytes_len(&self) -> usize {
+        <BidTrace as ssz::Encode>::ssz_bytes_len(&self.message)
+            + <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.execution_payload)
+            + <BlobsBundleV1 as ssz::Encode>::ssz_bytes_len(&self.blobs_bundle)
+            + <BlsSignature as ssz::Encode>::ssz_bytes_len(&self.signature)
+    }
 }
 
 /// SubmitBlockRequest is the request from the builder to submit a block.

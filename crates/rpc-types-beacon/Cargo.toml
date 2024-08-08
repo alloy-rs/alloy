@@ -22,6 +22,7 @@ workspace = true
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-rpc-types-engine.workspace = true
 alloy-primitives.workspace = true
+alloy-consensus = { workspace = true, features = ["std"] }
 
 # ssz
 ethereum_ssz_derive = { workspace = true, optional = true }
