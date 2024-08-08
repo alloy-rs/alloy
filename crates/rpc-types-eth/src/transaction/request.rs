@@ -68,7 +68,7 @@ pub struct TransactionRequest {
     #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<BlobTransactionSidecar>,
     /// Authorization list for for EIP-7702 transactions.
-    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
