@@ -1086,7 +1086,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
@@ -1107,7 +1107,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws_boxed() {
         use futures::stream::StreamExt;

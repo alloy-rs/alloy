@@ -250,7 +250,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "ipc")]
+    #[cfg(all(feature = "ipc", not(windows)))]
     fn test_parsing_ipc() {
         use alloy_node_bindings::Anvil;
 
