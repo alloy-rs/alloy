@@ -320,12 +320,12 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         Ok(block)
     }
 
-    /// Gets the selected block [BlockNumberOrTag] receipts.
+    /// Gets the selected block [BlockId] receipts.
     async fn get_block_receipts(
         &self,
-        block: BlockNumberOrTag,
+        id: BlockId,
     ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
-        self.client().request("eth_getBlockReceipts", (block,)).await
+        self.client().request("eth_getBlockReceipts", (id,)).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].
@@ -1433,7 +1433,8 @@ mod tests {
     async fn gets_block_receipts() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
+        let receipts =
+            provider.get_block_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert!(receipts.is_some());
     }
 
