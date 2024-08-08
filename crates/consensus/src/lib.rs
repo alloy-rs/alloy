@@ -30,7 +30,7 @@ mod request;
 pub use request::Request;
 
 pub mod transaction;
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 pub use transaction::BlobTransactionValidationError;
 pub use transaction::{
     SignableTransaction, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
@@ -42,7 +42,7 @@ pub use alloy_eips::eip4844::{
     utils, Blob, BlobTransactionSidecar, Bytes48,
 };
 
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 pub use alloy_eips::eip4844::env_settings::EnvKzgSettings;
 
 pub use alloy_primitives::{Sealable, Sealed};

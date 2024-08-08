@@ -9,6 +9,9 @@ use alloy_rlp::{Decodable, Encodable};
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
+use crate::eip4844::kzg::{KzgError, KzgProofVerifier, KzgSettings};
+
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -83,8 +86,8 @@ impl BlobTransactionSidecar {
     /// Verifies that the versioned hashes are valid for this sidecar's blob data, commitments, and
     /// proofs.
     ///
-    /// Takes as input the [KzgSettings](c_kzg::KzgSettings), which should contain the parameters
-    /// derived from the KZG trusted setup.
+    /// Takes as input the [KzgSettings], which should contain the parameters derived from the
+    /// KZG trusted setup.
     ///
     /// This ensures that the blob transaction payload has the same number of blob data elements,
     /// commitments, and proofs. Each blob data element is verified against its commitment and
@@ -93,28 +96,20 @@ impl BlobTransactionSidecar {
     /// Returns [BlobTransactionValidationError::InvalidProof] if any blob KZG proof in the response
     /// fails to verify, or if the versioned hashes in the transaction do not match the actual
     /// commitment versioned hashes.
-    #[cfg(feature = "kzg")]
+    #[cfg(any(feature = "kzg", feature = "kzg-rs"))]
     pub fn validate(
         &self,
         blob_versioned_hashes: &[B256],
-        proof_settings: &c_kzg::KzgSettings,
+        kzg_settings: &KzgSettings,
     ) -> Result<(), BlobTransactionValidationError> {
         // Ensure the versioned hashes and commitments have the same length.
-        if blob_versioned_hashes.len() != self.commitments.len() {
-            return Err(c_kzg::Error::MismatchLength(format!(
-                "There are {} versioned commitment hashes and {} commitments",
-                blob_versioned_hashes.len(),
-                self.commitments.len()
-            ))
-            .into());
-        }
+
+        self.check_blob_versioned_hashes_length(blob_versioned_hashes.len())?;
 
         // calculate versioned hashes by zipping & iterating
         for (versioned_hash, commitment) in
             blob_versioned_hashes.iter().zip(self.commitments.iter())
         {
-            let commitment = c_kzg::KzgCommitment::from(commitment.0);
-
             // calculate & verify versioned hash
             let calculated_versioned_hash = kzg_to_versioned_hash(commitment.as_slice());
             if *versioned_hash != calculated_versioned_hash {
@@ -125,19 +120,7 @@ impl BlobTransactionSidecar {
             }
         }
 
-        // SAFETY: ALL types have the same size
-        let res = unsafe {
-            c_kzg::KzgProof::verify_blob_kzg_proof_batch(
-                // blobs
-                core::mem::transmute::<&[Blob], &[c_kzg::Blob]>(self.blobs.as_slice()),
-                // commitments
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.commitments.as_slice()),
-                // proofs
-                core::mem::transmute::<&[Bytes48], &[c_kzg::Bytes48]>(self.proofs.as_slice()),
-                proof_settings,
-            )
-        }
-        .map_err(BlobTransactionValidationError::KZGError)?;
+        let res = self.verify_blob_kzg_proof_batch(kzg_settings)?;
 
         if res {
             Ok(())
@@ -225,12 +208,12 @@ where
 
 /// An error that can occur when validating a [BlobTransactionSidecar::validate].
 #[derive(Debug)]
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 pub enum BlobTransactionValidationError {
     /// Proof validation failed.
     InvalidProof,
-    /// An error returned by [`c_kzg`].
-    KZGError(c_kzg::Error),
+    /// An error returned by [`c_kzg`] or [`kzg_rs`].
+    KZGError(KzgError),
     /// The inner transaction is not a blob transaction.
     NotBlobTransaction(u8),
     /// Error variant for thrown by EIP-4844 tx variants without a sidecar.
@@ -244,7 +227,7 @@ pub enum BlobTransactionValidationError {
     },
 }
 
-#[cfg(all(feature = "kzg", feature = "std"))]
+#[cfg(all(any(feature = "kzg", feature = "kzg-rs"), feature = "std"))]
 impl std::error::Error for BlobTransactionValidationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -257,7 +240,7 @@ impl std::error::Error for BlobTransactionValidationError {
     }
 }
 
-#[cfg(feature = "kzg")]
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
 impl core::fmt::Display for BlobTransactionValidationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -278,9 +261,9 @@ impl core::fmt::Display for BlobTransactionValidationError {
     }
 }
 
-#[cfg(feature = "kzg")]
-impl From<c_kzg::Error> for BlobTransactionValidationError {
-    fn from(source: c_kzg::Error) -> Self {
+#[cfg(any(feature = "kzg", feature = "kzg-rs"))]
+impl From<KzgError> for BlobTransactionValidationError {
+    fn from(source: KzgError) -> Self {
         Self::KZGError(source)
     }
 }

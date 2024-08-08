@@ -84,6 +84,7 @@ ethereum_ssz = "0.5"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
+kzg-rs = { version = "0.1", default-features = false }
 elliptic-curve = { version = "0.13", default-features = false }
 k256 = { version = "0.13", default-features = false, features = ["ecdsa"] }
 sha2 = { version = "0.10", default-features = false }
@@ -129,6 +130,7 @@ thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
 derive_more = "0.99.17"
+cfg-if = "1.0.0"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [
@@ -144,3 +146,8 @@ assert_matches = "1.5"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
+
+# TODO: Remove this once https://github.com/succinctlabs/kzg-rs/pull/3 is merged
+[patch.crates-io]
+kzg-rs = { git = "https://github.com/leruaa/kzg-rs", branch = "verify_blobs" }
+bls12_381 = { git = "https://github.com/leruaa/bls12_381", branch = "msm_variable_base" }
