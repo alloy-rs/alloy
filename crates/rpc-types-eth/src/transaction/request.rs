@@ -585,6 +585,7 @@ impl TransactionRequest {
             TxType::Eip2930 => self.clone().build_2930().map(Into::into),
             TxType::Eip1559 => self.clone().build_1559().map(Into::into),
             TxType::Eip4844 => self.clone().build_4844_variant().map(Into::into),
+            TxType::Eip7702 => self.clone().build_7702().map(Into::into),
         }
         .map_err(|msg| self.into_tx_err(msg))
     }
