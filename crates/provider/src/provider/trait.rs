@@ -251,7 +251,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the balance of the account.
     ///
-    /// Defaults to the latest block. See also [`RpcWithBlock::block_id`].
+    /// Defaults to the latest block. See also [`RpcWithBlock::block`].
     fn get_balance(&self, address: Address) -> RpcWithBlock<T, Address, U256> {
         RpcWithBlock::new(self.weak_client(), "eth_getBalance", address)
     }
@@ -259,10 +259,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
     async fn get_block(
         &self,
-        id: BlockId,
+        block: BlockId,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<Block>> {
-        match id {
+        match block {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
             BlockId::Number(number) => {
                 let full = matches!(kind, BlockTransactionsKind::Full);
@@ -323,9 +323,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the selected block [BlockId] receipts.
     async fn get_block_receipts(
         &self,
-        id: BlockId,
+        block: BlockId,
     ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
-        self.client().request("eth_getBlockReceipts", (id,)).await
+        self.client().request("eth_getBlockReceipts", (block,)).await
     }
 
     /// Gets the bytecode located at the corresponding [Address].

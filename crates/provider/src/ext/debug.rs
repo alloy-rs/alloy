@@ -13,16 +13,16 @@ use alloy_transport::{Transport, TransportResult};
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait DebugApi<N, T>: Send + Sync {
     /// Returns an RLP-encoded header.
-    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+    async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes>;
 
     /// Retrieves and returns the RLP encoded block by number, hash or tag.
-    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes>;
+    async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes>;
 
     /// Returns an EIP-2718 binary-encoded transaction.
     async fn debug_get_raw_transaction(&self, hash: TxHash) -> TransportResult<Bytes>;
 
     /// Returns an array of EIP-2718 binary-encoded receipts.
-    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>>;
+    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>>;
 
     /// Returns an array of recent bad blocks that the client has seen on the network.
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>>;
@@ -109,7 +109,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     async fn debug_trace_call(
         &self,
         tx: TransactionRequest,
-        block: BlockNumberOrTag,
+        block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace>;
 
@@ -123,7 +123,7 @@ pub trait DebugApi<N, T>: Send + Sync {
     async fn debug_trace_call_many(
         &self,
         txs: Vec<TransactionRequest>,
-        block: BlockNumberOrTag,
+        block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
 }
@@ -136,11 +136,11 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
-    async fn debug_get_raw_header(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+    async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
     }
 
-    async fn debug_get_raw_block(&self, block: BlockNumberOrTag) -> TransportResult<Bytes> {
+    async fn debug_get_raw_block(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawBlock", (block,)).await
     }
 
@@ -148,7 +148,7 @@ where
         self.client().request("debug_getRawTransaction", (hash,)).await
     }
 
-    async fn debug_get_raw_receipts(&self, block: BlockNumberOrTag) -> TransportResult<Vec<Bytes>> {
+    async fn debug_get_raw_receipts(&self, block: BlockId) -> TransportResult<Vec<Bytes>> {
         self.client().request("debug_getRawReceipts", (block,)).await
     }
 
@@ -200,7 +200,7 @@ where
     async fn debug_trace_call(
         &self,
         tx: TransactionRequest,
-        block: BlockNumberOrTag,
+        block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<GethTrace> {
         self.client().request("debug_traceCall", (tx, block, trace_options)).await
@@ -209,7 +209,7 @@ where
     async fn debug_trace_call_many(
         &self,
         txs: Vec<TransactionRequest>,
-        block: BlockNumberOrTag,
+        block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
         self.client().request("debug_traceCallMany", (txs, block, trace_options)).await
