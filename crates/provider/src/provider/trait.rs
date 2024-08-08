@@ -259,10 +259,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
     async fn get_block(
         &self,
-        id: BlockId,
+        block: BlockId,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<Block>> {
-        match id {
+        match block {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
             BlockId::Number(number) => {
                 let full = matches!(kind, BlockTransactionsKind::Full);
@@ -320,10 +320,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         Ok(block)
     }
 
-    /// Gets the selected block [BlockNumberOrTag] receipts.
+    /// Gets the selected block [BlockId] receipts.
     async fn get_block_receipts(
         &self,
-        block: BlockNumberOrTag,
+        block: BlockId,
     ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
         self.client().request("eth_getBlockReceipts", (block,)).await
     }
@@ -1086,7 +1086,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
@@ -1107,7 +1107,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws_boxed() {
         use futures::stream::StreamExt;
@@ -1433,7 +1433,8 @@ mod tests {
     async fn gets_block_receipts() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
+        let receipts =
+            provider.get_block_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert!(receipts.is_some());
     }
 
