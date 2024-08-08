@@ -30,6 +30,8 @@ jobs:
           - "--no-default-features"
           # Default features
           - ""
+          # All features
+          - "--all-features"
         exclude:
           # All features on MSRV
           - rust: "1.76" # MSRV
