@@ -78,7 +78,7 @@ impl Authorization {
     /// Computes the signature hash used to sign the authorization, or recover the authority from a
     /// signed authorization list item.
     ///
-    /// The signature hash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
+    /// The signature hash is `keccak(MAGIC || rlp([chain_id, address, nonce]))`
     #[inline]
     pub fn signature_hash(&self) -> B256 {
         use super::constants::MAGIC;
