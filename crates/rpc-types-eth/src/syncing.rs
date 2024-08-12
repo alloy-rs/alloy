@@ -47,28 +47,6 @@ pub struct Peers {
     pub peers: Vec<PeerInfo>,
 }
 
-/// Number of peers connected to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum PeerCount {
-    /// Peer count as integer
-    Number(u32),
-    /// Peer count as hex
-    Hex(U64),
-}
-
-impl From<u32> for PeerCount {
-    fn from(number: u32) -> Self {
-        Self::Number(number)
-    }
-}
-
-impl From<U64> for PeerCount {
-    fn from(hex: U64) -> Self {
-        Self::Hex(hex)
-    }
-}
-
 /// Peer connection information
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerInfo {
