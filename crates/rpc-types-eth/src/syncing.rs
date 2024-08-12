@@ -57,6 +57,18 @@ pub enum PeerCount {
     Hex(U64),
 }
 
+impl From<u32> for PeerCount {
+    fn from(number: u32) -> Self {
+        Self::Number(number)
+    }
+}
+
+impl From<U64> for PeerCount {
+    fn from(hex: U64) -> Self {
+        Self::Hex(hex)
+    }
+}
+
 /// Peer connection information
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PeerInfo {
