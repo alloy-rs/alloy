@@ -1,6 +1,7 @@
 //! Ethereum JSON-RPC provider.
 
 use crate::{
+    heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
@@ -18,7 +19,7 @@ use alloy_rpc_types_eth::{
     AccessListResult, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory,
     Filter, FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{BoxTransport, Transport, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
@@ -481,7 +482,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> Result<PendingTransaction, PendingTransactionError> {
         self.root().watch_pending_transaction(config).await
     }
 
@@ -962,7 +963,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> Result<PendingTransaction, PendingTransactionError> {
         let block_number =
             if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
                 // The transaction is already confirmed.
@@ -979,7 +980,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
         self.get_heart()
             .watch_tx(config, block_number)
             .await
-            .map_err(|_| TransportErrorKind::backend_gone())
+            .map_err(|_| PendingTransactionError::FailedToRegister)
     }
 }
 

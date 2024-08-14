@@ -53,6 +53,7 @@ pin-project.workspace = true
 reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
 serde.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
