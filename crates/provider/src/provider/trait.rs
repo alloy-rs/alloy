@@ -692,8 +692,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use [`Provider::watch_blocks`].
     /// However, be aware that polling increases RPC usage drastically.
@@ -724,8 +724,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use [`Provider::watch_pending_transactions`].
     /// However, be aware that polling increases RPC usage drastically.
@@ -762,8 +762,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use
     /// [`Provider::watch_full_pending_transactions`]. However, be aware that polling increases
@@ -783,8 +783,6 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
-    /// 
-    /// [`TransportErrorKind::PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     #[cfg(feature = "pubsub")]
     async fn subscribe_full_pending_transactions(
         &self,
@@ -799,8 +797,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use
     /// [`Provider::watch_logs`]. However, be aware that polling increases
@@ -897,6 +895,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcParam,
@@ -1072,7 +1072,10 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
 
         let err = provider.subscribe_blocks().await.unwrap_err();
-        let alloy_json_rpc::RpcError::Transport(alloy_transport::TransportErrorKind::PubsubUnavailable) = err else {
+        let alloy_json_rpc::RpcError::Transport(
+            alloy_transport::TransportErrorKind::PubsubUnavailable,
+        ) = err
+        else {
             panic!("{err:?}");
         };
     }
