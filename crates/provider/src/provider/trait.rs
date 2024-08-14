@@ -783,6 +783,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
+    /// 
+    /// [`TransportErrorKind::PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     #[cfg(feature = "pubsub")]
     async fn subscribe_full_pending_transactions(
         &self,
@@ -1070,7 +1072,7 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
 
         let err = provider.subscribe_blocks().await.unwrap_err();
-        let alloy_json_rpc::RpcError::Transport(TransportErrorKind::PubsubUnavailable) = err else {
+        let alloy_json_rpc::RpcError::Transport(alloy_transport::TransportErrorKind::PubsubUnavailable) = err else {
             panic!("{err:?}");
         };
     }

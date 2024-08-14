@@ -189,7 +189,7 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     /// - [`get_receipt`](Self::get_receipt) for fetching the receipt after the transaction has been
     ///   confirmed.
     pub async fn watch(self) -> Result<TxHash, PendingTransactionError> {
-        Ok(self.register().await?.await?)
+        self.register().await?.await
     }
 
     /// Waits for the transaction to confirm with the given number of confirmations, and
