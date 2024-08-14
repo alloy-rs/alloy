@@ -7,7 +7,7 @@ use serde::{
 use serde_json::{value::RawValue, Value};
 use std::{borrow::Borrow, fmt, marker::PhantomData};
 
-/// A JSONRPC-2.0 error object.
+/// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
@@ -165,7 +165,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
             type Value = ErrorPayload<Data>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(formatter, "a JSON-RPC2.0 error object")
+                write!(formatter, "a JSON-RPC 2.0 error object")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
