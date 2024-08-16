@@ -1,6 +1,6 @@
 //! Geth call tracer types.
 
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256, U64};
 use serde::{Deserialize, Serialize};
 
 /// The response object for `debug_traceTransaction` with `"tracer": "callTracer"`.
@@ -58,7 +58,7 @@ pub struct CallLogFrame {
     pub data: Option<Bytes>,
     /// The position of the log relative to subcalls within the same trace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub position: Option<U256>,
+    pub position: Option<U64>,
 }
 
 /// The configuration for the call tracer.
