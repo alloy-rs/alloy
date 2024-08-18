@@ -367,7 +367,7 @@ impl Decodable for TxEip7702 {
     }
 }
 
-// #[cfg(all(test, feature = "k256"))]
+#[cfg(all(test, feature = "k256"))]
 mod tests {
     use core::str::FromStr;
 
