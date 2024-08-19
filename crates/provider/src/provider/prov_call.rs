@@ -27,7 +27,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// An underlying call to an RPC server.
     RpcCall(RpcCall<Conn, Params, Resp, Output, Map>),
@@ -44,7 +44,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
     pub const fn ready(output: Output) -> Self {
@@ -163,7 +163,7 @@ where
     Params: ToOwned,
     Params::Owned: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
     ///
@@ -200,7 +200,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     fn from(call: RpcCall<Conn, Params, Resp, Output, Map>) -> Self {
         Self::RpcCall(call)
@@ -226,7 +226,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
         Self::BoxedFuture(fut)
@@ -251,7 +251,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
