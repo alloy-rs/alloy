@@ -80,7 +80,7 @@ impl<Params> Request<Params> {
     }
 
     /// Change type of the request parameters.
-    pub fn map_params<NewParams>(self, map: impl Fn(Params) -> NewParams) -> Request<NewParams> {
+    pub fn map_params<NewParams>(self, map: impl FnOnce(Params) -> NewParams) -> Request<NewParams> {
         Request { meta: self.meta, params: map(self.params) }
     }
 }
