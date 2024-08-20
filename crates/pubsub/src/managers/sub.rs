@@ -1,6 +1,6 @@
 use crate::{managers::ActiveSubscription, RawSubscription};
-use alloy_json_rpc::{EthNotification, SerializedRequest};
-use alloy_primitives::{B256, U256};
+use alloy_json_rpc::{EthNotification, Id, SerializedRequest};
+use alloy_primitives::B256;
 use bimap::BiBTreeMap;
 
 #[derive(Debug, Default)]
@@ -8,7 +8,7 @@ pub(crate) struct SubscriptionManager {
     /// The subscriptions.
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
-    local_to_server: BiBTreeMap<B256, U256>,
+    local_to_server: BiBTreeMap<B256, Id>,
 }
 
 impl SubscriptionManager {
@@ -26,7 +26,7 @@ impl SubscriptionManager {
     fn insert(
         &mut self,
         request: SerializedRequest,
-        server_id: U256,
+        server_id: Id,
         channel_size: usize,
     ) -> RawSubscription {
         let active = ActiveSubscription::new(request, channel_size);
@@ -43,7 +43,7 @@ impl SubscriptionManager {
     pub(crate) fn upsert(
         &mut self,
         request: SerializedRequest,
-        server_id: U256,
+        server_id: Id,
         channel_size: usize,
     ) -> RawSubscription {
         let local_id = request.params_hash();
@@ -59,8 +59,8 @@ impl SubscriptionManager {
     }
 
     /// De-alias an alias, getting the original ID.
-    pub(crate) fn local_id_for(&self, server_id: U256) -> Option<B256> {
-        self.local_to_server.get_by_right(&server_id).copied()
+    pub(crate) fn local_id_for(&self, server_id: &Id) -> Option<B256> {
+        self.local_to_server.get_by_right(server_id).copied()
     }
 
     /// Drop all server_ids.
@@ -69,7 +69,7 @@ impl SubscriptionManager {
     }
 
     /// Change the server_id of a subscription.
-    fn change_server_id(&mut self, local_id: B256, server_id: U256) {
+    fn change_server_id(&mut self, local_id: B256, server_id: Id) {
         self.local_to_server.insert(local_id, server_id);
     }
 
@@ -83,7 +83,7 @@ impl SubscriptionManager {
     /// and if any receiver exists. If the sub id is unknown, or no receiver
     /// exists, the notification is dropped.
     pub(crate) fn notify(&mut self, notification: EthNotification) {
-        if let Some(local_id) = self.local_id_for(notification.subscription) {
+        if let Some(local_id) = self.local_id_for(&notification.subscription) {
             if let Some((_, mut sub)) = self.local_to_sub.remove_by_left(&local_id) {
                 sub.notify(notification.result);
                 self.local_to_sub.insert(local_id, sub);

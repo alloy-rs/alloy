@@ -167,16 +167,14 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Rewrite the subscription id and insert into the subscriptions manager
-    fn handle_sub_response(&mut self, in_flight: InFlight, server_id: U256) -> TransportResult<()> {
+    fn handle_sub_response(&mut self, in_flight: InFlight, server_id: Id) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
 
-        self.subs.upsert(request, server_id, in_flight.channel_size);
+        let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
 
-        // lie to the client about the sub id.
-        let local_id = self.subs.local_id_for(server_id).unwrap();
         // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(&local_id)?;
+        let ser_alias = to_json_raw_value(sub.local_id())?;
 
         // We send back a success response with the new subscription ID.
         // We don't care if the channel is dead.

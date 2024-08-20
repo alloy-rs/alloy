@@ -1,5 +1,4 @@
-use alloy_json_rpc::{Response, ResponsePayload, SerializedRequest};
-use alloy_primitives::U256;
+use alloy_json_rpc::{Id, Response, ResponsePayload, SerializedRequest};
 use alloy_transport::{TransportError, TransportResult};
 use std::fmt;
 use tokio::sync::oneshot;
@@ -55,10 +54,10 @@ impl InFlight {
     /// Fulfill the request with a response. This consumes the in-flight
     /// request. If the request is a subscription and the response is not an
     /// error, the subscription ID and the in-flight request are returned.
-    pub(crate) fn fulfill(self, resp: Response) -> Option<(U256, Self)> {
+    pub(crate) fn fulfill(self, resp: Response) -> Option<(Id, Self)> {
         if self.is_subscription() {
             if let ResponsePayload::Success(val) = resp.payload {
-                let sub_id: serde_json::Result<U256> = serde_json::from_str(val.get());
+                let sub_id: serde_json::Result<Id> = serde_json::from_str(val.get());
                 return match sub_id {
                     Ok(alias) => Some((alias, self)),
                     Err(e) => {
