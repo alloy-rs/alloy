@@ -216,7 +216,7 @@ where
             WithBlockInner::BoxedFuture(get_fut) => {
                 ProviderCall::BoxedFuture(get_fut(self.block_id))
             }
-            WithBlockInner::Ready(f) => ProviderCall::Ready(Some(f(self.block_id)))
+            WithBlockInner::Ready(f) => ProviderCall::Ready(Some(f(self.block_id))),
         }
     }
 }
