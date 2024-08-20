@@ -3,10 +3,7 @@ use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_primitives::B256;
 use alloy_rpc_client::RpcCall;
 use alloy_transport::{Transport, TransportResult};
-use std::{
-    future::{Future, IntoFuture},
-    pin::Pin,
-};
+use std::future::IntoFuture;
 
 use crate::ProviderCall;
 
@@ -49,12 +46,9 @@ where
     Map: Fn(Resp) -> Output,
 {
     RpcCall(RpcCall<T, Params, Resp, Output, Map>),
-    BoxedFuture(
-        Box<
-            dyn Fn(BlockId) -> Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>> + Send,
-        >,
+    ProviderCall(
+        Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>,
     ),
-    Ready(Box<dyn Fn(BlockId) -> Output + Send>),
 }
 
 impl<T, Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<T, Params, Resp, Output, Map>
@@ -67,8 +61,7 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
-            Self::BoxedFuture(_) => f.debug_struct("BoxedFuture").finish_non_exhaustive(),
-            Self::Ready(_) => f.debug_struct("Ready").finish_non_exhaustive(),
+            Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
         }
     }
 }
@@ -103,25 +96,15 @@ where
         Self { inner: WithBlockInner::RpcCall(inner), block_id: Default::default() }
     }
 
-    /// Create a new [`RpcWithBlock`] from a function producing a future based on a block id.
-    pub fn new_future<F, Fut>(get_fut: F) -> Self
+    /// Create a new [`RpcWithBlock`] from a closure producing a [`ProviderCall`].
+    pub fn new_provider<F>(get_call: F) -> Self
     where
-        F: Fn(BlockId) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = TransportResult<Output>> + Send + Sync + 'static,
+        F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map>
+            + Send
+            + 'static,
     {
-        let get_fut = Box::new(move |block_id| {
-            let fut = get_fut(block_id);
-            Box::pin(fut) as Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>
-        });
-        Self { inner: WithBlockInner::BoxedFuture(get_fut), block_id: Default::default() }
-    }
-
-    /// Create a new [`RpcWithBlock`] from a function producing a value based on a block id.
-    pub fn new_ready<F>(f: F) -> Self
-    where
-        F: Fn(BlockId) -> Output + Send + Sync + 'static,
-    {
-        Self { inner: WithBlockInner::Ready(Box::new(f)), block_id: Default::default() }
+        let get_call = Box::new(get_call);
+        Self { inner: WithBlockInner::ProviderCall(get_call), block_id: Default::default() }
     }
 }
 
@@ -213,10 +196,7 @@ where
                 let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
                 ProviderCall::RpcCall(rpc_call)
             }
-            WithBlockInner::BoxedFuture(get_fut) => {
-                ProviderCall::BoxedFuture(get_fut(self.block_id))
-            }
-            WithBlockInner::Ready(f) => ProviderCall::Ready(Some(f(self.block_id))),
+            WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),
         }
     }
 }
