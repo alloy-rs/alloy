@@ -122,6 +122,19 @@ where
     }
 }
 
+impl<F, T, Params, Resp, Output, Map> From<F> for RpcWithBlock<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output + Clone,
+    F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
+{
+    fn from(inner: F) -> Self {
+        Self::new_provider(inner)
+    }
+}
+
 impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
