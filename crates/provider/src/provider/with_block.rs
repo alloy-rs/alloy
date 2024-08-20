@@ -54,6 +54,7 @@ where
             dyn Fn(BlockId) -> Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>> + Send,
         >,
     ),
+    Ready(Box<dyn Fn(BlockId) -> Output + Send>),
 }
 
 impl<T, Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<T, Params, Resp, Output, Map>
@@ -67,6 +68,7 @@ where
         match self {
             Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
             Self::BoxedFuture(_) => f.debug_struct("BoxedFuture").finish_non_exhaustive(),
+            Self::Ready(_) => f.debug_struct("Ready").finish_non_exhaustive(),
         }
     }
 }
@@ -112,6 +114,14 @@ where
             Box::pin(fut) as Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>
         });
         Self { inner: WithBlockInner::BoxedFuture(get_fut), block_id: Default::default() }
+    }
+
+    /// Create a new [`RpcWithBlock`] from a function producing a value based on a block id.
+    pub fn new_ready<F>(f: F) -> Self
+    where
+        F: Fn(BlockId) -> Output + Send + Sync + 'static,
+    {
+        Self { inner: WithBlockInner::Ready(Box::new(f)), block_id: Default::default() }
     }
 }
 
@@ -206,6 +216,7 @@ where
             WithBlockInner::BoxedFuture(get_fut) => {
                 ProviderCall::BoxedFuture(get_fut(self.block_id))
             }
+            WithBlockInner::Ready(f) => ProviderCall::Ready(Some(f(self.block_id)))
         }
     }
 }
