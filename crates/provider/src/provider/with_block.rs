@@ -48,7 +48,9 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output,
 {
+    /// [RpcCall] which params are getting wrapped into [ParamsWithBlock] once the block id is set.
     RpcCall(RpcCall<T, Params, Resp, Output, Map>),
+    /// Closure that produces a [ProviderCall] once the block id is set.
     ProviderCall(ProviderCallProducer<T, Params, Resp, Output, Map>),
 }
 
