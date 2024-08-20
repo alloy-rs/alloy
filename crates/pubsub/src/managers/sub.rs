@@ -1,5 +1,5 @@
 use crate::{managers::ActiveSubscription, RawSubscription};
-use alloy_json_rpc::{EthNotification, Id, SerializedRequest};
+use alloy_json_rpc::{EthNotification, SerializedRequest, SubId};
 use alloy_primitives::B256;
 use bimap::BiBTreeMap;
 
@@ -8,7 +8,7 @@ pub(crate) struct SubscriptionManager {
     /// The subscriptions.
     local_to_sub: BiBTreeMap<B256, ActiveSubscription>,
     /// Tracks the CURRENT server id for a subscription.
-    local_to_server: BiBTreeMap<B256, Id>,
+    local_to_server: BiBTreeMap<B256, SubId>,
 }
 
 impl SubscriptionManager {
@@ -26,7 +26,7 @@ impl SubscriptionManager {
     fn insert(
         &mut self,
         request: SerializedRequest,
-        server_id: Id,
+        server_id: SubId,
         channel_size: usize,
     ) -> RawSubscription {
         let active = ActiveSubscription::new(request, channel_size);
@@ -43,7 +43,7 @@ impl SubscriptionManager {
     pub(crate) fn upsert(
         &mut self,
         request: SerializedRequest,
-        server_id: Id,
+        server_id: SubId,
         channel_size: usize,
     ) -> RawSubscription {
         let local_id = request.params_hash();
@@ -59,7 +59,7 @@ impl SubscriptionManager {
     }
 
     /// De-alias an alias, getting the original ID.
-    pub(crate) fn local_id_for(&self, server_id: &Id) -> Option<B256> {
+    pub(crate) fn local_id_for(&self, server_id: &SubId) -> Option<B256> {
         self.local_to_server.get_by_right(server_id).copied()
     }
 
@@ -69,7 +69,7 @@ impl SubscriptionManager {
     }
 
     /// Change the server_id of a subscription.
-    fn change_server_id(&mut self, local_id: B256, server_id: Id) {
+    fn change_server_id(&mut self, local_id: B256, server_id: SubId) {
         self.local_to_server.insert(local_id, server_id);
     }
 

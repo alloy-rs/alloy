@@ -1,15 +1,26 @@
-use crate::{Id, Response, ResponsePayload};
+use crate::{Response, ResponsePayload};
+use alloy_primitives::U256;
 use serde::{
     de::{MapAccess, Visitor},
     Deserialize, Serialize,
 };
+
+/// A subscription ID.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[serde(untagged)]
+pub enum SubId {
+    /// A number.
+    Number(U256),
+    /// A string.
+    String(String),
+}
 
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
     /// The subscription ID.
-    pub subscription: Id,
+    pub subscription: SubId,
     /// The notification payload.
     pub result: T,
 }
@@ -127,7 +138,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
 #[cfg(test)]
 mod test {
 
-    use crate::{EthNotification, Id, PubSubItem};
+    use crate::{EthNotification, PubSubItem, SubId};
 
     #[test]
     fn deserializer_test() {
@@ -141,7 +152,7 @@ mod test {
             PubSubItem::Notification(EthNotification { subscription, result }) => {
                 assert_eq!(
                     subscription,
-                    Id::Number("0xcd0c3e8af590364c09d0fa6a1210faf5".parse().unwrap())
+                    SubId::Number("0xcd0c3e8af590364c09d0fa6a1210faf5".parse().unwrap())
                 );
                 assert_eq!(result.get(), r#"{"difficulty": "0xd9263f42a87", "uncles": []}"#);
             }

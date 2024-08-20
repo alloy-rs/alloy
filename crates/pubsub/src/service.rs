@@ -4,7 +4,7 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload};
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
 use alloy_primitives::U256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
@@ -167,7 +167,11 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Rewrite the subscription id and insert into the subscriptions manager
-    fn handle_sub_response(&mut self, in_flight: InFlight, server_id: Id) -> TransportResult<()> {
+    fn handle_sub_response(
+        &mut self,
+        in_flight: InFlight,
+        server_id: SubId,
+    ) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
 
