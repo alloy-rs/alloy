@@ -36,7 +36,7 @@ where
     /// A boxed future.
     BoxedFuture(Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>),
     /// The output, produces synchronously.
-    Ready(Option<Output>),
+    Ready(Option<TransportResult<Output>>),
 }
 
 impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, Params, Resp, Output, Map>
@@ -47,7 +47,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
-    pub const fn ready(output: Output) -> Self {
+    pub const fn ready(output: TransportResult<Output>) -> Self {
         Self::Ready(Some(output))
     }
 
@@ -118,7 +118,7 @@ where
     /// # Panics
     ///
     /// Panics if the future is already complete
-    pub const fn as_ready(&self) -> Option<&Output> {
+    pub const fn as_ready(&self) -> Option<&TransportResult<Output>> {
         match self {
             Self::Ready(Some(output)) => Some(output),
             Self::Ready(None) => panic!("tried to access ready value after taking"),
@@ -261,7 +261,7 @@ where
             ProviderCallProj::Waiter(waiter) => waiter.poll_unpin(cx),
             ProviderCallProj::BoxedFuture(fut) => fut.poll_unpin(cx),
             ProviderCallProj::Ready(output) => {
-                Poll::Ready(Ok(output.take().expect("output taken twice")))
+                Poll::Ready(output.take().expect("output taken twice"))
             }
         }
     }
