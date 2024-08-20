@@ -37,6 +37,9 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
     }
 }
 
+type ProviderCallProducer<T, Params, Resp, Output, Map> =
+    Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
+
 /// Container for varous types of calls dependent on a block id.
 enum WithBlockInner<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
@@ -46,9 +49,7 @@ where
     Map: Fn(Resp) -> Output,
 {
     RpcCall(RpcCall<T, Params, Resp, Output, Map>),
-    ProviderCall(
-        Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>,
-    ),
+    ProviderCall(ProviderCallProducer<T, Params, Resp, Output, Map>),
 }
 
 impl<T, Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<T, Params, Resp, Output, Map>
