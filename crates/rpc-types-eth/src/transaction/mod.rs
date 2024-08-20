@@ -7,7 +7,6 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
-use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
@@ -112,11 +111,6 @@ pub struct Transaction {
     /// signer desires to execute in the context of their EOA and their signature.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
-    /// Arbitrary extra fields.
-    ///
-    /// This captures fields that are not native to ethereum but included in ethereum adjacent networks, for example fields the [optimism `eth_getTransactionByHash` request](https://docs.alchemy.com/alchemy/apis/optimism/eth-gettransactionbyhash) returns additional fields that this type will capture
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
 impl Transaction {
@@ -378,7 +372,6 @@ mod tests {
                 nonce: 1u64,
             })
             .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
@@ -422,7 +415,6 @@ mod tests {
                 nonce: 1u64,
             })
             .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
