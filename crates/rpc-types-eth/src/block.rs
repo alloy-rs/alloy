@@ -68,8 +68,8 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub number: Option<u64>,
+    #[serde(with = "alloy_serde::quantity")]
+    pub number: u64,
     /// Gas Limit
     #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
@@ -185,7 +185,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             withdrawals_root,
             logs_bloom,
             difficulty,
-            number: number.ok_or(ConversionError::MissingBlockNumber)?,
+            number,
             gas_limit,
             gas_used,
             timestamp,
@@ -202,16 +202,12 @@ impl TryFrom<Header> for alloy_consensus::Header {
 }
 
 impl HeaderResponse for Header {
-    fn hash(&self) -> Option<BlockHash> {
-        self.hash
-    }
-
-    fn number(&self) -> Option<u64> {
+    fn number(&self) -> u64 {
         self.number
     }
 
-    fn timestamp(&self) -> Option<u64> {
-        Some(self.timestamp)
+    fn timestamp(&self) -> u64 {
+        self.timestamp
     }
 
     fn extra_data(&self) -> &Bytes {

@@ -50,14 +50,11 @@ pub trait TransactionResponse {
 
 /// Header JSON-RPC response.
 pub trait HeaderResponse {
-    /// Hash of the block
-    fn hash(&self) -> Option<BlockHash>;
-
     /// Block number
-    fn number(&self) -> Option<u64>;
+    fn number(&self) -> u64;
 
     /// Block timestamp
-    fn timestamp(&self) -> Option<u64>;
+    fn timestamp(&self) -> u64;
 
     /// Extra data
     fn extra_data(&self) -> &Bytes;
@@ -148,15 +145,11 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 }
 
 impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
-    fn hash(&self) -> Option<BlockHash> {
-        self.inner.hash()
-    }
-
-    fn number(&self) -> Option<u64> {
+    fn number(&self) -> u64 {
         self.inner.number()
     }
 
-    fn timestamp(&self) -> Option<u64> {
+    fn timestamp(&self) -> u64 {
         self.inner.timestamp()
     }
 
