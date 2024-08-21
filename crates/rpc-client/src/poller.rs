@@ -1,5 +1,5 @@
 use crate::WeakClient;
-use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
+use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_transport::{utils::Spawnable, Transport};
 use futures::{Stream, StreamExt};
 use serde::Serialize;
@@ -13,9 +13,6 @@ use std::{
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::Instrument;
-
-/// The number of retries for polling a request.
-const MAX_RETRIES: usize = 3;
 
 /// A poller task builder.
 ///
@@ -152,7 +149,6 @@ where
         let span = debug_span!("poller", method = %self.method);
         let fut = async move {
             let mut params = ParamsOnce::Typed(self.params);
-            let mut retries = MAX_RETRIES;
             'outer: for _ in 0..self.limit {
                 let Some(client) = self.client.upgrade() else {
                     debug!("client dropped");
@@ -168,26 +164,18 @@ where
                     }
                 };
 
-                loop {
-                    trace!("polling");
-                    match client.request(self.method.clone(), params).await {
-                        Ok(resp) => {
-                            if tx.send(resp).is_err() {
-                                debug!("channel closed");
-                                break 'outer;
-                            }
-                        }
-                        Err(RpcError::Transport(err)) if retries > 0 && err.recoverable() => {
-                            debug!(%err, "failed to poll, retrying");
-                            retries -= 1;
-                            continue;
-                        }
-                        Err(err) => {
-                            error!(%err, "failed to poll");
+                trace!("polling");
+                match client.request(self.method.clone(), params).await {
+                    Ok(resp) => {
+                        if tx.send(resp).is_err() {
+                            debug!("channel closed");
                             break 'outer;
                         }
                     }
-                    break;
+                    Err(err) => {
+                        error!(%err, "failed to poll");
+                        break 'outer;
+                    }
                 }
 
                 trace!(duration=?self.poll_interval, "sleeping");
