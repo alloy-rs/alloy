@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+
+### Dependencies
+
+- Bump jsonrpsee 0.24 ([#1067](https://github.com/alloy-rs/alloy/issues/1067))
+
+### Features
+
+- [engine-types] `PayloadError::PrePragueBlockWithEip7702Transactions` ([#1116](https://github.com/alloy-rs/alloy/issues/1116))
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- Release 0.2.1
 - Release 0.2.0
 - Add payloadbodies v2 to capabilities set ([#1025](https://github.com/alloy-rs/alloy/issues/1025))
 

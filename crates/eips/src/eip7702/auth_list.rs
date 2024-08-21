@@ -2,7 +2,7 @@ use core::ops::Deref;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use alloy_primitives::{keccak256, Address, ChainId, Signature, B256};
+use alloy_primitives::{keccak256, Address, Signature, B256, U256};
 use alloy_rlp::{
     length_of_length, BufMut, Decodable, Encodable, Header, Result as RlpResult, RlpDecodable,
     RlpEncodable,
@@ -47,11 +47,12 @@ impl RecoveredAuthority {
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub struct Authorization {
     /// The chain ID of the authorization.
-    pub chain_id: ChainId,
+    pub chain_id: U256,
     /// The address of the authorization.
     pub address: Address,
     /// The nonce for the authorization.
-    pub nonce: OptionalNonce,
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub nonce: u64,
 }
 
 impl Authorization {
@@ -60,7 +61,7 @@ impl Authorization {
     /// # Note
     ///
     /// Implementers should check that this matches the current `chain_id` *or* is 0.
-    pub const fn chain_id(&self) -> ChainId {
+    pub const fn chain_id(&self) -> U256 {
         self.chain_id
     }
 
@@ -70,19 +71,14 @@ impl Authorization {
     }
 
     /// Get the `nonce` for the authorization.
-    ///
-    /// # Note
-    ///
-    /// If this is `Some`, implementers should check that the nonce of the authority is equal to
-    /// this nonce.
-    pub fn nonce(&self) -> Option<u64> {
-        *self.nonce
+    pub const fn nonce(&self) -> u64 {
+        self.nonce
     }
 
     /// Computes the signature hash used to sign the authorization, or recover the authority from a
     /// signed authorization list item.
     ///
-    /// The signature hash is `keccak(MAGIC || rlp([chain_id, [nonce], address]))`
+    /// The signature hash is `keccak(MAGIC || rlp([chain_id, address, nonce]))`
     #[inline]
     pub fn signature_hash(&self) -> B256 {
         use super::constants::MAGIC;
@@ -280,72 +276,6 @@ impl Deref for RecoveredAuthorization {
     }
 }
 
-/// An internal wrapper around an `Option<u64>` for optional nonces.
-///
-/// In EIP-7702 the nonce is encoded as a list of either 0 or 1 items, where 0 items means that no
-/// nonce was specified (i.e. `None`). If there is 1 item, this is the same as `Some`.
-///
-/// The wrapper type is used for RLP encoding and decoding.
-#[derive(Default, Debug, Copy, Clone, Hash, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-pub struct OptionalNonce(Option<u64>);
-
-impl OptionalNonce {
-    /// Create a new [`OptionalNonce`]
-    pub const fn new(nonce: Option<u64>) -> Self {
-        Self(nonce)
-    }
-}
-
-impl From<Option<u64>> for OptionalNonce {
-    fn from(value: Option<u64>) -> Self {
-        Self::new(value)
-    }
-}
-
-impl Encodable for OptionalNonce {
-    fn encode(&self, out: &mut dyn BufMut) {
-        match self.0 {
-            Some(nonce) => {
-                Header { list: true, payload_length: nonce.length() }.encode(out);
-                nonce.encode(out);
-            }
-            None => Header { list: true, payload_length: 0 }.encode(out),
-        }
-    }
-
-    fn length(&self) -> usize {
-        self.map(|nonce| nonce.length() + length_of_length(nonce.length())).unwrap_or(1)
-    }
-}
-
-impl Decodable for OptionalNonce {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let mut bytes = Header::decode_bytes(buf, true)?;
-        if bytes.is_empty() {
-            return Ok(Self(None));
-        }
-
-        let payload_view = &mut bytes;
-        let nonce = u64::decode(payload_view)?;
-        if !payload_view.is_empty() {
-            // if there's more than 1 item in the nonce list we error
-            Err(alloy_rlp::Error::UnexpectedLength)
-        } else {
-            Ok(Self(Some(nonce)))
-        }
-    }
-}
-
-impl Deref for OptionalNonce {
-    type Target = Option<u64>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,44 +294,26 @@ mod tests {
     fn test_encode_decode_auth() {
         // fully filled
         test_encode_decode_roundtrip(Authorization {
-            chain_id: 1u64,
+            chain_id: U256::from(1u64),
             address: Address::left_padding_from(&[6]),
-            nonce: Some(1u64).into(),
+            nonce: 1,
         });
-
-        // no nonce
-        test_encode_decode_roundtrip(Authorization {
-            chain_id: 1u64,
-            address: Address::left_padding_from(&[6]),
-            nonce: None.into(),
-        });
-    }
-
-    #[test]
-    fn opt_nonce_too_many_elements() {
-        let mut buf = Vec::new();
-        vec![1u64, 2u64].encode(&mut buf);
-
-        assert_eq!(
-            OptionalNonce::decode(&mut buf.as_ref()),
-            Err(alloy_rlp::Error::UnexpectedLength)
-        )
     }
 
     #[test]
     fn test_encode_decode_signed_auth() {
         let auth = SignedAuthorization {
             inner: Authorization {
-                chain_id: 1u64,
+                chain_id: U256::from(1u64),
                 address: Address::left_padding_from(&[6]),
-                nonce: Some(1u64).into(),
+                nonce: 1,
             },
             signature: Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap(),
         };
         let mut buf = Vec::new();
         auth.encode(&mut buf);
 
-        let expected = "f85b01940000000000000000000000000000000000000006c1011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
+        let expected = "f85a01940000000000000000000000000000000000000006011ba048b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353a0efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804";
         assert_eq!(hex::encode(&buf), expected);
 
         let decoded = SignedAuthorization::decode(&mut buf.as_ref()).unwrap();

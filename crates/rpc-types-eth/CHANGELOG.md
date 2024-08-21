@@ -5,25 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
 
 ### Bug Fixes
 
 - Trim conflicting key `max_fee_per_blob_gas` from Eip1559 tx type ([#1064](https://github.com/alloy-rs/alloy/issues/1064))
 
+### Dependencies
+
+- Bump jsonrpsee 0.24 ([#1067](https://github.com/alloy-rs/alloy/issues/1067))
+
 ### Features
 
+- Eth_simulateV1 Request / Response types ([#1042](https://github.com/alloy-rs/alloy/issues/1042))
+- Feat(rpc-type-eth) convert vec TxReq to bundle ([#1091](https://github.com/alloy-rs/alloy/issues/1091))
+- Feat(provider) : introduction to eth_sendRawTransactionConditional  RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
 - [rpc-types-eth] Serde flatten `BlobTransactionSidecar` in tx req ([#1054](https://github.com/alloy-rs/alloy/issues/1054))
 - Add authorization list to rpc transaction and tx receipt types ([#1051](https://github.com/alloy-rs/alloy/issues/1051))
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- Release 0.2.1
+- [rpc] Make `Deserialize` impl for `FilterChanges` generic over transaction ([#1118](https://github.com/alloy-rs/alloy/issues/1118))
+- Export rpc account type ([#1075](https://github.com/alloy-rs/alloy/issues/1075))
 - Release 0.2.0
 - Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
 
+### Other
+
+- Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
+- Derive arbitrary for `TransactionRequest` ([#1113](https://github.com/alloy-rs/alloy/issues/1113))
+- Added stages to the sync info rpc type ([#1079](https://github.com/alloy-rs/alloy/issues/1079))
+
 ### Refactor
 
+- Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
 - Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
 
 ### Styling

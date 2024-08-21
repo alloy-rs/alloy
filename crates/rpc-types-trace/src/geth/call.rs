@@ -44,7 +44,7 @@ pub struct CallFrame {
     pub typ: String,
 }
 
-/// Represents a recorded call.
+/// Represents a recorded log that is emitted during a trace call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallLogFrame {
     /// The address of the contract that was called.
@@ -56,6 +56,9 @@ pub struct CallLogFrame {
     /// The data of the log.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<Bytes>,
+    /// The position of the log relative to subcalls within the same trace.
+    #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
+    pub position: Option<u64>,
 }
 
 /// The configuration for the call tracer.
