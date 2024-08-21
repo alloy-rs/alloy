@@ -40,9 +40,6 @@ pub use typed::TypedTransaction;
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
-    /// Hash of the transaction.
-    fn hash(&self) -> &B256;
-
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 

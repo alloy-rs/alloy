@@ -230,6 +230,13 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::TxEip4844(tx) => tx.priority_fee_or_price(),
+            Self::TxEip4844WithSidecar(tx) => tx.priority_fee_or_price(),
+        }
+    }
+
     fn to(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
@@ -946,6 +953,18 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.gas_price()
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.tx.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.tx.max_priority_fee_per_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.tx.priority_fee_or_price()
+    }
+
     fn to(&self) -> TxKind {
         self.tx.to()
     }
@@ -964,6 +983,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.tx.access_list)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+        self.tx.blob_versioned_hashes()
     }
 }
 
