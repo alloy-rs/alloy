@@ -259,10 +259,10 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         match self {
-            Self::TxEip4844(tx) => tx.input.as_ref(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
+            Self::TxEip4844(tx) => tx.input(),
+            Self::TxEip4844WithSidecar(tx) => tx.input(),
         }
     }
 
@@ -352,7 +352,7 @@ pub struct TxEip4844 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
     pub gas_limit: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -723,7 +723,7 @@ impl Transaction for TxEip4844 {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 
@@ -996,7 +996,7 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.value()
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         self.tx.input()
     }
 

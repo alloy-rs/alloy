@@ -2,7 +2,7 @@
 
 use crate::Signed;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, TxKind, B256, U256};
 use core::any;
 
 #[cfg(not(feature = "std"))]
@@ -109,7 +109,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     fn value(&self) -> U256;
 
     /// Get `data`.
-    fn input(&self) -> &[u8];
+    fn input(&self) -> &Bytes;
 
     /// Returns the transaction type
     fn ty(&self) -> u8;
