@@ -2,6 +2,7 @@ use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
     Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
+use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{ChainId, TxKind};
 
 /// The TypedTransaction enum represents all Ethereum transaction request types.
@@ -231,6 +232,16 @@ impl Transaction for TypedTransaction {
             Self::Eip1559(tx) => tx.ty(),
             Self::Eip4844(tx) => tx.ty(),
             Self::Eip7702(tx) => tx.ty(),
+        }
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        match self {
+            Self::Legacy(tx) => tx.access_list(),
+            Self::Eip2930(tx) => tx.access_list(),
+            Self::Eip1559(tx) => tx.access_list(),
+            Self::Eip4844(tx) => tx.access_list(),
+            Self::Eip7702(tx) => tx.access_list(),
         }
     }
 }

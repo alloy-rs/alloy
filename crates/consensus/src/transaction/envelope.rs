@@ -1,7 +1,10 @@
 use core::fmt;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
+use alloy_eips::{
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
+    eip2930::AccessList,
+};
 use alloy_primitives::{TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
@@ -499,6 +502,16 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().ty(),
             Self::Eip4844(tx) => tx.tx().ty(),
             Self::Eip7702(tx) => tx.tx().ty(),
+        }
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        match self {
+            Self::Legacy(tx) => tx.tx().access_list(),
+            Self::Eip2930(tx) => tx.tx().access_list(),
+            Self::Eip1559(tx) => tx.tx().access_list(),
+            Self::Eip4844(tx) => tx.tx().access_list(),
+            Self::Eip7702(tx) => tx.tx().access_list(),
         }
     }
 }

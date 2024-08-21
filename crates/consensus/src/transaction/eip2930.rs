@@ -265,6 +265,10 @@ impl Transaction for TxEip2930 {
     fn ty(&self) -> u8 {
         TxType::Eip2930 as u8
     }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip2930 {

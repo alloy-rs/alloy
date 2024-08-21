@@ -255,6 +255,13 @@ impl Transaction for TxEip4844Variant {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        match self {
+            Self::TxEip4844(tx) => tx.access_list(),
+            Self::TxEip4844WithSidecar(tx) => tx.access_list(),
+        }
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
@@ -690,6 +697,10 @@ impl Transaction for TxEip4844 {
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
     }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
 }
 
 impl Encodable for TxEip4844 {
@@ -934,6 +945,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn ty(&self) -> u8 {
         TxType::Eip4844 as u8
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.tx.access_list)
     }
 }
 
