@@ -1,6 +1,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::fmt;
+use std::collections::BTreeMap;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
 use alloy_eips::{
@@ -9,6 +10,8 @@ use alloy_eips::{
 };
 use alloy_primitives::{Bytes, TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
+use serde::Deserialize;
+use serde_value::ValueDeserializer;
 
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
@@ -57,7 +60,7 @@ impl fmt::Display for TxType {
 #[cfg(any(test, feature = "arbitrary"))]
 impl<'a> arbitrary::Arbitrary<'a> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
-        Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
+        Ok(u.int_in_range(0u8..=4)?.try_into().unwrap())
     }
 }
 
@@ -76,6 +79,27 @@ impl TryFrom<u8> for TxType {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for TxType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        U8::from(u8::from(*self)).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TxType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let val = Option::<U8>::deserialize(deserializer)?.unwrap_or(U8::ZERO);
+        Self::try_from(val.to::<u8>()).map_err(serde::de::Error::custom)
+    }
+}
+
 /// The Ethereum [EIP-2718] Transaction Envelope.
 ///
 /// # Note:
@@ -88,7 +112,7 @@ impl TryFrom<u8> for TxType {
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[doc(alias = "TransactionEnvelope")]
@@ -556,6 +580,64 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().authorization_list(),
             Self::Eip4844(tx) => tx.tx().authorization_list(),
             Self::Eip7702(tx) => tx.tx().authorization_list(),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TxEnvelope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde_value::Value;
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = (TxType, Value);
+
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                formatter.write_str("transaction envelope")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut tx_type = None;
+                let mut content: BTreeMap<Value, Value> = BTreeMap::new();
+                while let Some((key, value)) = map.next_entry()? {
+                    match key {
+                        Value::String(key) if key == "type" => {
+                            tx_type = Some(TxType::deserialize(ValueDeserializer::new(value))?);
+                        }
+                        _ => {
+                            content.insert(key, value);
+                        }
+                    }
+                }
+
+                Ok((tx_type.unwrap_or(TxType::Legacy), Value::Map(content)))
+            }
+        }
+
+        let (tx_type, content) = deserializer.deserialize_map(Visitor)?;
+        let deserializer = ValueDeserializer::new(content);
+
+        match tx_type {
+            TxType::Legacy => Signed::<TxLegacy>::deserialize(deserializer).map(TxEnvelope::Legacy),
+            TxType::Eip2930 => {
+                Signed::<TxEip2930>::deserialize(deserializer).map(TxEnvelope::Eip2930)
+            }
+            TxType::Eip1559 => {
+                Signed::<TxEip1559>::deserialize(deserializer).map(TxEnvelope::Eip1559)
+            }
+            TxType::Eip4844 => {
+                Signed::<TxEip4844Variant>::deserialize(deserializer).map(TxEnvelope::Eip4844)
+            }
+            TxType::Eip7702 => {
+                Signed::<TxEip7702>::deserialize(deserializer).map(TxEnvelope::Eip7702)
+            }
         }
     }
 }

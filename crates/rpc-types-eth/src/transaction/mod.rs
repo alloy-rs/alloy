@@ -1,6 +1,6 @@
 //! RPC types for transactions
 
-use alloy_consensus::{Transaction as TxTrait, TxEnvelope};
+use alloy_consensus::Transaction as TxTrait;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
@@ -23,10 +23,9 @@ pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-mod signature;
-pub use signature::{Parity, Signature};
-
-pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
+pub use alloy_consensus::{
+    AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxEnvelope,
+};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,7 +98,8 @@ impl TransactionResponse for Transaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::Signature as AlloySignature;
+    use alloy_consensus::{Signed, TxEip7702, TxLegacy};
+    use alloy_primitives::{Parity, Signature, TxKind};
     use arbitrary::Arbitrary;
     use rand::Rng;
     use std::str::FromStr;
@@ -115,41 +115,33 @@ mod tests {
     #[test]
     fn serde_transaction() {
         let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
+            tx: Signed::new_unchecked(TxEip7702 {
+                    nonce: 2,
+                    chain_id: 17,
+                    max_fee_per_gas: 21,
+                    max_priority_fee_per_gas: 22,
+                    gas_limit: 10,
+                    to: TxKind::Call(Address::with_last_byte(7)),
+                    value: U256::from(8),
+                    authorization_list: vec![Authorization {
+                        chain_id: U256::from(1u64),
+                        address: Address::left_padding_from(&[6]),
+                        nonce: 1u64,
+                    }.into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],
+                    input: vec![11, 12, 13].into(),
+                    access_list: AccessList::default(),
+                },
+                Signature::from_rs_and_parity(U256::from(14), U256::from(14), 36).unwrap(),
+                B256::with_last_byte(1)).into(),
             block_hash: Some(B256::with_last_byte(3)),
             block_number: Some(4),
             transaction_index: Some(5),
             from: Address::with_last_byte(6),
-            to: Some(Address::with_last_byte(7)),
-            value: U256::from(8),
-            gas_price: Some(9),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: None,
-            }),
-            chain_id: Some(17),
-            blob_versioned_hashes: None,
-            access_list: None,
-            transaction_type: Some(20),
-            max_fee_per_gas: Some(21),
-            max_priority_fee_per_gas: Some(22),
-            max_fee_per_blob_gas: None,
-            authorization_list: Some(vec![(Authorization {
-                chain_id: U256::from(1u64),
-                address: Address::left_padding_from(&[6]),
-                nonce: 1u64,
-            })
-            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
+            r#"{"type":"0x4","chainId":"0x11","nonce":"0x2","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","to":"0x0000000000000000000000000000000000000007","value":"0x8","accessList":[],"authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}],"input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0x24","hash":"0x0000000000000000000000000000000000000000000000000000000000000001","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
@@ -158,41 +150,33 @@ mod tests {
     #[test]
     fn serde_transaction_with_parity_bit() {
         let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
+            tx: Signed::new_unchecked(TxEip7702 {
+                    nonce: 2,
+                    chain_id: 17,
+                    max_fee_per_gas: 21,
+                    max_priority_fee_per_gas: 22,
+                    gas_limit: 10,
+                    to: TxKind::Call(Address::with_last_byte(7)),
+                    value: U256::from(8),
+                    authorization_list: vec![Authorization {
+                        chain_id: U256::from(1u64),
+                        address: Address::left_padding_from(&[6]),
+                        nonce: 1u64,
+                    }.into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],
+                    input: vec![11, 12, 13].into(),
+                    access_list: AccessList::default(),
+                },
+                Signature::from_rs_and_parity(U256::from(14), U256::from(14), Parity::Parity(true)).unwrap(),
+                B256::with_last_byte(1)).into(),
             block_hash: Some(B256::with_last_byte(3)),
             block_number: Some(4),
             transaction_index: Some(5),
             from: Address::with_last_byte(6),
-            to: Some(Address::with_last_byte(7)),
-            value: U256::from(8),
-            gas_price: Some(9),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            signature: Some(Signature {
-                v: U256::from(14),
-                r: U256::from(14),
-                s: U256::from(14),
-                y_parity: Some(Parity(true)),
-            }),
-            chain_id: Some(17),
-            blob_versioned_hashes: None,
-            access_list: None,
-            transaction_type: Some(20),
-            max_fee_per_gas: Some(21),
-            max_priority_fee_per_gas: Some(22),
-            max_fee_per_blob_gas: None,
-            authorization_list: Some(vec![(Authorization {
-                chain_id: U256::from(1u64),
-                address: Address::left_padding_from(&[6]),
-                nonce: 1u64,
-            })
-            .into_signed(AlloySignature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())]),
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
+            r#"{"type":"0x4","chainId":"0x11","nonce":"0x2","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","to":"0x0000000000000000000000000000000000000007","value":"0x8","accessList":[],"authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}],"input":"0x0b0c0d","r":"0xe","s":"0xe","yParity":"0x1","hash":"0x0000000000000000000000000000000000000000000000000000000000000001","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
@@ -201,13 +185,16 @@ mod tests {
     #[test]
     fn serde_minimal_transaction() {
         let transaction = Transaction {
-            hash: B256::with_last_byte(1),
-            nonce: 2,
-            from: Address::with_last_byte(6),
-            value: U256::from(8),
-            gas: 10,
-            input: vec![11, 12, 13].into(),
-            ..Default::default()
+            tx: Signed::new_unchecked(
+                TxLegacy { ..Default::default() },
+                Signature::from_rs_and_parity(U256::from(14), U256::from(14), 14).unwrap(),
+                B256::with_last_byte(1),
+            )
+            .into(),
+            from: Default::default(),
+            block_hash: None,
+            block_number: None,
+            transaction_index: None,
         };
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
