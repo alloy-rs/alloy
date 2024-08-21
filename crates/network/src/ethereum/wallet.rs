@@ -2,7 +2,6 @@ use crate::{Network, NetworkWallet, TxSigner};
 use alloy_consensus::{SignableTransaction, TxEnvelope, TypedTransaction};
 use alloy_primitives::Address;
 use alloy_signer::Signature;
-use async_trait::async_trait;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// A wallet capable of signing any transaction for the Ethereum network.
@@ -95,8 +94,6 @@ impl EthereumWallet {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<N> NetworkWallet<N> for EthereumWallet
 where
     N: Network<UnsignedTx = TypedTransaction, TxEnvelope = TxEnvelope>,
@@ -133,6 +130,10 @@ where
                 Ok(t.into_signed(sig).into())
             }
             TypedTransaction::Eip4844(mut t) => {
+                let sig = self.sign_transaction_inner(sender, &mut t).await?;
+                Ok(t.into_signed(sig).into())
+            }
+            TypedTransaction::Eip7702(mut t) => {
                 let sig = self.sign_transaction_inner(sender, &mut t).await?;
                 Ok(t.into_signed(sig).into())
             }

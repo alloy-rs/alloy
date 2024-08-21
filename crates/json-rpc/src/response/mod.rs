@@ -13,9 +13,9 @@ pub use error::{BorrowedErrorPayload, ErrorPayload};
 mod payload;
 pub use payload::{BorrowedResponsePayload, ResponsePayload};
 
-/// A JSONRPC-2.0 response object containing a [`ResponsePayload`].
+/// A JSON-RPC 2.0 response object containing a [`ResponsePayload`].
 ///
-/// This object is used to represent a JSONRPC-2.0 response. It may contain
+/// This object is used to represent a JSON-RPC 2.0 response. It may contain
 /// either a successful result or an error. The `id` field is used to match
 /// the response to the request that it is responding to, and should be
 /// mirrored from the response.

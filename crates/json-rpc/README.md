@@ -1,15 +1,15 @@
 # alloy-json-rpc
 
-Core types for JSON-RPC2.0 clients.
+Core types for JSON-RPC 2.0 clients.
 
-This crate includes data types and traits for JSON-RPC2.0 requests and
+This crate includes data types and traits for JSON-RPC 2.0 requests and
 responses, targeted at RPC client usage.
 
 ### Core Model
 
 <!-- TODO: More links and real doctests -->
 
-A JSON-RPC2.0 request is a JSON object containing an ID, a method name, and
+A JSON-RPC 2.0 request is a JSON object containing an ID, a method name, and
 an arbitrary parameters object. The parameters object may be omitted if empty.
 
 Any object that may be Serialized and Cloned may be used as RPC Parameters.

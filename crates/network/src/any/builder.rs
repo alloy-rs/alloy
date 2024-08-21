@@ -3,6 +3,7 @@ use crate::{
     TransactionBuilderError,
 };
 use alloy_consensus::BlobTransactionSidecar;
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::{AccessList, TransactionRequest};
 use alloy_serde::WithOtherFields;
@@ -117,6 +118,14 @@ impl TransactionBuilder<AnyNetwork> for WithOtherFields<TransactionRequest> {
 
     fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
         self.deref_mut().set_blob_sidecar(sidecar)
+    }
+
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
+        self.deref().authorization_list()
+    }
+
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
+        self.deref_mut().set_authorization_list(authorization_list)
     }
 
     fn complete_type(&self, ty: <AnyNetwork as Network>::TxType) -> Result<(), Vec<&'static str>> {

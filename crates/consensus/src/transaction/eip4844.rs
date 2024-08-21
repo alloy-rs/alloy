@@ -122,12 +122,10 @@ impl TxEip4844Variant {
     /// If `with_header` is `true`, the following will be encoded:
     /// `rlp(tx_type (0x03) || rlp([transaction_payload_body, blobs, commitments, proofs]))`
     #[doc(hidden)]
-    pub fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
+    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = match self {
             Self::TxEip4844(tx) => tx.fields_len() + signature.rlp_vrs_len(),
             Self::TxEip4844WithSidecar(tx) => {
@@ -519,12 +517,10 @@ impl TxEip4844 {
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header
     #[doc(hidden)]
-    pub fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
+    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         if with_header {
             Header {
@@ -778,7 +774,10 @@ impl TxEip4844WithSidecar {
     ///
     /// where `tx_payload` is the RLP encoding of the [TxEip4844] transaction fields:
     /// `rlp([chain_id, nonce, max_priority_fee_per_gas, ..., v, r, s])`
-    pub fn encode_with_signature_fields(&self, signature: &Signature, out: &mut dyn BufMut) {
+    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn BufMut)
+    where
+        S: EncodableSignature,
+    {
         let inner_payload_length = self.tx.fields_len() + signature.rlp_vrs_len();
         let inner_header = Header { list: true, payload_length: inner_payload_length };
 

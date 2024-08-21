@@ -35,7 +35,10 @@ pub mod ext;
 pub mod fillers;
 
 mod heart;
-pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
+pub use heart::{
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, WatchTxError,
+};
 
 pub mod layers;
 
