@@ -161,7 +161,7 @@ mod tests {
         provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
 
         let block = with_timeout(stream.next()).await.expect("Block wasn't fetched");
-        assert_eq!(block.header.number, Some(1u64));
+        assert_eq!(block.header.number, 1);
     }
 
     #[tokio::test]

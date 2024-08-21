@@ -1123,7 +1123,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), n);
+            assert_eq!(block.header.number, n);
             assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
@@ -1145,7 +1145,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), n);
+            assert_eq!(block.header.number, n);
             assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
@@ -1165,7 +1165,7 @@ mod tests {
         let mut stream = sub.into_stream().take(1);
         while let Some(block) = stream.next().await {
             println!("New block {:?}", block);
-            assert!(block.header.number.unwrap() > 0);
+            assert!(block.header.number > 0);
         }
     }
 
@@ -1303,7 +1303,7 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        assert_eq!(block.header.number.unwrap(), num);
+        assert_eq!(block.header.number, num);
     }
 
     #[tokio::test]
@@ -1313,7 +1313,7 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        assert_eq!(block.header.number.unwrap(), num);
+        assert_eq!(block.header.number, num);
     }
 
     #[tokio::test]
