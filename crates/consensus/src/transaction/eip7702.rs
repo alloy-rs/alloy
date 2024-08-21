@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -328,6 +328,10 @@ impl Transaction for TxEip7702 {
 
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+        None
     }
 }
 

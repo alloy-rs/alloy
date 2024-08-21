@@ -244,6 +244,16 @@ impl Transaction for TypedTransaction {
             Self::Eip7702(tx) => tx.access_list(),
         }
     }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&alloy_primitives::B256>> {
+        match self {
+            Self::Legacy(tx) => tx.blob_versioned_hashes(),
+            Self::Eip2930(tx) => tx.blob_versioned_hashes(),
+            Self::Eip1559(tx) => tx.blob_versioned_hashes(),
+            Self::Eip4844(tx) => tx.blob_versioned_hashes(),
+            Self::Eip7702(tx) => tx.blob_versioned_hashes(),
+        }
+    }
 }
 
 #[cfg(feature = "serde")]

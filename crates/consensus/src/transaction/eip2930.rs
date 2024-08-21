@@ -269,6 +269,10 @@ impl Transaction for TxEip2930 {
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
     }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+        None
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip2930 {

@@ -262,6 +262,13 @@ impl Transaction for TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.access_list(),
         }
     }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+        match self {
+            Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
+            Self::TxEip4844WithSidecar(tx) => tx.blob_versioned_hashes(),
+        }
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
@@ -700,6 +707,10 @@ impl Transaction for TxEip4844 {
 
     fn access_list(&self) -> Option<&AccessList> {
         Some(&self.access_list)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+        Some(self.blob_versioned_hashes.iter().collect())
     }
 }
 
