@@ -212,22 +212,22 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn gas_price(&self) -> Option<u128> {
+        None
+    }
+
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_gas(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().max_fee_per_gas(),
+            Self::TxEip4844WithSidecar(tx) => tx.max_fee_per_gas(),
         }
     }
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_priority_fee_per_gas(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::TxEip4844WithSidecar(tx) => tx.max_priority_fee_per_gas(),
         }
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        None
     }
 
     fn to(&self) -> TxKind {

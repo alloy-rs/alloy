@@ -180,6 +180,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.max_fee_per_gas(),
             Self::Eip1559(tx) => tx.max_fee_per_gas(),
             Self::Eip4844(tx) => tx.max_fee_per_gas(),
+            Self::Eip7702(tx) => tx.max_fee_per_gas(),
         }
     }
 
@@ -189,6 +190,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.max_priority_fee_per_gas(),
             Self::Eip1559(tx) => tx.max_priority_fee_per_gas(),
             Self::Eip4844(tx) => tx.max_priority_fee_per_gas(),
+            Self::Eip7702(tx) => tx.max_priority_fee_per_gas(),
         }
     }
 
