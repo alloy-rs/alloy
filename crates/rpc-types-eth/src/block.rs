@@ -206,6 +206,22 @@ impl TryFrom<Header> for alloy_consensus::Header {
 }
 
 impl HeaderResponse for Header {
+    fn hash(&self) -> Option<BlockHash> {
+        self.hash
+    }
+
+    fn number(&self) -> Option<u64> {
+        self.number
+    }
+
+    fn timestamp(&self) -> Option<u64> {
+        Some(self.timestamp)
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
+    }
+
     fn base_fee_per_gas(&self) -> Option<u128> {
         self.base_fee_per_gas
     }

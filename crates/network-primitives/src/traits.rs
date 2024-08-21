@@ -50,6 +50,18 @@ pub trait TransactionResponse {
 
 /// Header JSON-RPC response.
 pub trait HeaderResponse {
+    /// Hash of the block
+    fn hash(&self) -> Option<BlockHash>;
+
+    /// Block number
+    fn number(&self) -> Option<u64>;
+
+    /// Block timestamp
+    fn timestamp(&self) -> Option<u64>;
+
+    /// Extra data
+    fn extra_data(&self) -> &Bytes;
+
     /// Base fee per unit of gas (If EIP-1559 is supported)
     fn base_fee_per_gas(&self) -> Option<u128>;
 
@@ -132,5 +144,31 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         self.inner.transactions_mut()
+    }
+}
+
+impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
+    fn hash(&self) -> Option<BlockHash> {
+        self.inner.hash()
+    }
+
+    fn number(&self) -> Option<u64> {
+        self.inner.number()
+    }
+
+    fn timestamp(&self) -> Option<u64> {
+        self.inner.timestamp()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.inner.base_fee_per_gas()
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.inner.next_block_blob_fee()
     }
 }
