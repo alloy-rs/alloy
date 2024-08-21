@@ -195,6 +195,15 @@ impl Transaction for TypedTransaction {
             Self::Eip4844(tx) => tx.input(),
         }
     }
+
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.ty(),
+            Self::Eip2930(tx) => tx.ty(),
+            Self::Eip1559(tx) => tx.ty(),
+            Self::Eip4844(tx) => tx.ty(),
+        }
+    }
 }
 
 #[cfg(feature = "serde")]

@@ -442,6 +442,15 @@ impl Transaction for TxEnvelope {
             Self::Eip4844(tx) => tx.tx().value(),
         }
     }
+
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.tx().ty(),
+            Self::Eip2930(tx) => tx.tx().ty(),
+            Self::Eip1559(tx) => tx.tx().ty(),
+            Self::Eip4844(tx) => tx.tx().ty(),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -253,6 +253,10 @@ impl Transaction for TxEip4844Variant {
             Self::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
         }
     }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip4844Variant {
@@ -686,6 +690,10 @@ impl Transaction for TxEip4844 {
     fn input(&self) -> &[u8] {
         &self.input
     }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
+    }
 }
 
 impl Encodable for TxEip4844 {
@@ -923,6 +931,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn input(&self) -> &[u8] {
         self.tx.input()
+    }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip4844 as u8
     }
 }
 

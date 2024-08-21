@@ -310,6 +310,10 @@ impl Transaction for TxEip7702 {
     fn input(&self) -> &[u8] {
         &self.input
     }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip7702 as u8
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip7702 {
