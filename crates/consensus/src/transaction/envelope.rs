@@ -465,6 +465,16 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        match self {
+            Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip2930(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip1559(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip4844(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip7702(tx) => tx.tx().max_fee_per_blob_gas(),
+        }
+    }
+
     fn input(&self) -> &[u8] {
         match self {
             Self::Legacy(tx) => tx.tx().input(),

@@ -290,6 +290,10 @@ impl Transaction for TxEip1559 {
         self.max_priority_fee_per_gas
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }

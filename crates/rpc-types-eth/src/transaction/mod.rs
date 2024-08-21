@@ -376,11 +376,7 @@ impl TransactionResponse for Transaction<alloy_primitives::Signature> {
             transaction_index: transaction_index.map(|idx| idx as u64),
             // EIP-4844 fields
             max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
-            blob_versioned_hashes: tx
-                .blob_versioned_hashes()
-                .into_iter()
-                .clone()
-                .collect::<Vec<_>>(),
+            blob_versioned_hashes: tx.blob_versioned_hashes().into_iter().cloned().collect(),
             authorization_list: tx.authorization_list().map(|l| l.to_vec()),
         }
     }
