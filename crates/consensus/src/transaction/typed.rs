@@ -230,6 +230,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.ty(),
             Self::Eip1559(tx) => tx.ty(),
             Self::Eip4844(tx) => tx.ty(),
+            Self::Eip7702(tx) => tx.ty(),
         }
     }
 }

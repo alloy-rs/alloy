@@ -498,6 +498,7 @@ impl Transaction for TxEnvelope {
             Self::Eip2930(tx) => tx.tx().ty(),
             Self::Eip1559(tx) => tx.tx().ty(),
             Self::Eip4844(tx) => tx.tx().ty(),
+            Self::Eip7702(tx) => tx.tx().ty(),
         }
     }
 }
