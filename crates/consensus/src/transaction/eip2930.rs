@@ -244,6 +244,14 @@ impl Transaction for TxEip2930 {
         Some(self.gas_price)
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }

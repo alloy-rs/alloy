@@ -269,7 +269,8 @@ impl TxEip7702 {
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
+        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
+        // authorization_list
     }
 }
 
@@ -288,6 +289,14 @@ impl Transaction for TxEip7702 {
 
     fn gas_price(&self) -> Option<u128> {
         None
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.max_priority_fee_per_gas)
     }
 
     fn to(&self) -> TxKind {

@@ -85,7 +85,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Returns the transaction type
     fn tx_type(&self) -> u8;
 
-    /// Returns the EIP2930 `access_list` for the particular transaction type. Returns `None` for 
+    /// Returns the EIP2930 `access_list` for the particular transaction type. Returns `None` for
     /// older transaction types.
     fn access_list(&self) -> Option<&AccessList>;
 
