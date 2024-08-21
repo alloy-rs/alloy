@@ -45,12 +45,7 @@ rand = { workspace = true, optional = true }
 default = ["jwt"]
 jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = [
-    "dep:ethereum_ssz",
-    "dep:ethereum_ssz_derive",
-    "alloy-primitives/ssz",
-    "alloy-eips/ssz",
-]
+ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
 kzg = ["alloy-consensus/kzg"]
 
 [dev-dependencies]
