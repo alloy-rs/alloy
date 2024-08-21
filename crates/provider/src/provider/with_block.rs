@@ -1,59 +1,11 @@
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcParam, RpcReturn};
 use alloy_primitives::B256;
+use alloy_rpc_client::RpcCall;
 use alloy_transport::{Transport, TransportResult};
-use futures::FutureExt;
+use std::future::IntoFuture;
 
-use crate::{Caller, ProviderCall};
-use std::{
-    borrow::Cow,
-    future::{Future, IntoFuture},
-    marker::PhantomData,
-    sync::Arc,
-    task::Poll,
-};
-/// States of WithBlockFut
-enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output,
-{
-    Invalid,
-    Preparing {
-        caller: Arc<dyn Caller<T, ParamsWithBlock<Params>, Resp>>,
-        method: Cow<'static, str>,
-        params: Params,
-        block_id: BlockId,
-        map: Map,
-    },
-    Running {
-        map: Map,
-        fut: ProviderCall<T, serde_json::Value, Resp>,
-    },
-}
-
-impl<T, Params, Resp, Output, Map> core::fmt::Debug for States<T, Params, Resp, Output, Map>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Invalid => f.debug_tuple("Invalid").finish(),
-            Self::Preparing { caller: _, method, params, block_id, .. } => f
-                .debug_struct("Preparing")
-                .field("method", method)
-                .field("params", params)
-                .field("block_id", block_id)
-                .finish(),
-            Self::Running { map: _, fut: _ } => f.debug_tuple("Running").finish(),
-        }
-    }
-}
+use crate::ProviderCall;
 
 /// Helper struct that houses the params along with the BlockId.
 #[derive(Debug, Clone)]
@@ -85,13 +37,45 @@ impl<Params: RpcParam> serde::Serialize for ParamsWithBlock<Params> {
     }
 }
 
+type ProviderCallProducer<T, Params, Resp, Output, Map> =
+    Box<dyn Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send>;
+
+/// Container for varous types of calls dependent on a block id.
+enum WithBlockInner<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
+    /// [RpcCall] which params are getting wrapped into [ParamsWithBlock] once the block id is set.
+    RpcCall(RpcCall<T, Params, Resp, Output, Map>),
+    /// Closure that produces a [ProviderCall] once the block id is set.
+    ProviderCall(ProviderCallProducer<T, Params, Resp, Output, Map>),
+}
+
+impl<T, Params, Resp, Output, Map> core::fmt::Debug for WithBlockInner<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RpcCall(call) => f.debug_tuple("RpcCall").field(call).finish(),
+            Self::ProviderCall(_) => f.debug_struct("ProviderCall").finish(),
+        }
+    }
+}
+
 /// A struct that takes an optional [`BlockId`] parameter.
 ///
 /// This resolves to a [`ProviderCall`] that will execute the call on the specified block.
 ///
 /// By default this will use "latest".
 #[pin_project::pin_project]
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct RpcWithBlock<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     T: Transport + Clone,
@@ -99,49 +83,57 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    caller: Arc<dyn Caller<T, ParamsWithBlock<Params>, Resp>>,
-    method: Cow<'static, str>,
-    params: Params,
+    inner: WithBlockInner<T, Params, Resp, Output, Map>,
     block_id: BlockId,
-    map: Map,
-    _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<T, Params, Resp> core::fmt::Debug for RpcWithBlock<T, Params, Resp>
+impl<T, Params, Resp, Output, Map> RpcWithBlock<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
+    Map: Fn(Resp) -> Output + Clone,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RpcWithBlock")
-            .field("method", &self.method)
-            .field("params", &self.params)
-            .field("block_id", &self.block_id)
-            .finish()
+    /// Create a new [`RpcWithBlock`] from a [`RpcCall`].
+    pub fn new_rpc(inner: RpcCall<T, Params, Resp, Output, Map>) -> Self {
+        Self { inner: WithBlockInner::RpcCall(inner), block_id: Default::default() }
+    }
+
+    /// Create a new [`RpcWithBlock`] from a closure producing a [`ProviderCall`].
+    pub fn new_provider<F>(get_call: F) -> Self
+    where
+        F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map>
+            + Send
+            + 'static,
+    {
+        let get_call = Box::new(get_call);
+        Self { inner: WithBlockInner::ProviderCall(get_call), block_id: Default::default() }
     }
 }
 
-impl<T, Params, Resp> RpcWithBlock<T, Params, Resp>
+impl<T, Params, Resp, Output, Map> From<RpcCall<T, Params, Resp, Output, Map>>
+    for RpcWithBlock<T, Params, Resp, Output, Map>
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
+    Map: Fn(Resp) -> Output + Clone,
 {
-    /// Create a new [`RpcWithBlock`] instance.
-    pub fn new(
-        caller: impl Caller<T, ParamsWithBlock<Params>, Resp> + 'static,
-        method: impl Into<Cow<'static, str>>,
-        params: Params,
-    ) -> Self {
-        Self {
-            caller: Arc::new(caller),
-            method: method.into(),
-            params,
-            block_id: Default::default(),
-            map: std::convert::identity,
-            _pd: PhantomData,
-        }
+    fn from(inner: RpcCall<T, Params, Resp, Output, Map>) -> Self {
+        Self::new_rpc(inner)
+    }
+}
+
+impl<F, T, Params, Resp, Output, Map> From<F> for RpcWithBlock<T, Params, Resp, Output, Map>
+where
+    T: Transport + Clone,
+    Params: RpcParam,
+    Resp: RpcReturn,
+    Map: Fn(Resp) -> Output + Clone,
+    F: Fn(BlockId) -> ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map> + Send + 'static,
+{
+    fn from(inner: F) -> Self {
+        Self::new_provider(inner)
     }
 }
 
@@ -152,34 +144,6 @@ where
     Resp: RpcReturn,
     Map: Fn(Resp) -> Output + Clone,
 {
-    /// Map the response to a different type. This is usable for converting
-    /// the response to a more usable type, e.g. changing `U64` to `u64`.
-    ///
-    /// ## Note
-    ///
-    /// Carefully review the rust documentation on [fn pointers] before passing
-    /// them to this function. Unless the pointer is specifically coerced to a
-    /// `fn(_) -> _`, the `NewMap` will be inferred as that function's unique
-    /// type. This can lead to confusing error messages.
-    ///
-    /// [fn pointers]: https://doc.rust-lang.org/std/primitive.fn.html#creating-function-pointers
-    pub fn map_resp<NewOutput, NewMap>(
-        self,
-        map: NewMap,
-    ) -> RpcWithBlock<T, Params, Resp, NewOutput, NewMap>
-    where
-        NewMap: Fn(Resp) -> NewOutput + Clone,
-    {
-        RpcWithBlock {
-            caller: self.caller,
-            method: self.method,
-            params: self.params,
-            block_id: self.block_id,
-            map,
-            _pd: PhantomData,
-        }
-    }
-
     /// Set the block id.
     pub const fn block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = block_id;
@@ -239,94 +203,16 @@ where
 {
     type Output = TransportResult<Output>;
 
-    type IntoFuture = WithBlockFut<T, Params, Resp, Output, Map>;
+    type IntoFuture = ProviderCall<T, ParamsWithBlock<Params>, Resp, Output, Map>;
 
     fn into_future(self) -> Self::IntoFuture {
-        WithBlockFut {
-            state: States::Preparing {
-                caller: self.caller,
-                method: self.method,
-                params: self.params,
-                block_id: self.block_id,
-                map: self.map,
-            },
-        }
-    }
-}
-
-/// Intermediate `Future` type between `RpcWithBlock` and `ProviderCall`, that helps poll
-/// the `ProviderCall` and map the response.
-#[derive(Debug)]
-#[pin_project::pin_project]
-pub struct WithBlockFut<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Output: 'static,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
-{
-    state: States<T, Params, Resp, Output, Map>,
-}
-
-impl<T, Params, Resp, Output, Map> WithBlockFut<T, Params, Resp, Output, Map>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Resp: RpcReturn,
-    Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
-{
-    fn poll_preparing(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<TransportResult<Output>> {
-        let this = self.project();
-        let States::Preparing { caller, params, method, block_id, map } =
-            std::mem::replace(this.state, States::Invalid)
-        else {
-            unreachable!("bad state")
-        };
-
-        let params = ParamsWithBlock { params, block_id };
-
-        let mut fut = caller.call(method, params)?;
-
-        match fut.poll_unpin(cx) {
-            Poll::Ready(value) => Poll::Ready(value.map(map)),
-            Poll::Pending => {
-                *this.state = States::Running { map, fut };
-                Poll::Pending
+        match self.inner {
+            WithBlockInner::RpcCall(rpc_call) => {
+                let block_id = self.block_id;
+                let rpc_call = rpc_call.map_params(|params| ParamsWithBlock { params, block_id });
+                ProviderCall::RpcCall(rpc_call)
             }
-        }
-    }
-
-    fn poll_running(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<TransportResult<Output>> {
-        let States::Running { map, fut } = self.project().state else { unreachable!("bad state") };
-        fut.poll_unpin(cx).map(|value| value.map(map))
-    }
-}
-
-impl<T, Params, Resp, Output, Map> Future for WithBlockFut<T, Params, Resp, Output, Map>
-where
-    T: Transport + Clone,
-    Params: RpcParam,
-    Output: 'static,
-    Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
-{
-    type Output = TransportResult<Output>;
-
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        if matches!(self.state, States::Preparing { .. }) {
-            self.poll_preparing(cx)
-        } else if matches!(self.state, States::Running { .. }) {
-            self.poll_running(cx)
-        } else {
-            panic!("bad state")
+            WithBlockInner::ProviderCall(get_call) => get_call(self.block_id),
         }
     }
 }

@@ -27,7 +27,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// An underlying call to an RPC server.
     RpcCall(RpcCall<Conn, Params, Resp, Output, Map>),
@@ -36,7 +36,7 @@ where
     /// A boxed future.
     BoxedFuture(Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>),
     /// The output, produces synchronously.
-    Ready(Option<Output>),
+    Ready(Option<TransportResult<Output>>),
 }
 
 impl<Conn, Params, Resp, Output, Map> ProviderCall<Conn, Params, Resp, Output, Map>
@@ -44,10 +44,10 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// Instantiate a new [`ProviderCall`] from the output.
-    pub const fn ready(output: Output) -> Self {
+    pub const fn ready(output: TransportResult<Output>) -> Self {
         Self::Ready(Some(output))
     }
 
@@ -118,7 +118,7 @@ where
     /// # Panics
     ///
     /// Panics if the future is already complete
-    pub const fn as_ready(&self) -> Option<&Output> {
+    pub const fn as_ready(&self) -> Option<&TransportResult<Output>> {
         match self {
             Self::Ready(Some(output)) => Some(output),
             Self::Ready(None) => panic!("tried to access ready value after taking"),
@@ -163,7 +163,7 @@ where
     Params: ToOwned,
     Params::Owned: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
     ///
@@ -200,7 +200,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     fn from(call: RpcCall<Conn, Params, Resp, Output, Map>) -> Self {
         Self::RpcCall(call)
@@ -226,7 +226,7 @@ where
     Conn: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     fn from(fut: Pin<Box<dyn Future<Output = TransportResult<Output>> + Send>>) -> Self {
         Self::BoxedFuture(fut)
@@ -251,7 +251,7 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Clone,
+    Map: Fn(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
@@ -261,7 +261,7 @@ where
             ProviderCallProj::Waiter(waiter) => waiter.poll_unpin(cx),
             ProviderCallProj::BoxedFuture(fut) => fut.poll_unpin(cx),
             ProviderCallProj::Ready(output) => {
-                Poll::Ready(Ok(output.take().expect("output taken twice")))
+                Poll::Ready(output.take().expect("output taken twice"))
             }
         }
     }

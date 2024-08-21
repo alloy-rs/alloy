@@ -260,6 +260,22 @@ where
         };
         request.as_mut().expect("no request in prepared")
     }
+
+    /// Map the params of the request into a new type.
+    pub fn map_params<NewParams: RpcParam>(
+        self,
+        map: impl Fn(Params) -> NewParams,
+    ) -> RpcCall<Conn, NewParams, Resp, Output, Map> {
+        let CallState::Prepared { request, connection } = self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        let request = request.expect("no request in prepared").map_params(map);
+        RpcCall {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        }
+    }
 }
 
 impl<Conn, Params, Resp, Output, Map> RpcCall<Conn, &Params, Resp, Output, Map>
