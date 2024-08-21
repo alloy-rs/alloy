@@ -1,7 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
-use alloy_eips::eip2930::AccessList;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
 
@@ -124,6 +124,11 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
     /// `None`.
     fn blob_versioned_hashes(&self) -> Option<Vec<&B256>>;
+
+    /// Returns the [`SignedAuthorization`] list of the transaction.
+    ///
+    /// Returns `None` if this transaction is not EIP-7702.
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 }
 
 /// A signable transaction.

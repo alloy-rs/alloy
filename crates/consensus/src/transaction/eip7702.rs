@@ -341,6 +341,10 @@ impl Transaction for TxEip7702 {
     fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
         None
     }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        Some(&self.authorization_list)
+    }
 }
 
 impl SignableTransaction<Signature> for TxEip7702 {

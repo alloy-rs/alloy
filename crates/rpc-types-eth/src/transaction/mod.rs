@@ -40,7 +40,7 @@ pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptW
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "Tx")]
-pub struct Transaction<S = Signature> {
+pub struct Transaction {
     /// Hash
     pub hash: TxHash,
     /// Nonce
@@ -82,7 +82,7 @@ pub struct Transaction<S = Signature> {
     ///
     /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub signature: Option<S>,
+    pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub chain_id: Option<ChainId>,
@@ -153,6 +153,20 @@ impl Transaction {
             blob_versioned_hashes: self.blob_versioned_hashes,
             sidecar: None,
             authorization_list: self.authorization_list,
+        }
+    }
+}
+
+impl From<alloy_primitives::Signature> for Signature {
+    fn from(signature: alloy_primitives::Signature) -> Self {
+        Self {
+            v: U256::from(signature.v().to_u64()),
+            r: signature.r(),
+            s: signature.s(),
+            y_parity: Some(Parity::from(
+                signature.v().y_parity_byte_non_eip155().unwrap_or(signature.v().y_parity_byte())
+                    != 0,
+            )),
         }
     }
 }
@@ -298,7 +312,7 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
-impl TransactionResponse for Transaction<alloy_primitives::Signature> {
+impl TransactionResponse for Transaction {
     fn tx_hash(&self) -> B256 {
         self.hash
     }
@@ -323,7 +337,7 @@ impl TransactionResponse for Transaction<alloy_primitives::Signature> {
         &self.input
     }
 
-    fn gas_price(tx: impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128 {
+    fn gas_price(tx: &impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128 {
         match TxType::try_from(tx.ty()).expect("should decode") {
             TxType::Legacy | TxType::Eip2930 => tx.max_fee_per_gas(),
             TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => {
@@ -361,12 +375,12 @@ impl TransactionResponse for Transaction<alloy_primitives::Signature> {
             from: signer,
             to: tx.to().to().copied(),
             value: tx.value(),
-            gas_price: Some(Self::gas_price(tx, base_fee)),
+            gas_price: Some(Self::gas_price(&tx, base_fee)),
             max_fee_per_gas: Some(tx.max_fee_per_gas()),
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
-            signature: Some(signature),
+            signature: Some(signature.into()),
             gas: tx.gas_limit(),
-            input: tx.input().clone().into(),
+            input: tx.input().to_vec().into(),
             chain_id: tx.chain_id(),
             access_list: tx.access_list().cloned(),
             transaction_type: Some(tx.ty()),
@@ -376,7 +390,9 @@ impl TransactionResponse for Transaction<alloy_primitives::Signature> {
             transaction_index: transaction_index.map(|idx| idx as u64),
             // EIP-4844 fields
             max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
-            blob_versioned_hashes: tx.blob_versioned_hashes().into_iter().cloned().collect(),
+            blob_versioned_hashes: tx
+                .blob_versioned_hashes()
+                .map(|hashes| hashes.into_iter().copied().collect()),
             authorization_list: tx.authorization_list().map(|l| l.to_vec()),
         }
     }

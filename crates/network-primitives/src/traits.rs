@@ -47,7 +47,7 @@ pub trait TransactionResponse {
     fn input(&self) -> &Bytes;
 
     /// Returns the gas price formatted for the RPC response.
-    fn gas_price(tx: impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128;
+    fn gas_price(tx: &impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128;
 
     /// Returns the max fee per gas.
     fn max_fee_per_gas(tx: impl alloy_consensus::Transaction) -> Option<u128>;
@@ -88,7 +88,7 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.input()
     }
 
-    fn gas_price(tx: impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128 {
+    fn gas_price(tx: &impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128 {
         T::gas_price(tx, base_fee)
     }
 

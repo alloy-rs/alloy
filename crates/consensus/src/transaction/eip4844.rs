@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 
-use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
@@ -282,6 +282,10 @@ impl Transaction for TxEip4844Variant {
             Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
             Self::TxEip4844WithSidecar(tx) => tx.blob_versioned_hashes(),
         }
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 
@@ -734,6 +738,10 @@ impl Transaction for TxEip4844 {
     fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
         Some(self.blob_versioned_hashes.iter().collect())
     }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
+    }
 }
 
 impl Encodable for TxEip4844 {
@@ -1002,6 +1010,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
         self.tx.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 

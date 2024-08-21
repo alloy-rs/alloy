@@ -544,6 +544,16 @@ impl Transaction for TxEnvelope {
             Self::Eip7702(tx) => tx.tx().blob_versioned_hashes(),
         }
     }
+
+    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
+        match self {
+            Self::Legacy(tx) => tx.tx().authorization_list(),
+            Self::Eip2930(tx) => tx.tx().authorization_list(),
+            Self::Eip1559(tx) => tx.tx().authorization_list(),
+            Self::Eip4844(tx) => tx.tx().authorization_list(),
+            Self::Eip7702(tx) => tx.tx().authorization_list(),
+        }
+    }
 }
 
 #[cfg(test)]
