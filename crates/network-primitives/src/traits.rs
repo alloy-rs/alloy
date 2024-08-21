@@ -104,14 +104,7 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         base_fee: Option<u64>,
         transaction_index: Option<usize>,
     ) -> Self {
-        WithOtherFields::new(T::fill(
-            signed_tx,
-            signer,
-            block_hash,
-            block_number,
-            base_fee,
-            transaction_index,
-        ))
+        Self::new(T::fill(signed_tx, signer, block_hash, block_number, base_fee, transaction_index))
     }
 }
 

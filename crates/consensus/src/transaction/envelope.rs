@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 use core::fmt;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
