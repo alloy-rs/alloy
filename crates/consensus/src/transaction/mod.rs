@@ -1,6 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
+use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
 
@@ -39,6 +40,9 @@ pub use typed::TypedTransaction;
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
+    /// Hash of the transaction.
+    fn hash(&self) -> &B256;
+
     /// Get `chain_id`.
     fn chain_id(&self) -> Option<ChainId>;
 
@@ -51,6 +55,24 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;
 
+    /// Returns the EIP-1559 the maximum fee per gas the caller is willing to pay.
+    ///
+    /// For legacy transactions this is `gas_price`.
+    ///
+    /// This is also commonly referred to as the "Gas Fee Cap" (`GasFeeCap`).
+    fn max_fee_per_gas(&self) -> u128;
+
+    /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
+    ///
+    /// This will return `None` for non-EIP1559 transactions
+    fn max_priority_fee_per_gas(&self) -> Option<u128>;
+
+    /// Returns the effective tip for this transaction.
+    ///
+    /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
+    /// For legacy transactions: `gas_price - base_fee`.
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128>;
+
     /// Get `to`.
     fn to(&self) -> TxKind;
 
@@ -59,6 +81,17 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 
     /// Get `data`.
     fn input(&self) -> &[u8];
+
+    /// Returns the transaction type
+    fn tx_type(&self) -> u8;
+
+    /// Returns the EIP2930 `access_list` for the particular transaction type. Returns `None` for 
+    /// older transaction types.
+    fn access_list(&self) -> Option<&AccessList>;
+
+    /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
+    /// `None`.
+    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>>;
 }
 
 /// A signable transaction.
