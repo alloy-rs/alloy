@@ -56,13 +56,20 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     ///
     /// For legacy transactions this is `gas_price`.
     ///
-    /// This is also commonly referred to as the "Gas Fee Cap" (`GasFeeCap`).
+    /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
     /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
     ///
     /// This will return `None` for non-EIP1559 transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
+
+    /// Max fee per blob gas for EIP-4844 transaction.
+    ///
+    /// Returns `None` for non-eip4844 transactions.
+    ///
+    /// This is also commonly referred to as the "Blob Gas Fee Cap".
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
     /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
     /// otherwise return the gas price.

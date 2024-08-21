@@ -40,7 +40,7 @@ pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptW
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "Tx")]
-pub struct Transaction {
+pub struct Transaction<S = Signature> {
     /// Hash
     pub hash: TxHash,
     /// Nonce
@@ -82,7 +82,7 @@ pub struct Transaction {
     ///
     /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub signature: Option<Signature>,
+    pub signature: Option<S>,
     /// The chain id of the transaction, if any.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub chain_id: Option<ChainId>,
@@ -298,7 +298,7 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
-impl TransactionResponse for Transaction {
+impl TransactionResponse for Transaction<alloy_primitives::Signature> {
     fn tx_hash(&self) -> B256 {
         self.hash
     }
@@ -322,7 +322,70 @@ impl TransactionResponse for Transaction {
     fn input(&self) -> &Bytes {
         &self.input
     }
+
+    fn gas_price(tx: impl alloy_consensus::Transaction, base_fee: Option<u64>) -> u128 {
+        match TxType::try_from(tx.ty()).expect("should decode") {
+            TxType::Legacy | TxType::Eip2930 => tx.max_fee_per_gas(),
+            TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => {
+                // the gas price field for EIP1559 is set to `min(tip, gasFeeCap - baseFee) +
+                // baseFee`
+                base_fee
+                    .and_then(|base_fee| {
+                        tx.effective_tip_per_gas(base_fee).map(|tip| tip + base_fee as u128)
+                    })
+                    .unwrap_or_else(|| tx.max_fee_per_gas())
+            }
+        }
+    }
+
+    fn max_fee_per_gas(tx: impl alloy_consensus::Transaction) -> Option<u128> {
+        match TxType::try_from(tx.ty()).expect("should decode") {
+            TxType::Legacy | TxType::Eip2930 => None,
+            TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => Some(tx.max_fee_per_gas()),
+        }
+    }
+
+    fn fill(
+        signed_tx: Signed<impl alloy_consensus::Transaction>,
+        signer: Address,
+        block_hash: Option<B256>,
+        block_number: Option<u64>,
+        base_fee: Option<u64>,
+        transaction_index: Option<usize>,
+    ) -> Self {
+        let (tx, signature, hash) = signed_tx.into_parts();
+
+        Self {
+            hash,
+            nonce: tx.nonce(),
+            from: signer,
+            to: tx.to().to().copied(),
+            value: tx.value(),
+            gas_price: Some(Self::gas_price(tx, base_fee)),
+            max_fee_per_gas: Some(tx.max_fee_per_gas()),
+            max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
+            signature: Some(signature),
+            gas: tx.gas_limit(),
+            input: tx.input().clone().into(),
+            chain_id: tx.chain_id(),
+            access_list: tx.access_list().cloned(),
+            transaction_type: Some(tx.ty()),
+            // These fields are set to None because they are not stored as part of the transaction
+            block_hash,
+            block_number,
+            transaction_index: transaction_index.map(|idx| idx as u64),
+            // EIP-4844 fields
+            max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
+            blob_versioned_hashes: tx
+                .blob_versioned_hashes()
+                .into_iter()
+                .clone()
+                .collect::<Vec<_>>(),
+            authorization_list: tx.authorization_list().map(|l| l.to_vec()),
+        }
+    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

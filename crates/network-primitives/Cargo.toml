@@ -21,6 +21,7 @@ workspace = true
 [dependencies]
 alloy-primitives.workspace = true
 alloy-serde.workspace = true
+alloy-consensus.workspace = true
 
 serde.workspace = true
 
