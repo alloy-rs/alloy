@@ -67,11 +67,39 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// This will return `None` for non-EIP1559 transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
 
+    /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
+    /// otherwise return the gas price.
+    ///
+    /// # Warning
+    ///
+    /// This is different than the `max_priority_fee_per_gas` method, which returns `None` for
+    /// non-EIP-1559 transactions.
+    fn priority_fee_or_price(&self) -> u128;
+
     /// Returns the effective tip for this transaction.
     ///
     /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
     /// For legacy transactions: `gas_price - base_fee`.
-    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128>;
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
+        let base_fee = base_fee as u128;
+
+        let max_fee_per_gas = self.max_fee_per_gas();
+
+        // Check if max_fee_per_gas is less than base_fee
+        if max_fee_per_gas < base_fee {
+            return None;
+        }
+
+        // Calculate the difference between max_fee_per_gas and base_fee
+        let fee = max_fee_per_gas - base_fee;
+
+        // Compare the fee with max_priority_fee_per_gas (or gas price for non-EIP1559 transactions)
+        if let Some(priority_fee) = self.max_priority_fee_per_gas() {
+            Some(fee.min(priority_fee))
+        } else {
+            Some(fee)
+        }
+    }
 
     /// Get `to`.
     fn to(&self) -> TxKind;

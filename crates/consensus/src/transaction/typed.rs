@@ -195,6 +195,16 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.priority_fee_or_price(),
+        }
+    }
+
     fn to(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.to(),

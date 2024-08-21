@@ -455,6 +455,16 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
+        }
+    }
+
     fn input(&self) -> &[u8] {
         match self {
             Self::Legacy(tx) => tx.tx().input(),

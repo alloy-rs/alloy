@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -284,6 +284,10 @@ impl Transaction for TxEip1559 {
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         Some(self.max_priority_fee_per_gas)
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
     }
 
     fn to(&self) -> TxKind {

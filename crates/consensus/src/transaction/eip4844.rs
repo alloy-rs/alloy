@@ -689,6 +689,10 @@ impl Transaction for TxEip4844 {
         Some(self.max_priority_fee_per_gas)
     }
 
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
+    }
+
     fn to(&self) -> TxKind {
         self.to.into()
     }

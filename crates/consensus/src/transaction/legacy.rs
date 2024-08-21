@@ -228,6 +228,10 @@ impl Transaction for TxLegacy {
         None
     }
 
+    fn priority_fee_or_price(&self) -> u128 {
+        self.gas_price
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
