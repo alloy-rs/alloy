@@ -1,6 +1,6 @@
 use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
-    Transaction, TxEip1559, TxEip2930, TxEnvelope, TxLegacy, TxType,
+    Transaction, TxEip1559, TxEip2930, TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_primitives::{ChainId, TxKind};
 
@@ -28,6 +28,9 @@ pub enum TypedTransaction {
     /// EIP-4844 transaction
     #[cfg_attr(feature = "serde", serde(rename = "0x03", alias = "0x3"))]
     Eip4844(TxEip4844Variant),
+    /// EIP-7702 transaction
+    #[cfg_attr(feature = "serde", serde(rename = "0x04", alias = "0x4"))]
+    Eip7702(TxEip7702),
 }
 
 impl From<TxLegacy> for TypedTransaction {
@@ -66,6 +69,12 @@ impl From<TxEip4844WithSidecar> for TypedTransaction {
     }
 }
 
+impl From<TxEip7702> for TypedTransaction {
+    fn from(tx: TxEip7702) -> Self {
+        Self::Eip7702(tx)
+    }
+}
+
 impl From<TxEnvelope> for TypedTransaction {
     fn from(envelope: TxEnvelope) -> Self {
         match envelope {
@@ -73,6 +82,7 @@ impl From<TxEnvelope> for TypedTransaction {
             TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
             TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
             TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
+            TxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
         }
     }
 }
@@ -86,6 +96,7 @@ impl TypedTransaction {
             Self::Eip2930(_) => TxType::Eip2930,
             Self::Eip1559(_) => TxType::Eip1559,
             Self::Eip4844(_) => TxType::Eip4844,
+            Self::Eip7702(_) => TxType::Eip7702,
         }
     }
 
@@ -112,6 +123,14 @@ impl TypedTransaction {
             _ => None,
         }
     }
+
+    /// Return the inner EIP-7702 transaction if it exists.
+    pub const fn eip7702(&self) -> Option<&TxEip7702> {
+        match self {
+            Self::Eip7702(tx) => Some(tx),
+            _ => None,
+        }
+    }
 }
 
 impl Transaction for TypedTransaction {
@@ -121,6 +140,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.chain_id(),
             Self::Eip1559(tx) => tx.chain_id(),
             Self::Eip4844(tx) => tx.chain_id(),
+            Self::Eip7702(tx) => tx.chain_id(),
         }
     }
 
@@ -130,6 +150,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.nonce(),
             Self::Eip1559(tx) => tx.nonce(),
             Self::Eip4844(tx) => tx.nonce(),
+            Self::Eip7702(tx) => tx.nonce(),
         }
     }
 
@@ -139,6 +160,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.gas_limit(),
             Self::Eip1559(tx) => tx.gas_limit(),
             Self::Eip4844(tx) => tx.gas_limit(),
+            Self::Eip7702(tx) => tx.gas_limit(),
         }
     }
 
@@ -148,6 +170,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.gas_price(),
             Self::Eip1559(tx) => tx.gas_price(),
             Self::Eip4844(tx) => tx.gas_price(),
+            Self::Eip7702(tx) => tx.gas_price(),
         }
     }
 
@@ -157,6 +180,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.to(),
             Self::Eip1559(tx) => tx.to(),
             Self::Eip4844(tx) => tx.to(),
+            Self::Eip7702(tx) => tx.to(),
         }
     }
 
@@ -166,6 +190,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.value(),
             Self::Eip1559(tx) => tx.value(),
             Self::Eip4844(tx) => tx.value(),
+            Self::Eip7702(tx) => tx.value(),
         }
     }
 
@@ -175,6 +200,7 @@ impl Transaction for TypedTransaction {
             Self::Eip2930(tx) => tx.input(),
             Self::Eip1559(tx) => tx.input(),
             Self::Eip4844(tx) => tx.input(),
+            Self::Eip7702(tx) => tx.input(),
         }
     }
 }

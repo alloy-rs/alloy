@@ -3,7 +3,6 @@
 use crate::{ConversionError, Transaction, Withdrawal};
 use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
-use alloy_serde::OtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -35,9 +34,6 @@ pub struct Block<T = Transaction> {
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Support for arbitrary additional fields.
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
 impl Block {
@@ -417,7 +413,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -460,7 +455,6 @@ mod tests {
             transactions: BlockTransactions::Uncle,
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -503,7 +497,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(

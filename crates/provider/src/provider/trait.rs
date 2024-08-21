@@ -1,6 +1,7 @@
 //! Ethereum JSON-RPC provider.
 
 use crate::{
+    heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
     EthCall, Identity, PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
     ProviderBuilder, RootProvider, RpcWithBlock, SendableTx,
@@ -17,10 +18,10 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types_eth::{
-    AccessListWithGasUsed, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory,
-    Filter, FilterChanges, Log, SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
+    FilterChanges, Log, SyncStatus,
 };
-use alloy_transport::{BoxTransport, Transport, TransportErrorKind, TransportResult};
+use alloy_transport::{BoxTransport, Transport, TransportResult};
 use serde_json::value::RawValue;
 use std::borrow::Cow;
 
@@ -150,7 +151,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Not all client implementations support state overrides.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, 'static, T, N, Bytes> {
+    fn call<'req, 'state>(
+        &self,
+        tx: &'req N::TransactionRequest,
+    ) -> EthCall<'req, 'state, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
     }
 
@@ -165,7 +169,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn create_access_list<'a>(
         &self,
         request: &'a N::TransactionRequest,
-    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListWithGasUsed> {
+    ) -> RpcWithBlock<T, &'a N::TransactionRequest, AccessListResult> {
         RpcWithBlock::new(self.weak_client(), "eth_createAccessList", request)
     }
 
@@ -258,10 +262,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets a block by either its hash, tag, or number, with full transactions or only hashes.
     async fn get_block(
         &self,
-        id: BlockId,
+        block: BlockId,
         kind: BlockTransactionsKind,
     ) -> TransportResult<Option<N::BlockResponse>> {
-        match id {
+        match block {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
             BlockId::Number(number) => {
                 let full = matches!(kind, BlockTransactionsKind::Full);
@@ -319,10 +323,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         Ok(block)
     }
 
-    /// Gets the selected block [BlockNumberOrTag] receipts.
+    /// Gets the selected block [BlockId] receipts.
     async fn get_block_receipts(
         &self,
-        block: BlockNumberOrTag,
+        block: BlockId,
     ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
         self.client().request("eth_getBlockReceipts", (block,)).await
     }
@@ -480,7 +484,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> Result<PendingTransaction, PendingTransactionError> {
         self.root().watch_pending_transaction(config).await
     }
 
@@ -515,6 +519,18 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         hash: TxHash,
     ) -> TransportResult<Option<N::TransactionResponse>> {
         self.client().request("eth_getTransactionByHash", (hash,)).await
+    }
+
+    /// Returns the EIP-2718 encoded transaction if it exists, see also
+    /// [Decodable2718](alloy_eips::eip2718::Decodable2718).
+    ///
+    /// If the transaction is an EIP-4844 transaction that is still in the pool (pending) it will
+    /// include the sidecar, otherwise it will the consensus variant without the sidecar:
+    /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
+    ///
+    /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
+    async fn get_raw_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getRawTransactionByHash", (hash,)).await
     }
 
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
@@ -690,8 +706,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use [`Provider::watch_blocks`].
     /// However, be aware that polling increases RPC usage drastically.
@@ -724,8 +740,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use [`Provider::watch_pending_transactions`].
     /// However, be aware that polling increases RPC usage drastically.
@@ -762,8 +778,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use
     /// [`Provider::watch_full_pending_transactions`]. However, be aware that polling increases
@@ -797,8 +813,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Errors
     ///
     /// This method is only available on `pubsub` clients, such as WebSockets or IPC, and will
-    /// return a [`PubsubUnavailable`](TransportErrorKind::PubsubUnavailable) transport error if the
-    /// client does not support it.
+    /// return a [`PubsubUnavailable`](alloy_transport::TransportErrorKind::PubsubUnavailable)
+    /// transport error if the client does not support it.
     ///
     /// For a polling alternative available over HTTP, use
     /// [`Provider::watch_logs`]. However, be aware that polling increases
@@ -895,6 +911,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// [`PubsubUnavailable`]: alloy_transport::TransportErrorKind::PubsubUnavailable
     async fn raw_request<P, R>(&self, method: Cow<'static, str>, params: P) -> TransportResult<R>
     where
         P: RpcParam,
@@ -963,7 +981,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
     async fn watch_pending_transaction(
         &self,
         config: PendingTransactionConfig,
-    ) -> TransportResult<PendingTransaction> {
+    ) -> Result<PendingTransaction, PendingTransactionError> {
         let block_number =
             if let Some(receipt) = self.get_transaction_receipt(*config.tx_hash()).await? {
                 // The transaction is already confirmed.
@@ -980,7 +998,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
         self.get_heart()
             .watch_tx(config, block_number)
             .await
-            .map_err(|_| TransportErrorKind::backend_gone())
+            .map_err(|_| PendingTransactionError::FailedToRegister)
     }
 }
 
@@ -1070,7 +1088,10 @@ mod tests {
         let provider = ProviderBuilder::new().on_anvil_with_config(|a| a.block_time(1));
 
         let err = provider.subscribe_blocks().await.unwrap_err();
-        let alloy_json_rpc::RpcError::Transport(TransportErrorKind::PubsubUnavailable) = err else {
+        let alloy_json_rpc::RpcError::Transport(
+            alloy_transport::TransportErrorKind::PubsubUnavailable,
+        ) = err
+        else {
             panic!("{err:?}");
         };
     }
@@ -1087,7 +1108,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws() {
         use futures::stream::StreamExt;
@@ -1108,7 +1129,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "ws")]
+    #[cfg(all(feature = "ws", not(windows)))]
     #[tokio::test]
     async fn subscribe_blocks_ws_boxed() {
         use futures::stream::StreamExt;
@@ -1434,7 +1455,8 @@ mod tests {
     async fn gets_block_receipts() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let receipts = provider.get_block_receipts(BlockNumberOrTag::Latest).await.unwrap();
+        let receipts =
+            provider.get_block_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert!(receipts.is_some());
     }
 

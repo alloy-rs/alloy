@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.76"
 authors = ["Alloy Contributors"]
@@ -128,7 +128,7 @@ semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
-derive_more = "0.99.17"
+derive_more = "1.0.0"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [

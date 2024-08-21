@@ -29,6 +29,7 @@ pub enum TraceType {
 #[serde(rename_all = "camelCase")]
 pub struct TraceResults {
     /// Output of the trace
+    #[serde(deserialize_with = "alloy_serde::null_as_default")]
     pub output: Bytes,
     /// Enabled if [TraceType::StateDiff] is provided
     pub state_diff: Option<StateDiff>,
@@ -820,5 +821,32 @@ mod tests {
         assert!(trace.trace.action.is_selfdestruct());
         let serialized = serde_json::to_string_pretty(&trace).unwrap();
         similar_asserts::assert_eq!(serialized, reference_data);
+    }
+    #[test]
+    fn test_nethermind_trace_result_null_output_value() {
+        let reference_data = r#"{
+  "output": null,
+  "stateDiff": {
+    "0x5e1d1eb61e1164d5a50b28c575da73a29595dff7": {
+      "balance": "=",
+      "code": "=",
+      "nonce": "=",
+      "storage": {
+        "0x0000000000000000000000000000000000000000000000000000000000000005": {
+          "*": {
+            "from": "0x0000000000000000000000000000000000000000000000000000000000042f66",
+            "to": "0x0000000000000000000000000000000000000000000000000000000000042f67"
+          }
+        }
+      }
+    }
+  },
+  "trace": [],
+  "vmTrace": null,
+  "transactionHash": "0xe56a5e7455c45b1842b35dbcab9d024b21870ee59820525091e183b573b4f9eb"
+}"#;
+        let trace =
+            serde_json::from_str::<TraceResultsWithTransactionHash>(reference_data).unwrap();
+        assert_eq!(trace.full_trace.output, Bytes::default());
     }
 }
