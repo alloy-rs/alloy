@@ -259,6 +259,7 @@ getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
+ssz = ["alloy-rpc-types?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
     "alloy-consensus?/arbitrary",
