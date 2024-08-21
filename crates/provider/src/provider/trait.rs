@@ -519,6 +519,18 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getTransactionByHash", (hash,)).await
     }
 
+    /// Returns the EIP-2718 encoded transaction if it exists, see also
+    /// [Decodable2718](alloy_eips::eip2718::Decodable2718).
+    ///
+    /// If the transaction is an EIP-4844 transaction that is still in the pool (pending) it will
+    /// include the sidecar, otherwise it will the consensus variant without the sidecar:
+    /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
+    ///
+    /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
+    async fn get_raw_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Option<Bytes>> {
+        self.client().request("eth_getRawTransactionByHash", (hash,)).await
+    }
+
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
     #[doc(alias = "get_nonce")]
     #[doc(alias = "get_account_nonce")]
