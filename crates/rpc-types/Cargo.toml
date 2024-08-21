@@ -34,7 +34,7 @@ serde = { workspace = true, features = ["derive", "std"]}
 serde_json.workspace = true
 
 [features]
-default = ["eth"]
+default = ["eth", "alloy-rpc-types-engine?/default"]
 admin = ["dep:alloy-rpc-types-admin"]
 anvil = ["dep:alloy-rpc-types-anvil"]
 beacon = ["dep:alloy-rpc-types-beacon"]

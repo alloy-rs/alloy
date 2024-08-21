@@ -11,7 +11,7 @@ use std::{
     task::Poll,
 };
 
-/// States of the
+/// States of the [`RpcWithBlock`] future.
 #[derive(Clone)]
 enum States<T, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where

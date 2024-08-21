@@ -34,17 +34,13 @@ elliptic-curve = { workspace = true, optional = true }
 eth-keystore = { version = "0.5.0", default-features = false, optional = true }
 
 # mnemonic
-coins-bip32 = { version = "0.11.1", default-features = false, optional = true }
-coins-bip39 = { version = "0.11.1", default-features = false, features = [
+coins-bip32 = { version = "0.12", default-features = false, optional = true }
+coins-bip39 = { version = "0.12", default-features = false, features = [
     "english",
 ], optional = true }
 
 # yubi
-yubihsm = { version = "0.42", features = [
-    "secp256k1",
-    "http",
-    "usb",
-], optional = true }
+yubihsm = { version = "0.42", features = ["secp256k1", "http", "usb"], optional = true }
 
 [dev-dependencies]
 alloy-dyn-abi.workspace = true
