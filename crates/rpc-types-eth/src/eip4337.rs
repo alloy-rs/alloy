@@ -42,6 +42,7 @@ pub enum AccountStorage {
 
 /// EIP-4337: User Operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserOperation {
     /// The account making the operation.
     pub sender: Address,
@@ -77,7 +78,8 @@ pub struct UserOperation {
 
 /// Response to sending a user operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SendUserOperationResponse {
     /// The hash of the user operation.
-    pub user_operation_hash: Bytes,
+    pub hash: Bytes,
 }
