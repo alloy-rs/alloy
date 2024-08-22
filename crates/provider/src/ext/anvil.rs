@@ -652,7 +652,7 @@ mod tests {
 
         let node_info = provider.anvil_node_info().await.unwrap();
 
-        assert_eq!(node_info.current_block_number, latest_block.header.number.unwrap() + 1);
+        assert_eq!(node_info.current_block_number, latest_block.header.number + 1);
     }
 
     #[tokio::test]

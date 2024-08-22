@@ -9,15 +9,17 @@ use crate::{
 use alloy_eips::eip2718::Encodable2718;
 use alloy_json_rpc::{RpcError, RpcParam, RpcReturn};
 use alloy_network::{Ethereum, Network};
-use alloy_network_primitives::{BlockTransactionsKind, ReceiptResponse};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactionsKind, HeaderResponse, ReceiptResponse,
+};
 use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
 use alloy_rpc_client::{ClientRef, PollerBuilder, RpcCall, WeakClient};
 use alloy_rpc_types_eth::{
-    AccessListResult, Block, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory,
-    Filter, FilterChanges, Log, SyncStatus,
+    AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
+    FilterChanges, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportResult};
 use serde_json::value::RawValue;
@@ -213,8 +215,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
                 self.get_block_by_number(BlockNumberOrTag::Latest, false)
                     .await?
                     .ok_or(RpcError::NullResp)?
-                    .header
-                    .base_fee_per_gas
+                    .header()
+                    .base_fee_per_gas()
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
             }
         };
@@ -262,7 +264,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         block: BlockId,
         kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         match block {
             BlockId::Hash(hash) => self.get_block_by_hash(hash.into(), kind).await,
             BlockId::Number(number) => {
@@ -277,7 +279,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         hash: BlockHash,
         kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         let full = match kind {
             BlockTransactionsKind::Full => true,
             BlockTransactionsKind::Hashes => false,
@@ -285,13 +287,13 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
         let block = self
             .client()
-            .request::<_, Option<Block>>("eth_getBlockByHash", (hash, full))
+            .request::<_, Option<N::BlockResponse>>("eth_getBlockByHash", (hash, full))
             .await?
             .map(|mut block| {
                 if !full {
                     // this ensures an empty response for `Hashes` has the expected form
                     // this is required because deserializing [] is ambiguous
-                    block.transactions.convert_to_hashes();
+                    block.transactions_mut().convert_to_hashes();
                 }
                 block
             });
@@ -305,16 +307,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         number: BlockNumberOrTag,
         hydrate: bool,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         let block = self
             .client()
-            .request::<_, Option<Block>>("eth_getBlockByNumber", (number, hydrate))
+            .request::<_, Option<N::BlockResponse>>("eth_getBlockByNumber", (number, hydrate))
             .await?
             .map(|mut block| {
                 if !hydrate {
                     // this ensures an empty response for `Hashes` has the expected form
                     // this is required because deserializing [] is ambiguous
-                    block.transactions.convert_to_hashes();
+                    block.transactions_mut().convert_to_hashes();
                 }
                 block
             });
@@ -548,7 +550,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [u64].
-    async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<Block>> {
+    async fn get_uncle(&self, tag: BlockId, idx: u64) -> TransportResult<Option<N::BlockResponse>> {
         let idx = U64::from(idx);
         match tag {
             BlockId::Hash(hash) => {
@@ -725,7 +727,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # }
     /// ```
     #[cfg(feature = "pubsub")]
-    async fn subscribe_blocks(&self) -> TransportResult<alloy_pubsub::Subscription<Block>> {
+    async fn subscribe_blocks(
+        &self,
+    ) -> TransportResult<alloy_pubsub::Subscription<N::BlockResponse>> {
         self.root().pubsub_frontend()?;
         let id = self.client().request("eth_subscribe", ("newHeads",)).await?;
         self.root().get_subscription(id).await
@@ -1007,7 +1011,7 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rpc_types_eth::request::TransactionRequest;
+    use alloy_rpc_types_eth::{request::TransactionRequest, Block};
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1119,7 +1123,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), n);
+            assert_eq!(block.header.number, n);
             assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
@@ -1141,7 +1145,7 @@ mod tests {
         let mut stream = sub.into_stream().take(2);
         let mut n = 1;
         while let Some(block) = stream.next().await {
-            assert_eq!(block.header.number.unwrap(), n);
+            assert_eq!(block.header.number, n);
             assert_eq!(block.transactions.hashes().len(), 0);
             n += 1;
         }
@@ -1161,7 +1165,7 @@ mod tests {
         let mut stream = sub.into_stream().take(1);
         while let Some(block) = stream.next().await {
             println!("New block {:?}", block);
-            assert!(block.header.number.unwrap() > 0);
+            assert!(block.header.number > 0);
         }
     }
 
@@ -1299,7 +1303,7 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        assert_eq!(block.header.number.unwrap(), num);
+        assert_eq!(block.header.number, num);
     }
 
     #[tokio::test]
@@ -1309,7 +1313,7 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        assert_eq!(block.header.number.unwrap(), num);
+        assert_eq!(block.header.number, num);
     }
 
     #[tokio::test]
