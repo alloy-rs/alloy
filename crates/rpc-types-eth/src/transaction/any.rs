@@ -3,7 +3,7 @@ use alloy_consensus::{
     TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Address, BlockHash, Bytes, ChainId, Signature, TxHash, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxHash, B256, U256};
 use serde::{Deserialize, Serialize};
 
 use super::ConversionError;
