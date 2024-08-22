@@ -18,17 +18,6 @@ pub struct AnyTxEnvelope {
     /// Nonce
     #[serde(with = "alloy_serde::quantity")]
     pub nonce: u64,
-    /// Block hash
-    #[serde(default)]
-    pub block_hash: Option<BlockHash>,
-    /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub block_number: Option<u64>,
-    /// Transaction Index
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub transaction_index: Option<u64>,
-    /// Sender
-    pub from: Address,
     /// Recipient
     pub to: Option<Address>,
     /// Transferred value
