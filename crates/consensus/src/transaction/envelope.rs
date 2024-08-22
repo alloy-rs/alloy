@@ -537,7 +537,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip2930(tx) => tx.tx().blob_versioned_hashes(),

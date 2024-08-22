@@ -267,8 +267,7 @@ impl TxEip7702 {
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
-        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>()
-        // authorization_list
+        self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
     }
 
     /// Output the length of the RLP signed transaction encoding, _without_ a RLP string header.
@@ -338,7 +337,7 @@ impl Transaction for TxEip7702 {
         Some(&self.access_list)
     }
 
-    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 
