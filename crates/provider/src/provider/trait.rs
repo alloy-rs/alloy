@@ -860,7 +860,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Cancels a subscription given the subscription ID.
     #[cfg(feature = "pubsub")]
-    async fn unsubscribe(&self, id: U256) -> TransportResult<()> {
+    async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)
     }
 
