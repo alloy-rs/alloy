@@ -135,6 +135,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
+    #[cfg(feature = "k256")]
     fn arbitrary_transaction() {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
