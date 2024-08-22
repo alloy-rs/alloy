@@ -23,6 +23,9 @@ pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
+mod any;
+pub use any::AnyTxEnvelope;
+
 pub use alloy_consensus::{
     AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxEnvelope,
 };
@@ -32,10 +35,10 @@ pub use alloy_consensus::{
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "Tx")]
-pub struct Transaction {
-    /// Typed transaction envelope
+pub struct Transaction<T = TxEnvelope> {
+    /// Transaction envelope, containing consensus data.
     #[serde(flatten)]
-    pub tx: TxEnvelope,
+    pub tx: T,
     /// Block hash
     #[serde(default)]
     pub block_hash: Option<BlockHash>,
@@ -95,6 +98,33 @@ impl TransactionResponse for Transaction {
         self.tx.input()
     }
 }
+
+impl TransactionResponse for Transaction<AnyTxEnvelope> {
+    fn tx_hash(&self) -> B256 {
+        self.tx.hash
+    }
+
+    fn from(&self) -> Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.tx.to
+    }
+
+    fn value(&self) -> U256 {
+        self.tx.value
+    }
+
+    fn gas(&self) -> u128 {
+        self.tx.gas
+    }
+
+    fn input(&self) -> &Bytes {
+        &self.tx.input
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

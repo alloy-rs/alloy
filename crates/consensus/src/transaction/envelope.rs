@@ -10,8 +10,6 @@ use alloy_eips::{
 };
 use alloy_primitives::{Bytes, TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
-use serde::Deserialize;
-use serde_value::ValueDeserializer;
 
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
@@ -590,7 +588,8 @@ impl<'de> serde::Deserialize<'de> for TxEnvelope {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde_value::Value;
+        use serde::Deserialize;
+        use serde_value::{Value, ValueDeserializer};
         struct Visitor;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
@@ -1074,10 +1073,9 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_deser_no_tag() {
         let serialized = r#"{"nonce":"0x0","gasPrice":"0x0","gas":"0x0","value":"0x0","input":"0x","r":"0x840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565","s":"0x25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1","yParity":"0x0","hash":"0xdb92c47d1ee601a818ac3bd1517c55fe46a869327f6c11837e003a32f25f71fe"}"#;
-        let deserialized: TxEnvelope = serde_json::from_str(&serialized).unwrap();
-        let expected = TxLegacy {
-            ..Default::default()
-        }.into_signed(Signature::test_signature()).into();
+        let deserialized: TxEnvelope = serde_json::from_str(serialized).unwrap();
+        let expected =
+            TxLegacy { ..Default::default() }.into_signed(Signature::test_signature()).into();
         assert_eq!(deserialized, expected);
     }
 
