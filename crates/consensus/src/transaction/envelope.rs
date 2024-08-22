@@ -1,16 +1,17 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::fmt;
-use std::collections::BTreeMap;
-
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
+<<<<<<< HEAD
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
+=======
+use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
+>>>>>>> e670510c (fix features)
 use alloy_primitives::{Bytes, TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
-
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
@@ -83,7 +84,7 @@ impl serde::Serialize for TxType {
     where
         S: serde::Serializer,
     {
-        U8::from(u8::from(*self)).serialize(serializer)
+        alloy_primitives::U8::from(u8::from(*self)).serialize(serializer)
     }
 }
 
@@ -93,7 +94,7 @@ impl<'de> serde::Deserialize<'de> for TxType {
     where
         D: serde::Deserializer<'de>,
     {
-        let val = Option::<U8>::deserialize(deserializer)?.unwrap_or(U8::ZERO);
+        let val = Option::<alloy_primitives::U8>::deserialize(deserializer)?.unwrap_or_default();
         Self::try_from(val.to::<u8>()).map_err(serde::de::Error::custom)
     }
 }
@@ -591,6 +592,11 @@ impl<'de> serde::Deserialize<'de> for TxEnvelope {
         use serde::Deserialize;
         use serde_value::{Value, ValueDeserializer};
         struct Visitor;
+
+        #[cfg(not(feature = "std"))]
+        use alloc::collections::BTreeMap;
+        #[cfg(feature = "std")]
+        use std::collections::BTreeMap;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
             type Value = (TxType, Value);
