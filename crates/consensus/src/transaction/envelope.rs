@@ -1,7 +1,12 @@
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 use core::fmt;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
+use alloy_eips::{
+    eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
+    eip2930::AccessList,
+};
 use alloy_primitives::{TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
 
@@ -433,6 +438,36 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
+            Self::Eip2930(tx) => tx.tx().max_fee_per_gas(),
+            Self::Eip1559(tx) => tx.tx().max_fee_per_gas(),
+            Self::Eip4844(tx) => tx.tx().max_fee_per_gas(),
+            Self::Eip7702(tx) => tx.tx().max_fee_per_gas(),
+        }
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        match self {
+            Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::Eip2930(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::Eip1559(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::Eip4844(tx) => tx.tx().max_priority_fee_per_gas(),
+            Self::Eip7702(tx) => tx.tx().max_priority_fee_per_gas(),
+        }
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
+        }
+    }
+
     fn input(&self) -> &[u8] {
         match self {
             Self::Legacy(tx) => tx.tx().input(),
@@ -470,6 +505,36 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().value(),
             Self::Eip4844(tx) => tx.tx().value(),
             Self::Eip7702(tx) => tx.tx().value(),
+        }
+    }
+
+    fn ty(&self) -> u8 {
+        match self {
+            Self::Legacy(tx) => tx.tx().ty(),
+            Self::Eip2930(tx) => tx.tx().ty(),
+            Self::Eip1559(tx) => tx.tx().ty(),
+            Self::Eip4844(tx) => tx.tx().ty(),
+            Self::Eip7702(tx) => tx.tx().ty(),
+        }
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        match self {
+            Self::Legacy(tx) => tx.tx().access_list(),
+            Self::Eip2930(tx) => tx.tx().access_list(),
+            Self::Eip1559(tx) => tx.tx().access_list(),
+            Self::Eip4844(tx) => tx.tx().access_list(),
+            Self::Eip7702(tx) => tx.tx().access_list(),
+        }
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        match self {
+            Self::Legacy(tx) => tx.tx().blob_versioned_hashes(),
+            Self::Eip2930(tx) => tx.tx().blob_versioned_hashes(),
+            Self::Eip1559(tx) => tx.tx().blob_versioned_hashes(),
+            Self::Eip4844(tx) => tx.tx().blob_versioned_hashes(),
+            Self::Eip7702(tx) => tx.tx().blob_versioned_hashes(),
         }
     }
 }
