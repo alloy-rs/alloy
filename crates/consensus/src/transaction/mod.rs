@@ -113,7 +113,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 
     /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
     /// `None`.
-    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>>;
+    fn blob_versioned_hashes(&self) -> Option<&[B256]>;
 }
 
 /// A signable transaction.

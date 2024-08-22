@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{ChainId, TxKind};
+use alloy_primitives::{ChainId, TxKind, B256};
 
 use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
@@ -259,7 +259,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn blob_versioned_hashes(&self) -> Option<Vec<&alloy_primitives::B256>> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Legacy(tx) => tx.blob_versioned_hashes(),
             Self::Eip2930(tx) => tx.blob_versioned_hashes(),

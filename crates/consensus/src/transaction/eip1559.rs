@@ -310,7 +310,7 @@ impl Transaction for TxEip1559 {
         Some(&self.access_list)
     }
 
-    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 }

@@ -252,7 +252,7 @@ impl Transaction for TxLegacy {
         None
     }
 
-    fn blob_versioned_hashes(&self) -> Option<Vec<&B256>> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
     }
 }
