@@ -7,13 +7,14 @@ use alloy_rlp::{Decodable, Encodable, Header};
 
 use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
 
-/// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], and
-/// [2930].
+/// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
+/// [4844], and [7702].
 ///
 /// [2718]: https://eips.ethereum.org/EIPS/eip-2718
 /// [1559]: https://eips.ethereum.org/EIPS/eip-1559
 /// [2930]: https://eips.ethereum.org/EIPS/eip-2930
 /// [4844]: https://eips.ethereum.org/EIPS/eip-4844
+/// [7702]: https://eips.ethereum.org/EIPS/eip-7702
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[doc(alias = "TransactionType")]
