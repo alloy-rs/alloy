@@ -14,10 +14,10 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
