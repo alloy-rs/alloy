@@ -53,6 +53,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-admin`] - Types for the `admin` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-anvil`] - Types for the [Anvil] development node's Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
+  - [`alloy-rpc-types-debug`] - Types for the `debug` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace
