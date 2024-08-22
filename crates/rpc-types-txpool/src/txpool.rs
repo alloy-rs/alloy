@@ -193,7 +193,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a",
         "gas": "0x2af9e",
-        "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
         "maxPriorityFeePerGas": "0x3b9aca00",
         "hash": "0xfbc6fd04ba1c4114f06574263f04099b4fb2da72acc6f9709f0a3d2361308344",
@@ -205,7 +204,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0xbb809ae71b03319ba2811ebd581c85665169143ffade86e07d2eb4cd03b544dc",
         "s": "0x65a2aa7e0e70356f765205a611d580de8e84fa79086f117fd9ab4765f5cf1339"
       }
@@ -236,7 +235,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x000fab888651fbceb55de230493562159ead0340",
         "gas": "0x12fed",
-        "gasPrice": "0x1a13b8600",
         "maxFeePerGas": "0x1a13b8600",
         "maxPriorityFeePerGas": "0x59682f00",
         "hash": "0xfae0cffdae6774abe11662a2cdbea019fce48fca87ba9ebf5e9e7c2454c01715",
@@ -248,7 +246,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x7b717e689d1bd045ee7afd79b97219f2e36bd22a6a14e07023902194bca96fbf",
         "s": "0x7b0ba462c98e7b0f95a53f047cf568ee0443839628dfe4ab294bfab88fa8e251"
       }
@@ -261,7 +259,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf",
         "gas": "0x33c3b",
-        "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
         "maxPriorityFeePerGas": "0x77359400",
         "hash": "0x68959706857f7a58d752ede0a5118a5f55f4ae40801f31377e1af201944720b2",
@@ -273,7 +270,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x77d149add2b1b84af9408af55661b05b21e2a436f9bfcaa844584905a0f8f1ac",
         "s": "0x358d79063d702f0c3fb46ad0f6ce5db61f5fdb0b20359c8da2e72a11988db283"
       }
@@ -284,7 +281,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7918",
-        "gasPrice": "0x12e531724e",
         "maxFeePerGas": "0x12e531724e",
         "maxPriorityFeePerGas": "0x59682f00",
         "hash": "0x35109918ab6129a4d69480514ebec0ea08dc4a4de032fec59003ea66718828c4",
@@ -296,7 +292,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x0",
+        "yParity": "0x0",
         "r": "0x863ed0413a14f3f1695fd9728f1500a2b46e69d6f4c82408af15354cc5a667d6",
         "s": "0x2d503050aa1c9ecbb6df9957459c296f2f6190bc07aa09047d541233100b1c7a"
       },
@@ -305,7 +301,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7530",
-        "gasPrice": "0x1919617600",
         "maxFeePerGas": "0x1919617600",
         "maxPriorityFeePerGas": "0x5c7261c0",
         "hash": "0xa58e54464b2ca62a5e2d976604ed9a53b13f8823a170ee4c3ae0cd91cde2a6c5",
@@ -317,7 +312,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x1",
+        "yParity": "0x1",
         "r": "0xb6a571191c4b5b667876295571c42c9411bbb4569eea1a6ad149572e4efc55a9",
         "s": "0x248a72dab9b24568dd9cbe289c205eaba1a6b58b32b5a96c48554945d3fd0d86"
       }
@@ -328,7 +323,6 @@ mod tests {
         "blockNumber": null,
         "from": "0x02666081cfb787de3562efbbca5f0fe890e927f1",
         "gas": "0x16404",
-        "gasPrice": "0x4bad00695",
         "maxFeePerGas": "0x4bad00695",
         "maxPriorityFeePerGas": "0xa3e9ab80",
         "hash": "0xf627e59d7a59eb650f4c9df222858572601a566263809fdacbb755ac2277a4a7",
@@ -340,7 +334,7 @@ mod tests {
         "type": "0x2",
         "accessList": [],
         "chainId": "0x1",
-        "v": "0x1",
+        "yParity": "0x1",
         "r": "0xcfc88f55fc0779d12705acba58719cd7d0ed5b0c1a7c3c3682b56397ca493dd5",
         "s": "0x7e7dc008058c543ebfdae67154c797639447db5e8006f8fc0585352d857c1b6c"
       }

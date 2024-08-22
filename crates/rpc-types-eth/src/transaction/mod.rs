@@ -217,7 +217,7 @@ mod tests {
         let transaction = Transaction {
             tx: Signed::new_unchecked(
                 TxLegacy { ..Default::default() },
-                Signature::from_rs_and_parity(U256::from(14), U256::from(14), 14).unwrap(),
+                Signature::from_rs_and_parity(U256::from(14), U256::from(14), 36).unwrap(),
                 B256::with_last_byte(1),
             )
             .into(),
@@ -229,7 +229,7 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000006","to":null,"value":"0x8","gas":"0xa","input":"0x0b0c0d"}"#
+            r#"{"type":"0x0","nonce":"0x0","gasPrice":"0x0","gas":"0x0","value":"0x0","input":"0x","r":"0xe","s":"0xe","v":"0x24","hash":"0x0000000000000000000000000000000000000000000000000000000000000001","blockHash":null,"blockNumber":null,"transactionIndex":null,"from":"0x0000000000000000000000000000000000000000"}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
