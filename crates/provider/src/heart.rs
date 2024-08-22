@@ -563,7 +563,7 @@ impl<S> Heartbeat<S> {
     /// the latest block.
     fn handle_new_block(&mut self, block: Block, latest: &watch::Sender<Option<Block>>) {
         // Blocks without numbers are ignored, as they're not part of the chain.
-        let Some(block_height) = &block.header.number else { return };
+        let block_height = &block.header.number;
 
         // Add the block the lookbehind.
         // The value is chosen arbitrarily to not have a huge memory footprint but still

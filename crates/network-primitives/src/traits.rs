@@ -2,6 +2,8 @@ use alloy_consensus::Signed;
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
+use crate::BlockTransactions;
+
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
@@ -61,6 +63,41 @@ pub trait TransactionResponse {
         base_fee: Option<u64>,
         transaction_index: Option<usize>,
     ) -> Self;
+}
+
+/// Header JSON-RPC response.
+pub trait HeaderResponse {
+    /// Block number
+    fn number(&self) -> u64;
+
+    /// Block timestamp
+    fn timestamp(&self) -> u64;
+
+    /// Extra data
+    fn extra_data(&self) -> &Bytes;
+
+    /// Base fee per unit of gas (If EIP-1559 is supported)
+    fn base_fee_per_gas(&self) -> Option<u128>;
+
+    /// Blob fee for the next block (if EIP-4844 is supported)
+    fn next_block_blob_fee(&self) -> Option<u128>;
+}
+
+/// Block JSON-RPC response.
+pub trait BlockResponse {
+    /// Header type
+    type Header;
+    /// Transaction type
+    type Transaction;
+
+    /// Block header
+    fn header(&self) -> &Self::Header;
+
+    /// Block transactions
+    fn transactions(&self) -> &BlockTransactions<Self::Transaction>;
+
+    /// Mutable reference to block transactions
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction>;
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
@@ -123,5 +160,44 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn block_number(&self) -> Option<u64> {
         self.inner.block_number()
+    }
+}
+
+impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
+    type Header = T::Header;
+    type Transaction = T::Transaction;
+
+    fn header(&self) -> &Self::Header {
+        self.inner.header()
+    }
+
+    fn transactions(&self) -> &BlockTransactions<Self::Transaction> {
+        self.inner.transactions()
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        self.inner.transactions_mut()
+    }
+}
+
+impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
+    fn number(&self) -> u64 {
+        self.inner.number()
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.inner.timestamp()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.inner.extra_data()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.inner.base_fee_per_gas()
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.inner.next_block_blob_fee()
     }
 }

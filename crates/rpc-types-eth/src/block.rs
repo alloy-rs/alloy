@@ -1,7 +1,7 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::BlockTransactions;
+use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
@@ -68,8 +68,8 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub number: Option<u64>,
+    #[serde(with = "alloy_serde::quantity")]
+    pub number: u64,
     /// Gas Limit
     #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
@@ -185,7 +185,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             withdrawals_root,
             logs_bloom,
             difficulty,
-            number: number.ok_or(ConversionError::MissingBlockNumber)?,
+            number,
             gas_limit,
             gas_used,
             timestamp,
@@ -198,6 +198,28 @@ impl TryFrom<Header> for alloy_consensus::Header {
             requests_root,
             extra_data,
         })
+    }
+}
+
+impl HeaderResponse for Header {
+    fn number(&self) -> u64 {
+        self.number
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_blob_fee()
     }
 }
 
@@ -312,6 +334,23 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
+impl<T> BlockResponse for Block<T> {
+    type Transaction = T;
+    type Header = Header;
+
+    fn header(&self) -> &Self::Header {
+        &self.header
+    }
+
+    fn transactions(&self) -> &BlockTransactions<T> {
+        &self.transactions
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        &mut self.transactions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloy_primitives::keccak256;
@@ -350,7 +389,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -392,7 +431,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -434,7 +473,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: None,
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
