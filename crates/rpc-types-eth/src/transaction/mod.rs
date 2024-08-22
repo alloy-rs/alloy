@@ -130,13 +130,14 @@ mod tests {
     use super::*;
     use alloy_consensus::{Signed, TxEip7702, TxLegacy};
     use alloy_primitives::{Parity, Signature, TxKind};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
     use std::str::FromStr;
 
     #[test]
     #[cfg(feature = "k256")]
     fn arbitrary_transaction() {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
         let _: Transaction =
