@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, BlockNumber, B256, U256};
+use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -38,4 +38,46 @@ pub enum AccountStorage {
     RootHash(B256),
     /// Explicit storage slots and their expected values.
     Slots(HashMap<U256, B256>),
+}
+
+/// EIP-4337: User Operation
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserOperation {
+    /// The account making the operation.
+    pub sender: Address,
+    /// Prevents message replay attacks and serves as a randomizing element for initial user registration.
+    pub nonce: U256,
+    /// Deployer contract address: Required exclusively for deploying new accounts that don't yet exist on the blockchain.
+    pub factory: Address,
+    /// Factory data for the account creation process, applicable only when using a deployer contract.
+    pub factory_data: Bytes,
+    /// The call data.
+    pub call_data: Bytes,
+    /// The gas limit for the call.
+    pub call_gas_limit: U256,
+    /// The gas limit for the verification.
+    pub verification_gas_limit: U256,
+    /// Prepaid gas fee: Covers the bundler's costs for initial transaction validation and data transmission.
+    pub pre_verification_gas: U256,
+    /// The maximum fee per gas.
+    pub max_fee_per_gas: U256,
+    /// The maximum priority fee per gas.
+    pub max_priority_fee_per_gas: U256,
+    /// Paymaster contract address: Needed if a third party is covering transaction costs; left blank for self-funded accounts.
+    pub paymaster: Address,
+    /// The gas limit for the paymaster verification.
+    pub paymaster_verification_gas_limit: U256,
+    /// The gas limit for the paymaster post-operation.
+    pub paymaster_post_op_gas_limit: U256,
+    /// The paymaster data.
+    pub paymaster_data: Bytes,
+    /// The signature of the transaction.
+    pub signature: Bytes,
+}
+
+/// Response to sending a user operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SendUserOperationResponse {
+    /// The hash of the user operation.
+    pub user_operation_hash: Bytes,
 }
