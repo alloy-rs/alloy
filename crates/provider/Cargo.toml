@@ -98,6 +98,7 @@ anvil-node = [
     "dep:alloy-signer-local",
 ]
 debug-api = ["dep:alloy-rpc-types-trace"]
+eip4337-api = []
 engine-api = ["dep:alloy-rpc-types-engine"]
 net-api = []
 trace-api = ["dep:alloy-rpc-types-trace"]
