@@ -1,7 +1,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::Address;
-use alloy_rpc_types_eth::eip4337::{SendUserOperationResponse, UserOperation};
+use alloy_rpc_types_eth::erc4337::{SendUserOperationResponse, UserOperation};
 use alloy_transport::{Transport, TransportResult};
 
 /// ERC-4337 Account Abstraction API
@@ -9,7 +9,7 @@ use alloy_transport::{Transport, TransportResult};
 /// as defined in ERC-4337.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait Eip4337Api<N, T>: Send + Sync {
+pub trait Erc4337Api<N, T>: Send + Sync {
     /// Sends a UserOperation to the bundler.
     async fn eth_send_user_operation(
         &self,
@@ -20,7 +20,7 @@ pub trait Eip4337Api<N, T>: Send + Sync {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<N, T, P> Eip4337Api<N, T> for P
+impl<N, T, P> Erc4337Api<N, T> for P
 where
     N: Network,
     T: Transport + Clone,
