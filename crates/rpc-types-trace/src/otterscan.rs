@@ -174,7 +174,11 @@ impl<T> From<Rich<Block<T>>> for BlockDetails {
 
 impl BlockDetails {
     /// Create a new `BlockDetails` struct.
-    pub fn new<T>(rich_block: Rich<Block<T>>, issuance: InternalIssuance, total_fees: U256) -> Self {
+    pub fn new<T>(
+        rich_block: Rich<Block<T>>,
+        issuance: InternalIssuance,
+        total_fees: U256,
+    ) -> Self {
         Self { block: rich_block.inner.into(), issuance, total_fees }
     }
 }
