@@ -102,17 +102,17 @@ pub struct InternalIssuance {
 /// Custom `Block` struct that includes transaction count for Otterscan responses
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OtsBlock {
+pub struct OtsBlock<T = Transaction> {
     /// The block information.
     #[serde(flatten)]
-    pub block: Block,
+    pub block: Block<T>,
     /// The number of transactions in the block.
     #[doc(alias = "tx_count")]
     pub transaction_count: usize,
 }
 
-impl From<Block> for OtsBlock {
-    fn from(block: Block) -> Self {
+impl<T> From<Block<T>> for OtsBlock<T> {
+    fn from(block: Block<T>) -> Self {
         Self { transaction_count: block.transactions.len(), block }
     }
 }
@@ -138,8 +138,8 @@ pub struct OtsSlimBlock {
     pub transaction_count: usize,
 }
 
-impl From<Block> for OtsSlimBlock {
-    fn from(block: Block) -> Self {
+impl<T> From<Block<T>> for OtsSlimBlock {
+    fn from(block: Block<T>) -> Self {
         Self {
             header: block.header,
             uncles: block.uncles,
@@ -162,8 +162,8 @@ pub struct BlockDetails {
     pub total_fees: U256,
 }
 
-impl From<Rich<Block>> for BlockDetails {
-    fn from(rich_block: Rich<Block>) -> Self {
+impl<T> From<Rich<Block<T>>> for BlockDetails {
+    fn from(rich_block: Rich<Block<T>>) -> Self {
         Self {
             block: rich_block.inner.into(),
             issuance: Default::default(),
@@ -174,7 +174,7 @@ impl From<Rich<Block>> for BlockDetails {
 
 impl BlockDetails {
     /// Create a new `BlockDetails` struct.
-    pub fn new(rich_block: Rich<Block>, issuance: InternalIssuance, total_fees: U256) -> Self {
+    pub fn new<T>(rich_block: Rich<Block<T>>, issuance: InternalIssuance, total_fees: U256) -> Self {
         Self { block: rich_block.inner.into(), issuance, total_fees }
     }
 }
@@ -220,9 +220,9 @@ pub struct OtsReceipt {
 
 /// Custom struct for otterscan `getBlockTransactions` RPC response
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OtsBlockTransactions {
+pub struct OtsBlockTransactions<T = Transaction> {
     /// The full block information with transaction count.
-    pub fullblock: OtsBlock,
+    pub fullblock: OtsBlock<T>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
 }
@@ -232,10 +232,10 @@ pub struct OtsBlockTransactions {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "TxWithReceipts")]
-pub struct TransactionsWithReceipts {
+pub struct TransactionsWithReceipts<T = Transaction> {
     /// The list of transactions.
     #[doc(alias = "transactions")]
-    pub txs: Vec<Transaction>,
+    pub txs: Vec<T>,
     /// The list of transaction receipts.
     pub receipts: Vec<OtsTransactionReceipt>,
     /// Indicates if this is the first page of results.
