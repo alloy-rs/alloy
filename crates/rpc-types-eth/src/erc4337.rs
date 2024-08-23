@@ -117,3 +117,17 @@ pub struct UserOperationReceipt {
     /// The transaction receipt of the user operation.
     pub receipt: TransactionReceipt,
 }
+
+/// Represents the gas estimation for a user operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperationGasEstimation {
+    /// The gas limit for the pre-verification.
+    pub pre_verification_gas: U256,
+    /// The gas limit for the verification.
+    pub verification_gas: U256,
+    /// The gas limit for the paymaster verification.
+    pub paymaster_verification_gas: U256,
+    /// The gas limit for the call.
+    pub call_gas_limit: U256,
+}
