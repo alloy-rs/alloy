@@ -46,11 +46,14 @@ pub enum AccountStorage {
 pub struct UserOperation {
     /// The account making the operation.
     pub sender: Address,
-    /// Prevents message replay attacks and serves as a randomizing element for initial user registration.
+    /// Prevents message replay attacks and serves as a randomizing element for initial user
+    /// registration.
     pub nonce: U256,
-    /// Deployer contract address: Required exclusively for deploying new accounts that don't yet exist on the blockchain.
+    /// Deployer contract address: Required exclusively for deploying new accounts that don't yet
+    /// exist on the blockchain.
     pub factory: Address,
-    /// Factory data for the account creation process, applicable only when using a deployer contract.
+    /// Factory data for the account creation process, applicable only when using a deployer
+    /// contract.
     pub factory_data: Bytes,
     /// The call data.
     pub call_data: Bytes,
@@ -58,13 +61,15 @@ pub struct UserOperation {
     pub call_gas_limit: U256,
     /// The gas limit for the verification.
     pub verification_gas_limit: U256,
-    /// Prepaid gas fee: Covers the bundler's costs for initial transaction validation and data transmission.
+    /// Prepaid gas fee: Covers the bundler's costs for initial transaction validation and data
+    /// transmission.
     pub pre_verification_gas: U256,
     /// The maximum fee per gas.
     pub max_fee_per_gas: U256,
     /// The maximum priority fee per gas.
     pub max_priority_fee_per_gas: U256,
-    /// Paymaster contract address: Needed if a third party is covering transaction costs; left blank for self-funded accounts.
+    /// Paymaster contract address: Needed if a third party is covering transaction costs; left
+    /// blank for self-funded accounts.
     pub paymaster: Address,
     /// The gas limit for the paymaster verification.
     pub paymaster_verification_gas_limit: U256,
