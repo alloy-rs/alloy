@@ -6,8 +6,5 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-mod traits;
-pub use traits::{BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse};
-
-mod block;
-pub use block::{BlockTransactionHashes, BlockTransactions, BlockTransactionsKind};
+mod debug;
+pub use debug::*;
