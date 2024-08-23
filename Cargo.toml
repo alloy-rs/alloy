@@ -79,8 +79,8 @@ alloy-rlp = { version = "0.3", default-features = false }
 alloy-chains = { version = "0.1.18", default-features = false }
 
 # ethereum
-ethereum_ssz_derive = "0.7"
-ethereum_ssz = "0.7"
+ethereum_ssz_derive = "0.7.1"
+ethereum_ssz = "0.7.1"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
