@@ -14,7 +14,7 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction, H = Header> {
+pub struct Block<H = Header, T = Transaction> {
     /// Header of the block.
     #[serde(flatten)]
     pub header: H,
@@ -36,7 +36,7 @@ pub struct Block<T = Transaction, H = Header> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl Block {
+impl Block<Header> {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
         Self { transactions: txs.into(), ..self }
@@ -334,7 +334,7 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<T> BlockResponse for Block<T> {
+impl<Header, T> BlockResponse for Block<Header, T> {
     type Transaction = T;
     type Header = Header;
 
