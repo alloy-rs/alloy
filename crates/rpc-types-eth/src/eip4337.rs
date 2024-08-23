@@ -40,7 +40,7 @@ pub enum AccountStorage {
     Slots(HashMap<U256, B256>),
 }
 
-/// EIP-4337: User Operation
+/// ERC-4337: User Operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperation {

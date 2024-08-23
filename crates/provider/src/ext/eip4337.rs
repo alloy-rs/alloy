@@ -4,9 +4,9 @@ use alloy_primitives::Address;
 use alloy_rpc_types_eth::eip4337::{SendUserOperationResponse, UserOperation};
 use alloy_transport::{Transport, TransportResult};
 
-/// EIP-4337 Account Abstraction API
+/// ERC-4337 Account Abstraction API
 /// This module provides support for the `eth_sendUserOperation` RPC method
-/// as defined in EIP-4337.
+/// as defined in ERC-4337.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait Eip4337Api<N, T>: Send + Sync {
