@@ -62,11 +62,10 @@ mod tests {
             signature: Bytes::default(),
         };
 
-        let entry_point = Address::random();
+        let entry_point = Address::from_str("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789").unwrap();
 
         let result = provider.eth_send_user_operation(user_op, entry_point).await;
 
-        // Note: This is a filler test and will fail, need to come up with a better mocking/approach.
         assert!(result.is_ok());
     }
 }
