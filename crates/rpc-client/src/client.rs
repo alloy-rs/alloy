@@ -306,14 +306,14 @@ mod pubsub_impl {
 
     impl RpcClientInner<PubSubFrontend> {
         /// Get a [`RawSubscription`] for the given subscription ID.
-        pub async fn get_raw_subscription(&self, id: alloy_primitives::U256) -> RawSubscription {
+        pub async fn get_raw_subscription(&self, id: alloy_primitives::B256) -> RawSubscription {
             self.transport.get_subscription(id).await.unwrap()
         }
 
         /// Get a [`Subscription`] for the given subscription ID.
         pub async fn get_subscription<T: serde::de::DeserializeOwned>(
             &self,
-            id: alloy_primitives::U256,
+            id: alloy_primitives::B256,
         ) -> Subscription<T> {
             Subscription::from(self.get_raw_subscription(id).await)
         }
