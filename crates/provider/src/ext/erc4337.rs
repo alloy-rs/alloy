@@ -5,12 +5,13 @@ use alloy_rpc_types_eth::erc4337::{SendUserOperationResponse, UserOperation};
 use alloy_transport::{Transport, TransportResult};
 
 /// ERC-4337 Account Abstraction API
+///
 /// This module provides support for the `eth_sendUserOperation` RPC method
 /// as defined in ERC-4337.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait Erc4337Api<N, T>: Send + Sync {
-    /// Sends a UserOperation to the bundler.
+    /// Sends a [`UserOperation`] to the bundler.
     async fn eth_send_user_operation(
         &self,
         user_op: UserOperation,
