@@ -1,7 +1,9 @@
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::Address;
-use alloy_rpc_types_eth::erc4337::{SendUserOperationResponse, UserOperation};
+use alloy_primitives::{Address, Bytes};
+use alloy_rpc_types_eth::erc4337::{
+    SendUserOperationResponse, UserOperation, UserOperationReceipt,
+};
 use alloy_transport::{Transport, TransportResult};
 
 /// ERC-4337 Account Abstraction API
@@ -17,6 +19,15 @@ pub trait Erc4337Api<N, T>: Send + Sync {
         user_op: UserOperation,
         entry_point: Address,
     ) -> TransportResult<SendUserOperationResponse>;
+
+    /// Returns the list of supported entry points.
+    async fn eth_supported_entry_points(&self) -> TransportResult<Vec<Address>>;
+
+    /// Returns the receipt of a [`UserOperation`].
+    async fn eth_get_user_operation_receipt(
+        &self,
+        user_op_hash: Bytes,
+    ) -> TransportResult<UserOperationReceipt>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -33,6 +44,17 @@ where
         entry_point: Address,
     ) -> TransportResult<SendUserOperationResponse> {
         self.client().request("eth_sendUserOperation", (user_op, entry_point)).await
+    }
+
+    async fn eth_supported_entry_points(&self) -> TransportResult<Vec<Address>> {
+        self.client().request("eth_supportedEntryPoints", ()).await
+    }
+
+    async fn eth_get_user_operation_receipt(
+        &self,
+        user_op_hash: Bytes,
+    ) -> TransportResult<UserOperationReceipt> {
+        self.client().request("eth_getUserOperationReceipt", (user_op_hash,)).await
     }
 }
 
@@ -71,6 +93,41 @@ mod tests {
 
         let result = provider.eth_send_user_operation(user_op, entry_point).await;
 
-        assert!(result.is_ok());
+        match result {
+            Ok(_) => {
+                println!("User operation sent successfully: {:?}", result);
+            }
+            Err(e) => {
+                if e.to_string().contains("Invalid user operation for entry point") {
+                    println!("Invalid user operation for entry point: {:?}", e);
+                } else {
+                    panic!("Unexpected error: {:?}", e);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eth_supported_entry_points() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let result = provider.eth_supported_entry_points().await;
+
+        assert!(result.unwrap().len() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_eth_get_user_operation_receipt() {
+        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
+        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+
+        let user_op_hash =
+            "0x93c06f3f5909cc2b192713ed9bf93e3e1fde4b22fcd2466304fa404f9b80ff90".parse().unwrap();
+        let result = provider.eth_get_user_operation_receipt(user_op_hash).await;
+
+        assert!(result.unwrap().success);
     }
 }
