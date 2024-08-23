@@ -67,7 +67,7 @@ mod tests {
             signature: Bytes::default(),
         };
 
-        let entry_point = Address::from_str("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789").unwrap();
+        let entry_point: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
 
         let result = provider.eth_send_user_operation(user_op, entry_point).await;
 
