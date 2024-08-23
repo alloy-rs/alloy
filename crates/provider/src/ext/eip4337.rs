@@ -51,14 +51,18 @@ mod tests {
         let user_op = UserOperation {
             sender: Address::random(),
             nonce: U256::from(0),
-            init_code: Bytes::default(),
+            factory: Address::random(),
+            factory_data: Bytes::default(),
             call_data: Bytes::default(),
             call_gas_limit: U256::from(1000000),
             verification_gas_limit: U256::from(1000000),
             pre_verification_gas: U256::from(1000000),
             max_fee_per_gas: U256::from(1000000000),
             max_priority_fee_per_gas: U256::from(1000000000),
-            paymaster_and_data: Bytes::default(),
+            paymaster: Address::random(),
+            paymaster_verification_gas_limit: U256::from(1000000),
+            paymaster_post_op_gas_limit: U256::from(1000000),
+            paymaster_data: Bytes::default(),
             signature: Bytes::default(),
         };
 
