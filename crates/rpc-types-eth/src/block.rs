@@ -36,7 +36,7 @@ pub struct Block<H = Header, T = Transaction> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl Block<Header> {
+impl<H> Block<H> {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
         Self { transactions: txs.into(), ..self }
@@ -334,9 +334,9 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<Header, T> BlockResponse for Block<Header, T> {
+impl<H, T> BlockResponse for Block<H, T> {
     type Transaction = T;
-    type Header = Header;
+    type Header = H;
 
     fn header(&self) -> &Self::Header {
         &self.header
