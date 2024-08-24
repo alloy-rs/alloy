@@ -81,7 +81,7 @@ mod tests {
     use alloy_primitives::{Address, Bytes, U256};
 
     #[tokio::test]
-    async fn test_eth_send_user_operation() {
+    async fn test_send_user_operation() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -102,7 +102,7 @@ mod tests {
 
         let entry_point: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
 
-        let result = provider.eth_send_user_operation(user_op, entry_point).await;
+        let result = provider.send_user_operation(user_op, entry_point).await;
 
         match result {
             Ok(_) => {
@@ -115,18 +115,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_eth_supported_entry_points() {
+    async fn test_supported_entry_points() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let result = provider.eth_supported_entry_points().await;
+        let result = provider.supported_entry_points().await;
 
         assert!(result.unwrap().len() > 0);
     }
 
     #[tokio::test]
-    async fn test_eth_get_user_operation_receipt() {
+    async fn test_get_user_operation_receipt() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -134,13 +134,13 @@ mod tests {
         /// User operation hash that has already been included in a block
         let user_op_hash =
             "0x93c06f3f5909cc2b192713ed9bf93e3e1fde4b22fcd2466304fa404f9b80ff90".parse().unwrap();
-        let result = provider.eth_get_user_operation_receipt(user_op_hash).await;
+        let result = provider.get_user_operation_receipt(user_op_hash).await;
 
         assert!(result.unwrap().success);
     }
 
     #[tokio::test]
-    async fn test_eth_estimate_user_operation_gas() {
+    async fn test_estimate_user_operation_gas() {
         let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -161,7 +161,7 @@ mod tests {
 
         let entry_point: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
 
-        let result = provider.eth_estimate_user_operation_gas(user_op, entry_point).await;
+        let result = provider.estimate_user_operation_gas(user_op, entry_point).await;
 
         match result {
             Ok(_) => {
