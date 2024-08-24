@@ -41,7 +41,7 @@ pub enum AccountStorage {
     Slots(HashMap<U256, B256>),
 }
 
-/// ERC-4337: User Operation
+/// [`UserOperation`] in the spec: Entry Point V0.6
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperation {
@@ -63,10 +63,61 @@ pub struct UserOperation {
     pub max_fee_per_gas: U256,
     /// Maximum priority fee per gas
     pub max_priority_fee_per_gas: U256,
-    /// Paymaster Contract address and any extra data required for verification and execution (empty for self-sponsored transaction)
+    /// Paymaster Contract address and any extra data required for verification and execution
+    /// (empty for self-sponsored transaction)
     pub paymaster_and_data: Bytes,
     /// Used to validate a UserOperation along with the nonce during verification
     pub signature: Bytes,
+}
+
+/// [`PackedUserOperation`] in the spec: Entry Point V0.7
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackedUserOperation {
+    /// The account making the operation.
+    pub sender: Address,
+    /// Prevents message replay attacks and serves as a randomizing element for initial user
+    /// registration.
+    pub nonce: U256,
+    /// Deployer contract address: Required exclusively for deploying new accounts that don't yet
+    /// exist on the blockchain.
+    pub factory: Address,
+    /// Factory data for the account creation process, applicable only when using a deployer
+    /// contract.
+    pub factory_data: Bytes,
+    /// The call data.
+    pub call_data: Bytes,
+    /// The gas limit for the call.
+    pub call_gas_limit: U256,
+    /// The gas limit for the verification.
+    pub verification_gas_limit: U256,
+    /// Prepaid gas fee: Covers the bundler's costs for initial transaction validation and data
+    /// transmission.
+    pub pre_verification_gas: U256,
+    /// The maximum fee per gas.
+    pub max_fee_per_gas: U256,
+    /// The maximum priority fee per gas.
+    pub max_priority_fee_per_gas: U256,
+    /// Paymaster contract address: Needed if a third party is covering transaction costs; left
+    /// blank for self-funded accounts.
+    pub paymaster: Address,
+    /// The gas limit for the paymaster verification.
+    pub paymaster_verification_gas_limit: U256,
+    /// The gas limit for the paymaster post-operation.
+    pub paymaster_post_op_gas_limit: U256,
+    /// The paymaster data.
+    pub paymaster_data: Bytes,
+    /// The signature of the transaction.
+    pub signature: Bytes,
+}
+
+/// Send User Operation
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SendUserOperation {
+    /// User Operation
+    EntryPointV06(UserOperation),
+    /// Packed User Operation
+    EntryPointV07(PackedUserOperation),
 }
 
 /// Response to sending a user operation.

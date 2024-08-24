@@ -2,7 +2,7 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::erc4337::{
-    SendUserOperationResponse, UserOperation, UserOperationGasEstimation, UserOperationReceipt,
+    SendUserOperation, SendUserOperationResponse, UserOperationGasEstimation, UserOperationReceipt,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -13,26 +13,32 @@ use alloy_transport::{Transport, TransportResult};
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 pub trait Erc4337Api<N, T>: Send + Sync {
-    /// Sends a [`UserOperation`] to the bundler.
+    /// Sends a [`UserOperation`] or [`PackedUserOperation`] to the bundler.
+    ///
+    /// Entry point changes based on the user operation type.
     async fn send_user_operation(
         &self,
-        user_op: UserOperation,
+        user_op: SendUserOperation,
         entry_point: Address,
     ) -> TransportResult<SendUserOperationResponse>;
 
     /// Returns the list of supported entry points.
     async fn supported_entry_points(&self) -> TransportResult<Vec<Address>>;
 
-    /// Returns the receipt of a [`UserOperation`].
+    /// Returns the receipt for any [`UserOperation`] or [`PackedUserOperation`].
+    ///
+    /// Hash is the same as the one returned by [`send_user_operation`].
     async fn get_user_operation_receipt(
         &self,
         user_op_hash: Bytes,
     ) -> TransportResult<UserOperationReceipt>;
 
-    /// Estimates the gas for a [`UserOperation`].
+    /// Estimates the gas for a [`UserOperation`] or [`PackedUserOperation`].
+    ///
+    /// Entry point changes based on the user operation type.
     async fn estimate_user_operation_gas(
         &self,
-        user_op: UserOperation,
+        user_op: SendUserOperation,
         entry_point: Address,
     ) -> TransportResult<UserOperationGasEstimation>;
 }
@@ -47,10 +53,17 @@ where
 {
     async fn send_user_operation(
         &self,
-        user_op: UserOperation,
+        user_op: SendUserOperation,
         entry_point: Address,
     ) -> TransportResult<SendUserOperationResponse> {
-        self.client().request("eth_sendUserOperation", (user_op, entry_point)).await
+        match user_op {
+            SendUserOperation::EntryPointV06(user_op) => {
+                self.client().request("eth_sendUserOperation", (user_op, entry_point)).await
+            }
+            SendUserOperation::EntryPointV07(packed_user_op) => {
+                self.client().request("eth_sendUserOperation", (packed_user_op, entry_point)).await
+            }
+        }
     }
 
     async fn supported_entry_points(&self) -> TransportResult<Vec<Address>> {
@@ -66,10 +79,19 @@ where
 
     async fn estimate_user_operation_gas(
         &self,
-        user_op: UserOperation,
+        user_op: SendUserOperation,
         entry_point: Address,
     ) -> TransportResult<UserOperationGasEstimation> {
-        self.client().request("eth_estimateUserOperationGas", (user_op, entry_point)).await
+        match user_op {
+            SendUserOperation::EntryPointV06(user_op) => {
+                self.client().request("eth_estimateUserOperationGas", (user_op, entry_point)).await
+            }
+            SendUserOperation::EntryPointV07(packed_user_op) => {
+                self.client()
+                    .request("eth_estimateUserOperationGas", (packed_user_op, entry_point))
+                    .await
+            }
+        }
     }
 }
 
@@ -86,7 +108,7 @@ mod tests {
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let user_op = UserOperation {
+        let user_op = SendUserOperation::EntryPointV06(UserOperation {
             sender: Address::random(),
             nonce: U256::from(0),
             init_code: Bytes::default(),
@@ -98,17 +120,18 @@ mod tests {
             max_priority_fee_per_gas: U256::from(1000000000),
             paymaster_and_data: Bytes::default(),
             signature: Bytes::default(),
-        };
+        });
 
-        let entry_point: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
+        let entry_point_old: Address =
+            "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
 
-        let result = provider.send_user_operation(user_op, entry_point).await;
+        let result = provider.send_user_operation(user_op, entry_point_old).await;
 
         match result {
-            Ok(_) => {
+            Ok(result) => {
                 println!("User operation sent successfully: {:?}", result);
             }
-            Err(e) => {
+            Err(_) => {
                 println!("Skipping eth_sendUserOperation test because of non-realistic user_op construction")
             }
         }
@@ -131,7 +154,6 @@ mod tests {
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        /// User operation hash that has already been included in a block
         let user_op_hash =
             "0x93c06f3f5909cc2b192713ed9bf93e3e1fde4b22fcd2466304fa404f9b80ff90".parse().unwrap();
         let result = provider.get_user_operation_receipt(user_op_hash).await;
@@ -145,29 +167,34 @@ mod tests {
         let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
         let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let user_op = UserOperation {
+        let user_op = SendUserOperation::EntryPointV07(PackedUserOperation {
             sender: Address::random(),
             nonce: U256::from(0),
-            init_code: Bytes::default(),
+            factory: Address::random(),
+            factory_data: Bytes::default(),
             call_data: Bytes::default(),
             call_gas_limit: U256::from(1000000),
             verification_gas_limit: U256::from(1000000),
             pre_verification_gas: U256::from(1000000),
             max_fee_per_gas: U256::from(1000000000),
             max_priority_fee_per_gas: U256::from(1000000000),
-            paymaster_and_data: Bytes::default(),
+            paymaster: Address::random(),
+            paymaster_verification_gas_limit: U256::from(1000000),
+            paymaster_post_op_gas_limit: U256::from(1000000),
+            paymaster_data: Bytes::default(),
             signature: Bytes::default(),
-        };
+        });
 
-        let entry_point: Address = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789".parse().unwrap();
+        let entry_point_new: Address =
+            "0x0000000071727De22E5E9d8BAf0edAc6f37da032".parse().unwrap();
 
-        let result = provider.estimate_user_operation_gas(user_op, entry_point).await;
+        let result = provider.estimate_user_operation_gas(user_op, entry_point_new).await;
 
         match result {
-            Ok(_) => {
+            Ok(result) => {
                 println!("User operation gas estimation: {:?}", result);
             }
-            Err(e) => {
+            Err(_) => {
                 println!("Skipping eth_estimateUserOperationGas test because of non-realistic user_op construction")
             }
         }
