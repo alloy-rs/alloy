@@ -26,7 +26,7 @@ pub struct OptimismTransactionFields {
     pub is_system_tx: Option<bool>,
 }
 
-/// Additional fields for Optimism transaction receipts
+/// Additional fields for Optimism transaction receipts: <https://github.com/ethereum-optimism/op-geth/blob/f2e69450c6eec9c35d56af91389a1c47737206ca/core/types/receipt.go#L87-L87>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[doc(alias = "OptimismTxReceiptFields")]
@@ -37,18 +37,27 @@ pub struct OptimismTransactionReceiptFields {
     /// Deposit receipt version for deposit transactions post-canyon
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub deposit_receipt_version: Option<u64>,
-    /// L1 fee for the transaction
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub l1_fee: Option<u128>,
-    /// L1 fee scalar for the transaction
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "l1_fee_scalar_serde")]
-    pub l1_fee_scalar: Option<f64>,
-    /// L1 gas price for the transaction
+    /// Present from pre-bedrock. L1 Basefee after Bedrock
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub l1_gas_price: Option<u128>,
-    /// L1 gas used for the transaction
+    /// Always null prior to the Ecotone hardfork.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub l1_blob_base_fee: Option<u128>,
+    /// Present from pre-bedrock, deprecated as of Fjord.
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub l1_gas_used: Option<u128>,
+    /// Present from pre-bedrock. L1 fee for the transaction
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub l1_fee: Option<u128>,
+    /// Present from pre-bedrock to Ecotone. Nil after Ecotone
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "l1_fee_scalar_serde")]
+    pub l1_fee_scalar: Option<f64>,
+    /// Always null prior to the Ecotone hardfork.
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub l1_base_fee_scalar: Option<u128>,
+    /// Always null prior to the Ecotone hardfork
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    pub l1_blob_base_fee_scalar: Option<u128>,
 }
 
 impl From<OptimismTransactionFields> for OtherFields {
@@ -135,5 +144,34 @@ mod tests {
 
         let op_fields: OptimismTransactionReceiptFields = serde_json::from_value(json).unwrap();
         assert_eq!(op_fields.l1_fee_scalar, None);
+    }
+
+    #[test]
+    fn deserialize_op_receipt() {
+        let s = r#"{
+    "blockHash": "0x70a8a64a0f8b141718f60e49c30f027cb9e4f91753d5f13a48d8e1ad263c08bf",
+    "blockNumber": "0x1185e55",
+    "contractAddress": null,
+    "cumulativeGasUsed": "0xc74f5e",
+    "effectiveGasPrice": "0x31b41b",
+    "from": "0x889ebdac39408782b5165c5185c1a769b4dd3ce6",
+    "gasUsed": "0x5208",
+    "l1BaseFeeScalar": "0x8dd",
+    "l1BlobBaseFee": "0x1",
+    "l1BlobBaseFeeScalar": "0x101c12",
+    "l1Fee": "0x125f723f3",
+    "l1GasPrice": "0x50f928b4",
+    "l1GasUsed": "0x640",
+    "logs": [
+    ],
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "status": "0x1",
+    "to": "0x7449061f45d7b39b3b80b4159286cd8682f60a3c",
+    "transactionHash": "0xca564948e3e825f65731424da063240eec34ba921dd117ac5d06b8c2e0b2d962",
+    "transactionIndex": "0x3e",
+    "type": "0x2"
+}
+"#;
+        let _receipt = serde_json::from_str::<OptimismTransactionReceiptFields>(s).unwrap();
     }
 }
