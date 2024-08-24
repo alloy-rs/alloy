@@ -45,40 +45,27 @@ pub enum AccountStorage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserOperation {
-    /// The account making the operation.
+    /// The address of the smart contract account
     pub sender: Address,
-    /// Prevents message replay attacks and serves as a randomizing element for initial user
-    /// registration.
+    /// Anti-replay protection; also used as the salt for first-time account creation
     pub nonce: U256,
-    /// Deployer contract address: Required exclusively for deploying new accounts that don't yet
-    /// exist on the blockchain.
-    pub factory: Address,
-    /// Factory data for the account creation process, applicable only when using a deployer
-    /// contract.
-    pub factory_data: Bytes,
-    /// The call data.
+    /// Code used to deploy the account if not yet on-chain
+    pub init_code: Bytes,
+    /// Data that's passed to the sender for execution
     pub call_data: Bytes,
-    /// The gas limit for the call.
+    /// Gas limit for execution phase
     pub call_gas_limit: U256,
-    /// The gas limit for the verification.
+    /// Gas limit for verification phase
     pub verification_gas_limit: U256,
-    /// Prepaid gas fee: Covers the bundler's costs for initial transaction validation and data
-    /// transmission.
+    /// Gas to compensate the bundler
     pub pre_verification_gas: U256,
-    /// The maximum fee per gas.
+    /// Maximum fee per gas
     pub max_fee_per_gas: U256,
-    /// The maximum priority fee per gas.
+    /// Maximum priority fee per gas
     pub max_priority_fee_per_gas: U256,
-    /// Paymaster contract address: Needed if a third party is covering transaction costs; left
-    /// blank for self-funded accounts.
-    pub paymaster: Address,
-    /// The gas limit for the paymaster verification.
-    pub paymaster_verification_gas_limit: U256,
-    /// The gas limit for the paymaster post-operation.
-    pub paymaster_post_op_gas_limit: U256,
-    /// The paymaster data.
-    pub paymaster_data: Bytes,
-    /// The signature of the transaction.
+    /// Paymaster Contract address and any extra data required for verification and execution (empty for self-sponsored transaction)
+    pub paymaster_and_data: Bytes,
+    /// Used to validate a UserOperation along with the nonce during verification
     pub signature: Bytes,
 }
 
@@ -87,7 +74,7 @@ pub struct UserOperation {
 #[serde(rename_all = "camelCase")]
 pub struct SendUserOperationResponse {
     /// The hash of the user operation.
-    pub hash: Bytes,
+    pub user_op_hash: Bytes,
 }
 
 /// Represents the receipt of a user operation.
