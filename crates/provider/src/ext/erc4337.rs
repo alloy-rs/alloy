@@ -28,7 +28,7 @@ pub trait Erc4337Api<N, T>: Send + Sync {
 
     /// Returns the receipt for any [`UserOperation`] or [`PackedUserOperation`].
     ///
-    /// Hash is the same as the one returned by [`send_user_operation`].
+    /// Hash is the same returned by both operations.
     async fn get_user_operation_receipt(
         &self,
         user_op_hash: Bytes,
