@@ -113,8 +113,8 @@ mod tests {
                 println!("User operation sent successfully: {:?}", result);
             }
             Err(e) => {
-                if e.to_string().contains("Invalid user operation for entry point") {
-                    println!("User operation parameters are invalid, skipping test");
+                if e.to_string().contains("32602") {
+                    println!("Returns error code 32602, user operation parameters are invalid, skipping test");
                 } else {
                     panic!("Unexpected error: {:?}", e);
                 }
@@ -180,8 +180,8 @@ mod tests {
                 println!("User operation gas estimation: {:?}", result);
             }
             Err(e) => {
-                if e.to_string().contains("Invalid user operation for entry point") {
-                    println!("User operation parameters are invalid, skipping test");
+                if e.to_string().contains("32602") {
+                    println!("Returns error code 32602, user operation parameters are invalid, skipping test");
                 } else {
                     panic!("Unexpected error: {:?}", e);
                 }
