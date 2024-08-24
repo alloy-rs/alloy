@@ -2,7 +2,8 @@ use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{Address, Bytes};
 use alloy_rpc_types_eth::erc4337::{
-    SendUserOperation, SendUserOperationResponse, UserOperationGasEstimation, UserOperationReceipt,
+    PackedUserOperation, SendUserOperation, SendUserOperationResponse, UserOperation,
+    UserOperationGasEstimation, UserOperationReceipt,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -101,6 +102,7 @@ mod tests {
     use crate::ProviderBuilder;
     use alloy_node_bindings::Geth;
     use alloy_primitives::{Address, Bytes, U256};
+    use alloy_rpc_types_eth::erc4337::{PackedUserOperation, UserOperation};
 
     #[tokio::test]
     async fn test_send_user_operation() {
