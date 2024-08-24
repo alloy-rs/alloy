@@ -4,12 +4,12 @@ use alloy_primitives::B256;
 use alloy_serde::OtherFields;
 use serde::{Deserialize, Serialize};
 
-/// Optimism specific transaction fields
+/// Optimism specific transaction fields: <https://github.com/ethereum-optimism/op-geth/blob/641e996a2dcf1f81bac9416cb6124f86a69f1de7/internal/ethapi/api.go#L1479-L1479>
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[doc(alias = "OptimismTxFields")]
 pub struct OptimismTransactionFields {
     /// Hash that uniquely identifies the source of the deposit.
-    #[serde(rename = "sourceHash", skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "sourceHash", skip_serializing_if = "Option::is_none")]
     pub source_hash: Option<B256>,
     /// The ETH value to mint on L2
     #[serde(
@@ -21,9 +21,17 @@ pub struct OptimismTransactionFields {
     pub mint: Option<u128>,
     /// Field indicating whether the transaction is a system transaction, and therefore
     /// exempt from the L2 gas limit.
-    #[serde(rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
+    #[serde(default, rename = "isSystemTx", skip_serializing_if = "Option::is_none")]
     #[doc(alias = "is_system_transaction")]
     pub is_system_tx: Option<bool>,
+    /// Deposit receipt version for Optimism deposit transactions, post-Canyon only
+    ///
+    ///
+    /// The deposit receipt version was introduced in Canyon to indicate an update to how
+    /// receipt hashes should be computed when set. The state transition process
+    /// ensures this is only set for post-Canyon deposit transactions.
+    #[serde(default, rename = "depositReceiptVersion", skip_serializing_if = "Option::is_none")]
+    pub deposit_receipt_version: Option<u64>,
 }
 
 /// Additional fields for Optimism transaction receipts: <https://github.com/ethereum-optimism/op-geth/blob/f2e69450c6eec9c35d56af91389a1c47737206ca/core/types/receipt.go#L87-L87>
