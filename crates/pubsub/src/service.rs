@@ -5,7 +5,7 @@ use crate::{
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
 use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
-use alloy_primitives::U256;
+use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
     TransportErrorKind, TransportResult,
@@ -123,19 +123,21 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// the subscription does not exist, the waiter is sent nothing, and the
     /// `tx` is dropped. This notifies the waiter that the subscription does
     /// not exist.
-    fn service_get_sub(&mut self, local_id: U256, tx: oneshot::Sender<RawSubscription>) {
-        if let Some(rx) = self.subs.get_subscription(local_id.into()) {
+    fn service_get_sub(&mut self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
+        if let Some(rx) = self.subs.get_subscription(local_id) {
             let _ = tx.send(rx);
         }
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
-        let req = Request::new("eth_unsubscribe", Id::None, [local_id]);
-        let brv = req.serialize().expect("no ser error").take_request();
+    fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
+        if let Some(server_id) = self.subs.server_id_for(&local_id) {
+            let req = Request::new("eth_unsubscribe", Id::None, [server_id]);
+            let brv = req.serialize().expect("no ser error").take_request();
 
-        self.dispatch_request(brv)?;
-        self.subs.remove_sub(local_id.into());
+            self.dispatch_request(brv)?;
+        }
+        self.subs.remove_sub(local_id);
         Ok(())
     }
 

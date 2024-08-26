@@ -1,8 +1,11 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
+use alloy_serde::WithOtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -14,10 +17,10 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
@@ -36,9 +39,9 @@ pub struct Block<T = Transaction> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl Block {
+impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
 }
@@ -234,21 +237,15 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A Block representation that allows to include additional fields
-pub type RichBlock = Rich<Block>;
-
-impl From<Block> for RichBlock {
+impl From<Block> for WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
-/// Header representation with additional info.
-pub type RichHeader = Rich<Header>;
-
-impl From<Header> for RichHeader {
+impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -334,9 +331,9 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<T> BlockResponse for Block<T> {
+impl<T, H> BlockResponse for Block<T, H> {
     type Transaction = T;
-    type Header = Header;
+    type Header = H;
 
     fn header(&self) -> &Self::Header {
         &self.header
@@ -536,9 +533,9 @@ mod tests {
     "size": "0xaeb6"
 }"#;
 
-        let block = serde_json::from_str::<RichBlock>(s).unwrap();
+        let block = serde_json::from_str::<WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        let block2 = serde_json::from_str::<WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 

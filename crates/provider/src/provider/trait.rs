@@ -15,7 +15,7 @@ use alloy_primitives::{
     hex, Address, BlockHash, BlockNumber, Bytes, StorageKey, StorageValue, TxHash, B256, U128,
     U256, U64,
 };
-use alloy_rpc_client::{ClientRef, PollerBuilder, WeakClient};
+use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
     FilterChanges, Log, SyncStatus,
@@ -100,18 +100,18 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
     async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
-        self.client().request("eth_accounts", ()).await
+        self.client().request_noparams("eth_accounts").await
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
     async fn get_blob_base_fee(&self) -> TransportResult<u128> {
-        self.client().request("eth_blobBaseFee", ()).await.map(|fee: U128| fee.to::<u128>())
+        self.client().request_noparams("eth_blobBaseFee").await.map(|fee: U128| fee.to::<u128>())
     }
 
     /// Get the last block number available.
-    fn get_block_number(&self) -> ProviderCall<T, (), U64, BlockNumber> {
+    fn get_block_number(&self) -> ProviderCall<T, NoParams, U64, BlockNumber> {
         self.client()
-            .request("eth_blockNumber", ())
+            .request_noparams("eth_blockNumber")
             .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
@@ -150,9 +150,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the chain ID.  
-    fn get_chain_id(&self) -> ProviderCall<T, (), U64, u64> {
+    fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
-            .request("eth_chainId", ())
+            .request_noparams("eth_chainId")
             .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
@@ -236,9 +236,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the current gas price in wei.
-    fn get_gas_price(&self) -> ProviderCall<T, (), U128, u128> {
+    fn get_gas_price(&self) -> ProviderCall<T, NoParams, U128, u128> {
         self.client()
-            .request("eth_gasPrice", ())
+            .request_noparams("eth_gasPrice")
             .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
             .into()
     }
@@ -585,7 +585,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
     async fn get_max_priority_fee_per_gas(&self) -> TransportResult<u128> {
         self.client()
-            .request("eth_maxPriorityFeePerGas", ())
+            .request_noparams("eth_maxPriorityFeePerGas")
             .await
             .map(|fee: U128| fee.to::<u128>())
     }
@@ -596,7 +596,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ///
     /// See also [`watch_blocks`](Self::watch_blocks) to configure a poller.
     async fn new_block_filter(&self) -> TransportResult<U256> {
-        self.client().request("eth_newBlockFilter", ()).await
+        self.client().request_noparams("eth_newBlockFilter").await
     }
 
     /// Notify the provider that we are interested in logs that match the given filter.
@@ -866,19 +866,19 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Cancels a subscription given the subscription ID.
     #[cfg(feature = "pubsub")]
-    async fn unsubscribe(&self, id: U256) -> TransportResult<()> {
+    async fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.root().unsubscribe(id)
     }
 
     /// Gets syncing info.
     async fn syncing(&self) -> TransportResult<SyncStatus> {
-        self.client().request("eth_syncing", ()).await
+        self.client().request_noparams("eth_syncing").await
     }
 
     /// Gets the client version.
     #[doc(alias = "web3_client_version")]
     async fn get_client_version(&self) -> TransportResult<String> {
-        self.client().request("web3_clientVersion", ()).await
+        self.client().request_noparams("web3_clientVersion").await
     }
 
     /// Gets the `Keccak-256` hash of the given data.
@@ -888,9 +888,9 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
-    fn get_net_version(&self) -> ProviderCall<T, (), U64, u64> {
+    fn get_net_version(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
-            .request("net_version", ())
+            .request_noparams("net_version")
             .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
@@ -904,9 +904,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_rpc_types_eth::BlockNumberOrTag;
+    /// use alloy_rpc_client::NoParams;
     ///
     /// // No parameters: `()`
-    /// let block_number = provider.raw_request("eth_blockNumber".into(), ()).await?;
+    /// let block_number = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
     ///
     /// // One parameter: `(param,)` or `[param]`
     /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
@@ -1258,7 +1259,8 @@ mod tests {
     async fn gets_block_number_with_raw_req() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
-        let num: U64 = provider.raw_request("eth_blockNumber".into(), ()).await.unwrap();
+        let num: U64 =
+            provider.raw_request("eth_blockNumber".into(), NoParams::default()).await.unwrap();
         assert_eq!(0, num.to::<u64>())
     }
 

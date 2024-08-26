@@ -9,19 +9,22 @@ use alloy_transport::{Transport, TransportResult};
 #[allow(unused, unreachable_pub)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-pub trait TxPoolApi<T, N = Ethereum>: Send + Sync {
+pub trait TxPoolApi<T, N: Network = Ethereum>: Send + Sync {
     /// Returns the content of the transaction pool.
     ///
     /// Lists the exact details of all the transactions currently pending for inclusion in the next
     /// block(s), as well as the ones that are being scheduled for future execution only.
     ///
     /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-    async fn txpool_content(&self) -> TransportResult<TxpoolContent>;
+    async fn txpool_content(&self) -> TransportResult<TxpoolContent<N::TransactionResponse>>;
 
     /// Returns the content of the transaction pool filtered by a specific address.
     ///
     /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-    async fn txpool_content_from(&self, from: Address) -> TransportResult<TxpoolContentFrom>;
+    async fn txpool_content_from(
+        &self,
+        from: Address,
+    ) -> TransportResult<TxpoolContentFrom<N::TransactionResponse>>;
 
     /// Returns a textual summary of each transaction in the pool.
     ///
@@ -50,20 +53,23 @@ where
     T: Transport + Clone,
     N: Network,
 {
-    async fn txpool_content(&self) -> TransportResult<TxpoolContent> {
-        self.client().request("txpool_content", ()).await
+    async fn txpool_content(&self) -> TransportResult<TxpoolContent<N::TransactionResponse>> {
+        self.client().request_noparams("txpool_content").await
     }
 
-    async fn txpool_content_from(&self, from: Address) -> TransportResult<TxpoolContentFrom> {
+    async fn txpool_content_from(
+        &self,
+        from: Address,
+    ) -> TransportResult<TxpoolContentFrom<N::TransactionResponse>> {
         self.client().request("txpool_contentFrom", (from,)).await
     }
 
     async fn txpool_inspect(&self) -> TransportResult<TxpoolInspect> {
-        self.client().request("txpool_inspect", ()).await
+        self.client().request_noparams("txpool_inspect").await
     }
 
     async fn txpool_status(&self) -> TransportResult<TxpoolStatus> {
-        self.client().request("txpool_status", ()).await
+        self.client().request_noparams("txpool_status").await
     }
 }
 

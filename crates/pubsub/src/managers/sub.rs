@@ -63,6 +63,11 @@ impl SubscriptionManager {
         self.local_to_server.get_by_right(server_id).copied()
     }
 
+    /// De-alias an alias, getting the original ID.
+    pub(crate) fn server_id_for(&self, local_id: &B256) -> Option<&SubId> {
+        self.local_to_server.get_by_left(local_id)
+    }
+
     /// Drop all server_ids.
     pub(crate) fn drop_server_ids(&mut self) {
         self.local_to_server.clear();

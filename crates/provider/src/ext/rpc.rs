@@ -22,6 +22,6 @@ where
     P: Provider<T, N>,
 {
     async fn rpc_modules(&self) -> TransportResult<RpcModules> {
-        self.client().request("rpc_modules", ()).await
+        self.client().request_noparams("rpc_modules").await
     }
 }
