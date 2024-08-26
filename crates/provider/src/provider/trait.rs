@@ -104,7 +104,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
-    async fn get_blob_base_fee(&self) -> ProviderCall<T, (), U128, u128> {
+    fn get_blob_base_fee(&self) -> ProviderCall<T, (), U128, u128> {
         self.client()
             .request("eth_blobBaseFee", ())
             .map_resp(utils::convert_u128 as fn(U128) -> u128)
@@ -529,7 +529,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
     ///
     /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
-    async fn get_raw_transaction_by_hash(
+    fn get_raw_transaction_by_hash(
         &self,
         hash: TxHash,
     ) -> ProviderCall<T, (TxHash,), Option<Bytes>> {
