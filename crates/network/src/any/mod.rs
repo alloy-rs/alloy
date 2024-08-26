@@ -75,5 +75,5 @@ impl Network for AnyNetwork {
 
     type HeaderResponse = Header;
 
-    type BlockResponse = WithOtherFields<Block<Self::HeaderResponse, Self::TransactionResponse>>;
+    type BlockResponse = WithOtherFields<Block<Self::TransactionResponse, Self::HeaderResponse>>;
 }
