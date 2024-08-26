@@ -1,7 +1,9 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
