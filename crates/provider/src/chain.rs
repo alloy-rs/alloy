@@ -19,7 +19,7 @@ const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
 pub(crate) struct ChainStreamPoller<T, N = Ethereum> {
     client: WeakClient<T>,
-    poll_task: PollerBuilder<T, (), U64>,
+    poll_task: PollerBuilder<T, [(); 0], U64>,
     next_yield: BlockNumber,
     known_blocks: LruCache<BlockNumber, Block>,
     _phantom: PhantomData<N>,
@@ -39,7 +39,7 @@ impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
     fn with_next_yield(client: WeakClient<T>, next_yield: BlockNumber) -> Self {
         Self {
             client: client.clone(),
-            poll_task: PollerBuilder::new(client, "eth_blockNumber", ()),
+            poll_task: PollerBuilder::new(client, "eth_blockNumber", []),
             next_yield,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
             _phantom: PhantomData,
