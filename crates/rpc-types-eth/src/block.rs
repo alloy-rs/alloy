@@ -5,6 +5,7 @@ use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
+use alloy_serde::WithOtherFields;
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -236,21 +237,15 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A Block representation that allows to include additional fields
-pub type RichBlock = Rich<Block>;
-
-impl From<Block> for RichBlock {
+impl From<Block> for WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
-/// Header representation with additional info.
-pub type RichHeader = Rich<Header>;
-
-impl From<Header> for RichHeader {
+impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -538,9 +533,9 @@ mod tests {
     "size": "0xaeb6"
 }"#;
 
-        let block = serde_json::from_str::<RichBlock>(s).unwrap();
+        let block = serde_json::from_str::<WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        let block2 = serde_json::from_str::<WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 

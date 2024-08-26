@@ -1,7 +1,8 @@
 //! Ethereum types for pub-sub
 
-use crate::{Filter, Log, RichHeader, Transaction};
+use crate::{Filter, Header, Log, Transaction};
 use alloy_primitives::B256;
+use alloy_serde::WithOtherFields;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Subscription result.
@@ -9,7 +10,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 #[serde(untagged)]
 pub enum SubscriptionResult<T = Transaction> {
     /// New block header.
-    Header(Box<RichHeader>),
+    Header(Box<WithOtherFields<Header>>),
     /// Log
     Log(Box<Log>),
     /// Transaction hash
