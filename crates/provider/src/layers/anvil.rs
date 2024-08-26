@@ -9,10 +9,11 @@ use std::{
 
 use crate::{Provider, ProviderLayer, RootProvider};
 
-/// A layer that wraps an [`Anvil`] config. The config will be used
-/// to spawn an [`AnvilInstance`] when the layer is applied, or when the user
-/// requests any information about the anvil node (e.g. via the
-/// [`AnvilLayer::ws_endpoint_url`] method ).
+/// A layer that wraps an [`Anvil`] config.
+///
+/// The config will be used to spawn an [`AnvilInstance`] when the layer is applied, or when the
+/// user requests any information about the anvil node (e.g. via the [`AnvilLayer::ws_endpoint_url`]
+/// method).
 #[derive(Debug, Clone, Default)]
 pub struct AnvilLayer {
     anvil: Anvil,

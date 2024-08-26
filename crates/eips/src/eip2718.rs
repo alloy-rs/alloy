@@ -143,9 +143,10 @@ pub trait Decodable2718: Sized {
     }
 }
 
-/// Encoding trait for [EIP-2718] envelopes. These envelopes wrap a transaction
-/// or a receipt with a type flag. [EIP-2718] encodings are used by the
-/// `eth_sendRawTransaction` RPC call, the Ethereum block header's tries, and the
+/// Encoding trait for [EIP-2718] envelopes.
+///
+/// These envelopes wrap a transaction or a receipt with a type flag. [EIP-2718] encodings are used
+/// by the `eth_sendRawTransaction` RPC call, the Ethereum block header's tries, and the
 /// peer-to-peer protocol.
 ///
 /// Users should rarely import this trait, and should instead prefer letting the
@@ -224,10 +225,11 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
     }
 }
 
-/// An [EIP-2718] envelope, blanket implemented for types that impl
-/// [`Encodable2718`] and [`Decodable2718`]. This envelope is a wrapper around
-/// a transaction, or a receipt, or any other type that is differentiated by an
-/// EIP-2718 transaction type.
+/// An [EIP-2718] envelope, blanket implemented for types that impl [`Encodable2718`] and
+/// [`Decodable2718`].
+///
+/// This envelope is a wrapper around a transaction, or a receipt, or any other type that is
+/// differentiated by an EIP-2718 transaction type.
 ///
 /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 pub trait Eip2718Envelope: Decodable2718 + Encodable2718 {}
