@@ -6,8 +6,8 @@ use alloy_network_primitives::{
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::WithOtherFields;
-use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
@@ -246,47 +246,6 @@ impl From<Block> for WithOtherFields<Block> {
 impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
         Self { inner, other: Default::default() }
-    }
-}
-
-/// Value representation with additional info
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub struct Rich<T> {
-    /// Standard value.
-    #[serde(flatten)]
-    pub inner: T,
-    /// Additional fields that should be serialized into the `Block` object
-    #[serde(flatten)]
-    pub extra_info: BTreeMap<String, serde_json::Value>,
-}
-
-impl<T> Deref for Rich<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T: Serialize> Serialize for Rich<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if self.extra_info.is_empty() {
-            return self.inner.serialize(serializer);
-        }
-
-        let inner = serde_json::to_value(&self.inner);
-        let extras = serde_json::to_value(&self.extra_info);
-
-        if let (Ok(serde_json::Value::Object(mut value)), Ok(serde_json::Value::Object(extras))) =
-            (inner, extras)
-        {
-            value.extend(extras);
-            value.serialize(serializer)
-        } else {
-            Err(S::Error::custom("Unserializable structures: expected objects"))
-        }
     }
 }
 

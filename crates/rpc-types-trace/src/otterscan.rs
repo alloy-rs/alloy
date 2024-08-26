@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Rich, Transaction, TransactionReceipt, Withdrawal};
+use alloy_rpc_types_eth::{Block, Header, Transaction, TransactionReceipt, Withdrawal};
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -162,24 +162,16 @@ pub struct BlockDetails {
     pub total_fees: U256,
 }
 
-impl<T> From<Rich<Block<T>>> for BlockDetails {
-    fn from(rich_block: Rich<Block<T>>) -> Self {
-        Self {
-            block: rich_block.inner.into(),
-            issuance: Default::default(),
-            total_fees: U256::default(),
-        }
+impl<T> From<Block<T>> for BlockDetails {
+    fn from(block: Block<T>) -> Self {
+        Self { block: block.into(), issuance: Default::default(), total_fees: U256::default() }
     }
 }
 
 impl BlockDetails {
     /// Create a new `BlockDetails` struct.
-    pub fn new<T>(
-        rich_block: Rich<Block<T>>,
-        issuance: InternalIssuance,
-        total_fees: U256,
-    ) -> Self {
-        Self { block: rich_block.inner.into(), issuance, total_fees }
+    pub fn new<T>(block: Block<T>, issuance: InternalIssuance, total_fees: U256) -> Self {
+        Self { block: block.into(), issuance, total_fees }
     }
 }
 
