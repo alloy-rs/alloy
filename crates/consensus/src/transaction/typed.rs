@@ -1,7 +1,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
-use alloy_eips::eip2930::AccessList;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{ChainId, TxKind, B256};
 
 use crate::{
@@ -209,6 +209,16 @@ impl Transaction for TypedTransaction {
         }
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        match self {
+            Self::Legacy(tx) => tx.max_fee_per_blob_gas(),
+            Self::Eip2930(tx) => tx.max_fee_per_blob_gas(),
+            Self::Eip1559(tx) => tx.max_fee_per_blob_gas(),
+            Self::Eip4844(tx) => tx.max_fee_per_blob_gas(),
+            Self::Eip7702(tx) => tx.max_fee_per_blob_gas(),
+        }
+    }
+
     fn to(&self) -> TxKind {
         match self {
             Self::Legacy(tx) => tx.to(),
@@ -266,6 +276,16 @@ impl Transaction for TypedTransaction {
             Self::Eip1559(tx) => tx.blob_versioned_hashes(),
             Self::Eip4844(tx) => tx.blob_versioned_hashes(),
             Self::Eip7702(tx) => tx.blob_versioned_hashes(),
+        }
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        match self {
+            Self::Legacy(tx) => tx.authorization_list(),
+            Self::Eip2930(tx) => tx.authorization_list(),
+            Self::Eip1559(tx) => tx.authorization_list(),
+            Self::Eip4844(tx) => tx.authorization_list(),
+            Self::Eip7702(tx) => tx.authorization_list(),
         }
     }
 }
