@@ -899,9 +899,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// ```no_run
     /// # async fn example(provider: impl alloy_provider::Provider) -> Result<(), Box<dyn std::error::Error>> {
     /// use alloy_rpc_types_eth::BlockNumberOrTag;
+    /// use alloy_rpc_client::NoParams;
     ///
     /// // No parameters: `()`
-    /// let block_number = provider.raw_request_noparams("eth_blockNumber".into()).await?;
+    /// let block_number = provider.raw_request("eth_blockNumber".into(), NoParams::default()).await?;
     ///
     /// // One parameter: `(param,)` or `[param]`
     /// let block = provider.raw_request("eth_getBlockByNumber".into(), (BlockNumberOrTag::Latest,)).await?;
