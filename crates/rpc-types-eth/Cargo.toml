@@ -48,7 +48,7 @@ alloy-primitives = { workspace = true, features = [
     "arbitrary",
 ] }
 alloy-consensus = { workspace = true, features = ["std", "arbitrary"] }
-alloy-eips = { workspace = true, features = ["arbitrary"] }
+alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
 
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
@@ -64,4 +64,4 @@ arbitrary = [
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
-k256 = ["alloy-consensus/k256"]
+k256 = ["alloy-consensus/k256", "alloy-eips/k256"]
