@@ -15,12 +15,10 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
-/// A block hash which may have
-/// a boolean requireCanonical field.
-/// If false, an RPC call should raise if a block
-/// matching the hash is not found.
-/// If true, an RPC call should additionally raise if
-/// the block is not in the canonical chain.
+/// A block hash which may have a boolean requireCanonical field.
+///
+/// If false, an RPC call should raise if a block matching the hash is not found.
+/// If true, an RPC call should additionally raise if the block is not in the canonical chain.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

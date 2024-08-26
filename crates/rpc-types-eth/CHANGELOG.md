@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Eth_simulateV1 Request / Response types ([#1042](https://github.com/alloy-rs/alloy/issues/1042))
 - Feat(rpc-type-eth) convert vec TxReq to bundle ([#1091](https://github.com/alloy-rs/alloy/issues/1091))
-- Feat(provider) : introduction to eth_sendRawTransactionConditional  RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
+- Feat(provider) : introduction to eth_sendRawTransactionConditional RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
 - [rpc-types-eth] Serde flatten `BlobTransactionSidecar` in tx req ([#1054](https://github.com/alloy-rs/alloy/issues/1054))
 - Add authorization list to rpc transaction and tx receipt types ([#1051](https://github.com/alloy-rs/alloy/issues/1051))
 
@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Refactor
 
 - Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
-- Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
+- Replace `U64` with `u64` ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
 
 ### Styling
 
@@ -112,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Miscellaneous Tasks
 
 - Rm unused txtype mod ([#879](https://github.com/alloy-rs/alloy/issues/879))
-- [other] Use type aliases where possible to improve clarity  ([#859](https://github.com/alloy-rs/alloy/issues/859))
+- [other] Use type aliases where possible to improve clarity ([#859](https://github.com/alloy-rs/alloy/issues/859))
 - [docs] Crate completeness and fix typos ([#861](https://github.com/alloy-rs/alloy/issues/861))
 
 ### Other

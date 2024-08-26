@@ -24,15 +24,15 @@ where
     P: Provider<T, N>,
 {
     async fn net_listening(&self) -> TransportResult<bool> {
-        self.client().request("net_listening", ()).await
+        self.client().request_noparams("net_listening").await
     }
 
     async fn net_peer_count(&self) -> TransportResult<u64> {
-        self.client().request("net_peerCount", ()).map_resp(crate::utils::convert_u64).await
+        self.client().request_noparams("net_peerCount").map_resp(crate::utils::convert_u64).await
     }
 
     async fn net_version(&self) -> TransportResult<u64> {
-        self.client().request("net_version", ()).map_resp(crate::utils::convert_u64).await
+        self.client().request_noparams("net_version").map_resp(crate::utils::convert_u64).await
     }
 }
 
