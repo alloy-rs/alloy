@@ -313,6 +313,10 @@ impl Transaction for TxEip7702 {
         self.max_priority_fee_per_gas
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -335,6 +339,10 @@ impl Transaction for TxEip7702 {
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        Some(&self.authorization_list)
     }
 }
 
