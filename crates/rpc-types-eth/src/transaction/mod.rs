@@ -373,9 +373,10 @@ impl TransactionResponse for Transaction {
             block_hash,
             block_number,
             transaction_index: transaction_index.map(|idx| idx as u64),
-            // EIP-4844 fields
+            // EIP-4844 fields //
             max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
             blob_versioned_hashes: tx.blob_versioned_hashes().map(|hashes| hashes.to_vec()),
+            /////////////////////
             authorization_list: tx.authorization_list().map(|l| l.to_vec()),
         }
     }
