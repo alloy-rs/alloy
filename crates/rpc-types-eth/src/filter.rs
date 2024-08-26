@@ -12,7 +12,7 @@ use std::{
         HashSet,
     },
     hash::Hash,
-    ops::{Range, RangeFrom, RangeTo},
+    ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
 use thiserror::Error;
 
@@ -277,16 +277,17 @@ impl From<u64> for FilterBlockOption {
     }
 }
 
-impl<T: Into<BlockNumberOrTag>> From<Range<T>> for FilterBlockOption {
-    fn from(r: Range<T>) -> Self {
-        let from_block = Some(r.start.into());
-        let to_block = Some(r.end.into());
+impl<T: Into<BlockNumberOrTag>> From<RangeInclusive<T>> for FilterBlockOption {
+    fn from(r: RangeInclusive<T>) -> Self {
+        let (start, end) = r.into_inner();
+        let from_block = Some(start.into());
+        let to_block = Some(end.into());
         Self::Range { from_block, to_block }
     }
 }
 
-impl<T: Into<BlockNumberOrTag>> From<RangeTo<T>> for FilterBlockOption {
-    fn from(r: RangeTo<T>) -> Self {
+impl<T: Into<BlockNumberOrTag>> From<RangeToInclusive<T>> for FilterBlockOption {
+    fn from(r: RangeToInclusive<T>) -> Self {
         let to_block = Some(r.end.into());
         Self::Range { from_block: Some(BlockNumberOrTag::Earliest), to_block }
     }
