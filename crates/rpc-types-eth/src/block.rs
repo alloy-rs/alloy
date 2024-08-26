@@ -1,7 +1,7 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
+use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use serde::{ser::Error, Deserialize, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
@@ -14,7 +14,7 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<H = Header, T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
     pub header: H,
@@ -36,9 +36,9 @@ pub struct Block<H = Header, T = Transaction> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl<H> Block<H> {
+impl<T: TransactionResponse> Block<T> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
 }
@@ -334,7 +334,7 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<H, T> BlockResponse for Block<H, T> {
+impl<T, H> BlockResponse for Block<T, H> {
     type Transaction = T;
     type Header = H;
 
