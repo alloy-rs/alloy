@@ -370,7 +370,6 @@ impl TransactionResponse for Transaction {
             chain_id: tx.chain_id(),
             access_list: tx.access_list().cloned(),
             transaction_type: Some(tx.ty()),
-            // These fields are set to None because they are not stored as part of the transaction
             block_hash,
             block_number,
             transaction_index: transaction_index.map(|idx| idx as u64),
