@@ -1,6 +1,6 @@
 use alloy_node_bindings::Geth;
 use alloy_primitives::U64;
-use alloy_rpc_client::{ClientBuilder, NoParams, RpcCall};
+use alloy_rpc_client::{ClientBuilder, RpcCall};
 use alloy_transport_ipc::IpcConnect;
 
 #[tokio::test]
@@ -17,7 +17,7 @@ async fn it_makes_a_request() {
     let connect = IpcConnect::new(geth.ipc_endpoint());
     let client = ClientBuilder::default().pubsub(connect).await.unwrap();
 
-    let req: RpcCall<_, NoParams, U64> = client.request_noparams("eth_blockNumber");
+    let req: RpcCall<_, _, U64> = client.request_noparams("eth_blockNumber");
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(2), req);
     let res = timeout.await.unwrap().unwrap();
     assert!(res.to::<u64>() <= 3);
