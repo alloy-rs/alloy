@@ -99,13 +99,16 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
 
     /// Gets the accounts in the remote node. This is usually empty unless you're using a local
     /// node.
-    async fn get_accounts(&self) -> TransportResult<Vec<Address>> {
-        self.client().request("eth_accounts", ()).await
+    fn get_accounts(&self) -> ProviderCall<T, (), Vec<Address>> {
+        self.client().request("eth_accounts", ()).into()
     }
 
     /// Returns the base fee per blob gas (blob gas price) in wei.
-    async fn get_blob_base_fee(&self) -> TransportResult<u128> {
-        self.client().request("eth_blobBaseFee", ()).await.map(|fee: U128| fee.to::<u128>())
+    async fn get_blob_base_fee(&self) -> ProviderCall<T, (), U128, u128> {
+        self.client()
+            .request("eth_blobBaseFee", ())
+            .map_resp(utils::convert_u128 as fn(U128) -> u128)
+            .into()
     }
 
     /// Get the last block number available.
@@ -321,11 +324,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets the selected block [BlockId] receipts.
-    async fn get_block_receipts(
+    fn get_block_receipts(
         &self,
         block: BlockId,
-    ) -> TransportResult<Option<Vec<N::ReceiptResponse>>> {
-        self.client().request("eth_getBlockReceipts", (block,)).await
+    ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
+        self.client().request("eth_getBlockReceipts", (block,)).into()
     }
 
     /// Gets the bytecode located at the corresponding [Address].
@@ -511,11 +514,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets a transaction by its [TxHash].
-    async fn get_transaction_by_hash(
+    fn get_transaction_by_hash(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<N::TransactionResponse>> {
-        self.client().request("eth_getTransactionByHash", (hash,)).await
+    ) -> ProviderCall<T, (TxHash,), Option<N::TransactionResponse>> {
+        self.client().request("eth_getTransactionByHash", (hash,)).into()
     }
 
     /// Returns the EIP-2718 encoded transaction if it exists, see also
@@ -526,8 +529,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// [TxEip4844](alloy_consensus::transaction::eip4844::TxEip4844).
     ///
     /// This can be decoded into [TxEnvelope](alloy_consensus::transaction::TxEnvelope).
-    async fn get_raw_transaction_by_hash(&self, hash: TxHash) -> TransportResult<Option<Bytes>> {
-        self.client().request("eth_getRawTransactionByHash", (hash,)).await
+    async fn get_raw_transaction_by_hash(
+        &self,
+        hash: TxHash,
+    ) -> ProviderCall<T, (TxHash,), Option<Bytes>> {
+        self.client().request("eth_getRawTransactionByHash", (hash,)).into()
     }
 
     /// Gets the transaction count (AKA "nonce") of the corresponding address.
@@ -544,11 +550,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets a transaction receipt if it exists, by its [TxHash].
-    async fn get_transaction_receipt(
+    fn get_transaction_receipt(
         &self,
         hash: TxHash,
-    ) -> TransportResult<Option<N::ReceiptResponse>> {
-        self.client().request("eth_getTransactionReceipt", (hash,)).await
+    ) -> ProviderCall<T, (TxHash,), Option<N::ReceiptResponse>> {
+        self.client().request("eth_getTransactionReceipt", (hash,)).into()
     }
 
     /// Gets an uncle block through the tag [BlockId] and index [u64].
@@ -583,11 +589,11 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Returns a suggestion for the current `maxPriorityFeePerGas` in wei.
-    async fn get_max_priority_fee_per_gas(&self) -> TransportResult<u128> {
+    fn get_max_priority_fee_per_gas(&self) -> ProviderCall<T, (), U128, u128> {
         self.client()
             .request("eth_maxPriorityFeePerGas", ())
-            .await
-            .map(|fee: U128| fee.to::<u128>())
+            .map_resp(utils::convert_u128 as fn(U128) -> u128)
+            .into()
     }
 
     /// Notify the provider that we are interested in new blocks.
@@ -871,20 +877,20 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     }
 
     /// Gets syncing info.
-    async fn syncing(&self) -> TransportResult<SyncStatus> {
-        self.client().request("eth_syncing", ()).await
+    fn syncing(&self) -> ProviderCall<T, (), SyncStatus> {
+        self.client().request("eth_syncing", ()).into()
     }
 
     /// Gets the client version.
     #[doc(alias = "web3_client_version")]
-    async fn get_client_version(&self) -> TransportResult<String> {
-        self.client().request("web3_clientVersion", ()).await
+    fn get_client_version(&self) -> ProviderCall<T, (), String> {
+        self.client().request("web3_clientVersion", ()).into()
     }
 
     /// Gets the `Keccak-256` hash of the given data.
     #[doc(alias = "web3_sha3")]
-    async fn get_sha3(&self, data: &[u8]) -> TransportResult<B256> {
-        self.client().request("web3_sha3", (hex::encode_prefixed(data),)).await
+    fn get_sha3(&self, data: &[u8]) -> ProviderCall<T, (String,), B256> {
+        self.client().request("web3_sha3", (hex::encode_prefixed(data),)).into()
     }
 
     /// Gets the network ID. Same as `eth_chainId`.
