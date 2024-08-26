@@ -4,6 +4,8 @@ Ethereum Improvement Proprosal (EIP) implementations.
 
 Contains constants, helpers, and basic data structures for consensus EIPs.
 
+EIPs 2930 and 7702 are re-exported from [alloy-rs/eips](https://github.com/alloy-rs/eips).
+
 ## Current support
 
 - [EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)
