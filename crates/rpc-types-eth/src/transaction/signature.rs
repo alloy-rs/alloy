@@ -75,6 +75,20 @@ impl TryFrom<Signature> for alloy_primitives::Signature {
     }
 }
 
+impl From<alloy_primitives::Signature> for Signature {
+    fn from(signature: alloy_primitives::Signature) -> Self {
+        Self {
+            v: U256::from(signature.v().to_u64()),
+            r: signature.r(),
+            s: signature.s(),
+            y_parity: Some(Parity::from(
+                signature.v().y_parity_byte_non_eip155().unwrap_or(signature.v().y_parity_byte())
+                    != 0,
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
