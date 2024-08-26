@@ -87,14 +87,14 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     #[cfg(feature = "pubsub")]
     pub async fn get_subscription<R: alloy_json_rpc::RpcReturn>(
         &self,
-        id: alloy_primitives::U256,
+        id: alloy_primitives::B256,
     ) -> alloy_transport::TransportResult<Subscription<R>> {
         self.pubsub_frontend()?.get_subscription(id).await.map(Subscription::from)
     }
 
     /// Unsubscribes from the subscription corresponding to the given RPC subscription ID.
     #[cfg(feature = "pubsub")]
-    pub fn unsubscribe(&self, id: alloy_primitives::U256) -> alloy_transport::TransportResult<()> {
+    pub fn unsubscribe(&self, id: alloy_primitives::B256) -> alloy_transport::TransportResult<()> {
         self.pubsub_frontend()?.unsubscribe(id)
     }
 
