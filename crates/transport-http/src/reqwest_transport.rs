@@ -34,7 +34,7 @@ impl TransportConnect for ReqwestConnect {
 impl Http<Client> {
     /// Create a new [`Http`] transport.
     pub fn new(url: Url) -> Self {
-        Self { client: Default::default(), url }
+        Self { client: Default::default(), url, auth: None }
     }
 
     /// Make a request.
@@ -43,13 +43,13 @@ impl Http<Client> {
         let span: tracing::Span = debug_span!("ReqwestTransport", url = %self.url);
         Box::pin(
             async move {
-                let resp = this
-                    .client
-                    .post(this.url)
-                    .json(&req)
-                    .send()
-                    .await
-                    .map_err(TransportErrorKind::custom)?;
+                let mut builder = this.client.post(this.url);
+
+                if let Some(auth) = this.auth {
+                    builder = builder.header(reqwest::header::AUTHORIZATION, auth.to_string());
+                }
+
+                let resp = builder.json(&req).send().await.map_err(TransportErrorKind::custom)?;
                 let status = resp.status();
 
                 debug!(%status, "received response from server");

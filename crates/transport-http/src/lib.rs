@@ -27,7 +27,7 @@ pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
 
-use alloy_transport::utils::guess_local_url;
+use alloy_transport::{utils::guess_local_url, Authorization};
 use core::{marker::PhantomData, str::FromStr};
 use url::Url;
 
@@ -75,12 +75,18 @@ impl<T> FromStr for HttpConnect<T> {
 pub struct Http<T> {
     client: T,
     url: Url,
+    auth: Option<Authorization>,
 }
 
 impl<T> Http<T> {
     /// Create a new [`Http`] transport with a custom client.
     pub const fn with_client(client: T, url: Url) -> Self {
-        Self { client, url }
+        Self { client, url, auth: None }
+    }
+
+    /// Set the authorization header.
+    pub fn set_auth(&mut self, auth: Authorization) {
+        self.auth = Some(auth);
     }
 
     /// Set the URL.

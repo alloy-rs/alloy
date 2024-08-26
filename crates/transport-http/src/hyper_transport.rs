@@ -58,15 +58,20 @@ where
                 let ser = req.serialize().map_err(TransportError::ser_err)?;
                 // convert the Box<RawValue> into a hyper request<B>
                 let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
-                let req = hyper::Request::builder()
+
+                let mut builder = hyper::Request::builder()
                     .method(hyper::Method::POST)
                     .uri(this.url.as_str())
                     .header(
                         header::CONTENT_TYPE,
                         header::HeaderValue::from_static("application/json"),
-                    )
-                    .body(body)
-                    .expect("request parts are valid");
+                    );
+
+                if let Some(auth) = this.auth {
+                    builder = builder.header(header::AUTHORIZATION, auth.to_string());
+                }
+
+                let req = builder.body(body).expect("request parts are valid");
 
                 let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
                 let status = resp.status();
