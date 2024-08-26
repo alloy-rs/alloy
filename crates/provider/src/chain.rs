@@ -1,6 +1,6 @@
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
-use alloy_rpc_client::{PollerBuilder, WeakClient};
+use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::Block;
 use alloy_transport::{RpcError, Transport};
 use async_stream::stream;
@@ -19,7 +19,7 @@ const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
 pub(crate) struct ChainStreamPoller<T, N = Ethereum> {
     client: WeakClient<T>,
-    poll_task: PollerBuilder<T, [(); 0], U64>,
+    poll_task: PollerBuilder<T, NoParams, U64>,
     next_yield: BlockNumber,
     known_blocks: LruCache<BlockNumber, Block>,
     _phantom: PhantomData<N>,
