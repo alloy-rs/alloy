@@ -372,7 +372,7 @@ impl Filter {
     /// ```rust
     /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
-    /// let filter = Filter::new().select(0u64..100u64);
+    /// let filter = Filter::new().select(0u64..=100u64);
     /// # }
     /// ```
     ///
@@ -390,7 +390,7 @@ impl Filter {
     /// ```rust
     /// # use alloy_rpc_types_eth::Filter;
     /// # fn main() {
-    /// let filter = Filter::new().select(..1337u64);
+    /// let filter = Filter::new().select(..=1337u64);
     /// # }
     /// ```
     #[must_use]
