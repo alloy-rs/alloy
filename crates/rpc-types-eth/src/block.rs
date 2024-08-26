@@ -36,7 +36,7 @@ pub struct Block<T = Transaction, H = Header> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl<T: TransactionResponse> Block<T> {
+impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
     pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
