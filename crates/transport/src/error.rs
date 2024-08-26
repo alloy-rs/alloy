@@ -109,19 +109,13 @@ pub struct HttpError {
 impl HttpError {
     /// Checks the `status` to determine whether the request should be retried.
     pub const fn is_rate_limit_err(&self) -> bool {
-        if self.status == 429 {
-            return true;
-        }
-        false
+        self.status == 429
     }
 
     /// Checks the `status` to determine whether the service was temporarily unavailable and should
     /// be retried.
     pub const fn is_temporarily_unavailable(&self) -> bool {
-        if self.status == 503 {
-            return true;
-        }
-        false
+        self.status == 503
     }
 }
 
