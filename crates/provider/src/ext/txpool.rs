@@ -54,7 +54,7 @@ where
     N: Network,
 {
     async fn txpool_content(&self) -> TransportResult<TxpoolContent<N::TransactionResponse>> {
-        self.client().request("txpool_content", ()).await
+        self.client().request_noparams("txpool_content").await
     }
 
     async fn txpool_content_from(
@@ -65,11 +65,11 @@ where
     }
 
     async fn txpool_inspect(&self) -> TransportResult<TxpoolInspect> {
-        self.client().request("txpool_inspect", ()).await
+        self.client().request_noparams("txpool_inspect").await
     }
 
     async fn txpool_status(&self) -> TransportResult<TxpoolStatus> {
-        self.client().request("txpool_status", ()).await
+        self.client().request_noparams("txpool_status").await
     }
 }
 

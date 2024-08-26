@@ -19,6 +19,9 @@ pub type WeakClient<T> = Weak<RpcClientInner<T>>;
 /// A borrowed [`RpcClient`].
 pub type ClientRef<'a, T> = &'a RpcClientInner<T>;
 
+/// Parameter type of a JSON-RPC request with no parameters.
+pub type NoParams = [(); 0];
+
 /// A JSON-RPC client.
 ///
 /// [`RpcClient`] should never be instantiated directly. Instead, use
@@ -278,6 +281,16 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     ) -> RpcCall<T, Params, Resp> {
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
+    }
+
+    /// Prepares an [`RpcCall`] with no parameters.
+    ///
+    /// See [`request`](Self::request) for more details.
+    pub fn request_noparams<Resp: RpcReturn>(
+        &self,
+        method: impl Into<Cow<'static, str>>,
+    ) -> RpcCall<T, NoParams, Resp> {
+        self.request(method, [])
     }
 
     /// Type erase the service in the transport, allowing it to be used in a

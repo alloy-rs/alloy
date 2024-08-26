@@ -153,7 +153,7 @@ where
     }
 
     async fn debug_get_bad_blocks(&self) -> TransportResult<Vec<Block>> {
-        self.client().request("debug_getBadBlocks", ()).await
+        self.client().request_noparams("debug_getBadBlocks").await
     }
 
     async fn debug_trace_chain(
