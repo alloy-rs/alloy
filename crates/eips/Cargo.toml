@@ -20,8 +20,8 @@ workspace = true
 
 [dependencies]
 # eips
-eip-2930.workspace = true
-eip-7702.workspace = true
+alloy-eip2930.workspace = true
+alloy-eip7702.workspace = true
 
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
@@ -62,10 +62,10 @@ default = ["std", "kzg-sidecar"]
 std = ["alloy-primitives/std", "alloy-rlp/std",
 "serde?/std", "c-kzg?/std", "once_cell?/std"]
 serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde", 
-"c-kzg?/serde", "eip-2930/serde", "eip-7702/serde"]
+"c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
 kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
-k256 = ["eip-7702/k256"]
+k256 = ["alloy-eip7702/k256"]
 sha2 = ["dep:sha2"]
 ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
 arbitrary = [
@@ -74,7 +74,7 @@ arbitrary = [
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
-    "eip-2930/arbitrary",
-    "eip-7702/arbitrary",
-    "eip-7702/k256",
+    "alloy-eip2930/arbitrary",
+    "alloy-eip7702/arbitrary",
+    "alloy-eip7702/k256",
 ]
