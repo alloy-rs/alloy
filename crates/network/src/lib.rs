@@ -9,7 +9,6 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_network_primitives::{BlockResponse, HeaderResponse};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -25,7 +24,9 @@ mod any;
 pub use any::{AnyNetwork, AnyTxType};
 
 pub use alloy_eips::eip2718;
-pub use alloy_network_primitives::{self as primitives, ReceiptResponse, TransactionResponse};
+pub use alloy_network_primitives::{
+    self as primitives, BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse,
+};
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
