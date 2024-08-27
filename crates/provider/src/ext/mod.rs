@@ -39,3 +39,8 @@ pub use rpc::RpcApi;
 mod txpool;
 #[cfg(feature = "txpool-api")]
 pub use txpool::TxPoolApi;
+
+#[cfg(feature = "erc4337-api")]
+mod erc4337;
+#[cfg(feature = "erc4337-api")]
+pub use erc4337::Erc4337Api;

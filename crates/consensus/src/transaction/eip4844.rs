@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 
-use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB};
+use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
@@ -237,6 +237,13 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        match self {
+            Self::TxEip4844(tx) => tx.max_fee_per_blob_gas(),
+            Self::TxEip4844WithSidecar(tx) => tx.max_fee_per_blob_gas(),
+        }
+    }
+
     fn to(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
@@ -275,6 +282,10 @@ impl Transaction for TxEip4844Variant {
             Self::TxEip4844(tx) => tx.blob_versioned_hashes(),
             Self::TxEip4844WithSidecar(tx) => tx.blob_versioned_hashes(),
         }
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 
@@ -700,6 +711,10 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        Some(self.max_fee_per_blob_gas)
+    }
+
     fn to(&self) -> TxKind {
         self.to.into()
     }
@@ -722,6 +737,10 @@ impl Transaction for TxEip4844 {
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         Some(&self.blob_versioned_hashes)
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 
@@ -965,6 +984,10 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.priority_fee_or_price()
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.tx.max_fee_per_blob_gas()
+    }
+
     fn to(&self) -> TxKind {
         self.tx.to()
     }
@@ -987,6 +1010,10 @@ impl Transaction for TxEip4844WithSidecar {
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         self.tx.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 

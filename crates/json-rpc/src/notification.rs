@@ -25,8 +25,9 @@ pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
     pub result: T,
 }
 
-/// An item received over an Ethereum pubsub transport. Ethereum pubsub uses a
-/// non-standard JSON-RPC notification format. An item received over a pubsub
+/// An item received over an Ethereum pubsub transport.
+///
+/// Ethereum pubsub uses a non-standard JSON-RPC notification format. An item received over a pubsub
 /// transport may be a JSON-RPC response or an Ethereum-style notification.
 #[derive(Clone, Debug)]
 pub enum PubSubItem {

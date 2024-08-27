@@ -52,6 +52,10 @@ mod work;
 pub use work::Work;
 
 /// This module provides implementations for EIP-4337.
-pub mod eip4337;
+pub mod erc4337;
+pub use erc4337::{
+    PackedUserOperation, SendUserOperation, SendUserOperationResponse, UserOperation,
+    UserOperationGasEstimation, UserOperationReceipt,
+};
 
 pub mod simulate;

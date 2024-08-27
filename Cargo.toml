@@ -69,11 +69,11 @@ alloy-transport-http = { version = "0.2", path = "crates/transport-http", defaul
 alloy-transport-ipc = { version = "0.2", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "0.2", path = "crates/transport-ws", default-features = false }
 
-alloy-core = { version = "0.7.7", default-features = false }
-alloy-dyn-abi = { version = "0.7.7", default-features = false }
-alloy-json-abi = { version = "0.7.7", default-features = false }
-alloy-primitives = { version = "0.7.7", default-features = false }
-alloy-sol-types = { version = "0.7.7", default-features = false }
+alloy-core = { version = "0.8.0", default-features = false }
+alloy-dyn-abi = { version = "0.8.0", default-features = false }
+alloy-json-abi = { version = "0.8.0", default-features = false }
+alloy-primitives = { version = "0.8.0", default-features = false }
+alloy-sol-types = { version = "0.8.0", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 
@@ -84,8 +84,8 @@ eip-2930 = { git = "https://github.com/alloy-rs/eips", rev = "c5166fa" }
 eip-7702 = { git = "https://github.com/alloy-rs/eips", rev = "c5166fa" }
 
 # ethereum
-ethereum_ssz_derive = "0.5"
-ethereum_ssz = "0.5"
+ethereum_ssz_derive = "0.7.1"
+ethereum_ssz = "0.7.1"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }

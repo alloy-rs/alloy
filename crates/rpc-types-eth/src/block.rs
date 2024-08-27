@@ -1,10 +1,13 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::{BlockResponse, BlockTransactions, HeaderResponse};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
-use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use alloy_serde::WithOtherFields;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
@@ -14,10 +17,10 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
@@ -36,9 +39,9 @@ pub struct Block<T = Transaction> {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
-impl Block {
+impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
 }
@@ -234,62 +237,15 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A Block representation that allows to include additional fields
-pub type RichBlock = Rich<Block>;
-
-impl From<Block> for RichBlock {
+impl From<Block> for WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
-/// Header representation with additional info.
-pub type RichHeader = Rich<Header>;
-
-impl From<Header> for RichHeader {
+impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
-        Self { inner, extra_info: Default::default() }
-    }
-}
-
-/// Value representation with additional info
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub struct Rich<T> {
-    /// Standard value.
-    #[serde(flatten)]
-    pub inner: T,
-    /// Additional fields that should be serialized into the `Block` object
-    #[serde(flatten)]
-    pub extra_info: BTreeMap<String, serde_json::Value>,
-}
-
-impl<T> Deref for Rich<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T: Serialize> Serialize for Rich<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if self.extra_info.is_empty() {
-            return self.inner.serialize(serializer);
-        }
-
-        let inner = serde_json::to_value(&self.inner);
-        let extras = serde_json::to_value(&self.extra_info);
-
-        if let (Ok(serde_json::Value::Object(mut value)), Ok(serde_json::Value::Object(extras))) =
-            (inner, extras)
-        {
-            value.extend(extras);
-            value.serialize(serializer)
-        } else {
-            Err(S::Error::custom("Unserializable structures: expected objects"))
-        }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -334,9 +290,9 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<T> BlockResponse for Block<T> {
+impl<T, H> BlockResponse for Block<T, H> {
     type Transaction = T;
-    type Header = Header;
+    type Header = H;
 
     fn header(&self) -> &Self::Header {
         &self.header
@@ -536,9 +492,9 @@ mod tests {
     "size": "0xaeb6"
 }"#;
 
-        let block = serde_json::from_str::<RichBlock>(s).unwrap();
+        let block = serde_json::from_str::<WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        let block2 = serde_json::from_str::<WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 

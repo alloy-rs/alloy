@@ -78,6 +78,7 @@ pub struct SimCallResult {
 }
 
 /// Simulation options for executing multiple blocks and transactions.
+///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
 #[derive(Clone, Debug, Serialize, Deserialize)]
