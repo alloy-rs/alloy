@@ -816,7 +816,9 @@ pub enum PayloadError {
     /// blob transactions present in pre-prague payload.
     #[error("eip 7702 transactions present in pre-prague payload")]
     PrePragueBlockWithEip7702Transactions,
-
+    /// requests present in pre-prague payload.
+    #[error("requests present in pre-prague payload")]
+    PrePragueBlockRequests,
     /// Invalid payload block hash.
     #[error("block hash mismatch: want {consensus}, got {execution}")]
     BlockHash {
