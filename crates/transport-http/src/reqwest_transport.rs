@@ -1,7 +1,8 @@
 use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
-    utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
+    utils::guess_local_url, Authorization, TransportConnect, TransportError, TransportErrorKind,
+    TransportFut,
 };
 use std::task;
 use tower::Service;
@@ -35,6 +36,12 @@ impl Http<Client> {
     /// Create a new [`Http`] transport.
     pub fn new(url: Url) -> Self {
         Self { client: Default::default(), url, auth: None }
+    }
+
+    /// With authorization header.
+    pub fn with_auth(mut self, auth: Option<Authorization>) -> Self {
+        self.auth = auth;
+        self
     }
 
     /// Make a request.
