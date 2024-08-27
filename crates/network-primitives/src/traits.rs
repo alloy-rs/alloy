@@ -50,6 +50,9 @@ pub trait TransactionResponse {
 
 /// Header JSON-RPC response.
 pub trait HeaderResponse {
+    /// Block hash
+    fn hash(&self) -> BlockHash;
+
     /// Block number
     fn number(&self) -> u64;
 
@@ -145,6 +148,10 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 }
 
 impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
+    fn hash(&self) -> BlockHash {
+        self.inner.hash()
+    }
+
     fn number(&self) -> u64 {
         self.inner.number()
     }
