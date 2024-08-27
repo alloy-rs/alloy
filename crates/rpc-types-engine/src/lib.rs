@@ -11,13 +11,10 @@ mod forkchoice;
 mod identification;
 #[cfg(feature = "jwt")]
 mod jwt;
-mod optimism;
 pub mod payload;
 mod transition;
 
-pub use self::{
-    cancun::*, forkchoice::*, identification::*, optimism::*, payload::*, transition::*,
-};
+pub use self::{cancun::*, forkchoice::*, identification::*, payload::*, transition::*};
 
 #[cfg(feature = "jwt")]
 pub use self::jwt::*;
