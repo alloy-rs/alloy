@@ -303,11 +303,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let provider = ProviderBuilder::new()
-            .filler(crate::fillers::GasFiller)
-            .filler(crate::fillers::NonceFiller::default())
-            .filler(crate::fillers::ChainIdFiller::default())
-            .on_anvil();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil();
 
         let tx = TransactionRequest {
             from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),
