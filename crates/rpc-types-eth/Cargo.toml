@@ -61,7 +61,6 @@ arbitrary = [
     "alloy-primitives/arbitrary",
     "alloy-serde/arbitrary",
     "alloy-eips/arbitrary",
-    "alloy-eips/k256",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]

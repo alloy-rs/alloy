@@ -269,9 +269,9 @@ arbitrary = [
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
-    "alloy-eips?/k256",
     "alloy-network?/k256",
     "alloy-rpc-types?/k256",
+    "alloy-eips?/k256",
 ]
 kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
 eip712 = [
