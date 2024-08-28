@@ -14,7 +14,7 @@ use std::sync::Arc;
 /// A trait that determines the behavior of filling nonces.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug + Default {
+pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
     /// Get the next nonce for the given account.
     async fn get_next_nonce<P, T, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -30,6 +30,7 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug + Default {
 /// which results in more frequent calls to the provider, but it is more resilient to chain
 /// reorganizations.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct SimpleNonceManager;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
