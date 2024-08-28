@@ -307,7 +307,7 @@ impl Transaction for TxEip1559 {
     }
 
     fn ty(&self) -> u8 {
-        TxType::Eip2930 as u8
+        TxType::Eip1559 as u8
     }
 
     fn access_list(&self) -> Option<&AccessList> {
