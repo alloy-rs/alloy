@@ -130,10 +130,7 @@ impl<T> TxpoolContent<T> {
 
 impl<T> Default for TxpoolContent<T> {
     fn default() -> Self {
-        Self {
-            pending: Default::default(),
-            queued: Default::default(),
-        }
+        Self { pending: Default::default(), queued: Default::default() }
     }
 }
 
@@ -152,10 +149,7 @@ pub struct TxpoolContentFrom<T = Transaction> {
 
 impl<T> Default for TxpoolContentFrom<T> {
     fn default() -> Self {
-        Self {
-            pending: Default::default(),
-            queued: Default::default(),
-        }
+        Self { pending: Default::default(), queued: Default::default() }
     }
 }
 
