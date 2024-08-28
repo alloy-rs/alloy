@@ -14,9 +14,7 @@ pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
     eip7702::Authorization,
 };
-
-mod common;
-pub use common::TransactionInfo;
+pub use alloy_network_primitives::TransactionInfo;
 
 mod error;
 pub use error::ConversionError;
@@ -150,6 +148,20 @@ impl Transaction {
             blob_versioned_hashes: self.blob_versioned_hashes,
             sidecar: None,
             authorization_list: self.authorization_list,
+        }
+    }
+}
+
+impl From<&Transaction> for TransactionInfo {
+    fn from(tx: &Transaction) -> Self {
+        Self {
+            hash: Some(tx.hash),
+            index: tx.transaction_index,
+            block_hash: tx.block_hash,
+            block_number: tx.block_number,
+            // We don't know the base fee of the block when we're constructing this from
+            // `Transaction`
+            base_fee: None,
         }
     }
 }
