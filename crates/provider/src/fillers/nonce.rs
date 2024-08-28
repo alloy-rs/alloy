@@ -103,10 +103,10 @@ impl NonceManager for CachedNonceManager {
 /// ```
 /// # use alloy_network::{NetworkWallet, EthereumWallet, Ethereum};
 /// # use alloy_rpc_types_eth::TransactionRequest;
-/// # use alloy_provider::{fillers::SimpleNonceManager, ProviderBuilder, RootProvider, Provider};
+/// # use alloy_provider::{ProviderBuilder, RootProvider, Provider};
 /// # async fn test<W: NetworkWallet<Ethereum> + Clone>(url: url::Url, wallet: W) -> Result<(), Box<dyn std::error::Error>> {
 /// let provider = ProviderBuilder::new()
-///     .with_nonce_management(SimpleNonceManager)
+///     .with_simple_nonce_management()
 ///     .wallet(wallet)
 ///     .on_http(url);
 ///
@@ -115,7 +115,7 @@ impl NonceManager for CachedNonceManager {
 /// # }
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct NonceFiller<M: NonceManager> {
+pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
     nonce_manager: M,
 }
 
@@ -234,8 +234,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_nonce_if_sender_unset() {
-        let provider =
-            ProviderBuilder::new().with_nonce_management(CachedNonceManager::default()).on_anvil();
+        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil();
 
         let tx = TransactionRequest {
             value: Some(U256::from(100)),
@@ -251,9 +250,7 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
-        let provider = ProviderBuilder::new()
-            .with_nonce_management(CachedNonceManager::default())
-            .on_anvil_with_wallet();
+        let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil_with_wallet();
 
         let from = provider.default_signer_address();
         let tx = TransactionRequest {

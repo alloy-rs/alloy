@@ -35,10 +35,8 @@ use std::marker::PhantomData;
 
 /// The recommended filler, a preconfigured set of layers handling gas estimation, nonce
 /// management, and chain-id fetching.
-pub type RecommendedFiller = JoinFill<
-    JoinFill<JoinFill<Identity, GasFiller>, NonceFiller<SimpleNonceManager>>,
-    ChainIdFiller,
->;
+pub type RecommendedFiller =
+    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
 
 /// The control flow for a filler.
 #[derive(Clone, Debug, PartialEq, Eq)]
