@@ -21,6 +21,7 @@ enum ArbitraryValue {
     Null,
     Bool(bool),
     Number(u64),
+    Float(f64),
     String(String),
     Array(Vec<ArbitraryValue>),
     Object(BTreeMap<String, ArbitraryValue>),
@@ -31,6 +32,7 @@ impl ArbitraryValue {
         match self {
             Self::Null => serde_json::Value::Null,
             Self::Bool(b) => serde_json::Value::Bool(b),
+            Self::Float(n) => serde_json::Value::String(n.to_string()),
             Self::Number(n) => serde_json::Value::Number(n.into()),
             Self::String(s) => serde_json::Value::String(s),
             Self::Array(a) => {
@@ -39,6 +41,19 @@ impl ArbitraryValue {
             Self::Object(o) => serde_json::Value::Object(
                 o.into_iter().map(|(k, v)| (k, v.into_json_value())).collect(),
             ),
+        }
+    }
+
+    fn from_json_value(value: serde_json::Value) -> Option<Self> {
+        match value {
+            serde_json::Value::String(s) => {
+                if let Ok(f) = s.parse::<f64>() {
+                    Some(Self::Float(f))
+                } else {
+                    Some(Self::String(s))
+                }
+            }
+            _ => todo!(),
         }
     }
 }
