@@ -2,7 +2,7 @@ use alloy_consensus::Signed;
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
-use crate::BlockTransactions;
+use crate::{BlockTransactions, TransactionInfo};
 
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
@@ -58,10 +58,7 @@ pub trait TransactionResponse {
     fn fill(
         signed_tx: Signed<impl alloy_consensus::Transaction>,
         signer: Address,
-        block_hash: Option<B256>,
-        block_number: Option<u64>,
-        base_fee: Option<u64>,
-        transaction_index: Option<usize>,
+        tx_info: TransactionInfo,
     ) -> Self;
 }
 
@@ -139,12 +136,9 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
     fn fill(
         signed_tx: Signed<impl alloy_consensus::Transaction>,
         signer: Address,
-        block_hash: Option<B256>,
-        block_number: Option<u64>,
-        base_fee: Option<u64>,
-        transaction_index: Option<usize>,
+        tx_info: TransactionInfo,
     ) -> Self {
-        Self::new(T::fill(signed_tx, signer, block_hash, block_number, base_fee, transaction_index))
+        Self::new(T::fill(signed_tx, signer, tx_info))
     }
 }
 

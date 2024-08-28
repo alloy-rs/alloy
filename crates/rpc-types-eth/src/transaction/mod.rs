@@ -1,8 +1,8 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
-    TxEnvelope, TxLegacy, TxType,
+    transaction, SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
+    TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
@@ -357,12 +357,13 @@ impl TransactionResponse for Transaction {
     fn fill(
         signed_tx: Signed<impl alloy_consensus::Transaction>,
         signer: Address,
-        block_hash: Option<B256>,
-        block_number: Option<u64>,
-        base_fee: Option<u64>,
-        transaction_index: Option<usize>,
+        tx_info: TransactionInfo,
     ) -> Self {
         let (tx, signature, hash) = signed_tx.into_parts();
+
+        let TransactionInfo {
+            block_hash, block_number, base_fee, index: transaction_index, ..
+        } = tx_info;
 
         Self {
             hash,
@@ -381,7 +382,7 @@ impl TransactionResponse for Transaction {
             transaction_type: Some(tx.ty()),
             block_hash,
             block_number,
-            transaction_index: transaction_index.map(|idx| idx as u64),
+            transaction_index,
             // EIP-4844 fields //
             max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
             blob_versioned_hashes: tx.blob_versioned_hashes().map(|hashes| hashes.to_vec()),
