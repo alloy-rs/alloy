@@ -47,11 +47,7 @@ impl ArbitraryValue {
     fn from_json_value(value: serde_json::Value) -> Option<Self> {
         match value {
             serde_json::Value::String(s) => {
-                if let Ok(f) = s.parse::<f64>() {
-                    Some(Self::Float(f))
-                } else {
-                    Some(Self::String(s))
-                }
+                s.parse::<f64>().map_or(Some(Self::String(s)), |f| Some(Self::Float(f)))
             }
             _ => todo!(),
         }
