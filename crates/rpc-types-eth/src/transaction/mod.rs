@@ -1,15 +1,17 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    transaction, SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant,
-    TxEip7702, TxEnvelope, TxLegacy, TxType,
+    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
+    TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
-pub use alloy_consensus::BlobTransactionSidecar;
+pub use alloy_consensus::{
+    AnyReceiptEnvelope, BlobTransactionSidecar, Receipt, ReceiptEnvelope, ReceiptWithBloom,
+};
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
     eip7702::Authorization,
@@ -27,8 +29,6 @@ pub use request::{TransactionInput, TransactionRequest};
 
 mod signature;
 pub use signature::{Parity, Signature};
-
-pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -371,7 +371,7 @@ impl TransactionResponse for Transaction {
             from: signer,
             to: tx.to().to().copied(),
             value: tx.value(),
-            gas_price: Some(Self::gas_price(&tx, base_fee)),
+            gas_price: Some(Self::gas_price(&tx, base_fee.map(|bf| bf as u64))),
             max_fee_per_gas: Some(tx.max_fee_per_gas()),
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
             signature: Some(signature.into()),

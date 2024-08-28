@@ -1,5 +1,5 @@
 use alloy_consensus::Signed;
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::{BlockTransactions, TransactionInfo};
