@@ -21,9 +21,6 @@ pub use common::TransactionInfo;
 mod error;
 pub use error::ConversionError;
 
-pub mod optimism;
-pub use optimism::OptimismTransactionReceiptFields;
-
 mod receipt;
 pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
 

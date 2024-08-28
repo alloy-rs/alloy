@@ -52,7 +52,7 @@ impl<T: TransactionResponse, H> Block<T, H> {
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
-    pub hash: Option<BlockHash>,
+    pub hash: BlockHash,
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles
@@ -205,6 +205,10 @@ impl TryFrom<Header> for alloy_consensus::Header {
 }
 
 impl HeaderResponse for Header {
+    fn hash(&self) -> BlockHash {
+        self.hash
+    }
+
     fn number(&self) -> u64 {
         self.number
     }
@@ -337,7 +341,7 @@ mod tests {
     fn serde_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -379,7 +383,7 @@ mod tests {
     fn serde_uncle_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -421,7 +425,7 @@ mod tests {
     fn serde_block_with_withdrawals_set_as_none() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -639,7 +643,7 @@ mod tests {
         let block = serde_json::from_str::<Block>(s).unwrap();
         let header: alloy_consensus::Header = block.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block.header.hash);
 
         let s2 = r#"{
             "baseFeePerGas":"0x886b221ad",
@@ -676,6 +680,6 @@ mod tests {
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
         let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block2.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block2.header.hash);
     }
 }

@@ -39,6 +39,5 @@ serde_json.workspace = true
 ssz = [
     "dep:ethereum_ssz",
     "dep:ethereum_ssz_derive",
-    "alloy-primitives/ssz",
     "alloy-rpc-types-engine/ssz",
 ]
