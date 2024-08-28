@@ -7,7 +7,7 @@ use serde::{
 use serde_json::{value::RawValue, Value};
 use std::{borrow::Borrow, fmt, marker::PhantomData};
 
-/// A JSONRPC-2.0 error object.
+/// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
@@ -81,9 +81,15 @@ fn spelunk_revert(value: &Value) -> Option<Bytes> {
     }
 }
 
-impl<ErrData> fmt::Display for ErrorPayload<ErrData> {
+impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error code {}: {}", self.code, self.message)
+        write!(
+            f,
+            "error code {}: {}{}",
+            self.code,
+            self.message,
+            self.data.as_ref().map(|data| format!(", data: {}", data)).unwrap_or_default()
+        )
     }
 }
 
@@ -159,7 +165,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
             type Value = ErrorPayload<Data>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(formatter, "a JSON-RPC2.0 error object")
+                write!(formatter, "a JSON-RPC 2.0 error object")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>

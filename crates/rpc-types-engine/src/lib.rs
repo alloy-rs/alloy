@@ -9,14 +9,15 @@
 mod cancun;
 mod forkchoice;
 mod identification;
+#[cfg(feature = "jwt")]
 mod jwt;
-mod optimism;
 pub mod payload;
 mod transition;
 
-pub use self::{
-    cancun::*, forkchoice::*, identification::*, jwt::*, optimism::*, payload::*, transition::*,
-};
+pub use self::{cancun::*, forkchoice::*, identification::*, payload::*, transition::*};
+
+#[cfg(feature = "jwt")]
+pub use self::jwt::*;
 
 #[doc(inline)]
 pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;

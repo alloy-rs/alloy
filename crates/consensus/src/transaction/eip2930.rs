@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -86,7 +86,7 @@ impl TxEip2930 {
     /// - `value`
     /// - `data` (`input`)
     /// - `access_list`
-    pub(crate) fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    pub fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
             nonce: Decodable::decode(buf)?,
@@ -157,12 +157,10 @@ impl TxEip2930 {
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header
     #[doc(hidden)]
-    pub fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
+    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         if with_header {
             Header {
@@ -244,6 +242,22 @@ impl Transaction for TxEip2930 {
         Some(self.gas_price)
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -254,6 +268,22 @@ impl Transaction for TxEip2930 {
 
     fn input(&self) -> &[u8] {
         &self.input
+    }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip2930 as u8
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 

@@ -1,11 +1,13 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
-use alloy_network_primitives::BlockTransactions;
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
-use alloy_serde::OtherFields;
-use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use alloy_serde::WithOtherFields;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
@@ -15,10 +17,10 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
@@ -35,14 +37,11 @@ pub struct Block<T = Transaction> {
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Support for arbitrary additional fields.
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
-impl Block {
+impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
 }
@@ -53,7 +52,7 @@ impl Block {
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
-    pub hash: Option<BlockHash>,
+    pub hash: BlockHash,
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles
@@ -72,8 +71,8 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub number: Option<u64>,
+    #[serde(with = "alloy_serde::quantity")]
+    pub number: u64,
     /// Gas Limit
     #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
@@ -189,7 +188,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             withdrawals_root,
             logs_bloom,
             difficulty,
-            number: number.ok_or(ConversionError::MissingBlockNumber)?,
+            number,
             gas_limit,
             gas_used,
             timestamp,
@@ -205,6 +204,32 @@ impl TryFrom<Header> for alloy_consensus::Header {
     }
 }
 
+impl HeaderResponse for Header {
+    fn hash(&self) -> BlockHash {
+        self.hash
+    }
+
+    fn number(&self) -> u64 {
+        self.number
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
+    }
+
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_blob_fee()
+    }
+}
+
 /// Error that can occur when converting other types to blocks
 #[derive(Clone, Copy, Debug, thiserror::Error)]
 pub enum BlockError {
@@ -216,62 +241,15 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A Block representation that allows to include additional fields
-pub type RichBlock = Rich<Block>;
-
-impl From<Block> for RichBlock {
+impl From<Block> for WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
-/// Header representation with additional info.
-pub type RichHeader = Rich<Header>;
-
-impl From<Header> for RichHeader {
+impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
-        Self { inner, extra_info: Default::default() }
-    }
-}
-
-/// Value representation with additional info
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub struct Rich<T> {
-    /// Standard value.
-    #[serde(flatten)]
-    pub inner: T,
-    /// Additional fields that should be serialized into the `Block` object
-    #[serde(flatten)]
-    pub extra_info: BTreeMap<String, serde_json::Value>,
-}
-
-impl<T> Deref for Rich<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T: Serialize> Serialize for Rich<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if self.extra_info.is_empty() {
-            return self.inner.serialize(serializer);
-        }
-
-        let inner = serde_json::to_value(&self.inner);
-        let extras = serde_json::to_value(&self.extra_info);
-
-        if let (Ok(serde_json::Value::Object(mut value)), Ok(serde_json::Value::Object(extras))) =
-            (inner, extras)
-        {
-            value.extend(extras);
-            value.serialize(serializer)
-        } else {
-            Err(S::Error::custom("Unserializable structures: expected objects"))
-        }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -316,6 +294,23 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
+impl<T, H> BlockResponse for Block<T, H> {
+    type Transaction = T;
+    type Header = H;
+
+    fn header(&self) -> &Self::Header {
+        &self.header
+    }
+
+    fn transactions(&self) -> &BlockTransactions<T> {
+        &self.transactions
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        &mut self.transactions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloy_primitives::keccak256;
@@ -346,7 +341,7 @@ mod tests {
     fn serde_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -354,7 +349,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -374,7 +369,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -389,7 +383,7 @@ mod tests {
     fn serde_uncle_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -397,7 +391,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -417,7 +411,6 @@ mod tests {
             transactions: BlockTransactions::Uncle,
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -432,7 +425,7 @@ mod tests {
     fn serde_block_with_withdrawals_set_as_none() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -440,7 +433,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: None,
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -460,7 +453,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -504,9 +496,9 @@ mod tests {
     "size": "0xaeb6"
 }"#;
 
-        let block = serde_json::from_str::<RichBlock>(s).unwrap();
+        let block = serde_json::from_str::<WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        let block2 = serde_json::from_str::<WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 
@@ -651,7 +643,7 @@ mod tests {
         let block = serde_json::from_str::<Block>(s).unwrap();
         let header: alloy_consensus::Header = block.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block.header.hash);
 
         let s2 = r#"{
             "baseFeePerGas":"0x886b221ad",
@@ -688,6 +680,6 @@ mod tests {
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
         let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block2.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block2.header.hash);
     }
 }

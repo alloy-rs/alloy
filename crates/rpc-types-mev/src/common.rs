@@ -217,8 +217,9 @@ impl<'de> Deserialize<'de> for PrivacyHint {
     }
 }
 
-/// Specifies the minimum percent of a given bundle's earnings to redistribute
-/// for it to be included in a builder's block.
+/// Specifies the minimum percent of a given bundle's earnings to redistribute for it to be included
+/// in a builder's block.
+///
 /// Related endpoint: `mev_sendBundle`, `mev_simBundle`, `eth_sendPrivateTransaction`,
 /// `eth_sendPrivateRawTransaction`
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

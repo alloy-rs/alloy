@@ -1,7 +1,10 @@
-use crate::{EncodableSignature, SignableTransaction, Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
+
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
+
+use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -217,6 +220,22 @@ impl Transaction for TxLegacy {
         Some(self.gas_price)
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -227,6 +246,22 @@ impl Transaction for TxLegacy {
 
     fn input(&self) -> &[u8] {
         &self.input
+    }
+
+    fn ty(&self) -> u8 {
+        TxType::Legacy as u8
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        None
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 

@@ -5,18 +5,29 @@ use serde::{
     Deserialize, Serialize,
 };
 
+/// A subscription ID.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[serde(untagged)]
+pub enum SubId {
+    /// A number.
+    Number(U256),
+    /// A string.
+    String(String),
+}
+
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EthNotification<T = Box<serde_json::value::RawValue>> {
     /// The subscription ID.
-    pub subscription: U256,
+    pub subscription: SubId,
     /// The notification payload.
     pub result: T,
 }
 
-/// An item received over an Ethereum pubsub transport. Ethereum pubsub uses a
-/// non-standard JSON-RPC notification format. An item received over a pubsub
+/// An item received over an Ethereum pubsub transport.
+///
+/// Ethereum pubsub uses a non-standard JSON-RPC notification format. An item received over a pubsub
 /// transport may be a JSON-RPC response or an Ethereum-style notification.
 #[derive(Clone, Debug)]
 pub enum PubSubItem {
@@ -128,7 +139,7 @@ impl<'de> Deserialize<'de> for PubSubItem {
 #[cfg(test)]
 mod test {
 
-    use crate::{EthNotification, PubSubItem};
+    use crate::{EthNotification, PubSubItem, SubId};
 
     #[test]
     fn deserializer_test() {
@@ -140,7 +151,10 @@ mod test {
 
         match deser {
             PubSubItem::Notification(EthNotification { subscription, result }) => {
-                assert_eq!(subscription, "0xcd0c3e8af590364c09d0fa6a1210faf5".parse().unwrap());
+                assert_eq!(
+                    subscription,
+                    SubId::Number("0xcd0c3e8af590364c09d0fa6a1210faf5".parse().unwrap())
+                );
                 assert_eq!(result.get(), r#"{"difficulty": "0xd9263f42a87", "uncles": []}"#);
             }
             _ => panic!("unexpected deserialization result"),

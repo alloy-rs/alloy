@@ -64,11 +64,11 @@ where
     }
 
     async fn peers(&self) -> TransportResult<Vec<PeerInfo>> {
-        self.client().request("admin_peers", ()).await
+        self.client().request_noparams("admin_peers").await
     }
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
-        self.client().request("admin_nodeInfo", ()).await
+        self.client().request_noparams("admin_nodeInfo").await
     }
 
     #[cfg(feature = "pubsub")]
@@ -76,7 +76,7 @@ where
         &self,
     ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>> {
         self.root().pubsub_frontend()?;
-        let mut call = self.client().request("admin_peerEvents_subscribe", ());
+        let mut call = self.client().request_noparams("admin_peerEvents_subscribe");
         call.set_is_subscription();
         let id = call.await?;
         self.root().get_subscription(id).await

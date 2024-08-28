@@ -7,9 +7,10 @@ use alloy_network::Network;
 use alloy_transport::{Transport, TransportResult};
 use futures::try_join;
 
-/// A layer that can fill in a [`TransactionRequest`] with additional
-/// information by joining two [`TxFiller`]s. This  struct is itself a
-/// [`TxFiller`], and can be nested to compose any number of fill layers.
+/// A layer that can fill in a [`TransactionRequest`] with additional information by joining two
+/// [`TxFiller`]s.
+///
+/// This struct is itself a [`TxFiller`], and can be nested to compose any number of fill layers.
 ///
 /// [`TransactionRequest`]: alloy_rpc_types_eth::TransactionRequest
 #[derive(Clone, Copy, Debug)]

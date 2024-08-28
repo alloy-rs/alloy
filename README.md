@@ -26,7 +26,7 @@ cargo add alloy --features full
 Alternatively, you can add the following to your `Cargo.toml` file:
 
 ```toml
-alloy = { version = "0.1", features = ["full"] }
+alloy = { version = "0.2", features = ["full"] }
 ```
 
 For a more fine-grained control over the features you wish to include, you can add the individual crates to your `Cargo.toml` file, or use the `alloy` crate with the features you need.
@@ -53,6 +53,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-admin`] - Types for the `admin` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-anvil`] - Types for the [Anvil] development node's Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
+  - [`alloy-rpc-types-debug`] - Types for the `debug` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace

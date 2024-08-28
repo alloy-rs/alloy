@@ -43,6 +43,9 @@ pub enum ConversionError {
     /// Missing `blobVersionedHashes` field for EIP-4844 transaction.
     #[error("missing `blobVersionedHashes` field for EIP-4844 transaction")]
     MissingBlobVersionedHashes,
+    /// Missing `authorizationList` field for EIP-7702 transaction.
+    #[error("missing `authorizationList` field for EIP-7702 transaction")]
+    MissingAuthorizationList,
     /// Missing full transactions required for block decoding
     #[error("missing full transactions required for block decoding")]
     MissingFullTransactions,
