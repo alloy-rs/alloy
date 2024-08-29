@@ -143,10 +143,7 @@ where
             requests
                 .into_iter()
                 .map(|(_, call)| {
-                    Ok(IMulticall3::Call {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        callData: call.input().cloned().unwrap_or_default(),
-                    })
+                    call_from_tx_ref::<N>(call)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -164,10 +161,7 @@ where
             requests
                 .into_iter()
                 .map(|(_, call)| {
-                    Ok(IMulticall3::Call {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        callData: call.into_input().unwrap_or_default(),
-                    })
+                    call_from_tx::<N>(call)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -187,10 +181,7 @@ where
             requests
                 .into_iter()
                 .map(|(_, call)| {
-                    Ok(IMulticall3::Call {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        callData: call.input().cloned().unwrap_or_default(),
-                    })
+                    call_from_tx_ref::<N>(call)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -210,10 +201,7 @@ where
             requests
                 .into_iter()
                 .map(|(_, call)| {
-                    Ok(IMulticall3::Call {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        callData: call.into_input().unwrap_or_default(),
-                    })
+                    call_from_tx::<N>(call)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -229,11 +217,7 @@ where
             requests
                 .into_iter()
                 .map(|(allow_failure, call)| {
-                    Ok(IMulticall3::Call3 {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        allowFailure: allow_failure,
-                        callData: call.input().cloned().unwrap_or_default(),
-                    })
+                    call3_from_tx_ref::<N>(call, allow_failure)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -249,11 +233,7 @@ where
             requests
                 .into_iter()
                 .map(|(allow_failure, call)| {
-                    Ok(IMulticall3::Call3 {
-                        target: call.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
-                        allowFailure: allow_failure,
-                        callData: call.into_input().unwrap_or_default(),
-                    })
+                    call3_from_tx::<N>(call, allow_failure)
                 })
                 .collect::<Result<Vec<_>, MultiCallError>>()?,
         )
@@ -280,9 +260,11 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let mut results = Vec::with_capacity(requests.len());
+        let mut results;
 
         if let Some(batch) = self.batch {
+            results = Vec::with_capacity(requests.len());
+
             for chunk in requests.chunks(batch) {
                 let chunk_results = self.instance.aggregate(chunk.to_vec()).call().await?;
 
@@ -307,9 +289,11 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let mut results = Vec::with_capacity(requests.len());
+        let mut results;
 
         if let Some(batch) = self.batch {
+            results = Vec::with_capacity(requests.len());
+
             for chunk in requests.chunks(batch) {
                 let chunk_results = self.instance.tryAggregate(require_success, chunk.to_vec()).call().await?;
 
@@ -340,8 +324,11 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call3>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let mut results = Vec::with_capacity(requests.len());
+        let mut results;
+
         if let Some(batch) = self.batch {
+            results = Vec::with_capacity(requests.len());
+
             for chunk in requests.chunks(batch) {
                 let chunk_results = self.instance.aggregate3(chunk.to_vec()).call().await?;
 
@@ -382,4 +369,49 @@ where
             .map(|(allow_failure, call)| (call.decoder(), (*allow_failure, call.as_ref())))
             .unzip()
     }
+}
+
+fn call3_from_tx<N>(tx: N::TransactionRequest, allow_failure: bool) -> Result<IMulticall3::Call3, MultiCallError>
+where
+    N: Network,
+{
+    Ok(IMulticall3::Call3 {
+        target: tx.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
+        allowFailure: allow_failure,
+        callData: tx.into_input().unwrap_or_default(),
+    })
+}
+
+fn call3_from_tx_ref<N>(
+    tx: &N::TransactionRequest,
+    allow_failure: bool,
+) -> Result<IMulticall3::Call3, MultiCallError>
+where
+    N: Network,
+{
+    Ok(IMulticall3::Call3 {
+        target: tx.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
+        allowFailure: allow_failure,
+        callData: tx.input().cloned().unwrap_or_default(),
+    })
+}
+
+fn call_from_tx<N>(tx: N::TransactionRequest) -> Result<IMulticall3::Call, MultiCallError>
+where
+    N: Network,
+{
+    Ok(IMulticall3::Call {
+        target: tx.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
+        callData: tx.into_input().unwrap_or_default(),
+    })
+}
+
+fn call_from_tx_ref<N>(tx: &N::TransactionRequest) -> Result<IMulticall3::Call, MultiCallError>
+where
+    N: Network,
+{
+    Ok(IMulticall3::Call {
+        target: tx.to().ok_or(error::MultiCallError::MissingTargetAddress)?,
+        callData: tx.input().cloned().unwrap_or_default(),
+    })
 }
