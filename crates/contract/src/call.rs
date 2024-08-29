@@ -137,6 +137,24 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
     pub fn into_transaction_request(self) -> N::TransactionRequest {
         self.request
     }
+
+    pub fn decoder(&self) -> &D {
+        &self.decoder
+    }
+
+    pub fn take_decoder(self) -> (D, RawCallBuilder<T, P, N>) {
+        (
+            self.decoder,
+            RawCallBuilder {
+                request: self.request,
+                block: self.block,
+                state: self.state,
+                provider: self.provider,
+                decoder: (),
+                transport: PhantomData,
+            },
+        )
+    }
 }
 
 impl<T, P, D, N: Network> AsRef<N::TransactionRequest> for CallBuilder<T, P, D, N> {
