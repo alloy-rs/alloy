@@ -353,13 +353,7 @@ impl<T: DeserializeOwned> Stream for SubAnyStream<T> {
 
 impl<T> From<broadcast::Receiver<Box<RawValue>>> for Subscription<T> {
     fn from(rx: broadcast::Receiver<Box<RawValue>>) -> Self {
-        Self {
-            inner: RawSubscription {
-                rx,
-                local_id: B256::ZERO,
-            },
-            _pd: std::marker::PhantomData,
-        }
+        Self { inner: RawSubscription { rx, local_id: B256::ZERO }, _pd: std::marker::PhantomData }
     }
 }
 
