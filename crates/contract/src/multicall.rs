@@ -8,7 +8,7 @@ pub use error::MultiCallError;
 
 use alloy_json_abi::Function;
 use alloy_network::{Network, TransactionBuilder};
-use alloy_primitives::{Address, Bytes};
+use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
 use alloy_transport::Transport;
@@ -64,6 +64,7 @@ pub type DynMultiCall<T, P, N> = MultiCall<T, P, Function, N>;
 pub struct MultiCall<T, P, D: CallDecoder, N: Network> {
     instance: IMulticall3::IMulticall3Instance<T, P, N>,
     calls: Vec<(bool, CallBuilder<T, P, D, N>)>,
+    batch: Option<usize>,
 }
 
 impl<T, P, D, N> MultiCall<T, P, D, N>
@@ -90,7 +91,7 @@ where
             provider,
         );
 
-        Ok(Self { instance, calls: vec![] })
+        Ok(Self { instance, calls: vec![], batch: None })
     }
 
     pub fn add_call<'a>(&mut self, call: CallBuilder<T, P, D, N>, allow_failure: bool) {
@@ -102,6 +103,10 @@ where
         I: Iterator<Item = (bool, CallBuilder<T, P, D, N>)>,
     {
         self.calls.extend(calls);
+    }
+
+    pub fn batch(&mut self, batch: Option<usize>) {
+        self.batch = batch;
     }
 }
 
@@ -132,7 +137,7 @@ where
     }
 
     /// Calls aggreagte, without cloning any of the calldata
-    /// 
+    ///
     /// Aggreagte will revert on the first failure and ignores any failure mode set on the individual calls
     pub async fn aggregate(&mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
         let (decoders, requests) = self.parts();
@@ -153,7 +158,10 @@ where
     }
 
     //// Like [Self::try_aggregate] method but clones the calls
-    pub async fn try_aggregate_ref(&self, require_success: bool) -> Result<Vec<D::CallOutput>, MultiCallError> {
+    pub async fn try_aggregate_ref(
+        &self,
+        require_success: bool,
+    ) -> Result<Vec<D::CallOutput>, MultiCallError> {
         let (decoders, requests) = self.parts_ref();
 
         self.try_aggregate_inner(
@@ -173,7 +181,10 @@ where
     }
 
     /// Calls try_aggregate, without cloning any of the calldata, this method ignores the failure mode set on the individual calls
-    pub async fn try_aggregate(&mut self, require_success: bool) -> Result<Vec<D::CallOutput>, MultiCallError> {
+    pub async fn try_aggregate(
+        &mut self,
+        require_success: bool,
+    ) -> Result<Vec<D::CallOutput>, MultiCallError> {
         let (decoders, requests) = self.parts();
 
         self.try_aggregate_inner(
@@ -251,11 +262,19 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let results = self.instance.aggregate(requests).call().await?;
+        let mut results = Vec::with_capacity(requests.len());
 
-        // we dont need to check for success here since this method will revert on the first failure
+        if let Some(batch) = self.batch {
+            for chunk in requests.chunks(batch) {
+                let chunk_results = self.instance.aggregate(chunk.to_vec()).call().await?;
+
+                results.extend(chunk_results.returnData);
+            }
+        } else {
+            results = self.instance.aggregate(requests).call().await?.returnData;
+        }
+
         results
-            .returnData
             .into_iter()
             .zip(decoders.into_iter())
             .map(|(out, decoder)| decoder.abi_decode_output(out, true))
@@ -270,10 +289,19 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let results = self.instance.tryAggregate(require_success, requests).call().await?;
+        let mut results = Vec::with_capacity(requests.len());
+
+        if let Some(batch) = self.batch {
+            for chunk in requests.chunks(batch) {
+                let chunk_results = self.instance.tryAggregate(require_success, chunk.to_vec()).call().await?;
+
+                results.extend(chunk_results.returnData);
+            }
+        } else {
+            results = self.instance.tryAggregate(require_success, requests).call().await?.returnData;
+        }
 
         results
-            .returnData
             .into_iter()
             .zip(decoders.into_iter())
             .filter_map(|(out, decoder)| {
@@ -294,10 +322,18 @@ where
         decoders: &[&D],
         requests: Vec<IMulticall3::Call3>,
     ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-        let results = self.instance.aggregate3(requests).call().await?;
+        let mut results = Vec::with_capacity(requests.len());
+        if let Some(batch) = self.batch {
+            for chunk in requests.chunks(batch) {
+                let chunk_results = self.instance.aggregate3(chunk.to_vec()).call().await?;
+
+                results.extend(chunk_results.returnData);
+            }
+        } else {
+            results = self.instance.aggregate3(requests).call().await?.returnData;
+        }
 
         results
-            .returnData
             .into_iter()
             .zip(decoders.into_iter())
             .filter_map(|(r, d)| {
