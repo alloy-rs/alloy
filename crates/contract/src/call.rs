@@ -138,10 +138,12 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
         self.request
     }
 
+    /// A refrence to the decoder for this builder
     pub fn decoder(&self) -> &D {
         &self.decoder
     }
 
+    /// Take the decoder from this builder and return a builder without one
     pub fn take_decoder(self) -> (D, RawCallBuilder<T, P, N>) {
         (
             self.decoder,
