@@ -282,6 +282,14 @@ impl TxEip7702 {
         let len = self.payload_len_with_signature_without_header(signature);
         length_of_length(len) + len
     }
+
+    /// Outputs the signature hash of the transaction by first encoding without a signature, then
+    /// hashing.
+    pub fn signature_hash(&self) -> B256 {
+        let mut buf = Vec::with_capacity(self.payload_len_for_signature());
+        self.encode_for_signing(&mut buf);
+        keccak256(&buf)
+    }
 }
 
 impl Transaction for TxEip7702 {
