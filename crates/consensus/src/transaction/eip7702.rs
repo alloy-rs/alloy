@@ -250,9 +250,8 @@ impl TxEip7702 {
 
     /// Get transaction type
     #[doc(alias = "transaction_type")]
-    #[allow(unused)]
-    pub(crate) fn tx_type(&self) -> TxType {
-        unimplemented!("not yet added to tx type enum")
+    pub const fn tx_type(&self) -> TxType {
+        TxType::Eip7702
     }
 
     /// Calculates a heuristic for the in-memory size of the [TxEip7702] transaction.
