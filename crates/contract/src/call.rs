@@ -565,7 +565,7 @@ mod tests {
     use alloy_provider::{
         layers::AnvilProvider, Provider, ProviderBuilder, RootProvider, WalletProvider,
     };
-    use alloy_rpc_types_eth::AccessListItem;
+    use alloy_rpc_types_eth::{AccessListItem, TxEnvelope};
     use alloy_sol_types::sol;
     use alloy_transport_http::Http;
     use reqwest::Client;
@@ -769,20 +769,22 @@ mod tests {
             .await
             .expect("Could not get the receipt");
         let transaction_hash = receipt.transaction_hash;
-        let transaction = provider
+        let TxEnvelope::Eip1559(transaction) = provider
             .get_transaction_by_hash(transaction_hash)
             .await
             .expect("failed to fetch tx")
-            .expect("tx not included");
+            .expect("tx not included")
+            .tx
+        else {
+            panic!("tx not EIP-1559")
+        };
         assert_eq!(
-            transaction.max_fee_per_gas.expect("max_fee_per_gas of the transaction should be set"),
+            transaction.tx().max_fee_per_gas,
             max_fee_per_gas.to(),
             "max_fee_per_gas of the transaction should be set to the right value"
         );
         assert_eq!(
-            transaction
-                .max_priority_fee_per_gas
-                .expect("max_priority_fee_per_gas of the transaction should be set"),
+            transaction.tx().max_priority_fee_per_gas,
             max_priority_fee_per_gas.to(),
             "max_priority_fee_per_gas of the transaction should be set to the right value"
         )

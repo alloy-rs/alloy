@@ -32,6 +32,7 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+serde-value = { version = "0.7", optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
@@ -53,5 +54,6 @@ serde = [
     "dep:serde",
     "alloy-primitives/serde",
     "dep:alloy-serde",
+    "dep:serde-value",
     "alloy-eips/serde",
 ]

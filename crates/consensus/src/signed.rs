@@ -3,6 +3,7 @@ use alloy_primitives::{Signature, B256};
 
 /// A transaction with a signature and hash seal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]

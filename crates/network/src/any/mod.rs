@@ -69,7 +69,7 @@ impl Network for AnyNetwork {
 
     type TransactionRequest = WithOtherFields<TransactionRequest>;
 
-    type TransactionResponse = WithOtherFields<Transaction>;
+    type TransactionResponse = WithOtherFields<Transaction<alloy_rpc_types_eth::AnyTxEnvelope>>;
 
     type ReceiptResponse = AnyTransactionReceipt;
 
