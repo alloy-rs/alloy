@@ -291,7 +291,7 @@ impl Anvil {
     pub fn try_spawn(self) -> Result<AnvilInstance, AnvilError> {
         let mut cmd = self.program.as_ref().map_or_else(|| Command::new("anvil"), Command::new);
         cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::inherit());
-        let mut port = self.port.unwrap_or_default();
+        let mut port = self.port.unwrap_or(8545u16);
         cmd.arg("-p").arg(port.to_string());
 
         if let Some(mnemonic) = self.mnemonic {
@@ -416,5 +416,11 @@ mod tests {
     fn assert_chain_id_without_rpc() {
         let anvil = Anvil::new().spawn();
         assert_eq!(anvil.chain_id(), 31337);
+    }
+
+    #[test]
+    fn assert_default_port() {
+        let anvil = Anvil::new().spawn();
+        assert_eq!(anvil.port(), 8545);
     }
 }
