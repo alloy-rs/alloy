@@ -1,6 +1,7 @@
-#![allow(missing_docs)]
-
+/// The canon deployed address and chains
 pub mod constants;
+use std::marker::PhantomData;
+
 pub use constants::{MULTICALL_ADDRESS, MULTICALL_SUPPORTED_CHAINS};
 
 mod error;
@@ -17,6 +18,7 @@ use crate::{CallBuilder, CallDecoder};
 
 sol! {
     #![sol(alloy_contract = crate)]
+    #[allow(missing_docs)]
     #[derive(Debug)]
     #[sol(rpc, abi)]
     /// Module containing types and functions of the Multicall3 contract.
@@ -44,13 +46,16 @@ sol! {
             bytes returnData;
         }
 
+        /// Aggregates multiple calls into a single call.
         function aggregate(Call[] calldata calls)
             external
             payable
             returns (uint256 blockNumber, bytes[] memory returnData);
 
+        /// Aggregates multiple calls into a single call allowing some to fail
         function aggregate3(Call3[] calldata calls) external payable returns (Result[] memory returnData);
 
+        /// Aggregates multiple calls into a single call allowing some to fail
         function tryAggregate(bool requireSuccess, Call[] calldata calls)
             external
             payable
@@ -58,8 +63,13 @@ sol! {
   }
 }
 
+/// An instance of a dynamically typed MultiCall.
 pub type DynMultiCall<T, P, N> = MultiCall<T, P, Function, N>;
 
+/// An instance of static typed MultiCall.
+pub type SolMultiCall<T, P, C, N> = MultiCall<T, P, PhantomData<C>, N>;
+
+/// The MultiCall struct is used to aggregate multiple calls into a single call.
 #[derive(Debug)]
 pub struct MultiCall<T, P, D: CallDecoder, N: Network> {
     instance: IMulticall3::IMulticall3Instance<T, P, N>,
@@ -74,6 +84,10 @@ where
     D: CallDecoder,
     N: Network,
 {
+    /// Create a new multicall instance.
+    /// 
+    /// # Errors
+    /// - If the chain_id is not in the list of supported chains.
     pub async fn new(provider: P, address: Option<Address>) -> Result<Self, MultiCallError> {
         let instance = IMulticall3::IMulticall3Instance::new(
             {
@@ -94,10 +108,12 @@ where
         Ok(Self { instance, calls: vec![], batch: None })
     }
 
-    pub fn add_call<'a>(&mut self, call: CallBuilder<T, P, D, N>, allow_failure: bool) {
+    /// Add a call to the multicall instance.
+    pub fn add_call(&mut self, call: CallBuilder<T, P, D, N>, allow_failure: bool) {
         self.calls.push((allow_failure, call));
     }
 
+    /// Add multiple calls to the multicall instance.
     pub fn add_calls<I>(&mut self, calls: I)
     where
         I: Iterator<Item = (bool, CallBuilder<T, P, D, N>)>,
@@ -105,6 +121,7 @@ where
         self.calls.extend(calls);
     }
 
+    /// Set the batch size 
     pub fn batch(&mut self, batch: Option<usize>) {
         self.batch = batch;
     }
@@ -157,7 +174,7 @@ where
         .await
     }
 
-    //// Like [Self::try_aggregate] method but clones the calls
+    /// Like [Self::try_aggregate] method but clones the calls
     pub async fn try_aggregate_ref(
         &self,
         require_success: bool,
@@ -243,6 +260,7 @@ where
         .await
     }
 
+    /// Cleas the calls if any
     pub fn clear_calls(&mut self) {
         self.calls.clear();
     }

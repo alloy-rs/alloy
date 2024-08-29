@@ -1,6 +1,9 @@
 use alloy_transport::TransportError;
 
+
 #[derive(Debug, thiserror::Error)]
+/// Errors that can occur when interacting with the Multicall contract
+#[allow(missing_docs)]
 pub enum MultiCallError {
     #[error("A call with no target address was attempted to be added to the multicall")]
     MissingTargetAddress,
@@ -16,7 +19,4 @@ pub enum MultiCallError {
 
     #[error("Transport Error: {0}")]
     TransportError(#[from] TransportError),
-
-    #[error("Tried to add no calls")]
-    NoCalls,
 }
