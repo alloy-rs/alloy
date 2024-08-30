@@ -506,7 +506,7 @@ impl TxEip4844 {
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without a RLP header.
-    pub(crate) fn encode_fields(&self, out: &mut dyn BufMut) {
+    pub fn encode_fields(&self, out: &mut dyn BufMut) {
         self.chain_id.encode(out);
         self.nonce.encode(out);
         self.max_priority_fee_per_gas.encode(out);
@@ -652,6 +652,19 @@ impl TxEip4844 {
         let payload_length = self.fields_len();
         // 'transaction type byte length' + 'header length' + 'payload length'
         1 + Header { list: true, payload_length }.length() + payload_length
+    }
+
+    /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
+    pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
+        let len = self.payload_len_with_signature_without_header(signature);
+        length_of_length(len) + len
+    }
+
+    /// Output the length of the RLP signed transaction encoding, _without_ a RLP header.
+    pub fn payload_len_with_signature_without_header(&self, signature: &Signature) -> usize {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
     }
 }
 
