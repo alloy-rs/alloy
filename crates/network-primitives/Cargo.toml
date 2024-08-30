@@ -1,0 +1,28 @@
+[package]
+name = "alloy-network-primitives"
+description = "Primitive types for Alloy network abstraction"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-serde.workspace = true
+
+serde.workspace = true
+
+[dev-dependencies]
+rand.workspace = true

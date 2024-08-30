@@ -5,10 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes
 
+- Make `Block::hash` required ([#1205](https://github.com/alloy-rs/alloy/issues/1205))
+- Remove optimism-related types ([#1203](https://github.com/alloy-rs/alloy/issues/1203))
+- Use `impl From<RangeInclusive> for FilterBlockOption` instead of `Range`  ([#1199](https://github.com/alloy-rs/alloy/issues/1199))
+- Serde for `depositReceiptVersion` ([#1196](https://github.com/alloy-rs/alloy/issues/1196))
+- [provider] Serialize no parameters as `[]` instead of `null` ([#1193](https://github.com/alloy-rs/alloy/issues/1193))
+- Change generics order for `Block` ([#1192](https://github.com/alloy-rs/alloy/issues/1192))
+- Add missing op fields ([#1187](https://github.com/alloy-rs/alloy/issues/1187))
+- Use `server_id` when unsubscribing ([#1182](https://github.com/alloy-rs/alloy/issues/1182))
+- Allow arbitrary strings in subscription ids ([#1163](https://github.com/alloy-rs/alloy/issues/1163))
+- Remove `OtherFields` from Transaction and Block ([#1154](https://github.com/alloy-rs/alloy/issues/1154))
+- [rpc-types-eth] Match 7702 in TxReceipt.status() ([#1149](https://github.com/alloy-rs/alloy/issues/1149))
+- Return more user-friendly error on tx timeout ([#1145](https://github.com/alloy-rs/alloy/issues/1145))
+- [doc] Correct order of fields ([#1139](https://github.com/alloy-rs/alloy/issues/1139))
+- Use `BlockId` superset over `BlockNumberOrTag` where applicable  ([#1135](https://github.com/alloy-rs/alloy/issues/1135))
+- [rpc] Show data in when cast send result in custom error ([#1129](https://github.com/alloy-rs/alloy/issues/1129))
+- Make Parity TraceResults output optional ([#1102](https://github.com/alloy-rs/alloy/issues/1102))
+- Correctly trim eip7251 bytecode ([#1105](https://github.com/alloy-rs/alloy/issues/1105))
+- [eips] Make SignedAuthorizationList arbitrary less fallible ([#1084](https://github.com/alloy-rs/alloy/issues/1084))
+- [node-bindings] Backport fix from ethers-rs ([#1081](https://github.com/alloy-rs/alloy/issues/1081))
 - Trim conflicting key `max_fee_per_blob_gas` from Eip1559 tx type ([#1064](https://github.com/alloy-rs/alloy/issues/1064))
 - [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
 - Require storageKeys value broken bincode serialization from [#955](https://github.com/alloy-rs/alloy/issues/955) ([#1058](https://github.com/alloy-rs/alloy/issues/1058))
@@ -19,10 +38,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 
+- Rm 2930 and 7702 - use alloy-rs/eips ([#1181](https://github.com/alloy-rs/alloy/issues/1181))
+- Bump core and rm ssz feat ([#1167](https://github.com/alloy-rs/alloy/issues/1167))
+- [deps] Bump some deps ([#1141](https://github.com/alloy-rs/alloy/issues/1141))
+- Revert "chore(deps): bump some deps"
+- [deps] Bump some deps
+- Bump jsonrpsee 0.24 ([#1067](https://github.com/alloy-rs/alloy/issues/1067))
 - [deps] Bump Trezor client to `=0.1.4` to fix signing bug ([#1045](https://github.com/alloy-rs/alloy/issues/1045))
+
+### Documentation
+
+- Readme fix ([#1114](https://github.com/alloy-rs/alloy/issues/1114))
+- Update links to use docs.rs ([#1066](https://github.com/alloy-rs/alloy/issues/1066))
 
 ### Features
 
+- Add error for pre prague requests ([#1204](https://github.com/alloy-rs/alloy/issues/1204))
+- [transport] Retry http errors with 503 status code ([#1164](https://github.com/alloy-rs/alloy/issues/1164))
+- Add erc4337 endpoint methods to provider ([#1176](https://github.com/alloy-rs/alloy/issues/1176))
+- Add block and transaction generics to otterscan and txpool types ([#1183](https://github.com/alloy-rs/alloy/issues/1183))
+- Make block struct generic over header type ([#1179](https://github.com/alloy-rs/alloy/issues/1179))
+- [rpc-types] `debug_executionWitness` ([#1178](https://github.com/alloy-rs/alloy/issues/1178))
+- Network-parameterized block responses ([#1106](https://github.com/alloy-rs/alloy/issues/1106))
+- Add get raw transaction by hash ([#1168](https://github.com/alloy-rs/alloy/issues/1168))
+- [geth/trace] Add field log.position ([#1150](https://github.com/alloy-rs/alloy/issues/1150))
+- Make signature methods generic over EncodableSignature ([#1138](https://github.com/alloy-rs/alloy/issues/1138))
+- Add 7702 tx enum ([#1059](https://github.com/alloy-rs/alloy/issues/1059))
+- Add authorization list to TransactionRequest ([#1125](https://github.com/alloy-rs/alloy/issues/1125))
+- [engine-types] `PayloadError::PrePragueBlockWithEip7702Transactions` ([#1116](https://github.com/alloy-rs/alloy/issues/1116))
+- Use EncodableSignature for tx encoding ([#1100](https://github.com/alloy-rs/alloy/issues/1100))
+- Eth_simulateV1 Request / Response types ([#1042](https://github.com/alloy-rs/alloy/issues/1042))
+- Add helper for decoding custom errors ([#1098](https://github.com/alloy-rs/alloy/issues/1098))
+- Enable more features transitively in meta crate ([#1097](https://github.com/alloy-rs/alloy/issues/1097))
+- [rpc/trace] Filter matches with trace ([#1090](https://github.com/alloy-rs/alloy/issues/1090))
+- Feat(rpc-type-eth) convert vec TxReq to bundle ([#1091](https://github.com/alloy-rs/alloy/issues/1091))
+- [eip] Make 7702 auth recovery fallible ([#1082](https://github.com/alloy-rs/alloy/issues/1082))
+- [json-rpc] Implement `From<u64> for Id` and `From<String> for Id` ([#1088](https://github.com/alloy-rs/alloy/issues/1088))
+- [consensus] Add `From<ConsolidationRequest>` for `Request` ([#1083](https://github.com/alloy-rs/alloy/issues/1083))
+- Feat(provider) : introduction to eth_sendRawTransactionConditional  RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
 - Expose encoded_len_with_signature() ([#1063](https://github.com/alloy-rs/alloy/issues/1063))
 - Add 7702 tx type ([#1046](https://github.com/alloy-rs/alloy/issues/1046))
 - [rpc-types-eth] Serde flatten `BlobTransactionSidecar` in tx req ([#1054](https://github.com/alloy-rs/alloy/issues/1054))
@@ -39,20 +92,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
-- Release 0.2.0
+- [consensus] Add missing getter trait methods for `alloy_consensus::Transaction` ([#1197](https://github.com/alloy-rs/alloy/issues/1197))
+- Rm Rich type ([#1195](https://github.com/alloy-rs/alloy/issues/1195))
+- Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
+- Remove RichBlock and RichHeader types ([#1185](https://github.com/alloy-rs/alloy/issues/1185))
+- Add deposit receipt version ([#1188](https://github.com/alloy-rs/alloy/issues/1188))
+- Remove async_trait from NetworkWallet ([#1160](https://github.com/alloy-rs/alloy/issues/1160))
+- JSON-RPC 2.0 spelling ([#1146](https://github.com/alloy-rs/alloy/issues/1146))
+- Add missing 7702 check ([#1137](https://github.com/alloy-rs/alloy/issues/1137))
+- [eip7702] Devnet3 changes ([#1056](https://github.com/alloy-rs/alloy/issues/1056))
+- [dep] Feature gate jwt in engine types ([#1131](https://github.com/alloy-rs/alloy/issues/1131))
+- Release 0.2.1
+- [rpc] Make `Deserialize` impl for `FilterChanges` generic over transaction ([#1118](https://github.com/alloy-rs/alloy/issues/1118))
+- Correctly cfg unused type ([#1117](https://github.com/alloy-rs/alloy/issues/1117))
+- Re-export and document network-primitives ([#1107](https://github.com/alloy-rs/alloy/issues/1107))
+- Allow override all group ([#1104](https://github.com/alloy-rs/alloy/issues/1104))
+- Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))
+- Export rpc account type ([#1075](https://github.com/alloy-rs/alloy/issues/1075))
 - Release 0.2.0
 - Make auth mandatory in recovered auth ([#1047](https://github.com/alloy-rs/alloy/issues/1047))
 - Trace output utils ([#1027](https://github.com/alloy-rs/alloy/issues/1027))
 - Fix unnameable types ([#1029](https://github.com/alloy-rs/alloy/issues/1029))
 - Add payloadbodies v2 to capabilities set ([#1025](https://github.com/alloy-rs/alloy/issues/1025))
 
+### Other
+
+- Implement conversion between signature types ([#1198](https://github.com/alloy-rs/alloy/issues/1198))
+- Add emhane to codeowners ([#1189](https://github.com/alloy-rs/alloy/issues/1189))
+- Add trait methods for constructing `alloy_rpc_types_eth::Transaction` to `alloy_consensus::Transaction` ([#1172](https://github.com/alloy-rs/alloy/issues/1172))
+- Update TxType comment ([#1175](https://github.com/alloy-rs/alloy/issues/1175))
+- Add payload length methods ([#1152](https://github.com/alloy-rs/alloy/issues/1152))
+- Export types engine default features ([#1143](https://github.com/alloy-rs/alloy/issues/1143))
+- Rm `PeerCount` ([#1140](https://github.com/alloy-rs/alloy/issues/1140))
+- TxRequest into EIP-4844 without sidecar ([#1093](https://github.com/alloy-rs/alloy/issues/1093))
+- Add conversion from BlockHashOrNumber to BlockId ([#1127](https://github.com/alloy-rs/alloy/issues/1127))
+- Make `alloy_rpc_types_eth::SubscriptionResult` generic over tx ([#1123](https://github.com/alloy-rs/alloy/issues/1123))
+- Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
+- Derive arbitrary for `TransactionRequest` ([#1113](https://github.com/alloy-rs/alloy/issues/1113))
+- Fix typo in genesis ([#1096](https://github.com/alloy-rs/alloy/issues/1096))
+- Removing async get account ([#1080](https://github.com/alloy-rs/alloy/issues/1080))
+- Added stages to the sync info rpc type ([#1079](https://github.com/alloy-rs/alloy/issues/1079))
+- `alloy-consensus` should use `alloy_primitives::Sealable` ([#1072](https://github.com/alloy-rs/alloy/issues/1072))
+
 ### Refactor
 
+- Add network-primitives ([#1101](https://github.com/alloy-rs/alloy/issues/1101))
 - Replace `U64` with `u64`  ([#1057](https://github.com/alloy-rs/alloy/issues/1057))
 
 ### Styling
 
 - Remove proptest in all crates and Arbitrary derives ([#966](https://github.com/alloy-rs/alloy/issues/966))
+
+### Testing
+
+- Flaky rpc ([#1180](https://github.com/alloy-rs/alloy/issues/1180))
 
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 

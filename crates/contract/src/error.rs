@@ -1,5 +1,6 @@
 use alloy_dyn_abi::Error as AbiError;
 use alloy_primitives::Selector;
+use alloy_provider::PendingTransactionError;
 use alloy_transport::TransportError;
 use thiserror::Error;
 
@@ -27,6 +28,9 @@ pub enum Error {
     /// An error occurred interacting with a contract over RPC.
     #[error(transparent)]
     TransportError(#[from] TransportError),
+    /// An error occured while waiting for a pending transaction.
+    #[error(transparent)]
+    PendingTransactionError(#[from] PendingTransactionError),
 }
 
 impl From<alloy_sol_types::Error> for Error {

@@ -19,6 +19,9 @@ pub type WeakClient<T> = Weak<RpcClientInner<T>>;
 /// A borrowed [`RpcClient`].
 pub type ClientRef<'a, T> = &'a RpcClientInner<T>;
 
+/// Parameter type of a JSON-RPC request with no parameters.
+pub type NoParams = [(); 0];
+
 /// A JSON-RPC client.
 ///
 /// [`RpcClient`] should never be instantiated directly. Instead, use
@@ -255,7 +258,7 @@ impl<T> RpcClientInner<T> {
     /// Reserve a request ID u64.
     #[inline]
     pub fn next_id(&self) -> Id {
-        Id::Number(self.increment_id())
+        self.increment_id().into()
     }
 }
 
@@ -278,6 +281,16 @@ impl<T: Transport + Clone> RpcClientInner<T> {
     ) -> RpcCall<T, Params, Resp> {
         let request = self.make_request(method, params);
         RpcCall::new(request, self.transport.clone())
+    }
+
+    /// Prepares an [`RpcCall`] with no parameters.
+    ///
+    /// See [`request`](Self::request) for more details.
+    pub fn request_noparams<Resp: RpcReturn>(
+        &self,
+        method: impl Into<Cow<'static, str>>,
+    ) -> RpcCall<T, NoParams, Resp> {
+        self.request(method, [])
     }
 
     /// Type erase the service in the transport, allowing it to be used in a
@@ -306,14 +319,14 @@ mod pubsub_impl {
 
     impl RpcClientInner<PubSubFrontend> {
         /// Get a [`RawSubscription`] for the given subscription ID.
-        pub async fn get_raw_subscription(&self, id: alloy_primitives::U256) -> RawSubscription {
+        pub async fn get_raw_subscription(&self, id: alloy_primitives::B256) -> RawSubscription {
             self.transport.get_subscription(id).await.unwrap()
         }
 
         /// Get a [`Subscription`] for the given subscription ID.
         pub async fn get_subscription<T: serde::de::DeserializeOwned>(
             &self,
-            id: alloy_primitives::U256,
+            id: alloy_primitives::B256,
         ) -> Subscription<T> {
             Subscription::from(self.get_raw_subscription(id).await)
         }

@@ -132,10 +132,11 @@ impl PartialSidecar {
     }
 }
 
-/// A strategy for coding and decoding data into sidecars. Coder instances are
-/// responsible for encoding and decoding data into and from the sidecar. They
-/// are called by the [`SidecarBuilder`] during the [`ingest`],
-/// [`take`], and (if `c_kzg` feature enabled) `build` methods.
+/// A strategy for coding and decoding data into sidecars.
+///
+/// Coder instances are responsible for encoding and decoding data into and from the sidecar. They
+/// are called by the [`SidecarBuilder`] during the [`ingest`], [`take`], and (if `c_kzg` feature
+/// enabled) `build` methods.
 ///
 /// This trait allows different downstream users to use different bit-packing
 /// strategies. For example, a simple coder might only use the last 31 bytes of

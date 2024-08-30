@@ -1,6 +1,10 @@
 use alloy_primitives::{Address, Bytes, B256, B512, U256};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
+
+// re-export account type for `eth_getAccount`
+pub use alloy_consensus::Account;
+
 /// Account information.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountInfo {

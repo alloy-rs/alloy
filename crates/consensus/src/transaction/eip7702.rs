@@ -1,7 +1,7 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[cfg(not(feature = "std"))]
@@ -110,7 +110,7 @@ impl TxEip7702 {
     /// - `data` (`input`)
     /// - `access_list`
     /// - `authorization_list`
-    pub(crate) fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    pub fn decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
             nonce: Decodable::decode(buf)?,
@@ -161,7 +161,10 @@ impl TxEip7702 {
     ///
     /// If `with_header` is `true`, the payload length will include the RLP header length.
     /// If `with_header` is `false`, the payload length will not include the RLP header length.
-    pub fn encoded_len_with_signature(&self, signature: &Signature, with_header: bool) -> usize {
+    pub fn encoded_len_with_signature<S>(&self, signature: &S, with_header: bool) -> usize
+    where
+        S: EncodableSignature,
+    {
         // this counts the tx fields and signature fields
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
 
@@ -184,12 +187,10 @@ impl TxEip7702 {
     /// Inner encoding function that is used for both rlp [`Encodable`] trait and for calculating
     /// hash that for eip2718 does not require a rlp header.
     #[doc(hidden)]
-    pub fn encode_with_signature(
-        &self,
-        signature: &Signature,
-        out: &mut dyn BufMut,
-        with_header: bool,
-    ) {
+    pub fn encode_with_signature<S>(&self, signature: &S, out: &mut dyn BufMut, with_header: bool)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         if with_header {
             Header {
@@ -236,7 +237,10 @@ impl TxEip7702 {
     /// tx type byte or string header.
     ///
     /// This __does__ encode a list header and include a signature.
-    pub(crate) fn encode_with_signature_fields(&self, signature: &Signature, out: &mut dyn BufMut) {
+    pub fn encode_with_signature_fields<S>(&self, signature: &S, out: &mut dyn BufMut)
+    where
+        S: EncodableSignature,
+    {
         let payload_length = self.fields_len() + signature.rlp_vrs_len();
         let header = Header { list: true, payload_length };
         header.encode(out);
@@ -265,6 +269,19 @@ impl TxEip7702 {
         self.input.len() + // input
         self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
     }
+
+    /// Output the length of the RLP signed transaction encoding, _without_ a RLP string header.
+    pub fn payload_len_with_signature_without_header(&self, signature: &Signature) -> usize {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
+    }
+
+    /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
+    pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
+        let len = self.payload_len_with_signature_without_header(signature);
+        length_of_length(len) + len
+    }
 }
 
 impl Transaction for TxEip7702 {
@@ -284,6 +301,22 @@ impl Transaction for TxEip7702 {
         None
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.max_priority_fee_per_gas)
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -294,6 +327,22 @@ impl Transaction for TxEip7702 {
 
     fn input(&self) -> &[u8] {
         &self.input
+    }
+
+    fn ty(&self) -> u8 {
+        TxType::Eip7702 as u8
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        Some(&self.authorization_list)
     }
 }
 
@@ -352,10 +401,66 @@ impl Decodable for TxEip7702 {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
+    use core::str::FromStr;
+
     use super::TxEip7702;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, U256};
+    use alloy_primitives::{address, b256, hex, Address, Bytes, Signature, TxKind, U256};
+
+    #[test]
+    fn test_payload_len_with_signature_without_header() {
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: TxKind::Create,
+            value: U256::ZERO,
+            input: Bytes::from(vec![1, 2]),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+
+        let signature = Signature::from_rs_and_parity(
+            U256::from_str("0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0")
+                .unwrap(),
+            U256::from_str("0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05")
+                .unwrap(),
+            1,
+        )
+        .unwrap();
+
+        assert_eq!(tx.payload_len_with_signature_without_header(&signature), 91);
+    }
+
+    #[test]
+    fn test_payload_len_with_signature() {
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: TxKind::Create,
+            value: U256::ZERO,
+            input: Bytes::from(vec![1, 2]),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+
+        let signature = Signature::from_rs_and_parity(
+            U256::from_str("0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0")
+                .unwrap(),
+            U256::from_str("0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05")
+                .unwrap(),
+            1,
+        )
+        .unwrap();
+
+        assert_eq!(tx.payload_len_with_signature(&signature), 93);
+    }
 
     #[test]
     fn encode_decode_eip7702() {

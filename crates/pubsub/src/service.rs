@@ -4,8 +4,8 @@ use crate::{
     managers::{InFlight, RequestManager, SubscriptionManager},
     PubSubConnect, PubSubFrontend, RawSubscription,
 };
-use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload};
-use alloy_primitives::U256;
+use alloy_json_rpc::{Id, PubSubItem, Request, Response, ResponsePayload, SubId};
+use alloy_primitives::B256;
 use alloy_transport::{
     utils::{to_json_raw_value, Spawnable},
     TransportErrorKind, TransportResult,
@@ -123,19 +123,21 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// the subscription does not exist, the waiter is sent nothing, and the
     /// `tx` is dropped. This notifies the waiter that the subscription does
     /// not exist.
-    fn service_get_sub(&mut self, local_id: U256, tx: oneshot::Sender<RawSubscription>) {
-        if let Some(rx) = self.subs.get_subscription(local_id.into()) {
+    fn service_get_sub(&mut self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
+        if let Some(rx) = self.subs.get_subscription(local_id) {
             let _ = tx.send(rx);
         }
     }
 
     /// Service an unsubscribe instruction.
-    fn service_unsubscribe(&mut self, local_id: U256) -> TransportResult<()> {
-        let req = Request::new("eth_unsubscribe", Id::None, [local_id]);
-        let brv = req.serialize().expect("no ser error").take_request();
+    fn service_unsubscribe(&mut self, local_id: B256) -> TransportResult<()> {
+        if let Some(server_id) = self.subs.server_id_for(&local_id) {
+            let req = Request::new("eth_unsubscribe", Id::None, [server_id]);
+            let brv = req.serialize().expect("no ser error").take_request();
 
-        self.dispatch_request(brv)?;
-        self.subs.remove_sub(local_id.into());
+            self.dispatch_request(brv)?;
+        }
+        self.subs.remove_sub(local_id);
         Ok(())
     }
 
@@ -167,16 +169,18 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Rewrite the subscription id and insert into the subscriptions manager
-    fn handle_sub_response(&mut self, in_flight: InFlight, server_id: U256) -> TransportResult<()> {
+    fn handle_sub_response(
+        &mut self,
+        in_flight: InFlight,
+        server_id: SubId,
+    ) -> TransportResult<()> {
         let request = in_flight.request;
         let id = request.id().clone();
 
-        self.subs.upsert(request, server_id, in_flight.channel_size);
+        let sub = self.subs.upsert(request, server_id, in_flight.channel_size);
 
-        // lie to the client about the sub id.
-        let local_id = self.subs.local_id_for(server_id).unwrap();
         // Serialized B256 is always a valid serialized U256 too.
-        let ser_alias = to_json_raw_value(&local_id)?;
+        let ser_alias = to_json_raw_value(sub.local_id())?;
 
         // We send back a success response with the new subscription ID.
         // We don't care if the channel is dead.

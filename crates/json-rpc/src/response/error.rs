@@ -1,11 +1,13 @@
+use alloy_primitives::Bytes;
+use alloy_sol_types::SolInterface;
 use serde::{
     de::{DeserializeOwned, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
-use serde_json::value::RawValue;
+use serde_json::{value::RawValue, Value};
 use std::{borrow::Borrow, fmt, marker::PhantomData};
 
-/// A JSONRPC-2.0 error object.
+/// A JSON-RPC 2.0 error object.
 ///
 /// This response indicates that the server received and handled the request,
 /// but that there was an error in the processing of it. The error should be
@@ -67,9 +69,27 @@ impl<E> ErrorPayload<E> {
     }
 }
 
-impl<ErrData> fmt::Display for ErrorPayload<ErrData> {
+/// Recursively traverses the value, looking for hex data that it can extract.
+///
+/// Inspired by ethers-js logic:
+/// <https://github.com/ethers-io/ethers.js/blob/9f990c57f0486728902d4b8e049536f2bb3487ee/packages/providers/src.ts/json-rpc-provider.ts#L25-L53>
+fn spelunk_revert(value: &Value) -> Option<Bytes> {
+    match value {
+        Value::String(s) => s.parse().ok(),
+        Value::Object(o) => o.values().find_map(spelunk_revert),
+        _ => None,
+    }
+}
+
+impl<ErrData: fmt::Display> fmt::Display for ErrorPayload<ErrData> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error code {}: {}", self.code, self.message)
+        write!(
+            f,
+            "error code {}: {}{}",
+            self.code,
+            self.message,
+            self.data.as_ref().map(|data| format!(", data: {}", data)).unwrap_or_default()
+        )
     }
 }
 
@@ -145,7 +165,7 @@ impl<'de, ErrData: Deserialize<'de>> Deserialize<'de> for ErrorPayload<ErrData> 
             type Value = ErrorPayload<Data>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(formatter, "a JSON-RPC2.0 error object")
+                write!(formatter, "a JSON-RPC 2.0 error object")
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -224,10 +244,38 @@ where
             _ => Err(self),
         }
     }
+
+    /// Attempt to extract revert data from the JsonRpcError be recursively
+    /// traversing the error's data field
+    ///
+    /// This returns the first hex it finds in the data object, and its
+    /// behavior may change with `serde_json` internal changes.
+    ///
+    /// If no hex object is found, it will return an empty bytes IFF the error
+    /// is a revert
+    ///
+    /// Inspired by ethers-js logic:
+    /// <https://github.com/ethers-io/ethers.js/blob/9f990c57f0486728902d4b8e049536f2bb3487ee/packages/providers/src.ts/json-rpc-provider.ts#L25-L53>
+    pub fn as_revert_data(&self) -> Option<Bytes> {
+        if self.message.contains("revert") {
+            let value = Value::deserialize(self.data.as_ref()?.borrow()).ok()?;
+            spelunk_revert(&value)
+        } else {
+            None
+        }
+    }
+
+    /// Extracts revert data and tries decoding it into given custom errors set.
+    pub fn as_decoded_error<E: SolInterface>(&self, validate: bool) -> Option<E> {
+        self.as_revert_data().and_then(|data| E::abi_decode(&data, validate).ok())
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use alloy_primitives::U256;
+    use alloy_sol_types::sol;
+
     use super::BorrowedErrorPayload;
     use crate::ErrorPayload;
 
@@ -264,5 +312,22 @@ mod test {
         assert_eq!(payload.code, -32007);
         assert_eq!(payload.message, "20/second request limit reached - reduce calls per second or upgrade your account at quicknode.com");
         assert!(payload.data.is_none());
+    }
+
+    #[test]
+    fn custom_error_decoding() {
+        sol!(
+            library Errors {
+                error SomeCustomError(uint256 a);
+            }
+        );
+
+        let json = r#"{"code":3,"message":"execution reverted: ","data":"0x810f00230000000000000000000000000000000000000000000000000000000000000001"}"#;
+        let payload: ErrorPayload = serde_json::from_str(json).unwrap();
+
+        let Errors::ErrorsErrors::SomeCustomError(value) =
+            payload.as_decoded_error::<Errors::ErrorsErrors>(false).unwrap();
+
+        assert_eq!(value.a, U256::from(1));
     }
 }

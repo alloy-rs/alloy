@@ -19,6 +19,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+# eips
+alloy-eip2930.workspace = true
+alloy-eip7702.workspace = true
+
 alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp = { workspace = true, features = ["derive"] }
 
@@ -28,7 +32,11 @@ serde = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, optional = true }
-derive_more = { workspace = true, optional = true }
+derive_more = { workspace = true, features = [
+    "as_ref",
+    "deref",
+    "deref_mut",
+], optional = true }
 once_cell = { workspace = true, features = ["race", "alloc"], optional = true }
 sha2 = { workspace = true, optional = true }
 
@@ -39,8 +47,6 @@ ethereum_ssz = { workspace = true, optional = true }
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
-# for signed authorization list arbitrary
-k256 = { workspace = true, optional = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = [
@@ -53,33 +59,22 @@ serde_json.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
-std = [
-    "alloy-primitives/std",
-    "alloy-rlp/std",
-    "serde?/std",
-    "c-kzg?/std",
-    "once_cell?/std",
-]
-serde = [
-    "dep:alloy-serde",
-    "dep:serde",
-    "alloy-primitives/serde",
-    "c-kzg?/serde",
-]
+std = ["alloy-primitives/std", "alloy-rlp/std",
+"serde?/std", "c-kzg?/std", "once_cell?/std"]
+serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde", 
+"c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
 kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
+k256 = ["alloy-eip7702/k256"]
 sha2 = ["dep:sha2"]
-k256 = ["alloy-primitives/k256", "dep:k256"]
-ssz = [
-    "std",
-    "dep:ethereum_ssz",
-    "dep:ethereum_ssz_derive",
-    "alloy-primitives/ssz",
-]
+ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive"]
 arbitrary = [
     "std",
     "kzg-sidecar",
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde?/arbitrary",
+    "alloy-eip2930/arbitrary",
+    "alloy-eip7702/arbitrary",
+    "alloy-eip7702/k256",
 ]

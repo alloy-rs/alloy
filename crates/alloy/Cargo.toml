@@ -131,7 +131,7 @@ network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider", "rpc-client", "eips"]
+providers = ["dep:alloy-provider", "rpc-client", "transports", "eips"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
@@ -184,9 +184,9 @@ pubsub = [
 # rpc
 rpc = []
 json-rpc = ["rpc", "dep:alloy-json-rpc"]
-rpc-client = ["rpc", "dep:alloy-rpc-client"]
-rpc-client-ws = ["rpc-client", "alloy-rpc-client?/ws"]
-rpc-client-ipc = ["rpc-client", "alloy-rpc-client?/ipc"]
+rpc-client = ["rpc", "transports", "transport-http", "dep:alloy-rpc-client"]
+rpc-client-ws = ["rpc-client", "transport-ws", "alloy-rpc-client?/ws"]
+rpc-client-ipc = ["rpc-client", "transport-ipc", "alloy-rpc-client?/ipc"]
 rpc-types = ["rpc", "dep:alloy-rpc-types", "alloy-rpc-types?/eth"]
 rpc-types-admin = [
     "rpc-types",
@@ -259,7 +259,7 @@ getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
-ssz = ["alloy-core/ssz", "alloy-rpc-types?/ssz"]
+ssz = ["alloy-rpc-types?/ssz"]
 arbitrary = [
     "alloy-core/arbitrary",
     "alloy-consensus?/arbitrary",
@@ -269,9 +269,9 @@ arbitrary = [
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
-    "alloy-eips?/k256",
     "alloy-network?/k256",
     "alloy-rpc-types?/k256",
+    "alloy-eips?/k256",
 ]
 kzg = ["alloy-consensus?/kzg", "alloy-rpc-types?/kzg"]
 eip712 = [

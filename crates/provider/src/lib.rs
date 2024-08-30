@@ -36,7 +36,10 @@ pub mod layers;
 mod chain;
 
 mod heart;
-pub use heart::{PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig};
+pub use heart::{
+    PendingTransaction, PendingTransactionBuilder, PendingTransactionConfig,
+    PendingTransactionError, WatchTxError,
+};
 
 mod provider;
 pub use provider::{

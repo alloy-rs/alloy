@@ -19,7 +19,7 @@ pub struct Account {
 }
 
 impl Account {
-    /// Compute  hash as committed to in the MPT trie without memoizing.
+    /// Compute  hash as committed to in the MPT trie without memorizing.
     pub fn trie_hash_slow(&self) -> B256 {
         keccak256(alloy_rlp::encode(self))
     }
