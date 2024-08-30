@@ -20,7 +20,7 @@ sol! {
     #![sol(alloy_contract = crate)]
     #[allow(missing_docs)]
     #[derive(Debug)]
-    #[sol(rpc, abi)]
+    #[sol(rpc)]
     /// Module containing types and functions of the Multicall3 contract.
     interface IMulticall3 {
         struct Call {
@@ -67,9 +67,13 @@ sol! {
 pub type DynMultiCall<T, P, N> = MultiCall<T, P, Function, N>;
 
 /// An instance of static typed MultiCall.
+/// 
+/// Here we need C: [`alloy_sol_types::SolCall`], which can be easily created by using the [`sol!`] macro.
 pub type SolMultiCall<T, P, C, N> = MultiCall<T, P, PhantomData<C>, N>;
 
-/// The MultiCall struct is used to aggregate multiple calls into a single call.
+/// The Multicall struct either works with a single type or every return type is dynamic.
+/// 
+/// Multicall is easier to name via the [`SolMultiCall`] or [`DynMultiCall`] type aliases.
 #[derive(Debug)]
 pub struct MultiCall<T, P, D: CallDecoder, N: Network> {
     instance: IMulticall3::IMulticall3Instance<T, P, N>,
@@ -283,7 +287,7 @@ where
     }
 
     /// Try to aggregate the calls, this method ignores the failure mode set on the individual calls
-    pub async fn try_aggregate_inner(
+    async fn try_aggregate_inner(
         &self,
         require_success: bool,
         decoders: &[&D],
@@ -319,7 +323,7 @@ where
 
     /// Call the aggregate3 method, this method utilizes the allow_failure flag on the individual
     /// calls
-    pub async fn aggregate3_inner(
+    async fn aggregate3_inner(
         &self,
         decoders: &[&D],
         requests: Vec<IMulticall3::Call3>,
