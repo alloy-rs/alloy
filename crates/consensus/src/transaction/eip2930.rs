@@ -223,6 +223,19 @@ impl TxEip2930 {
     pub const fn tx_type(&self) -> TxType {
         TxType::Eip2930
     }
+
+    /// Output the length of the RLP signed transaction encoding, _without_ a RLP string header.
+    pub fn payload_len_with_signature_without_header(&self, signature: &Signature) -> usize {
+        let payload_length = self.fields_len() + signature.rlp_vrs_len();
+        // 'transaction type byte length' + 'header length' + 'payload length'
+        1 + length_of_length(payload_length) + payload_length
+    }
+
+    /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
+    pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
+        let len = self.payload_len_with_signature_without_header(signature);
+        length_of_length(len) + len
+    }
 }
 
 impl Transaction for TxEip2930 {
