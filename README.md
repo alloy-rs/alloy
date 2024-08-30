@@ -124,7 +124,7 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-The current MSRV (minimum supported rust version) is 1.76.
+The current MSRV (minimum supported rust version) is 1.78.
 
 Alloy will keep a rolling MSRV policy of **at least** two versions behind the
 latest stable release (so if the latest stable release is 1.58, we would
