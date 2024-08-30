@@ -1,0 +1,25 @@
+name: no_std
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-no-std:
+    name: check no_std ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ["alloy-eips", "alloy-consensus", "alloy-genesis"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imac-unknown-none-elf
+      - run: cargo check --target riscv32imac-unknown-none-elf --no-default-features -p ${{ matrix.crate }}
