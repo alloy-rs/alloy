@@ -14,9 +14,9 @@ pub enum MultiCallError {
     #[error("Decoding Failed: {0}")]
     DecoderError(#[from] alloy_sol_types::Error),
 
-    #[error("Contract Error: {0}")]
+    #[error(transparent)]
     ContractError(#[from] crate::Error),
 
-    #[error("Transport Error: {0}")]
+    #[error(transparent)]
     TransportError(#[from] TransportError),
 }
