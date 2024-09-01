@@ -139,7 +139,7 @@ impl<T, P, D, N: Network> CallBuilder<T, P, D, N> {
     }
 
     /// A refrence to the decoder for this builder
-    pub fn decoder(&self) -> &D {
+    pub const fn decoder(&self) -> &D {
         &self.decoder
     }
 

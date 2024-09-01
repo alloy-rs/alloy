@@ -71,9 +71,20 @@ sol! {
   }
 }
 
-/// The Multicall struct either works with a single type or every return type is dynamic.
+/// The multicall instance, which is responsible for giving out builders for the various multicall operations.
+/// 
+/// This type holds no calldata itself, instead you can use one of the aggreagte call types to store
+/// the calls.
 ///
-/// Multicall is easier to name via the [`SolMultiCall`] or [`DynMultiCall`] type aliases.
+/// Multicall offers three modes of operation:
+///     - [Self::aggregate] which will fail fast on any revert
+///     - [Self::try_aggregate] which will filter out any failed calls
+///     - [Self::aggregate3] which will allow you to specify which calls can fail
+///
+/// If you have a multicall with calldata that doesnt change, you can easily name these types using one of the following aliases
+///     - [DynAggreagate] or [SolAggreagate] for the aggregate call
+///     - [DynTryAggreagate] or [SolTryAggreagate] for the try_aggregate call
+///     - [DynAggreagate3] or [SolAggreagate3] for the aggregate3 call
 #[derive(Debug)]
 pub struct MultiCall<T, P, N: Network> {
     instance: Arc<IMulticall3::IMulticall3Instance<T, P, N>>,
@@ -110,18 +121,18 @@ where
     }
 
     /// A builder for the aggregate call.
-    pub fn aggregate<'a, D: CallDecoder>(&'a self) -> AggregateRef<'a, T, P, D, N> {
-        AggregateRef { r#ref: &self.instance, calls: vec![], batch: None }
+    pub const fn aggregate<D: CallDecoder>(&self) -> AggregateRef<'_, T, P, D, N> {
+        AggregateRef { r#ref: &self.instance, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the try_aggreate call.
-    pub fn try_aggregate<'a, D: CallDecoder>(&'a self) -> TryAggregateRef<'a, T, P, D, N> {
-        TryAggregateRef { r#ref: &self.instance, calls: vec![], batch: None }
+    pub const fn try_aggregate<D: CallDecoder>(&self) -> TryAggregateRef<'_, T, P, D, N> {
+        TryAggregateRef { r#ref: &self.instance, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the aggregate3 call.
-    pub fn aggregate3<'a, D: CallDecoder>(&'a self) -> Aggregate3Ref<'a, T, P, D, N> {
-        Aggregate3Ref { r#ref: &self.instance, calls: vec![], batch: None }
+    pub const fn aggregate3<D: CallDecoder>(&self) -> Aggregate3Ref<'_, T, P, D, N> {
+        Aggregate3Ref { r#ref: &self.instance, calls: Vec::new(), batch: None }
     }
 }
 
@@ -148,7 +159,7 @@ mod aggregate {
 
     use super::into_calls::*;
     use super::*;
-    
+
     /// An aggreagte call that owns the refrence to the underlying instance
     pub type OwnedAggregate<T, P, D, N> =
         Aggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
@@ -209,6 +220,7 @@ mod aggregate {
             .await
         }
 
+        /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
             self.batch = batch;
         }
@@ -226,7 +238,7 @@ mod aggregate {
         /// Add multiple calls to the multicall
         pub fn add_calls<I>(&mut self, calls: I)
         where
-            I: Iterator<Item = CallBuilder<T, P, D, N>>,
+            I: IntoIterator<Item = CallBuilder<T, P, D, N>>,
         {
             self.calls.extend(calls);
         }
@@ -264,7 +276,7 @@ mod aggregate {
 
             results
                 .into_iter()
-                .zip(decoders.into_iter())
+                .zip(decoders)
                 .map(|(out, decoder)| decoder.abi_decode_output(out, true))
                 .map(|r| r.map_err(Into::into))
                 .collect()
@@ -371,7 +383,10 @@ mod try_aggregate {
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Call the aggregate method, filtering out any failed calls.
-        pub async fn call(&self, require_success: bool) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        pub async fn call(
+            &self,
+            require_success: bool,
+        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let (decoders, requests) = self.parts_ref();
 
             self.try_aggregate_inner(
@@ -408,6 +423,7 @@ mod try_aggregate {
             self.calls.clear();
         }
 
+        /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
             self.batch = batch;
         }
@@ -420,7 +436,7 @@ mod try_aggregate {
         /// Add multiple calls to the multicall
         pub fn add_calls<I>(&mut self, calls: I)
         where
-            I: Iterator<Item = CallBuilder<T, P, D, N>>,
+            I: IntoIterator<Item = CallBuilder<T, P, D, N>>,
         {
             self.calls.extend(calls);
         }
@@ -460,7 +476,7 @@ mod try_aggregate {
 
             results
                 .into_iter()
-                .zip(decoders.into_iter())
+                .zip(decoders)
                 .filter_map(|(out, decoder)| {
                     if out.success {
                         Some(decoder.abi_decode_output(out.returnData, true))
@@ -576,6 +592,7 @@ mod aggregate3 {
             self.calls.clear();
         }
 
+        /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
             self.batch = batch;
         }
@@ -588,7 +605,7 @@ mod aggregate3 {
         /// Add multiple calls to the multicall
         pub fn add_calls<I>(&mut self, calls: I)
         where
-            I: Iterator<Item = (bool, CallBuilder<T, P, D, N>)>,
+            I: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
         {
             self.calls.extend(calls);
         }
@@ -626,7 +643,7 @@ mod aggregate3 {
 
             results
                 .into_iter()
-                .zip(decoders.into_iter())
+                .zip(decoders)
                 .filter_map(|(r, d)| {
                     if r.success {
                         Some(d.abi_decode_output(r.returnData, true))
