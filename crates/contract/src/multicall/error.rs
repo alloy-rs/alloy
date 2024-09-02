@@ -1,6 +1,5 @@
 use alloy_transport::TransportError;
 
-
 #[derive(Debug, thiserror::Error)]
 /// Errors that can occur when interacting with the Multicall contract
 #[allow(missing_docs)]

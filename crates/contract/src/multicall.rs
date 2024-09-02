@@ -71,8 +71,9 @@ sol! {
   }
 }
 
-/// The multicall instance, which is responsible for giving out builders for the various multicall operations.
-/// 
+/// The multicall instance, which is responsible for giving out builders for the various multicall
+/// operations.
+///
 /// This type holds no calldata itself, instead you can use one of the aggreagte call types to store
 /// the calls.
 ///
@@ -81,7 +82,8 @@ sol! {
 ///     - [Self::try_aggregate] which will filter out any failed calls
 ///     - [Self::aggregate3] which will allow you to specify which calls can fail
 ///
-/// If you have a multicall with calldata that doesnt change, you can easily name these types using one of the following aliases
+/// If you have a multicall with calldata that doesnt change, you can easily name these types using
+/// one of the following aliases
 ///     - [DynAggreagate] or [SolAggreagate] for the aggregate call
 ///     - [DynTryAggreagate] or [SolTryAggreagate] for the try_aggregate call
 ///     - [DynAggreagate3] or [SolAggreagate3] for the aggregate3 call
@@ -157,8 +159,7 @@ pub type SolAggreagate3<T, P, C, N> = OwnedAggregate3<T, P, PhantomData<C>, N>;
 mod aggregate {
     use std::fmt::Debug;
 
-    use super::into_calls::*;
-    use super::*;
+    use super::{into_calls::*, *};
 
     /// An aggreagte call that owns the refrence to the underlying instance
     pub type OwnedAggregate<T, P, D, N> =
@@ -252,8 +253,8 @@ mod aggregate {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, this method will revert on the first failure regardless of what
-        /// you set
+        /// Call the aggregate method, this method will revert on the first failure regardless of
+        /// what you set
         async fn aggregate_inner(
             &self,
             decoders: &[&D],
@@ -329,8 +330,7 @@ mod aggregate {
 }
 
 mod try_aggregate {
-    use super::into_calls::*;
-    use super::*;
+    use super::{into_calls::*, *};
     use std::fmt::Debug;
 
     /// An aggreagte call that owns the refrence to the underlying instance
@@ -382,7 +382,7 @@ mod try_aggregate {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, filtering out any failed calls.
+        /// Call the aggregate method, filtering out any failed calls if require_success is false
         pub async fn call(
             &self,
             require_success: bool,
@@ -400,7 +400,7 @@ mod try_aggregate {
             .await
         }
 
-        /// Call the aggregate method, this method will revert on the first failure regardless of what
+        /// Like [Self::call] but will consume the calldata
         pub async fn call_take(
             &mut self,
             require_success: bool,
@@ -450,8 +450,8 @@ mod try_aggregate {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, this method will revert on the first failure regardless of what
-        /// you set
+        /// Call the aggregate method, this method will revert on the first failure regardless of
+        /// what you set
         async fn try_aggregate_inner(
             &self,
             require_success: bool,
@@ -506,8 +506,7 @@ mod try_aggregate {
 }
 
 mod aggregate3 {
-    use super::into_calls::*;
-    use super::*;
+    use super::{into_calls::*, *};
     use std::fmt::Debug;
 
     /// An aggreagte call that owns the refrence to the underlying instance
@@ -619,8 +618,8 @@ mod aggregate3 {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, this method will revert on the first failure regardless of what
-        /// you set
+        /// Call the aggregate method, this method will revert on the first failure regardless of
+        /// what you set
         async fn aggregate3_inner(
             &self,
             decoders: &[&D],
