@@ -73,6 +73,7 @@ reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
+tower.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

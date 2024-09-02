@@ -17,6 +17,10 @@ mod layer_transport;
 
 pub use layer_transport::*;
 
+mod layers;
+
+pub use layers::{LoggingLayer, LoggingService};
+
 #[cfg(feature = "reqwest")]
 pub use reqwest;
 

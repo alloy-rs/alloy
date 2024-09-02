@@ -2,21 +2,29 @@ use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
 };
-use std::task;
-use tower::{Service, ServiceBuilder};
+use std::{future::Future, pin::Pin, task};
+use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
 
 /// A [reqwest] client that can be used with tower layers.
 #[derive(Debug, Clone)]
-pub struct LayerClient {
+pub struct LayerClient<S> {
     url: Url,
+    service: S,
 }
 
-impl LayerClient {
+impl<S> LayerClient<S>
+where
+    S: Service<reqwest::Request, Response = reqwest::Response, Error = reqwest::Error>
+        + Clone
+        + Send
+        + 'static,
+    S::Future: Send,
+{
     /// Create a new [LayerClient] with the given URL.
-    pub const fn new(url: Url) -> Self {
-        Self { url }
+    pub fn new(url: Url, service: S) -> Self {
+        Self { url, service }
     }
 
     /// Make a request using the tower service with layers.
@@ -25,18 +33,15 @@ impl LayerClient {
         let span = debug_span!("LayerClient", url = %self.url);
         Box::pin(
             async move {
-                let client = reqwest::Client::new();
+                let mut service = this.service.clone();
 
-                let mut service = ServiceBuilder::new().service(client);
-
-                let reqwest_request = service
+                let raw_req = reqwest::Client::new()
                     .post(this.url.to_owned())
                     .json(&req)
                     .build()
                     .map_err(TransportErrorKind::custom)?;
 
-                let resp =
-                    service.call(reqwest_request).await.map_err(TransportErrorKind::custom)?;
+                let resp = service.call(raw_req).await.map_err(TransportErrorKind::custom)?;
 
                 let status = resp.status();
 
@@ -62,8 +67,16 @@ impl LayerClient {
     }
 }
 
-impl TransportConnect for LayerClient {
-    type Transport = LayerClient;
+impl<S> TransportConnect for LayerClient<S>
+where
+    S: Service<reqwest::Request, Response = reqwest::Response, Error = reqwest::Error>
+        + Clone
+        + Send
+        + 'static
+        + Sync,
+    S::Future: Send,
+{
+    type Transport = LayerClient<S>;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -72,11 +85,18 @@ impl TransportConnect for LayerClient {
     fn get_transport<'a: 'b, 'b>(
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
-        Box::pin(async move { Ok(LayerClient::new(self.url.clone())) })
+        Box::pin(async move { Ok(LayerClient::new(self.url.clone(), self.service.clone())) })
     }
 }
 
-impl Service<RequestPacket> for LayerClient {
+impl<S> Service<RequestPacket> for LayerClient<S>
+where
+    S: Service<reqwest::Request, Response = reqwest::Response, Error = reqwest::Error>
+        + Clone
+        + Send
+        + 'static,
+    S::Future: Send,
+{
     type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
@@ -89,3 +109,32 @@ impl Service<RequestPacket> for LayerClient {
         self.request(req)
     }
 }
+
+/// Future for reqwest responses.
+pub type ReqwestResponseFut<T = reqwest::Response, E = reqwest::Error> =
+    Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
+
+// impl<S> Service<reqwest::Request> for LayerClient<S>
+// where
+//     S: Service<reqwest::Request, Response = reqwest::Response, Error = reqwest::Error>
+//         + Clone
+//         + Send
+//         + 'static,
+//     S::Future: Send,
+// {
+//     type Response = reqwest::Response;
+//     type Error = reqwest::Error;
+//     type Future = ReqwestResponseFut<reqwest::Response, reqwest::Error>;
+
+//     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>>
+// {         task::Poll::Ready(Ok(()))
+//     }
+
+//     fn call(&mut self, req: reqwest::Request) -> Self::Future {
+//         let fut = self.service.call(req);
+//         Box::pin(async move {
+//             let resp = fut.await?;
+//             Ok(resp)
+//         })
+//     }
+// }

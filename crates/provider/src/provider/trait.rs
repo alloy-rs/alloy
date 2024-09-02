@@ -1013,6 +1013,7 @@ mod tests {
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
+    use alloy_transport_http::LoggingLayer;
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1039,7 +1040,9 @@ mod tests {
     async fn test_layer_transport() {
         init_tracing();
         let anvil = Anvil::new().spawn();
-        let layer_transport = alloy_transport_http::LayerClient::new(anvil.endpoint_url());
+        let service =
+            tower::ServiceBuilder::new().layer(LoggingLayer).service(reqwest::Client::new());
+        let layer_transport = alloy_transport_http::LayerClient::new(anvil.endpoint_url(), service);
 
         let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
 
