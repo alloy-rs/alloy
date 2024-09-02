@@ -13,6 +13,10 @@ mod reqwest_transport;
 #[doc(inline)]
 pub use reqwest_transport::*;
 
+mod layer_transport;
+
+pub use layer_transport::*;
+
 #[cfg(feature = "reqwest")]
 pub use reqwest;
 
