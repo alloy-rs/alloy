@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
 - Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
 - Release 0.2.1
 - Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))

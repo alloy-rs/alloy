@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
 - Rm Rich type ([#1195](https://github.com/alloy-rs/alloy/issues/1195))
 - Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
 - Remove RichBlock and RichHeader types ([#1185](https://github.com/alloy-rs/alloy/issues/1185))

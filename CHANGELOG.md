@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Bug Fixes
+
+- Anvil builder default port ([#1213](https://github.com/alloy-rs/alloy/issues/1213))
+- [eips] No-std compat ([#1222](https://github.com/alloy-rs/alloy/issues/1222))
+- Value of TxEip1559.ty ([#1210](https://github.com/alloy-rs/alloy/issues/1210))
+
+### Dependencies
+
+- Bump rust msrv to 1.78 ([#1219](https://github.com/alloy-rs/alloy/issues/1219))
+
+### Documentation
+
+- Update version ([#1211](https://github.com/alloy-rs/alloy/issues/1211))
+
+### Features
+
+- [`json-rpc`] Implement From U256 and String for SubId ([#1226](https://github.com/alloy-rs/alloy/issues/1226))
+- Workflow to validate no_std compatibility ([#1223](https://github.com/alloy-rs/alloy/issues/1223))
+- Derive `arbitrary::Arbitrary` for `TxEip7702` ([#1216](https://github.com/alloy-rs/alloy/issues/1216))
+- Implement `tx_type` for `TxEip7702` ([#1214](https://github.com/alloy-rs/alloy/issues/1214))
+- [alloy-provider] Add abstraction for `NonceFiller` behavior ([#1108](https://github.com/alloy-rs/alloy/issues/1108))
+
+### Miscellaneous Tasks
+
+- [README] Add a link to `rpc-types-debug` ([#1212](https://github.com/alloy-rs/alloy/issues/1212))
+- [features] Enable `consensus` and `network` along with `providers` ([#1207](https://github.com/alloy-rs/alloy/issues/1207))
+
+### Other
+
+- Rm useless methods for `TxEip7702` ([#1221](https://github.com/alloy-rs/alloy/issues/1221))
+
 ## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes
@@ -92,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
 - [consensus] Add missing getter trait methods for `alloy_consensus::Transaction` ([#1197](https://github.com/alloy-rs/alloy/issues/1197))
 - Rm Rich type ([#1195](https://github.com/alloy-rs/alloy/issues/1195))
 - Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
