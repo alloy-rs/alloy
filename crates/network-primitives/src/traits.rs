@@ -68,16 +68,28 @@ pub trait HeaderResponse {
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
 
-    /// Miner/Coinbase of the block
-    fn miner(&self) -> Address;
+    /// Coinbase/Miner of the block
+    fn coinbase(&self) -> Address;
 
     /// Gas limit of the block
-    fn gas(&self) -> u128;
+    fn gas_limit(&self) -> u128;
 
     /// Mix hash of the block
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoW).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
     fn mix_hash(&self) -> Option<B256>;
 
     /// Difficulty of the block
+    ///
+    /// Unused after the Paris (AKA the merge) upgrade, and replaced by `prevrandao`.
     fn difficulty(&self) -> U256;
 }
 
@@ -193,12 +205,12 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
         self.inner.next_block_blob_fee()
     }
 
-    fn miner(&self) -> Address {
-        self.inner.miner()
+    fn coinbase(&self) -> Address {
+        self.inner.coinbase()
     }
 
-    fn gas(&self) -> u128 {
-        self.inner.gas()
+    fn gas_limit(&self) -> u128 {
+        self.inner.gas_limit()
     }
 
     fn mix_hash(&self) -> Option<B256> {

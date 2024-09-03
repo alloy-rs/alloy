@@ -229,11 +229,11 @@ impl HeaderResponse for Header {
         self.next_block_blob_fee()
     }
 
-    fn miner(&self) -> Address {
+    fn coinbase(&self) -> Address {
         self.miner
     }
 
-    fn gas(&self) -> u128 {
+    fn gas_limit(&self) -> u128 {
         self.gas_limit
     }
 
