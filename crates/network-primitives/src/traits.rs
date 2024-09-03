@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
@@ -67,6 +67,18 @@ pub trait HeaderResponse {
 
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
+
+    /// Miner/Coinbase of the block
+    fn miner(&self) -> Address;
+
+    /// Gas limit of the block
+    fn gas(&self) -> u128;
+
+    /// Mix hash of the block
+    fn mix_hash(&self) -> Option<B256>;
+
+    /// Difficulty of the block
+    fn difficulty(&self) -> U256;
 }
 
 /// Block JSON-RPC response.
@@ -170,5 +182,21 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
 
     fn next_block_blob_fee(&self) -> Option<u128> {
         self.inner.next_block_blob_fee()
+    }
+
+    fn miner(&self) -> Address {
+        self.inner.miner()
+    }
+
+    fn gas(&self) -> u128 {
+        self.inner.gas()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
     }
 }
