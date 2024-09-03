@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
@@ -67,6 +67,30 @@ pub trait HeaderResponse {
 
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
+
+    /// Coinbase/Miner of the block
+    fn coinbase(&self) -> Address;
+
+    /// Gas limit of the block
+    fn gas_limit(&self) -> u128;
+
+    /// Mix hash of the block
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoW).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
+    fn mix_hash(&self) -> Option<B256>;
+
+    /// Difficulty of the block
+    ///
+    /// Unused after the Paris (AKA the merge) upgrade, and replaced by `prevrandao`.
+    fn difficulty(&self) -> U256;
 }
 
 /// Block JSON-RPC response.
@@ -84,6 +108,11 @@ pub trait BlockResponse {
 
     /// Mutable reference to block transactions
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction>;
+
+    /// Returns the `other` field from `WithOtherFields` type.
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        None
+    }
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
@@ -145,6 +174,10 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         self.inner.transactions_mut()
     }
+
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        Some(&self.other)
+    }
 }
 
 impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
@@ -170,5 +203,21 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
 
     fn next_block_blob_fee(&self) -> Option<u128> {
         self.inner.next_block_blob_fee()
+    }
+
+    fn coinbase(&self) -> Address {
+        self.inner.coinbase()
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.inner.gas_limit()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
     }
 }
