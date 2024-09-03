@@ -281,6 +281,12 @@ impl Reth {
 
         // If the `dev` flag is set, enable it.
         if self.dev {
+            // Enable the dev mode.
+            // This mode uses a local proof-of-authority consensus engine with either fixed block
+            // times or automatically mined blocks.
+            // Disables network discovery and enables local http server.
+            // Prefunds 20 accounts derived by mnemonic "test test test test test test test test
+            // test test test junk" with 10 000 ETH each.
             cmd.arg("--dev");
 
             // If the block time is set, use it.
@@ -325,6 +331,7 @@ impl Reth {
 
         if !self.discovery_enabled {
             cmd.arg("--disable-discovery");
+            cmd.arg("--no-persist-peers");
         }
 
         if let Some(chain_or_path) = self.chain_or_path {
@@ -429,7 +436,7 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|dir| {
-            let _ = Reth::new()
+            let _reth = Reth::new()
                 .dev()
                 .block_time("1sec")
                 .instance(0)
