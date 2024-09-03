@@ -63,7 +63,7 @@ install_reth() {
             chmod +x reth
             ;;
         *)
-            NAME="reth-v$RETH_BUILD-x86_64-pc-windows-gnu.tar.gz"
+            NAME="reth-v$RETH_BUILD-x86_64-pc-windows-gnu"
             curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
             mv -f "$NAME/reth.exe" ./
             rm -rf "$NAME"
