@@ -9,7 +9,6 @@ RETH_BUILD=${RETH_BUILD:-"1.0.6"}
 BIN_DIR=${BIN_DIR:-"$HOME/bin"}
 
 PLATFORM="$(uname -s | awk '{print tolower($0)}')"
-ARCHITECTURE="$(uname -m)"
 
 main() {
     mkdir -p "$BIN_DIR"
@@ -56,7 +55,7 @@ install_geth() {
 install_reth() {
     case "$PLATFORM" in
         linux)
-            NAME="reth-v$RETH_BUILD-$PLATFORM-$ARCHITECTURE-unknown-linux-gnu"
+            NAME="reth-v$RETH_BUILD-x86_64-unknown-linux-gnu"
             curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
             mv -f "$NAME/reth" ./
             rm -rf "$NAME"
