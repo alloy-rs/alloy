@@ -1,9 +1,6 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{
-    extract_endpoint, extract_value, DevOptions, NodeError, NodeInstanceError, NodeMode,
-    NODE_STARTUP_TIMEOUT,
-};
+use crate::{extract_endpoint, NodeError, NodeInstanceError, NODE_STARTUP_TIMEOUT};
 use alloy_genesis::Genesis;
 use std::{
     fs::create_dir,
@@ -131,6 +128,7 @@ impl Drop for RethInstance {
 #[derive(Clone, Debug, Default)]
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
+    dev: bool,
     instance: u16,
     discovery_enabled: bool,
     program: Option<PathBuf>,
@@ -148,6 +146,7 @@ impl Reth {
     /// The mnemonic is chosen randomly.
     pub fn new() -> Self {
         Self {
+            dev: false,
             instance: 0,
             discovery_enabled: true,
             program: None,
@@ -182,6 +181,12 @@ impl Reth {
     /// [`std::process::Command::new()`]
     pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
         self.program = Some(path.into());
+        self
+    }
+
+    /// Enable `dev` mode for the reth instance.
+    pub const fn dev(mut self) -> Self {
+        self.dev = true;
         self
     }
 
@@ -265,6 +270,11 @@ impl Reth {
         // Use Reth's `node` subcommand.
         cmd.arg("node");
 
+        // If the `dev` flag is set, enable it.
+        if self.dev {
+            cmd.arg("--dev");
+        }
+
         // If IPC is not enabled on the builder, disable it.
         if !self.ipc_enabled {
             cmd.arg("--ipcdisable");
@@ -338,17 +348,13 @@ impl Reth {
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             if line.contains("RPC HTTP server started") {
-                // Extracts the address from the output
                 if let Some(addr) = extract_endpoint("url=", &line) {
-                    // use the actual http port
                     http_port = addr.port();
                 }
             }
 
             if line.contains("RPC WS server started") {
-                // Extracts the address from the output
                 if let Some(addr) = extract_endpoint("url=", &line) {
-                    // use the actual ws port
                     ws_port = addr.port();
                 }
             }
@@ -373,6 +379,7 @@ impl Reth {
                 if line.contains("Updated local ENR") {
                     if let Some(port) = extract_endpoint("IpV4 UDP Socket", &line) {
                         p2p_port = port.port();
+                        p2p_started = true;
                     }
                 }
             } else {
