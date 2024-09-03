@@ -30,6 +30,41 @@ pub struct ForkchoiceState {
     pub finalized_block_hash: B256,
 }
 
+impl ForkchoiceState {
+    /// Returns the `head_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
+    /// [`None`].
+    #[inline]
+    pub fn state_head_hash(&self) -> Option<B256> {
+        if self.head_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.head_block_hash)
+        }
+    }
+
+    /// Returns the `safe_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
+    /// [`None`].
+    #[inline]
+    pub fn state_safe_hash(&self) -> Option<B256> {
+        if self.safe_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.safe_block_hash)
+        }
+    }
+
+    /// Returns the `finalized_block_hash`, only if it is not [`B256::ZERO`], otherwise this
+    /// returns [`None`].
+    #[inline]
+    pub fn state_finalized_hash(&self) -> Option<B256> {
+        if self.finalized_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.finalized_block_hash)
+        }
+    }
+}
+
 /// A standalone forkchoice update errors for RPC.
 ///
 /// These are considered hard RPC errors and are _not_ returned as [PayloadStatus] or
