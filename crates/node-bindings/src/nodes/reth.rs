@@ -168,6 +168,12 @@ impl Reth {
         self
     }
 
+    /// Puts the reth instance in `dev` mode.
+    pub fn dev(mut self) -> Self {
+        self.mode = NodeMode::Dev(Default::default());
+        self
+    }
+
     /// Sets the port which will be used when the `reth-cli` instance is launched.
     ///
     /// If port is 0 then the OS will choose a random port.
@@ -412,7 +418,9 @@ mod tests {
     #[test]
     fn instance_0() {
         run_with_tempdir(|_| {
-            let _reth = Reth::new().disable_discovery().instance(0).spawn();
+            let reth = Reth::new().dev().instance(0).spawn();
+
+            drop(reth)
         });
     }
 

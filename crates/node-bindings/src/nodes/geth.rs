@@ -192,6 +192,21 @@ impl Geth {
         Self::new().path(path)
     }
 
+    /// Sets the `path` to the `geth` executable
+    ///
+    /// By default, it's expected that `geth` is in `$PATH`, see also
+    /// [`std::process::Command::new()`]
+    pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
+        self.program = Some(path.into());
+        self
+    }
+
+    /// Puts the `geth` instance in `dev` mode.
+    pub fn dev(mut self) -> Self {
+        self.mode = NodeMode::Dev(Default::default());
+        self
+    }
+
     /// Returns whether the node is launched in Clique consensus mode.
     pub const fn is_clique(&self) -> bool {
         self.clique_private_key.is_some()
@@ -200,15 +215,6 @@ impl Geth {
     /// Calculates the address of the Clique consensus address.
     pub fn clique_address(&self) -> Option<Address> {
         self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
-    }
-
-    /// Sets the `path` to the `geth` executable
-    ///
-    /// By default, it's expected that `geth` is in `$PATH`, see also
-    /// [`std::process::Command::new()`]
-    pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
-        self.program = Some(path.into());
-        self
     }
 
     /// Sets the Clique Private Key to the `geth` executable, which will be later
