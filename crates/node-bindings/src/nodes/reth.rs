@@ -130,7 +130,7 @@ pub struct Reth {
     ipc_path: Option<PathBuf>,
     ipc_enabled: bool,
     data_dir: Option<PathBuf>,
-    chain_id: Option<u64>,
+    chain_or_path: Option<String>,
     genesis: Option<Genesis>,
     mode: NodeMode,
 }
@@ -193,8 +193,8 @@ impl Reth {
     }
 
     /// Sets the chain id for the reth instance.
-    pub const fn chain_id(mut self, chain_id: u64) -> Self {
-        self.chain_id = Some(chain_id);
+    pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
+        self.chain_or_path = Some(chain_or_path.to_string());
         self
     }
 
@@ -215,11 +215,6 @@ impl Reth {
     /// This will put the reth instance into non-dev mode, discarding any previously set dev-mode
     /// options.
     pub fn disable_discovery(mut self) -> Self {
-        self.inner_disable_discovery();
-        self
-    }
-
-    fn inner_disable_discovery(&mut self) {
         match &mut self.mode {
             NodeMode::Dev(_) => {
                 self.mode =
@@ -227,6 +222,7 @@ impl Reth {
             }
             NodeMode::NonDev(opts) => opts.discovery = false,
         }
+        self
     }
 
     /// Sets the IPC path for the socket.
@@ -270,7 +266,7 @@ impl Reth {
             .map_or_else(|| RETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
         let mut cmd = Command::new(&bin_path);
-        // reth uses stderr for its logs
+        // `reth` uses stderr for its logs
         cmd.stderr(Stdio::piped());
 
         // Use Reth's `node` subcommand.
@@ -326,8 +322,8 @@ impl Reth {
             }
         };
 
-        if let Some(chain_id) = self.chain_id {
-            cmd.arg("--chain").arg(chain_id.to_string());
+        if let Some(chain_or_path) = self.chain_or_path {
+            cmd.arg("--chain").arg(chain_or_path.to_string());
         }
 
         // debug verbosity is needed to check when peers are added
@@ -416,11 +412,11 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn instance_0() {
-        run_with_tempdir(|_| {
-            let reth = Reth::new().dev().instance(0).spawn();
+    fn can_launch_reth() {
+        run_with_tempdir(|dir| {
+            let _ = Reth::new().chain_or_path("sepolia").instance(0).data_dir(dir).spawn();
 
-            drop(reth)
+            // Issue: reth instance stays open, doesn't close.
         });
     }
 

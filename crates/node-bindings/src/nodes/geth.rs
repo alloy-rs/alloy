@@ -347,7 +347,7 @@ impl Geth {
             .map_or_else(|| GETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
         let mut cmd = Command::new(&bin_path);
-        // geth uses stderr for its logs
+        // `geth` uses stderr for its logs
         cmd.stderr(Stdio::piped());
 
         // If no port provided, let the os chose it for us
