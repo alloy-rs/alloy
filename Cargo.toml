@@ -133,7 +133,7 @@ semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
-derive_more = "1.0.0"
+derive_more = { version = "1.0.0", default-features = false }
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [
