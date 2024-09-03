@@ -57,13 +57,11 @@ install_reth() {
         linux)
             NAME="reth-v$RETH_BUILD-x86_64-unknown-linux-gnu"
             curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
-            mv -f "reth" ./
             chmod +x reth
             ;;
         *)
             NAME="reth-v$RETH_BUILD-x86_64-pc-windows-gnu"
             curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
-            mv -f "reth.exe" ./
             ;;
     esac
 }
