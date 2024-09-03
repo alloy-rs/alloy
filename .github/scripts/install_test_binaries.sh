@@ -4,10 +4,12 @@
 set -e
 
 GETH_BUILD=${GETH_BUILD:-"1.14.8-a9523b64"}
+RETH_BUILD=${RETH_BUILD:-"1.0.6"}
 
 BIN_DIR=${BIN_DIR:-"$HOME/bin"}
 
 PLATFORM="$(uname -s | awk '{print tolower($0)}')"
+ARCHITECTURE="$(uname -m)"
 
 main() {
     mkdir -p "$BIN_DIR"
@@ -22,25 +24,50 @@ main() {
     echo ""
     echo "Installed Geth:"
     geth version
+
+    install_reth
+
+    echo ""
+    echo "Installed Reth:"
+    reth --version
 }
 
 # Installs geth from https://geth.ethereum.org/downloads
 install_geth() {
     case "$PLATFORM" in
-        linux|darwin)
-            name="geth-$PLATFORM-amd64-$GETH_BUILD"
-            curl -s "https://gethstore.blob.core.windows.net/builds/$name.tar.gz" | tar -xzf -
-            mv -f "$name/geth" ./
-            rm -rf "$name"
+        linux)
+            NAME="geth-$PLATFORM-amd64-$GETH_BUILD"
+            curl -s "https://gethstore.blob.core.windows.net/builds/$NAME.tar.gz" | tar -xzf -
+            mv -f "$NAME/geth" ./
+            rm -rf "$NAME"
             chmod +x geth
             ;;
         *)
-            name="geth-windows-amd64-$GETH_BUILD"
-            zip="$name.zip"
+            NAME="geth-windows-amd64-$GETH_BUILD"
+            zip="$NAME.zip"
             curl -so "$zip" "https://gethstore.blob.core.windows.net/builds/$zip"
             unzip "$zip"
-            mv -f "$name/geth.exe" ./
-            rm -rf "$name" "$zip"
+            mv -f "$NAME/geth.exe" ./
+            rm -rf "$NAME" "$zip"
+            ;;
+    esac
+}
+
+# Install reth from https://github.com/paradigmxyz/reth/releases
+install_reth() {
+    case "$PLATFORM" in
+        linux)
+            NAME="reth-v$RETH_BUILD-$PLATFORM-$ARCHITECTURE-unknown-linux-gnu"
+            curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
+            mv -f "$NAME/reth" ./
+            rm -rf "$NAME"
+            chmod +x reth
+            ;;
+        *)
+            NAME="reth-v$RETH_BUILD-x86_64-pc-windows-gnu.tar.gz"
+            curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
+            mv -f "$NAME/reth.exe" ./
+            rm -rf "$NAME"
             ;;
     esac
 }
