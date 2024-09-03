@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|dir| {
-            let _ = Reth::new().instance(0).disable_discovery().data_dir(dir).spawn();
+            let _ = Reth::new().dev().instance(0).disable_discovery().data_dir(dir).spawn();
 
             // Issue: reth instance stays open, doesn't close.
         });
