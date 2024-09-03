@@ -263,7 +263,7 @@ impl Reth {
             .to_os_string();
         let mut cmd = Command::new(&bin_path);
         // `reth` uses stderr for its logs
-        cmd.stderr(Stdio::piped());
+        cmd.stdout(Stdio::piped());
 
         // Use Reth's `node` subcommand.
         cmd.arg("node");
@@ -327,16 +327,14 @@ impl Reth {
             cmd.arg("--chain").arg(chain_or_path);
         }
 
-        // debug verbosity is needed to check when peers are added
-        cmd.arg("--verbosity").arg("-vvvv");
-
         if let Some(ipc) = &self.ipc_path {
             cmd.arg("--ipcpath").arg(ipc);
         }
+        dbg!(&cmd);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stderr = child.stderr.ok_or(NodeError::NoStderr)?;
+        let stderr = child.stdout.take().ok_or(NodeError::NoStderr).unwrap();
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
@@ -356,6 +354,8 @@ impl Reth {
 
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+
+            dbg!(&line);
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -401,7 +401,7 @@ impl Reth {
             }
         }
 
-        child.stderr = Some(reader.into_inner());
+        // child.stderr = Some(reader.into_inner());
 
         Ok(RethInstance {
             pid: child,
@@ -432,7 +432,7 @@ mod tests {
                 .disable_discovery()
                 .data_dir(dir)
                 .spawn();
-
+            dbg!(&_reth);
             // Issue: reth instance stays open, doesn't close.
         });
     }
