@@ -15,7 +15,7 @@ pub mod nodes;
 pub use nodes::{
     anvil::{self, Anvil, AnvilInstance},
     geth::{self, Geth, GethInstance},
-    // reth::{self, Reth, RethInstance},
+    reth::{self, Reth, RethInstance},
 };
 
 mod node;

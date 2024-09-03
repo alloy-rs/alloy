@@ -37,7 +37,7 @@ install_geth() {
     case "$PLATFORM" in
         linux)
             NAME="geth-$PLATFORM-amd64-$GETH_BUILD"
-            curl -s "https://gethstore.blob.core.windows.net/builds/$NAME.tar.gz" | tar -xzf -
+            curl -sL "https://gethstore.blob.core.windows.net/builds/$NAME.tar.gz" | tar -xzf -
             mv -f "$NAME/geth" ./
             rm -rf "$NAME"
             chmod +x geth
@@ -45,10 +45,9 @@ install_geth() {
         *)
             NAME="geth-windows-amd64-$GETH_BUILD"
             zip="$NAME.zip"
-            curl -so "$zip" "https://gethstore.blob.core.windows.net/builds/$zip"
-            unzip "$zip"
+            curl -sL "https://gethstore.blob.core.windows.net/builds/$NAME.tar.gz" | tar -xzf -
             mv -f "$NAME/geth.exe" ./
-            rm -rf "$NAME" "$zip"
+            rm -rf "$NAME"
             ;;
     esac
 }
