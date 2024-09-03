@@ -1,7 +1,7 @@
 //! Utilities for launching a Reth dev-mode instance.
 
 use crate::{
-    extract_endpoint, DevOptions, NodeError, NodeInstanceError, NodeMode, PrivateNetOptions,
+    extract_endpoint, extract_value, DevOptions, NodeError, NodeInstanceError, NodeMode,
     NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::Genesis;
@@ -27,23 +27,24 @@ const RETH: &str = "reth";
 #[derive(Debug)]
 pub struct RethInstance {
     pid: Child,
-    port: u16,
-    p2p_port: Option<u16>,
+    http_port: u16,
+    ws_port: u16,
     auth_port: Option<u16>,
+    p2p_port: Option<u16>,
     ipc: Option<PathBuf>,
     data_dir: Option<PathBuf>,
     genesis: Option<Genesis>,
 }
 
 impl RethInstance {
-    /// Returns the port of this instance
-    pub const fn port(&self) -> u16 {
-        self.port
+    /// Returns the HTTP port of this instance
+    pub const fn http_port(&self) -> u16 {
+        self.http_port
     }
 
-    /// Returns the p2p port of this instance
-    pub const fn p2p_port(&self) -> Option<u16> {
-        self.p2p_port
+    /// Returns the WS port of this instance
+    pub const fn ws_port(&self) -> u16 {
+        self.ws_port
     }
 
     /// Returns the auth port of this instance
@@ -51,15 +52,21 @@ impl RethInstance {
         self.auth_port
     }
 
+    /// Returns the p2p port of this instance
+    /// If discovery is disabled, this will be `None`
+    pub const fn p2p_port(&self) -> Option<u16> {
+        self.p2p_port
+    }
+
     /// Returns the HTTP endpoint of this instance
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        format!("http://localhost:{}", self.http_port)
     }
 
     /// Returns the Websocket endpoint of this instance
     pub fn ws_endpoint(&self) -> String {
-        format!("ws://localhost:{}", self.port)
+        format!("ws://localhost:{}", self.ws_port)
     }
 
     /// Returns the IPC endpoint of this instance
@@ -125,6 +132,7 @@ impl Drop for RethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     instance: u16,
+    discovery_enabled: bool,
     program: Option<PathBuf>,
     port: Option<u16>,
     ipc_path: Option<PathBuf>,
@@ -132,7 +140,6 @@ pub struct Reth {
     data_dir: Option<PathBuf>,
     chain_or_path: Option<String>,
     genesis: Option<Genesis>,
-    mode: NodeMode,
 }
 
 impl Reth {
@@ -140,7 +147,17 @@ impl Reth {
     ///
     /// The mnemonic is chosen randomly.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            instance: 0,
+            discovery_enabled: true,
+            program: None,
+            port: None,
+            ipc_path: None,
+            ipc_enabled: false,
+            data_dir: None,
+            chain_or_path: None,
+            genesis: None,
+        }
     }
 
     /// Creates a Reth builder which will execute `reth` at the given path.
@@ -168,9 +185,9 @@ impl Reth {
         self
     }
 
-    /// Puts the reth instance in `dev` mode.
-    pub fn dev(mut self) -> Self {
-        self.mode = NodeMode::Dev(Default::default());
+    /// Disables discovery for the reth instance.
+    pub fn disable_discovery(mut self) -> Self {
+        self.discovery_enabled = false;
         self
     }
 
@@ -180,15 +197,6 @@ impl Reth {
     /// [RethInstance::port] will return the port that was chosen.
     pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
         self.port = Some(port.into());
-        self
-    }
-
-    /// Sets the block-time which will be used when the `reth-cli` instance is launched.
-    ///
-    /// This will put the reth instance in `dev` mode, discarding any previously set options that
-    /// cannot be used in dev mode.
-    pub const fn block_time(mut self, block_time: u64) -> Self {
-        self.mode = NodeMode::Dev(DevOptions { block_time: Some(block_time) });
         self
     }
 
@@ -207,21 +215,6 @@ impl Reth {
     /// Sets the instance number for the reth instance.
     pub fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
-        self
-    }
-
-    /// Disable discovery for the reth instance.
-    ///
-    /// This will put the reth instance into non-dev mode, discarding any previously set dev-mode
-    /// options.
-    pub fn disable_discovery(mut self) -> Self {
-        match &mut self.mode {
-            NodeMode::Dev(_) => {
-                self.mode =
-                    NodeMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
-            }
-            NodeMode::NonDev(opts) => opts.discovery = false,
-        }
         self
     }
 
@@ -306,21 +299,9 @@ impl Reth {
             }
         }
 
-        // Dev mode with custom block time
-        match self.mode {
-            NodeMode::Dev(DevOptions { block_time }) => {
-                cmd.arg("--dev");
-                if let Some(block_time) = block_time {
-                    cmd.arg("--dev.block-time").arg(block_time.to_string());
-                }
-            }
-            NodeMode::NonDev(PrivateNetOptions { discovery, .. }) => {
-                // disable discovery if the flag is set
-                if !discovery {
-                    cmd.arg("--disable-discovery");
-                }
-            }
-        };
+        if !self.discovery_enabled {
+            cmd.arg("--disable-discovery");
+        }
 
         if let Some(chain_or_path) = self.chain_or_path {
             cmd.arg("--chain").arg(chain_or_path.to_string());
@@ -340,12 +321,13 @@ impl Reth {
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
-        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
-        let mut http_started = false;
-
-        let mut port = 0;
-        let mut p2p_port = 0;
+        let mut http_port = 0;
+        let mut ws_port = 0;
         let mut auth_port = 0;
+        let mut p2p_port = 0;
+
+        let mut ports_started = false;
+        let mut p2p_started = !self.discovery_enabled;
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
@@ -355,29 +337,26 @@ impl Reth {
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
+            if line.contains("RPC HTTP server started") {
+                // Extracts the address from the output
+                if let Some(addr) = extract_endpoint("url=", &line) {
+                    // use the actual http port
+                    http_port = addr.port();
+                }
+            }
+
+            if line.contains("RPC WS server started") {
+                // Extracts the address from the output
+                if let Some(addr) = extract_endpoint("url=", &line) {
+                    // use the actual ws port
+                    ws_port = addr.port();
+                }
+            }
+
             if line.contains("RPC auth server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
                     auth_port = addr.port();
                 }
-            }
-
-            if line.contains("HTTP server started") {
-                // Extracts the address from the output
-                if let Some(addr) = extract_endpoint("url=", &line) {
-                    // use the actual http port
-                    port = addr.port();
-                }
-
-                http_started = true;
-            }
-
-            if line.contains("opened UDP socket") {
-                if let Some(addr) = extract_endpoint("local_addr=", &line) {
-                    // use the actual p2p port
-                    p2p_port = addr.port();
-                }
-
-                p2p_started = true;
             }
 
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
@@ -386,7 +365,21 @@ impl Reth {
                 return Err(NodeError::Fatal(line));
             }
 
-            if p2p_started && http_started {
+            if http_port != 0 && ws_port != 0 && auth_port != 0 {
+                ports_started = true;
+            }
+
+            if self.discovery_enabled {
+                if line.contains("Updated local ENR") {
+                    if let Some(port) = extract_endpoint("IpV4 UDP Socket", &line) {
+                        p2p_port = port.port();
+                    }
+                }
+            } else {
+                p2p_started = true;
+            }
+
+            if ports_started && p2p_started {
                 break;
             }
         }
@@ -395,10 +388,11 @@ impl Reth {
 
         Ok(RethInstance {
             pid: child,
-            port,
+            http_port,
+            ws_port,
+            p2p_port: Some(p2p_port),
             ipc: self.ipc_path,
             data_dir: self.data_dir,
-            p2p_port: Some(p2p_port),
             auth_port: Some(auth_port),
             genesis: self.genesis,
         })
@@ -414,7 +408,7 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|dir| {
-            let _ = Reth::new().chain_or_path("sepolia").instance(0).data_dir(dir).spawn();
+            let _ = Reth::new().instance(0).disable_discovery().data_dir(dir).spawn();
 
             // Issue: reth instance stays open, doesn't close.
         });
