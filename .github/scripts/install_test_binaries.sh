@@ -43,7 +43,7 @@ install_geth() {
             ;;
         *)
             NAME="geth-windows-amd64-$GETH_BUILD"
-            curl -so "https://gethstore.blob.core.windows.net/builds/$NAME.zip"
+            curl -so $NAME.zip "https://gethstore.blob.core.windows.net/builds/$NAME.zip"
             unzip $NAME.zip
             mv -f "$NAME/geth.exe" ./
             rm -rf "$NAME" "$NAME.zip"
