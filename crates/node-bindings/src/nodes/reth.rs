@@ -9,7 +9,6 @@ use std::{
     process::{Child, ChildStderr, Command, Stdio},
     time::Instant,
 };
-
 use url::Url;
 
 /// The exposed APIs
@@ -121,7 +120,7 @@ impl Drop for RethInstance {
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
 ///
-/// let reth = Reth::new().port(port).block_time(5000u64).spawn();
+/// let reth = Reth::new().port(port).block_time("12sec").spawn();
 ///
 /// drop(reth); // this will kill the instance
 /// ```
@@ -129,7 +128,7 @@ impl Drop for RethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
-    block_time: Option<u64>,
+    block_time: Option<String>,
     instance: u16,
     discovery_enabled: bool,
     program: Option<PathBuf>,
@@ -189,6 +188,14 @@ impl Reth {
     /// Enable `dev` mode for the reth instance.
     pub const fn dev(mut self) -> Self {
         self.dev = true;
+        self
+    }
+
+    /// Sets the block time for the reth instance.
+    /// Parses strings using https://docs.rs/humantime/latest/humantime/fn.parse_duration.html.
+    /// This is only used if `dev` mode is enabled.
+    pub fn block_time(mut self, block_time: &str) -> Self {
+        self.block_time = Some(block_time.to_string());
         self
     }
 
@@ -422,7 +429,13 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|dir| {
-            let _ = Reth::new().dev().instance(0).disable_discovery().data_dir(dir).spawn();
+            let _ = Reth::new()
+                .dev()
+                .block_time("1sec")
+                .instance(0)
+                .disable_discovery()
+                .data_dir(dir)
+                .spawn();
 
             // Issue: reth instance stays open, doesn't close.
         });
