@@ -7,22 +7,19 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(feature = "reqwest")]
+pub use reqwest;
+#[cfg(feature = "reqwest")]
 mod reqwest_transport;
 
 #[cfg(feature = "reqwest")]
 #[doc(inline)]
 pub use reqwest_transport::*;
 
+#[cfg(feature = "reqwest")]
 mod layer_transport;
 
-pub use layer_transport::*;
-
-mod layers;
-
-pub use layers::{LoggingLayer, LoggingService};
-
 #[cfg(feature = "reqwest")]
-pub use reqwest;
+pub use layer_transport::*;
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper_transport;
