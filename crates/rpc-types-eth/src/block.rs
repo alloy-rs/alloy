@@ -1,10 +1,13 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
+use alloy_network_primitives::{
+    BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
-use alloy_serde::OtherFields;
-use serde::{ser::Error, Deserialize, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use alloy_serde::WithOtherFields;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
@@ -14,10 +17,10 @@ pub use alloy_eips::{
 /// Block representation
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Block<T = Transaction> {
+pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
     #[serde(flatten)]
-    pub header: Header,
+    pub header: H,
     /// Uncles' hashes.
     #[serde(default)]
     pub uncles: Vec<B256>,
@@ -34,14 +37,11 @@ pub struct Block<T = Transaction> {
     /// Withdrawals in the block.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Support for arbitrary additional fields.
-    #[serde(flatten)]
-    pub other: OtherFields,
 }
 
-impl Block {
+impl<T: TransactionResponse, H> Block<T, H> {
     /// Converts a block with Tx hashes into a full block.
-    pub fn into_full_block(self, txs: Vec<Transaction>) -> Self {
+    pub fn into_full_block(self, txs: Vec<T>) -> Self {
         Self { transactions: txs.into(), ..self }
     }
 }
@@ -52,7 +52,7 @@ impl Block {
 #[serde(rename_all = "camelCase")]
 pub struct Header {
     /// Hash of the block
-    pub hash: Option<BlockHash>,
+    pub hash: BlockHash,
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles
@@ -71,8 +71,8 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
-    pub number: Option<u64>,
+    #[serde(with = "alloy_serde::quantity")]
+    pub number: u64,
     /// Gas Limit
     #[serde(default, with = "alloy_serde::quantity")]
     pub gas_limit: u128,
@@ -188,7 +188,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             withdrawals_root,
             logs_bloom,
             difficulty,
-            number: number.ok_or(ConversionError::MissingBlockNumber)?,
+            number,
             gas_limit,
             gas_used,
             timestamp,
@@ -204,321 +204,29 @@ impl TryFrom<Header> for alloy_consensus::Header {
     }
 }
 
-/// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
-/// or if used by `eth_getUncle*`
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum BlockTransactions<T = Transaction> {
-    /// Full transactions
-    Full(Vec<T>),
-    /// Only hashes
-    Hashes(Vec<B256>),
-    /// Special case for uncle response.
-    Uncle,
-}
-
-impl<T> Default for BlockTransactions<T> {
-    fn default() -> Self {
-        Self::Hashes(Vec::default())
-    }
-}
-
-impl<T> BlockTransactions<T> {
-    /// Check if the enum variant is used for hashes.
-    #[inline]
-    pub const fn is_hashes(&self) -> bool {
-        matches!(self, Self::Hashes(_))
+impl HeaderResponse for Header {
+    fn hash(&self) -> BlockHash {
+        self.hash
     }
 
-    /// Fallibly cast to a slice of hashes.
-    pub fn as_hashes(&self) -> Option<&[B256]> {
-        match self {
-            Self::Hashes(hashes) => Some(hashes),
-            _ => None,
-        }
+    fn number(&self) -> u64 {
+        self.number
     }
 
-    /// Returns true if the enum variant is used for full transactions.
-    #[inline]
-    pub const fn is_full(&self) -> bool {
-        matches!(self, Self::Full(_))
+    fn timestamp(&self) -> u64 {
+        self.timestamp
     }
 
-    /// Fallibly cast to a slice of transactions.
-    ///
-    /// Returns `None` if the enum variant is not `Full`.
-    pub fn as_transactions(&self) -> Option<&[T]> {
-        match self {
-            Self::Full(txs) => Some(txs),
-            _ => None,
-        }
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
     }
 
-    /// Returns true if the enum variant is used for an uncle response.
-    #[inline]
-    pub const fn is_uncle(&self) -> bool {
-        matches!(self, Self::Uncle)
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
     }
 
-    /// Returns an iterator over the transactions (if any). This will be empty
-    /// if the block is an uncle or if the transaction list contains only
-    /// hashes.
-    #[doc(alias = "transactions")]
-    pub fn txns(&self) -> impl Iterator<Item = &T> {
-        self.as_transactions().map(|txs| txs.iter()).unwrap_or_else(|| [].iter())
-    }
-
-    /// Returns an iterator over the transactions (if any). This will be empty if the block is not
-    /// full.
-    pub fn into_transactions(self) -> std::vec::IntoIter<T> {
-        match self {
-            Self::Full(txs) => txs.into_iter(),
-            _ => std::vec::IntoIter::default(),
-        }
-    }
-
-    /// Returns an instance of BlockTransactions with the Uncle special case.
-    #[inline]
-    pub const fn uncle() -> Self {
-        Self::Uncle
-    }
-
-    /// Returns the number of transactions.
-    #[inline]
-    pub fn len(&self) -> usize {
-        match self {
-            Self::Hashes(h) => h.len(),
-            Self::Full(f) => f.len(),
-            Self::Uncle => 0,
-        }
-    }
-
-    /// Whether the block has no transactions.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl BlockTransactions<Transaction> {
-    /// Converts `self` into `Hashes`.
-    #[inline]
-    pub fn convert_to_hashes(&mut self) {
-        if !self.is_hashes() {
-            *self = Self::Hashes(self.hashes().copied().collect());
-        }
-    }
-
-    /// Converts `self` into `Hashes`.
-    #[inline]
-    pub fn into_hashes(mut self) -> Self {
-        self.convert_to_hashes();
-        self
-    }
-
-    /// Returns an iterator over the transaction hashes.
-    #[deprecated = "use `hashes` instead"]
-    #[inline]
-    pub fn iter(&self) -> BlockTransactionHashes<'_, Transaction> {
-        self.hashes()
-    }
-
-    /// Returns an iterator over references to the transaction hashes.
-    #[inline]
-    pub fn hashes(&self) -> BlockTransactionHashes<'_, Transaction> {
-        BlockTransactionHashes::new(self)
-    }
-
-    /// Returns an iterator over mutable references to the transaction hashes.
-    #[inline]
-    pub fn hashes_mut(&mut self) -> BlockTransactionHashesMut<'_, Transaction> {
-        BlockTransactionHashesMut::new(self)
-    }
-}
-
-impl From<Vec<B256>> for BlockTransactions {
-    fn from(hashes: Vec<B256>) -> Self {
-        Self::Hashes(hashes)
-    }
-}
-
-impl<T> From<Vec<T>> for BlockTransactions<T> {
-    fn from(transactions: Vec<T>) -> Self {
-        Self::Full(transactions)
-    }
-}
-
-/// An iterator over the transaction hashes of a block.
-///
-/// See [`BlockTransactions::hashes`].
-#[derive(Clone, Debug)]
-pub struct BlockTransactionHashes<'a, T>(BlockTransactionHashesInner<'a, T>);
-
-#[derive(Clone, Debug)]
-enum BlockTransactionHashesInner<'a, T = Transaction> {
-    Hashes(std::slice::Iter<'a, B256>),
-    Full(std::slice::Iter<'a, T>),
-    Uncle,
-}
-
-impl<'a, T> BlockTransactionHashes<'a, T> {
-    #[inline]
-    fn new(txs: &'a BlockTransactions<T>) -> Self {
-        Self(match txs {
-            BlockTransactions::Hashes(txs) => BlockTransactionHashesInner::Hashes(txs.iter()),
-            BlockTransactions::Full(txs) => BlockTransactionHashesInner::Full(txs.iter()),
-            BlockTransactions::Uncle => BlockTransactionHashesInner::Uncle,
-        })
-    }
-}
-
-impl<'a> Iterator for BlockTransactionHashes<'a, Transaction> {
-    type Item = &'a B256;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInner::Hashes(txs) => txs.next(),
-            BlockTransactionHashesInner::Full(txs) => txs.next().map(|tx| &tx.hash),
-            BlockTransactionHashesInner::Uncle => None,
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.size_hint(),
-            BlockTransactionHashesInner::Hashes(txs) => txs.size_hint(),
-            BlockTransactionHashesInner::Uncle => (0, Some(0)),
-        }
-    }
-}
-
-impl ExactSizeIterator for BlockTransactionHashes<'_, Transaction> {
-    #[inline]
-    fn len(&self) -> usize {
-        match &self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.len(),
-            BlockTransactionHashesInner::Hashes(txs) => txs.len(),
-            BlockTransactionHashesInner::Uncle => 0,
-        }
-    }
-}
-
-impl DoubleEndedIterator for BlockTransactionHashes<'_, Transaction> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInner::Full(txs) => txs.next_back().map(|tx| &tx.hash),
-            BlockTransactionHashesInner::Hashes(txs) => txs.next_back(),
-            BlockTransactionHashesInner::Uncle => None,
-        }
-    }
-}
-
-impl<'a> std::iter::FusedIterator for BlockTransactionHashes<'a, Transaction> {}
-
-/// An Iterator over the transaction hashes of a block.
-///
-/// See [`BlockTransactions::hashes_mut`].
-#[derive(Debug)]
-pub struct BlockTransactionHashesMut<'a, T = Transaction>(BlockTransactionHashesInnerMut<'a, T>);
-
-#[derive(Debug)]
-enum BlockTransactionHashesInnerMut<'a, T = Transaction> {
-    Hashes(std::slice::IterMut<'a, B256>),
-    Full(std::slice::IterMut<'a, T>),
-    Uncle,
-}
-
-impl<'a, T> BlockTransactionHashesMut<'a, T> {
-    #[inline]
-    fn new(txs: &'a mut BlockTransactions<T>) -> Self {
-        Self(match txs {
-            BlockTransactions::Hashes(txs) => {
-                BlockTransactionHashesInnerMut::Hashes(txs.iter_mut())
-            }
-            BlockTransactions::Full(txs) => BlockTransactionHashesInnerMut::Full(txs.iter_mut()),
-            BlockTransactions::Uncle => BlockTransactionHashesInnerMut::Uncle,
-        })
-    }
-}
-
-impl<'a> Iterator for BlockTransactionHashesMut<'a, Transaction> {
-    type Item = &'a mut B256;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.next().map(|tx| &mut tx.hash),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next(),
-            BlockTransactionHashesInnerMut::Uncle => None,
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.size_hint(),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.size_hint(),
-            BlockTransactionHashesInnerMut::Uncle => (0, Some(0)),
-        }
-    }
-}
-
-impl ExactSizeIterator for BlockTransactionHashesMut<'_, Transaction> {
-    #[inline]
-    fn len(&self) -> usize {
-        match &self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.len(),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.len(),
-            BlockTransactionHashesInnerMut::Uncle => 0,
-        }
-    }
-}
-
-impl DoubleEndedIterator for BlockTransactionHashesMut<'_, Transaction> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            BlockTransactionHashesInnerMut::Full(txs) => txs.next_back().map(|tx| &mut tx.hash),
-            BlockTransactionHashesInnerMut::Hashes(txs) => txs.next_back(),
-            BlockTransactionHashesInnerMut::Uncle => None,
-        }
-    }
-}
-
-impl<'a> std::iter::FusedIterator for BlockTransactionHashesMut<'a, Transaction> {}
-
-/// Determines how the `transactions` field of [Block] should be filled.
-///
-/// This essentially represents the `full:bool` argument in RPC calls that determine whether the
-/// response should include full transaction objects or just the hashes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum BlockTransactionsKind {
-    /// Only include hashes: [BlockTransactions::Hashes]
-    #[default]
-    Hashes,
-    /// Include full transaction objects: [BlockTransactions::Full]
-    Full,
-}
-
-impl From<bool> for BlockTransactionsKind {
-    fn from(is_full: bool) -> Self {
-        if is_full {
-            Self::Full
-        } else {
-            Self::Hashes
-        }
-    }
-}
-
-impl From<BlockTransactionsKind> for bool {
-    fn from(kind: BlockTransactionsKind) -> Self {
-        match kind {
-            BlockTransactionsKind::Full => true,
-            BlockTransactionsKind::Hashes => false,
-        }
+    fn next_block_blob_fee(&self) -> Option<u128> {
+        self.next_block_blob_fee()
     }
 }
 
@@ -533,62 +241,15 @@ pub enum BlockError {
     RlpDecodeRawBlock(alloy_rlp::Error),
 }
 
-/// A Block representation that allows to include additional fields
-pub type RichBlock = Rich<Block>;
-
-impl From<Block> for RichBlock {
+impl From<Block> for WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
-        Self { inner, extra_info: Default::default() }
+        Self { inner, other: Default::default() }
     }
 }
 
-/// Header representation with additional info.
-pub type RichHeader = Rich<Header>;
-
-impl From<Header> for RichHeader {
+impl From<Header> for WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
-        Self { inner, extra_info: Default::default() }
-    }
-}
-
-/// Value representation with additional info
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-pub struct Rich<T> {
-    /// Standard value.
-    #[serde(flatten)]
-    pub inner: T,
-    /// Additional fields that should be serialized into the `Block` object
-    #[serde(flatten)]
-    pub extra_info: BTreeMap<String, serde_json::Value>,
-}
-
-impl<T> Deref for Rich<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T: Serialize> Serialize for Rich<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if self.extra_info.is_empty() {
-            return self.inner.serialize(serializer);
-        }
-
-        let inner = serde_json::to_value(&self.inner);
-        let extras = serde_json::to_value(&self.extra_info);
-
-        if let (Ok(serde_json::Value::Object(mut value)), Ok(serde_json::Value::Object(extras))) =
-            (inner, extras)
-        {
-            value.extend(extras);
-            value.serialize(serializer)
-        } else {
-            Err(S::Error::custom("Unserializable structures: expected objects"))
-        }
+        Self { inner, other: Default::default() }
     }
 }
 
@@ -633,6 +294,23 @@ pub struct BlockOverrides {
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
+impl<T, H> BlockResponse for Block<T, H> {
+    type Transaction = T;
+    type Header = H;
+
+    fn header(&self) -> &Self::Header {
+        &self.header
+    }
+
+    fn transactions(&self) -> &BlockTransactions<T> {
+        &self.transactions
+    }
+
+    fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
+        &mut self.transactions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloy_primitives::keccak256;
@@ -646,15 +324,6 @@ mod tests {
         let mut bytes = [0u8; 1024];
         rand::thread_rng().fill(bytes.as_mut_slice());
         let _: Header = Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
-    }
-
-    #[test]
-    fn test_full_conversion() {
-        let full = true;
-        assert_eq!(BlockTransactionsKind::Full, full.into());
-
-        let full = false;
-        assert_eq!(BlockTransactionsKind::Hashes, full.into());
     }
 
     #[test]
@@ -672,7 +341,7 @@ mod tests {
     fn serde_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -680,7 +349,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -700,7 +369,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: Some(vec![]),
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -715,7 +383,7 @@ mod tests {
     fn serde_uncle_block() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -723,7 +391,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: Some(B256::with_last_byte(8)),
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -743,7 +411,6 @@ mod tests {
             transactions: BlockTransactions::Uncle,
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -758,7 +425,7 @@ mod tests {
     fn serde_block_with_withdrawals_set_as_none() {
         let block = Block {
             header: Header {
-                hash: Some(B256::with_last_byte(1)),
+                hash: B256::with_last_byte(1),
                 parent_hash: B256::with_last_byte(2),
                 uncles_hash: B256::with_last_byte(3),
                 miner: Address::with_last_byte(4),
@@ -766,7 +433,7 @@ mod tests {
                 transactions_root: B256::with_last_byte(6),
                 receipts_root: B256::with_last_byte(7),
                 withdrawals_root: None,
-                number: Some(9),
+                number: 9,
                 gas_used: 10,
                 gas_limit: 11,
                 extra_data: vec![1, 2, 3].into(),
@@ -786,7 +453,6 @@ mod tests {
             transactions: vec![B256::with_last_byte(18)].into(),
             size: Some(U256::from(19)),
             withdrawals: None,
-            other: Default::default(),
         };
         let serialized = serde_json::to_string(&block).unwrap();
         assert_eq!(
@@ -830,9 +496,9 @@ mod tests {
     "size": "0xaeb6"
 }"#;
 
-        let block = serde_json::from_str::<RichBlock>(s).unwrap();
+        let block = serde_json::from_str::<WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<RichBlock>(&serialized).unwrap();
+        let block2 = serde_json::from_str::<WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 
@@ -977,7 +643,7 @@ mod tests {
         let block = serde_json::from_str::<Block>(s).unwrap();
         let header: alloy_consensus::Header = block.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block.header.hash);
 
         let s2 = r#"{
             "baseFeePerGas":"0x886b221ad",
@@ -1014,6 +680,6 @@ mod tests {
         let block2 = serde_json::from_str::<Block>(s2).unwrap();
         let header: alloy_consensus::Header = block2.clone().header.try_into().unwrap();
         let recomputed_hash = keccak256(alloy_rlp::encode(&header));
-        assert_eq!(recomputed_hash, block2.header.hash.unwrap());
+        assert_eq!(recomputed_hash, block2.header.hash);
     }
 }

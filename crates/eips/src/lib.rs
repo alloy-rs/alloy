@@ -11,11 +11,6 @@
 #[macro_use]
 extern crate alloc;
 
-// To ensure no unused imports, since signed auth list requires arbitrary _and_ k256 features, but
-// is only enabled using the `arbitrary` feature.
-#[cfg(all(not(feature = "k256"), feature = "arbitrary"))]
-use rand as _;
-
 pub mod eip1559;
 pub use eip1559::calc_next_block_base_fee;
 

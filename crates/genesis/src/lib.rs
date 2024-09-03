@@ -64,8 +64,8 @@ pub struct Genesis {
 }
 
 impl Genesis {
-    /// Creates a chain config for Clique using the given chain id.
-    /// and funds the given address with max coins.
+    /// Creates a chain config for Clique using the given chain id and funds the given address with
+    /// max coins.
     ///
     /// Enables all hard forks up to London at genesis.
     pub fn clique_genesis(chain_id: u64, signer_addr: Address) -> Self {
@@ -567,6 +567,7 @@ pub struct CliqueConfig {
 }
 
 /// Consensus configuration for Parlia.
+///
 /// Parlia is the consensus engine for BNB Smart Chain.
 /// For the general introduction: <https://docs.bnbchain.org/docs/learn/consensus/>
 /// For the specification: <https://github.com/bnb-chain/bsc/blob/master/params/config.go#L558>

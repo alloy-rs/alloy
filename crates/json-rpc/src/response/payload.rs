@@ -3,9 +3,9 @@ use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::value::RawValue;
 use std::borrow::Borrow;
 
-/// A JSONRPC-2.0 response payload.
+/// A JSON-RPC 2.0 response payload.
 ///
-/// This enum covers both the success and error cases of a JSONRPC-2.0
+/// This enum covers both the success and error cases of a JSON-RPC 2.0
 /// response. It is used to represent the `result` and `error` fields of a
 /// response object.
 ///

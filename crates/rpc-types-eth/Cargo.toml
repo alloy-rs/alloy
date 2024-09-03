@@ -26,6 +26,8 @@ alloy-serde.workspace = true
 alloy-consensus = { workspace = true, features = ["std", "serde"] }
 alloy-eips = { workspace = true, features = ["std", "serde"] }
 
+alloy-network-primitives.workspace = true
+
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -51,6 +53,7 @@ alloy-eips = { workspace = true, features = ["arbitrary", "k256"] }
 arbitrary = { workspace = true, features = ["derive"] }
 rand.workspace = true
 similar-asserts.workspace = true
+assert_matches.workspace = true
 
 [features]
 arbitrary = [
@@ -58,8 +61,6 @@ arbitrary = [
     "alloy-primitives/arbitrary",
     "alloy-serde/arbitrary",
     "alloy-eips/arbitrary",
-    "alloy-eips/k256",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = ["alloy-primitives/ssz", "alloy-eips/ssz"]
 k256 = ["alloy-consensus/k256", "alloy-eips/k256"]

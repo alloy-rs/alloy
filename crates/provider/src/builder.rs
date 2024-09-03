@@ -1,7 +1,7 @@
 use crate::{
     fillers::{
-        ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller, RecommendedFiller,
-        TxFiller, WalletFiller,
+        CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
+        NonceManager, RecommendedFiller, SimpleNonceManager, TxFiller, WalletFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -144,8 +144,29 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add nonce management to the stack being built.
     ///
     /// See [`NonceFiller`]
-    pub fn with_nonce_management(self) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
-        self.filler(NonceFiller::default())
+    pub fn with_nonce_management<M: NonceManager>(
+        self,
+        nonce_manager: M,
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<M>>, N> {
+        self.filler(NonceFiller::new(nonce_manager))
+    }
+
+    /// Add simple nonce management to the stack being built.
+    ///
+    /// See [`SimpleNonceManager`]
+    pub fn with_simple_nonce_management(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller>, N> {
+        self.with_nonce_management(SimpleNonceManager::default())
+    }
+
+    /// Add cached nonce management to the stack being built.
+    ///
+    /// See [`CachedNonceManager`]
+    pub fn with_cached_nonce_management(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, NonceFiller<CachedNonceManager>>, N> {
+        self.with_nonce_management(CachedNonceManager::default())
     }
 
     /// Add a chain ID filler to the stack being built. The filler will attempt
@@ -346,6 +367,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     }
 }
 
+#[cfg(any(test, feature = "anvil-node"))]
 type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
 
 #[cfg(any(test, feature = "anvil-node"))]

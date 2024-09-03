@@ -53,8 +53,10 @@ pub struct ValidatorRegistrationMessage {
 }
 
 /// Represents public information about a block sent by a builder to the relay, or from the relay to
-/// the proposer. Depending on the context, value might represent the claimed value by a builder
-/// (not necessarily a value confirmed by the relay).
+/// the proposer.
+///
+/// Depending on the context, value might represent the claimed value by a builder (not necessarily
+/// a value confirmed by the relay).
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
@@ -274,10 +276,10 @@ impl ProposerPayloadsDeliveredQuery {
     }
 }
 
-/// OrderBy : Sort results in either ascending or descending values.  * `-value` - descending value
-/// (highest value first)  * `value` - ascending value (lowest value first) Sort results in either
-/// ascending or descending values.  * `-value` - descending value (highest value first)  * `value`
-/// - ascending value (lowest value first)
+/// Sort results in either ascending or descending values.
+///
+/// - `-value` - descending value (highest value first)
+/// - `value` - ascending value (lowest value first)
 #[derive(
     Default, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize,
 )]

@@ -8,6 +8,7 @@ use crate::{
 };
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder};
+use alloy_network_primitives::{BlockResponse, HeaderResponse};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
 use futures::FutureExt;
@@ -150,7 +151,7 @@ impl GasFiller {
                         .get_block_by_number(BlockNumberOrTag::Latest, false)
                         .await?
                         .ok_or(RpcError::NullResp)?
-                        .header
+                        .header()
                         .next_block_blob_fee()
                         .ok_or(RpcError::UnsupportedFeature("eip4844"))
                 }
@@ -302,11 +303,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_eip1559_network() {
-        let provider = ProviderBuilder::new()
-            .filler(crate::fillers::GasFiller)
-            .filler(crate::fillers::NonceFiller::default())
-            .filler(crate::fillers::ChainIdFiller::default())
-            .on_anvil();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil();
 
         let tx = TransactionRequest {
             from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),

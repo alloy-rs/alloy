@@ -80,10 +80,11 @@ impl<Params> Request<Params> {
     }
 }
 
-/// A [`Request`] that has been partially serialized. The request parameters
-/// have been serialized, and are represented as a boxed [`RawValue`]. This is
-/// useful for collections containing many requests, as it erases the `Param`
-/// type. It can be created with [`Request::box_params()`].
+/// A [`Request`] that has been partially serialized.
+///
+/// The request parameters have been serialized, and are represented as a boxed [`RawValue`]. This
+/// is useful for collections containing many requests, as it erases the `Param` type. It can be
+/// created with [`Request::box_params()`].
 ///
 /// See the [top-level docs] for more info.
 ///

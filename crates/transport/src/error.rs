@@ -84,7 +84,9 @@ impl TransportErrorKind {
         match self {
             // Missing batch response errors can be retried.
             Self::MissingBatchResponse(_) => true,
-            Self::HttpError(http_err) => http_err.is_rate_limit_err(),
+            Self::HttpError(http_err) => {
+                http_err.is_rate_limit_err() || http_err.is_temporarily_unavailable()
+            }
             Self::Custom(err) => {
                 let msg = err.to_string();
                 msg.contains("429 Too Many Requests")
@@ -107,10 +109,13 @@ pub struct HttpError {
 impl HttpError {
     /// Checks the `status` to determine whether the request should be retried.
     pub const fn is_rate_limit_err(&self) -> bool {
-        if self.status == 429 {
-            return true;
-        }
-        false
+        self.status == 429
+    }
+
+    /// Checks the `status` to determine whether the service was temporarily unavailable and should
+    /// be retried.
+    pub const fn is_temporarily_unavailable(&self) -> bool {
+        self.status == 503
     }
 }
 
