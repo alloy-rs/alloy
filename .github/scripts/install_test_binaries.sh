@@ -3,7 +3,7 @@
 # Note: intended for use only with CI (x86_64 Ubuntu, MacOS or Windows)
 set -e
 
-GETH_BUILD=${GETH_BUILD:-"1.14.7-aa55f5e"}
+GETH_BUILD=${GETH_BUILD:-"1.14.8-a9523b64"}
 
 BIN_DIR=${BIN_DIR:-"$HOME/bin"}
 
