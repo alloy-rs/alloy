@@ -20,6 +20,9 @@ pub enum NodeInstanceError {
 
     /// The child node process's stderr was not captured.
     NoStderr,
+
+    /// The child node process's stdout was not captured.
+    NoStdout,
 }
 
 /// Errors that can occur when working with the node.
@@ -34,6 +37,9 @@ pub enum NodeError {
     /// No stderr was captured from the child process.
     #[error("no stderr was captured from the process")]
     NoStderr,
+    /// No stdout was captured from the child process.
+    #[error("no stdout was captured from the process")]
+    NoStdout,
     /// Timed out waiting for the node to start.
     #[error("timed out waiting for node to spawn; is the node binary installed?")]
     Timeout,

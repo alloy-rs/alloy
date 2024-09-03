@@ -6,7 +6,7 @@ use std::{
     fs::create_dir,
     io::{BufRead, BufReader},
     path::PathBuf,
-    process::{Child, ChildStderr, Command, Stdio},
+    process::{Child, ChildStdout, Command, Stdio},
     time::Instant,
 };
 use url::Url;
@@ -91,12 +91,12 @@ impl RethInstance {
         &self.genesis
     }
 
-    /// Takes the stderr contained in the child process.
+    /// Takes the stdout contained in the child process.
     ///
-    /// This leaves a `None` in its place, so calling methods that require a stderr to be present
+    /// This leaves a `None` in its place, so calling methods that require a stdout to be present
     /// will fail if called after this.
-    pub fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
-        self.pid.stderr.take().ok_or(NodeInstanceError::NoStderr)
+    pub fn stdout(&mut self) -> Result<ChildStdout, NodeInstanceError> {
+        self.pid.stdout.take().ok_or(NodeInstanceError::NoStdout)
     }
 }
 
@@ -165,7 +165,7 @@ impl Reth {
     /// ```
     /// use alloy_node_bindings::Reth;
     /// # fn a() {
-    /// let reth = Reth::at("../go-ethereum/build/bin/reth").spawn();
+    /// let reth = Reth::at("../reth/target/release/reth").spawn();
     ///
     /// println!("Reth running at `{}`", reth.endpoint());
     /// # }
@@ -262,11 +262,12 @@ impl Reth {
             .map_or_else(|| RETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
         let mut cmd = Command::new(&bin_path);
-        // `reth` uses stderr for its logs
-        cmd.stderr(Stdio::piped());
+        // `reth` uses stdout for its logs
+        cmd.stdout(Stdio::piped());
 
         // Use Reth's `node` subcommand.
         cmd.arg("node");
+        cmd.arg("--color").arg("never");
 
         // If the `dev` flag is set, enable it.
         if self.dev {
@@ -336,10 +337,10 @@ impl Reth {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stderr = child.stderr.ok_or(NodeError::NoStderr)?;
+        let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
 
         let start = Instant::now();
-        let mut reader = BufReader::new(stderr);
+        let mut reader = BufReader::new(stdout);
 
         let mut http_port = 0;
         let mut ws_port = 0;
@@ -351,11 +352,14 @@ impl Reth {
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
+                let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+
+            dbg!(&line);
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -401,7 +405,7 @@ impl Reth {
             }
         }
 
-        child.stderr = Some(reader.into_inner());
+        child.stdout = Some(reader.into_inner());
 
         Ok(RethInstance {
             pid: child,
