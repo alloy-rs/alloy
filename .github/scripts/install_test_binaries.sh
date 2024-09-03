@@ -44,10 +44,10 @@ install_geth() {
             ;;
         *)
             NAME="geth-windows-amd64-$GETH_BUILD"
-            zip="$NAME.zip"
-            curl -sL "https://gethstore.blob.core.windows.net/builds/$NAME.tar.gz" | tar -xzf -
+            curl -so "https://gethstore.blob.core.windows.net/builds/$NAME.zip"
+            unzip $NAME.zip
             mv -f "$NAME/geth.exe" ./
-            rm -rf "$NAME"
+            rm -rf "$NAME" "$NAME.zip"
             ;;
     esac
 }
