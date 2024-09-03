@@ -129,6 +129,7 @@ impl Drop for RethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
+    block_time: Option<u64>,
     instance: u16,
     discovery_enabled: bool,
     program: Option<PathBuf>,
@@ -146,7 +147,8 @@ impl Reth {
     /// The mnemonic is chosen randomly.
     pub fn new() -> Self {
         Self {
-            dev: false,
+            dev: true,
+            block_time: None,
             instance: 0,
             discovery_enabled: true,
             program: None,
@@ -273,6 +275,11 @@ impl Reth {
         // If the `dev` flag is set, enable it.
         if self.dev {
             cmd.arg("--dev");
+
+            // If the block time is set, use it.
+            if let Some(block_time) = self.block_time {
+                cmd.arg("--dev.block-time").arg(block_time.to_string());
+            }
         }
 
         // If IPC is not enabled on the builder, disable it.
