@@ -96,6 +96,11 @@ pub trait BlockResponse {
 
     /// Mutable reference to block transactions
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction>;
+
+    /// Returns the `other` field from `WithOtherFields` type.
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        None
+    }
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
@@ -156,6 +161,10 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         self.inner.transactions_mut()
+    }
+
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        Some(&self.other)
     }
 }
 
