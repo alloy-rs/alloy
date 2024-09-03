@@ -190,7 +190,7 @@ impl Reth {
     }
 
     /// Sets the block time for the reth instance.
-    /// Parses strings using https://docs.rs/humantime/latest/humantime/fn.parse_duration.html.
+    /// Parses strings using <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
     /// This is only used if `dev` mode is enabled.
     pub fn block_time(mut self, block_time: &str) -> Self {
         self.block_time = Some(block_time.to_string());
