@@ -120,7 +120,7 @@ impl Drop for RethInstance {
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
 ///
-/// let reth = Reth::new().port(port).block_time("12sec").spawn();
+/// let reth = Reth::new().instance(0).block_time("12sec").spawn();
 ///
 /// drop(reth); // this will kill the instance
 /// ```
@@ -132,7 +132,6 @@ pub struct Reth {
     instance: u16,
     discovery_enabled: bool,
     program: Option<PathBuf>,
-    port: Option<u16>,
     ipc_path: Option<PathBuf>,
     ipc_enabled: bool,
     data_dir: Option<PathBuf>,
@@ -144,14 +143,13 @@ impl Reth {
     /// Creates an empty Reth builder.
     ///
     /// The mnemonic is chosen randomly.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             dev: true,
             block_time: None,
             instance: 0,
             discovery_enabled: true,
             program: None,
-            port: None,
             ipc_path: None,
             ipc_enabled: false,
             data_dir: None,
@@ -200,17 +198,8 @@ impl Reth {
     }
 
     /// Disables discovery for the reth instance.
-    pub fn disable_discovery(mut self) -> Self {
+    pub const fn disable_discovery(mut self) -> Self {
         self.discovery_enabled = false;
-        self
-    }
-
-    /// Sets the port which will be used when the `reth-cli` instance is launched.
-    ///
-    /// If port is 0 then the OS will choose a random port.
-    /// [RethInstance::port] will return the port that was chosen.
-    pub fn port<T: Into<u16>>(mut self, port: T) -> Self {
-        self.port = Some(port.into());
         self
     }
 
@@ -227,7 +216,7 @@ impl Reth {
     }
 
     /// Sets the instance number for the reth instance.
-    pub fn instance(mut self, instance: u16) -> Self {
+    pub const fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
         self
     }
@@ -291,7 +280,7 @@ impl Reth {
 
             // If the block time is set, use it.
             if let Some(block_time) = self.block_time {
-                cmd.arg("--dev.block-time").arg(block_time.to_string());
+                cmd.arg("--dev.block-time").arg(block_time);
             }
         }
 
@@ -335,7 +324,7 @@ impl Reth {
         }
 
         if let Some(chain_or_path) = self.chain_or_path {
-            cmd.arg("--chain").arg(chain_or_path.to_string());
+            cmd.arg("--chain").arg(chain_or_path);
         }
 
         // debug verbosity is needed to check when peers are added
