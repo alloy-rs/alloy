@@ -22,7 +22,7 @@ workspace = true
 # ethereum
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-consensus = { workspace = true, features = ["std"] }
+alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
 alloy-rpc-types-eth.workspace = true
 alloy-serde.workspace = true
 alloy-eips = { workspace = true, features = ["serde"] }
@@ -43,7 +43,7 @@ rand = { workspace = true, optional = true }
 
 [features]
 default = ["jwt"]
-jwt = ["dep:jsonwebtoken", "dep:rand"]
+jwt = ["alloy-consensus/std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
