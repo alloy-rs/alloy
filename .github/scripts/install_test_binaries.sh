@@ -18,13 +18,14 @@ main() {
         echo "$BIN_DIR" >> "$GITHUB_PATH"
     fi
 
-    install_geth
+    install_geth &
+    install_reth &
+
+    wait
 
     echo ""
     echo "Installed Geth:"
     geth version
-
-    install_reth
 
     echo ""
     echo "Installed Reth:"
