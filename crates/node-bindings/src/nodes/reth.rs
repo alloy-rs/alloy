@@ -145,7 +145,7 @@ impl Reth {
     /// The mnemonic is chosen randomly.
     pub const fn new() -> Self {
         Self {
-            dev: true,
+            dev: false,
             block_time: None,
             instance: 0,
             discovery_enabled: true,
@@ -267,6 +267,8 @@ impl Reth {
 
         // Use Reth's `node` subcommand.
         cmd.arg("node");
+
+        // Disable color output to make parsing logs easier.
         cmd.arg("--color").arg("never");
 
         // If the `dev` flag is set, enable it.
@@ -359,8 +361,6 @@ impl Reth {
             let mut line = String::with_capacity(120);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
-            dbg!(&line);
-
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
                     http_port = addr.port();
@@ -428,16 +428,23 @@ mod tests {
 
     #[test]
     fn can_launch_reth() {
-        run_with_tempdir(|dir| {
+        run_with_tempdir(|temp_dir_path| {
             let _reth = Reth::new()
                 .dev()
                 .block_time("1sec")
                 .instance(0)
                 .disable_discovery()
-                .data_dir(dir)
+                .data_dir(temp_dir_path)
                 .spawn();
+        });
+    }
 
-            // Issue: reth instance stays open, doesn't close.
+    #[test]
+    fn p2p_port() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
+            let p2p_port = reth.p2p_port();
+            assert!(p2p_port.is_some());
         });
     }
 
