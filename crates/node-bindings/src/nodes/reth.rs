@@ -268,9 +268,6 @@ impl Reth {
         // Use Reth's `node` subcommand.
         cmd.arg("node");
 
-        // Disable color output to make parsing logs easier.
-        cmd.arg("--color").arg("never");
-
         // If the `dev` flag is set, enable it.
         if self.dev {
             // Enable the dev mode.
@@ -300,6 +297,11 @@ impl Reth {
         cmd.arg("--ws");
         cmd.arg("--ws.api").arg(API);
 
+        // Configure the IPC path if it is set.
+        if let Some(ipc) = &self.ipc_path {
+            cmd.arg("--ipcpath").arg(ipc);
+        }
+
         // Configures the ports of the node to avoid conflicts with the defaults. This is useful for
         // running multiple nodes on the same machine.
         //
@@ -324,18 +326,19 @@ impl Reth {
         if !self.discovery_enabled {
             cmd.arg("--disable-discovery");
             cmd.arg("--no-persist-peers");
+        } else {
+            // Verbosity is required to read the P2P port from the logs.
+            cmd.arg("--verbosity").arg("-vvv");
         }
 
         if let Some(chain_or_path) = self.chain_or_path {
             cmd.arg("--chain").arg(chain_or_path);
         }
 
-        // debug verbosity is needed to check when peers are added
-        cmd.arg("--verbosity").arg("-vvvv");
+        // Disable color output to make parsing logs easier.
+        cmd.arg("--color").arg("never");
 
-        if let Some(ipc) = &self.ipc_path {
-            cmd.arg("--ipcpath").arg(ipc);
-        }
+        dbg!(&cmd);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
@@ -360,6 +363,8 @@ impl Reth {
 
             let mut line = String::with_capacity(200);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
+
+            dbg!(&line);
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -412,7 +417,7 @@ impl Reth {
             pid: child,
             http_port,
             ws_port,
-            p2p_port: Some(p2p_port),
+            p2p_port: if p2p_port != 0 { Some(p2p_port) } else { None },
             ipc: self.ipc_path,
             data_dir: self.data_dir,
             auth_port: Some(auth_port),
@@ -430,22 +435,74 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|temp_dir_path| {
-            let _reth = Reth::new()
-                .dev()
-                .block_time("1sec")
-                .instance(0)
-                .disable_discovery()
-                .data_dir(temp_dir_path)
-                .spawn();
+            let reth = Reth::new().data_dir(temp_dir_path).spawn();
+
+            assert_default_ports(&reth, false);
         });
     }
 
     #[test]
-    fn p2p_port() {
+    fn can_launch_reth_sepolia() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
+
+            assert_default_ports(&reth, false);
+        });
+    }
+
+    #[test]
+    fn can_launch_reth_dev() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
+
+            assert_default_ports(&reth, true);
+        });
+    }
+
+    #[test]
+    fn can_launch_reth_dev_custom_genesis() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new()
+                .dev()
+                .disable_discovery()
+                .data_dir(temp_dir_path)
+                .genesis(Genesis::default())
+                .spawn();
+
+            assert_default_ports(&reth, true);
+        });
+    }
+
+    #[test]
+    fn can_launch_reth_dev_custom_blocktime() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new().dev().block_time("1sec").data_dir(temp_dir_path).spawn();
+
+            assert_default_ports(&reth, true);
+        });
+    }
+
+    #[test]
+    fn can_launch_reth_p2p_instance1() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
-            let p2p_port = reth.p2p_port();
-            assert!(p2p_port.is_some());
+
+            assert_eq!(reth.http_port(), 8545);
+            assert_eq!(reth.ws_port(), 8546);
+            assert_eq!(reth.auth_port(), Some(8551));
+            assert_eq!(reth.p2p_port(), Some(30303));
+        });
+    }
+
+    #[test]
+    fn can_launch_reth_p2p_instance2() {
+        run_with_tempdir(|temp_dir_path| {
+            let reth = Reth::new().instance(2).data_dir(temp_dir_path).spawn();
+
+            assert_eq!(reth.http_port(), 8544);
+            assert_eq!(reth.ws_port(), 8548);
+            assert_eq!(reth.auth_port(), Some(8651));
+            assert_eq!(reth.p2p_port(), Some(30304));
         });
     }
 
@@ -461,5 +518,17 @@ mod tests {
         f(temp_dir_path);
         #[cfg(not(windows))]
         temp_dir.close().unwrap();
+    }
+
+    fn assert_default_ports(reth: &RethInstance, dev: bool) {
+        assert_eq!(reth.http_port(), 8545);
+        assert_eq!(reth.ws_port(), 8546);
+        assert_eq!(reth.auth_port(), Some(8551));
+
+        if dev {
+            assert_eq!(reth.p2p_port(), None);
+        } else {
+            assert_eq!(reth.p2p_port(), Some(30303));
+        }
     }
 }
