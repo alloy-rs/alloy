@@ -480,7 +480,12 @@ mod tests {
     #[test]
     fn can_launch_reth_dev_custom_blocktime() {
         run_with_tempdir(|temp_dir_path| {
-            let reth = Reth::new().dev().block_time("1sec").data_dir(temp_dir_path).spawn();
+            let reth = Reth::new()
+                .dev()
+                .disable_discovery()
+                .block_time("1sec")
+                .data_dir(temp_dir_path)
+                .spawn();
 
             assert_ports(&reth, true);
         });
