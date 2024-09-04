@@ -228,8 +228,10 @@ impl Reth {
     }
 
     /// Sets the data directory for reth.
-    pub fn data_dir<T: Into<PathBuf>>(mut self, path: T) -> Self {
-        self.data_dir = Some(path.into());
+    pub fn data_dir<T: Into<PathBuf>>(mut self, path: Option<T>) -> Self {
+        if let Some(path) = path {
+            self.data_dir = Some(path.into());
+        }
         self
     }
 
@@ -435,11 +437,7 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|temp_dir_path| {
-            #[cfg(not(windows))]
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
-
-            #[cfg(windows)]
-            let reth = Reth::new().spawn();
 
             assert_ports(&reth, false);
         });
@@ -521,12 +519,16 @@ mod tests {
     /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
     /// directory is cleaned up.
     #[track_caller]
-    fn run_with_tempdir(f: impl Fn(&Path)) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_dir_path = temp_dir.path();
-        f(temp_dir_path);
-        #[cfg(not(windows))]
-        temp_dir.close().unwrap();
+    fn run_with_tempdir(f: impl Fn(Option<&Path>)) {
+        // Disable tempdir on Windows.
+        if cfg!(windows) {
+            f(None);
+        } else {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let temp_dir_path = temp_dir.path();
+            f(Some(temp_dir_path));
+            temp_dir.close().unwrap();
+        }
     }
 
     fn assert_ports(reth: &RethInstance, dev: bool) {
