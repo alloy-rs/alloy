@@ -1,4 +1,7 @@
 //! Payload types.
+
+#[cfg(not(feature = "jwt"))]
+use alloc::vec::Vec;
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{
     eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
@@ -6,7 +9,6 @@ use alloy_eips::{
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -27,8 +29,8 @@ impl PayloadId {
     }
 }
 
-impl fmt::Display for PayloadId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for PayloadId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -962,8 +964,8 @@ impl PayloadStatus {
     }
 }
 
-impl fmt::Display for PayloadStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for PayloadStatus {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "PayloadStatus {{ status: {}, latestValidHash: {:?} }}",
@@ -1054,8 +1056,8 @@ impl PayloadStatusEnum {
     }
 }
 
-impl fmt::Display for PayloadStatusEnum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for PayloadStatusEnum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Invalid { validation_error } => {
                 f.write_str(self.as_str())?;
