@@ -48,15 +48,14 @@ impl EnvKzgSettings {
                 };
                 #[cfg(feature = "std")]
                 {
-                    use once_cell as _;
                     use std::sync::OnceLock;
                     static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
                     DEFAULT.get_or_init(load)
                 }
                 #[cfg(not(feature = "std"))]
                 {
-                    use once_cell::race::OnceBox;
-                    static DEFAULT: OnceBox<KzgSettings> = OnceBox::new();
+                    use std::sync::OnceLock;
+                    static DEFAULT: OnceLock<KzgSettings> = OnceLock::new();
                     DEFAULT.get_or_init(|| alloc::boxed::Box::new(load()))
                 }
             }
