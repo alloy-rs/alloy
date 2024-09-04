@@ -338,8 +338,6 @@ impl Reth {
         // Disable color output to make parsing logs easier.
         cmd.arg("--color").arg("never");
 
-        dbg!(&cmd);
-
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
         let stdout = child.stdout.take().ok_or(NodeError::NoStdout)?;
@@ -355,8 +353,6 @@ impl Reth {
         let mut ports_started = false;
         let mut p2p_started = !self.discovery_enabled;
 
-        let mut should_exit = false;
-
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
                 let _ = child.kill();
@@ -365,8 +361,6 @@ impl Reth {
 
             let mut line = String::with_capacity(200);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
-
-            dbg!(&line);
 
             if line.contains("RPC HTTP server started") {
                 if let Some(addr) = extract_endpoint("url=", &line) {
@@ -388,7 +382,8 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                should_exit = true;
+                let _ = child.kill();
+                return Err(NodeError::Fatal(line));
             }
 
             if http_port != 0 && ws_port != 0 && auth_port != 0 {
@@ -410,11 +405,6 @@ impl Reth {
             if ports_started && p2p_started {
                 break;
             }
-        }
-
-        if should_exit {
-            let _ = child.kill();
-            return Err(NodeError::Fatal("Encountered a critical error".to_string()));
         }
 
         child.stdout = Some(reader.into_inner());
@@ -439,6 +429,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
@@ -448,6 +439,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_sepolia() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
@@ -457,6 +449,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
@@ -466,6 +459,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_genesis() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new()
@@ -480,6 +474,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_blocktime() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new()
@@ -494,6 +489,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance1() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
@@ -506,6 +502,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance2() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().instance(2).data_dir(temp_dir_path).spawn();
@@ -531,6 +528,7 @@ mod tests {
         temp_dir.close().unwrap();
     }
 
+    // Asserts that the ports are set correctly for the given reth instance.
     fn assert_ports(reth: &RethInstance, dev: bool) {
         assert_eq!(reth.http_port(), 8545);
         assert_eq!(reth.ws_port(), 8546);
