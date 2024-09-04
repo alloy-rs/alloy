@@ -1,6 +1,7 @@
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    BlockNumHash,
 };
 use alloy_primitives::{
     b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
@@ -345,6 +346,11 @@ impl Header {
         length
     }
 
+    /// Returns the parent block's number and hash
+    pub const fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
+    }
+
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
     ///
     /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
@@ -537,6 +543,83 @@ impl Decodable for Header {
             });
         }
         Ok(this)
+    }
+}
+
+/// Generates a header which is valid __with respect to past and future forks__. This means, for
+/// example, that if the withdrawals root is present, the base fee per gas is also present.
+///
+/// If blob gas used were present, then the excess blob gas and parent beacon block root are also
+/// present. In this example, the withdrawals root would also be present.
+///
+/// This __does not, and should not guarantee__ that the header is valid with respect to __anything
+/// else__.
+#[cfg(any(test, feature = "arbitrary"))]
+pub(crate) const fn generate_valid_header(
+    mut header: Header,
+    eip_4844_active: bool,
+    blob_gas_used: u128,
+    excess_blob_gas: u128,
+    parent_beacon_block_root: B256,
+) -> Header {
+    // Clear all related fields if EIP-1559 is inactive
+    if header.base_fee_per_gas.is_none() {
+        header.withdrawals_root = None;
+    }
+
+    // Set fields based on EIP-4844 being active
+    if eip_4844_active {
+        header.blob_gas_used = Some(blob_gas_used);
+        header.excess_blob_gas = Some(excess_blob_gas);
+        header.parent_beacon_block_root = Some(parent_beacon_block_root);
+    } else {
+        header.blob_gas_used = None;
+        header.excess_blob_gas = None;
+        header.parent_beacon_block_root = None;
+    }
+
+    // Placeholder for future EIP adjustments
+    header.requests_root = None;
+
+    header
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for Header {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate an arbitrary header, passing it to the generate_valid_header function to make
+        // sure it is valid _with respect to hardforks only_.
+        let base = Self {
+            parent_hash: u.arbitrary()?,
+            ommers_hash: u.arbitrary()?,
+            beneficiary: u.arbitrary()?,
+            state_root: u.arbitrary()?,
+            transactions_root: u.arbitrary()?,
+            receipts_root: u.arbitrary()?,
+            logs_bloom: u.arbitrary()?,
+            difficulty: u.arbitrary()?,
+            number: u.arbitrary()?,
+            gas_limit: u.arbitrary()?,
+            gas_used: u.arbitrary()?,
+            timestamp: u.arbitrary()?,
+            extra_data: u.arbitrary()?,
+            mix_hash: u.arbitrary()?,
+            nonce: u.arbitrary()?,
+            base_fee_per_gas: u.arbitrary()?,
+            blob_gas_used: u.arbitrary()?,
+            excess_blob_gas: u.arbitrary()?,
+            parent_beacon_block_root: u.arbitrary()?,
+            requests_root: u.arbitrary()?,
+            withdrawals_root: u.arbitrary()?,
+        };
+
+        Ok(generate_valid_header(
+            base,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+        ))
     }
 }
 
