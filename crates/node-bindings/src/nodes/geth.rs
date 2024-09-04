@@ -507,7 +507,7 @@ impl Geth {
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
-        let stderr = child.stderr.ok_or(NodeError::NoStderr)?;
+        let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
@@ -515,10 +515,11 @@ impl Geth {
         // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
         // dev mode
         let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
-        let mut http_started = false;
+        let mut ports_started = false;
 
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
+                let _ = child.kill();
                 return Err(NodeError::Timeout);
             }
 
@@ -549,16 +550,18 @@ impl Geth {
                     port = addr.port();
                 }
 
-                http_started = true;
+                ports_started = true;
             }
 
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
+                let _ = child.kill();
                 return Err(NodeError::Fatal(line));
             }
 
-            if p2p_started && http_started {
+            // If all ports have started we are ready to be queried.
+            if ports_started && p2p_started {
                 break;
             }
         }

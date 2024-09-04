@@ -358,7 +358,7 @@ impl Reth {
                 return Err(NodeError::Timeout);
             }
 
-            let mut line = String::with_capacity(120);
+            let mut line = String::with_capacity(200);
             reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             if line.contains("RPC HTTP server started") {
@@ -379,9 +379,9 @@ impl Reth {
                 }
             }
 
-            // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
-            // 127.0.0.1:8545: bind: address already in use
+            // Encountered a critical error, exit early.
             if line.contains("ERROR") {
+                let _ = child.kill();
                 return Err(NodeError::Fatal(line));
             }
 
@@ -400,6 +400,7 @@ impl Reth {
                 p2p_started = true;
             }
 
+            // If all ports have started we are ready to be queried.
             if ports_started && p2p_started {
                 break;
             }
