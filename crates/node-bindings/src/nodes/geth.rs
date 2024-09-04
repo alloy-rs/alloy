@@ -619,7 +619,7 @@ impl Geth {
     }
 }
 
-// These tests should use a different datadir for each `Geth` spawned
+// These tests should use a different datadir for each `geth` spawned.
 #[cfg(test)]
 mod tests {
     use super::*;

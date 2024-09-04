@@ -353,11 +353,6 @@ impl Reth {
         let mut ports_started = false;
         let mut p2p_started = !self.discovery_enabled;
 
-        let mut encountered_error = false;
-        let mut line_counter = 0;
-
-        let mut log = vec![];
-
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
                 let _ = child.kill();
@@ -387,19 +382,8 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                encountered_error = true;
-            }
-
-            // If we encountered an error start collecting the logs.
-            if encountered_error {
-                line_counter += 1;
-                log.push(line.clone());
-
-                // If we have collected 10 lines after the error, break the loop.
-                if line_counter > 10 {
-                    let _ = child.kill();
-                    return Err(NodeError::Fatal(log.join("\n")));
-                }
+                let _ = child.kill();
+                return Err(NodeError::Fatal(line));
             }
 
             if http_port != 0 && ws_port != 0 && auth_port != 0 {
@@ -438,14 +422,14 @@ impl Reth {
     }
 }
 
-// These tests should use a different datadir for each `Reth` spawned
+// These tests should use a different datadir for each `reth` instance spawned.
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
@@ -455,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_sepolia() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
@@ -465,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
@@ -475,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_genesis() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new()
@@ -490,7 +474,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_blocktime() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new()
@@ -505,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance1() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
@@ -518,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    // #[cfg(not(windows))]
+    #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance2() {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().instance(2).data_dir(temp_dir_path).spawn();
@@ -540,7 +524,6 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_dir_path = temp_dir.path();
         f(temp_dir_path);
-        // #[cfg(not(windows))]
         temp_dir.close().unwrap();
     }
 
