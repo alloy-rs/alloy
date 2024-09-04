@@ -228,10 +228,8 @@ impl Reth {
     }
 
     /// Sets the data directory for reth.
-    pub fn data_dir<T: Into<PathBuf>>(mut self, path: Option<T>) -> Self {
-        if let Some(path) = path {
-            self.data_dir = Some(path.into());
-        }
+    pub fn data_dir<T: Into<PathBuf>>(mut self, path: T) -> Self {
+        self.data_dir = Some(path.into());
         self
     }
 
@@ -357,6 +355,8 @@ impl Reth {
         let mut ports_started = false;
         let mut p2p_started = !self.discovery_enabled;
 
+        let mut should_exit = false;
+
         loop {
             if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
                 let _ = child.kill();
@@ -388,8 +388,7 @@ impl Reth {
 
             // Encountered a critical error, exit early.
             if line.contains("ERROR") {
-                let _ = child.kill();
-                return Err(NodeError::Fatal(line));
+                should_exit = true;
             }
 
             if http_port != 0 && ws_port != 0 && auth_port != 0 {
@@ -411,6 +410,11 @@ impl Reth {
             if ports_started && p2p_started {
                 break;
             }
+        }
+
+        if should_exit {
+            let _ = child.kill();
+            return Err(NodeError::Fatal("Encountered a critical error".to_string()));
         }
 
         child.stdout = Some(reader.into_inner());
@@ -519,16 +523,12 @@ mod tests {
     /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
     /// directory is cleaned up.
     #[track_caller]
-    fn run_with_tempdir(f: impl Fn(Option<&Path>)) {
-        // Disable tempdir on Windows.
-        if cfg!(windows) {
-            f(None);
-        } else {
-            let temp_dir = tempfile::tempdir().unwrap();
-            let temp_dir_path = temp_dir.path();
-            f(Some(temp_dir_path));
-            temp_dir.close().unwrap();
-        }
+    fn run_with_tempdir(f: impl Fn(&Path)) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir_path = temp_dir.path();
+        f(temp_dir_path);
+        #[cfg(not(windows))]
+        temp_dir.close().unwrap();
     }
 
     fn assert_ports(reth: &RethInstance, dev: bool) {
