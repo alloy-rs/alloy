@@ -1,6 +1,7 @@
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
 };
 use alloy_primitives::{
     b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
@@ -343,6 +344,15 @@ impl Header {
         }
 
         length
+    }
+
+    /// Checks if the block's timestamp is in the future based on the present timestamp.
+    ///
+    /// Clock can drift but this can be consensus issue.
+    ///
+    /// Note: This check is relevant only pre-merge.
+    pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
+        self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
     }
 }
 
