@@ -435,9 +435,13 @@ mod tests {
     #[test]
     fn can_launch_reth() {
         run_with_tempdir(|temp_dir_path| {
+            #[cfg(not(windows))]
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
 
-            assert_default_ports(&reth, false);
+            #[cfg(windows)]
+            let reth = Reth::new().spawn();
+
+            assert_ports(&reth, false);
         });
     }
 
@@ -446,7 +450,7 @@ mod tests {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
 
-            assert_default_ports(&reth, false);
+            assert_ports(&reth, false);
         });
     }
 
@@ -455,7 +459,7 @@ mod tests {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
 
-            assert_default_ports(&reth, true);
+            assert_ports(&reth, true);
         });
     }
 
@@ -469,7 +473,7 @@ mod tests {
                 .genesis(Genesis::default())
                 .spawn();
 
-            assert_default_ports(&reth, true);
+            assert_ports(&reth, true);
         });
     }
 
@@ -478,7 +482,7 @@ mod tests {
         run_with_tempdir(|temp_dir_path| {
             let reth = Reth::new().dev().block_time("1sec").data_dir(temp_dir_path).spawn();
 
-            assert_default_ports(&reth, true);
+            assert_ports(&reth, true);
         });
     }
 
@@ -520,7 +524,7 @@ mod tests {
         temp_dir.close().unwrap();
     }
 
-    fn assert_default_ports(reth: &RethInstance, dev: bool) {
+    fn assert_ports(reth: &RethInstance, dev: bool) {
         assert_eq!(reth.http_port(), 8545);
         assert_eq!(reth.ws_port(), 8546);
         assert_eq!(reth.auth_port(), Some(8551));
