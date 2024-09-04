@@ -35,7 +35,7 @@ hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }
 
 [features]
-default = ["reqwest", "reqwest-default-tls"]
+default = ["reqwest", "reqwest-default-tls", "hyper"]
 reqwest = [
     "dep:reqwest",
     "dep:alloy-json-rpc",

@@ -1,63 +1,50 @@
-use crate::{Http, HttpConnect};
 use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Buf, Bytes},
-    header,
+    body::{Buf, Bytes, Incoming},
+    header, Request, Response,
 };
-use hyper_util::client::legacy::{connect::Connect, Client};
-use std::task;
+use std::{marker::PhantomData, task};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
+use url::Url;
 
-/// A [`hyper`] HTTP client.
-pub type HyperClient = hyper_util::client::legacy::Client<
-    hyper_util::client::legacy::connect::HttpConnector,
-    http_body_util::Full<::hyper::body::Bytes>,
->;
-
-/// An [`Http`] transport using [`hyper`].
-pub type HyperTransport = Http<HyperClient>;
-
-/// Connection details for a [`HyperTransport`].
-pub type HyperConnect = HttpConnect<HyperTransport>;
-
-impl TransportConnect for HyperConnect {
-    type Transport = HyperTransport;
-
-    fn is_local(&self) -> bool {
-        guess_local_url(self.url.as_str())
-    }
-
-    fn get_transport<'a: 'b, 'b>(
-        &'a self,
-    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
-        let executor = hyper_util::rt::TokioExecutor::new();
-
-        let client = hyper_util::client::legacy::Client::builder(executor).build_http();
-
-        Box::pin(async move { Ok(Http::with_client(client, self.url.clone())) })
-    }
+/// A [hyper] client that can be used with tower layers.
+#[derive(Clone, Debug)]
+pub struct HyperLayerTransport<S, B> {
+    url: Url,
+    service: S,
+    _pd: PhantomData<B>,
 }
 
-impl<C, B> Http<Client<C, Full<B>>>
+type HyperRequest<B> = Request<Full<B>>;
+type HyperResponse = Response<Incoming>;
+impl<S, B> HyperLayerTransport<S, B>
 where
-    C: Connect + Clone + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static,
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static + Clone,
 {
-    /// Make a request.
-    fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
+    /// Create a new [HyperLayerTransport] with the given URL and service.
+    pub const fn new(url: Url, service: S) -> Self {
+        Self { url, service, _pd: PhantomData }
+    }
+
+    /// Make a request to the server using the given service.
+    pub fn request(&mut self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", url = %self.url);
+        let span = debug_span!("HyperLayerTransport", url = %this.url);
         Box::pin(
             async move {
                 debug!(count = req.len(), "sending request packet to server");
                 let ser = req.serialize().map_err(TransportError::ser_err)?;
                 // convert the Box<RawValue> into a hyper request<B>
                 let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
+
                 let req = hyper::Request::builder()
                     .method(hyper::Method::POST)
                     .uri(this.url.as_str())
@@ -68,7 +55,9 @@ where
                     .body(body)
                     .expect("request parts are invalid");
 
-                let resp = this.client.request(req).await.map_err(TransportErrorKind::custom)?;
+                let mut service = this.service.clone();
+                let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
+
                 let status = resp.status();
 
                 debug!(%status, "received response from server");
@@ -105,44 +94,42 @@ where
     }
 }
 
-impl<C, B> Service<RequestPacket> for &Http<Client<C, Full<B>>>
+impl<S, B> TransportConnect for HyperLayerTransport<S, B>
 where
-    C: Connect + Clone + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static,
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static + Clone + Sync,
 {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
+    type Transport = Self;
 
-    #[inline]
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        // hyper always returns ok
-        task::Poll::Ready(Ok(()))
+    fn is_local(&self) -> bool {
+        guess_local_url(self.url.as_str())
     }
 
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request_hyper(req)
+    fn get_transport<'a: 'b, 'b>(
+        &'a self,
+    ) -> alloy_transport::Pbf<'b, Self::Transport, alloy_transport::TransportError> {
+        Box::pin(async move { Ok(Self::new(self.url.clone(), self.service.clone())) })
     }
 }
 
-impl<C, B> Service<RequestPacket> for Http<Client<C, Full<B>>>
+impl<S, B> Service<RequestPacket> for HyperLayerTransport<S, B>
 where
-    C: Connect + Clone + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static,
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Bytes> + Buf + Send + 'static + Clone + Sync,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
 
-    #[inline]
     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        // hyper always returns ok
         task::Poll::Ready(Ok(()))
     }
 
-    #[inline]
     fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request_hyper(req)
+        self.request(req)
     }
 }

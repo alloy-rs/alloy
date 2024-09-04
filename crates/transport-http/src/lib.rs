@@ -32,6 +32,12 @@ pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+mod hyper_layer_transport;
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[doc(inline)]
+pub use hyper_layer_transport::*;
+
 use alloy_transport::utils::guess_local_url;
 use core::{marker::PhantomData, str::FromStr};
 use url::Url;

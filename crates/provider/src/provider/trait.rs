@@ -1049,6 +1049,29 @@ mod tests {
         assert_eq!(0, num);
     }
 
+    #[cfg(feature = "hyper")]
+    #[tokio::test]
+    async fn test_hyper_layer_transport_no_layers() {
+        use alloy_transport_http::{
+            hyper::body::Bytes as HyperBytes,
+            hyper_util::{client::legacy::Client, rt::TokioExecutor},
+        };
+        use http_body_util::Full;
+
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+        let service = tower::ServiceBuilder::new().service(hyper_client);
+        let layer_transport =
+            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
     #[tokio::test]
     async fn test_builder_helper_fn_any_network() {
         init_tracing();
