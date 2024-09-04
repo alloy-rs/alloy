@@ -1,8 +1,8 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, DevOptions, NodeError, NodeInstanceError,
-    NodeMode, PrivateNetOptions, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    extract_endpoint, extract_value, unused_port, NodeError, NodeInstanceError,
+    NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
@@ -22,6 +22,44 @@ const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
 
 /// The geth command
 const GETH: &str = "geth";
+
+/// Whether or not node is in `dev` mode and configuration options that depend on the mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NodeMode {
+    /// Options that can be set in dev mode
+    Dev(DevOptions),
+    /// Options that cannot be set in dev mode
+    NonDev(PrivateNetOptions),
+}
+
+impl Default for NodeMode {
+    fn default() -> Self {
+        Self::Dev(Default::default())
+    }
+}
+
+/// Configuration options that can be set in dev mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DevOptions {
+    /// The interval at which the dev chain will mine new blocks.
+    pub block_time: Option<u64>,
+}
+
+/// Configuration options that cannot be set in dev mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrivateNetOptions {
+    /// The p2p port to use.
+    pub p2p_port: Option<u16>,
+
+    /// Whether or not peer discovery is enabled.
+    pub discovery: bool,
+}
+
+impl Default for PrivateNetOptions {
+    fn default() -> Self {
+        Self { p2p_port: None, discovery: true }
+    }
+}
 
 /// A geth instance. Will close the instance when dropped.
 ///

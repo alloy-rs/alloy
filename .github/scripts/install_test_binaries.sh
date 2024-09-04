@@ -22,6 +22,14 @@ main() {
     install_reth &
 
     wait
+
+    echo ""
+    echo "Installed Geth:"
+    geth version
+
+    echo ""
+    echo "Installed Reth:"
+    reth --version
 }
 
 # Installs geth from https://geth.ethereum.org/downloads
@@ -43,9 +51,6 @@ install_geth() {
             ;;
     esac
 
-    echo ""
-    echo "Installed Geth:"
-    geth version
 }
 
 # Install reth from https://github.com/paradigmxyz/reth/releases
@@ -55,10 +60,10 @@ install_reth() {
             NAME="reth-v$RETH_BUILD-x86_64-unknown-linux-gnu"
             curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
             chmod +x reth
-
-            echo ""
-            echo "Installed Reth:"
-            reth --version
+            ;;
+        *)
+            NAME="reth-v$RETH_BUILD-x86_64-pc-windows-gnu"
+            curl -sL "https://github.com/paradigmxyz/reth/releases/download/v$RETH_BUILD/$NAME.tar.gz" | tar -xzf -
             ;;
     esac
 }
