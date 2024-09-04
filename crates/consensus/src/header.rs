@@ -536,7 +536,7 @@ impl Decodable for Header {
 /// This __does not, and should not guarantee__ that the header is valid with respect to __anything
 /// else__.
 #[cfg(any(test, feature = "arbitrary"))]
-pub const fn generate_valid_header(
+pub(crate) const fn generate_valid_header(
     mut header: Header,
     eip_4844_active: bool,
     blob_gas_used: u128,
