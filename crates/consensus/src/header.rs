@@ -350,6 +350,19 @@ impl Header {
     pub const fn parent_num_hash(&self) -> BlockNumHash {
         BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
     }
+
+    /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
+    ///
+    /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
+    /// [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675#replacing-difficulty-with-0)
+    ///
+    /// Verifies whether, as per the EIP, the block's difficulty is updated to zero,
+    /// signifying the transition to a Proof-of-Stake mechanism.
+    ///
+    /// Returns `true` if the block's difficulty matches the constant zero set by the EIP.
+    pub fn is_zero_difficulty(&self) -> bool {
+        self.difficulty.is_zero()
+    }
 }
 
 impl Encodable for Header {
