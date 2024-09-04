@@ -1,6 +1,7 @@
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
     BlockNumHash,
 };
 use alloy_primitives::{
@@ -362,6 +363,15 @@ impl Header {
     /// Returns `true` if the block's difficulty matches the constant zero set by the EIP.
     pub fn is_zero_difficulty(&self) -> bool {
         self.difficulty.is_zero()
+    }
+
+    /// Checks if the block's timestamp is in the future based on the present timestamp.
+    ///
+    /// Clock can drift but this can be consensus issue.
+    ///
+    /// Note: This check is relevant only pre-merge.
+    pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
+        self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
     }
 }
 
