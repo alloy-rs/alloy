@@ -1,6 +1,7 @@
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    BlockNumHash,
 };
 use alloy_primitives::{
     b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
@@ -343,6 +344,11 @@ impl Header {
         }
 
         length
+    }
+
+    /// Returns the parent block's number and hash
+    pub const fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
     }
 }
 
