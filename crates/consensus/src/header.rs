@@ -594,7 +594,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
             withdrawals_root: u.arbitrary()?,
         };
 
-        Ok(test_utils::generate_valid_header(
+        Ok(generate_valid_header(
             base,
             u.arbitrary()?,
             u.arbitrary()?,
