@@ -767,11 +767,14 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
+#[cfg(test)]
 mod tests {
+    use alloy_primitives::b256;
+
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn compact_block_number_serde() {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
@@ -791,6 +794,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_parse_eip1898_block_ids() {
         let num = serde_json::json!(
             { "blockNumber": "0x0" }
@@ -864,6 +868,26 @@ mod tests {
                     .unwrap()
                     .into()
             )
+        );
+    }
+
+    #[test]
+    fn display_rpc_block_hash() {
+        const HASH: B256 =
+            b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
+
+        let hash = RpcBlockHash::from_hash(HASH, Some(true));
+
+        assert_eq!(
+            hash.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let hash = RpcBlockHash::from_hash(HASH, None);
+
+        assert_eq!(
+            hash.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
         );
     }
 }
