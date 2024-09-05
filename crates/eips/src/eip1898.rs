@@ -787,6 +787,8 @@ mod tests {
 
     use super::*;
 
+    const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
+
     #[test]
     #[cfg(feature = "serde")]
     fn compact_block_number_serde() {
@@ -887,9 +889,6 @@ mod tests {
 
     #[test]
     fn display_rpc_block_hash() {
-        const HASH: B256 =
-            b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
-
         let hash = RpcBlockHash::from_hash(HASH, Some(true));
 
         assert_eq!(
@@ -903,5 +902,46 @@ mod tests {
             hash.to_string(),
             "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
         );
+    }
+
+    #[test]
+    fn display_block_id() {
+        let id = BlockId::hash(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::hash_canonical(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::number(100000);
+
+        assert_eq!(id.to_string(), "number 0x186a0");
+
+        let id = BlockId::latest();
+
+        assert_eq!(id.to_string(), "latest");
+
+        let id = BlockId::safe();
+
+        assert_eq!(id.to_string(), "safe");
+
+        let id = BlockId::finalized();
+
+        assert_eq!(id.to_string(), "finalized");
+
+        let id = BlockId::earliest();
+
+        assert_eq!(id.to_string(), "earliest");
+
+        let id = BlockId::pending();
+
+        assert_eq!(id.to_string(), "pending");
     }
 }
