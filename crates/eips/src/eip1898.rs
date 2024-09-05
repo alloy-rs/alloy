@@ -525,6 +525,20 @@ impl<'de> Deserialize<'de> for BlockId {
     }
 }
 
+impl Display for BlockId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => write!(f, "{}", hash),
+            Self::Number(num) => {
+                if num.is_number() {
+                    return write!(f, "number {}", num);
+                }
+                write!(f, "{}", num)
+            }
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockId] from a string.
 #[derive(Debug)]
 pub enum ParseBlockIdError {
