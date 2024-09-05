@@ -131,7 +131,7 @@ network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider", "rpc-client", "transports", "eips"]
+providers = ["dep:alloy-provider", "rpc-client", "transports", "eips", "consensus", "network"]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]

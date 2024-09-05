@@ -164,7 +164,7 @@ pub struct Anvil {
 
 impl Anvil {
     /// Creates an empty Anvil builder.
-    /// The default port is 8545. The mnemonic is chosen randomly.
+    /// The default port and the mnemonic are chosen randomly.
     ///
     /// # Example
     ///

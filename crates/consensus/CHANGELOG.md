@@ -5,10 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Bug Fixes
+
+- Value of TxEip1559.ty ([#1210](https://github.com/alloy-rs/alloy/issues/1210))
 
 ### Features
 
+- Derive `arbitrary::Arbitrary` for `TxEip7702` ([#1216](https://github.com/alloy-rs/alloy/issues/1216))
+- Implement `tx_type` for `TxEip7702` ([#1214](https://github.com/alloy-rs/alloy/issues/1214))
+
+### Other
+
+- Rm useless methods for `TxEip7702` ([#1221](https://github.com/alloy-rs/alloy/issues/1221))
+
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
+
+### Dependencies
+
+- Rm 2930 and 7702 - use alloy-rs/eips ([#1181](https://github.com/alloy-rs/alloy/issues/1181))
+
+### Features
+
+- Make signature methods generic over EncodableSignature ([#1138](https://github.com/alloy-rs/alloy/issues/1138))
+- Add 7702 tx enum ([#1059](https://github.com/alloy-rs/alloy/issues/1059))
 - Use EncodableSignature for tx encoding ([#1100](https://github.com/alloy-rs/alloy/issues/1100))
 - [consensus] Add `From<ConsolidationRequest>` for `Request` ([#1083](https://github.com/alloy-rs/alloy/issues/1083))
 - Expose encoded_len_with_signature() ([#1063](https://github.com/alloy-rs/alloy/issues/1063))
@@ -17,11 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
+- [consensus] Add missing getter trait methods for `alloy_consensus::Transaction` ([#1197](https://github.com/alloy-rs/alloy/issues/1197))
+- Release 0.2.1
 - Chore : fix typos ([#1087](https://github.com/alloy-rs/alloy/issues/1087))
 - Release 0.2.0
 
 ### Other
 
+- Add trait methods for constructing `alloy_rpc_types_eth::Transaction` to `alloy_consensus::Transaction` ([#1172](https://github.com/alloy-rs/alloy/issues/1172))
+- Update TxType comment ([#1175](https://github.com/alloy-rs/alloy/issues/1175))
+- Add payload length methods ([#1152](https://github.com/alloy-rs/alloy/issues/1152))
 - `alloy-consensus` should use `alloy_primitives::Sealable` ([#1072](https://github.com/alloy-rs/alloy/issues/1072))
 
 ### Styling

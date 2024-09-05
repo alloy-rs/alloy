@@ -5,10 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
+
+### Bug Fixes
+
+- Make `Block::hash` required ([#1205](https://github.com/alloy-rs/alloy/issues/1205))
+
+### Features
+
+- Network-parameterized block responses ([#1106](https://github.com/alloy-rs/alloy/issues/1106))
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
 - Release 0.2.1
 
 ### Refactor

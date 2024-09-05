@@ -5,20 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Features
+
+- [alloy-provider] Add abstraction for `NonceFiller` behavior ([#1108](https://github.com/alloy-rs/alloy/issues/1108))
+
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes
 
+- Make `Block::hash` required ([#1205](https://github.com/alloy-rs/alloy/issues/1205))
+- [provider] Serialize no parameters as `[]` instead of `null` ([#1193](https://github.com/alloy-rs/alloy/issues/1193))
+- Use `server_id` when unsubscribing ([#1182](https://github.com/alloy-rs/alloy/issues/1182))
+- Return more user-friendly error on tx timeout ([#1145](https://github.com/alloy-rs/alloy/issues/1145))
+- Use `BlockId` superset over `BlockNumberOrTag` where applicable  ([#1135](https://github.com/alloy-rs/alloy/issues/1135))
 - [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
 - [provider] Do not overflow LRU cache capacity in ChainStreamPoller ([#1052](https://github.com/alloy-rs/alloy/issues/1052))
 - [admin] Id in NodeInfo is string instead of B256 ([#1038](https://github.com/alloy-rs/alloy/issues/1038))
 
+### Dependencies
+
+- [deps] Bump some deps ([#1141](https://github.com/alloy-rs/alloy/issues/1141))
+- Revert "chore(deps): bump some deps"
+- [deps] Bump some deps
+
 ### Features
 
+- Add erc4337 endpoint methods to provider ([#1176](https://github.com/alloy-rs/alloy/issues/1176))
+- Add block and transaction generics to otterscan and txpool types ([#1183](https://github.com/alloy-rs/alloy/issues/1183))
+- Network-parameterized block responses ([#1106](https://github.com/alloy-rs/alloy/issues/1106))
+- Add get raw transaction by hash ([#1168](https://github.com/alloy-rs/alloy/issues/1168))
 - Add rpc namespace ([#994](https://github.com/alloy-rs/alloy/issues/994))
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
+- Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
 - Release 0.2.1
 - Correctly cfg unused type ([#1117](https://github.com/alloy-rs/alloy/issues/1117))
 - Release 0.2.0

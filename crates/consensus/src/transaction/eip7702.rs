@@ -1,7 +1,7 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 #[cfg(not(feature = "std"))]
@@ -10,6 +10,7 @@ use alloy_eips::eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization};
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Eip7702Transaction", alias = "TransactionEip7702", alias = "Eip7702Tx")]
@@ -250,9 +251,8 @@ impl TxEip7702 {
 
     /// Get transaction type
     #[doc(alias = "transaction_type")]
-    #[allow(unused)]
-    pub(crate) fn tx_type(&self) -> TxType {
-        unimplemented!("not yet added to tx type enum")
+    pub const fn tx_type(&self) -> TxType {
+        TxType::Eip7702
     }
 
     /// Calculates a heuristic for the in-memory size of the [TxEip7702] transaction.
@@ -268,19 +268,6 @@ impl TxEip7702 {
         self.access_list.size() + // access_list
         self.input.len() + // input
         self.authorization_list.capacity() * mem::size_of::<SignedAuthorization>() // authorization_list
-    }
-
-    /// Output the length of the RLP signed transaction encoding, _without_ a RLP string header.
-    pub fn payload_len_with_signature_without_header(&self, signature: &Signature) -> usize {
-        let payload_length = self.fields_len() + signature.rlp_vrs_len();
-        // 'transaction type byte length' + 'header length' + 'payload length'
-        1 + length_of_length(payload_length) + payload_length
-    }
-
-    /// Output the length of the RLP signed transaction encoding. This encodes with a RLP header.
-    pub fn payload_len_with_signature(&self, signature: &Signature) -> usize {
-        let len = self.payload_len_with_signature_without_header(signature);
-        length_of_length(len) + len
     }
 }
 
@@ -401,66 +388,10 @@ impl Decodable for TxEip7702 {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use core::str::FromStr;
-
     use super::TxEip7702;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Bytes, Signature, TxKind, U256};
-
-    #[test]
-    fn test_payload_len_with_signature_without_header() {
-        let tx = TxEip7702 {
-            chain_id: 1u64,
-            nonce: 0,
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            gas_limit: 2,
-            to: TxKind::Create,
-            value: U256::ZERO,
-            input: Bytes::from(vec![1, 2]),
-            access_list: Default::default(),
-            authorization_list: Default::default(),
-        };
-
-        let signature = Signature::from_rs_and_parity(
-            U256::from_str("0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0")
-                .unwrap(),
-            U256::from_str("0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05")
-                .unwrap(),
-            1,
-        )
-        .unwrap();
-
-        assert_eq!(tx.payload_len_with_signature_without_header(&signature), 91);
-    }
-
-    #[test]
-    fn test_payload_len_with_signature() {
-        let tx = TxEip7702 {
-            chain_id: 1u64,
-            nonce: 0,
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            gas_limit: 2,
-            to: TxKind::Create,
-            value: U256::ZERO,
-            input: Bytes::from(vec![1, 2]),
-            access_list: Default::default(),
-            authorization_list: Default::default(),
-        };
-
-        let signature = Signature::from_rs_and_parity(
-            U256::from_str("0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0")
-                .unwrap(),
-            U256::from_str("0x1a891b566d369e79b7a66eecab1e008831e22daa15f91a0a0cf4f9f28f47ee05")
-                .unwrap(),
-            1,
-        )
-        .unwrap();
-
-        assert_eq!(tx.payload_len_with_signature(&signature), 93);
-    }
+    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, U256};
 
     #[test]
     fn encode_decode_eip7702() {
