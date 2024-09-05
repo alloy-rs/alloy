@@ -56,6 +56,16 @@ impl AsRef<B256> for RpcBlockHash {
     }
 }
 
+impl Display for RpcBlockHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self { block_hash, require_canonical } = self;
+        if *require_canonical == Some(true) {
+            write!(f, "canonical ")?
+        }
+        write!(f, "hash {}", block_hash)
+    }
+}
+
 /// A block Number (or tag - "latest", "earliest", "pending")
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BlockNumberOrTag {
