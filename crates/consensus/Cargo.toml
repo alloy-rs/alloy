@@ -33,6 +33,13 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
 
+derive_more = { workspace = true, features = [
+    "from",
+    "deref",
+    "deref_mut",
+    "into_iterator"
+], default-features = false }
+
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
 alloy-eips = { workspace = true, features = ["arbitrary"] }

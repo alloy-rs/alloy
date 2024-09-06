@@ -23,7 +23,8 @@ pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
+    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
+    TxReceipt,
 };
 
 mod request;

@@ -7,7 +7,7 @@ mod envelope;
 pub use envelope::ReceiptEnvelope;
 
 mod receipts;
-pub use receipts::{Receipt, ReceiptWithBloom};
+pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 
 mod status;
 pub use status::Eip658Value;
