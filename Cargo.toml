@@ -113,7 +113,7 @@ rustls = { version = "0.23", default-features = false, features = [
 ] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.23"
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 
 # tracing
 tracing = "0.1"
