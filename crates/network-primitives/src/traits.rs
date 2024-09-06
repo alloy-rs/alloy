@@ -1,3 +1,4 @@
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
@@ -23,6 +24,36 @@ pub trait ReceiptResponse {
 
     /// Number of the block this transaction was included within.
     fn block_number(&self) -> Option<u64>;
+
+    /// Transaction Hash.
+    fn transaction_hash(&self) -> TxHash;
+
+    /// Index within the block.
+    fn transaction_index(&self) -> Option<u64>;
+
+    /// Gas used by this transaction alone.
+    fn gas_used(&self) -> u128;
+
+    /// Effective gas price.
+    fn effective_gas_price(&self) -> u128;
+
+    /// Blob gas used by the eip-4844 transaction.
+    fn blob_gas_used(&self) -> Option<u128>;
+
+    /// Blob gas price paid by the eip-4844 transaction.
+    fn blob_gas_price(&self) -> Option<u128>;
+
+    /// Address of the sender.
+    fn from(&self) -> Address;
+
+    /// Address of the receiver.
+    fn to(&self) -> Option<Address>;
+
+    /// Post-transaction state root.
+    fn state_root(&self) -> Option<B256>;
+
+    /// Authorization list.
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>>;
 }
 
 /// Transaction JSON-RPC response.
@@ -156,6 +187,46 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn block_number(&self) -> Option<u64> {
         self.inner.block_number()
+    }
+
+    fn transaction_hash(&self) -> TxHash {
+        self.inner.transaction_hash()
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index()
+    }
+
+    fn gas_used(&self) -> u128 {
+        self.inner.gas_used()
+    }
+
+    fn effective_gas_price(&self) -> u128 {
+        self.inner.effective_gas_price()
+    }
+
+    fn blob_gas_used(&self) -> Option<u128> {
+        self.inner.blob_gas_used()
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        self.inner.blob_gas_price()
+    }
+
+    fn from(&self) -> Address {
+        self.inner.from()
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.inner.to()
+    }
+
+    fn state_root(&self) -> Option<B256> {
+        self.inner.state_root()
+    }
+
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
+        self.inner.authorization_list()
     }
 }
 

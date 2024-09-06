@@ -131,7 +131,7 @@ impl<T> TransactionReceipt<T> {
 pub type AnyTransactionReceipt = WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
 
 impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
-    fn contract_address(&self) -> Option<alloy_primitives::Address> {
+    fn contract_address(&self) -> Option<Address> {
         self.contract_address
     }
 
@@ -139,12 +139,52 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
         self.inner.status()
     }
 
-    fn block_hash(&self) -> Option<alloy_primitives::BlockHash> {
+    fn block_hash(&self) -> Option<BlockHash> {
         self.block_hash
     }
 
     fn block_number(&self) -> Option<u64> {
         self.block_number
+    }
+
+    fn transaction_hash(&self) -> TxHash {
+        self.transaction_hash
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.transaction_index
+    }
+
+    fn gas_used(&self) -> u128 {
+        self.gas_used
+    }
+
+    fn effective_gas_price(&self) -> u128 {
+        self.effective_gas_price
+    }
+
+    fn blob_gas_used(&self) -> Option<u128> {
+        self.blob_gas_used
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        self.blob_gas_price
+    }
+
+    fn from(&self) -> Address {
+        self.from
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.to
+    }
+
+    fn state_root(&self) -> Option<B256> {
+        self.state_root
+    }
+
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
+        self.authorization_list.clone()
     }
 }
 
