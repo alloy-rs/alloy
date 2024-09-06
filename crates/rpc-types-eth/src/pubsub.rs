@@ -1,6 +1,7 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction};
+use alloc::{boxed::Box, format};
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};

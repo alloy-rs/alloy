@@ -7,8 +7,14 @@ use alloy_consensus::{
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use core::hash::Hash;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -930,8 +936,9 @@ impl From<TxEnvelope> for TransactionRequest {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[cfg_attr(feature = "std", error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data"))]
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;

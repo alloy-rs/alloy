@@ -3,6 +3,8 @@
 use alloy_primitives::{Address, Bytes, Log, B256};
 use serde::{Deserialize, Serialize};
 
+use alloc::{string::String, vec::Vec};
+
 use crate::{state::StateOverride, BlockOverrides, TransactionRequest};
 
 /// The maximum number of blocks that can be simulated in a single request,

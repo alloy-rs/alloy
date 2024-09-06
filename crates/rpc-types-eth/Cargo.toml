@@ -19,19 +19,21 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
-
-alloy-consensus = { workspace = true, features = ["serde", "std"] }
-alloy-eips = { workspace = true, features = ["serde", "std"] }
-
 alloy-network-primitives.workspace = true
+alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
+alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-consensus = { workspace = true, features = ["serde"] }
+alloy-eips = { workspace = true, features = ["serde"] }
+
+hashbrown = { workspace = true, features = ["serde"] }
 
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-thiserror.workspace = true
+
+# std
+thiserror = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
@@ -56,7 +58,10 @@ similar-asserts.workspace = true
 assert_matches.workspace = true
 
 [features]
+default = ["std"]
+std = ["dep:thiserror", "alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
 arbitrary = [
+    "std",
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde/arbitrary",

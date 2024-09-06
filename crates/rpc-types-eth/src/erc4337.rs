@@ -1,7 +1,9 @@
 use crate::{Log, TransactionReceipt};
 use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use alloc::vec::Vec;
 
 /// Options for conditional raw transaction submissions.
 // reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
