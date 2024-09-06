@@ -14,6 +14,11 @@ pub use account::*;
 mod block;
 pub use block::*;
 
+use alloy_serde::WithOtherFields;
+
+/// A catch-all block type for handling blocks on multiple networks.
+pub type AnyBlock = WithOtherFields<Block<WithOtherFields<Transaction>>>;
+
 pub use alloy_network_primitives::{
     BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,
 };
