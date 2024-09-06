@@ -3,10 +3,9 @@ use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::borrow::Borrow;
 use derive_more::{DerefMut, From, IntoIterator};
-use serde::{Deserialize, Serialize};
 
 #[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -106,18 +105,9 @@ impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
 
 /// A collection of receipts organized as a two-dimensional vector.
 #[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    Default,
-    Serialize,
-    Deserialize,
-    From,
-    derive_more::Deref,
-    DerefMut,
-    IntoIterator,
+    Clone, Debug, PartialEq, Eq, Default, From, derive_more::Deref, DerefMut, IntoIterator,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts {
     /// A two-dimensional vector of optional `Receipt` instances.
     pub receipt_vec: Vec<Vec<Option<Receipt>>>,
