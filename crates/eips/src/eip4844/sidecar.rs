@@ -175,9 +175,9 @@ impl BlobTransactionSidecar {
         self.blobs.iter().zip(&self.commitments).zip(&self.proofs).enumerate().map(
             |(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
                 index,
-                blob: blob.clone(),
-                kzg_commitment: commitment.clone(),
-                kzg_proof: proof.clone(),
+                blob: *blob,
+                kzg_commitment: *commitment,
+                kzg_proof: *proof,
             },
         )
     }
