@@ -11,8 +11,6 @@ use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 use c_kzg::KzgProof;
 use sha2::{Digest, Sha256};
-#[cfg(not(feature = "std"))]
-use std::error::Error;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
@@ -67,21 +65,21 @@ impl BlobTransactionSidecarItem {
         let settings = binding.get();
 
         let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
-            .map_err(|e| Self::InvalidBlobData(e.to_string()))?;
+            .map_err(|e| BlobValidationError::InvalidBlobData(e.to_string()))?;
 
         let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
-            .map_err(|e| Self::InvalidCommitmentData(e.to_string()))?;
+            .map_err(|e| BlobValidationError::InvalidCommitmentData(e.to_string()))?;
 
         let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
-            .map_err(|e| Self::InvalidProofData(e.to_string()))?;
+            .map_err(|e| BlobValidationError::InvalidProofData(e.to_string()))?;
 
         KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
-            .map_err(|e| Self::ProofVerificationError(e.to_string()))
+            .map_err(|e| BlobValidationError::ProofVerificationError(e.to_string()))
             .and_then(|result| {
                 if result {
                     Ok(true)
                 } else {
-                    Err(Self::ProofVerificationFailed(
+                    Err(BlobValidationError::ProofVerificationFailed(
                         "Cryptographic proof verification failed.".to_string(),
                     ))
                 }
@@ -90,7 +88,7 @@ impl BlobTransactionSidecarItem {
     #[allow(missing_docs)]
     pub fn verify_blob(&self, hash: &IndexedBlobHash) -> Result<(), BlobValidationError> {
         if self.index != hash.index {
-            return Err(Self::IndexMismatch {
+            return Err(BlobValidationError::IndexMismatch {
                 expected: hash.index,
                 found: self.index,
                 details: "The index of the blob does not match the expected index.".to_string(),
@@ -99,7 +97,7 @@ impl BlobTransactionSidecarItem {
 
         let computed_hash = self.to_kzg_versioned_hash();
         if computed_hash != hash.hash {
-            return Err(Self::HashMismatch {
+            return Err(BlobValidationError::HashMismatch {
                 expected: *hash.hash,
                 found: computed_hash,
                 details:
@@ -110,10 +108,10 @@ impl BlobTransactionSidecarItem {
 
         match self.verify_blob_kzg_proof() {
             Ok(result) if result => Ok(()),
-            Ok(_) => Err(Self::ProofVerificationFailed(
+            Ok(_) => Err(BlobValidationError::ProofVerificationFailed(
                 "The cryptographic proof verification failed.".to_string(),
             )),
-            Err(e) => Err(Self::ProofVerificationError(e.to_string())),
+            Err(e) => Err(BlobValidationError::ProofVerificationError(e.to_string())),
         }
     }
 }
@@ -161,7 +159,6 @@ impl fmt::Display for BlobValidationError {
         }
     }
 }
-impl Error for BlobValidationError {}
 
 /// A Blob hash
 #[derive(Default, Clone, Debug)]
