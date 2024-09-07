@@ -157,7 +157,7 @@ impl fmt::Display for BlobValidationError {
             Self::InvalidCommitmentData(details) => {
                 write!(f, "Invalid commitment data. Details: {}", details)
             }
-            BlobValidationError::InvalidProofData(details) => {
+            Self::InvalidProofData(details) => {
                 write!(f, "Invalid proof data. Details: {}", details)
             }
         }
