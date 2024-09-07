@@ -103,42 +103,42 @@ impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
     }
 }
 
-/// A collection of receipts organized as a two-dimensional vector.
+/// Receipt containing result of transaction execution.
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, From, derive_more::Deref, DerefMut, IntoIterator,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Receipts {
-    /// A two-dimensional vector of optional `Receipt` instances.
-    pub receipt_vec: Vec<Vec<Option<Receipt>>>,
+pub struct Receipts<T> {
+    /// A two-dimensional vector of [`Receipt`] instances.
+    pub receipt_vec: Vec<Vec<Receipt<T>>>,
 }
 
-impl Receipts {
-    /// Returns the length of the `Receipts` vector.
+impl<T> Receipts<T> {
+    /// Returns the length of the [`Receipts`] vector.
     pub fn len(&self) -> usize {
         self.receipt_vec.len()
     }
 
-    /// Returns `true` if the `Receipts` vector is empty.
+    /// Returns `true` if the [`Receipts`] vector is empty.
     pub fn is_empty(&self) -> bool {
         self.receipt_vec.is_empty()
     }
 
-    /// Push a new vector of receipts into the `Receipts` collection.
-    pub fn push(&mut self, receipts: Vec<Option<Receipt>>) {
+    /// Push a new vector of receipts into the [`Receipts`] collection.
+    pub fn push(&mut self, receipts: Vec<Receipt<T>>) {
         self.receipt_vec.push(receipts);
     }
 }
 
-impl From<Vec<Receipt>> for Receipts {
-    fn from(block_receipts: Vec<Receipt>) -> Self {
-        Self { receipt_vec: vec![block_receipts.into_iter().map(Option::Some).collect()] }
+impl<T> From<Vec<Receipt<T>>> for Receipts<T> {
+    fn from(block_receipts: Vec<Receipt<T>>) -> Self {
+        Self { receipt_vec: vec![block_receipts] }
     }
 }
 
-impl FromIterator<Vec<Option<Receipt>>> for Receipts {
-    fn from_iter<I: IntoIterator<Item = Vec<Option<Receipt>>>>(iter: I) -> Self {
-        iter.into_iter().collect::<Vec<_>>().into()
+impl<T> FromIterator<Vec<Receipt<T>>> for Receipts<T> {
+    fn from_iter<I: IntoIterator<Item = Vec<Receipt<T>>>>(iter: I) -> Self {
+        Self { receipt_vec: iter.into_iter().collect() }
     }
 }
 
