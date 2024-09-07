@@ -7,6 +7,8 @@ use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
+#[cfg(feature = "kzg")]
+use alloc::string::ToString;
 use alloc::{fmt, string::String};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
