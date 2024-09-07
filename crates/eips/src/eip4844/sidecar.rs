@@ -7,15 +7,17 @@ use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloc::{fmt, string::ToString};
+use alloc::{fmt, string::String};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 #[cfg(feature = "kzg")]
 use c_kzg::KzgProof;
+#[cfg(feature = "kzg")]
 use sha2::{Digest, Sha256};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+#[cfg(feature = "kzg")]
 /// The versioned hash version for KZG.
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 /// This represents a set of blobs, and its corresponding commitments and proofs.
@@ -133,26 +135,26 @@ pub enum BlobValidationError {
 impl fmt::Display for BlobValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlobValidationError::IndexMismatch { expected, found, details } => write!(
+            Self::IndexMismatch { expected, found, details } => write!(
                 f,
                 "Index mismatch: expected {}, found {}. Details: {}",
                 expected, found, details
             ),
-            BlobValidationError::HashMismatch { expected, found, details } => write!(
+            Self::HashMismatch { expected, found, details } => write!(
                 f,
                 "Hash mismatch: expected {:02x?}, found {:02x?}. Details: {}",
                 expected, found, details
             ),
-            BlobValidationError::ProofVerificationFailed(details) => {
+            Self::ProofVerificationFailed(details) => {
                 write!(f, "Proof verification failed. Details: {}", details)
             }
-            BlobValidationError::ProofVerificationError(details) => {
+            Self::ProofVerificationError(details) => {
                 write!(f, "Error during proof verification. Details: {}", details)
             }
-            BlobValidationError::InvalidBlobData(details) => {
+            Self::InvalidBlobData(details) => {
                 write!(f, "Invalid blob data. Details: {}", details)
             }
-            BlobValidationError::InvalidCommitmentData(details) => {
+            Self::InvalidCommitmentData(details) => {
                 write!(f, "Invalid commitment data. Details: {}", details)
             }
             BlobValidationError::InvalidProofData(details) => {
