@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: ["alloy-eips", "alloy-consensus", "alloy-genesis"]
+        crate: ["alloy-eips", "alloy-consensus", "alloy-genesis", "alloy-network-primitives"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

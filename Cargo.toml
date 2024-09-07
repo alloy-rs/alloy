@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.3.1"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.79"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
@@ -124,7 +124,7 @@ auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
 home = "0.5"
-itertools = "0.13"
+itertools = { version = "0.13", default-features = false }
 once_cell = { version = "1.19", default-features = false }
 pin-project = "1.1"
 rand = "0.8"
