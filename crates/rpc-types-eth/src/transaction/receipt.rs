@@ -179,12 +179,8 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
         self.to
     }
 
-    fn state_root(&self) -> Option<B256> {
-        self.state_root
-    }
-
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
-        self.authorization_list.clone()
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.authorization_list.as_deref()
     }
 }
 

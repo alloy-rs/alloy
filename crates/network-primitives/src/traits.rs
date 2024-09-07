@@ -52,11 +52,8 @@ pub trait ReceiptResponse {
     /// Address of the receiver.
     fn to(&self) -> Option<Address>;
 
-    /// Post-transaction state root.
-    fn state_root(&self) -> Option<B256>;
-
     /// Authorization list.
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>>;
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 }
 
 /// Transaction JSON-RPC response.
@@ -224,11 +221,7 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.to()
     }
 
-    fn state_root(&self) -> Option<B256> {
-        self.inner.state_root()
-    }
-
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
     }
 }
