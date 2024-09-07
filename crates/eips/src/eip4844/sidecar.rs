@@ -3,12 +3,15 @@
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    env_settings::EnvKzgSettings, kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB,
+    BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
 use alloc::fmt;
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
+use c_kzg::KzgProof;
 use sha2::{Digest, Sha256};
+#[cfg(not(feature = "std"))]
 use std::error::Error;
 
 #[cfg(not(feature = "std"))]
@@ -48,7 +51,7 @@ pub struct BlobTransactionSidecarItem {
 
     pub kzg_proof: Bytes48,
 }
-use crate::eip4844::env_settings::EnvKzgSettings;
+
 impl BlobTransactionSidecarItem {
     #[allow(missing_docs)]
     pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
@@ -63,22 +66,22 @@ impl BlobTransactionSidecarItem {
         let binding = EnvKzgSettings::Default;
         let settings = binding.get();
 
-        let blob = c_kzg::Blob::from_bytes(&self.blob.as_slice())
-            .map_err(|e| BlobValidationError::InvalidBlobData(e.to_string()))?;
+        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
+            .map_err(|e| Self::InvalidBlobData(e.to_string()))?;
 
-        let commitment = c_kzg::Bytes48::from_bytes(&self.kzg_commitment.as_slice())
-            .map_err(|e| BlobValidationError::InvalidCommitmentData(e.to_string()))?;
+        let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
+            .map_err(|e| Self::InvalidCommitmentData(e.to_string()))?;
 
-        let proof = c_kzg::Bytes48::from_bytes(&self.kzg_proof.as_slice())
-            .map_err(|e| BlobValidationError::InvalidProofData(e.to_string()))?;
+        let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
+            .map_err(|e| Self::InvalidProofData(e.to_string()))?;
 
-        KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, &settings)
-            .map_err(|e| BlobValidationError::ProofVerificationError(e.to_string()))
+        KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+            .map_err(|e| Self::ProofVerificationError(e.to_string()))
             .and_then(|result| {
                 if result {
                     Ok(true)
                 } else {
-                    Err(BlobValidationError::ProofVerificationFailed(
+                    Err(Self::ProofVerificationFailed(
                         "Cryptographic proof verification failed.".to_string(),
                     ))
                 }
@@ -87,7 +90,7 @@ impl BlobTransactionSidecarItem {
     #[allow(missing_docs)]
     pub fn verify_blob(&self, hash: &IndexedBlobHash) -> Result<(), BlobValidationError> {
         if self.index != hash.index {
-            return Err(BlobValidationError::IndexMismatch {
+            return Err(Self::IndexMismatch {
                 expected: hash.index,
                 found: self.index,
                 details: "The index of the blob does not match the expected index.".to_string(),
@@ -96,7 +99,7 @@ impl BlobTransactionSidecarItem {
 
         let computed_hash = self.to_kzg_versioned_hash();
         if computed_hash != hash.hash {
-            return Err(BlobValidationError::HashMismatch {
+            return Err(Self::HashMismatch {
                 expected: *hash.hash,
                 found: computed_hash,
                 details:
@@ -107,10 +110,10 @@ impl BlobTransactionSidecarItem {
 
         match self.verify_blob_kzg_proof() {
             Ok(result) if result => Ok(()),
-            Ok(_) => Err(BlobValidationError::ProofVerificationFailed(
+            Ok(_) => Err(Self::ProofVerificationFailed(
                 "The cryptographic proof verification failed.".to_string(),
             )),
-            Err(e) => Err(BlobValidationError::ProofVerificationError(e.to_string())),
+            Err(e) => Err(Self::ProofVerificationError(e.to_string())),
         }
     }
 }
@@ -159,7 +162,7 @@ impl fmt::Display for BlobValidationError {
     }
 }
 impl Error for BlobValidationError {}
-use c_kzg::KzgProof;
+
 /// A Blob hash
 #[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -170,7 +173,7 @@ pub struct IndexedBlobHash {
     pub hash: B256,
 }
 impl BlobTransactionSidecar {
-    /// Creates an iterator 
+    /// Creates an iterator
     pub fn iter(&self) -> impl Iterator<Item = BlobTransactionSidecarItem> + '_ {
         self.blobs.iter().zip(&self.commitments).zip(&self.proofs).enumerate().map(
             |(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
