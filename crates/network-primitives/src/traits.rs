@@ -52,7 +52,7 @@ pub trait ReceiptResponse {
     /// Address of the receiver.
     fn to(&self) -> Option<Address>;
 
-    /// Authorization list.
+    /// EIP-7702 Authorization list.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 }
 
