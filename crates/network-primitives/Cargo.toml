@@ -27,3 +27,7 @@ serde.workspace = true
 
 [dev-dependencies]
 rand.workspace = true
+
+[features]
+default = ["std"]
+std = ["alloy-primitives/std"]

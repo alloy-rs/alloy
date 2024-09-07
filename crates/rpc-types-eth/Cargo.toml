@@ -23,8 +23,8 @@ alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
 alloy-serde.workspace = true
 
-alloy-consensus = { workspace = true, features = ["std", "serde"] }
-alloy-eips = { workspace = true, features = ["std", "serde"] }
+alloy-consensus = { workspace = true, features = ["serde", "std"] }
+alloy-eips = { workspace = true, features = ["serde", "std"] }
 
 alloy-network-primitives.workspace = true
 
