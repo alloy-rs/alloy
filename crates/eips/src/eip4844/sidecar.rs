@@ -1,14 +1,16 @@
 //! EIP-4844 sidecar type
 
+#[cfg(feature = "kzg")]
+use crate::eip4844::env_settings::EnvKzgSettings;
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 use crate::eip4844::{
-    env_settings::EnvKzgSettings, kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB,
-    BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
-use alloc::fmt;
+use alloc::{fmt, string::ToString};
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
+#[cfg(feature = "kzg")]
 use c_kzg::KzgProof;
 use sha2::{Digest, Sha256};
 
@@ -49,7 +51,7 @@ pub struct BlobTransactionSidecarItem {
 
     pub kzg_proof: Bytes48,
 }
-
+#[cfg(feature = "kzg")]
 impl BlobTransactionSidecarItem {
     #[allow(missing_docs)]
     pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
