@@ -43,9 +43,9 @@ jsonwebtoken = { version = "9.3.0", optional = true }
 rand = { workspace = true, optional = true }
 
 [features]
-default = ["jwt"]
+default = ["jwt", "std"]
 std = ["alloy-consensus/std", "derive_more/std"]
-jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
+jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]

@@ -12,42 +12,41 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use thiserror::Error;
 
 /// Errors returned by the [`JwtSecret`]
-#[derive(Error, Debug)]
+#[derive(Debug, derive_more::Display)]
 pub enum JwtError {
     /// An error encountered while decoding the hexadecimal string for the JWT secret.
-    #[error(transparent)]
-    JwtSecretHexDecodeError(#[from] hex::FromHexError),
+    #[display("{_0}")]
+    JwtSecretHexDecodeError(hex::FromHexError),
 
     /// The JWT key length provided is invalid, expecting a specific length.
-    #[error("JWT key is expected to have a length of {0} digits. {1} digits key provided")]
+    #[display("JWT key is expected to have a length of {_0} digits. {_1} digits key provided")]
     InvalidLength(usize, usize),
 
     /// The signature algorithm used in the JWT is not supported. Only HS256 is supported.
-    #[error("unsupported signature algorithm. Only HS256 is supported")]
+    #[display("unsupported signature algorithm. Only HS256 is supported")]
     UnsupportedSignatureAlgorithm,
 
     /// The provided signature in the JWT is invalid.
-    #[error("provided signature is invalid")]
+    #[display("provided signature is invalid")]
     InvalidSignature,
 
     /// The "iat" (issued-at) claim in the JWT is not within the allowed ±60 seconds from the
     /// current time.
-    #[error("IAT (issued-at) claim is not within ±60 seconds from the current time")]
+    #[display("IAT (issued-at) claim is not within ±60 seconds from the current time")]
     InvalidIssuanceTimestamp,
 
     /// The Authorization header is missing or invalid in the context of JWT validation.
-    #[error("Authorization header is missing or invalid")]
+    #[display("Authorization header is missing or invalid")]
     MissingOrInvalidAuthorizationHeader,
 
     /// An error occurred during JWT decoding.
-    #[error("JWT decoding error: {0}")]
+    #[display("JWT decoding error: {_0}")]
     JwtDecodingError(String),
 
     /// An error occurred while creating a directory to store the JWT.
-    #[error("failed to create dir {path:?}: {source}")]
+    #[display("failed to create dir {path:?}: {source}")]
     CreateDir {
         /// The source `io::Error`.
         source: io::Error,
@@ -56,7 +55,7 @@ pub enum JwtError {
     },
 
     /// An error occurred while reading the JWT from a file.
-    #[error("failed to read from {path:?}: {source}")]
+    #[display("failed to read from {path:?}: {source}")]
     Read {
         /// The source `io::Error`.
         source: io::Error,
@@ -65,7 +64,7 @@ pub enum JwtError {
     },
 
     /// An error occurred while writing the JWT to a file.
-    #[error("failed to write to {path:?}: {source}")]
+    #[display("failed to write to {path:?}: {source}")]
     Write {
         /// The source `io::Error`.
         source: io::Error,
@@ -73,6 +72,15 @@ pub enum JwtError {
         path: PathBuf,
     },
 }
+
+impl From<hex::FromHexError> for JwtError {
+    fn from(err: hex::FromHexError) -> Self {
+        JwtError::JwtSecretHexDecodeError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for JwtError {}
 
 /// Length of the hex-encoded 256 bit secret key.
 /// A 256-bit encoded string in Rust has a length of 64 digits because each digit represents 4 bits
