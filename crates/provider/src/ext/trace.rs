@@ -10,6 +10,9 @@ use alloy_rpc_types_trace::{
 };
 use alloy_transport::{Transport, TransportResult};
 
+/// List of trace calls for use with [`TraceApi::trace_call_many`]
+pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
+
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -39,8 +42,8 @@ where
     /// Not all nodes support this call.
     fn trace_call_many<'a>(
         &self,
-        request: &'a [(N::TransactionRequest, Vec<TraceType>)],
-    ) -> RpcWithBlock<T, &'a [(N::TransactionRequest, Vec<TraceType>)], TraceResults>;
+        request: &'a TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, &'a TraceCallList<'a, N>, TraceResults>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -114,9 +117,8 @@ where
 
     fn trace_call_many<'a>(
         &self,
-        request: &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)],
-    ) -> RpcWithBlock<T, &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)], TraceResults>
-    {
+        request: &'a TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, &'a TraceCallList<'a, N>, TraceResults> {
         RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
@@ -181,6 +183,7 @@ mod test {
     use super::*;
 
     #[tokio::test]
+    #[cfg(not(windows))]
     async fn trace_block() {
         run_with_tempdir("reth-test-", |temp_dir| async move {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
@@ -196,6 +199,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg(not(windows))]
     async fn trace_call_many() {
         run_with_tempdir("reth-test-", |temp_dir| async move {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
