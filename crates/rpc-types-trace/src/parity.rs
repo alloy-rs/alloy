@@ -429,6 +429,7 @@ pub struct TransactionTrace {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// Output of the trace, can be CALL or CREATE
+    #[serde(default)]
     pub result: Option<TraceOutput>,
     /// How many subtraces this trace has.
     pub subtraces: usize,
@@ -501,7 +502,7 @@ impl Serialize for LocalizedTransactionTrace {
         match result {
             Some(TraceOutput::Call(call)) => s.serialize_field("result", call)?,
             Some(TraceOutput::Create(create)) => s.serialize_field("result", create)?,
-            None => s.serialize_field("result", &None as &Option<u8>)?,
+            None => s.serialize_field("result", &None::<()>)?,
         }
 
         s.serialize_field("subtraces", &subtraces)?;
