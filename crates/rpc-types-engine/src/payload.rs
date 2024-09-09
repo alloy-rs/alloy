@@ -1,6 +1,5 @@
 //! Payload types.
 
-#[cfg(not(feature = "std"))]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -1102,7 +1101,6 @@ impl std::error::Error for PayloadValidationError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "std"))]
     use alloc::vec;
 
     #[test]

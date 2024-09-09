@@ -1,6 +1,5 @@
 //! Client identification: <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md>
 
-#[cfg(not(feature = "std"))]
 use alloc::string::{String, ToString};
 
 use core::str::FromStr;
