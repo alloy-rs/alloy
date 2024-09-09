@@ -1049,20 +1049,6 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[tokio::test]
-    async fn test_layer_transport() {
-        init_tracing();
-        let anvil = Anvil::new().spawn();
-        let service = tower::ServiceBuilder::new().service(reqwest::Client::new());
-        let layer_transport = alloy_transport_http::LayerClient::new(anvil.endpoint_url(), service);
-
-        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
-
-        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(0, num);
-    }
-
     #[cfg(feature = "hyper")]
     #[tokio::test]
     async fn test_hyper_layer_transport_no_layers() {

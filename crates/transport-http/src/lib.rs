@@ -15,12 +15,6 @@ mod reqwest_transport;
 #[doc(inline)]
 pub use reqwest_transport::*;
 
-#[cfg(feature = "reqwest")]
-mod layer_transport;
-
-#[cfg(feature = "reqwest")]
-pub use layer_transport::*;
-
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 mod hyper_transport;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
