@@ -40,8 +40,10 @@ fn estimate_priority_fee(rewards: &[Vec<u128>]) -> u128 {
     std::cmp::max(median, EIP1559_MIN_PRIORITY_FEE)
 }
 
-/// The default EIP-1559 fee estimator which is based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56)
-/// (constants for "medium" priority level are used)
+/// The default EIP-1559 fee estimator.
+///
+/// Based on the work by [MetaMask](https://github.com/MetaMask/core/blob/main/packages/gas-fee-controller/src/fetchGasEstimatesViaEthFeeHistory/calculateGasFeeEstimatesForPriorityLevels.ts#L56);
+/// constants for "medium" priority level are used.
 pub fn eip1559_default_estimator(
     base_fee_per_gas: u128,
     rewards: &[Vec<u128>],

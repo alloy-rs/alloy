@@ -88,6 +88,7 @@ const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 
 /// Claims in JWT are used to represent a set of information about an entity.
+///
 /// Claims are essentially key-value pairs that are encoded as JSON objects and included in the
 /// payload of a JWT. They are used to transmit information such as the identity of the entity, the
 /// time the JWT was issued, and the expiration time of the JWT, among others.
@@ -128,6 +129,7 @@ impl Default for Claims {
 }
 
 /// Value-object holding a reference to a hex-encoded 256-bit secret key.
+///
 /// A JWT secret key is used to secure JWT-based authentication. The secret key is
 /// a shared secret between the server and the client and is used to calculate a digital signature
 /// for the JWT, which is included in the JWT along with its payload.

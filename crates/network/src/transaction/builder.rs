@@ -1,6 +1,7 @@
 use super::signer::NetworkWallet;
 use crate::Network;
 use alloy_consensus::BlobTransactionSidecar;
+use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_rpc_types_eth::AccessList;
 use alloy_sol_types::SolCall;
@@ -296,6 +297,18 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
     fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecar) -> Self {
         self.set_blob_sidecar(sidecar);
+        self
+    }
+
+    /// Get the EIP-7702 authorization list for the transaction.
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>>;
+
+    /// Sets the EIP-7702 authorization list.
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>);
+
+    /// Builder-pattern method for setting the authorization list.
+    fn with_authorization_list(mut self, authorization_list: Vec<SignedAuthorization>) -> Self {
+        self.set_authorization_list(authorization_list);
         self
     }
 

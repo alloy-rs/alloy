@@ -38,17 +38,14 @@ thiserror.workspace = true
 jsonrpsee-types = { version = "0.24", optional = true }
 
 # jwt
-jsonwebtoken = "9.3.0"
-rand.workspace = true
+jsonwebtoken = { version = "9.3.0", optional = true }
+rand = { workspace = true, optional = true }
 
 [features]
+default = ["jwt"]
+jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
-ssz = [
-    "dep:ethereum_ssz",
-    "dep:ethereum_ssz_derive",
-    "alloy-primitives/ssz",
-    "alloy-eips/ssz",
-]
+ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
 
 [dev-dependencies]

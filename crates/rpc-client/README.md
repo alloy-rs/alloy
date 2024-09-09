@@ -16,7 +16,7 @@ For example, to make a simple request:
 let client: ReqwestClient = ClientBuilder::default().http(url);
 
 // Prepare a request to the server.
-let request = client.request("eth_blockNumber", ());
+let request = client.request_noparams("eth_blockNumber");
 
 // Poll the request to completion.
 let block_number = request.await.unwrap();

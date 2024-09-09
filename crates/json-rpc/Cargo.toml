@@ -1,6 +1,6 @@
 [package]
 name = "alloy-json-rpc"
-description = "Core types for JSON-RPC2.0 clients"
+description = "Core types for JSON-RPC 2.0 clients"
 
 version.workspace = true
 edition.workspace = true
@@ -24,3 +24,4 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["std", "raw_value"] }
 thiserror.workspace = true
 tracing.workspace = true
+alloy-sol-types.workspace = true

@@ -15,12 +15,10 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 
-/// A block hash which may have
-/// a boolean requireCanonical field.
-/// If false, an RPC call should raise if a block
-/// matching the hash is not found.
-/// If true, an RPC call should additionally raise if
-/// the block is not in the canonical chain.
+/// A block hash which may have a boolean requireCanonical field.
+///
+/// If false, an RPC call should raise if a block matching the hash is not found.
+/// If true, an RPC call should additionally raise if the block is not in the canonical chain.
 /// <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1898.md#specification>
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -55,6 +53,16 @@ impl From<RpcBlockHash> for B256 {
 impl AsRef<B256> for RpcBlockHash {
     fn as_ref(&self) -> &B256 {
         &self.block_hash
+    }
+}
+
+impl Display for RpcBlockHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self { block_hash, require_canonical } = self;
+        if *require_canonical == Some(true) {
+            write!(f, "canonical ")?
+        }
+        write!(f, "hash {}", block_hash)
     }
 }
 
@@ -385,6 +393,17 @@ impl From<BlockNumberOrTag> for BlockId {
     }
 }
 
+impl From<BlockHashOrNumber> for BlockId {
+    fn from(block: BlockHashOrNumber) -> Self {
+        match block {
+            BlockHashOrNumber::Hash(hash) => {
+                Self::Hash(RpcBlockHash { block_hash: hash, require_canonical: None })
+            }
+            BlockHashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
+        }
+    }
+}
+
 impl From<B256> for BlockId {
     fn from(block_hash: B256) -> Self {
         Self::Hash(RpcBlockHash { block_hash, require_canonical: None })
@@ -503,6 +522,20 @@ impl<'de> Deserialize<'de> for BlockId {
         }
 
         deserializer.deserialize_any(BlockIdVisitor)
+    }
+}
+
+impl Display for BlockId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => write!(f, "{}", hash),
+            Self::Number(num) => {
+                if num.is_number() {
+                    return write!(f, "number {}", num);
+                }
+                write!(f, "{}", num)
+            }
+        }
     }
 }
 
@@ -748,11 +781,16 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
+#[cfg(test)]
 mod tests {
+    use alloy_primitives::b256;
+
     use super::*;
 
+    const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
+
     #[test]
+    #[cfg(feature = "serde")]
     fn compact_block_number_serde() {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
@@ -772,6 +810,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_parse_eip1898_block_ids() {
         let num = serde_json::json!(
             { "blockNumber": "0x0" }
@@ -846,5 +885,63 @@ mod tests {
                     .into()
             )
         );
+    }
+
+    #[test]
+    fn display_rpc_block_hash() {
+        let hash = RpcBlockHash::from_hash(HASH, Some(true));
+
+        assert_eq!(
+            hash.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let hash = RpcBlockHash::from_hash(HASH, None);
+
+        assert_eq!(
+            hash.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+    }
+
+    #[test]
+    fn display_block_id() {
+        let id = BlockId::hash(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::hash_canonical(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::number(100000);
+
+        assert_eq!(id.to_string(), "number 0x186a0");
+
+        let id = BlockId::latest();
+
+        assert_eq!(id.to_string(), "latest");
+
+        let id = BlockId::safe();
+
+        assert_eq!(id.to_string(), "safe");
+
+        let id = BlockId::finalized();
+
+        assert_eq!(id.to_string(), "finalized");
+
+        let id = BlockId::earliest();
+
+        assert_eq!(id.to_string(), "earliest");
+
+        let id = BlockId::pending();
+
+        assert_eq!(id.to_string(), "pending");
     }
 }

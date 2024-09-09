@@ -24,7 +24,7 @@ alloy-primitives.workspace = true
 alloy-signer.workspace = true
 
 async-trait.workspace = true
-coins-ledger = { version = "0.11", default-features = false }
+coins-ledger = { version = "0.12", default-features = false }
 futures-util.workspace = true
 semver.workspace = true
 thiserror.workspace = true

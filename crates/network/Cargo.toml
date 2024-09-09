@@ -22,6 +22,7 @@ workspace = true
 alloy-consensus = { workspace = true, features = ["std"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 alloy-json-rpc.workspace = true
+alloy-network-primitives.workspace = true
 alloy-primitives.workspace = true
 alloy-rpc-types-eth.workspace = true
 alloy-signer.workspace = true

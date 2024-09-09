@@ -26,7 +26,7 @@ cargo add alloy --features full
 Alternatively, you can add the following to your `Cargo.toml` file:
 
 ```toml
-alloy = { version = "0.1", features = ["full"] }
+alloy = { version = "0.3", features = ["full"] }
 ```
 
 For a more fine-grained control over the features you wish to include, you can add the individual crates to your `Cargo.toml` file, or use the `alloy` crate with the features you need.
@@ -44,6 +44,7 @@ This repository contains the following crates:
 - [`alloy-genesis`] - Ethereum genesis file definitions
 - [`alloy-json-rpc`] - Core data types for JSON-RPC 2.0 clients
 - [`alloy-network`] - Network abstraction for RPC types
+  - [`alloy-network-primitives`] - Primitive types for the network abstraction
 - [`alloy-node-bindings`] - Ethereum execution-layer client bindings
 - [`alloy-provider`] - Interface with an Ethereum blockchain
 - [`alloy-pubsub`] - Ethereum JSON-RPC [publish-subscribe] tower service and type definitions
@@ -52,6 +53,7 @@ This repository contains the following crates:
   - [`alloy-rpc-types-admin`] - Types for the `admin` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-anvil`] - Types for the [Anvil] development node's Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-beacon`] - Types for the [Ethereum Beacon Node API][beacon-apis]
+  - [`alloy-rpc-types-debug`] - Types for the `debug` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-engine`] - Types for the `engine` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-eth`] - Types for the `eth` Ethereum JSON-RPC namespace
   - [`alloy-rpc-types-mev`] - Types for the MEV bundle JSON-RPC namespace
@@ -77,6 +79,7 @@ This repository contains the following crates:
 [`alloy-genesis`]: https://github.com/alloy-rs/alloy/tree/main/crates/genesis
 [`alloy-json-rpc`]: https://github.com/alloy-rs/alloy/tree/main/crates/json-rpc
 [`alloy-network`]: https://github.com/alloy-rs/alloy/tree/main/crates/network
+[`alloy-network-primitives`]: https://github.com/alloy-rs/alloy/tree/main/crates/network-primitives
 [`alloy-node-bindings`]: https://github.com/alloy-rs/alloy/tree/main/crates/node-bindings
 [`alloy-provider`]: https://github.com/alloy-rs/alloy/tree/main/crates/provider
 [`alloy-pubsub`]: https://github.com/alloy-rs/alloy/tree/main/crates/pubsub
@@ -85,6 +88,7 @@ This repository contains the following crates:
 [`alloy-rpc-types-admin`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-admin
 [`alloy-rpc-types-anvil`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-anvil
 [`alloy-rpc-types-beacon`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-beacon
+[`alloy-rpc-types-debug`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-debug
 [`alloy-rpc-types-engine`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-engine
 [`alloy-rpc-types-eth`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-eth
 [`alloy-rpc-types-mev`]: https://github.com/alloy-rs/alloy/tree/main/crates/rpc-types-mev
@@ -120,7 +124,7 @@ When updating this, also update:
 - .github/workflows/ci.yml
 -->
 
-The current MSRV (minimum supported rust version) is 1.76.
+The current MSRV (minimum supported rust version) is 1.79.
 
 Alloy will keep a rolling MSRV policy of **at least** two versions behind the
 latest stable release (so if the latest stable release is 1.58, we would

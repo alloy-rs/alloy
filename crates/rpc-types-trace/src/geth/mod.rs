@@ -32,7 +32,9 @@ pub struct UnexpectedTracerError(pub GethTrace);
 pub type TraceResult = crate::common::TraceResult<GethTrace, String>;
 
 /// blockTraceResult represents the results of tracing a single block when an entire chain is being
-/// traced. ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/eth/tracers/api.go#L218-L222>
+/// traced.
+///
+/// Ref <https://github.com/ethereum/go-ethereum/blob/ee530c0d5aa70d2c00ab5691a89ab431b73f8165/eth/tracers/api.go#L218-L222>
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockTraceResult {
     /// Block number corresponding to the trace task
