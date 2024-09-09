@@ -119,8 +119,6 @@ where
         &self,
         request: &'a TraceCallList<'a, 'b, N>,
     ) -> RpcWithBlock<T, &'a TraceCallList<'a, 'b, N>, TraceResults> {
-        println!("{:?}", request);
-
         RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
@@ -285,6 +283,55 @@ mod test {
                 .trace_call_many(&[(&tx1, &[TraceType::Trace]), (&tx2, &[TraceType::Trace])])
                 .await;
             println!("{:?}", result);
+
+            // [
+            //     (
+            //         TransactionRequest {
+            //             from: Some(0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266),
+            //             to: Some(Call(0x70997970c51812dc3a010c7d01b50e0d17dc79c8)),
+            //             gas_price: None,
+            //             max_fee_per_gas: None,
+            //             max_priority_fee_per_gas: None,
+            //             max_fee_per_blob_gas: None,
+            //             gas: None,
+            //             value: Some(100),
+            //             input: TransactionInput { input: None, data: None },
+            //             nonce: Some(0),
+            //             chain_id: None,
+            //             access_list: None,
+            //             transaction_type: None,
+            //             blob_versioned_hashes: None,
+            //             sidecar: None,
+            //             authorization_list: None,
+            //         },
+            //         [Trace],
+            //     ),
+            //     (
+            //         TransactionRequest {
+            //             from: Some(0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266),
+            //             to: Some(Call(0x70997970c51812dc3a010c7d01b50e0d17dc79c8)),
+            //             gas_price: None,
+            //             max_fee_per_gas: None,
+            //             max_priority_fee_per_gas: None,
+            //             max_fee_per_blob_gas: None,
+            //             gas: None,
+            //             value: Some(100),
+            //             input: TransactionInput { input: None, data: None },
+            //             nonce: Some(1),
+            //             chain_id: None,
+            //             access_list: None,
+            //             transaction_type: None,
+            //             blob_versioned_hashes: None,
+            //             sidecar: None,
+            //             authorization_list: None,
+            //         },
+            //         [Trace],
+            //     ),
+            // ]
+
+            // Err(ErrorResp(ErrorPayload { code: -32602, message: "Invalid params", data:
+            // Some(RawValue("invalid type: map, expected a tuple of size 2 at line 1 column 1"))
+            // }))
         })
         .await
     }
