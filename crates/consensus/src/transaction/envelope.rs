@@ -994,7 +994,7 @@ mod tests {
             gas_limit: u128::MAX,
             max_fee_per_gas: u128::MAX,
             max_priority_fee_per_gas: u128::MAX,
-            to: Address::random().into(),
+            to: Address::random(),
             value: U256::MAX,
             input: Bytes::new(),
             access_list: AccessList(vec![AccessListItem {

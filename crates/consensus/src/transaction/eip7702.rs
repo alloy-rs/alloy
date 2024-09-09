@@ -389,7 +389,7 @@ mod tests {
     use super::TxEip7702;
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, TxKind, U256};
+    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
 
     #[test]
     fn encode_decode_eip7702() {
@@ -397,7 +397,7 @@ mod tests {
             chain_id: 1,
             nonce: 0x42,
             gas_limit: 44386,
-            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
+            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6"),
             value: U256::from(0_u64),
             input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
             max_fee_per_gas: 0x4a817c800,
@@ -454,7 +454,7 @@ mod tests {
             max_fee_per_gas: 0x4a817c800,
             max_priority_fee_per_gas: 0x3b9aca00,
             gas_limit: 2,
-            to: Address::default().into(),
+            to: Address::default(),
             value: U256::ZERO,
             input: vec![1, 2].into(),
             access_list: Default::default(),
