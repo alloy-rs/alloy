@@ -74,7 +74,12 @@ tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
 tower.workspace = true
+tower-http = { workspace = true, features = [
+    "set-header",
+    "sensitive-headers",
+] }
 http-body-util.workspace = true
+http.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

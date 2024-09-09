@@ -1129,10 +1129,56 @@ mod tests {
             }
         }
 
+        use http::header::{self, HeaderValue};
+        use tower_http::{
+            sensitive_headers::SetSensitiveRequestHeadersLayer, set_header::SetRequestHeaderLayer,
+        };
         init_tracing();
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-        let service = tower::ServiceBuilder::new().layer(LoggingLayer).service(hyper_client);
+
+        // Setup tower serive with multiple layers modifying request headers
+        let service = tower::ServiceBuilder::new()
+            .layer(SetRequestHeaderLayer::if_not_present(
+                header::USER_AGENT,
+                HeaderValue::from_static("alloy app"),
+            ))
+            .layer(SetRequestHeaderLayer::overriding(
+                header::AUTHORIZATION,
+                HeaderValue::from_static("some-jwt-token"),
+            ))
+            .layer(SetRequestHeaderLayer::appending(
+                header::SET_COOKIE,
+                HeaderValue::from_static("cookie-value"),
+            ))
+            .layer(SetSensitiveRequestHeadersLayer::new([header::AUTHORIZATION])) // Hides the jwt token as sensitive.
+            .layer(LoggingLayer)
+            .service(hyper_client);
+
+        let layer_transport =
+            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[cfg(feature = "hyper")]
+    #[tokio::test]
+    async fn test_layer_transport_with_tower_http() {
+        use http::header::{self, HeaderValue};
+        use tower_http::set_header::SetRequestHeaderLayer;
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+        let service = tower::ServiceBuilder::new()
+            .layer(SetRequestHeaderLayer::if_not_present(
+                header::USER_AGENT,
+                HeaderValue::from_static("alloy app"),
+            ))
+            .service(hyper_client);
         let layer_transport =
             alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
 
