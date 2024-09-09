@@ -497,12 +497,11 @@ impl Serialize for LocalizedTransactionTrace {
 
         if let Some(error) = error {
             s.serialize_field("error", error)?;
-        } else {
-            match result {
-                Some(TraceOutput::Call(call)) => s.serialize_field("result", call)?,
-                Some(TraceOutput::Create(create)) => s.serialize_field("result", create)?,
-                None => s.serialize_field("result", &None as &Option<u8>)?,
-            }
+        }
+        match result {
+            Some(TraceOutput::Call(call)) => s.serialize_field("result", call)?,
+            Some(TraceOutput::Create(create)) => s.serialize_field("result", create)?,
+            None => s.serialize_field("result", &None as &Option<u8>)?,
         }
 
         s.serialize_field("subtraces", &subtraces)?;
@@ -839,6 +838,21 @@ mod tests {
         assert_eq!(deserialized["result"], serde_json::Value::Null);
         assert!(deserialized.as_object().unwrap().contains_key("result"));
         assert!(!deserialized.as_object().unwrap().contains_key("error"));
+
+        let deserialized_trace: TransactionTrace = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized_trace.result, None);
+    }
+
+    #[test]
+    fn test_transaction_trace_error_result() {
+        let trace = TransactionTrace { error: Some("Reverted".to_string()), ..Default::default() };
+
+        let serialized = serde_json::to_string(&trace).unwrap();
+        let deserialized: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized["result"], serde_json::Value::Null);
+        assert!(deserialized.as_object().unwrap().contains_key("result"));
+        assert!(deserialized.as_object().unwrap().contains_key("error"));
 
         let deserialized_trace: TransactionTrace = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized_trace.result, None);
