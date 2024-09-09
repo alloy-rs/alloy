@@ -1,7 +1,6 @@
 //! Contains types related to the Cancun hardfork that will be used by RPC to communicate with the
 //! beacon consensus engine.
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 use alloy_primitives::B256;

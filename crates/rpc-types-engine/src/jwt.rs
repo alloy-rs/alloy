@@ -1,15 +1,16 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
 
 use alloy_primitives::hex;
+use core::str::FromStr;
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    str::FromStr,
     time::Duration,
 };
 
@@ -47,6 +48,7 @@ pub enum JwtError {
 
     /// An error occurred while creating a directory to store the JWT.
     #[display("failed to create dir {path:?}: {source}")]
+    #[cfg(feature = "std")]
     CreateDir {
         /// The source `io::Error`.
         source: io::Error,
@@ -56,6 +58,7 @@ pub enum JwtError {
 
     /// An error occurred while reading the JWT from a file.
     #[display("failed to read from {path:?}: {source}")]
+    #[cfg(feature = "std")]
     Read {
         /// The source `io::Error`.
         source: io::Error,
@@ -65,6 +68,7 @@ pub enum JwtError {
 
     /// An error occurred while writing the JWT to a file.
     #[display("failed to write to {path:?}: {source}")]
+    #[cfg(feature = "std")]
     Write {
         /// The source `io::Error`.
         source: io::Error,
@@ -90,6 +94,7 @@ impl std::error::Error for JwtError {}
 const JWT_SECRET_LEN: usize = 64;
 
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
+#[cfg(feature = "std")]
 const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
@@ -123,6 +128,7 @@ impl Claims {
     }
 
     /// Checks if the `iat` claim is within the allowed range from the current time.
+    #[cfg(feature = "std")]
     pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
         now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
@@ -169,6 +175,7 @@ impl JwtSecret {
     /// Tries to load a [`JwtSecret`] from the specified file path.
     /// I/O or secret validation errors might occur during read operations in the form of
     /// a [`JwtError`].
+    #[cfg(feature = "std")]
     pub fn from_file(fpath: &Path) -> Result<Self, JwtError> {
         let hex = fs::read_to_string(fpath)
             .map_err(|err| JwtError::Read { source: err, path: fpath.into() })?;
@@ -178,6 +185,7 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
+    #[cfg(feature = "std")]
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
             // Create parent directory
