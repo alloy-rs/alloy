@@ -346,6 +346,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn validation_error_iat_out_of_window() {
         let secret = JwtSecret::random();
 
