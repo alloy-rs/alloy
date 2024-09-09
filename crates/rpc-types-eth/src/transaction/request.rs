@@ -312,12 +312,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?;
-
-        let to_address = match checked_to {
-            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
-            TxKind::Call(to) => to,
-        };
+        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
