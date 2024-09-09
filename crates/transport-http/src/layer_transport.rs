@@ -23,7 +23,7 @@ where
     S::Future: Send,
 {
     /// Create a new [LayerClient] with the given URL.
-    pub fn new(url: Url, service: S) -> Self {
+    pub const fn new(url: Url, service: S) -> Self {
         Self { url, service }
     }
 
@@ -76,7 +76,7 @@ where
         + Sync,
     S::Future: Send,
 {
-    type Transport = LayerClient<S>;
+    type Transport = Self;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -85,7 +85,7 @@ where
     fn get_transport<'a: 'b, 'b>(
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
-        Box::pin(async move { Ok(LayerClient::new(self.url.clone(), self.service.clone())) })
+        Box::pin(async move { Ok(Self::new(self.url.clone(), self.service.clone())) })
     }
 }
 
@@ -113,28 +113,3 @@ where
 /// Future for reqwest responses.
 pub type ReqwestResponseFut<T = reqwest::Response, E = reqwest::Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
-
-// impl<S> Service<reqwest::Request> for LayerClient<S>
-// where
-//     S: Service<reqwest::Request, Response = reqwest::Response, Error = reqwest::Error>
-//         + Clone
-//         + Send
-//         + 'static,
-//     S::Future: Send,
-// {
-//     type Response = reqwest::Response;
-//     type Error = reqwest::Error;
-//     type Future = ReqwestResponseFut<reqwest::Response, reqwest::Error>;
-
-//     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>>
-// {         task::Poll::Ready(Ok(()))
-//     }
-
-//     fn call(&mut self, req: reqwest::Request) -> Self::Future {
-//         let fut = self.service.call(req);
-//         Box::pin(async move {
-//             let resp = fut.await?;
-//             Ok(resp)
-//         })
-//     }
-// }

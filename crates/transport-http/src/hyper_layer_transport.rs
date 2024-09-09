@@ -7,7 +7,8 @@ use hyper::{
     body::{Buf, Bytes, Incoming},
     header, Request, Response,
 };
-use std::{marker::PhantomData, task};
+use hyper_util::client::legacy::Error;
+use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
@@ -20,8 +21,16 @@ pub struct HyperLayerTransport<S, B> {
     _pd: PhantomData<B>,
 }
 
-type HyperRequest<B> = Request<Full<B>>;
-type HyperResponse = Response<Incoming>;
+/// Alias for [`Request<Full<B>>`]
+pub type HyperRequest<B> = Request<Full<B>>;
+
+/// Alias for [`Response<Incoming>`]
+pub type HyperResponse = Response<Incoming>;
+
+/// Alias for pinned box future that results in [`HyperResponse`]
+pub type HyperResponseFut<T = HyperResponse, E = Error> =
+    Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
+
 impl<S, B> HyperLayerTransport<S, B>
 where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,

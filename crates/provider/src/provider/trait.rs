@@ -1013,6 +1013,20 @@ mod tests {
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
+    // For layer transport tests
+    #[cfg(feature = "hyper")]
+    use alloy_transport_http::{
+        hyper::body::{Buf, Bytes as HyperBytes},
+        hyper_util::{
+            client::legacy::{Client, Error},
+            rt::TokioExecutor,
+        },
+        HyperRequest, HyperResponse, HyperResponseFut,
+    };
+    #[cfg(feature = "hyper")]
+    use http_body_util::Full;
+    #[cfg(feature = "hyper")]
+    use tower::{Layer, Service};
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -1052,16 +1066,73 @@ mod tests {
     #[cfg(feature = "hyper")]
     #[tokio::test]
     async fn test_hyper_layer_transport_no_layers() {
-        use alloy_transport_http::{
-            hyper::body::Bytes as HyperBytes,
-            hyper_util::{client::legacy::Client, rt::TokioExecutor},
-        };
-        use http_body_util::Full;
-
         init_tracing();
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
         let service = tower::ServiceBuilder::new().service(hyper_client);
+        let layer_transport =
+            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[cfg(feature = "hyper")]
+    #[tokio::test]
+    async fn test_hyper_layer_transport() {
+        struct LoggingLayer;
+
+        impl<S> Layer<S> for LoggingLayer {
+            type Service = LoggingService<S>;
+
+            fn layer(&self, inner: S) -> Self::Service {
+                LoggingService { inner }
+            }
+        }
+
+        #[derive(Clone)] // required
+        struct LoggingService<S> {
+            inner: S,
+        }
+
+        impl<S, B> Service<HyperRequest<B>> for LoggingService<S>
+        where
+            S: Service<HyperRequest<B>, Response = HyperResponse, Error = Error>
+                + Clone
+                + Send
+                + Sync
+                + 'static,
+            S::Future: Send,
+            S::Error: std::error::Error + Send + Sync + 'static,
+            B: From<Bytes> + Buf + Send + 'static + Clone + Sync + std::fmt::Debug,
+        {
+            type Response = HyperResponse;
+            type Error = Error;
+            type Future = HyperResponseFut;
+
+            fn poll_ready(
+                &mut self,
+                cx: &mut std::task::Context<'_>,
+            ) -> std::task::Poll<Result<(), Self::Error>> {
+                self.inner.poll_ready(cx)
+            }
+
+            fn call(&mut self, req: HyperRequest<B>) -> Self::Future {
+                println!("Logging Layer - HyperRequest {req:?}");
+
+                let fut = self.inner.call(req);
+
+                Box::pin(async move { fut.await })
+            }
+        }
+
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+        let service = tower::ServiceBuilder::new().layer(LoggingLayer).service(hyper_client);
         let layer_transport =
             alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
 
