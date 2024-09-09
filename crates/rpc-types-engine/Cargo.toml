@@ -32,15 +32,15 @@ ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
 # misc
-serde = { workspace = true, features = ["derive"] }
+serde.workspace = true
 derive_more = { workspace = true, features = ["display"] }
 
 # jsonrpsee
 jsonrpsee-types = { version = "0.24", optional = true }
 
 # jwt
-jsonwebtoken = { version = "9.3.0", optional = true }
 rand = { workspace = true, optional = true }
+jsonwebtoken = { version = "9.3.0", optional = true }
 
 [features]
 default = ["jwt", "std"]
