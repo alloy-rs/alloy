@@ -612,6 +612,9 @@ pub struct BlockNumHash {
 /// Block number and hash of the forked block.
 pub type ForkBlock = BlockNumHash;
 
+/// Either a hash _or_ a number
+pub type NumHash = BlockNumHash;
+
 impl BlockNumHash {
     /// Creates a new `BlockNumHash` from a block number and hash.
     pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
@@ -654,6 +657,9 @@ pub enum BlockHashOrNumber {
     /// A block number
     Number(u64),
 }
+
+/// Either a hash _or_ a number
+pub type HashOrNumber = BlockHashOrNumber;
 
 // === impl BlockHashOrNumber ===
 
