@@ -261,7 +261,7 @@ impl TxEip7702 {
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
-            mem::size_of::<Address>() + // to
+        mem::size_of::<Address>() + // to
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
