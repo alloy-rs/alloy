@@ -1,7 +1,7 @@
 use crate::{
     fillers::{
         CachedNonceManager, ChainIdFiller, FillerControlFlow, GasFiller, JoinFill, NonceFiller,
-        NonceManager, RecommendedFiller, SimpleNonceManager, TxFiller, WalletFiller,
+        NonceManager, RecommendedFillers, SimpleNonceManager, TxFiller, WalletFiller,
     },
     provider::SendableTx,
     Provider, RootProvider,
@@ -130,8 +130,13 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
 impl<L, N> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
-    pub fn with_recommended_fillers(self) -> ProviderBuilder<L, RecommendedFiller, N> {
-        self.filler(GasFiller).filler(NonceFiller::default()).filler(ChainIdFiller::default())
+    pub fn with_recommended_fillers(
+        self,
+    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecomendedFillters>, N>
+    where
+        N: RecommendedFillers,
+    {
+        self.filler(N::recommended_fillers())
     }
 
     /// Add gas estimation to the stack being built.
