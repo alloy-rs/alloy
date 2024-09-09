@@ -1,5 +1,6 @@
 //! Node-related types and constants.
 
+use alloy_primitives::hex;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -9,23 +10,7 @@ pub const NODE_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 /// Timeout for waiting for the node to add a peer.
 pub const NODE_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Errors that can occur when working with a node instance.
-#[derive(Debug)]
-pub enum NodeInstanceError {
-    /// Timed out waiting for a message from node's stderr.
-    Timeout(String),
-
-    /// A line could not be read from the node's stderr.
-    ReadLineError(std::io::Error),
-
-    /// The child node process's stderr was not captured.
-    NoStderr,
-
-    /// The child node process's stdout was not captured.
-    NoStdout,
-}
-
-/// Errors that can occur when working with the node.
+/// Errors that can occur when working with the node instance.
 #[derive(Debug, Error)]
 pub enum NodeError {
     /// The chain id was not set.
@@ -65,4 +50,17 @@ pub enum NodeError {
     /// Clique private key error
     #[error("clique address error: {0}")]
     CliqueAddressError(String),
+
+    /// The private key could not be parsed.
+    #[error("could not parse private key")]
+    ParsePrivateKeyError,
+    /// An error occurred while deserializing a private key.
+    #[error("could not deserialize private key from bytes")]
+    DeserializePrivateKeyError,
+    /// An error occurred while parsing a hex string.
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
+    /// No keys available this node instance.
+    #[error("no keys available in this node instance")]
+    NoKeysAvailable,
 }

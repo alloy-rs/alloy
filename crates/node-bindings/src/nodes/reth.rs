@@ -1,7 +1,12 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{utils::extract_endpoint, NodeError, NodeInstanceError, NODE_STARTUP_TIMEOUT};
+use crate::{
+    utils::{extract_endpoint, get_default_keys},
+    NodeError, NODE_STARTUP_TIMEOUT,
+};
 use alloy_genesis::Genesis;
+use alloy_primitives::Address;
+use k256::SecretKey;
 use std::{
     fs::create_dir,
     io::{BufRead, BufReader},
@@ -23,6 +28,8 @@ const RETH: &str = "reth";
 #[derive(Debug)]
 pub struct RethInstance {
     pid: Child,
+    private_keys: Vec<SecretKey>,
+    addresses: Vec<Address>,
     http_port: u16,
     ws_port: u16,
     auth_port: Option<u16>,
@@ -33,23 +40,34 @@ pub struct RethInstance {
 }
 
 impl RethInstance {
-    /// Returns the HTTP port of this instance
+    /// Returns the private keys used to instantiate this instance.
+    /// Only available in dev mode.
+    pub fn keys(&self) -> &[SecretKey] {
+        &self.private_keys
+    }
+
+    /// Returns the addresses used to instantiate this instance
+    pub fn addresses(&self) -> &[Address] {
+        &self.addresses
+    }
+
+    /// Returns the HTTP port of this instance.
     pub const fn http_port(&self) -> u16 {
         self.http_port
     }
 
-    /// Returns the WS port of this instance
+    /// Returns the WS port of this instance.
     pub const fn ws_port(&self) -> u16 {
         self.ws_port
     }
 
-    /// Returns the auth port of this instance
+    /// Returns the auth port of this instance.
     pub const fn auth_port(&self) -> Option<u16> {
         self.auth_port
     }
 
-    /// Returns the p2p port of this instance
-    /// If discovery is disabled, this will be `None`
+    /// Returns the p2p port of this instance.
+    /// If discovery is disabled, this will be `None`.
     pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
     }
@@ -95,8 +113,8 @@ impl RethInstance {
     ///
     /// This leaves a `None` in its place, so calling methods that require a stdout to be present
     /// will fail if called after this.
-    pub fn stdout(&mut self) -> Result<ChildStdout, NodeInstanceError> {
-        self.pid.stdout.take().ok_or(NodeInstanceError::NoStdout)
+    pub fn stdout(&mut self) -> Result<ChildStdout, NodeError> {
+        self.pid.stdout.take().ok_or(NodeError::NoStdout)
     }
 }
 
@@ -269,6 +287,9 @@ impl Reth {
         cmd.arg("node");
 
         // If the `dev` flag is set, enable it.
+        let mut private_keys = Vec::new();
+        let mut addresses = Vec::new();
+
         if self.dev {
             // Enable the dev mode.
             // This mode uses a local proof-of-authority consensus engine with either fixed block
@@ -282,6 +303,9 @@ impl Reth {
             if let Some(block_time) = self.block_time {
                 cmd.arg("--dev.block-time").arg(block_time);
             }
+
+            // Set the default keys and addresses that are used in dev mode.
+            (private_keys, addresses) = get_default_keys();
         }
 
         // If IPC is not enabled on the builder, disable it.
@@ -411,6 +435,8 @@ impl Reth {
 
         Ok(RethInstance {
             pid: child,
+            private_keys,
+            addresses,
             http_port,
             ws_port,
             p2p_port: if p2p_port != 0 { Some(p2p_port) } else { None },

@@ -2,7 +2,9 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
-use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, TransactionRequest};
+use alloy_rpc_types_eth::{
+    Block, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
+};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -122,8 +124,8 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_many(
         &self,
-        txs: Vec<TransactionRequest>,
-        block: BlockId,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
 }
@@ -208,11 +210,11 @@ where
 
     async fn debug_trace_call_many(
         &self,
-        txs: Vec<TransactionRequest>,
-        block: BlockId,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
-        self.client().request("debug_traceCallMany", (txs, block, trace_options)).await
+        self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
     }
 }
 
@@ -222,11 +224,11 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
 
     #[tokio::test]
-    async fn test_debug_trace_transaction() {
+    async fn debug_trace_transaction() {
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
         let from = provider.default_signer_address();
 
@@ -251,7 +253,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_debug_trace_call() {
+    async fn debug_trace_call() {
         let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let from = provider.default_signer_address();
         let gas_price = provider.get_gas_price().await.unwrap();
@@ -276,7 +278,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn call_debug_get_raw_header() {
+    async fn debug_get_raw_header() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -292,7 +294,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn call_debug_get_raw_block() {
+    async fn debug_get_raw_block() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -308,7 +310,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn call_debug_get_raw_receipts() {
+    async fn debug_get_raw_receipts() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
@@ -321,13 +323,52 @@ mod test {
     }
 
     #[tokio::test]
-    async fn call_debug_get_bad_blocks() {
+    async fn debug_get_bad_blocks() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let result = provider.debug_get_bad_blocks().await;
             assert!(result.is_ok());
+        })
+        .await
+    }
+
+    #[tokio::test]
+    async fn debug_trace_call_many() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider =
+                ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+
+            let accounts = reth.addresses();
+            let alice = &accounts[0];
+            let bob = &accounts[1];
+
+            let tx1 = TransactionRequest::default()
+                .with_from(*alice)
+                .with_to(*bob)
+                .with_nonce(0)
+                .with_value(U256::from(100));
+
+            let tx2 = TransactionRequest::default()
+                .with_from(*bob)
+                .with_to(*alice)
+                .with_nonce(1)
+                .with_value(U256::from(100));
+
+            let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
+            let state_context = StateContext::default();
+            let trace_options = GethDebugTracingCallOptions::default();
+            let result =
+                provider.debug_trace_call_many(bundles, state_context, trace_options).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string(&traces).unwrap(),
+                r#"[[{"failed":false,"gas":21000,"returnValue":"","structLogs":[]},{"failed":false,"gas":21000,"returnValue":"","structLogs":[]}]]"#,
+            );
         })
         .await
     }

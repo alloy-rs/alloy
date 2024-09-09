@@ -2,7 +2,7 @@
 
 use crate::{
     utils::{extract_endpoint, extract_value, unused_port},
-    NodeError, NodeInstanceError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
@@ -139,22 +139,22 @@ impl GethInstance {
     ///
     /// This leaves a `None` in its place, so calling methods that require a stderr to be present
     /// will fail if called after this.
-    pub fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
-        self.pid.stderr.take().ok_or(NodeInstanceError::NoStderr)
+    pub fn stderr(&mut self) -> Result<ChildStderr, NodeError> {
+        self.pid.stderr.take().ok_or(NodeError::NoStderr)
     }
 
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeInstanceError::NoStderr)?;
+    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
+        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
         let start = Instant::now();
 
         while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
             line.clear();
-            err_reader.read_line(&mut line).map_err(NodeInstanceError::ReadLineError)?;
+            err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             // geth ids are truncated
             let truncated_id = if id.len() > 16 { &id[..16] } else { id };
@@ -162,7 +162,7 @@ impl GethInstance {
                 return Ok(());
             }
         }
-        Err(NodeInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
+        Err(NodeError::Timeout)
     }
 }
 
