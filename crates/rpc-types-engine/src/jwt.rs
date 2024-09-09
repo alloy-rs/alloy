@@ -250,6 +250,7 @@ impl JwtSecret {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::fmt::Debug for JwtSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JwtSecretHash").field(&"{{}}").finish()
@@ -269,6 +270,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use jsonwebtoken::{encode, EncodingKey, Header};
+    #[cfg(feature = "std")]
     use std::time::{SystemTime, UNIX_EPOCH};
     use tempfile::tempdir;
 
@@ -419,6 +421,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn ephemeral_secret_created() {
         let fpath: &Path = Path::new("secret0.hex");
         assert!(fs::metadata(fpath).is_err());
@@ -428,6 +431,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn valid_secret_provided() {
         let fpath = Path::new("secret1.hex");
         assert!(fs::metadata(fpath).is_err());
@@ -447,6 +451,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn invalid_hex_provided() {
         let fpath = Path::new("secret2.hex");
         fs::write(fpath, "invalid hex").unwrap();
@@ -456,6 +461,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn provided_file_not_exists() {
         let fpath = Path::new("secret3.hex");
         let result = JwtSecret::from_file(fpath);
@@ -464,12 +470,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn provided_file_is_a_directory() {
         let dir = tempdir().unwrap();
         let result = JwtSecret::from_file(dir.path());
         assert_matches!(result, Err(JwtError::Read {source: _,path}) if path == dir.into_path());
     }
 
+    #[cfg(feature = "std")]
     fn to_u64(time: SystemTime) -> u64 {
         time.duration_since(UNIX_EPOCH).unwrap().as_secs()
     }
