@@ -292,7 +292,7 @@ where
     async fn send_transaction_internal(
         &self,
         mut tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<'life0, T, N>> {
         tx = self.fill_inner(tx).await?;
 
         if let Some(builder) = tx.as_builder() {
