@@ -156,11 +156,10 @@ impl From<U256> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, PartialEq, Eq, derive_more::Display)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
-    #[cfg_attr(feature = "std", error("`from_block` ({from}) is greater than `to_block` ({to})"))]
+    #[display("`from_block` ({from}) is greater than `to_block` ({to})")]
     FromBlockGreaterThanToBlock {
         /// The starting block number, which is greater than `to`.
         from: u64,
@@ -168,6 +167,9 @@ pub enum FilterBlockError {
         to: u64,
     },
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for FilterBlockError {}
 
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

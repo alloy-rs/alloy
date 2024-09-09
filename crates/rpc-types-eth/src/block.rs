@@ -249,15 +249,24 @@ impl HeaderResponse for Header {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Clone, Copy, Debug, derive_more::Display)]
 pub enum BlockError {
     /// A transaction failed sender recovery
-    #[cfg_attr(feature = "std", error("transaction failed sender recovery"))]
+    #[display("transaction failed sender recovery")]
     InvalidSignature,
     /// A raw block failed to decode
-    #[cfg_attr(feature = "std", error("failed to decode raw block {0}"))]
+    #[display("failed to decode raw block {_0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for BlockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::RlpDecodeRawBlock(err) => Some(err),
+            _ => None,
+        }
+    }
 }
 
 impl From<Block> for WithOtherFields<Block> {

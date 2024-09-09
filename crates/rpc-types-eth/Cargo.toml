@@ -27,13 +27,11 @@ alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 
 hashbrown = { workspace = true, features = ["serde"] }
+derive_more = { workspace = true, features = ["display"] }
 
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-
-# std
-thiserror = { workspace = true, optional = true }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
@@ -59,7 +57,7 @@ assert_matches.workspace = true
 
 [features]
 default = ["std"]
-std = ["dep:thiserror", "alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
+std = ["alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
 arbitrary = [
     "std",
     "dep:arbitrary",

@@ -936,12 +936,14 @@ impl From<TxEnvelope> for TransactionRequest {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default)]
-#[cfg_attr(feature = "std", derive(thiserror::Error))]
-#[cfg_attr(feature = "std", error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data"))]
+#[derive(Debug, Default, derive_more::Display)]
+#[display("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
+
+#[cfg(feature = "std")]
+impl std::error::Error for TransactionInputError {}
 
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]
