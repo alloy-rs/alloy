@@ -840,7 +840,14 @@ pub enum PayloadError {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for PayloadError {}
+impl std::error::Error for PayloadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Decode(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 impl PayloadError {
     /// Returns `true` if the error is caused by a block hash mismatch.
