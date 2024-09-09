@@ -11,7 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::{Transport, TransportResult};
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
-pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
+pub type TraceCallList<'a, 'b, N> = [(&'a <N as Network>::TransactionRequest, &'b [TraceType])];
 
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -40,10 +40,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    fn trace_call_many<'a>(
+    fn trace_call_many<'a, 'b>(
         &self,
-        request: &'a TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, &'a TraceCallList<'a, N>, TraceResults>;
+        request: &'a TraceCallList<'a, 'b, N>,
+    ) -> RpcWithBlock<T, &'a TraceCallList<'a, 'b, N>, TraceResults>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -115,10 +115,12 @@ where
         RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_types))
     }
 
-    fn trace_call_many<'a>(
+    fn trace_call_many<'a, 'b>(
         &self,
-        request: &'a TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, &'a TraceCallList<'a, N>, TraceResults> {
+        request: &'a TraceCallList<'a, 'b, N>,
+    ) -> RpcWithBlock<T, &'a TraceCallList<'a, 'b, N>, TraceResults> {
+        println!("{:?}", request);
+
         RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
@@ -178,7 +180,10 @@ where
 mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
+    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    use alloy_primitives::U256;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     use super::*;
 
@@ -193,7 +198,62 @@ mod test {
             assert!(result.is_ok());
 
             let traces = result.unwrap();
-            assert_eq!(traces.len(), 0);
+            assert_eq!(serde_json::to_string(&traces).unwrap(), "[]");
+        })
+        .await
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn trace_call() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let accounts = reth.addresses();
+            let alice = &accounts[0];
+            let bob = &accounts[1];
+
+            let tx = TransactionRequest::default()
+                .with_from(*alice)
+                .with_to(*bob)
+                .with_nonce(0)
+                .with_value(U256::from(100));
+
+            let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
+{
+  "output": "0x",
+  "stateDiff": null,
+  "trace": [
+    {
+      "type": "call",
+      "action": {
+        "from": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+        "callType": "call",
+        "gas": "0x2fa9e78",
+        "input": "0x",
+        "to": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+        "value": "0x64"
+      },
+      "result": {
+        "gasUsed": "0x0",
+        "output": "0x"
+      },
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "vmTrace": null
+}
+"#
+                .trim(),
+            );
         })
         .await
     }
@@ -204,6 +264,27 @@ mod test {
         run_with_tempdir("reth-test-", |temp_dir| async move {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let accounts = reth.addresses();
+            let alice = &accounts[0];
+            let bob = &accounts[1];
+
+            let tx1 = TransactionRequest::default()
+                .with_from(*alice)
+                .with_to(*bob)
+                .with_nonce(0)
+                .with_value(U256::from(100));
+
+            let tx2 = TransactionRequest::default()
+                .with_from(*alice)
+                .with_to(*bob)
+                .with_nonce(1)
+                .with_value(U256::from(100));
+
+            let result = provider
+                .trace_call_many(&[(&tx1, &[TraceType::Trace]), (&tx2, &[TraceType::Trace])])
+                .await;
+            println!("{:?}", result);
         })
         .await
     }
