@@ -287,8 +287,8 @@ impl Reth {
         cmd.arg("node");
 
         // If the `dev` flag is set, enable it.
-        let mut private_keys = Vec::new();
         let mut addresses = Vec::new();
+        let mut private_keys = Vec::new();
 
         if self.dev {
             // Enable the dev mode.
@@ -305,7 +305,7 @@ impl Reth {
             }
 
             // Set the default keys and addresses that are used in dev mode.
-            (private_keys, addresses) = get_default_keys();
+            (addresses, private_keys) = get_default_keys();
         }
 
         // If IPC is not enabled on the builder, disable it.

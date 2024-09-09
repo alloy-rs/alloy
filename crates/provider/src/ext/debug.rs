@@ -335,6 +335,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg(not(windows))]
     async fn debug_trace_call_many() {
         run_with_tempdir("reth-test-", |temp_dir| async move {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
