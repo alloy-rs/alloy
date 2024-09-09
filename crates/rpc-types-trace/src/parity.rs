@@ -497,16 +497,12 @@ impl Serialize for LocalizedTransactionTrace {
 
         if let Some(error) = error {
             s.serialize_field("error", error)?;
-        }
-
-        match result {
-            Some(TraceOutput::Call(call)) => {
-                s.serialize_field("result", call)?;
+        } else {
+            match result {
+                Some(TraceOutput::Call(call)) => s.serialize_field("result", call)?,
+                Some(TraceOutput::Create(create)) => s.serialize_field("result", create)?,
+                None => s.serialize_field("result", &None as &Option<u8>)?,
             }
-            Some(TraceOutput::Create(create)) => {
-                s.serialize_field("result", create)?;
-            }
-            None => {}
         }
 
         s.serialize_field("subtraces", &subtraces)?;
