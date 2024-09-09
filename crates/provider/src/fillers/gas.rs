@@ -155,7 +155,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        if tx.gas_price().is_some() || tx.access_list().is_some() {
+        if tx.gas_price().is_some() {
             self.prepare_legacy(provider, tx).await
         } else {
             match self.prepare_1559(provider, tx).await {
@@ -288,25 +288,5 @@ mod tests {
         let receipt = tx.get_receipt().await.unwrap();
 
         assert_eq!(receipt.gas_used, 0x5208);
-    }
-
-    #[tokio::test]
-    async fn non_eip1559_network() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil();
-
-        let tx = TransactionRequest {
-            from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),
-            value: Some(U256::from(100)),
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            // access list forces legacy gassing
-            access_list: Some(vec![Default::default()].into()),
-            ..Default::default()
-        };
-
-        let tx = provider.send_transaction(tx).await.unwrap();
-
-        let receipt = tx.get_receipt().await.unwrap();
-
-        assert_eq!(receipt.effective_gas_price, 2000000000);
     }
 }
