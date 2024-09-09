@@ -6,6 +6,7 @@ no_std_packages=(
     alloy-genesis
     alloy-serde
     alloy-consensus
+    alloy-rpc-types-engine
 )
 
 for package in "${no_std_packages[@]}"; do

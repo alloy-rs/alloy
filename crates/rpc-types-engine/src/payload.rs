@@ -1,7 +1,7 @@
 //! Payload types.
 
-#[cfg(not(feature = "jwt"))]
-use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use alloc::{string::{ToString, String}, vec::Vec};
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{
     eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
@@ -771,58 +771,58 @@ impl<'de> Deserialize<'de> for ExecutionPayload {
 }
 
 /// Error that can occur when handling payloads.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, derive_more::Display)]
 pub enum PayloadError {
     /// Invalid payload extra data.
-    #[error("invalid payload extra data: {0}")]
+    #[display("invalid payload extra data: {_0}")]
     ExtraData(Bytes),
     /// Invalid payload base fee.
-    #[error("invalid payload base fee: {0}")]
+    #[display("invalid payload base fee: {_0}")]
     BaseFee(U256),
     /// Invalid payload blob gas used.
-    #[error("invalid payload blob gas used: {0}")]
+    #[display("invalid payload blob gas used: {_0}")]
     BlobGasUsed(U256),
     /// Invalid payload excess blob gas.
-    #[error("invalid payload excess blob gas: {0}")]
+    #[display("invalid payload excess blob gas: {_0}")]
     ExcessBlobGas(U256),
     /// withdrawals present in pre-shanghai payload.
-    #[error("withdrawals present in pre-shanghai payload")]
+    #[display("withdrawals present in pre-shanghai payload")]
     PreShanghaiBlockWithWitdrawals,
     /// withdrawals missing in post-shanghai payload.
-    #[error("withdrawals missing in post-shanghai payload")]
+    #[display("withdrawals missing in post-shanghai payload")]
     PostShanghaiBlockWithoutWitdrawals,
     /// blob transactions present in pre-cancun payload.
-    #[error("blob transactions present in pre-cancun payload")]
+    #[display("blob transactions present in pre-cancun payload")]
     PreCancunBlockWithBlobTransactions,
     /// blob gas used present in pre-cancun payload.
-    #[error("blob gas used present in pre-cancun payload")]
+    #[display("blob gas used present in pre-cancun payload")]
     PreCancunBlockWithBlobGasUsed,
     /// excess blob gas present in pre-cancun payload.
-    #[error("excess blob gas present in pre-cancun payload")]
+    #[display("excess blob gas present in pre-cancun payload")]
     PreCancunBlockWithExcessBlobGas,
     /// cancun fields present in pre-cancun payload.
-    #[error("cancun fields present in pre-cancun payload")]
+    #[display("cancun fields present in pre-cancun payload")]
     PreCancunWithCancunFields,
     /// blob transactions missing in post-cancun payload.
-    #[error("blob transactions missing in post-cancun payload")]
+    #[display("blob transactions missing in post-cancun payload")]
     PostCancunBlockWithoutBlobTransactions,
     /// blob gas used missing in post-cancun payload.
-    #[error("blob gas used missing in post-cancun payload")]
+    #[display("blob gas used missing in post-cancun payload")]
     PostCancunBlockWithoutBlobGasUsed,
     /// excess blob gas missing in post-cancun payload.
-    #[error("excess blob gas missing in post-cancun payload")]
+    #[display("excess blob gas missing in post-cancun payload")]
     PostCancunBlockWithoutExcessBlobGas,
     /// cancun fields missing in post-cancun payload.
-    #[error("cancun fields missing in post-cancun payload")]
+    #[display("cancun fields missing in post-cancun payload")]
     PostCancunWithoutCancunFields,
     /// blob transactions present in pre-prague payload.
-    #[error("eip 7702 transactions present in pre-prague payload")]
+    #[display("eip 7702 transactions present in pre-prague payload")]
     PrePragueBlockWithEip7702Transactions,
     /// requests present in pre-prague payload.
-    #[error("requests present in pre-prague payload")]
+    #[display("requests present in pre-prague payload")]
     PrePragueBlockRequests,
     /// Invalid payload block hash.
-    #[error("block hash mismatch: want {consensus}, got {execution}")]
+    #[display("block hash mismatch: want {consensus}, got {execution}")]
     BlockHash {
         /// The block hash computed from the payload.
         execution: B256,
@@ -830,12 +830,15 @@ pub enum PayloadError {
         consensus: B256,
     },
     /// Expected blob versioned hashes do not match the given transactions.
-    #[error("expected blob versioned hashes do not match the given transactions")]
+    #[display("expected blob versioned hashes do not match the given transactions")]
     InvalidVersionedHashes,
     /// Encountered decoding error.
-    #[error(transparent)]
-    Decode(#[from] alloy_rlp::Error),
+    #[display("{_0}")]
+    Decode(alloy_rlp::Error),
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for PayloadError {}
 
 impl PayloadError {
     /// Returns `true` if the error is caused by a block hash mismatch.
@@ -1072,16 +1075,16 @@ impl core::fmt::Display for PayloadStatusEnum {
 /// Various errors that can occur when validating a payload or forkchoice update.
 ///
 /// This is intended for the [PayloadStatusEnum::Invalid] variant.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::Display)]
 pub enum PayloadValidationError {
     /// Thrown when a forkchoice update's head links to a previously rejected payload.
-    #[error("links to previously rejected block")]
+    #[display("links to previously rejected block")]
     LinksToRejectedPayload,
     /// Thrown when a new payload contains a wrong block number.
-    #[error("invalid block number")]
+    #[display("invalid block number")]
     InvalidBlockNumber,
     /// Thrown when a new payload contains a wrong state root
-    #[error("invalid merkle root: (remote: {remote:?} local: {local:?})")]
+    #[display("invalid merkle root: (remote: {remote:?} local: {local:?})")]
     InvalidStateRoot {
         /// The state root of the payload we received from remote (CL)
         remote: B256,
@@ -1090,9 +1093,14 @@ pub enum PayloadValidationError {
     },
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for PayloadValidationError {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec;
 
     #[test]
     fn serde_payload_status() {

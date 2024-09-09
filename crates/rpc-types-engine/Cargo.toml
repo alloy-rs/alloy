@@ -31,8 +31,9 @@ alloy-eips = { workspace = true, features = ["serde"] }
 ethereum_ssz_derive = { workspace = true, optional = true }
 ethereum_ssz = { workspace = true, optional = true }
 
+# misc
 serde = { workspace = true, features = ["derive"] }
-thiserror.workspace = true
+derive_more = { workspace = true, features = ["display"] }
 
 # jsonrpsee
 jsonrpsee-types = { version = "0.24", optional = true }
@@ -43,7 +44,8 @@ rand = { workspace = true, optional = true }
 
 [features]
 default = ["jwt"]
-jwt = ["alloy-consensus/std", "dep:jsonwebtoken", "dep:rand"]
+std = ["alloy-consensus/std", "derive_more/std"]
+jwt = ["std", "dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]

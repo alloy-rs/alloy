@@ -1,7 +1,10 @@
 //! Client identification: <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md>
 
-use serde::{Deserialize, Serialize};
+#[cfg(not(feature = "std"))]
+use alloc::string::{String, ToString};
+
 use core::str::FromStr;
+use serde::{Deserialize, Serialize};
 
 /// This enum defines a standard for specifying a client with just two letters. Clients teams which
 /// have a code reserved in this list MUST use this code when identifying themselves.
