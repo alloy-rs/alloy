@@ -1,0 +1,266 @@
+alloy-rpc-types-engine v0.3.1 (/Users/andreasbigger/alloy-fork/crates/rpc-types-engine)
+├── alloy-consensus v0.3.1 (/Users/andreasbigger/alloy-fork/crates/consensus)
+│   ├── alloy-eips v0.3.1 (/Users/andreasbigger/alloy-fork/crates/eips)
+│   │   ├── alloy-eip2930 v0.1.0
+│   │   │   ├── alloy-primitives v0.8.2
+│   │   │   │   ├── alloy-rlp v0.3.8
+│   │   │   │   │   ├── alloy-rlp-derive v0.3.8 (proc-macro)
+│   │   │   │   │   │   ├── proc-macro2 v1.0.86
+│   │   │   │   │   │   │   └── unicode-ident v1.0.12
+│   │   │   │   │   │   ├── quote v1.0.37
+│   │   │   │   │   │   │   └── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   │   └── syn v2.0.77
+│   │   │   │   │   │       ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   │       ├── quote v1.0.37 (*)
+│   │   │   │   │   │       └── unicode-ident v1.0.12
+│   │   │   │   │   ├── arrayvec v0.7.6
+│   │   │   │   │   └── bytes v1.7.1
+│   │   │   │   │       └── serde v1.0.210
+│   │   │   │   │           └── serde_derive v1.0.210 (proc-macro)
+│   │   │   │   │               ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │               ├── quote v1.0.37 (*)
+│   │   │   │   │               └── syn v2.0.77 (*)
+│   │   │   │   ├── arbitrary v1.3.2
+│   │   │   │   │   └── derive_arbitrary v1.3.2 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │       ├── quote v1.0.37 (*)
+│   │   │   │   │       └── syn v2.0.77 (*)
+│   │   │   │   ├── bytes v1.7.1 (*)
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   ├── const-hex v1.12.0
+│   │   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   │   └── serde v1.0.210 (*)
+│   │   │   │   ├── derive_arbitrary v1.3.2 (proc-macro) (*)
+│   │   │   │   ├── derive_more v1.0.0
+│   │   │   │   │   └── derive_more-impl v1.0.0 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │       ├── quote v1.0.37 (*)
+│   │   │   │   │       ├── syn v2.0.77 (*)
+│   │   │   │   │       └── unicode-xid v0.2.5
+│   │   │   │   ├── getrandom v0.2.15
+│   │   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   │   └── libc v0.2.158
+│   │   │   │   ├── hex-literal v0.4.1
+│   │   │   │   ├── itoa v1.0.11
+│   │   │   │   ├── proptest v1.5.0
+│   │   │   │   │   ├── bit-set v0.5.3
+│   │   │   │   │   │   └── bit-vec v0.6.3
+│   │   │   │   │   ├── bit-vec v0.6.3
+│   │   │   │   │   ├── bitflags v2.6.0
+│   │   │   │   │   ├── lazy_static v1.5.0
+│   │   │   │   │   ├── num-traits v0.2.19
+│   │   │   │   │   │   └── libm v0.2.8
+│   │   │   │   │   │   [build-dependencies]
+│   │   │   │   │   │   └── autocfg v1.3.0
+│   │   │   │   │   ├── rand v0.8.5
+│   │   │   │   │   │   ├── libc v0.2.158
+│   │   │   │   │   │   ├── rand_chacha v0.3.1
+│   │   │   │   │   │   │   ├── ppv-lite86 v0.2.20
+│   │   │   │   │   │   │   │   └── zerocopy v0.7.35
+│   │   │   │   │   │   │   │       ├── byteorder v1.5.0
+│   │   │   │   │   │   │   │       └── zerocopy-derive v0.7.35 (proc-macro)
+│   │   │   │   │   │   │   │           ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   │   │   │           ├── quote v1.0.37 (*)
+│   │   │   │   │   │   │   │           └── syn v2.0.77 (*)
+│   │   │   │   │   │   │   └── rand_core v0.6.4
+│   │   │   │   │   │   │       └── getrandom v0.2.15 (*)
+│   │   │   │   │   │   └── rand_core v0.6.4 (*)
+│   │   │   │   │   ├── rand_chacha v0.3.1 (*)
+│   │   │   │   │   ├── rand_xorshift v0.3.0
+│   │   │   │   │   │   └── rand_core v0.6.4 (*)
+│   │   │   │   │   ├── regex-syntax v0.8.4
+│   │   │   │   │   ├── rusty-fork v0.3.0
+│   │   │   │   │   │   ├── fnv v1.0.7
+│   │   │   │   │   │   ├── quick-error v1.2.3
+│   │   │   │   │   │   ├── tempfile v3.12.0
+│   │   │   │   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   │   │   │   ├── fastrand v2.1.1
+│   │   │   │   │   │   │   ├── once_cell v1.19.0
+│   │   │   │   │   │   │   └── rustix v0.38.36
+│   │   │   │   │   │   │       ├── bitflags v2.6.0
+│   │   │   │   │   │   │       ├── errno v0.3.9
+│   │   │   │   │   │   │       │   └── libc v0.2.158
+│   │   │   │   │   │   │       └── libc v0.2.158
+│   │   │   │   │   │   └── wait-timeout v0.2.0
+│   │   │   │   │   │       └── libc v0.2.158
+│   │   │   │   │   ├── tempfile v3.12.0 (*)
+│   │   │   │   │   └── unarray v0.1.4
+│   │   │   │   ├── proptest-derive v0.5.0 (proc-macro)
+│   │   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   ├── quote v1.0.37 (*)
+│   │   │   │   │   └── syn v2.0.77 (*)
+│   │   │   │   ├── rand v0.8.5 (*)
+│   │   │   │   ├── ruint v1.12.3
+│   │   │   │   │   ├── alloy-rlp v0.3.8 (*)
+│   │   │   │   │   ├── arbitrary v1.3.2 (*)
+│   │   │   │   │   ├── proptest v1.5.0 (*)
+│   │   │   │   │   ├── rand v0.8.5 (*)
+│   │   │   │   │   ├── ruint-macro v1.2.1 (proc-macro)
+│   │   │   │   │   └── serde v1.0.210 (*)
+│   │   │   │   ├── serde v1.0.210 (*)
+│   │   │   │   └── tiny-keccak v2.0.2
+│   │   │   │       └── crunchy v0.2.2
+│   │   │   ├── alloy-rlp v0.3.8 (*)
+│   │   │   └── serde v1.0.210 (*)
+│   │   ├── alloy-eip7702 v0.1.0
+│   │   │   ├── alloy-primitives v0.8.2 (*)
+│   │   │   ├── alloy-rlp v0.3.8 (*)
+│   │   │   └── serde v1.0.210 (*)
+│   │   ├── alloy-primitives v0.8.2 (*)
+│   │   ├── alloy-rlp v0.3.8 (*)
+│   │   ├── alloy-serde v0.3.1 (/Users/andreasbigger/alloy-fork/crates/serde)
+│   │   │   ├── alloy-primitives v0.8.2 (*)
+│   │   │   ├── serde v1.0.210 (*)
+│   │   │   └── serde_json v1.0.128
+│   │   │       ├── itoa v1.0.11
+│   │   │       ├── memchr v2.7.4
+│   │   │       ├── ryu v1.0.18
+│   │   │       └── serde v1.0.210 (*)
+│   │   ├── c-kzg v1.0.3
+│   │   │   ├── blst v0.3.13
+│   │   │   │   ├── threadpool v1.8.1
+│   │   │   │   │   └── num_cpus v1.16.0
+│   │   │   │   │       └── libc v0.2.158
+│   │   │   │   └── zeroize v1.8.1
+│   │   │   │       └── zeroize_derive v1.4.2 (proc-macro)
+│   │   │   │           ├── proc-macro2 v1.0.86 (*)
+│   │   │   │           ├── quote v1.0.37 (*)
+│   │   │   │           └── syn v2.0.77 (*)
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── cc v1.1.18
+│   │   │   │       └── shlex v1.3.0
+│   │   │   ├── hex v0.4.3
+│   │   │   ├── libc v0.2.158
+│   │   │   └── serde v1.0.210 (*)
+│   │   │   [build-dependencies]
+│   │   │   └── cc v1.1.18 (*)
+│   │   ├── derive_more v1.0.0 (*)
+│   │   ├── once_cell v1.19.0
+│   │   ├── serde v1.0.210 (*)
+│   │   └── sha2 v0.10.8
+│   │       ├── cfg-if v1.0.0
+│   │       ├── cpufeatures v0.2.14
+│   │       │   └── libc v0.2.158
+│   │       └── digest v0.10.7
+│   │           ├── block-buffer v0.10.4
+│   │           │   └── generic-array v0.14.7
+│   │           │       └── typenum v1.17.0
+│   │           │       [build-dependencies]
+│   │           │       └── version_check v0.9.5
+│   │           └── crypto-common v0.1.6
+│   │               ├── generic-array v0.14.7 (*)
+│   │               └── typenum v1.17.0
+│   ├── alloy-primitives v0.8.2 (*)
+│   ├── alloy-rlp v0.3.8 (*)
+│   ├── alloy-serde v0.3.1 (/Users/andreasbigger/alloy-fork/crates/serde) (*)
+│   ├── c-kzg v1.0.3 (*)
+│   └── serde v1.0.210 (*)
+├── alloy-eips v0.3.1 (/Users/andreasbigger/alloy-fork/crates/eips) (*)
+├── alloy-primitives v0.8.2 (*)
+├── alloy-rlp v0.3.8 (*)
+├── alloy-rpc-types-eth v0.3.1 (/Users/andreasbigger/alloy-fork/crates/rpc-types-eth)
+│   ├── alloy-consensus v0.3.1 (/Users/andreasbigger/alloy-fork/crates/consensus) (*)
+│   ├── alloy-eips v0.3.1 (/Users/andreasbigger/alloy-fork/crates/eips) (*)
+│   ├── alloy-network-primitives v0.3.1 (/Users/andreasbigger/alloy-fork/crates/network-primitives)
+│   │   ├── alloy-primitives v0.8.2 (*)
+│   │   ├── alloy-serde v0.3.1 (/Users/andreasbigger/alloy-fork/crates/serde) (*)
+│   │   └── serde v1.0.210 (*)
+│   ├── alloy-primitives v0.8.2 (*)
+│   ├── alloy-rlp v0.3.8 (*)
+│   ├── alloy-serde v0.3.1 (/Users/andreasbigger/alloy-fork/crates/serde) (*)
+│   ├── alloy-sol-types v0.8.2
+│   │   ├── alloy-primitives v0.8.2 (*)
+│   │   ├── alloy-sol-macro v0.8.2 (proc-macro)
+│   │   │   ├── alloy-sol-macro-expander v0.8.2
+│   │   │   │   ├── alloy-sol-macro-input v0.8.2
+│   │   │   │   │   ├── const-hex v1.12.0
+│   │   │   │   │   │   └── cfg-if v1.0.0
+│   │   │   │   │   ├── dunce v1.0.5
+│   │   │   │   │   ├── heck v0.5.0
+│   │   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   ├── quote v1.0.37 (*)
+│   │   │   │   │   ├── syn v2.0.77 (*)
+│   │   │   │   │   └── syn-solidity v0.8.2
+│   │   │   │   │       ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │       ├── quote v1.0.37 (*)
+│   │   │   │   │       └── syn v2.0.77 (*)
+│   │   │   │   ├── const-hex v1.12.0 (*)
+│   │   │   │   ├── heck v0.5.0
+│   │   │   │   ├── indexmap v2.5.0
+│   │   │   │   │   ├── equivalent v1.0.1
+│   │   │   │   │   └── hashbrown v0.14.5
+│   │   │   │   ├── proc-macro-error2 v2.0.1
+│   │   │   │   │   ├── proc-macro-error-attr2 v2.0.0 (proc-macro)
+│   │   │   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   │   └── quote v1.0.37 (*)
+│   │   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   │   ├── quote v1.0.37 (*)
+│   │   │   │   │   └── syn v2.0.77 (*)
+│   │   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   │   ├── quote v1.0.37 (*)
+│   │   │   │   ├── syn v2.0.77 (*)
+│   │   │   │   ├── syn-solidity v0.8.2 (*)
+│   │   │   │   └── tiny-keccak v2.0.2 (*)
+│   │   │   ├── alloy-sol-macro-input v0.8.2 (*)
+│   │   │   ├── proc-macro-error2 v2.0.1 (*)
+│   │   │   ├── proc-macro2 v1.0.86 (*)
+│   │   │   ├── quote v1.0.37 (*)
+│   │   │   └── syn v2.0.77 (*)
+│   │   └── const-hex v1.12.0 (*)
+│   ├── itertools v0.13.0
+│   │   └── either v1.13.0
+│   ├── serde v1.0.210 (*)
+│   ├── serde_json v1.0.128 (*)
+│   └── thiserror v1.0.63
+│       └── thiserror-impl v1.0.63 (proc-macro)
+│           ├── proc-macro2 v1.0.86 (*)
+│           ├── quote v1.0.37 (*)
+│           └── syn v2.0.77 (*)
+├── alloy-serde v0.3.1 (/Users/andreasbigger/alloy-fork/crates/serde) (*)
+├── derive_more v1.0.0 (*)
+├── jsonwebtoken v9.3.0
+│   ├── base64 v0.21.7
+│   ├── pem v3.0.4
+│   │   └── base64 v0.22.1
+│   ├── ring v0.17.8
+│   │   ├── cfg-if v1.0.0
+│   │   ├── getrandom v0.2.15 (*)
+│   │   ├── spin v0.9.8
+│   │   └── untrusted v0.9.0
+│   │   [build-dependencies]
+│   │   └── cc v1.1.18 (*)
+│   ├── serde v1.0.210 (*)
+│   ├── serde_json v1.0.128 (*)
+│   └── simple_asn1 v0.6.2
+│       ├── num-bigint v0.4.6
+│       │   ├── num-integer v0.1.46
+│       │   │   └── num-traits v0.2.19 (*)
+│       │   └── num-traits v0.2.19 (*)
+│       ├── num-traits v0.2.19 (*)
+│       ├── thiserror v1.0.63 (*)
+│       └── time v0.3.36
+│           ├── deranged v0.3.11
+│           │   └── powerfmt v0.2.0
+│           ├── itoa v1.0.11
+│           ├── num-conv v0.1.0
+│           ├── powerfmt v0.2.0
+│           ├── time-core v0.1.2
+│           └── time-macros v0.2.18 (proc-macro)
+│               ├── num-conv v0.1.0
+│               └── time-core v0.1.2
+├── rand v0.8.5 (*)
+└── serde v1.0.210 (*)
+[dev-dependencies]
+├── alloy-primitives v0.8.2 (*)
+├── arbitrary v1.3.2 (*)
+├── assert_matches v1.5.0
+├── rand v0.8.5 (*)
+├── serde_json v1.0.128 (*)
+├── similar-asserts v1.6.0
+│   ├── console v0.15.8
+│   │   ├── lazy_static v1.5.0
+│   │   └── libc v0.2.158
+│   └── similar v2.6.0
+│       └── unicode-segmentation v1.11.0
+└── tempfile v3.12.0 (*)

@@ -75,7 +75,7 @@ pub enum JwtError {
 
 impl From<hex::FromHexError> for JwtError {
     fn from(err: hex::FromHexError) -> Self {
-        JwtError::JwtSecretHexDecodeError(err)
+        Self::JwtSecretHexDecodeError(err)
     }
 }
 
