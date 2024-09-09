@@ -155,7 +155,7 @@ impl<N: Network> TxFiller<N> for GasFiller {
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        if tx.gas_price().is_some() {
+        if tx.gas_price().is_some() || tx.access_list().is_some() {
             self.prepare_legacy(provider, tx).await
         } else {
             match self.prepare_1559(provider, tx).await {
