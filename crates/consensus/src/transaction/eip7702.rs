@@ -1,6 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -50,10 +50,8 @@ pub struct TxEip7702 {
     /// This is also known as `GasTipCap`
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub max_priority_fee_per_gas: u128,
-    /// The 160-bit address of the message call’s recipient or, for a contract creation
-    /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
-    pub to: TxKind,
+    /// The 160-bit address of the message call’s recipient.
+    pub to: Address,
     /// A scalar value equal to the number of Wei to
     /// be transferred to the message call’s recipient or,
     /// in the case of contract creation, as an endowment
@@ -263,7 +261,7 @@ impl TxEip7702 {
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
+            mem::size_of::<Address>() + // to
         mem::size_of::<U256>() + // value
         self.access_list.size() + // access_list
         self.input.len() + // input
@@ -305,7 +303,7 @@ impl Transaction for TxEip7702 {
     }
 
     fn to(&self) -> TxKind {
-        self.to
+        self.to.into()
     }
 
     fn value(&self) -> U256 {
@@ -430,7 +428,7 @@ mod tests {
             max_fee_per_gas: 0x4a817c800,
             max_priority_fee_per_gas: 0x3b9aca00,
             gas_limit: 2,
-            to: TxKind::Create,
+            to: Address::default(),
             value: U256::ZERO,
             input: vec![1, 2].into(),
             access_list: Default::default(),

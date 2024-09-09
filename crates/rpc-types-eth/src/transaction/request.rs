@@ -314,6 +314,11 @@ impl TransactionRequest {
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
         let checked_to = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?;
 
+        let to_address = match checked_to {
+            TxKind::Create => return Err("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly."),
+            TxKind::Call(to) => to,
+        };
+
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
             nonce: self.nonce.ok_or("Missing 'nonce' field for Eip7702 transaction.")?,
@@ -324,7 +329,7 @@ impl TransactionRequest {
             max_priority_fee_per_gas: self
                 .max_priority_fee_per_gas
                 .ok_or("Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.")?,
-            to: checked_to,
+            to: to_address,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -808,7 +813,7 @@ impl From<TxEip4844Variant> for TransactionRequest {
 impl From<TxEip7702> for TransactionRequest {
     fn from(tx: TxEip7702) -> Self {
         Self {
-            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
+            to: Some(tx.to.into()),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),

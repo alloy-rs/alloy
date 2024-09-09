@@ -641,7 +641,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[cfg(feature = "serde")]
     #[test]

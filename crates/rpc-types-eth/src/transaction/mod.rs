@@ -269,7 +269,7 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
                 .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            to: tx.to.into(),
+            to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
             authorization_list: tx
