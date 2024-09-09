@@ -4,14 +4,19 @@ use alloy_rpc_client::WeakClient;
 use alloy_transport::{RpcError, Transport, TransportErrorKind, TransportResult};
 use std::borrow::Cow;
 
-/// A caller that helper convert `RpcWithBlock` and `EthCall` into a `ProviderCall`.
+// TODO: Make `EthCall` specific. Ref: https://github.com/alloy-rs/alloy/pull/788#discussion_r1748862509.
+
+/// Trait that helpes convert `EthCall` into a `ProviderCall`.
 pub trait Caller<T, Params, Resp>: Send + Sync
 where
     T: Transport + Clone,
     Params: RpcParam,
     Resp: RpcReturn,
 {
-    /// Methods that needs to be implemented to convert to a `ProviderCall`.
+    /// Method that needs to be implemented to convert to a `ProviderCall`.
+    ///
+    /// This method handles serialization of the params and sends the request to relevant data
+    /// source and returns a `ProviderCall`.
     fn call(
         &self,
         method: Cow<'static, str>,
