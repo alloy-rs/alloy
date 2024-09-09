@@ -1,7 +1,10 @@
 //! Payload types.
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::{ToString, String}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{
     eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
