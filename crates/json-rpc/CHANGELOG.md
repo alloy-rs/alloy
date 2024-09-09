@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [`json-rpc`] Implement From U256 and String for SubId ([#1226](https://github.com/alloy-rs/alloy/issues/1226))
 
+### Miscellaneous Tasks
+
+- Release 0.3.1
+
 ## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes
