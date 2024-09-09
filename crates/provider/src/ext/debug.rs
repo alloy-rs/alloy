@@ -2,10 +2,7 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
-use alloy_rpc_types_eth::{
-    state::StateOverride, Block, BlockId, BlockNumberOrTag, Bundle, EthCallResponse, StateContext,
-    TransactionRequest,
-};
+use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, TransactionRequest};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -129,15 +126,6 @@ pub trait DebugApi<N, T>: Send + Sync {
         block: BlockId,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
-
-    /// Simulate arbitrary number of transactions at an arbitrary blockchain index, with the
-    /// optionality of state overrides
-    async fn call_many(
-        &self,
-        tx: Bundle,
-        state_context: Option<StateContext>,
-        state_override: Option<StateOverride>,
-    ) -> TransportResult<Vec<EthCallResponse>>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -148,15 +136,6 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
-    async fn call_many(
-        &self,
-        tx: Bundle,
-        state_context: Option<StateContext>,
-        state_override: Option<StateOverride>,
-    ) -> TransportResult<Vec<EthCallResponse>> {
-        self.client().request("callMany", (tx, state_context, state_override)).await
-    }
-
     async fn debug_get_raw_header(&self, block: BlockId) -> TransportResult<Bytes> {
         self.client().request("debug_getRawHeader", (block,)).await
     }

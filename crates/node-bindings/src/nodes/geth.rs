@@ -1,8 +1,8 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, NodeError, NodeInstanceError,
-    NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    utils::{extract_endpoint, extract_value, unused_port},
+    NodeError, NodeInstanceError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
@@ -622,33 +622,20 @@ impl Geth {
 // These tests should use a different datadir for each `geth` spawned.
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use std::path::Path;
+    use crate::utils::run_with_tempdir_sync;
 
     #[test]
     fn port_0() {
-        run_with_tempdir(|_| {
+        run_with_tempdir_sync("geth-test-", |_| {
             let _geth = Geth::new().disable_discovery().port(0u16).spawn();
         });
     }
 
-    /// Allows running tests with a temporary directory, which is cleaned up after the function is
-    /// called.
-    ///
-    /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
-    /// directory is cleaned up.
-    #[track_caller]
-    fn run_with_tempdir(f: impl Fn(&Path)) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_dir_path = temp_dir.path();
-        f(temp_dir_path);
-        #[cfg(not(windows))]
-        temp_dir.close().unwrap();
-    }
-
     #[test]
     fn p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
             assert!(p2p_port.is_some());
@@ -657,7 +644,7 @@ mod tests {
 
     #[test]
     fn explicit_p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // if a p2p port is explicitly set, it should be used
             let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -667,7 +654,7 @@ mod tests {
 
     #[test]
     fn dev_mode() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // dev mode should not have a p2p port, and dev should be the default
             let geth = Geth::new().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -679,7 +666,7 @@ mod tests {
     #[ignore = "fails on geth >=1.14"]
     #[allow(deprecated)]
     fn clique_correctly_configured() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let private_key = SigningKey::random(&mut rand::thread_rng());
             let geth = Geth::new()
                 .set_clique_private_key(private_key)

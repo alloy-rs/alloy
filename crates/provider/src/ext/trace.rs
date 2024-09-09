@@ -10,9 +10,6 @@ use alloy_rpc_types_trace::{
 };
 use alloy_transport::{Transport, TransportResult};
 
-/// List of trace calls for use with [`TraceApi::trace_call_many`]
-pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
-
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -42,8 +39,8 @@ where
     /// Not all nodes support this call.
     fn trace_call_many<'a>(
         &self,
-        request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults>;
+        request: &'a [(N::TransactionRequest, Vec<TraceType>)],
+    ) -> RpcWithBlock<T, &'a [(N::TransactionRequest, Vec<TraceType>)], TraceResults>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -117,8 +114,9 @@ where
 
     fn trace_call_many<'a>(
         &self,
-        request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
+        request: &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)],
+    ) -> RpcWithBlock<T, &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)], TraceResults>
+    {
         RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
     }
 
@@ -178,18 +176,31 @@ where
 mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
 
     use super::*;
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
+    #[tokio::test]
+    async fn trace_block() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let result = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(traces.len(), 0);
+        })
+        .await
     }
 
     #[tokio::test]
-    async fn test_trace_block() {
-        init_tracing();
-        let provider = ProviderBuilder::new().on_anvil();
-        let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
-        assert_eq!(traces.len(), 0);
+    async fn trace_call_many() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        })
+        .await
     }
 }

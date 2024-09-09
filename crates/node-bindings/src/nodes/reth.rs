@@ -1,6 +1,6 @@
 //! Utilities for launching a Reth dev-mode instance.
 
-use crate::{extract_endpoint, NodeError, NodeInstanceError, NODE_STARTUP_TIMEOUT};
+use crate::{utils::extract_endpoint, NodeError, NodeInstanceError, NODE_STARTUP_TIMEOUT};
 use alloy_genesis::Genesis;
 use std::{
     fs::create_dir,
@@ -426,12 +426,12 @@ impl Reth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use crate::utils::run_with_tempdir_sync;
 
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
 
             assert_ports(&reth, false);
@@ -441,7 +441,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_sepolia() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
 
             assert_ports(&reth, false);
@@ -451,7 +451,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_dev() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
 
             assert_ports(&reth, true);
@@ -461,7 +461,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_genesis() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
                 .dev()
                 .disable_discovery()
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_dev_custom_blocktime() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
                 .dev()
                 .disable_discovery()
@@ -491,7 +491,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance1() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
 
             assert_eq!(reth.http_port(), 8545);
@@ -504,7 +504,7 @@ mod tests {
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth_p2p_instance2() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().instance(2).data_dir(temp_dir_path).spawn();
 
             assert_eq!(reth.http_port(), 8544);
@@ -512,19 +512,6 @@ mod tests {
             assert_eq!(reth.auth_port(), Some(8651));
             assert_eq!(reth.p2p_port(), Some(30304));
         });
-    }
-
-    /// Allows running tests with a temporary directory, which is cleaned up after the function is
-    /// called.
-    ///
-    /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
-    /// directory is cleaned up.
-    #[track_caller]
-    fn run_with_tempdir(f: impl Fn(&Path)) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_dir_path = temp_dir.path();
-        f(temp_dir_path);
-        temp_dir.close().unwrap();
     }
 
     // Asserts that the ports are set correctly for the given reth instance.
