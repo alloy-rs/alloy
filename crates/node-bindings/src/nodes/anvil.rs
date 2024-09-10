@@ -164,7 +164,7 @@ pub struct Anvil {
 
 impl Anvil {
     /// Creates an empty Anvil builder.
-    /// The default port is 8545. The mnemonic is chosen randomly.
+    /// The default port and the mnemonic are chosen randomly.
     ///
     /// # Example
     ///
@@ -408,8 +408,9 @@ mod tests {
 
     #[test]
     fn assert_chain_id() {
-        let anvil = Anvil::new().fork("https://eth.llamarpc.com	").spawn();
-        assert_eq!(anvil.chain_id(), 1);
+        let id = 99999;
+        let anvil = Anvil::new().chain_id(id).spawn();
+        assert_eq!(anvil.chain_id(), id);
     }
 
     #[test]

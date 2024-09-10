@@ -228,6 +228,22 @@ impl HeaderResponse for Header {
     fn next_block_blob_fee(&self) -> Option<u128> {
         self.next_block_blob_fee()
     }
+
+    fn coinbase(&self) -> Address {
+        self.miner
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.gas_limit
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.mix_hash
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.difficulty
+    }
 }
 
 /// Error that can occur when converting other types to blocks

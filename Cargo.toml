@@ -3,9 +3,9 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.2"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.79"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
@@ -113,7 +113,7 @@ rustls = { version = "0.23", default-features = false, features = [
 ] }
 tokio-test = "0.4"
 tokio-tungstenite = "0.23"
-tower = { version = "0.4", features = ["util"] }
+tower = { version = "0.5", features = ["util"] }
 
 # tracing
 tracing = "0.1"
@@ -124,7 +124,7 @@ auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
 home = "0.5"
-itertools = "0.13"
+itertools = { version = "0.13", default-features = false }
 once_cell = { version = "1.19", default-features = false }
 pin-project = "1.1"
 rand = "0.8"
@@ -133,7 +133,7 @@ semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
-derive_more = "1.0.0"
+derive_more = { version = "1.0.0", default-features = false }
 http = "1.1.0"
 
 ## serde

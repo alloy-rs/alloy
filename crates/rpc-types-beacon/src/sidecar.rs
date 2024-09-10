@@ -10,7 +10,29 @@ use std::vec::IntoIter;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
-    data: Vec<BlobData>,
+    pub data: Vec<BlobData>,
+}
+
+impl BeaconBlobBundle {
+    /// Creates a new [`BeaconBlobBundle`] from a given vector of [`BlobData`].
+    pub const fn new(data: Vec<BlobData>) -> Self {
+        Self { data }
+    }
+
+    /// Returns the number of blobs in the bundle.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns if the bundle is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Returns the blob with the given index.
+    pub fn get_blob(&self, index: u64) -> Option<&BlobData> {
+        self.data.iter().find(|blob| blob.index == index)
+    }
 }
 
 /// Yields an iterator for BlobData

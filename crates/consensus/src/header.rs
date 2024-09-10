@@ -1,6 +1,8 @@
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
+    merge::ALLOWED_FUTURE_BLOCK_TIME_SECONDS,
+    BlockNumHash,
 };
 use alloy_primitives::{
     b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
@@ -131,6 +133,12 @@ pub struct Header {
     /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes or
     /// fewer; formally Hx.
     pub extra_data: Bytes,
+}
+
+impl AsRef<Self> for Header {
+    fn as_ref(&self) -> &Self {
+        self
+    }
 }
 
 impl Default for Header {
@@ -344,6 +352,33 @@ impl Header {
 
         length
     }
+
+    /// Returns the parent block's number and hash
+    pub const fn parent_num_hash(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
+    }
+
+    /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
+    ///
+    /// This function is linked to EIP-3675, proposing the consensus upgrade to Proof-of-Stake:
+    /// [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675#replacing-difficulty-with-0)
+    ///
+    /// Verifies whether, as per the EIP, the block's difficulty is updated to zero,
+    /// signifying the transition to a Proof-of-Stake mechanism.
+    ///
+    /// Returns `true` if the block's difficulty matches the constant zero set by the EIP.
+    pub fn is_zero_difficulty(&self) -> bool {
+        self.difficulty.is_zero()
+    }
+
+    /// Checks if the block's timestamp is in the future based on the present timestamp.
+    ///
+    /// Clock can drift but this can be consensus issue.
+    ///
+    /// Note: This check is relevant only pre-merge.
+    pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
+        self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
+    }
 }
 
 impl Encodable for Header {
@@ -527,11 +562,87 @@ impl Decodable for Header {
     }
 }
 
-#[cfg(test)]
+/// Generates a header which is valid __with respect to past and future forks__. This means, for
+/// example, that if the withdrawals root is present, the base fee per gas is also present.
+///
+/// If blob gas used were present, then the excess blob gas and parent beacon block root are also
+/// present. In this example, the withdrawals root would also be present.
+///
+/// This __does not, and should not guarantee__ that the header is valid with respect to __anything
+/// else__.
+#[cfg(any(test, feature = "arbitrary"))]
+pub(crate) const fn generate_valid_header(
+    mut header: Header,
+    eip_4844_active: bool,
+    blob_gas_used: u128,
+    excess_blob_gas: u128,
+    parent_beacon_block_root: B256,
+) -> Header {
+    // Clear all related fields if EIP-1559 is inactive
+    if header.base_fee_per_gas.is_none() {
+        header.withdrawals_root = None;
+    }
+
+    // Set fields based on EIP-4844 being active
+    if eip_4844_active {
+        header.blob_gas_used = Some(blob_gas_used);
+        header.excess_blob_gas = Some(excess_blob_gas);
+        header.parent_beacon_block_root = Some(parent_beacon_block_root);
+    } else {
+        header.blob_gas_used = None;
+        header.excess_blob_gas = None;
+        header.parent_beacon_block_root = None;
+    }
+
+    // Placeholder for future EIP adjustments
+    header.requests_root = None;
+
+    header
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a> arbitrary::Arbitrary<'a> for Header {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // Generate an arbitrary header, passing it to the generate_valid_header function to make
+        // sure it is valid _with respect to hardforks only_.
+        let base = Self {
+            parent_hash: u.arbitrary()?,
+            ommers_hash: u.arbitrary()?,
+            beneficiary: u.arbitrary()?,
+            state_root: u.arbitrary()?,
+            transactions_root: u.arbitrary()?,
+            receipts_root: u.arbitrary()?,
+            logs_bloom: u.arbitrary()?,
+            difficulty: u.arbitrary()?,
+            number: u.arbitrary()?,
+            gas_limit: u.arbitrary()?,
+            gas_used: u.arbitrary()?,
+            timestamp: u.arbitrary()?,
+            extra_data: u.arbitrary()?,
+            mix_hash: u.arbitrary()?,
+            nonce: u.arbitrary()?,
+            base_fee_per_gas: u.arbitrary()?,
+            blob_gas_used: u.arbitrary()?,
+            excess_blob_gas: u.arbitrary()?,
+            parent_beacon_block_root: u.arbitrary()?,
+            requests_root: u.arbitrary()?,
+            withdrawals_root: u.arbitrary()?,
+        };
+
+        Ok(generate_valid_header(
+            base,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+        ))
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "serde")]
     #[test]
     fn header_serde() {
         let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;

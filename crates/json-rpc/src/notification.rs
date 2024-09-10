@@ -15,6 +15,18 @@ pub enum SubId {
     String(String),
 }
 
+impl From<U256> for SubId {
+    fn from(value: U256) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<String> for SubId {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
 /// An ethereum-style notification, not to be confused with a JSON-RPC
 /// notification.
 #[derive(Clone, Debug, Serialize, Deserialize)]
