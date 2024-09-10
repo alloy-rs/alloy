@@ -15,9 +15,9 @@ use crate::collections::{
 };
 use core::{
     hash::Hash,
+    iter::{FromIterator, IntoIterator},
     ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
-use core::iter::{FromIterator, IntoIterator};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
