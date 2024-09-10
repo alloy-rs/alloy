@@ -647,18 +647,18 @@ impl From<(B256, u64)> for NumHash {
     }
 }
 
-/// Either a block hash _or_ a block number
+/// Either a hash _or_ a block number
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 pub enum HashOrNumber {
-    /// A block hash
+    /// The hash
     Hash(B256),
-    /// A block number
+    /// The number
     Number(u64),
 }
 
-/// Either a hash _or_ a number
+/// A block hash _or_ a block number
 pub type BlockHashOrNumber = HashOrNumber;
 
 // === impl HashOrNumber ===
@@ -698,7 +698,7 @@ impl From<RpcBlockHash> for HashOrNumber {
     }
 }
 
-/// Allows for RLP encoding of either a block hash or block number
+/// Allows for RLP encoding of either a hash or a number
 impl Encodable for HashOrNumber {
     fn encode(&self, out: &mut dyn bytes::BufMut) {
         match self {
@@ -714,7 +714,7 @@ impl Encodable for HashOrNumber {
     }
 }
 
-/// Allows for RLP decoding of a block hash or block number
+/// Allows for RLP decoding of a hash or number
 impl Decodable for HashOrNumber {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header: u8 = *buf.first().ok_or(RlpError::InputTooShort)?;
