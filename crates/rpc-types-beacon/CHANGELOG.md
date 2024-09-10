@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.2
 - Add helpers for beacon blob bundle ([#1254](https://github.com/alloy-rs/alloy/issues/1254))
 
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02

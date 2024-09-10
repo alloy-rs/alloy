@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump tower to 0.5 ([#1249](https://github.com/alloy-rs/alloy/issues/1249))
 
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Miscellaneous Tasks

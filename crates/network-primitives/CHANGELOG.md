@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No_std network primitives ([#1248](https://github.com/alloy-rs/alloy/issues/1248))
 - [network-primitives] Expose more fields via block response traits ([#1229](https://github.com/alloy-rs/alloy/issues/1229))
 
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
 ### Other
 
 - Add getter trait methods to `ReceiptResponse` ([#1251](https://github.com/alloy-rs/alloy/issues/1251))

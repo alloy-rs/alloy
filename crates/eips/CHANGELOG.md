@@ -5,10 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Swap BlockNumHash alias and struct name ([#1265](https://github.com/alloy-rs/alloy/issues/1265))
+
 ## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
 
 ### Miscellaneous Tasks
 
+- Release 0.3.2
 - Add aliases for Num Hash ([#1253](https://github.com/alloy-rs/alloy/issues/1253))
 - [eip1898] Display `RpcBlockHash` ([#1242](https://github.com/alloy-rs/alloy/issues/1242))
 - Optional derive more ([#1239](https://github.com/alloy-rs/alloy/issues/1239))

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [rpc-types-engine] Add forkchoice state zero helpers ([#1231](https://github.com/alloy-rs/alloy/issues/1231))
 
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Miscellaneous Tasks
