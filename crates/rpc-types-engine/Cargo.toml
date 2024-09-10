@@ -47,7 +47,7 @@ default = ["jwt", "std"]
 std = ["alloy-rpc-types-eth/std", "alloy-consensus/std", "derive_more/std"]
 jwt = ["dep:jsonwebtoken", "dep:rand"]
 jsonrpsee-types = ["dep:jsonrpsee-types", "alloy-rpc-types-eth/jsonrpsee-types"]
-ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
+ssz = ["std", "dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
 
 [dev-dependencies]
