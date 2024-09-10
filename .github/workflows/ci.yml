@@ -155,6 +155,21 @@ jobs:
       - name: cargo hack
         run: cargo hack check --feature-powerset --depth 1
 
+  check-no-std:
+    name: check no_std ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imac-unknown-none-elf
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: ./scripts/check_no_std.sh
+
   clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
