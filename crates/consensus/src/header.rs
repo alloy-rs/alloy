@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
@@ -11,9 +12,6 @@ use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
