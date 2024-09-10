@@ -1,9 +1,9 @@
 //! 'eth_simulateV1' Request / Response types: <https://github.com/ethereum/execution-apis/pull/484>
 
-use alloy_primitives::{Bytes};
+use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::{state::StateOverride, Block, Log, BlockOverrides, TransactionRequest};
+use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -147,11 +147,21 @@ mod tests {
         assert_eq!(sim_opts.block_state_calls.len(), 2);
 
         let block_state_call_1 = &sim_opts.block_state_calls[0];
-        assert!(block_state_call_1.state_overrides.contains_key(&address_1));
-        assert_eq!(block_state_call_1.state_overrides.get(&address_1).unwrap().nonce.unwrap(), 5);
+        assert!(block_state_call_1.state_overrides.as_ref().unwrap().contains_key(&address_1));
+        assert_eq!(
+            block_state_call_1
+                .state_overrides
+                .as_ref()
+                .unwrap()
+                .get(&address_1)
+                .unwrap()
+                .nonce
+                .unwrap(),
+            5
+        );
 
         let block_state_call_2 = &sim_opts.block_state_calls[1];
-        assert!(block_state_call_2.state_overrides.contains_key(&address_1));
+        assert!(block_state_call_2.state_overrides.as_ref().unwrap().contains_key(&address_1));
 
         assert_eq!(block_state_call_2.calls.len(), 2);
         assert_eq!(block_state_call_2.calls[0].from.unwrap(), address_1);
