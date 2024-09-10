@@ -9,14 +9,15 @@ use serde::{
 
 use alloc::{format, string::String, vec::Vec};
 
+use crate::collections::{
+    hash_set::{IntoIter, Iter},
+    HashSet,
+};
 use core::{
     hash::Hash,
     ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
-use hashbrown::{
-    hash_set::{IntoIter, Iter},
-    HashSet,
-};
+use core::iter::{FromIterator, IntoIterator};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]

@@ -1,6 +1,5 @@
-use crate::{Log, TransactionReceipt};
+use crate::{collections::HashMap, Log, TransactionReceipt};
 use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use alloc::vec::Vec;

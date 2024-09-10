@@ -26,12 +26,15 @@ alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 
-hashbrown = { workspace = true, features = ["serde"] }
 derive_more = { workspace = true, features = ["display"] }
 
 itertools.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+
+# `no_std` compatibility
+cfg-if.workspace = true
+hashbrown = { workspace = true, features = ["serde"] }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }

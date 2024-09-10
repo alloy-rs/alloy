@@ -1,9 +1,8 @@
 //! bindings for state overrides in eth_call
 
-use crate::BlockOverrides;
+use crate::{collections::HashMap, BlockOverrides};
 use alloc::boxed::Box;
 use alloy_primitives::{Address, Bytes, B256, U256};
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// A set of account overrides
