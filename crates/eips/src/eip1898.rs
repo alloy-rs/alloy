@@ -1,6 +1,6 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, BlockNumber, B256, U64};
+use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use core::{
     fmt::{self, Debug, Display, Formatter},
@@ -600,29 +600,29 @@ impl FromStr for BlockId {
     }
 }
 
-/// Block number and hash.
+/// A number and a hash.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct BlockNumHash {
-    /// Block number
-    pub number: BlockNumber,
-    /// Block hash
-    pub hash: BlockHash,
+pub struct NumHash {
+    /// The number
+    pub number: u64,
+    /// The hash.
+    pub hash: B256,
 }
 
 /// Block number and hash of the forked block.
-pub type ForkBlock = BlockNumHash;
+pub type ForkBlock = NumHash;
 
-/// Either a hash _or_ a number
-pub type NumHash = BlockNumHash;
+/// A block number and a hash
+pub type BlockNumHash = NumHash;
 
-impl BlockNumHash {
-    /// Creates a new `BlockNumHash` from a block number and hash.
-    pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
+impl NumHash {
+    /// Creates a new `NumHash` from a number and hash.
+    pub const fn new(number: u64, hash: B256) -> Self {
         Self { number, hash }
     }
 
-    /// Consumes `Self` and returns [`BlockNumber`], [`BlockHash`]
-    pub const fn into_components(self) -> (BlockNumber, BlockHash) {
+    /// Consumes `Self` and returns the number and hash
+    pub const fn into_components(self) -> (u64, B256) {
         (self.number, self.hash)
     }
 
@@ -635,14 +635,14 @@ impl BlockNumHash {
     }
 }
 
-impl From<(BlockNumber, BlockHash)> for BlockNumHash {
-    fn from(val: (BlockNumber, BlockHash)) -> Self {
+impl From<(u64, B256)> for NumHash {
+    fn from(val: (u64, B256)) -> Self {
         Self { number: val.0, hash: val.1 }
     }
 }
 
-impl From<(BlockHash, BlockNumber)> for BlockNumHash {
-    fn from(val: (BlockHash, BlockNumber)) -> Self {
+impl From<(B256, u64)> for NumHash {
+    fn from(val: (B256, u64)) -> Self {
         Self { hash: val.0, number: val.1 }
     }
 }
