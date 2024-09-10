@@ -87,7 +87,7 @@ sol! {
 ///     - [DynAggreagate] or [SolAggreagate] for the aggregate call
 ///     - [DynTryAggreagate] or [SolTryAggreagate] for the try_aggregate call
 ///     - [DynAggreagate3] or [SolAggreagate3] for the aggregate3 call
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MultiCall<T, P, N: Network> {
     instance: Arc<IMulticall3::IMulticall3Instance<T, P, N>>,
 }
@@ -161,11 +161,11 @@ mod aggregate {
 
     use super::{into_calls::*, *};
 
-    /// An aggreagte call that owns the refrence to the underlying instance
+    /// An call that owns the refrence to the underlying instance
     pub type OwnedAggregate<T, P, D, N> =
         Aggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
-    /// An aggreagte call that doesnt own the refrence to the underlying instance
+    /// An [Multicall::aggregate] call that doesnt own the refrence to the underlying instance
     pub type AggregateRef<'a, T, P, D, N> =
         Aggregate<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
@@ -185,6 +185,22 @@ mod aggregate {
         pub(super) batch: Option<usize>,
     }
 
+    impl<R, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for Aggregate<R, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
+    {
+        fn extend<I>(&mut self, iter: I)
+        where
+            I: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+        {
+            self.add_calls(iter)
+        }
+    }
+
     impl<R, T, P, D, N> Aggregate<R, T, P, D, N>
     where
         T: Transport + Clone,
@@ -193,34 +209,6 @@ mod aggregate {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, this method will fail fast on any reverts
-        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
-
-            self.aggregate_inner(
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx_ref::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
-        /// like [Self::call] but will consume the calldata
-        pub async fn call_take(&mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts();
-
-            self.aggregate_inner(
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
         /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
             self.batch = batch;
@@ -242,6 +230,50 @@ mod aggregate {
             I: IntoIterator<Item = CallBuilder<T, P, D, N>>,
         {
             self.calls.extend(calls);
+        }
+    }
+
+    impl<T, P, D, N> OwnedAggregate<T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// Call the aggregate method, this method will fail fast on any reverts
+        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts_ref();
+
+            self.aggregate_inner(
+                &decoders,
+                requests
+                    .into_iter()
+                    .map(|call| call_from_tx_ref::<N>(call))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
+        }
+    }
+
+    impl<'a, T, P, D, N> AggregateRef<'a, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// like [Self::call] but will consumes the call builder
+        pub async fn call(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts();
+
+            self.aggregate_inner(
+                decoders.iter().collect::<Vec<_>>().as_slice(),
+                requests
+                    .into_iter()
+                    .map(|call| call_from_tx::<N>(call))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
         }
     }
 
@@ -357,6 +389,22 @@ mod try_aggregate {
         pub(super) batch: Option<usize>,
     }
 
+    impl<R, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for TryAggregate<R, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
+    {
+        fn extend<I>(&mut self, iter: I)
+        where
+            I: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+        {
+            self.add_calls(iter)
+        }
+    }
+
     impl<R, T, P, D, N> Debug for TryAggregate<R, T, P, D, N>
     where
         T: Transport + Clone,
@@ -382,42 +430,6 @@ mod try_aggregate {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate method, filtering out any failed calls if require_success is false
-        pub async fn call(
-            &self,
-            require_success: bool,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
-
-            self.try_aggregate_inner(
-                require_success,
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx_ref::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
-        /// Like [Self::call] but will consume the calldata
-        pub async fn call_take(
-            &mut self,
-            require_success: bool,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts();
-
-            self.try_aggregate_inner(
-                require_success,
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
         /// Clear the calls
         pub fn clear_calls(&mut self) {
             self.calls.clear();
@@ -441,6 +453,58 @@ mod try_aggregate {
             self.calls.extend(calls);
         }
     }
+
+    impl<T, P, D, N> OwnedTryAggregate<T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// Call the aggregate method, filtering out any failed calls if require_success is false
+        pub async fn call(
+            &self,
+            require_success: bool,
+        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts_ref();
+
+            self.try_aggregate_inner(
+                require_success,
+                &decoders,
+                requests
+                    .into_iter()
+                    .map(|call| call_from_tx_ref::<N>(call))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
+        }
+    }
+
+    impl<'a, T, P, D, N> TryAggregateRef<'a, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// Like [Self::call] but will consumes this call builder
+        pub async fn call(
+            mut self,
+            require_success: bool,
+        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts();
+
+            self.try_aggregate_inner(
+                require_success,
+                decoders.iter().collect::<Vec<_>>().as_slice(),
+                requests
+                    .into_iter()
+                    .map(|call| call_from_tx::<N>(call))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
+        }
+    } 
 
     impl<R, T, P, D, N> TryAggregate<R, T, P, D, N>
     where
@@ -533,6 +597,22 @@ mod aggregate3 {
         pub(super) batch: Option<usize>,
     }
 
+    impl<R, T, P, D, N> Extend<(bool, CallBuilder<T, P, D, N>)> for Aggregate3<R, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
+    {
+        fn extend<I>(&mut self, iter: I)
+        where
+            I: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
+        {
+            self.add_calls(iter)
+        }
+    }
+
     impl<R, T, P, D, N> Debug for Aggregate3<R, T, P, D, N>
     where
         T: Transport + Clone,
@@ -558,34 +638,6 @@ mod aggregate3 {
         N: Network,
         R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        /// Call the aggregate3 method, filtering out any failed calls.
-        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
-
-            self.aggregate3_inner(
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|(allow_failure, call)| call3_from_tx_ref::<N>(call, allow_failure))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
-        /// like [Self::call] but will consume the calldata
-        pub async fn call_take(&mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts();
-
-            self.aggregate3_inner(
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|(allow_failure, call)| call3_from_tx::<N>(call, allow_failure))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
-        }
-
         /// Clear the calls
         pub fn clear_calls(&mut self) {
             self.calls.clear();
@@ -607,6 +659,50 @@ mod aggregate3 {
             I: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
         {
             self.calls.extend(calls);
+        }
+    }
+
+    impl<T, P, D, N> OwnedAggregate3<T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// Call the aggregate3 method, this method will fail fast on any reverts
+        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts_ref();
+
+            self.aggregate3_inner(
+                &decoders,
+                requests
+                    .into_iter()
+                    .map(|(allow_failure, call)| call3_from_tx_ref::<N>(call, allow_failure))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
+        }
+    }
+
+    impl<'a, T, P, D, N> Aggregate3Ref<'a, T, P, D, N>
+    where
+        T: Transport + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        /// Like [Self::call] but will consume the call builder
+        pub async fn call(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+            let (decoders, requests) = self.parts();
+
+            self.aggregate3_inner(
+                decoders.iter().collect::<Vec<_>>().as_slice(),
+                requests
+                    .into_iter()
+                    .map(|(allow_failure, call)| call3_from_tx::<N>(call, allow_failure))
+                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+            )
+            .await
         }
     }
 
