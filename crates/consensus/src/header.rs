@@ -6,7 +6,7 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{
-    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
+    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
@@ -369,6 +369,14 @@ impl Header {
     /// Note: This check is relevant only pre-merge.
     pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
         self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
+    }
+
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
+        Sealed::new_unchecked(self, hash)
     }
 }
 
