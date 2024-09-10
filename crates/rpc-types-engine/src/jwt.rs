@@ -1,7 +1,7 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
 
 use alloy_primitives::hex;
-use core::str::FromStr;
+use core::{result::Result, str::FromStr};
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
@@ -250,9 +250,8 @@ impl JwtSecret {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::fmt::Debug for JwtSecret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for JwtSecret {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("JwtSecretHash").field(&"{{}}").finish()
     }
 }

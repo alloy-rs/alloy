@@ -10,6 +10,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
+use core::{iter::{FromIterator, IntoIterator}, result::Result};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 /// The execution payload body response that allows for `null` values.
@@ -976,8 +977,9 @@ impl PayloadStatus {
     }
 }
 
-impl core::fmt::Display for PayloadStatus {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+#[cfg(feature = "std")]
+impl std::fmt::Display for PayloadStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "PayloadStatus {{ status: {}, latestValidHash: {:?} }}",

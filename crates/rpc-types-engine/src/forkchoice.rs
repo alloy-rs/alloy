@@ -2,6 +2,7 @@ use super::{PayloadStatus, PayloadStatusEnum};
 use crate::PayloadId;
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
+use core::result::Result;
 
 /// invalid forkchoice state error code.
 pub const INVALID_FORK_CHOICE_STATE_ERROR: i32 = -38002;

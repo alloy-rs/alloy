@@ -20,15 +20,15 @@ workspace = true
 
 [dependencies]
 # ethereum
+alloy-serde.workspace = true
+alloy-rpc-types-eth.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
-alloy-rpc-types-eth.workspace = true
-alloy-serde.workspace = true
+alloy-consensus = { workspace = true, features = ["serde"] }
 alloy-eips = { workspace = true, features = ["serde"] }
 
 # misc
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true, features = ["display"] }
 
 # ssz
@@ -44,9 +44,9 @@ jsonwebtoken = { version = "9.3.0", optional = true }
 
 [features]
 default = ["jwt", "std"]
-std = ["alloy-consensus/std", "derive_more/std"]
+std = ["alloy-rpc-types-eth/std", "alloy-consensus/std", "derive_more/std"]
 jwt = ["dep:jsonwebtoken", "dep:rand"]
-jsonrpsee-types = ["dep:jsonrpsee-types"]
+jsonrpsee-types = ["dep:jsonrpsee-types", "alloy-rpc-types-eth/jsonrpsee-types"]
 ssz = ["dep:ethereum_ssz", "dep:ethereum_ssz_derive", "alloy-eips/ssz"]
 kzg = ["alloy-consensus/kzg"]
 
