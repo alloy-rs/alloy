@@ -384,7 +384,7 @@ impl Header {
     ///
     /// WARNING: This method does not perform validation whether the hash is correct.
     #[inline]
-    pub const fn seal(self, hash: B256) -> Sealed<Header> {
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
         Sealed::new_unchecked(self, hash)
     }
 }
