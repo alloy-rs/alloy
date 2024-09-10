@@ -176,13 +176,6 @@ impl Sealable for Header {
 }
 
 impl Header {
-    // TODO: re-enable
-
-    // /// Returns the parent block's number and hash
-    // pub fn parent_num_hash(&self) -> BlockNumHash {
-    //     BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
-    // }
-
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     ///
     /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.
