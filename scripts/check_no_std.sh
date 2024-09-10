@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-no_std_packages=(
+target=riscv32imac-unknown-none-elf
+crates=(
     alloy-eips
     alloy-genesis
     alloy-serde
@@ -10,17 +11,10 @@ no_std_packages=(
     alloy-rpc-types-eth
 )
 
-for package in "${no_std_packages[@]}"; do
-  cmd="cargo +stable build -p $package --target riscv32imac-unknown-none-elf --no-default-features"
-  if [ -n "$CI" ]; then
-    echo "::group::$cmd"
-  else
-    printf "\n%s:\n  %s\n" "$package" "$cmd"
-  fi
-
-  $cmd
-
-  if [ -n "$CI" ]; then
-    echo "::endgroup::"
-  fi
+cmd=(cargo +stable hack check --no-default-features --target "$target")
+for crate in "${crates[@]}"; do
+    cmd+=(-p "$crate")
 done
+
+echo "Running: ${cmd[*]}"
+"${cmd[@]}"
