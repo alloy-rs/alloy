@@ -1,5 +1,7 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
 
+#[cfg(not(feature = "std"))]
+use alloc::{format, string::String};
 use alloy_primitives::hex;
 use core::{result::Result, str::FromStr};
 use jsonwebtoken::{
