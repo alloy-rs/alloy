@@ -13,10 +13,10 @@ extern crate alloc;
 pub mod collections {
     cfg_if::cfg_if! {
         if #[cfg(feature = "std")] {
-            pub use std::collections::{hash_map, hash_set, HashMap, HashSet};
+            pub use std::collections::{hash_set, HashMap, HashSet};
             use hashbrown as _;
         } else {
-            pub use hashbrown::{hash_map, hash_set, HashMap, HashSet};
+            pub use hashbrown::{hash_set, HashMap, HashSet};
         }
     }
 }
