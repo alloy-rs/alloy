@@ -31,6 +31,13 @@ pub type HyperResponse = Response<Incoming>;
 pub type HyperResponseFut<T = HyperResponse, E = Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
 
+impl<S, B> HyperLayerTransport<S, B> {
+    /// Create a new [HyperLayerTransport] with the given URL and service.
+    pub const fn new(url: Url, service: S) -> Self {
+        Self { url, service, _pd: PhantomData }
+    }
+}
+
 impl<S, B> HyperLayerTransport<S, B>
 where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
@@ -38,11 +45,6 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
     B: From<Bytes> + Buf + Send + 'static + Clone,
 {
-    /// Create a new [HyperLayerTransport] with the given URL and service.
-    pub const fn new(url: Url, service: S) -> Self {
-        Self { url, service, _pd: PhantomData }
-    }
-
     /// Make a request to the server using the given service.
     pub fn request(&mut self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
