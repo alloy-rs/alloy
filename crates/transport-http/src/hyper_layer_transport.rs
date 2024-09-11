@@ -4,7 +4,7 @@ use alloy_transport::{
 };
 use http_body_util::{BodyExt, Full};
 use hyper::{
-    body::{Buf, Bytes, Incoming},
+    body::{Buf, Incoming},
     header, Request, Response,
 };
 use hyper_util::client::legacy::Error;
@@ -43,7 +43,7 @@ where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static + Clone,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone,
 {
     /// Make a request to the server using the given service.
     pub fn request(&mut self, req: RequestPacket) -> TransportFut<'static> {
@@ -54,7 +54,7 @@ where
                 debug!(count = req.len(), "sending request packet to server");
                 let ser = req.serialize().map_err(TransportError::ser_err)?;
                 // convert the Box<RawValue> into a hyper request<B>
-                let body = Full::from(Bytes::from(<Box<[u8]>>::from(<Box<str>>::from(ser))));
+                let body = ser.get().as_bytes().to_owned().into();
 
                 let req = hyper::Request::builder()
                     .method(hyper::Method::POST)
@@ -110,7 +110,7 @@ where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static + Clone + Sync,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
 {
     type Transport = Self;
 
@@ -130,7 +130,7 @@ where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Bytes> + Buf + Send + 'static + Clone + Sync,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
