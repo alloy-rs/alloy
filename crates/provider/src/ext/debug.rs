@@ -1,4 +1,5 @@
 //! This module extends the Ethereum JSON-RPC provider with the Debug namespace's RPC methods.
+
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
@@ -367,8 +368,26 @@ mod test {
 
             let traces = result.unwrap();
             assert_eq!(
-                serde_json::to_string(&traces).unwrap(),
-                r#"[[{"failed":false,"gas":21000,"returnValue":"","structLogs":[]},{"failed":false,"gas":21000,"returnValue":"","structLogs":[]}]]"#,
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
+[
+  [
+    {
+      "failed": false,
+      "gas": 21000,
+      "returnValue": "",
+      "structLogs": []
+    },
+    {
+      "failed": false,
+      "gas": 21000,
+      "returnValue": "",
+      "structLogs": []
+    }
+  ]
+]
+"#
+                .trim(),
             );
         })
         .await
