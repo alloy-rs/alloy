@@ -75,6 +75,7 @@ pub struct SimulatePayload {
     #[cfg_attr(feature = "serde", serde(default))]
     pub validation: bool,
     /// Flag to decide if full transactions should be returned instead of just their hashes.
+    #[serde(default)]
     pub return_full_transactions: bool,
 }
 
