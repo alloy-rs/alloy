@@ -134,6 +134,10 @@ mod tests {
 
     use super::*;
 
+    fn init_tracing() {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
+
     async fn with_timeout<T: Future>(fut: T) -> T::Output {
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(1)) => panic!("Operation timed out"),
@@ -143,6 +147,8 @@ mod tests {
 
     #[tokio::test]
     async fn yield_block() {
+        init_tracing();
+
         let anvil = Anvil::new().spawn();
 
         let client = ReqwestClient::new_http(anvil.endpoint_url());
@@ -162,6 +168,8 @@ mod tests {
     async fn yield_many_blocks() {
         // Make sure that we can process more blocks than fits in the cache.
         const BLOCKS_TO_MINE: usize = BLOCK_CACHE_SIZE.get() + 1;
+
+        init_tracing();
 
         let anvil = Anvil::new().spawn();
 
