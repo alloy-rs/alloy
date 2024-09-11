@@ -1,7 +1,6 @@
 use super::{PayloadStatus, PayloadStatusEnum};
 use crate::PayloadId;
 use alloy_primitives::B256;
-use core::result::Result;
 use serde::{Deserialize, Serialize};
 
 /// invalid forkchoice state error code.
