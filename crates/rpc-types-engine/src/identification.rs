@@ -1,7 +1,7 @@
 //! Client identification: <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md>
 
-use core::str::FromStr;
 use alloc::string::{String, ToString};
+use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 /// This enum defines a standard for specifying a client with just two letters. Clients teams which
