@@ -41,7 +41,7 @@ mod test {
     use crate::ProviderBuilder;
 
     use super::*;
-    use alloy_node_bindings::{run_with_tempdir, Geth};
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
 
     #[tokio::test]
     async fn call_net_version() {

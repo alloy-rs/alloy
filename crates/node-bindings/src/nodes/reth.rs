@@ -498,7 +498,7 @@ impl Reth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::run_with_tempdir_sync;
+    use crate::utils::run_with_tempdir_sync;
 
     const DISCOVERY_PORT: u16 = 30303;
     const AUTH_PORT: u16 = 8551;

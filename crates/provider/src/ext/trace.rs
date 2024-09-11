@@ -179,7 +179,7 @@ mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{run_with_tempdir, Reth};
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::U256;
     use alloy_rpc_types_eth::TransactionRequest;
 
