@@ -7,7 +7,6 @@ use alloy_network_primitives::{
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::WithOtherFields;
-use serde::{Deserialize, Serialize};
 
 use alloc::vec::Vec;
 
@@ -17,27 +16,28 @@ pub use alloy_eips::{
 };
 
 /// Block representation
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Block<T = Transaction, H = Header> {
     /// Header of the block.
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub header: H,
     /// Uncles' hashes.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
-    #[serde(
+    #[cfg_attr(feature = "serde", serde(
         default = "BlockTransactions::uncle",
         skip_serializing_if = "BlockTransactions::is_uncle"
-    )]
+    ))]
     pub transactions: BlockTransactions<T>,
     /// Integer the size of this block in bytes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub size: Option<U256>,
     /// Withdrawals in the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
@@ -50,15 +50,16 @@ impl<T: TransactionResponse, H> Block<T, H> {
 
 /// Block header representation.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Header {
     /// Hash of the block
     pub hash: BlockHash,
     /// Hash of the parent
     pub parent_hash: B256,
     /// Hash of the uncles
-    #[serde(rename = "sha3Uncles")]
+    #[cfg_attr(feature = "serde", serde(rename = "sha3Uncles"))]
     pub uncles_hash: B256,
     /// Alias of `author`
     pub miner: Address,
@@ -73,19 +74,19 @@ pub struct Header {
     /// Difficulty
     pub difficulty: U256,
     /// Block number
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub number: u64,
     /// Gas Limit
-    #[serde(default, with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub gas_limit: u128,
     /// Gas Used
-    #[serde(default, with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub gas_used: u128,
     /// Timestamp
-    #[serde(default, with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub timestamp: u64,
     /// Total difficulty
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub total_difficulty: Option<U256>,
     /// Extra data
     pub extra_data: Bytes,
@@ -100,28 +101,28 @@ pub struct Header {
     ///
     /// See also <https://eips.ethereum.org/EIPS/eip-4399>
     /// And <https://github.com/ethereum/execution-apis/issues/328>
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub mix_hash: Option<B256>,
     /// Nonce
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals_root: Option<B256>,
     /// Blob gas used
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub blob_gas_used: Option<u128>,
     /// Excess blob gas
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub excess_blob_gas: Option<u128>,
     /// EIP-4788 parent beacon block root
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
     /// EIP-7685 requests root.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub requests_root: Option<B256>,
 }
 
@@ -282,43 +283,44 @@ impl From<Header> for WithOtherFields<Header> {
 }
 
 /// BlockOverrides is a set of header fields to override.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
 pub struct BlockOverrides {
     /// Overrides the block number.
     ///
     /// For `eth_callMany` this will be the block number of the first simulated block. Each
     /// following block increments its block number by 1
     // Note: geth uses `number`, erigon uses `blockNumber`
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "blockNumber")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", alias = "blockNumber"))]
     pub number: Option<U256>,
     /// Overrides the difficulty of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub difficulty: Option<U256>,
     /// Overrides the timestamp of the block.
     // Note: geth uses `time`, erigon uses `timestamp`
-    #[serde(
+    #[cfg_attr(feature = "serde", serde(
         default,
         skip_serializing_if = "Option::is_none",
         alias = "timestamp",
         with = "alloy_serde::quantity::opt"
-    )]
+    ))]
     pub time: Option<u64>,
     /// Overrides the gas limit of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub coinbase: Option<Address>,
     /// Overrides the prevrandao of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub random: Option<B256>,
     /// Overrides the basefee of the block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub base_fee: Option<U256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It could be queried from the
     /// solidity opcode BLOCKHASH.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
@@ -355,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "jsonrpsee-types")]
+    #[cfg(all(feature = "jsonrpsee-types", feature = "serde"))]
     fn serde_json_header() {
         use jsonrpsee_types::SubscriptionResponse;
         let resp = r#"{"jsonrpc":"2.0","method":"eth_subscribe","params":{"subscription":"0x7eef37ff35d471f8825b1c8f67a5d3c0","result":{"hash":"0x7a7ada12e140961a32395059597764416499f4178daf1917193fad7bd2cc6386","parentHash":"0xdedbd831f496e705e7f2ec3c8dcb79051040a360bf1455dbd7eb8ea6ad03b751","sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","miner":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","number":"0x8","gasUsed":"0x0","gasLimit":"0x1c9c380","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x642aa48f","difficulty":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000"}}}"#;
@@ -366,6 +368,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block() {
         let block = Block {
             header: Header {
@@ -408,6 +411,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_uncle_block() {
         let block = Block {
             header: Header {
@@ -450,6 +454,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_with_withdrawals_set_as_none() {
         let block = Block {
             header: Header {
@@ -492,12 +497,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn block_overrides() {
         let s = r#"{"blockNumber": "0xe39dd0"}"#;
         let _overrides = serde_json::from_str::<BlockOverrides>(s).unwrap();
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_rich_block() {
         let s = r#"{
     "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
@@ -531,6 +538,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_missing_uncles_block() {
         let s = r#"{
             "baseFeePerGas":"0x886b221ad",
@@ -572,6 +580,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_block_containing_uncles() {
         let s = r#"{
             "baseFeePerGas":"0x886b221ad",
@@ -615,6 +624,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_empty_block() {
         let s = r#"{
     "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",
@@ -645,6 +655,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn recompute_block_hash() {
         let s = r#"{
     "hash": "0xb25d0e54ca0104e3ebfb5a1dcdf9528140854d609886a300946fd6750dcb19f4",

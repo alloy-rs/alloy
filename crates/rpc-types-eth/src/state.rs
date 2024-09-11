@@ -3,36 +3,36 @@
 use crate::{collections::HashMap, BlockOverrides};
 use alloc::boxed::Box;
 use alloy_primitives::{Address, Bytes, B256, U256};
-use serde::{Deserialize, Serialize};
 
 /// A set of account overrides
 pub type StateOverride = HashMap<Address, AccountOverride>;
 
 /// Custom account override used in call
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "camelCase", deny_unknown_fields))]
 pub struct AccountOverride {
     /// Fake balance to set for the account before executing the call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub balance: Option<U256>,
     /// Fake nonce to set for the account before executing the call.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub nonce: Option<u64>,
     /// Fake EVM bytecode to inject into the account before executing the call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub code: Option<Bytes>,
     /// Fake key-value mapping to override all slots in the account storage before executing the
     /// call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state: Option<HashMap<B256, B256>>,
     /// Fake key-value mapping to override individual slots in the account storage before executing
     /// the call.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_diff: Option<HashMap<B256, B256>>,
     /// Moves addresses precompile into the specified address. This move is done before the 'code'
     /// override is set. When the specified address is not a precompile, the behaviour is undefined
     /// and different clients might behave differently.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "movePrecompileToAddress")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", rename = "movePrecompileToAddress"))]
     pub move_precompile_to: Option<Address>,
 }
 
@@ -94,6 +94,17 @@ mod tests {
     use alloy_primitives::address;
 
     #[test]
+    fn test_default_account_override() {
+        let acc_override = AccountOverride::default();
+        assert!(acc_override.balance.is_none());
+        assert!(acc_override.nonce.is_none());
+        assert!(acc_override.code.is_none());
+        assert!(acc_override.state.is_none());
+        assert!(acc_override.state_diff.is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     #[should_panic(expected = "invalid type")]
     fn test_invalid_json_structure() {
         let invalid_json = r#"{
@@ -106,6 +117,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_large_values_in_override() {
         let large_values_json = r#"{
             "0x1234567890123456789012345678901234567890": {
@@ -122,16 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_default_account_override() {
-        let acc_override = AccountOverride::default();
-        assert!(acc_override.balance.is_none());
-        assert!(acc_override.nonce.is_none());
-        assert!(acc_override.code.is_none());
-        assert!(acc_override.state.is_none());
-        assert!(acc_override.state_diff.is_none());
-    }
-
-    #[test]
+    #[cfg(feature = "serde")]
     fn test_state_override() {
         let s = r#"{
             "0x0000000000000000000000000000000000000124": {
@@ -145,6 +148,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_state_override_state_diff() {
         let s = r#"{
                 "0x1b5212AF6b76113afD94cD2B5a78a73B7d7A8222": {

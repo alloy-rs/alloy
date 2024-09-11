@@ -1,36 +1,36 @@
 use alloy_primitives::{Address, BlockHash, LogData, TxHash, B256};
-use serde::{Deserialize, Serialize};
 
 /// Ethereum Log emitted by a transaction
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Log<T = LogData> {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     /// Consensus log object
     pub inner: alloy_primitives::Log<T>,
     /// Hash of the block the transaction that emitted this log was mined in
     pub block_hash: Option<BlockHash>,
     /// Number of the block the transaction that emitted this log was mined in
-    #[serde(with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
     /// The timestamp of the block as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>
-    #[serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default)]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default))]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
     #[doc(alias = "tx_hash")]
     pub transaction_hash: Option<TxHash>,
     /// Index of the Transaction in the block
-    #[serde(with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
     #[doc(alias = "tx_index")]
     pub transaction_index: Option<u64>,
     /// Log Index in Block
-    #[serde(with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity::opt"))]
     pub log_index: Option<u64>,
     /// Geth Compatibility Field: whether this log was removed
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub removed: bool,
 }
 
@@ -161,6 +161,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_log() {
         let mut log = Log {
             inner: alloy_primitives::Log {

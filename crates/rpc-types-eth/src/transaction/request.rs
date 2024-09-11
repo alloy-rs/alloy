@@ -8,7 +8,6 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
 use core::hash::Hash;
-use serde::{Deserialize, Serialize};
 
 use alloc::{
     string::{String, ToString},
@@ -17,64 +16,65 @@ use alloc::{
 };
 
 /// Represents _all_ transaction requests to/from RPC.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxRequest")]
 pub struct TransactionRequest {
     /// The address of the transaction author.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub from: Option<Address>,
     /// The destination address of the transaction.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub to: Option<TxKind>,
     /// The legacy gas price.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub gas_price: Option<u128>,
     /// The max base fee per gas the sender is willing to pay.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub max_fee_per_gas: Option<u128>,
     /// The max priority fee per gas the sender is willing to pay, also called the miner tip.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub max_priority_fee_per_gas: Option<u128>,
     /// The max fee per blob gas for EIP-4844 blob transactions.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub max_fee_per_blob_gas: Option<u128>,
     /// The gas limit for the transaction.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub gas: Option<u128>,
     /// The value transferred in the transaction, in wei.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub value: Option<U256>,
     /// Transaction data.
-    #[serde(default, flatten)]
+    #[cfg_attr(feature = "serde", serde(default, flatten))]
     pub input: TransactionInput,
     /// The nonce of the transaction.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub nonce: Option<u64>,
     /// The chain ID for the transaction.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
     pub chain_id: Option<ChainId>,
     /// An EIP-2930 access list, which lowers cost for accessing accounts and storages in the list. See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930) for more information.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub access_list: Option<AccessList>,
     /// The EIP-2718 transaction type. See [EIP-2718](https://eips.ethereum.org/EIPS/eip-2718) for more information.
-    #[serde(
+    #[cfg_attr(feature = "serde", serde(
         default,
         rename = "type",
         skip_serializing_if = "Option::is_none",
         with = "alloy_serde::quantity::opt"
-    )]
+    ))]
     #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// Blob versioned hashes for EIP-4844 transactions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// Blob sidecar for EIP-4844 transactions.
-    #[serde(default, flatten, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, flatten, skip_serializing_if = "Option::is_none"))]
     pub sidecar: Option<BlobTransactionSidecar>,
     /// Authorization list for for EIP-7702 transactions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
@@ -610,16 +610,17 @@ impl TransactionRequest {
 /// If both fields are set, it is expected that they contain the same value, otherwise an error is
 /// returned.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[doc(alias = "TxInput")]
 pub struct TransactionInput {
     /// Transaction data
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub input: Option<Bytes>,
     /// Transaction data
     ///
     /// This is the same as `input` but is used for backwards compatibility: <https://github.com/ethereum/go-ethereum/issues/15628>
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub data: Option<Bytes>,
 }
 
@@ -963,6 +964,7 @@ mod tests {
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_from_to() {
         let s = r#"{"from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "to":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8" }"#;
         let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
@@ -970,12 +972,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_request() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
         let _req = serde_json::from_str::<TransactionRequest>(s).unwrap();
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_unique_call_input() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac", "input":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02"}"#;
         let req = serde_json::from_str::<TransactionRequest>(s).unwrap();
@@ -995,6 +999,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_request_additional_fields() {
         let s = r#"{"accessList":[],"data":"0x0902f1ac","to":"0xa478c2975ab1ea89e8196811f51a7b7ade33eb11","type":"0x02","sourceHash":"0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a"}"#;
         let req = serde_json::from_str::<WithOtherFields<TransactionRequest>>(s).unwrap();
@@ -1005,6 +1010,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_chain_id_field() {
         let chain_id: ChainId = 12345678;
 
@@ -1018,6 +1024,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_empty() {
         let tx = TransactionRequest::default();
         let serialized = serde_json::to_string(&tx).unwrap();
@@ -1025,6 +1032,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_tx_with_sidecar() {
         // Create a sidecar with some data.
         let s = r#"{
