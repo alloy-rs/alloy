@@ -4,21 +4,23 @@
 use crate::eip4844::env_settings::EnvKzgSettings;
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
-use crate::eip4844::{
-    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+use crate::{
+    eip4844::{
+        kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
+    },
+    BlockNumHash,
 };
-#[cfg(feature = "kzg")]
-use alloc::string::ToString;
-use alloc::{fmt, string::String};
-use alloy_primitives::{bytes::BufMut, B256};
-use alloy_rlp::{Decodable, Encodable};
-#[cfg(feature = "kzg")]
-use c_kzg::KzgProof;
-#[cfg(feature = "kzg")]
-use sha2::{Digest, Sha256};
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use alloy_primitives::{bytes::BufMut, FixedBytes, B256};
+use alloy_rlp::{Decodable, Encodable};
+#[cfg(feature = "kzg")]
+use c_kzg::KzgProof;
+use core::str::FromStr;
+use serde::Deserialize;
+#[cfg(feature = "kzg")]
+use sha2::{Digest, Sha256};
 #[cfg(feature = "kzg")]
 /// The versioned hash version for KZG.
 pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
@@ -42,139 +44,6 @@ pub struct BlobTransactionSidecar {
     pub proofs: Vec<Bytes48>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[repr(C)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[allow(missing_docs)]
-pub struct BlobTransactionSidecarItem {
-    pub index: usize,
-
-    pub blob: Blob,
-
-    pub kzg_commitment: Bytes48,
-
-    pub kzg_proof: Bytes48,
-}
-#[cfg(feature = "kzg")]
-impl BlobTransactionSidecarItem {
-    #[allow(missing_docs)]
-    pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
-        let commitment = self.kzg_commitment.as_slice();
-        let mut hash: [u8; 32] = Sha256::digest(commitment).into();
-        hash[0] = VERSIONED_HASH_VERSION_KZG;
-        hash
-    }
-
-    #[allow(missing_docs)]
-    pub fn verify_blob_kzg_proof(&self) -> Result<bool, BlobValidationError> {
-        let binding = EnvKzgSettings::Default;
-        let settings = binding.get();
-
-        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
-            .map_err(|e| BlobValidationError::InvalidBlobData(e.to_string()))?;
-
-        let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
-            .map_err(|e| BlobValidationError::InvalidCommitmentData(e.to_string()))?;
-
-        let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
-            .map_err(|e| BlobValidationError::InvalidProofData(e.to_string()))?;
-
-        KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
-            .map_err(|e| BlobValidationError::ProofVerificationError(e.to_string()))
-            .and_then(|result| {
-                if result {
-                    Ok(true)
-                } else {
-                    Err(BlobValidationError::ProofVerificationFailed(
-                        "Cryptographic proof verification failed.".to_string(),
-                    ))
-                }
-            })
-    }
-    #[allow(missing_docs)]
-    pub fn verify_blob(&self, hash: &IndexedBlobHash) -> Result<(), BlobValidationError> {
-        if self.index != hash.index {
-            return Err(BlobValidationError::IndexMismatch {
-                expected: hash.index,
-                found: self.index,
-                details: "The index of the blob does not match the expected index.".to_string(),
-            });
-        }
-
-        let computed_hash = self.to_kzg_versioned_hash();
-        if computed_hash != hash.hash {
-            return Err(BlobValidationError::HashMismatch {
-                expected: *hash.hash,
-                found: computed_hash,
-                details:
-                    "The computed hash does not match the hash recorded in the IndexedBlobHash."
-                        .to_string(),
-            });
-        }
-
-        match self.verify_blob_kzg_proof() {
-            Ok(result) if result => Ok(()),
-            Ok(_) => Err(BlobValidationError::ProofVerificationFailed(
-                "The cryptographic proof verification failed.".to_string(),
-            )),
-            Err(e) => Err(BlobValidationError::ProofVerificationError(e.to_string())),
-        }
-    }
-}
-#[allow(missing_docs)]
-#[derive(Debug)]
-pub enum BlobValidationError {
-    IndexMismatch { expected: usize, found: usize, details: String },
-    HashMismatch { expected: [u8; 32], found: [u8; 32], details: String },
-    ProofVerificationFailed(String),
-    ProofVerificationError(String),
-    InvalidBlobData(String),
-    InvalidCommitmentData(String),
-    InvalidProofData(String),
-}
-
-/// Provides human-readable error messages for `BlobValidationError`.
-impl fmt::Display for BlobValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IndexMismatch { expected, found, details } => write!(
-                f,
-                "Index mismatch: expected {}, found {}. Details: {}",
-                expected, found, details
-            ),
-            Self::HashMismatch { expected, found, details } => write!(
-                f,
-                "Hash mismatch: expected {:02x?}, found {:02x?}. Details: {}",
-                expected, found, details
-            ),
-            Self::ProofVerificationFailed(details) => {
-                write!(f, "Proof verification failed. Details: {}", details)
-            }
-            Self::ProofVerificationError(details) => {
-                write!(f, "Error during proof verification. Details: {}", details)
-            }
-            Self::InvalidBlobData(details) => {
-                write!(f, "Invalid blob data. Details: {}", details)
-            }
-            Self::InvalidCommitmentData(details) => {
-                write!(f, "Invalid commitment data. Details: {}", details)
-            }
-            Self::InvalidProofData(details) => {
-                write!(f, "Invalid proof data. Details: {}", details)
-            }
-        }
-    }
-}
-
-/// A Blob hash
-#[derive(Default, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct IndexedBlobHash {
-    /// The index of the blob
-    pub index: usize,
-    /// The hash of the blob
-    pub hash: B256,
-}
 impl BlobTransactionSidecar {
     /// Creates an iterator
     pub fn iter(&self) -> impl Iterator<Item = BlobTransactionSidecarItem> + '_ {
@@ -441,6 +310,93 @@ impl From<c_kzg::Error> for BlobTransactionValidationError {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// A blob sidecar.
+pub struct BlobTransactionSidecarItem {
+    /// The index.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "parse_u64_string"))]
+    pub index: usize,
+    /// The index.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "parse_u64_string"))]
+    pub blob: Blob,
+    /// The KZG commitment.
+    #[cfg_attr(feature = "serde", serde(rename = "kzg_commitment"))]
+    pub kzg_commitment: Bytes48,
+    /// The KZG proof.
+    #[cfg_attr(feature = "serde", serde(rename = "kzg_proof"))]
+    pub kzg_proof: Bytes48,
+}
+#[cfg(feature = "kzg")]
+impl BlobTransactionSidecarItem {
+    /// `VERSIONED_HASH_VERSION_KZG ++ sha256(commitment)[1..]`
+    pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
+        let commitment = self.kzg_commitment.as_slice();
+        let mut hash: [u8; 32] = Sha256::digest(commitment).into();
+        hash[0] = VERSIONED_HASH_VERSION_KZG;
+        hash
+    }
+
+    /// Verifies the KZG proof of a blob to ensure its integrity and correctness.
+    pub fn verify_blob_kzg_proof(&self) -> Result<bool, BlobTransactionValidationError> {
+        let binding = EnvKzgSettings::Default;
+        let settings = binding.get();
+
+        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
+            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+
+        let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
+            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+
+        let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
+            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+
+        KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+            .map_err(|e| BlobTransactionValidationError::KZGError(e))
+            .and_then(|result| {
+                if result {
+                    Ok(true)
+                } else {
+                    Err(BlobTransactionValidationError::InvalidProof)
+                }
+            })
+    }
+    /// Verify the blob sidecar against it's [BlockNumHash].
+
+    pub fn verify_blob(&self, hash: &BlockNumHash) -> Result<(), BlobTransactionValidationError> {
+        if self.index != hash.number as usize {
+            let blob_hash_part = FixedBytes::<32>::from_slice(&self.blob[0..32]);
+            return Err(BlobTransactionValidationError::WrongVersionedHash {
+                have: blob_hash_part,
+                expected: hash.hash,
+            });
+        }
+
+        let computed_hash = self.to_kzg_versioned_hash();
+        if computed_hash != hash.hash {
+            return Err(BlobTransactionValidationError::WrongVersionedHash {
+                have: computed_hash.into(),
+                expected: alloy_primitives::FixedBytes(*hash.hash),
+            });
+        }
+
+        match self.verify_blob_kzg_proof() {
+            Ok(result) if result => Ok(()),
+            Ok(_) => Err(BlobTransactionValidationError::InvalidProof),
+            Err(_) => Err(BlobTransactionValidationError::InvalidProof),
+        }
+    }
+}
+#[cfg(feature = "serde")]
+fn parse_u64_string<'de, T, D>(de: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: core::fmt::Display,
+{
+    String::deserialize(de)?.parse().map_err(serde::de::Error::custom)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
