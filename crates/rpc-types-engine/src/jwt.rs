@@ -2,7 +2,7 @@
 
 use alloc::{format, string::String};
 use alloy_primitives::hex;
-use core::{result::Result, str::FromStr};
+use core::{result::Result, str::FromStr, time::Duration};
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
@@ -84,7 +84,17 @@ impl From<hex::FromHexError> for JwtError {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for JwtError {}
+impl std::error::Error for JwtError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::JwtSecretHexDecodeError(err) => Some(err),
+            Self::CreateDir { source, .. } => Some(source),
+            Self::Read { source, .. } => Some(source),
+            Self::Write { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
 
 /// Length of the hex-encoded 256 bit secret key.
 /// A 256-bit encoded string in Rust has a length of 64 digits because each digit represents 4 bits
@@ -94,7 +104,7 @@ impl std::error::Error for JwtError {}
 const JWT_SECRET_LEN: usize = 64;
 
 /// The JWT `iat` (issued-at) claim cannot exceed +-60 seconds from the current time.
-const JWT_MAX_IAT_DIFF_SECS: u64 = 60;
+const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 
 /// The execution layer client MUST support at least the following alg HMAC + SHA256 (HS256)
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
@@ -129,7 +139,7 @@ impl Claims {
     /// Checks if the `iat` claim is within the allowed range from the current time.
     pub fn is_within_time_window(&self) -> bool {
         let now_secs = get_current_timestamp();
-        now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF_SECS
+        now_secs.abs_diff(self.iat) <= JWT_MAX_IAT_DIFF.as_secs()
     }
 }
 
@@ -348,7 +358,7 @@ mod tests {
         let secret = JwtSecret::random();
 
         // Check past 'iat' claim more than 60 secs
-        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF_SECS + 1);
+        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
         let out_of_window_time = SystemTime::now().checked_sub(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
@@ -358,7 +368,7 @@ mod tests {
         assert!(matches!(result, Err(JwtError::InvalidIssuanceTimestamp)));
 
         // Check future 'iat' claim more than 60 secs
-        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF_SECS + 1);
+        let offset = Duration::from_secs(JWT_MAX_IAT_DIFF.as_secs() + 1);
         let out_of_window_time = SystemTime::now().checked_add(offset).unwrap();
         let claims = Claims { iat: to_u64(out_of_window_time), exp: Some(10000000000) };
         let jwt = secret.encode(&claims).unwrap();
