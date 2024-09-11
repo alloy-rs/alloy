@@ -26,7 +26,7 @@ impl From<Vec<TransactionRequest>> for Bundle {
     }
 }
 
-/// State context for *_callMany
+/// State context for callMany
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StateContext {

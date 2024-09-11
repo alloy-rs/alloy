@@ -497,7 +497,7 @@ mod tests {
 
     // TODO: Fix this test, `chain_id` is not being set correctly.
     // #[tokio::test]
-    // async fn anvil_reset() {
+    // async fn test_anvil_reset() {
     //     let fork1 = Anvil::default().chain_id(777).spawn();
     //     let fork2 = Anvil::default().chain_id(888).spawn();
 
@@ -857,7 +857,7 @@ mod tests {
 
     // TODO: Fix this test, only a single block is being mined regardless of the `blocks` parameter.
     // #[tokio::test]
-    // async fn evm_mine_with_configuration() {
+    // async fn test_evm_mine_with_configuration() {
     //     let provider = ProviderBuilder::new().on_anvil();
 
     //     let start_num = provider.get_block_number().await.unwrap();
