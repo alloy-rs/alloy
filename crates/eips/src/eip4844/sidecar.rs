@@ -10,6 +10,8 @@ use crate::eip4844::{
 
 #[cfg(feature = "kzg")]
 use crate::BlockNumHash;
+#[cfg(feature = "serde")]
+use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 #[cfg(feature = "kzg")]
