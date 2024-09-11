@@ -29,6 +29,11 @@ pub struct AccountOverride {
     /// the call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state_diff: Option<HashMap<B256, B256>>,
+    /// Moves addresses precompile into the specified address. This move is done before the 'code'
+    /// override is set. When the specified address is not a precompile, the behaviour is undefined
+    /// and different clients might behave differently.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "movePrecompileToAddress")]
+    pub move_precompile_to: Option<Address>,
 }
 
 /// Helper type that bundles various overrides for EVM Execution.
