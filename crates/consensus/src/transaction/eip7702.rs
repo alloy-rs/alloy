@@ -1,12 +1,12 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::eip2930::AccessList;
+use alloc::vec::Vec;
+use alloy_eips::{
+    eip2930::AccessList,
+    eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
+};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-use alloy_eips::eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization};
 
 /// A transaction with a priority fee ([EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
@@ -5,15 +6,12 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{
-    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
+    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
@@ -176,13 +174,6 @@ impl Sealable for Header {
 }
 
 impl Header {
-    // TODO: re-enable
-
-    // /// Returns the parent block's number and hash
-    // pub fn parent_num_hash(&self) -> BlockNumHash {
-    //     BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
-    // }
-
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     ///
     /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.
@@ -378,6 +369,14 @@ impl Header {
     /// Note: This check is relevant only pre-merge.
     pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
         self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
+    }
+
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
+        Sealed::new_unchecked(self, hash)
     }
 }
 

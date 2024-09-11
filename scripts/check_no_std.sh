@@ -9,7 +9,6 @@ crates=(
     alloy-consensus
     alloy-network-primitives
     alloy-rpc-types-eth
-    alloy-rpc-types-engine
 )
 
 cmd=(cargo +stable hack check --no-default-features --target "$target")
