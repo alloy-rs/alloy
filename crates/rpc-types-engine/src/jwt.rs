@@ -2,7 +2,7 @@
 
 use alloc::{format, string::String};
 use alloy_primitives::hex;
-use core::{result::Result, str::FromStr, time::Duration};
+use core::{str::FromStr, time::Duration};
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };

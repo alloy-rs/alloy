@@ -10,10 +10,7 @@ use alloy_eips::{
 };
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
-use core::{
-    iter::{FromIterator, IntoIterator},
-    result::Result,
-};
+use core::iter::{FromIterator, IntoIterator};
 use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 /// The execution payload body response that allows for `null` values.
