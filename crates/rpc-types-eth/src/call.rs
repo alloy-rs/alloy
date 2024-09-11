@@ -15,7 +15,7 @@ pub struct Bundle {
     /// All transactions to execute
     pub transactions: Vec<TransactionRequest>,
     /// Block overrides to apply
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_override: Option<BlockOverrides>,
 }
 
