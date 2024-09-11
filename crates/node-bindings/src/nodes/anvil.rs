@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     fn assert_chain_id() {
-        let anvil = Anvil::new().fork("https://eth.llamarpc.com	").spawn();
+        let anvil = Anvil::new().fork("https://eth.merkle.io").spawn();
         assert_eq!(anvil.chain_id(), 1);
     }
 

@@ -624,7 +624,7 @@ impl Geth {
 mod tests {
 
     use super::*;
-    use crate::utils::run_with_tempdir_sync;
+    use crate::run_with_tempdir_sync;
 
     #[test]
     fn port_0() {

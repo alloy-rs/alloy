@@ -179,7 +179,7 @@ mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    use alloy_node_bindings::{run_with_tempdir, Reth};
     use alloy_primitives::U256;
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -189,7 +189,8 @@ mod test {
     #[cfg(not(windows))]
     async fn trace_block() {
         run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let reth =
+                Reth::new().random_instance().dev().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
             let result = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await;
@@ -205,7 +206,8 @@ mod test {
     #[cfg(not(windows))]
     async fn trace_call() {
         run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let reth =
+                Reth::new().random_instance().dev().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
             let accounts = reth.addresses();

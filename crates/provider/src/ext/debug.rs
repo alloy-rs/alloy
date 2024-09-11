@@ -225,7 +225,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
+    use alloy_node_bindings::{run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
 
     #[tokio::test]

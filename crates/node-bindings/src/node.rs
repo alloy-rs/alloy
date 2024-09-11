@@ -13,12 +13,6 @@ pub const NODE_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);
 /// Errors that can occur when working with the node instance.
 #[derive(Debug, Error)]
 pub enum NodeError {
-    /// The chain id was not set.
-    #[error("the chain ID was not set")]
-    ChainIdNotSet,
-    /// Could not create the data directory.
-    #[error("could not create directory: {0}")]
-    CreateDirError(std::io::Error),
     /// No stderr was captured from the child process.
     #[error("no stderr was captured from the process")]
     NoStderr,
@@ -34,6 +28,14 @@ pub enum NodeError {
     /// A line could not be read from the node stderr.
     #[error("could not read line from node stderr: {0}")]
     ReadLineError(std::io::Error),
+
+    /// The chain id was not set.
+    #[error("the chain ID was not set")]
+    ChainIdNotSet,
+    /// Could not create the data directory.
+    #[error("could not create directory: {0}")]
+    CreateDirError(std::io::Error),
+
     /// Genesis error
     #[error("genesis error occurred: {0}")]
     GenesisError(String),
