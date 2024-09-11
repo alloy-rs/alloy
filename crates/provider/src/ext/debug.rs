@@ -233,7 +233,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn debug_trace_transaction() {
+    async fn test_debug_trace_transaction() {
         init_tracing();
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
         let from = provider.default_signer_address();
@@ -259,7 +259,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn debug_trace_call() {
+    async fn test_debug_trace_call() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil_with_wallet();
         let from = provider.default_signer_address();
