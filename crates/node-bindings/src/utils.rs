@@ -6,7 +6,7 @@ use std::{
     net::{SocketAddr, TcpListener},
     path::PathBuf,
 };
-use tempfile;
+use tempfile::TempDir;
 
 /// A bit of hack to find an unused TCP port.
 ///
@@ -70,7 +70,7 @@ pub(crate) fn extract_endpoint(key: &str, line: &str) -> Option<SocketAddr> {
 
 /// Runs the given closure with a temporary directory.
 pub fn run_with_tempdir_sync(prefix: &str, f: impl FnOnce(PathBuf)) {
-    let temp_dir = tempfile::TempDir::with_prefix(prefix).unwrap();
+    let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path);
     #[cfg(not(windows))]
@@ -83,7 +83,7 @@ where
     F: FnOnce(PathBuf) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let temp_dir = tempfile::TempDir::with_prefix(prefix).unwrap();
+    let temp_dir = TempDir::with_prefix(prefix).unwrap();
     let temp_dir_path = temp_dir.path().to_path_buf();
     f(temp_dir_path).await;
     #[cfg(not(windows))]
