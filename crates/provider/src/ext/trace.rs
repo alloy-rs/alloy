@@ -11,7 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::{Transport, TransportResult};
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
-type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
+pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
 
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
