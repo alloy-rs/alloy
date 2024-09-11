@@ -16,7 +16,14 @@ pub struct AccountOverride {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub balance: Option<U256>,
     /// Fake nonce to set for the account before executing the call.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub nonce: Option<u64>,
     /// Fake EVM bytecode to inject into the account before executing the call.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -32,7 +39,14 @@ pub struct AccountOverride {
     /// Moves addresses precompile into the specified address. This move is done before the 'code'
     /// override is set. When the specified address is not a precompile, the behaviour is undefined
     /// and different clients might behave differently.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", rename = "movePrecompileToAddress"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "movePrecompileToAddress"
+        )
+    )]
     pub move_precompile_to: Option<Address>,
 }
 

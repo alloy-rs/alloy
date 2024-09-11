@@ -1,7 +1,7 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
+use alloc::{format, string::String, vec::Vec};
 use alloy_primitives::{keccak256, Address, BlockHash, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
-use alloc::{format, string::String, vec::Vec};
 
 use crate::collections::{
     hash_set::{IntoIter, Iter},

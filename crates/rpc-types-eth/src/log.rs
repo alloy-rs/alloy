@@ -17,7 +17,14 @@ pub struct Log<T = LogData> {
     /// The timestamp of the block as proposed in:
     /// <https://ethereum-magicians.org/t/proposal-for-adding-blocktimestamp-to-logs-object-returned-by-eth-getlogs-and-related-requests>
     /// <https://github.com/ethereum/execution-apis/issues/295>
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt",
+            default
+        )
+    )]
     pub block_timestamp: Option<u64>,
     /// Transaction Hash
     #[doc(alias = "tx_hash")]

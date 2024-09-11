@@ -69,7 +69,9 @@ impl<'a> serde::Deserialize<'a> for Index {
                     },
                     |val| {
                         usize::from_str_radix(val, 16).map(Index).map_err(|e| {
-                            serde::de::Error::custom(format!("Failed to parse hex encoded index value: {e}"))
+                            serde::de::Error::custom(format!(
+                                "Failed to parse hex encoded index value: {e}"
+                            ))
                         })
                     },
                 )

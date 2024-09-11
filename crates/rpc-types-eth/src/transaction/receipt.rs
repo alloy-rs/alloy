@@ -44,10 +44,24 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// Blob gas used by the eip-4844 transaction
     ///
     /// This is None for non eip-4844 transactions
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt",
+            default
+        )
+    )]
     pub blob_gas_used: Option<u128>,
     /// The price paid by the eip-4844 transaction per blob gas.
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt", default))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt",
+            default
+        )
+    )]
     pub blob_gas_price: Option<u128>,
     /// Address of the sender
     pub from: Address,

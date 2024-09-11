@@ -1,5 +1,5 @@
-use core::fmt;
 use alloy_primitives::{B256, U256};
+use core::fmt;
 
 /// The result of an `eth_getWork` request
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

@@ -28,10 +28,13 @@ pub struct Block<T = Transaction, H = Header> {
     pub uncles: Vec<B256>,
     /// Block Transactions. In the case of an uncle block, this field is not included in RPC
     /// responses, and when deserialized, it will be set to [BlockTransactions::Uncle].
-    #[cfg_attr(feature = "serde", serde(
-        default = "BlockTransactions::uncle",
-        skip_serializing_if = "BlockTransactions::is_uncle"
-    ))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default = "BlockTransactions::uncle",
+            skip_serializing_if = "BlockTransactions::is_uncle"
+        )
+    )]
     pub transactions: BlockTransactions<T>,
     /// Integer the size of this block in bytes.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -107,16 +110,37 @@ pub struct Header {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub nonce: Option<B64>,
     /// Base fee per unit of gas (if past London)
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub base_fee_per_gas: Option<u128>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals_root: Option<B256>,
     /// Blob gas used
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub blob_gas_used: Option<u128>,
     /// Excess blob gas
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub excess_blob_gas: Option<u128>,
     /// EIP-4788 parent beacon block root
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -292,22 +316,35 @@ pub struct BlockOverrides {
     /// For `eth_callMany` this will be the block number of the first simulated block. Each
     /// following block increments its block number by 1
     // Note: geth uses `number`, erigon uses `blockNumber`
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", alias = "blockNumber"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "blockNumber")
+    )]
     pub number: Option<U256>,
     /// Overrides the difficulty of the block.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub difficulty: Option<U256>,
     /// Overrides the timestamp of the block.
     // Note: geth uses `time`, erigon uses `timestamp`
-    #[cfg_attr(feature = "serde", serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        alias = "timestamp",
-        with = "alloy_serde::quantity::opt"
-    ))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            alias = "timestamp",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub time: Option<u64>,
     /// Overrides the gas limit of the block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]

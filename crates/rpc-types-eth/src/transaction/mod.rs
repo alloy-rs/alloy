@@ -61,19 +61,47 @@ pub struct Transaction {
     /// Transferred value
     pub value: U256,
     /// Gas Price
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub gas_price: Option<u128>,
     /// Gas amount
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas: u128,
     /// Max BaseFeePerGas the user is willing to pay.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// Data
     pub input: Bytes,
@@ -83,7 +111,14 @@ pub struct Transaction {
     #[cfg_attr(feature = "serde", serde(flatten, skip_serializing_if = "Option::is_none"))]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub chain_id: Option<ChainId>,
     /// Contains the blob hashes for eip-4844 transactions.
     #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
@@ -98,12 +133,15 @@ pub struct Transaction {
     /// Transaction type,
     /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559
     /// transaction, Some(1) for AccessList transaction, None or Some(0) for Legacy
-    #[cfg_attr(feature = "serde", serde(
-        default,
-        rename = "type",
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::quantity::opt"
-    ))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            rename = "type",
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// The signed authorization list is a list of tuples that store the address to code which the
