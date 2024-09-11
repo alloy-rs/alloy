@@ -10,6 +10,9 @@ use alloy_rpc_types_trace::{
 };
 use alloy_transport::{Transport, TransportResult};
 
+/// List of trace calls for use with [`TraceApi::trace_call_many`]
+type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
+
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
@@ -23,11 +26,11 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
-        request: N::TransactionRequest,
-        trace_type: &[TraceType],
-    ) -> TransportResult<TraceResults>;
+        request: &'a N::TransactionRequest,
+        trace_type: &'b [TraceType],
+    ) -> RpcWithBlock<T, (&'a N::TransactionRequest, &'b [TraceType]), TraceResults>;
 
     /// Traces multiple transactions on top of the same block, i.e. transaction `n` will be executed
     /// on top of the given block with all `n - 1` transaction applied first.
@@ -37,10 +40,10 @@ where
     /// # Note
     ///
     /// Not all nodes support this call.
-    async fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
-        request: Vec<(N::TransactionRequest, &[TraceType])>,
-    ) -> TransportResult<Vec<TraceResults>>;
+        request: TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -103,19 +106,20 @@ where
     T: Transport + Clone,
     P: Provider<T, N>,
 {
-    async fn trace_call(
+    fn trace_call<'a, 'b>(
         &self,
-        request: N::TransactionRequest,
-        trace_types: &[TraceType],
-    ) -> TransportResult<TraceResults> {
-        self.client().request("trace_call", (request, trace_types)).await
+        request: &'a <N as Network>::TransactionRequest,
+        trace_types: &'b [TraceType],
+    ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
+    {
+        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_types))
     }
 
-    async fn trace_call_many(
+    fn trace_call_many<'a>(
         &self,
-        request: Vec<(N::TransactionRequest, &[TraceType])>,
-    ) -> TransportResult<Vec<TraceResults>> {
-        self.client().request("trace_callMany", (request,)).await
+        request: TraceCallList<'a, N>,
+    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>> {
+        RpcWithBlock::new(self.weak_client(), "trace_callMany", (request,))
     }
 
     async fn trace_transaction(
@@ -176,7 +180,7 @@ mod test {
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
-    use alloy_primitives::{bytes, U256};
+    use alloy_primitives::U256;
     use alloy_rpc_types_eth::TransactionRequest;
 
     use super::*;
@@ -214,7 +218,7 @@ mod test {
                 .with_nonce(0)
                 .with_value(U256::from(100));
 
-            let result = provider.trace_call(tx, &[TraceType::Trace]).await;
+            let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
             assert!(result.is_ok());
 
             let traces = result.unwrap();
@@ -276,7 +280,7 @@ mod test {
                 .with_value(U256::from(100));
 
             let result = provider
-                .trace_call_many(vec![(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
                 .await;
             assert!(result.is_ok());
 
