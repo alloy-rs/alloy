@@ -17,7 +17,9 @@ use alloy_primitives::{bytes::BufMut, FixedBytes, B256};
 use alloy_rlp::{Decodable, Encodable};
 #[cfg(feature = "kzg")]
 use c_kzg::KzgProof;
+#[cfg(feature = "kzg")]
 use core::str::FromStr;
+#[cfg(feature = "serde")]
 use serde::Deserialize;
 #[cfg(feature = "kzg")]
 use sha2::{Digest, Sha256};
@@ -344,23 +346,22 @@ impl BlobTransactionSidecarItem {
         let settings = binding.get();
 
         let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
-            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
         let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
-            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
         let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
-            .map_err(|e| BlobTransactionValidationError::KZGError(e))?;
+            .map_err(BlobTransactionValidationError::KZGError)?;
 
-        KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
-            .map_err(|e| BlobTransactionValidationError::KZGError(e))
-            .and_then(|result| {
-                if result {
-                    Ok(true)
-                } else {
-                    Err(BlobTransactionValidationError::InvalidProof)
-                }
-            })
+        let result = KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+            .map_err(BlobTransactionValidationError::KZGError)?;
+
+        if result {
+            Ok(true)
+        } else {
+            Err(BlobTransactionValidationError::InvalidProof)
+        }
     }
     /// Verify the blob sidecar against it's [BlockNumHash].
 
