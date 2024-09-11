@@ -6,6 +6,8 @@ use alloy_primitives::{Address, BlockHash, TxHash, B256};
 use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
 
+use alloc::vec::Vec;
+
 /// Transaction receipt
 ///
 /// This type is generic over an inner [`ReceiptEnvelope`] which contains

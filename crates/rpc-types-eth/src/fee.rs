@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use alloc::vec::Vec;
+
 /// Internal struct to calculate reward percentiles
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[doc(alias = "TransactionGasAndReward")]
@@ -11,13 +13,13 @@ pub struct TxGasAndReward {
 }
 
 impl PartialOrd for TxGasAndReward {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for TxGasAndReward {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // compare only the reward
         // see:
         // <https://github.com/ethereum/go-ethereum/blob/ee8e83fa5f6cb261dad2ed0a7bbcde4930c41e6c/eth/gasprice/feehistory.go#L85>

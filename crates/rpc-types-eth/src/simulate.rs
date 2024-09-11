@@ -1,9 +1,9 @@
 //! 'eth_simulateV1' Request / Response types: <https://github.com/ethereum/execution-apis/pull/484>
 
+use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
+use alloc::{string::String, vec::Vec};
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Serialize};
-
-use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;

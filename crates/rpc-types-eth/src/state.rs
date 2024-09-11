@@ -1,9 +1,9 @@
 //! bindings for state overrides in eth_call
 
-use crate::BlockOverrides;
+use crate::{collections::HashMap, BlockOverrides};
+use alloc::boxed::Box;
 use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// A set of account overrides
 pub type StateOverride = HashMap<Address, AccountOverride>;
