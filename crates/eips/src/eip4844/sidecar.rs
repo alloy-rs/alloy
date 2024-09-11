@@ -4,20 +4,21 @@
 use crate::eip4844::env_settings::EnvKzgSettings;
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
-use crate::{
-    eip4844::{
-        kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
-    },
-    BlockNumHash,
+use crate::eip4844::{
+    kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
 
+#[cfg(feature = "kzg")]
+use crate::BlockNumHash;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use alloy_primitives::{bytes::BufMut, FixedBytes, B256};
+#[cfg(feature = "kzg")]
+use alloy_primitives::FixedBytes;
+use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 #[cfg(feature = "kzg")]
 use c_kzg::KzgProof;
-#[cfg(feature = "kzg")]
+#[cfg(feature = "serde")]
 use core::str::FromStr;
 #[cfg(feature = "serde")]
 use serde::Deserialize;
