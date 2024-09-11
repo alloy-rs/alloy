@@ -23,7 +23,7 @@ workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 alloy-consensus = { workspace = true, features = ["std"] }
-alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-serde.workspace = true
 alloy-eips = { workspace = true, features = ["serde"] }
 

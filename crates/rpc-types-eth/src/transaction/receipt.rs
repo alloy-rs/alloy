@@ -266,7 +266,7 @@ mod test {
     #[cfg(feature = "serde")]
     fn deserialize_tx_receipt_op() {
         // OtherFields for Optimism
-        #[derive(Debug, Deserialize)]
+        #[derive(Debug, serde::Deserialize)]
         struct OpOtherFields {
             #[serde(rename = "l1BaseFeeScalar")]
             l1_base_fee_scalar: String,
@@ -342,7 +342,7 @@ mod test {
     #[cfg(feature = "serde")]
     fn deserialize_tx_receipt_arb() {
         // OtherFields for Arbitrum
-        #[derive(Debug, Deserialize)]
+        #[derive(Debug, serde::Deserialize)]
         struct ArbOtherFields {
             #[serde(rename = "gasUsedForL1")]
             gas_used_for_l1: String,
