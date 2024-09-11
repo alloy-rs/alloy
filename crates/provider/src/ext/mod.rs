@@ -28,7 +28,7 @@ pub use net::NetApi;
 #[cfg(feature = "trace-api")]
 mod trace;
 #[cfg(feature = "trace-api")]
-pub use trace::{TraceApi, TraceCallList};
+pub use trace::TraceApi;
 
 #[cfg(feature = "rpc-api")]
 mod rpc;
