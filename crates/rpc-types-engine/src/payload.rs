@@ -980,9 +980,8 @@ impl PayloadStatus {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::fmt::Display for PayloadStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for PayloadStatus {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "PayloadStatus {{ status: {}, latestValidHash: {:?} }}",
