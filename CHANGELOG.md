@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Bug Fixes
+
+- [rpc-types-trace] Use rpc-types Log in OtsReceipt ([#1261](https://github.com/alloy-rs/alloy/issues/1261))
+
+### Features
+
+- [rpc-types-trace] Always serialize result if no error ([#1258](https://github.com/alloy-rs/alloy/issues/1258))
+
+### Miscellaneous Tasks
+
+- Require destination for 7702 ([#1262](https://github.com/alloy-rs/alloy/issues/1262))
+- Swap BlockNumHash alias and struct name ([#1265](https://github.com/alloy-rs/alloy/issues/1265))
+
+### Other
+
+- Implement `AsRef` for `Header` ([#1260](https://github.com/alloy-rs/alloy/issues/1260))
+
+### Testing
+
+- Dont use fork test ([#1263](https://github.com/alloy-rs/alloy/issues/1263))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Bug Fixes
+
+- [consensus] Remove Unused Alloc Vecs ([#1250](https://github.com/alloy-rs/alloy/issues/1250))
+
+### Dependencies
+
+- Bump tower to 0.5 ([#1249](https://github.com/alloy-rs/alloy/issues/1249))
+
+### Features
+
+- No_std network primitives ([#1248](https://github.com/alloy-rs/alloy/issues/1248))
+- [rpc-types-eth] AnyBlock ([#1243](https://github.com/alloy-rs/alloy/issues/1243))
+- Add Reth node bindings ([#1092](https://github.com/alloy-rs/alloy/issues/1092))
+- [rpc-types-engine] Add forkchoice state zero helpers ([#1231](https://github.com/alloy-rs/alloy/issues/1231))
+- [network-primitives] Expose more fields via block response traits ([#1229](https://github.com/alloy-rs/alloy/issues/1229))
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+- Add aliases for Num Hash ([#1253](https://github.com/alloy-rs/alloy/issues/1253))
+- Add helpers for beacon blob bundle ([#1254](https://github.com/alloy-rs/alloy/issues/1254))
+- [eip1898] Display `RpcBlockHash` ([#1242](https://github.com/alloy-rs/alloy/issues/1242))
+- Optional derive more ([#1239](https://github.com/alloy-rs/alloy/issues/1239))
+- Derive more default features false ([#1230](https://github.com/alloy-rs/alloy/issues/1230))
+
+### Other
+
+- Add getter trait methods to `ReceiptResponse` ([#1251](https://github.com/alloy-rs/alloy/issues/1251))
+- Impl `exceeds_allowed_future_timestamp` for `Header` ([#1237](https://github.com/alloy-rs/alloy/issues/1237))
+- Impl `is_zero_difficulty` for `Header` ([#1236](https://github.com/alloy-rs/alloy/issues/1236))
+- Impl parent_num_hash for Header ([#1238](https://github.com/alloy-rs/alloy/issues/1238))
+- Implement `Arbitrary` for `Header` ([#1235](https://github.com/alloy-rs/alloy/issues/1235))
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Bug Fixes
@@ -31,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.1
 - [README] Add a link to `rpc-types-debug` ([#1212](https://github.com/alloy-rs/alloy/issues/1212))
 - [features] Enable `consensus` and `network` along with `providers` ([#1207](https://github.com/alloy-rs/alloy/issues/1207))
 

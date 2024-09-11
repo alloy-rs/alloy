@@ -2,6 +2,8 @@
 use alloy_primitives::U256;
 use serde::{Deserialize, Serialize};
 
+use alloc::{format, string::String};
+
 /// Container type for all signature fields in RPC
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -89,7 +91,7 @@ impl From<alloy_primitives::Signature> for Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use core::str::FromStr;
 
     #[test]
     fn deserialize_without_parity() {

@@ -6,15 +6,18 @@ use serde::{
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{
-    collections::{
-        hash_set::{IntoIter, Iter},
-        HashSet,
-    },
+
+use alloc::{format, string::String, vec::Vec};
+
+use crate::collections::{
+    hash_set::{IntoIter, Iter},
+    HashSet,
+};
+use core::{
     hash::Hash,
+    iter::{FromIterator, IntoIterator},
     ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
-use thiserror::Error;
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -46,7 +49,7 @@ impl<T: Eq + Hash> From<T> for FilterSet<T> {
 }
 
 impl<T: Eq + Hash> Hash for FilterSet<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         for value in &self.0 {
             value.hash(state);
         }
@@ -154,10 +157,10 @@ impl From<U256> for Topic {
 }
 
 /// Represents errors that can occur when setting block filters in `FilterBlockOption`.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, derive_more::Display)]
 pub enum FilterBlockError {
     /// Error indicating that the `from_block` is greater than the `to_block`.
-    #[error("`from_block` ({from}) is greater than `to_block` ({to})")]
+    #[display("`from_block` ({from}) is greater than `to_block` ({to})")]
     FromBlockGreaterThanToBlock {
         /// The starting block number, which is greater than `to`.
         from: u64,
@@ -165,6 +168,9 @@ pub enum FilterBlockError {
         to: u64,
     },
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for FilterBlockError {}
 
 /// Represents the target range of blocks for the filter
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -593,7 +599,7 @@ impl<'de> Deserialize<'de> for Filter {
         impl<'de> Visitor<'de> for FilterVisitor {
             type Value = Filter;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 formatter.write_str("Filter object")
             }
 

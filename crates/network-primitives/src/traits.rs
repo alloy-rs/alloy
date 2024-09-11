@@ -4,9 +4,6 @@ use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
 
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.

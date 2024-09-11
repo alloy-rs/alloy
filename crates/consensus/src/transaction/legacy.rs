@@ -1,13 +1,11 @@
 use core::mem;
 
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]

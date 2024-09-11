@@ -2,6 +2,8 @@ use alloy_primitives::{Address, Bytes, B256, B512, U256};
 use alloy_serde::storage::JsonStorageKey;
 use serde::{Deserialize, Serialize};
 
+use alloc::{string::String, vec::Vec};
+
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::Account;
 

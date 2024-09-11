@@ -9,6 +9,8 @@ use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 use serde::{Deserialize, Serialize};
 
+use alloc::vec::Vec;
+
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
@@ -269,7 +271,7 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
                 .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            to: tx.to.into(),
+            to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
             authorization_list: tx
@@ -325,8 +327,8 @@ mod tests {
     use super::*;
     use alloy_primitives::Signature as AlloySignature;
     use arbitrary::Arbitrary;
+    use core::str::FromStr;
     use rand::Rng;
-    use std::str::FromStr;
 
     #[test]
     fn arbitrary_transaction() {

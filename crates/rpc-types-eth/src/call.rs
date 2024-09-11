@@ -2,6 +2,12 @@ use crate::{request::TransactionRequest, BlockId, BlockOverrides};
 use alloy_primitives::Bytes;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+
 /// Bundle of transactions
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]

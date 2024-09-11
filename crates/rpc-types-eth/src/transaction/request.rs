@@ -7,8 +7,14 @@ use alloy_consensus::{
 };
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, B256, U256};
+use core::hash::Hash;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// Represents _all_ transaction requests to/from RPC.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -312,7 +318,7 @@ impl TransactionRequest {
     /// If required fields are missing. Use `complete_7702` to check if the
     /// request can be built.
     fn build_7702(self) -> Result<TxEip7702, &'static str> {
-        let checked_to = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?;
+        let to_address = self.to.ok_or("Missing 'to' field for Eip7702 transaction.")?.to().copied().ok_or("The field `to` can only be of type TxKind::Call(Account). Please change it accordingly.")?;
 
         Ok(TxEip7702 {
             chain_id: self.chain_id.unwrap_or(1),
@@ -324,7 +330,7 @@ impl TransactionRequest {
             max_priority_fee_per_gas: self
                 .max_priority_fee_per_gas
                 .ok_or("Missing 'max_priority_fee_per_gas' field for Eip7702 transaction.")?,
-            to: checked_to,
+            to: to_address,
             value: self.value.unwrap_or_default(),
             input: self.input.into_input().unwrap_or_default(),
             access_list: self.access_list.unwrap_or_default(),
@@ -808,7 +814,7 @@ impl From<TxEip4844Variant> for TransactionRequest {
 impl From<TxEip7702> for TransactionRequest {
     fn from(tx: TxEip7702) -> Self {
         Self {
-            to: if let TxKind::Call(to) = tx.to { Some(to.into()) } else { None },
+            to: Some(tx.to.into()),
             gas: Some(tx.gas_limit),
             max_fee_per_gas: Some(tx.max_fee_per_gas),
             max_priority_fee_per_gas: Some(tx.max_priority_fee_per_gas),
@@ -930,11 +936,14 @@ impl From<TxEnvelope> for TransactionRequest {
 }
 
 /// Error thrown when both `data` and `input` fields are set and not equal.
-#[derive(Debug, Default, thiserror::Error)]
-#[error("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
+#[derive(Debug, Default, derive_more::Display)]
+#[display("both \"data\" and \"input\" are set and not equal. Please use \"input\" to pass transaction call data")]
 #[doc(alias = "TxInputError")]
 #[non_exhaustive]
 pub struct TransactionInputError;
+
+#[cfg(feature = "std")]
+impl std::error::Error for TransactionInputError {}
 
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]

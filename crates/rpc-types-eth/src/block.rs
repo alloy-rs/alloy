@@ -1,13 +1,15 @@
 //! Block RPC types.
 
 use crate::{ConversionError, Transaction, Withdrawal};
+use alloc::collections::BTreeMap;
 use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
 use alloy_serde::WithOtherFields;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+
+use alloc::vec::Vec;
 
 pub use alloy_eips::{
     calc_blob_gasprice, calc_excess_blob_gas, BlockHashOrNumber, BlockId, BlockNumHash,
@@ -247,14 +249,24 @@ impl HeaderResponse for Header {
 }
 
 /// Error that can occur when converting other types to blocks
-#[derive(Clone, Copy, Debug, thiserror::Error)]
+#[derive(Clone, Copy, Debug, derive_more::Display)]
 pub enum BlockError {
     /// A transaction failed sender recovery
-    #[error("transaction failed sender recovery")]
+    #[display("transaction failed sender recovery")]
     InvalidSignature,
     /// A raw block failed to decode
-    #[error("failed to decode raw block {0}")]
+    #[display("failed to decode raw block {_0}")]
     RlpDecodeRawBlock(alloy_rlp::Error),
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for BlockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::RlpDecodeRawBlock(err) => Some(err),
+            _ => None,
+        }
+    }
 }
 
 impl From<Block> for WithOtherFields<Block> {

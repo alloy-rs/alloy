@@ -1,6 +1,7 @@
 use alloy_primitives::{B512, U256};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::BTreeMap;
+
+use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
 
 /// Syncing info
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
