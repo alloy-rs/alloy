@@ -51,6 +51,14 @@ pub trait ReceiptResponse {
 
     /// EIP-7702 Authorization list.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// Returns the cumulative gas used at this receipt.
+    fn cumulative_gas_used(&self) -> u128;
+
+    /// The post-transaction state root (pre Byzantium)
+    ///
+    /// EIP98 makes this field optional.
+    fn state_root(&self) -> Option<&B256>;
 }
 
 /// Transaction JSON-RPC response.
@@ -220,6 +228,14 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
 
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.inner.authorization_list()
+    }
+
+    fn cumulative_gas_used(&self) -> u128 {
+        self.inner.cumulative_gas_used()
+    }
+
+    fn state_root(&self) -> Option<&B256> {
+        self.inner.state_root()
     }
 }
 
