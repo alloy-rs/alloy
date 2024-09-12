@@ -1,11 +1,10 @@
-use alloy_primitives::{B512, U256};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 use alloc::{boxed::Box, collections::BTreeMap, string::String, vec::Vec};
+use alloy_primitives::{B512, U256};
 
 /// Syncing info
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SyncInfo {
     /// Starting block
     pub starting_block: U256,
@@ -19,24 +18,26 @@ pub struct SyncInfo {
     pub warp_chunks_processed: Option<U256>,
     /// The details of the sync stages as an hashmap
     /// where the key is the name of the stage and the value is the block number.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub stages: Option<Vec<Stage>>,
 }
 
 /// The detail of the sync stages.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Stage {
     /// The name of the sync stage.
-    #[serde(alias = "stage_name")]
+    #[cfg_attr(feature = "serde", serde(alias = "stage_name"))]
     pub name: String,
     /// Indicates the progress of the sync stage.
-    #[serde(alias = "block_number", with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(alias = "block_number", with = "alloy_serde::quantity"))]
     pub block: u64,
 }
 
 /// Peers info
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Peers {
     /// Number of active peers
     pub active: usize,
@@ -49,7 +50,8 @@ pub struct Peers {
 }
 
 /// Peer connection information
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PeerInfo {
     /// Public node id
     pub id: Option<String>,
@@ -64,8 +66,9 @@ pub struct PeerInfo {
 }
 
 /// Peer network information
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct PeerNetworkInfo {
     /// Remote endpoint address
     pub remote_address: String,
@@ -74,17 +77,19 @@ pub struct PeerNetworkInfo {
 }
 
 /// Peer protocols information
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PeerProtocolsInfo {
     /// Ethereum protocol information
     pub eth: Option<PeerEthProtocolInfo>,
     /// PIP protocol information.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub pip: Option<PipProtocolInfo>,
 }
 
 /// Peer Ethereum protocol information
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PeerEthProtocolInfo {
     /// Negotiated ethereum protocol version
     pub version: u32,
@@ -95,7 +100,8 @@ pub struct PeerEthProtocolInfo {
 }
 
 /// Peer PIP protocol information
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PipProtocolInfo {
     /// Negotiated PIP protocol version
     pub version: u32,
@@ -114,12 +120,13 @@ pub enum SyncStatus {
     None,
 }
 
-impl<'de> Deserialize<'de> for SyncStatus {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SyncStatus {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum Syncing {
             /// When client is synced to the highest block, eth_syncing with return "false"
@@ -137,10 +144,11 @@ impl<'de> Deserialize<'de> for SyncStatus {
     }
 }
 
-impl Serialize for SyncStatus {
+#[cfg(feature = "serde")]
+impl serde::Serialize for SyncStatus {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::Info(info) => info.serialize(serializer),
@@ -150,8 +158,9 @@ impl Serialize for SyncStatus {
 }
 
 /// Propagation statistics for pending transaction.
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "TxStats")]
 pub struct TransactionStats {
     /// Block no this transaction was first seen.
@@ -161,8 +170,9 @@ pub struct TransactionStats {
 }
 
 /// Chain status.
-#[derive(Clone, Copy, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ChainStatus {
     /// Describes the gap in the blockchain, if there is one: (first, last)
     pub block_gap: Option<(U256, U256)>,

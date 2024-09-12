@@ -3,7 +3,6 @@
 use crate::{state::StateOverride, Block, BlockOverrides, Log, TransactionRequest};
 use alloc::{string::String, vec::Vec};
 use alloy_primitives::Bytes;
-use serde::{Deserialize, Serialize};
 
 /// The maximum number of blocks that can be simulated in a single request,
 pub const MAX_SIMULATE_BLOCKS: u64 = 256;
@@ -11,25 +10,27 @@ pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 /// Represents a batch of calls to be simulated sequentially within a block.
 /// This struct includes block and state overrides as well as the transaction requests to be
 /// executed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimBlock {
     /// Modifications to the default block characteristics.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_overrides: Option<BlockOverrides>,
     /// State modifications to apply before executing the transactions.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
     pub calls: Vec<TransactionRequest>,
 }
 
 /// Represents the result of simulating a block.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatedBlock<B = Block> {
     /// The simulated block.
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: B,
     /// A vector of results for each call in the block.
     pub calls: Vec<SimCallResult>,
@@ -37,22 +38,23 @@ pub struct SimulatedBlock<B = Block> {
 
 /// Captures the outcome of a transaction simulation.
 /// It includes the return value, logs produced, gas used, and the status of the transaction.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimCallResult {
     /// The raw bytes returned by the transaction.
     pub return_value: Bytes,
     /// Logs generated during the execution of the transaction.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub logs: Vec<Log>,
     /// The amount of gas used by the transaction.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// The final status of the transaction, typically indicating success or failure.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub status: bool,
     /// Error in case the call failed
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub error: Option<SimulateError>,
 }
 
@@ -60,24 +62,26 @@ pub struct SimCallResult {
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatePayload {
     /// Array of block state calls to be executed at specific, optional block/state.
     pub block_state_calls: Vec<SimBlock>,
     /// Flag to determine whether to trace ERC20/ERC721 token transfers within transactions.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub trace_transfers: bool,
     /// Flag to enable or disable validation of the transaction sequence in the blocks.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub validation: bool,
     /// Flag to decide if full transactions should be returned instead of just their hashes.
     pub return_full_transactions: bool,
 }
 
 /// The error response returned by the `eth_simulateV1` method.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulateError {
     /// Code error
     /// -3200: Execution reverted
@@ -94,6 +98,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_eth_simulate_v1_account_not_precompile() {
         let request_json = json!({
             "jsonrpc": "2.0",
