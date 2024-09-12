@@ -605,6 +605,19 @@ mod tests {
 
     #[test]
     #[cfg(not(windows))]
+    fn can_launch_reth_custom_port() {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+            let reth = Reth::new().http_port(8577).data_dir(temp_dir_path).spawn();
+
+            assert_eq!(reth.http_port(), 8577);
+            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
+        });
+    }
+
+    #[test]
+    #[cfg(not(windows))]
     fn can_launch_reth_custom_ports() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
@@ -619,6 +632,21 @@ mod tests {
             assert_eq!(reth.ws_port(), 8578);
             assert_eq!(reth.auth_port(), Some(8579));
             assert_eq!(reth.p2p_port(), Some(30307));
+        });
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn can_launch_reth_random_port() {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+            let reth = Reth::new().http_port(0).data_dir(temp_dir_path).spawn();
+
+            // Assert that a random used port is used.
+            assert_ne!(reth.http_port(), DEFAULT_HTTP_PORT);
+
+            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
         });
     }
 
