@@ -11,7 +11,6 @@ use alloy_eips::{
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use core::iter::{FromIterator, IntoIterator};
-use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer};
 
 /// The execution payload body response that allows for `null` values.
 pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
@@ -20,7 +19,8 @@ pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadId(pub B64);
 
 // === impl PayloadId ===
@@ -49,8 +49,9 @@ impl core::fmt::Display for PayloadId {
 ///
 /// See:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/shanghai.md#response>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum ExecutionPayloadFieldV2 {
     /// V1 payload
     V1(ExecutionPayloadV1),
@@ -69,14 +70,15 @@ impl ExecutionPayloadFieldV2 {
 }
 
 /// This is the input to `engine_newPayloadV2`, which may or may not have a withdrawals field.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
 pub struct ExecutionPayloadInputV2 {
     /// The V1 execution payload
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub execution_payload: ExecutionPayloadV1,
     /// The payload withdrawals
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
@@ -85,8 +87,9 @@ pub struct ExecutionPayloadInputV2 {
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/main/src/engine/shanghai.md#engine_getpayloadv2>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV2 {
     /// Execution payload, which could be either V1 or V2
     ///
@@ -112,8 +115,9 @@ impl ExecutionPayloadEnvelopeV2 {
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#response-2>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV3 {
     /// Execution payload V3
     pub execution_payload: ExecutionPayloadV3,
@@ -131,8 +135,9 @@ pub struct ExecutionPayloadEnvelopeV3 {
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#engine_getpayloadv4>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV4 {
     /// Execution payload V4
     pub execution_payload: ExecutionPayloadV4,
@@ -148,8 +153,9 @@ pub struct ExecutionPayloadEnvelopeV4 {
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct ExecutionPayloadV1 {
     /// The parent hash of the block.
@@ -165,16 +171,16 @@ pub struct ExecutionPayloadV1 {
     /// The previous randao of the block.
     pub prev_randao: B256,
     /// The block number.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub block_number: u64,
     /// The gas limit of the block.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_limit: u64,
     /// The gas used of the block.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
     /// The timestamp of the block.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub timestamp: u64,
     /// The extra data of the block.
     pub extra_data: Bytes,
@@ -189,11 +195,12 @@ pub struct ExecutionPayloadV1 {
 /// This structure maps on the ExecutionPayloadV2 structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", deny_unknown_fields))]
 pub struct ExecutionPayloadV2 {
     /// Inner V1 payload
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub payload_inner: ExecutionPayloadV1,
 
     /// Array of [`Withdrawal`] enabled with V2
@@ -302,20 +309,21 @@ impl ssz::Encode for ExecutionPayloadV2 {
 /// This structure maps on the ExecutionPayloadV3 structure of the beacon chain spec.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/shanghai.md#executionpayloadv2>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadV3 {
     /// Inner V2 payload
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub payload_inner: ExecutionPayloadV2,
 
     /// Array of hex [`u64`] representing blob gas used, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub blob_gas_used: u64,
     /// Array of hex[`u64`] representing excess blob gas, enabled with V3
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub excess_blob_gas: u64,
 }
 
@@ -435,11 +443,12 @@ impl ssz::Encode for ExecutionPayloadV3 {
 ///
 /// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositRequests
 /// and withdrawalRequests.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadV4 {
     /// Inner V3 payload
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub payload_inner: ExecutionPayloadV3,
     /// Array of deposit requests.
     ///
@@ -468,7 +477,8 @@ impl ExecutionPayloadV4 {
 }
 
 /// This includes all bundled blob related data of an executed payload.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobsBundleV1 {
     /// All commitments in the bundle.
     pub commitments: Vec<alloy_consensus::Bytes48>,
@@ -594,8 +604,9 @@ impl FromIterator<BlobTransactionSidecar> for BlobsBundleV1 {
 
 /// An execution payload, which can be either [ExecutionPayloadV1], [ExecutionPayloadV2], or
 /// [ExecutionPayloadV3].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum ExecutionPayload {
     /// V1 payload
     V1(ExecutionPayloadV1),
@@ -751,12 +762,13 @@ impl From<ExecutionPayloadV4> for ExecutionPayload {
 }
 
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
-impl<'de> Deserialize<'de> for ExecutionPayload {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for ExecutionPayload {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        #[derive(Deserialize)]
+        #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum ExecutionPayloadDesc {
             V4(ExecutionPayloadV4),
@@ -867,7 +879,8 @@ impl PayloadError {
 /// This structure contains a body of an execution payload.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/shanghai.md#executionpayloadbodyv1>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExecutionPayloadBodyV1 {
     /// Enveloped encoded transactions.
     pub transactions: Vec<Bytes>,
@@ -881,8 +894,9 @@ pub struct ExecutionPayloadBodyV1 {
 /// depositRequests and withdrawalRequests.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/3ae3d29fc9900e5c48924c238dff7643fdc3680e/src/engine/prague.md#executionpayloadbodyv2>
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadBodyV2 {
     /// Enveloped encoded transactions.
     pub transactions: Vec<Bytes>,
@@ -906,11 +920,12 @@ pub struct ExecutionPayloadBodyV2 {
 
 /// This structure contains the attributes required to initiate a payload build process in the
 /// context of an `engine_forkchoiceUpdated` call.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct PayloadAttributes {
     /// Value for the `timestamp` field of the new payload
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub timestamp: u64,
     /// Value for the `prevRandao` field of the new payload
     pub prev_randao: B256,
@@ -918,21 +933,22 @@ pub struct PayloadAttributes {
     pub suggested_fee_recipient: Address,
     /// Array of [`Withdrawal`] enabled with V2
     /// See <https://github.com/ethereum/execution-apis/blob/6452a6b194d7db269bf1dbd087a267251d3cc7f8/src/engine/shanghai.md#payloadattributesv2>
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub withdrawals: Option<Vec<Withdrawal>>,
     /// Root of the parent beacon block enabled with V3.
     ///
     /// See also <https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md#payloadattributesv3>
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
 }
 
 /// This structure contains the result of processing a payload or fork choice update.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct PayloadStatus {
     /// The status of the payload.
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub status: PayloadStatusEnum,
     /// Hash of the most recent valid block in the branch defined by payload and its ancestors
     pub latest_valid_hash: Option<B256>,
@@ -987,11 +1003,13 @@ impl core::fmt::Display for PayloadStatus {
     }
 }
 
-impl Serialize for PayloadStatus {
+#[cfg(feature = "serde")]
+impl serde::Serialize for PayloadStatus {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
+        use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(Some(3))?;
         map.serialize_entry("status", self.status.as_str())?;
         map.serialize_entry("latestValidHash", &self.latest_valid_hash)?;
@@ -1007,8 +1025,9 @@ impl From<PayloadError> for PayloadStatusEnum {
 }
 
 /// Represents the status response of a payload.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "status", rename_all = "SCREAMING_SNAKE_CASE"))]
 pub enum PayloadStatusEnum {
     /// VALID is returned by the engine API in the following calls:
     ///   - newPayload:       if the payload was already known or was just validated and executed
@@ -1020,7 +1039,7 @@ pub enum PayloadStatusEnum {
     ///   - forkchoiceUpdate: if the new head is unknown, pre-merge, or reorg to it fails
     Invalid {
         /// The error message for the invalid payload.
-        #[serde(rename = "validationError")]
+        #[cfg_attr(feature = "serde", serde(rename = "validationError"))]
         validation_error: String,
     },
 
@@ -1112,6 +1131,7 @@ mod tests {
     use alloc::vec;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_payload_status() {
         let s = r#"{"status":"SYNCING","latestValidHash":null,"validationError":null}"#;
         let status: PayloadStatus = serde_json::from_str(s).unwrap();
@@ -1130,6 +1150,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_payload_status_error_deserialize() {
         let s = r#"{"status":"INVALID","latestValidHash":null,"validationError":"Failed to decode block"}"#;
         let q = PayloadStatus {
@@ -1178,6 +1199,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_roundtrip_legacy_txs_payload_v1() {
         // pulled from hive tests
         let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x44bb4b98c59dbb726f96ffceb5ee028dcbe35b9bba4f9ffd56aeebf8d1e4db62","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0x5655011482546f16b2312ef18e9fad03d6a52b1be95401aea884b222477f9e64","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"]}"#;
@@ -1189,6 +1211,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_roundtrip_legacy_txs_payload_v3() {
         // pulled from hive tests - modified with 4844 fields
         let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x44bb4b98c59dbb726f96ffceb5ee028dcbe35b9bba4f9ffd56aeebf8d1e4db62","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0x5655011482546f16b2312ef18e9fad03d6a52b1be95401aea884b222477f9e64","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"],"withdrawals":[],"blobGasUsed":"0xb10b","excessBlobGas":"0xb10b"}"#;
@@ -1200,6 +1223,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_roundtrip_enveloped_txs_payload_v1() {
         // pulled from hive tests
         let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x76a03cbcb7adce07fd284c61e4fa31e5e786175cefac54a29e46ec8efa28ea41","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x028111cb7d25918386a69656b3d17b2febe95fd0f11572c1a55c14f99fdfe3df","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0xa6f40ed042e61e88e76125dede8fff8026751ea14454b68fb534cea99f2b2a77","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"]}"#;
@@ -1211,6 +1235,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_roundtrip_enveloped_txs_payload_v3() {
         // pulled from hive tests - modified with 4844 fields
         let s = r#"{"parentHash":"0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x76a03cbcb7adce07fd284c61e4fa31e5e786175cefac54a29e46ec8efa28ea41","receiptsRoot":"0x4e3c608a9f2e129fccb91a1dae7472e78013b8e654bccc8d224ce3d63ae17006","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0x028111cb7d25918386a69656b3d17b2febe95fd0f11572c1a55c14f99fdfe3df","blockNumber":"0x1","gasLimit":"0x2fefd8","gasUsed":"0xa860","timestamp":"0x1235","extraData":"0x8b726574682f76302e312e30","baseFeePerGas":"0x342770c0","blockHash":"0xa6f40ed042e61e88e76125dede8fff8026751ea14454b68fb534cea99f2b2a77","transactions":["0xf865808506fc23ac00830124f8940000000000000000000000000000000000000316018032a044b25a8b9b247d01586b3d59c71728ff49c9b84928d9e7fa3377ead3b5570b5da03ceac696601ff7ee6f5fe8864e2998db9babdf5eeba1a0cd5b4d44b3fcbd181b"],"withdrawals":[],"blobGasUsed":"0xb10b","excessBlobGas":"0xb10b"}"#;
@@ -1222,6 +1247,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_roundtrip_execution_payload_envelope_v3() {
         // pulled from a geth response getPayloadV3 in hive tests
         let response = r#"{"executionPayload":{"parentHash":"0xe927a1448525fb5d32cb50ee1408461a945ba6c39bd5cf5621407d500ecc8de9","feeRecipient":"0x0000000000000000000000000000000000000000","stateRoot":"0x10f8a0830000e8edef6d00cc727ff833f064b1950afd591ae41357f97e543119","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xe0d8b4521a7da1582a713244ffb6a86aa1726932087386e2dc7973f43fc6cb24","blockNumber":"0x1","gasLimit":"0x2ffbd2","gasUsed":"0x0","timestamp":"0x1235","extraData":"0xd883010d00846765746888676f312e32312e30856c696e7578","baseFeePerGas":"0x342770c0","blockHash":"0x44d0fa5f2f73a938ebb96a2a21679eb8dea3e7b7dd8fd9f35aa756dda8bf0a8a","transactions":[],"withdrawals":[],"blobGasUsed":"0x0","excessBlobGas":"0x0"},"blockValue":"0x0","blobsBundle":{"commitments":[],"proofs":[],"blobs":[]},"shouldOverrideBuilder":false}"#;
@@ -1230,6 +1256,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_deserialize_execution_payload_input_v2() {
         let response = r#"
 {
@@ -1290,6 +1317,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_deserialize_v3_with_unknown_fields() {
         let input = r#"
 {
@@ -1373,6 +1401,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_deserialize_v2_input_with_blob_fields() {
         let input = r#"
 {
@@ -1404,6 +1433,7 @@ mod tests {
 
     // <https://github.com/paradigmxyz/reth/issues/6036>
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_op_base_payload() {
         let payload = r#"{"parentHash":"0x24e8df372a61cdcdb1a163b52aaa1785e0c869d28c3b742ac09e826bbb524723","feeRecipient":"0x4200000000000000000000000000000000000011","stateRoot":"0x9a5db45897f1ff1e620a6c14b0a6f1b3bcdbed59f2adc516a34c9a9d6baafa71","receiptsRoot":"0x8af6f74835d47835deb5628ca941d00e0c9fd75585f26dabdcb280ec7122e6af","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","prevRandao":"0xf37b24eeff594848072a05f74c8600001706c83e489a9132e55bf43a236e42ec","blockNumber":"0xe3d5d8","gasLimit":"0x17d7840","gasUsed":"0xb705","timestamp":"0x65a118c0","extraData":"0x","baseFeePerGas":"0x7a0ff32","blockHash":"0xf5c147b2d60a519b72434f0a8e082e18599021294dd9085d7597b0ffa638f1c0","withdrawals":[],"transactions":["0x7ef90159a05ba0034ffdcb246703298224564720b66964a6a69d0d7e9ffd970c546f7c048094deaddeaddeaddeaddeaddeaddeaddeaddead00019442000000000000000000000000000000000000158080830f424080b90104015d8eb900000000000000000000000000000000000000000000000000000000009e1c4a0000000000000000000000000000000000000000000000000000000065a11748000000000000000000000000000000000000000000000000000000000000000a4b479e5fa8d52dd20a8a66e468b56e993bdbffcccf729223aabff06299ab36db000000000000000000000000000000000000000000000000000000000000000400000000000000000000000073b4168cc87f35cc239200a20eb841cded23493b000000000000000000000000000000000000000000000000000000000000083400000000000000000000000000000000000000000000000000000000000f4240"]}"#;
         let _payload = serde_json::from_str::<ExecutionPayloadInputV2>(payload).unwrap();

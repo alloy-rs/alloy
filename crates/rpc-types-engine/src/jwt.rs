@@ -7,7 +7,6 @@ use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs, io,
@@ -117,7 +116,8 @@ const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 ///
 /// The Engine API spec requires that just the `iat` (issued-at) claim is provided.
 /// It ignores claims that are optional or additional for this specification.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Claims {
     /// The "iat" value MUST be a number containing a NumericDate value.
     /// According to the RFC A NumericDate represents the number of seconds since
