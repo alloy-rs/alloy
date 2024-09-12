@@ -154,9 +154,9 @@ pub struct ExecutionPayloadEnvelopeV4 {
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#executionpayloadv1>
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-#[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
 pub struct ExecutionPayloadV1 {
     /// The parent hash of the block.
     pub parent_hash: B256,
