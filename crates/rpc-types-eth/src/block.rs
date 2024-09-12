@@ -571,7 +571,8 @@ mod tests {
 
         let block = serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(s).unwrap();
         let serialized = serde_json::to_string(&block).unwrap();
-        let block2 = serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(&serialized).unwrap();
+        let block2 =
+            serde_json::from_str::<alloy_serde::WithOtherFields<Block>>(&serialized).unwrap();
         assert_eq!(block, block2);
     }
 
