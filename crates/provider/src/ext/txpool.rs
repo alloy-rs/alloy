@@ -82,37 +82,45 @@ mod tests {
 
     #[tokio::test]
     async fn test_txpool_content() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
-        let content = provider.txpool_content().await.unwrap();
-        assert_eq!(content, TxpoolContent::default());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+            let content = provider.txpool_content().await.unwrap();
+            assert_eq!(content, TxpoolContent::default());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_txpool_content_from() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
-        let content = provider.txpool_content_from(Address::default()).await.unwrap();
-        assert_eq!(content, TxpoolContentFrom::default());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+            let content = provider.txpool_content_from(Address::default()).await.unwrap();
+            assert_eq!(content, TxpoolContentFrom::default());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_txpool_inspect() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
-        let content = provider.txpool_inspect().await.unwrap();
-        assert_eq!(content, TxpoolInspect::default());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+            let content = provider.txpool_inspect().await.unwrap();
+            assert_eq!(content, TxpoolInspect::default());
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_txpool_status() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
-        let content = provider.txpool_status().await.unwrap();
-        assert_eq!(content, TxpoolStatus::default());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+            let content = provider.txpool_status().await.unwrap();
+            assert_eq!(content, TxpoolStatus::default());
+        })
+        .await;
     }
 }
