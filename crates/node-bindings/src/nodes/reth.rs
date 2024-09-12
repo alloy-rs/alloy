@@ -2,6 +2,7 @@
 
 use crate::{utils::extract_endpoint, NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_genesis::Genesis;
+use rand::Rng;
 use std::{
     fs::create_dir,
     io::{BufRead, BufReader},
@@ -23,6 +24,7 @@ const RETH: &str = "reth";
 #[derive(Debug)]
 pub struct RethInstance {
     pid: Child,
+    instance: u16,
     http_port: u16,
     ws_port: u16,
     auth_port: Option<u16>,
@@ -33,6 +35,11 @@ pub struct RethInstance {
 }
 
 impl RethInstance {
+    /// Returns the instance number of this instance.
+    pub const fn instance(&self) -> u16 {
+        self.instance
+    }
+
     /// Returns the HTTP port of this instance
     pub const fn http_port(&self) -> u16 {
         self.http_port
@@ -142,12 +149,12 @@ pub struct Reth {
 impl Reth {
     /// Creates an empty Reth builder.
     ///
-    /// The mnemonic is chosen randomly.
-    pub const fn new() -> Self {
+    /// The instance number is set to a random number between 0 and 200.
+    pub fn new() -> Self {
         Self {
             dev: false,
             block_time: None,
-            instance: 0,
+            instance: rand::thread_rng().gen_range(0..200),
             discovery_enabled: true,
             program: None,
             ipc_path: None,
@@ -411,6 +418,7 @@ impl Reth {
 
         Ok(RethInstance {
             pid: child,
+            instance: self.instance,
             http_port,
             ws_port,
             p2p_port: if p2p_port != 0 { Some(p2p_port) } else { None },
@@ -425,9 +433,13 @@ impl Reth {
 // These tests should use a different datadir for each `reth` instance spawned.
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::utils::run_with_tempdir_sync;
 
-    use super::*;
+    const DISCOVERY_PORT: u16 = 30303;
+    const AUTH_PORT: u16 = 8551;
+    const HTTP_RPC_PORT: u16 = 8545;
+    const WS_RPC_PORT: u16 = 8546;
 
     #[test]
     #[cfg(not(windows))]
@@ -517,14 +529,17 @@ mod tests {
 
     // Asserts that the ports are set correctly for the given reth instance.
     fn assert_ports(reth: &RethInstance, dev: bool) {
-        assert_eq!(reth.http_port(), 8545);
-        assert_eq!(reth.ws_port(), 8546);
-        assert_eq!(reth.auth_port(), Some(8551));
-
-        if dev {
-            assert_eq!(reth.p2p_port(), None);
-        } else {
-            assert_eq!(reth.p2p_port(), Some(30303));
-        }
+        // Changes to the following port numbers for each instance:
+        // - `DISCOVERY_PORT`: default + `instance` - 1
+        // - `AUTH_PORT`: default + `instance` * 100 - 100
+        // - `HTTP_RPC_PORT`: default - `instance` + 1
+        // - `WS_RPC_PORT`: default + `instance` * 2 - 2
+        assert_eq!(reth.http_port(), HTTP_RPC_PORT - reth.instance + 1);
+        assert_eq!(reth.ws_port(), WS_RPC_PORT + reth.instance * 2 - 2);
+        assert_eq!(reth.auth_port(), Some(AUTH_PORT + reth.instance * 100 - 100));
+        assert_eq!(
+            reth.p2p_port(),
+            if dev { None } else { Some(DISCOVERY_PORT + reth.instance - 1) }
+        );
     }
 }

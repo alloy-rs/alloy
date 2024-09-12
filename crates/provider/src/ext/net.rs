@@ -46,7 +46,7 @@ mod test {
     #[tokio::test]
     async fn call_net_version() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let version = provider.net_version().await.expect("net_version call should succeed");
@@ -58,7 +58,7 @@ mod test {
     #[tokio::test]
     async fn call_net_peer_count() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let count = provider.net_peer_count().await.expect("net_peerCount call should succeed");
@@ -70,7 +70,7 @@ mod test {
     #[tokio::test]
     async fn call_net_listening() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let listening =

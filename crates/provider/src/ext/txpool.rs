@@ -78,12 +78,12 @@ mod tests {
     use crate::ProviderBuilder;
 
     use super::*;
-    use alloy_node_bindings::Geth;
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
 
     #[tokio::test]
     async fn test_txpool_content() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
             let content = provider.txpool_content().await.unwrap();
             assert_eq!(content, TxpoolContent::default());
@@ -94,7 +94,7 @@ mod tests {
     #[tokio::test]
     async fn test_txpool_content_from() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
             let content = provider.txpool_content_from(Address::default()).await.unwrap();
             assert_eq!(content, TxpoolContentFrom::default());
@@ -105,7 +105,7 @@ mod tests {
     #[tokio::test]
     async fn test_txpool_inspect() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
             let content = provider.txpool_inspect().await.unwrap();
             assert_eq!(content, TxpoolInspect::default());
@@ -116,7 +116,7 @@ mod tests {
     #[tokio::test]
     async fn test_txpool_status() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
             let content = provider.txpool_status().await.unwrap();
             assert_eq!(content, TxpoolStatus::default());

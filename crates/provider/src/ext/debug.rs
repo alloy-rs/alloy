@@ -222,7 +222,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::Geth;
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
     use alloy_primitives::{address, U256};
 
     fn init_tracing() {
@@ -284,7 +284,7 @@ mod test {
     #[tokio::test]
     async fn call_debug_get_raw_header() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let rlp_header = provider
@@ -300,7 +300,7 @@ mod test {
     #[tokio::test]
     async fn call_debug_get_raw_block() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let rlp_block = provider
@@ -316,7 +316,7 @@ mod test {
     #[tokio::test]
     async fn call_debug_get_raw_receipts() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let result =
@@ -329,7 +329,7 @@ mod test {
     #[tokio::test]
     async fn call_debug_get_bad_blocks() {
         run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
             let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
             let result = provider.debug_get_bad_blocks().await;
