@@ -219,26 +219,34 @@ impl Reth {
     }
 
     /// Sets the HTTP port for the Reth instance.
+    /// Note: this resets the instance number to 0 to allow for custom ports.
     pub const fn http_port(mut self, http_port: u16) -> Self {
         self.http_port = http_port;
+        self.instance = 0;
         self
     }
 
     /// Sets the WS port for the Reth instance.
+    /// Note: this resets the instance number to 0 to allow for custom ports.
     pub const fn ws_port(mut self, ws_port: u16) -> Self {
         self.ws_port = ws_port;
+        self.instance = 0;
         self
     }
 
     /// Sets the auth port for the Reth instance.
+    /// Note: this resets the instance number to 0 to allow for custom ports.
     pub const fn auth_port(mut self, auth_port: u16) -> Self {
         self.auth_port = auth_port;
+        self.instance = 0;
         self
     }
 
     /// Sets the p2p port for the Reth instance.
+    /// Note: this resets the instance number to 0 to allow for custom ports.
     pub const fn p2p_port(mut self, p2p_port: u16) -> Self {
         self.p2p_port = p2p_port;
+        self.instance = 0;
         self
     }
 
@@ -374,7 +382,9 @@ impl Reth {
         }
 
         // If the instance is set, use it.
-        // Set the `instance` to 0 to use the default ports or want to customize the ports.
+        // Set the `instance` to 0 to use the default ports.
+        // By defining a custom `http_port`, `ws_port`, `auth_port`, or `p2p_port`, the instance
+        // number will be set to 0 automatically.
         if self.instance > 0 {
             cmd.arg("--instance").arg(self.instance.to_string());
         }
@@ -597,9 +607,7 @@ mod tests {
     #[cfg(not(windows))]
     fn can_launch_reth_custom_ports() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            // Note: to set custom ports, you must set the instance to 0.
             let reth = Reth::new()
-                .instance(0)
                 .http_port(8577)
                 .ws_port(8578)
                 .auth_port(8579)
