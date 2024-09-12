@@ -29,9 +29,11 @@ pub use account::*;
 mod block;
 pub use block::*;
 
+#[cfg(feature = "serde")]
 use alloy_serde::WithOtherFields;
 
 /// A catch-all block type for handling blocks on multiple networks.
+#[cfg(feature = "serde")]
 pub type AnyNetworkBlock = WithOtherFields<Block<WithOtherFields<Transaction>>>;
 
 pub use alloy_network_primitives::{
@@ -55,6 +57,7 @@ pub use index::Index;
 mod log;
 pub use log::*;
 
+#[cfg(feature = "serde")]
 pub mod pubsub;
 
 mod raw_log;
