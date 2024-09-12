@@ -6,7 +6,6 @@ use alloy_network_primitives::{
     BlockResponse, BlockTransactions, HeaderResponse, TransactionResponse,
 };
 use alloy_primitives::{Address, BlockHash, Bloom, Bytes, B256, B64, U256};
-use alloy_serde::WithOtherFields;
 
 use alloc::vec::Vec;
 
@@ -294,13 +293,15 @@ impl std::error::Error for BlockError {
     }
 }
 
-impl From<Block> for WithOtherFields<Block> {
+#[cfg(feature = "serde")]
+impl From<Block> for alloy_serde::WithOtherFields<Block> {
     fn from(inner: Block) -> Self {
         Self { inner, other: Default::default() }
     }
 }
 
-impl From<Header> for WithOtherFields<Header> {
+#[cfg(feature = "serde")]
+impl From<Header> for alloy_serde::WithOtherFields<Header> {
     fn from(inner: Header) -> Self {
         Self { inner, other: Default::default() }
     }
