@@ -18,7 +18,7 @@ const API: &str = "eth,net,web3,txpool,trace,rpc,reth,ots,admin,debug";
 /// The reth command
 const RETH: &str = "reth";
 
-/// A reth instance. Will close the instance when dropped.
+/// A Reth instance. Will close the instance when dropped.
 ///
 /// Construct this using [`Reth`].
 #[derive(Debug)]
@@ -40,55 +40,55 @@ impl RethInstance {
         self.instance
     }
 
-    /// Returns the HTTP port of this instance
+    /// Returns the HTTP port of this instance.
     pub const fn http_port(&self) -> u16 {
         self.http_port
     }
 
-    /// Returns the WS port of this instance
+    /// Returns the WS port of this instance.
     pub const fn ws_port(&self) -> u16 {
         self.ws_port
     }
 
-    /// Returns the auth port of this instance
+    /// Returns the auth port of this instance.
     pub const fn auth_port(&self) -> Option<u16> {
         self.auth_port
     }
 
-    /// Returns the p2p port of this instance
-    /// If discovery is disabled, this will be `None`
+    /// Returns the p2p port of this instance.
+    /// If discovery is disabled, this will be `None`.
     pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
     }
 
-    /// Returns the HTTP endpoint of this instance
+    /// Returns the HTTP endpoint of this instance.
     #[doc(alias = "http_endpoint")]
     pub fn endpoint(&self) -> String {
         format!("http://localhost:{}", self.http_port)
     }
 
-    /// Returns the Websocket endpoint of this instance
+    /// Returns the Websocket endpoint of this instance.
     pub fn ws_endpoint(&self) -> String {
         format!("ws://localhost:{}", self.ws_port)
     }
 
-    /// Returns the IPC endpoint of this instance
+    /// Returns the IPC endpoint of this instance.
     pub fn ipc_endpoint(&self) -> String {
         self.ipc.clone().map_or_else(|| "reth.ipc".to_string(), |ipc| ipc.display().to_string())
     }
 
-    /// Returns the HTTP endpoint url of this instance
+    /// Returns the HTTP endpoint url of this instance.
     #[doc(alias = "http_endpoint_url")]
     pub fn endpoint_url(&self) -> Url {
         Url::parse(&self.endpoint()).unwrap()
     }
 
-    /// Returns the Websocket endpoint url of this instance
+    /// Returns the Websocket endpoint url of this instance.
     pub fn ws_endpoint_url(&self) -> Url {
         Url::parse(&self.ws_endpoint()).unwrap()
     }
 
-    /// Returns the path to this instances' data directory
+    /// Returns the path to this instances' data directory.
     pub const fn data_dir(&self) -> &Option<PathBuf> {
         &self.data_dir
     }
@@ -127,7 +127,7 @@ impl Drop for RethInstance {
 /// let port = 8545u16;
 /// let url = format!("http://localhost:{}", port).to_string();
 ///
-/// let reth = Reth::new().instance(0).block_time("12sec").spawn();
+/// let reth = Reth::new().instance(1).block_time("12sec").spawn();
 ///
 /// drop(reth); // this will kill the instance
 /// ```
@@ -149,12 +149,14 @@ pub struct Reth {
 impl Reth {
     /// Creates an empty Reth builder.
     ///
-    /// The instance number is set to a random number between 0 and 200.
+    /// The instance number is set to a random number between 1 and 200 by default to reduce the
+    /// odds of port conflicts. This can be changed with [`Reth::instance`]. Set to 0 to use the
+    /// default ports. 200 is the maximum number of instances that can be run set by Reth.
     pub fn new() -> Self {
         Self {
             dev: false,
             block_time: None,
-            instance: rand::thread_rng().gen_range(0..200),
+            instance: rand::thread_rng().gen_range(1..200),
             discovery_enabled: true,
             program: None,
             ipc_path: None,
@@ -190,13 +192,13 @@ impl Reth {
         self
     }
 
-    /// Enable `dev` mode for the reth instance.
+    /// Enable `dev` mode for the Reth instance.
     pub const fn dev(mut self) -> Self {
         self.dev = true;
         self
     }
 
-    /// Sets the block time for the reth instance.
+    /// Sets the block time for the Reth instance.
     /// Parses strings using <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
     /// This is only used if `dev` mode is enabled.
     pub fn block_time(mut self, block_time: &str) -> Self {
@@ -204,26 +206,27 @@ impl Reth {
         self
     }
 
-    /// Disables discovery for the reth instance.
+    /// Disables discovery for the Reth instance.
     pub const fn disable_discovery(mut self) -> Self {
         self.discovery_enabled = false;
         self
     }
 
-    /// Sets the chain id for the reth instance.
+    /// Sets the chain id for the Reth instance.
     pub fn chain_or_path(mut self, chain_or_path: &str) -> Self {
         self.chain_or_path = Some(chain_or_path.to_string());
         self
     }
 
-    /// Enable IPC for the reth instance.
+    /// Enable IPC for the Reth instance.
     pub const fn enable_ipc(mut self) -> Self {
         self.ipc_enabled = true;
         self
     }
 
-    /// Sets the instance number for the reth instance.
-    pub const fn instance(mut self, instance: u16) -> Self {
+    /// Sets the instance number for the Reth instance. Set to 0 to use the default ports.
+    /// By default, a random number between 1 and 200 is used.
+    pub fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
         self
     }
@@ -240,7 +243,7 @@ impl Reth {
         self
     }
 
-    /// Sets the `genesis.json` for the reth instance.
+    /// Sets the `genesis.json` for the Reth instance.
     ///
     /// If this is set, reth will be initialized with `reth init` and the `--datadir` option will be
     /// set to the same value as `data_dir`.
@@ -309,14 +312,8 @@ impl Reth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        // Configures the ports of the node to avoid conflicts with the defaults. This is useful for
-        // running multiple nodes on the same machine.
-        //
-        // Changes to the following port numbers:
-        // - `DISCOVERY_PORT`: default + `instance` - 1
-        // - `AUTH_PORT`: default + `instance` * 100 - 100
-        // - `HTTP_RPC_PORT`: default - `instance` + 1
-        // - `WS_RPC_PORT`: default + `instance` * 2 - 2
+        // If the instance is set, use it.
+        // Set the `instance` to 0 to use the default ports.
         if self.instance > 0 {
             cmd.arg("--instance").arg(self.instance.to_string());
         }
@@ -527,7 +524,20 @@ mod tests {
         });
     }
 
-    // Asserts that the ports are set correctly for the given reth instance.
+    #[test]
+    #[cfg(not(windows))]
+    fn can_launch_reth_default_ports() {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+            let reth = Reth::new().instance(0).data_dir(temp_dir_path).spawn();
+
+            assert_eq!(reth.http_port(), 8545);
+            assert_eq!(reth.ws_port(), 8546);
+            assert_eq!(reth.auth_port(), Some(8551));
+            assert_eq!(reth.p2p_port(), Some(30303));
+        });
+    }
+
+    // Asserts that the ports are set correctly for the given Reth instance.
     fn assert_ports(reth: &RethInstance, dev: bool) {
         // Changes to the following port numbers for each instance:
         // - `DISCOVERY_PORT`: default + `instance` - 1
