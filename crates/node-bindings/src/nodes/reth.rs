@@ -590,10 +590,10 @@ mod tests {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().instance(0).data_dir(temp_dir_path).spawn();
 
-            assert_eq!(reth.http_port(), 8545);
-            assert_eq!(reth.ws_port(), 8546);
-            assert_eq!(reth.auth_port(), Some(8551));
-            assert_eq!(reth.p2p_port(), Some(30303));
+            assert_eq!(reth.http_port(), DEFAULT_HTTP_PORT);
+            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
         });
 
         // Assert that only the HTTP port is set and the rest are default.
