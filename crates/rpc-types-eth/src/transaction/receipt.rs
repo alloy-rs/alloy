@@ -198,6 +198,14 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         self.authorization_list.as_deref()
     }
+
+    fn cumulative_gas_used(&self) -> u128 {
+        self.inner.cumulative_gas_used()
+    }
+
+    fn state_root(&self) -> Option<B256> {
+        self.state_root
+    }
 }
 
 #[cfg(test)]

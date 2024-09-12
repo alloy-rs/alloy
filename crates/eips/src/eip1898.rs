@@ -602,6 +602,7 @@ impl FromStr for BlockId {
 
 /// A number and a hash.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NumHash {
     /// The number
     pub number: u64,
