@@ -224,7 +224,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{Geth, Reth};
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
 
     fn init_tracing() {
@@ -285,79 +285,88 @@ mod test {
 
     #[tokio::test]
     async fn call_debug_get_raw_header() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let rlp_header = provider
-            .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
-            .await
-            .expect("debug_getRawHeader call should succeed");
+            let rlp_header = provider
+                .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
+                .await
+                .expect("debug_getRawHeader call should succeed");
 
-        assert!(!rlp_header.is_empty());
+            assert!(!rlp_header.is_empty());
+        })
+        .await
     }
 
     #[tokio::test]
     async fn call_debug_get_raw_block() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let rlp_block = provider
-            .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
-            .await
-            .expect("debug_getRawBlock call should succeed");
+            let rlp_block = provider
+                .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
+                .await
+                .expect("debug_getRawBlock call should succeed");
 
-        assert!(!rlp_block.is_empty());
+            assert!(!rlp_block.is_empty());
+        })
+        .await
     }
 
     #[tokio::test]
     async fn call_debug_get_raw_receipts() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let result =
-            provider.debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await;
-        assert!(result.is_ok());
+            let result =
+                provider.debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await;
+            assert!(result.is_ok());
+        })
+        .await
     }
 
     #[tokio::test]
     async fn call_debug_get_bad_blocks() {
-        let temp_dir = tempfile::TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-        let result = provider.debug_get_bad_blocks().await;
-        assert!(result.is_ok());
+            let result = provider.debug_get_bad_blocks().await;
+            assert!(result.is_ok());
+        })
+        .await
     }
 
     #[tokio::test]
     #[cfg(not(windows))]
     async fn debug_trace_call_many() {
-        let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
-        let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider =
-            ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider =
+                ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
 
-        let tx1 = TransactionRequest::default()
-            .with_from(address!("0000000000000000000000000000000000000123"))
-            .with_to(address!("0000000000000000000000000000000000000456"));
+            let tx1 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
 
-        let tx2 = TransactionRequest::default()
-            .with_from(address!("0000000000000000000000000000000000000456"))
-            .with_to(address!("0000000000000000000000000000000000000789"));
+            let tx2 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000456"))
+                .with_to(address!("0000000000000000000000000000000000000789"));
 
-        let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
-        let state_context = StateContext::default();
-        let trace_options = GethDebugTracingCallOptions::default();
-        let result = provider.debug_trace_call_many(bundles, state_context, trace_options).await;
-        assert!(result.is_ok());
+            let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
+            let state_context = StateContext::default();
+            let trace_options = GethDebugTracingCallOptions::default();
+            let result =
+                provider.debug_trace_call_many(bundles, state_context, trace_options).await;
+            assert!(result.is_ok());
 
-        let traces = result.unwrap();
-        assert_eq!(
-            serde_json::to_string_pretty(&traces).unwrap().trim(),
-            r#"
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
 [
   [
     {
@@ -375,7 +384,9 @@ mod test {
   ]
 ]
 "#
-            .trim(),
-        );
+                .trim(),
+            );
+        })
+        .await
     }
 }

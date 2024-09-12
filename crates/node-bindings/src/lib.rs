@@ -21,8 +21,7 @@ pub use nodes::{
 mod node;
 pub use node::*;
 
-mod utils;
-use utils::*;
+pub mod utils;
 
 /// 1 Ether = 1e18 Wei == 0x0de0b6b3a7640000 Wei
 pub const WEI_IN_ETHER: U256 = U256::from_limbs([0x0de0b6b3a7640000, 0x0, 0x0, 0x0]);

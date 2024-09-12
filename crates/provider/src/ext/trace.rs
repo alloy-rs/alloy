@@ -179,7 +179,7 @@ mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::Reth;
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::address;
     use alloy_rpc_types_eth::TransactionRequest;
 
@@ -200,21 +200,21 @@ mod test {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn trace_call() {
-        let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
-        let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-        let tx = TransactionRequest::default()
-            .with_from(address!("0000000000000000000000000000000000000123"))
-            .with_to(address!("0000000000000000000000000000000000000456"));
+            let tx = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
 
-        let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
-        assert!(result.is_ok());
+            let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+            assert!(result.is_ok());
 
-        let traces = result.unwrap();
-        assert_eq!(
-            serde_json::to_string_pretty(&traces).unwrap().trim(),
-            r#"
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
 {
   "output": "0x",
   "stateDiff": null,
@@ -240,34 +240,36 @@ mod test {
   "vmTrace": null
 }
 "#
-            .trim(),
-        );
+                .trim(),
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     #[cfg(not(windows))]
     async fn trace_call_many() {
-        let temp_dir = tempfile::TempDir::with_prefix("reth-test-").unwrap();
-        let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-        let tx1 = TransactionRequest::default()
-            .with_from(address!("0000000000000000000000000000000000000123"))
-            .with_to(address!("0000000000000000000000000000000000000456"));
+            let tx1 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
 
-        let tx2 = TransactionRequest::default()
-            .with_from(address!("0000000000000000000000000000000000000456"))
-            .with_to(address!("0000000000000000000000000000000000000789"));
+            let tx2 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000456"))
+                .with_to(address!("0000000000000000000000000000000000000789"));
 
-        let result = provider
-            .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
-            .await;
-        assert!(result.is_ok());
+            let result = provider
+                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                .await;
+            assert!(result.is_ok());
 
-        let traces = result.unwrap();
-        assert_eq!(
-            serde_json::to_string_pretty(&traces).unwrap().trim(),
-            r#"
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
 [
   {
     "output": "0x",
@@ -319,7 +321,9 @@ mod test {
   }
 ]
 "#
-            .trim()
-        );
+                .trim()
+            );
+        })
+        .await;
     }
 }
