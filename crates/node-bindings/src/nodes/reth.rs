@@ -226,7 +226,7 @@ impl Reth {
 
     /// Sets the instance number for the Reth instance. Set to 0 to use the default ports.
     /// By default, a random number between 1 and 200 is used.
-    pub fn instance(mut self, instance: u16) -> Self {
+    pub const fn instance(mut self, instance: u16) -> Self {
         self.instance = instance;
         self
     }
