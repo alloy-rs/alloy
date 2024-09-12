@@ -18,6 +18,18 @@ const API: &str = "eth,net,web3,txpool,trace,rpc,reth,ots,admin,debug";
 /// The reth command
 const RETH: &str = "reth";
 
+/// The default HTTP port for Reth.
+const DEFAULT_HTTP_PORT: u16 = 8545;
+
+/// The default WS port for Reth.
+const DEFAULT_WS_PORT: u16 = 8546;
+
+/// The default auth port for Reth.
+const DEFAULT_AUTH_PORT: u16 = 8551;
+
+/// The default P2P port for Reth.
+const DEFAULT_P2P_PORT: u16 = 30303;
+
 /// A Reth instance. Will close the instance when dropped.
 ///
 /// Construct this using [`Reth`].
@@ -135,6 +147,10 @@ impl Drop for RethInstance {
 #[must_use = "This Builder struct does nothing unless it is `spawn`ed"]
 pub struct Reth {
     dev: bool,
+    http_port: u16,
+    ws_port: u16,
+    auth_port: u16,
+    p2p_port: u16,
     block_time: Option<String>,
     instance: u16,
     discovery_enabled: bool,
@@ -155,6 +171,10 @@ impl Reth {
     pub fn new() -> Self {
         Self {
             dev: false,
+            http_port: DEFAULT_HTTP_PORT,
+            ws_port: DEFAULT_WS_PORT,
+            auth_port: DEFAULT_AUTH_PORT,
+            p2p_port: DEFAULT_P2P_PORT,
             block_time: None,
             instance: rand::thread_rng().gen_range(1..200),
             discovery_enabled: true,
@@ -195,6 +215,30 @@ impl Reth {
     /// Enable `dev` mode for the Reth instance.
     pub const fn dev(mut self) -> Self {
         self.dev = true;
+        self
+    }
+
+    /// Sets the HTTP port for the Reth instance.
+    pub const fn http_port(mut self, http_port: u16) -> Self {
+        self.http_port = http_port;
+        self
+    }
+
+    /// Sets the WS port for the Reth instance.
+    pub const fn ws_port(mut self, ws_port: u16) -> Self {
+        self.ws_port = ws_port;
+        self
+    }
+
+    /// Sets the auth port for the Reth instance.
+    pub const fn auth_port(mut self, auth_port: u16) -> Self {
+        self.auth_port = auth_port;
+        self
+    }
+
+    /// Sets the p2p port for the Reth instance.
+    pub const fn p2p_port(mut self, p2p_port: u16) -> Self {
+        self.p2p_port = p2p_port;
         self
     }
 
@@ -278,6 +322,23 @@ impl Reth {
         // Use Reth's `node` subcommand.
         cmd.arg("node");
 
+        // Set the ports if they are not the default.
+        if self.http_port != DEFAULT_HTTP_PORT {
+            cmd.arg("--http.port").arg(self.http_port.to_string());
+        }
+
+        if self.ws_port != DEFAULT_WS_PORT {
+            cmd.arg("--ws.port").arg(self.ws_port.to_string());
+        }
+
+        if self.auth_port != DEFAULT_AUTH_PORT {
+            cmd.arg("--authrpc.port").arg(self.auth_port.to_string());
+        }
+
+        if self.p2p_port != DEFAULT_P2P_PORT {
+            cmd.arg("--discovery.port").arg(self.p2p_port.to_string());
+        }
+
         // If the `dev` flag is set, enable it.
         if self.dev {
             // Enable the dev mode.
@@ -313,7 +374,7 @@ impl Reth {
         }
 
         // If the instance is set, use it.
-        // Set the `instance` to 0 to use the default ports.
+        // Set the `instance` to 0 to use the default ports or want to customize the ports.
         if self.instance > 0 {
             cmd.arg("--instance").arg(self.instance.to_string());
         }
@@ -433,11 +494,6 @@ mod tests {
     use super::*;
     use crate::utils::run_with_tempdir_sync;
 
-    const DISCOVERY_PORT: u16 = 30303;
-    const AUTH_PORT: u16 = 8551;
-    const HTTP_RPC_PORT: u16 = 8545;
-    const WS_RPC_PORT: u16 = 8546;
-
     #[test]
     #[cfg(not(windows))]
     fn can_launch_reth() {
@@ -537,19 +593,40 @@ mod tests {
         });
     }
 
+    #[test]
+    #[cfg(not(windows))]
+    fn can_launch_reth_custom_ports() {
+        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+            // Note: to set custom ports, you must set the instance to 0.
+            let reth = Reth::new()
+                .instance(0)
+                .http_port(8577)
+                .ws_port(8578)
+                .auth_port(8579)
+                .p2p_port(30307)
+                .data_dir(temp_dir_path)
+                .spawn();
+
+            assert_eq!(reth.http_port(), 8577);
+            assert_eq!(reth.ws_port(), 8578);
+            assert_eq!(reth.auth_port(), Some(8579));
+            assert_eq!(reth.p2p_port(), Some(30307));
+        });
+    }
+
     // Asserts that the ports are set correctly for the given Reth instance.
     fn assert_ports(reth: &RethInstance, dev: bool) {
         // Changes to the following port numbers for each instance:
-        // - `DISCOVERY_PORT`: default + `instance` - 1
-        // - `AUTH_PORT`: default + `instance` * 100 - 100
         // - `HTTP_RPC_PORT`: default - `instance` + 1
         // - `WS_RPC_PORT`: default + `instance` * 2 - 2
-        assert_eq!(reth.http_port(), HTTP_RPC_PORT - reth.instance + 1);
-        assert_eq!(reth.ws_port(), WS_RPC_PORT + reth.instance * 2 - 2);
-        assert_eq!(reth.auth_port(), Some(AUTH_PORT + reth.instance * 100 - 100));
+        // - `AUTH_PORT`: default + `instance` * 100 - 100
+        // - `DISCOVERY_PORT`: default + `instance` - 1
+        assert_eq!(reth.http_port(), DEFAULT_HTTP_PORT - reth.instance + 1);
+        assert_eq!(reth.ws_port(), DEFAULT_WS_PORT + reth.instance * 2 - 2);
+        assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT + reth.instance * 100 - 100));
         assert_eq!(
             reth.p2p_port(),
-            if dev { None } else { Some(DISCOVERY_PORT + reth.instance - 1) }
+            if dev { None } else { Some(DEFAULT_P2P_PORT + reth.instance - 1) }
         );
     }
 }
