@@ -6,10 +6,10 @@ use alloc::{
 };
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{
-    eip6110::DepositRequest, eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
+    eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip6110::DepositRequest,
+    eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
 };
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
-use alloy_rpc_types_eth::{transaction::BlobTransactionSidecar, Withdrawal};
 use core::iter::{FromIterator, IntoIterator};
 
 /// The execution payload body response that allows for `null` values.
