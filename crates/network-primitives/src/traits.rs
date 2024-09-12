@@ -58,7 +58,7 @@ pub trait ReceiptResponse {
     /// The post-transaction state root (pre Byzantium)
     ///
     /// EIP98 makes this field optional.
-    fn state_root(&self) -> Option<&B256>;
+    fn state_root(&self) -> Option<B256>;
 }
 
 /// Transaction JSON-RPC response.
@@ -234,7 +234,7 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
         self.inner.cumulative_gas_used()
     }
 
-    fn state_root(&self) -> Option<&B256> {
+    fn state_root(&self) -> Option<B256> {
         self.inner.state_root()
     }
 }

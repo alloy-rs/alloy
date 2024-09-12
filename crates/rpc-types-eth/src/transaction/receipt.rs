@@ -189,8 +189,8 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
         self.inner.cumulative_gas_used()
     }
 
-    fn state_root(&self) -> Option<&B256> {
-        self.state_root.as_ref()
+    fn state_root(&self) -> Option<B256> {
+        self.state_root
     }
 }
 
