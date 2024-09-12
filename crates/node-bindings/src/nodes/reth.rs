@@ -641,7 +641,7 @@ mod tests {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().http_port(0).data_dir(temp_dir_path).spawn();
 
-            // Assert that a random used port is used.
+            // Assert that a random unused port is used picked by the OS.
             assert_ne!(reth.http_port(), DEFAULT_HTTP_PORT);
 
             assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
