@@ -1,7 +1,8 @@
 //! Client identification: <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md>
 
+use alloc::string::{String, ToString};
+use core::str::FromStr;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 /// This enum defines a standard for specifying a client with just two letters. Clients teams which
 /// have a code reserved in this list MUST use this code when identifying themselves.
@@ -93,8 +94,8 @@ impl FromStr for ClientCode {
     }
 }
 
-impl std::fmt::Display for ClientCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ClientCode {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
