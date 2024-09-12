@@ -2,7 +2,9 @@
 use crate::Provider;
 use alloy_network::Network;
 use alloy_primitives::{hex, Bytes, TxHash, B256};
-use alloy_rpc_types_eth::{Block, BlockId, BlockNumberOrTag, TransactionRequest};
+use alloy_rpc_types_eth::{
+    Block, BlockId, BlockNumberOrTag, Bundle, StateContext, TransactionRequest,
+};
 use alloy_rpc_types_trace::geth::{
     BlockTraceResult, GethDebugTracingCallOptions, GethDebugTracingOptions, GethTrace, TraceResult,
 };
@@ -122,8 +124,8 @@ pub trait DebugApi<N, T>: Send + Sync {
     /// Not all nodes support this call.
     async fn debug_trace_call_many(
         &self,
-        txs: Vec<TransactionRequest>,
-        block: BlockId,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>>;
 }
@@ -208,11 +210,11 @@ where
 
     async fn debug_trace_call_many(
         &self,
-        txs: Vec<TransactionRequest>,
-        block: BlockId,
+        bundles: Vec<Bundle>,
+        state_context: StateContext,
         trace_options: GethDebugTracingCallOptions,
     ) -> TransportResult<Vec<GethTrace>> {
-        self.client().request("debug_traceCallMany", (txs, block, trace_options)).await
+        self.client().request("debug_traceCallMany", (bundles, state_context, trace_options)).await
     }
 }
 
@@ -222,7 +224,7 @@ mod test {
 
     use super::*;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
 
     fn init_tracing() {
@@ -334,6 +336,56 @@ mod test {
 
             let result = provider.debug_get_bad_blocks().await;
             assert!(result.is_ok());
+        })
+        .await
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn debug_trace_call_many() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider =
+                ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+
+            let tx1 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
+
+            let tx2 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000456"))
+                .with_to(address!("0000000000000000000000000000000000000789"));
+
+            let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
+            let state_context = StateContext::default();
+            let trace_options = GethDebugTracingCallOptions::default();
+            let result =
+                provider.debug_trace_call_many(bundles, state_context, trace_options).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
+[
+  [
+    {
+      "failed": false,
+      "gas": 21000,
+      "returnValue": "",
+      "structLogs": []
+    },
+    {
+      "failed": false,
+      "gas": 21000,
+      "returnValue": "",
+      "structLogs": []
+    }
+  ]
+]
+"#
+                .trim(),
+            );
         })
         .await
     }

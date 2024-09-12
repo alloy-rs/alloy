@@ -566,46 +566,37 @@ mod tests {
 
     #[test]
     #[cfg(not(windows))]
-    fn can_launch_reth_p2p_instance1() {
+    fn can_launch_reth_p2p_instances() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().instance(1).data_dir(temp_dir_path).spawn();
+            let reth = Reth::new().instance(100).data_dir(temp_dir_path).spawn();
 
-            assert_eq!(reth.http_port(), 8545);
-            assert_eq!(reth.ws_port(), 8546);
-            assert_eq!(reth.auth_port(), Some(8551));
-            assert_eq!(reth.p2p_port(), Some(30303));
+            assert_ports(&reth, false);
+
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().instance(101).data_dir(temp_dir_path).spawn();
+
+                assert_ports(&reth, false);
+            });
         });
     }
 
+    // Tests that occupy the same port are combined so they are ran sequentially, to prevent
+    // flakiness.
     #[test]
     #[cfg(not(windows))]
-    fn can_launch_reth_p2p_instance2() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().instance(2).data_dir(temp_dir_path).spawn();
-
-            assert_eq!(reth.http_port(), 8544);
-            assert_eq!(reth.ws_port(), 8548);
-            assert_eq!(reth.auth_port(), Some(8651));
-            assert_eq!(reth.p2p_port(), Some(30304));
-        });
-    }
-
-    #[test]
-    #[cfg(not(windows))]
-    fn can_launch_reth_default_ports() {
+    fn can_launch_reth_custom_ports() {
+        // Assert that all ports are default if no custom ports are set
+        // and the instance is set to 0.
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().instance(0).data_dir(temp_dir_path).spawn();
 
-            assert_eq!(reth.http_port(), 8545);
-            assert_eq!(reth.ws_port(), 8546);
-            assert_eq!(reth.auth_port(), Some(8551));
-            assert_eq!(reth.p2p_port(), Some(30303));
+            assert_eq!(reth.http_port(), DEFAULT_HTTP_PORT);
+            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
         });
-    }
 
-    #[test]
-    #[cfg(not(windows))]
-    fn can_launch_reth_custom_port() {
+        // Assert that only the HTTP port is set and the rest are default.
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().http_port(8577).data_dir(temp_dir_path).spawn();
 
@@ -614,11 +605,8 @@ mod tests {
             assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
             assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
         });
-    }
 
-    #[test]
-    #[cfg(not(windows))]
-    fn can_launch_reth_custom_ports() {
+        // Assert that all ports can be set.
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
                 .http_port(8577)
@@ -633,11 +621,8 @@ mod tests {
             assert_eq!(reth.auth_port(), Some(8579));
             assert_eq!(reth.p2p_port(), Some(30307));
         });
-    }
 
-    #[test]
-    #[cfg(not(windows))]
-    fn can_launch_reth_random_port() {
+        // Assert that the HTTP port is picked by the OS and the rest are default.
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().http_port(0).data_dir(temp_dir_path).spawn();
 
