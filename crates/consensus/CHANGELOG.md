@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.4
 - [consensus] Remove Header Method ([#1271](https://github.com/alloy-rs/alloy/issues/1271))
 - [consensus] Alloc by Default ([#1272](https://github.com/alloy-rs/alloy/issues/1272))
 

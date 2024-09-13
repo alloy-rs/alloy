@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improve node bindings ([#1279](https://github.com/alloy-rs/alloy/issues/1279))
 
+### Miscellaneous Tasks
+
+- Release 0.3.4
+
 ## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
 
 ### Miscellaneous Tasks

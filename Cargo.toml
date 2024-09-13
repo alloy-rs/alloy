@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.4"
+version = "0.3.5"
 edition = "2021"
 rust-version = "1.79"
 authors = ["Alloy Contributors"]
