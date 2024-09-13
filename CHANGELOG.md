@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add missing conversion ([#1287](https://github.com/alloy-rs/alloy/issues/1287))
 
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
 
 ### Bug Fixes
