@@ -862,6 +862,12 @@ impl std::error::Error for PayloadError {
     }
 }
 
+impl From<alloy_rlp::Error> for PayloadError {
+    fn from(value: alloy_rlp::Error) -> Self {
+        Self::Decode(value)
+    }
+}
+
 impl PayloadError {
     /// Returns `true` if the error is caused by a block hash mismatch.
     #[inline]
