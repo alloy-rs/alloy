@@ -165,7 +165,7 @@ mod aggregate {
     pub type OwnedAggregate<T, P, D, N> =
         Aggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
-    /// An [Multicall::aggregate] call that doesnt own the refrence to the underlying instance
+    /// A call that doesnt own the refrence to the underlying instance
     pub type AggregateRef<'a, T, P, D, N> =
         Aggregate<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
@@ -365,17 +365,17 @@ mod try_aggregate {
     use super::{into_calls::*, *};
     use std::fmt::Debug;
 
-    /// An aggreagte call that owns the refrence to the underlying instance
+    /// An call that owns the refrence to the underlying instance
     pub type OwnedTryAggregate<T, P, D, N> =
         TryAggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
-    /// An aggreagte call that doesnt own the refrence to the underlying instance
+    /// A call that doesnt own the refrence to the underlying instance
     pub type TryAggregateRef<'a, T, P, D, N> =
         TryAggregate<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
     /// Represents a call to the aggregate method.
     ///
-    /// [`Aggregate`] multicalls will also fail fast.
+    /// [`TryAggregate`] multicalls will also fail fast.
     pub struct TryAggregate<R, T, P, D, N>
     where
         T: Transport + Clone,
@@ -504,7 +504,7 @@ mod try_aggregate {
             )
             .await
         }
-    } 
+    }
 
     impl<R, T, P, D, N> TryAggregate<R, T, P, D, N>
     where
@@ -573,17 +573,17 @@ mod aggregate3 {
     use super::{into_calls::*, *};
     use std::fmt::Debug;
 
-    /// An aggreagte call that owns the refrence to the underlying instance
+    /// An call that owns the refrence to the underlying instance
     pub type OwnedAggregate3<T, P, D, N> =
         Aggregate3<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
-    /// An aggreagte call that doesnt own the refrence to the underlying instance
+    /// An call that doesnt own the refrence to the underlying instance
     pub type Aggregate3Ref<'a, T, P, D, N> =
         Aggregate3<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
 
     /// Represents a call to the aggregate method.
     ///
-    /// [`Aggregate`] multicalls will also fail fast.
+    /// [`Aggregate3`] multicalls will filter failed results
     pub struct Aggregate3<R, T, P, D, N>
     where
         T: Transport + Clone,
