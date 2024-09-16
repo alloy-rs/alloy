@@ -227,6 +227,11 @@ mod aggregate {
         {
             self.calls.extend(calls);
         }
+
+        /// Reserve additional space for calls
+        pub fn reserve(&mut self, additional: usize) {
+            self.calls.reserve(additional);
+        }
     }
 
     impl<T, P, D, N> OwnedAggregate<T, P, D, N>
@@ -448,6 +453,11 @@ mod try_aggregate {
         {
             self.calls.extend(calls);
         }
+
+        /// Reserve additional space for calls
+        pub fn reserve(&mut self, additional: usize) {
+            self.calls.reserve(additional);
+        }
     }
 
     impl<T, P, D, N> OwnedTryAggregate<T, P, D, N>
@@ -655,6 +665,11 @@ mod aggregate3 {
             I: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
         {
             self.calls.extend(calls);
+        }
+
+        /// Reserve additional space for calls
+        pub fn reserve(&mut self, additional: usize) {
+            self.calls.reserve(additional);
         }
     }
 
