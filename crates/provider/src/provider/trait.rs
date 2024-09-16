@@ -1055,7 +1055,7 @@ mod tests {
     async fn test_hyper_layer_transport_no_layers() {
         init_tracing();
         let anvil = Anvil::new().spawn();
-        let layer_transport = alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url());
+        let layer_transport = alloy_transport_http::HyperTransport::new(anvil.endpoint_url());
 
         let http_hyper =
             alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
@@ -1142,7 +1142,7 @@ mod tests {
             .service(hyper_client);
 
         let layer_transport =
-            alloy_transport_http::HyperLayerTransport::with_service(anvil.endpoint_url(), service);
+            alloy_transport_http::HyperTransport::with_service(anvil.endpoint_url(), service);
 
         let http_hyper =
             alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
@@ -1178,7 +1178,7 @@ mod tests {
             ))
             .service(hyper_client);
         let layer_transport =
-            alloy_transport_http::HyperLayerTransport::with_service(anvil.endpoint_url(), service);
+            alloy_transport_http::HyperTransport::with_service(anvil.endpoint_url(), service);
 
         let http_hyper =
             alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());

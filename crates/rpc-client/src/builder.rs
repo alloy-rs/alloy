@@ -64,10 +64,10 @@ impl<L> ClientBuilder<L> {
     #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
     pub fn hyper_http(self, url: url::Url) -> RpcClient<L::Service>
     where
-        L: Layer<alloy_transport_http::Http<alloy_transport_http::HyperLayerTransport>>,
+        L: Layer<alloy_transport_http::Http<alloy_transport_http::HyperTransport>>,
         L::Service: Transport,
     {
-        let hyper = alloy_transport_http::HyperLayerTransport::new(url.clone());
+        let hyper = alloy_transport_http::HyperTransport::new(url.clone());
         let transport = alloy_transport_http::Http::with_client(hyper, url);
         let is_local = transport.guess_local();
 

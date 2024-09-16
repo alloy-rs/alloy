@@ -20,7 +20,7 @@ pub type ReqwestProvider<N = alloy_network::Ethereum> =
 /// [`Http`]: alloy_transport_http::Http
 #[cfg(feature = "hyper")]
 pub type HyperProvider<N = alloy_network::Ethereum> =
-    crate::RootProvider<alloy_transport_http::Http<alloy_transport_http::HyperLayerTransport>, N>;
+    crate::RootProvider<alloy_transport_http::Http<alloy_transport_http::HyperTransport>, N>;
 
 #[macro_use]
 extern crate tracing;
