@@ -35,27 +35,36 @@ pub use hyper_layer_transport::{
 };
 
 use alloy_transport::utils::guess_local_url;
-use core::{marker::PhantomData, str::FromStr};
+use core::str::FromStr;
 use url::Url;
 
 /// Connection details for an HTTP transport.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[doc(hidden)]
-pub struct HttpConnect<T> {
+pub struct HttpConnect<T = reqwest::Client> {
     /// The URL to connect to.
     url: Url,
-    _pd: PhantomData<T>,
+    transport: Option<T>,
 }
 
 impl<T> HttpConnect<T> {
     /// Create a new [`HttpConnect`] with the given URL.
     pub const fn new(url: Url) -> Self {
-        Self { url, _pd: PhantomData }
+        Self { url, transport: None }
+    }
+
+    pub const fn with_transport(transport: T, url: Url) -> Self {
+        Self { url, transport: Some(transport) }
     }
 
     /// Get a reference to the URL.
     pub const fn url(&self) -> &Url {
         &self.url
+    }
+
+    /// Get a reference to the client.
+    pub const fn transport(&self) -> &Option<T> {
+        &self.transport
     }
 }
 

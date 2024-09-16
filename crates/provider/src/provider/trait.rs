@@ -1051,15 +1051,22 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
+    async fn test_http_hyper_client() {}
+
+    #[cfg(feature = "hyper")]
+    #[tokio::test]
     async fn test_hyper_layer_transport_no_layers() {
         init_tracing();
         let anvil = Anvil::new().spawn();
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-        let service = tower::ServiceBuilder::new().service(hyper_client);
-        let layer_transport =
-            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+        // let service = tower::ServiceBuilder::new().service(hyper_client);
+        // let layer_transport =
+        //     alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
 
-        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+        let http_hyper =
+            alloy_transport_http::Http::with_client(hyper_client, anvil.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
@@ -1114,7 +1121,6 @@ mod tests {
                 Box::pin(async move { fut.await })
             }
         }
-
         use http::header::{self, HeaderValue};
         use tower_http::{
             sensitive_headers::SetSensitiveRequestHeadersLayer, set_header::SetRequestHeaderLayer,
@@ -1144,7 +1150,10 @@ mod tests {
         let layer_transport =
             alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
 
-        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+        let http_hyper =
+            alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();

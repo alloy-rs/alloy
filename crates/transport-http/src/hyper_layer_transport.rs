@@ -13,6 +13,8 @@ use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
 use url::Url;
 
+use crate::{Http, HttpConnect};
+
 /// A [hyper] client that can be used with tower layers.
 #[derive(Clone, Debug)]
 pub struct HyperLayerTransport<S, B> {
@@ -102,6 +104,68 @@ where
             }
             .instrument(span),
         )
+    }
+}
+
+impl<S, B> Http<HyperLayerTransport<S, B>>
+where
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone,
+{
+    /// Make a request to the server using the underlying service that may or may not contain
+    /// layers.
+    pub fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
+        self.client.request(req)
+    }
+}
+
+impl<S, B> TransportConnect for HttpConnect<HyperLayerTransport<S, B>>
+where
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
+{
+    type Transport = HyperLayerTransport<S, B>;
+
+    fn is_local(&self) -> bool {
+        guess_local_url(self.url.as_str())
+    }
+
+    fn get_transport<'a: 'b, 'b>(
+        &'a self,
+    ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
+        Box::pin(async move {
+            match &self.transport {
+                Some(transport) => {
+                    let underlying_svc_transport = transport.clone().service;
+                    Ok(HyperLayerTransport::new(self.url.clone(), underlying_svc_transport))
+                }
+                None => Err(TransportErrorKind::custom_str("Transport not initialized".into())),
+            }
+        })
+    }
+}
+
+impl<S, B> Service<RequestPacket> for Http<HyperLayerTransport<S, B>>
+where
+    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
+{
+    type Response = ResponsePacket;
+    type Error = TransportError;
+    type Future = TransportFut<'static>;
+
+    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        task::Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
+        self.request_hyper(req)
     }
 }
 
