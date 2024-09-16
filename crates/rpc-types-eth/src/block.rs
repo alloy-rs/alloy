@@ -348,13 +348,22 @@ pub struct BlockOverrides {
     )]
     pub gas_limit: Option<u64>,
     /// Overrides the coinbase address of the block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "feeRecipient")
+    )]
     pub coinbase: Option<Address>,
     /// Overrides the prevrandao of the block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "prevRandao")
+    )]
     pub random: Option<B256>,
     /// Overrides the basefee of the block.
-    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
+    )]
     pub base_fee: Option<U256>,
     /// A dictionary that maps blockNumber to a user-defined hash. It could be queried from the
     /// solidity opcode BLOCKHASH.

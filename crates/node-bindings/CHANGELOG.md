@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Bug Fixes
+
+- `debug_traceCallMany` and `trace_callMany` ([#1278](https://github.com/alloy-rs/alloy/issues/1278))
+
+### Features
+
+- Improve node bindings ([#1279](https://github.com/alloy-rs/alloy/issues/1279))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+
 ## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
 
 ### Testing
 

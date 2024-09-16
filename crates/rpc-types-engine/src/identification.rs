@@ -2,11 +2,11 @@
 
 use alloc::string::{String, ToString};
 use core::str::FromStr;
-use serde::{Deserialize, Serialize};
 
 /// This enum defines a standard for specifying a client with just two letters. Clients teams which
 /// have a code reserved in this list MUST use this code when identifying themselves.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ClientCode {
     /// Besu
     BU,
@@ -101,8 +101,9 @@ impl core::fmt::Display for ClientCode {
 }
 
 /// Contains information which identifies a client implementation.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ClientVersionV1 {
     /// Client code, e.g. GE for Geth
     pub code: ClientCode,
@@ -120,6 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn client_id_serde() {
         let s = r#"{"code":"RH","name":"Reth","version":"v1.10.8","commit":"fa4ff922"}"#;
         let v: ClientVersionV1 = serde_json::from_str(s).unwrap();

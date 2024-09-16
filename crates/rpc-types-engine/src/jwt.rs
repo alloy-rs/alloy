@@ -7,7 +7,6 @@ use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs, io,
@@ -117,7 +116,8 @@ const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 ///
 /// The Engine API spec requires that just the `iat` (issued-at) claim is provided.
 /// It ignores claims that are optional or additional for this specification.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Claims {
     /// The "iat" value MUST be a number containing a NumericDate value.
     /// According to the RFC A NumericDate represents the number of seconds since
@@ -215,6 +215,7 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
+    #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
@@ -250,6 +251,7 @@ impl JwtSecret {
 
     /// Encode the header and claims given and sign the payload using the algorithm from the header
     /// and the key.
+    #[cfg(feature = "serde")]
     pub fn encode(&self, claims: &Claims) -> Result<String, jsonwebtoken::errors::Error> {
         let bytes = &self.0;
         let key = jsonwebtoken::EncodingKey::from_secret(bytes);
@@ -331,6 +333,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_ok() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
@@ -342,6 +345,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_with_current_time_ok() {
         let secret = JwtSecret::random();
         let claims = Claims::default();
@@ -353,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "serde"))]
     fn validation_error_iat_out_of_window() {
         let secret = JwtSecret::random();
 
@@ -379,6 +383,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_exp_expired() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(1) };
@@ -390,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_wrong_signature() {
         let secret_1 = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
@@ -402,6 +408,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_unsupported_algorithm() {
         let secret = JwtSecret::random();
         let bytes = &secret.0;
@@ -417,6 +424,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn valid_without_exp_claim() {
         let secret = JwtSecret::random();
 

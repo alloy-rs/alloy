@@ -1,7 +1,6 @@
 use super::{PayloadStatus, PayloadStatusEnum};
 use crate::PayloadId;
 use alloy_primitives::B256;
-use serde::{Deserialize, Serialize};
 
 /// invalid forkchoice state error code.
 pub const INVALID_FORK_CHOICE_STATE_ERROR: i32 = -38002;
@@ -19,8 +18,9 @@ pub const INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG: &str = "Invalid payload attribut
 pub type ForkChoiceUpdateResult = Result<ForkchoiceUpdated, ForkchoiceUpdateError>;
 
 /// This structure encapsulates the fork choice state
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ForkchoiceState {
     /// Hash of the head block.
     pub head_block_hash: B256,
@@ -116,8 +116,9 @@ impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static
 /// Represents a successfully _processed_ forkchoice state update.
 ///
 /// Note: this can still be INVALID if the provided payload was invalid.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ForkchoiceUpdated {
     /// Represents the outcome of the validation of the payload, independently of the payload being
     /// valid or not.

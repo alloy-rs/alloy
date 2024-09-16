@@ -5,10 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Bug Fixes
+
+- `debug_traceCallMany` and `trace_callMany` ([#1278](https://github.com/alloy-rs/alloy/issues/1278))
+- Serde for `eth_simulateV1` ([#1273](https://github.com/alloy-rs/alloy/issues/1273))
+
+### Features
+
+- [alloy-rpc-types-eth] Optional serde ([#1276](https://github.com/alloy-rs/alloy/issues/1276))
+- No_std eth rpc types ([#1252](https://github.com/alloy-rs/alloy/issues/1252))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+
+### Other
+
+- Add trait methods `cumulative_gas_used` and `state_root` to `ReceiptResponse` ([#1275](https://github.com/alloy-rs/alloy/issues/1275))
+
 ## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
 
 ### Miscellaneous Tasks
 
+- Release 0.3.3
 - Require destination for 7702 ([#1262](https://github.com/alloy-rs/alloy/issues/1262))
 
 ## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09

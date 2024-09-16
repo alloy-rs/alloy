@@ -20,7 +20,7 @@ workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
-alloy-rpc-types-engine = { workspace = true }
+alloy-rpc-types-engine = { workspace = true, features = ["serde"] }
 alloy-serde = { workspace = true }
 
 # serde
