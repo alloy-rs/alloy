@@ -1051,10 +1051,6 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
-    async fn test_http_hyper_client() {}
-
-    #[cfg(feature = "hyper")]
-    #[tokio::test]
     async fn test_hyper_layer_transport_no_layers() {
         init_tracing();
         let anvil = Anvil::new().spawn();

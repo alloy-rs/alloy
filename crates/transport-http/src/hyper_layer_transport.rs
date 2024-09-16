@@ -169,26 +169,6 @@ where
     }
 }
 
-impl<S, B> TransportConnect for HyperLayerTransport<S, B>
-where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
-{
-    type Transport = Self;
-
-    fn is_local(&self) -> bool {
-        guess_local_url(self.url.as_str())
-    }
-
-    fn get_transport<'a: 'b, 'b>(
-        &'a self,
-    ) -> alloy_transport::Pbf<'b, Self::Transport, alloy_transport::TransportError> {
-        Box::pin(async move { Ok(Self::new(self.url.clone(), self.service.clone())) })
-    }
-}
-
 impl<S, B> Service<RequestPacket> for HyperLayerTransport<S, B>
 where
     S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
