@@ -14,6 +14,9 @@ pub use account::Account;
 
 pub mod constants;
 
+mod withdrawals;
+pub use withdrawals::Withdrawals;
+
 mod encodable_signature;
 pub use encodable_signature::EncodableSignature;
 
@@ -25,8 +28,11 @@ pub use receipt::{
     AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
 };
 
+mod block;
+pub use block::Block;
+
 mod request;
-pub use request::Request;
+pub use request::{Request, Requests};
 
 pub mod transaction;
 #[cfg(feature = "kzg")]
