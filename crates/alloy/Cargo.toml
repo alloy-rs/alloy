@@ -238,7 +238,7 @@ signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
 
 # transports
 transports = ["dep:alloy-transport"]
-transport-http = ["transports", "dep:alloy-transport-http"]
+transport-http = ["transports", "dep:alloy-transport-http", "reqwest"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]
