@@ -2,11 +2,8 @@ use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
 };
-use http_body_util::{BodyExt, Full};
-use hyper::{
-    body::{Buf, Incoming},
-    header, Request, Response,
-};
+use http_body_util::BodyExt;
+use hyper::{body::Incoming, header, Request, Response};
 use hyper_util::client::legacy::Error;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
@@ -22,9 +19,6 @@ pub struct HyperLayerTransport<S, B> {
     service: S,
     _pd: PhantomData<B>,
 }
-
-/// Alias for [`Request<Full<B>>`]
-pub type HyperRequest<B> = Request<Full<B>>;
 
 /// Alias for [`Response<Incoming>`]
 pub type HyperResponse = Response<Incoming>;
@@ -42,10 +36,10 @@ impl<S, B> HyperLayerTransport<S, B> {
 
 impl<S, B> HyperLayerTransport<S, B>
 where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone,
+    B: From<Vec<u8>> + Send + 'static + Clone,
 {
     /// Make a request to the server using the given service.
     pub fn request(&mut self, req: RequestPacket) -> TransportFut<'static> {
@@ -109,10 +103,10 @@ where
 
 impl<S, B> Http<HyperLayerTransport<S, B>>
 where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone,
+    B: From<Vec<u8>> + Send + 'static + Clone,
 {
     /// Make a request to the server using the underlying service that may or may not contain
     /// layers.
@@ -123,10 +117,10 @@ where
 
 impl<S, B> TransportConnect for HttpConnect<HyperLayerTransport<S, B>>
 where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
+    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
 {
     type Transport = HyperLayerTransport<S, B>;
 
@@ -151,10 +145,10 @@ where
 
 impl<S, B> Service<RequestPacket> for Http<HyperLayerTransport<S, B>>
 where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
+    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
 {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -171,10 +165,10 @@ where
 
 impl<S, B> Service<RequestPacket> for HyperLayerTransport<S, B>
 where
-    S: Service<HyperRequest<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Buf + Send + 'static + Clone + Sync,
+    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
 {
     type Response = ResponsePacket;
     type Error = TransportError;

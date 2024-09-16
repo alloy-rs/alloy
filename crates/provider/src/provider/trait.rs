@@ -1016,12 +1016,13 @@ mod tests {
     // For layer transport tests
     #[cfg(feature = "hyper")]
     use alloy_transport_http::{
-        hyper::body::{Buf, Bytes as HyperBytes},
+        hyper,
+        hyper::body::Bytes as HyperBytes,
         hyper_util::{
             client::legacy::{Client, Error},
             rt::TokioExecutor,
         },
-        HyperRequest, HyperResponse, HyperResponseFut,
+        HyperResponse, HyperResponseFut,
     };
     #[cfg(feature = "hyper")]
     use http_body_util::Full;
@@ -1087,16 +1088,16 @@ mod tests {
             inner: S,
         }
 
-        impl<S, B> Service<HyperRequest<B>> for LoggingService<S>
+        impl<S, B> Service<hyper::Request<B>> for LoggingService<S>
         where
-            S: Service<HyperRequest<B>, Response = HyperResponse, Error = Error>
+            S: Service<hyper::Request<B>, Response = HyperResponse, Error = Error>
                 + Clone
                 + Send
                 + Sync
                 + 'static,
             S::Future: Send,
             S::Error: std::error::Error + Send + Sync + 'static,
-            B: From<Bytes> + Buf + Send + 'static + Clone + Sync + std::fmt::Debug,
+            B: From<Vec<u8>> + Send + 'static + Clone + Sync + std::fmt::Debug,
         {
             type Response = HyperResponse;
             type Error = Error;
@@ -1109,7 +1110,7 @@ mod tests {
                 self.inner.poll_ready(cx)
             }
 
-            fn call(&mut self, req: HyperRequest<B>) -> Self::Future {
+            fn call(&mut self, req: hyper::Request<B>) -> Self::Future {
                 println!("Logging Layer - HyperRequest {req:?}");
 
                 let fut = self.inner.call(req);
