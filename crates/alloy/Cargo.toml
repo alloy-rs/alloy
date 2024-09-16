@@ -131,7 +131,14 @@ network = ["dep:alloy-network"]
 node-bindings = ["dep:alloy-node-bindings", "alloy-provider?/anvil-node"]
 
 # providers
-providers = ["dep:alloy-provider", "rpc-client", "transports", "eips", "consensus", "network"]
+providers = [
+    "dep:alloy-provider",
+    "rpc-client",
+    "transports",
+    "eips",
+    "consensus",
+    "network",
+]
 provider-http = ["providers", "transport-http"]
 provider-ws = ["providers", "alloy-provider?/ws", "transport-ws"]
 provider-ipc = ["providers", "alloy-provider?/ipc", "transport-ipc"]
@@ -238,7 +245,7 @@ signer-yubihsm = ["signer-local", "alloy-signer-local?/yubihsm"]
 
 # transports
 transports = ["dep:alloy-transport"]
-transport-http = ["transports", "dep:alloy-transport-http", "reqwest"]
+transport-http = ["transports", "dep:alloy-transport-http"]
 transport-ipc = ["transports", "pubsub", "dep:alloy-transport-ipc"]
 transport-ipc-mock = ["alloy-transport-ipc?/mock"]
 transport-ws = ["transports", "pubsub", "dep:alloy-transport-ws"]

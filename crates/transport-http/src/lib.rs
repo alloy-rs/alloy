@@ -35,7 +35,7 @@ use url::Url;
 /// Connection details for an HTTP transport.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[doc(hidden)]
-pub struct HttpConnect<T = reqwest::Client> {
+pub struct HttpConnect<T> {
     /// The URL to connect to.
     url: Url,
     transport: Option<T>,
