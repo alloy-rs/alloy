@@ -98,28 +98,24 @@ where
     P: Provider<T, N>,
     N: Network,
 {
-    /// Create a new multicall instance.
+    /// Create a new multicall instance with a specific address.
     ///
-    /// # Errors
-    /// - If the chain_id is not in the list of supported chains.
-    pub async fn new(provider: P, address: Option<Address>) -> Result<Self, MultiCallError> {
-        let instance = Arc::new(IMulticall3::IMulticall3Instance::new(
-            {
-                match address {
-                    Some(address) => address,
-                    None => {
-                        if !MULTICALL_SUPPORTED_CHAINS.contains(&provider.get_chain_id().await?) {
-                            MULTICALL_ADDRESS
-                        } else {
-                            return Err(error::MultiCallError::MissingTargetAddress);
-                        }
-                    }
-                }
-            },
-            provider,
-        ));
+    /// This method does not check the chain_id against the supported chains.
+    pub async fn new(address: Address, provider: P) -> Self {
+        let instance = Arc::new(IMulticall3::IMulticall3Instance::new(address, provider));
 
-        Ok(Self { instance })
+        Self { instance }
+    }
+
+    /// Create a new multicall instance checking if the chain_id is in the list of supported chains.
+    pub async fn new_checked(provider: P) -> Result<Self, MultiCallError> {
+        if !MULTICALL_SUPPORTED_CHAINS
+            .contains(&provider.get_chain_id().await.map_err(crate::Error::from)?)
+        {
+            Ok(Self::new(MULTICALL_ADDRESS, provider).await)
+        } else {
+            return Err(error::MultiCallError::MissingTargetAddress);
+        }
     }
 
     /// A builder for the aggregate call.
