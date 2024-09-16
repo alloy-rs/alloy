@@ -16,12 +16,6 @@ mod reqwest_transport;
 pub use reqwest_transport::*;
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-mod hyper_transport;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-#[doc(inline)]
-pub use hyper_transport::*;
-
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
@@ -30,7 +24,9 @@ pub use hyper_util;
 mod hyper_layer_transport;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 #[doc(inline)]
-pub use hyper_layer_transport::{HyperLayerTransport, HyperResponse, HyperResponseFut};
+pub use hyper_layer_transport::{
+    HyperClient, HyperLayerTransport, HyperResponse, HyperResponseFut,
+};
 
 use alloy_transport::utils::guess_local_url;
 use core::str::FromStr;

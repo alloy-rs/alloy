@@ -2,8 +2,11 @@ use alloy_json_rpc::{RequestPacket, ResponsePacket};
 use alloy_transport::{
     utils::guess_local_url, TransportConnect, TransportError, TransportErrorKind, TransportFut,
 };
-use http_body_util::BodyExt;
-use hyper::{body::Incoming, header, Request, Response};
+use http_body_util::{BodyExt, Full};
+use hyper::{
+    body::{Bytes, Incoming},
+    header, Request, Response,
+};
 use hyper_util::client::legacy::Error;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
@@ -12,9 +15,15 @@ use url::Url;
 
 use crate::{Http, HttpConnect};
 
+/// A [`hyper`] HTTP client.
+pub type HyperClient = hyper_util::client::legacy::Client<
+    hyper_util::client::legacy::connect::HttpConnector,
+    http_body_util::Full<::hyper::body::Bytes>,
+>;
+
 /// A [hyper] client that can be used with tower layers.
 #[derive(Clone, Debug)]
-pub struct HyperLayerTransport<S, B> {
+pub struct HyperLayerTransport<B = Full<Bytes>, S = HyperClient> {
     url: Url,
     service: S,
     _pd: PhantomData<B>,
@@ -27,14 +36,26 @@ pub type HyperResponse = Response<Incoming>;
 pub type HyperResponseFut<T = HyperResponse, E = Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
 
-impl<S, B> HyperLayerTransport<S, B> {
-    /// Create a new [HyperLayerTransport] with the given URL and service.
-    pub const fn new(url: Url, service: S) -> Self {
+impl HyperLayerTransport {
+    /// Create a new [HyperLayerTransport] with the given URL and default hyper client.
+    pub fn new(url: Url) -> Self {
+        let executor = hyper_util::rt::TokioExecutor::new();
+
+        let service =
+            hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
+
         Self { url, service, _pd: PhantomData }
     }
 }
 
-impl<S, B> HyperLayerTransport<S, B>
+impl<B, S> HyperLayerTransport<B, S> {
+    /// Create a new [HyperLayerTransport] with the given URL and service.
+    pub const fn with_service(url: Url, service: S) -> Self {
+        Self { url, service, _pd: PhantomData }
+    }
+}
+
+impl<B, S> HyperLayerTransport<B, S>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -101,7 +122,7 @@ where
     }
 }
 
-impl<S, B> Http<HyperLayerTransport<S, B>>
+impl<B, S> Http<HyperLayerTransport<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -115,14 +136,14 @@ where
     }
 }
 
-impl<S, B> TransportConnect for HttpConnect<HyperLayerTransport<S, B>>
+impl<B, S> TransportConnect for HttpConnect<HyperLayerTransport<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
     B: From<Vec<u8>> + Send + 'static + Clone + Sync,
 {
-    type Transport = HyperLayerTransport<S, B>;
+    type Transport = Http<HyperLayerTransport<B, S>>;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -132,18 +153,18 @@ where
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
         Box::pin(async move {
-            match &self.transport {
-                Some(transport) => {
-                    let underlying_svc_transport = transport.clone().service;
-                    Ok(HyperLayerTransport::new(self.url.clone(), underlying_svc_transport))
-                }
-                None => Err(TransportErrorKind::custom_str("Transport not initialized".into())),
-            }
+            self.transport.as_ref().map_or_else(
+                || Err(TransportErrorKind::custom_str("transport not initialized")),
+                |t| {
+                    let transport = t.clone();
+                    Ok(Http::with_client(transport, self.url.clone()))
+                },
+            )
         })
     }
 }
 
-impl<S, B> Service<RequestPacket> for Http<HyperLayerTransport<S, B>>
+impl<B, S> Service<RequestPacket> for Http<HyperLayerTransport<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -163,22 +184,22 @@ where
     }
 }
 
-impl<S, B> Service<RequestPacket> for HyperLayerTransport<S, B>
-where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
-{
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
+// impl<B, S> Service<RequestPacket> for HyperLayerTransport<B, S>
+// where
+//     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+//     S::Future: Send,
+//     S::Error: std::error::Error + Send + Sync + 'static,
+//     B: From<Vec<u8>> + Send + 'static + Clone + Sync,
+// {
+//     type Response = ResponsePacket;
+//     type Error = TransportError;
+//     type Future = TransportFut<'static>;
 
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        task::Poll::Ready(Ok(()))
-    }
+//     fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>>
+// {         task::Poll::Ready(Ok(()))
+//     }
 
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        self.request(req)
-    }
-}
+//     fn call(&mut self, req: RequestPacket) -> Self::Future {
+//         self.request(req)
+//     }
+// }

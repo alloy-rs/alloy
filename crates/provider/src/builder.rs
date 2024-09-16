@@ -351,13 +351,13 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     where
         L: ProviderLayer<
             crate::HyperProvider<N>,
-            alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+            alloy_transport_http::Http<alloy_transport_http::HyperLayerTransport>,
             N,
         >,
         F: TxFiller<N>
             + ProviderLayer<
                 L::Provider,
-                alloy_transport_http::Http<alloy_transport_http::HyperClient>,
+                alloy_transport_http::Http<alloy_transport_http::HyperLayerTransport>,
                 N,
             >,
         N: Network,

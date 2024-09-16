@@ -1055,13 +1055,10 @@ mod tests {
     async fn test_hyper_layer_transport_no_layers() {
         init_tracing();
         let anvil = Anvil::new().spawn();
-        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-        // let service = tower::ServiceBuilder::new().service(hyper_client);
-        // let layer_transport =
-        //     alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+        let layer_transport = alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url());
 
         let http_hyper =
-            alloy_transport_http::Http::with_client(hyper_client, anvil.endpoint_url());
+            alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
 
         let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
@@ -1145,12 +1142,21 @@ mod tests {
             .service(hyper_client);
 
         let layer_transport =
-            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+            alloy_transport_http::HyperLayerTransport::with_service(anvil.endpoint_url(), service);
 
         let http_hyper =
             alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
 
         let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+
+        // Test Cloning
+        let cloned_t = provider.client().transport().clone();
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(cloned_t, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
@@ -1172,9 +1178,12 @@ mod tests {
             ))
             .service(hyper_client);
         let layer_transport =
-            alloy_transport_http::HyperLayerTransport::new(anvil.endpoint_url(), service);
+            alloy_transport_http::HyperLayerTransport::with_service(anvil.endpoint_url(), service);
 
-        let rpc_client = alloy_rpc_client::RpcClient::new(layer_transport, true);
+        let http_hyper =
+            alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
