@@ -84,7 +84,7 @@ http-body-util.workspace = true
 http.workspace = true
 
 [features]
-default = ["reqwest", "reqwest-default-tls"]
+default = ["reqwest", "reqwest-default-tls", "hyper"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",

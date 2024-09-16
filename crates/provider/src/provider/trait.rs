@@ -1112,7 +1112,7 @@ mod tests {
 
                 let fut = self.inner.call(req);
 
-                Box::pin(async move { fut.await })
+                Box::pin(fut)
             }
         }
         use http::header::{self, HeaderValue};
