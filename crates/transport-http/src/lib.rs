@@ -21,10 +21,10 @@ pub use hyper;
 pub use hyper_util;
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-mod hyper_layer_transport;
+mod hyper_transport;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 #[doc(inline)]
-pub use hyper_layer_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTransport};
+pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTransport};
 
 use alloy_transport::utils::guess_local_url;
 use core::str::FromStr;
