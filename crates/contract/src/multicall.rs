@@ -4,16 +4,14 @@ use std::marker::PhantomData;
 pub mod constants;
 mod error;
 
-pub use aggregate::{Aggregate, AggregateRef, OwnedAggregate};
-pub use aggregate3::{Aggregate3, Aggregate3Ref, OwnedAggregate3};
-pub use try_aggregate::{OwnedTryAggregate, TryAggregate, TryAggregateRef};
+pub use aggregate::Aggregate;
+pub use aggregate3::Aggregate3;
+pub use try_aggregate::TryAggregate;
 
 pub use constants::{MULTICALL_ADDRESS, MULTICALL_SUPPORTED_CHAINS};
 
 #[doc(inline)]
 pub use error::MultiCallError;
-
-use std::sync::Arc;
 
 use alloy_json_abi::Function;
 use alloy_network::{Network, TransactionBuilder};
@@ -89,7 +87,7 @@ sol! {
 ///     - [DynAggreagate3] or [SolAggreagate3] for the aggregate3 call
 #[derive(Debug, Clone)]
 pub struct MultiCall<T, P, N: Network> {
-    instance: Arc<IMulticall3::IMulticall3Instance<T, P, N>>,
+    instance: IMulticall3::IMulticall3Instance<T, P, N>,
 }
 
 impl<T, P, N> MultiCall<T, P, N>
@@ -102,9 +100,7 @@ where
     ///
     /// This method does not check the chain_id against the supported chains.
     pub async fn new(address: Address, provider: P) -> Self {
-        let instance = Arc::new(IMulticall3::IMulticall3Instance::new(address, provider));
-
-        Self { instance }
+        Self { instance: IMulticall3::IMulticall3Instance::new(address, provider) }
     }
 
     /// Create a new multicall instance checking if the chain_id is in the list of supported chains.
@@ -119,75 +115,65 @@ where
     }
 
     /// A builder for the aggregate call.
-    pub const fn aggregate<D: CallDecoder>(&self) -> AggregateRef<'_, T, P, D, N> {
-        AggregateRef { r#ref: &self.instance, calls: Vec::new(), batch: None }
+    pub fn aggregate<D: CallDecoder>(self) -> Aggregate<T, P, D, N> {
+        Aggregate { instance: self.instance, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the try_aggreate call.
-    pub const fn try_aggregate<D: CallDecoder>(&self) -> TryAggregateRef<'_, T, P, D, N> {
-        TryAggregateRef { r#ref: &self.instance, calls: Vec::new(), batch: None }
+    pub fn try_aggregate<D: CallDecoder>(self) -> TryAggregate<T, P, D, N> {
+        TryAggregate { instance: self.instance, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the aggregate3 call.
-    pub const fn aggregate3<D: CallDecoder>(&self) -> Aggregate3Ref<'_, T, P, D, N> {
-        Aggregate3Ref { r#ref: &self.instance, calls: Vec::new(), batch: None }
+    pub fn aggregate3<D: CallDecoder>(self) -> Aggregate3<T, P, D, N> {
+        Aggregate3 { instance: self.instance, calls: Vec::new(), batch: None }
     }
 }
 
 /// A dyn aggregate call.
-pub type DynAggreagate<T, P, N> = OwnedAggregate<T, P, Function, N>;
+pub type DynAggreagate<T, P, N> = Aggregate<T, P, Function, N>;
 
 /// A static aggregate call.
-pub type SolAggreagate<T, P, C, N> = OwnedAggregate<T, P, PhantomData<C>, N>;
+pub type SolAggreagate<T, P, C, N> = Aggregate<T, P, PhantomData<C>, N>;
 
 /// A dyn try aggregate call.
-pub type DynTryAggreagate<T, P, N> = OwnedTryAggregate<T, P, Function, N>;
+pub type DynTryAggreagate<T, P, N> = TryAggregate<T, P, Function, N>;
 
 /// A static try aggregate call.
-pub type SolTryAggreagate<T, P, C, N> = OwnedTryAggregate<T, P, PhantomData<C>, N>;
+pub type SolTryAggreagate<T, P, C, N> = TryAggregate<T, P, PhantomData<C>, N>;
 
 /// A dyn aggregate3 call.
-pub type DynAggreagate3<T, P, N> = OwnedAggregate3<T, P, Function, N>;
+pub type DynAggreagate3<T, P, N> = Aggregate3<T, P, Function, N>;
 
 /// A static aggregate3 call.
-pub type SolAggreagate3<T, P, C, N> = OwnedAggregate3<T, P, PhantomData<C>, N>;
+pub type SolAggreagate3<T, P, C, N> = Aggregate3<T, P, PhantomData<C>, N>;
 
 mod aggregate {
     use std::fmt::Debug;
 
     use super::{into_calls::*, *};
 
-    /// An call that owns the refrence to the underlying instance
-    pub type OwnedAggregate<T, P, D, N> =
-        Aggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
-    /// A call that doesnt own the refrence to the underlying instance
-    pub type AggregateRef<'a, T, P, D, N> =
-        Aggregate<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate`] multicalls will also fail fast.
-    pub struct Aggregate<R, T, P, D, N>
+    pub struct Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        pub(super) r#ref: R,
+        pub(super) instance: IMulticall3::IMulticall3Instance<T, P, N>,
         pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
         pub(super) batch: Option<usize>,
     }
 
-    impl<R, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for Aggregate<R, T, P, D, N>
+    impl<T, P, D, N> Extend<CallBuilder<T, P, D, N>> for Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn extend<I>(&mut self, iter: I)
         where
@@ -197,13 +183,12 @@ mod aggregate {
         }
     }
 
-    impl<R, T, P, D, N> Aggregate<R, T, P, D, N>
+    impl<T, P, D, N> Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
@@ -234,7 +219,7 @@ mod aggregate {
         }
     }
 
-    impl<T, P, D, N> OwnedAggregate<T, P, D, N>
+    impl<T, P, D, N> Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
@@ -254,17 +239,9 @@ mod aggregate {
             )
             .await
         }
-    }
 
-    impl<'a, T, P, D, N> AggregateRef<'a, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-    {
         /// like [Self::call] but will consumes the call builder
-        pub async fn call(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let (decoders, requests) = self.parts();
 
             self.aggregate_inner(
@@ -278,13 +255,12 @@ mod aggregate {
         }
     }
 
-    impl<R, T, P, D, N> Aggregate<R, T, P, D, N>
+    impl<T, P, D, N> Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -294,18 +270,17 @@ mod aggregate {
             requests: Vec<IMulticall3::Call>,
         ) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let mut results;
-            let instance = self.r#ref.as_ref();
 
             if let Some(batch) = self.batch {
                 results = Vec::with_capacity(requests.len());
 
                 for chunk in requests.chunks(batch) {
-                    let chunk_results = instance.aggregate(chunk.to_vec()).call().await?;
+                    let chunk_results = self.instance.aggregate(chunk.to_vec()).call().await?;
 
                     results.extend(chunk_results.returnData);
                 }
             } else {
-                results = instance.aggregate(requests).call().await?.returnData;
+                results = self.instance.aggregate(requests).call().await?.returnData;
             }
 
             results
@@ -332,32 +307,18 @@ mod aggregate {
         }
     }
 
-    impl<R, T, P, D, N> Debug for Aggregate<R, T, P, D, N>
+    impl<T, P, D, N> Debug for Aggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("Aggregate")
-                .field("r#ref type", &std::any::type_name::<R>())
                 .field("calls", &self.calls)
                 .field("batch", &self.batch)
                 .finish()
-        }
-    }
-
-    impl<'a, T, P, D, N> From<AggregateRef<'a, T, P, D, N>> for OwnedAggregate<T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-    {
-        fn from(aggregate: AggregateRef<'a, T, P, D, N>) -> Self {
-            Self { r#ref: aggregate.r#ref.clone(), calls: aggregate.calls, batch: aggregate.batch }
         }
     }
 }
@@ -366,37 +327,27 @@ mod try_aggregate {
     use super::{into_calls::*, *};
     use std::fmt::Debug;
 
-    /// An call that owns the refrence to the underlying instance
-    pub type OwnedTryAggregate<T, P, D, N> =
-        TryAggregate<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
-    /// A call that doesnt own the refrence to the underlying instance
-    pub type TryAggregateRef<'a, T, P, D, N> =
-        TryAggregate<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
     /// Represents a call to the aggregate method.
     ///
     /// [`TryAggregate`] multicalls will also fail fast.
-    pub struct TryAggregate<R, T, P, D, N>
+    pub struct TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        pub(super) r#ref: R,
+        pub(super) instance: IMulticall3::IMulticall3Instance<T, P, N>,
         pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
         pub(super) batch: Option<usize>,
     }
 
-    impl<R, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for TryAggregate<R, T, P, D, N>
+    impl<T, P, D, N> Extend<CallBuilder<T, P, D, N>> for TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn extend<I>(&mut self, iter: I)
         where
@@ -406,30 +357,27 @@ mod try_aggregate {
         }
     }
 
-    impl<R, T, P, D, N> Debug for TryAggregate<R, T, P, D, N>
+    impl<T, P, D, N> Debug for TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
-                .field("r#ref type", &std::any::type_name::<R>())
                 .field("calls", &self.calls)
                 .field("batch", &self.batch)
                 .finish()
         }
     }
 
-    impl<R, T, P, D, N> TryAggregate<R, T, P, D, N>
+    impl<T, P, D, N> TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
@@ -460,7 +408,7 @@ mod try_aggregate {
         }
     }
 
-    impl<T, P, D, N> OwnedTryAggregate<T, P, D, N>
+    impl<T, P, D, N> TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
@@ -484,17 +432,9 @@ mod try_aggregate {
             )
             .await
         }
-    }
 
-    impl<'a, T, P, D, N> TryAggregateRef<'a, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-    {
         /// Like [Self::call] but will consumes this call builder
-        pub async fn call(
+        pub async fn call_consume(
             mut self,
             require_success: bool,
         ) -> Result<Vec<D::CallOutput>, MultiCallError> {
@@ -512,13 +452,12 @@ mod try_aggregate {
         }
     }
 
-    impl<R, T, P, D, N> TryAggregate<R, T, P, D, N>
+    impl<T, P, D, N> TryAggregate<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -529,19 +468,19 @@ mod try_aggregate {
             requests: Vec<IMulticall3::Call>,
         ) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let mut results;
-            let instance = self.r#ref.as_ref();
 
             if let Some(batch) = self.batch {
                 results = Vec::with_capacity(requests.len());
 
                 for chunk in requests.chunks(batch) {
                     let chunk_results =
-                        instance.tryAggregate(require_success, chunk.to_vec()).call().await?;
+                        self.instance.tryAggregate(require_success, chunk.to_vec()).call().await?;
 
                     results.extend(chunk_results.returnData);
                 }
             } else {
-                results = instance.tryAggregate(require_success, requests).call().await?.returnData;
+                results =
+                    self.instance.tryAggregate(require_success, requests).call().await?.returnData;
             }
 
             results
@@ -579,37 +518,27 @@ mod aggregate3 {
     use super::{into_calls::*, *};
     use std::fmt::Debug;
 
-    /// An call that owns the refrence to the underlying instance
-    pub type OwnedAggregate3<T, P, D, N> =
-        Aggregate3<Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
-    /// An call that doesnt own the refrence to the underlying instance
-    pub type Aggregate3Ref<'a, T, P, D, N> =
-        Aggregate3<&'a Arc<IMulticall3::IMulticall3Instance<T, P, N>>, T, P, D, N>;
-
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate3`] multicalls will filter failed results
-    pub struct Aggregate3<R, T, P, D, N>
+    pub struct Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
-        pub(super) r#ref: R,
+        pub(super) instance: IMulticall3::IMulticall3Instance<T, P, N>,
         pub(super) calls: Vec<(bool, CallBuilder<T, P, D, N>)>,
         pub(super) batch: Option<usize>,
     }
 
-    impl<R, T, P, D, N> Extend<(bool, CallBuilder<T, P, D, N>)> for Aggregate3<R, T, P, D, N>
+    impl<T, P, D, N> Extend<(bool, CallBuilder<T, P, D, N>)> for Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn extend<I>(&mut self, iter: I)
         where
@@ -619,30 +548,27 @@ mod aggregate3 {
         }
     }
 
-    impl<R, T, P, D, N> Debug for Aggregate3<R, T, P, D, N>
+    impl<T, P, D, N> Debug for Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
-                .field("r#ref type", &std::any::type_name::<R>())
                 .field("calls", &self.calls)
                 .field("batch", &self.batch)
                 .finish()
         }
     }
 
-    impl<R, T, P, D, N> Aggregate3<R, T, P, D, N>
+    impl<T, P, D, N> Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
@@ -673,7 +599,7 @@ mod aggregate3 {
         }
     }
 
-    impl<T, P, D, N> OwnedAggregate3<T, P, D, N>
+    impl<T, P, D, N> Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
@@ -693,17 +619,9 @@ mod aggregate3 {
             )
             .await
         }
-    }
 
-    impl<'a, T, P, D, N> Aggregate3Ref<'a, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-    {
         /// Like [Self::call] but will consume the call builder
-        pub async fn call(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let (decoders, requests) = self.parts();
 
             self.aggregate3_inner(
@@ -717,13 +635,12 @@ mod aggregate3 {
         }
     }
 
-    impl<R, T, P, D, N> Aggregate3<R, T, P, D, N>
+    impl<T, P, D, N> Aggregate3<T, P, D, N>
     where
         T: Transport + Clone,
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        R: AsRef<IMulticall3::IMulticall3Instance<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -733,18 +650,17 @@ mod aggregate3 {
             requests: Vec<IMulticall3::Call3>,
         ) -> Result<Vec<D::CallOutput>, MultiCallError> {
             let mut results;
-            let instance = self.r#ref.as_ref();
 
             if let Some(batch) = self.batch {
                 results = Vec::with_capacity(requests.len());
 
                 for chunk in requests.chunks(batch) {
-                    let chunk_results = instance.aggregate3(chunk.to_vec()).call().await?;
+                    let chunk_results = self.instance.aggregate3(chunk.to_vec()).call().await?;
 
                     results.extend(chunk_results.returnData);
                 }
             } else {
-                results = instance.aggregate3(requests).call().await?.returnData;
+                results = self.instance.aggregate3(requests).call().await?.returnData;
             }
 
             results
