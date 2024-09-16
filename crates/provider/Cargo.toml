@@ -32,7 +32,9 @@ alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
-alloy-rpc-types-engine = { workspace = true, optional = true, features = ["serde"] }
+alloy-rpc-types-engine = { workspace = true, optional = true, features = [
+    "serde",
+] }
 alloy-rpc-types = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -82,7 +84,7 @@ http-body-util.workspace = true
 http.workspace = true
 
 [features]
-default = ["reqwest", "reqwest-default-tls", "hyper"]
+default = ["reqwest", "reqwest-default-tls"]
 pubsub = ["alloy-rpc-client/pubsub", "dep:alloy-pubsub"]
 reqwest = [
     "dep:reqwest",
