@@ -371,7 +371,7 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
 type JoinedEthereumWalletFiller<F> = JoinFill<F, WalletFiller<alloy_network::EthereumWallet>>;
 
 #[cfg(any(test, feature = "anvil-node"))]
-type AnvilProviderResult<T> = Result<T, alloy_node_bindings::anvil::AnvilError>;
+type AnvilProviderResult<T> = Result<T, alloy_node_bindings::NodeError>;
 
 // Enabled when the `anvil` feature is enabled, or when both in test and the
 // `reqwest` feature is enabled.
@@ -490,9 +490,8 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let url = anvil_layer.endpoint_url();
 
         let default_keys = anvil_layer.instance().keys().to_vec();
-        let (default_key, remaining_keys) = default_keys
-            .split_first()
-            .ok_or(alloy_node_bindings::anvil::AnvilError::NoKeysAvailable)?;
+        let (default_key, remaining_keys) =
+            default_keys.split_first().ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
 
         let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone());
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);

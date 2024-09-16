@@ -19,19 +19,23 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp", "serde", "std"] }
+alloy-eips.workspace = true
 alloy-serde.workspace = true
-
-alloy-consensus = { workspace = true, features = ["serde", "std"] }
-alloy-eips = { workspace = true, features = ["serde", "std"] }
-
+alloy-consensus.workspace = true
 alloy-network-primitives.workspace = true
+alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
+alloy-primitives = { workspace = true, features = ["rlp"] }
 
 itertools.workspace = true
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-thiserror.workspace = true
+derive_more = { workspace = true, features = ["display"] }
+
+# serde
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+
+# `no_std` compatibility
+cfg-if.workspace = true
+hashbrown = { workspace = true, features = ["serde"] }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
@@ -56,7 +60,11 @@ similar-asserts.workspace = true
 assert_matches.workspace = true
 
 [features]
+default = ["std", "serde"]
+std = ["alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
+serde = ["dep:serde", "dep:serde_json", "alloy-primitives/serde", "alloy-consensus/serde", "alloy-eips/serde"]
 arbitrary = [
+    "std",
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
     "alloy-serde/arbitrary",

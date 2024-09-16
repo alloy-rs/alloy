@@ -22,11 +22,9 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["std", "k256", "serde"] }
 alloy-genesis.workspace = true
 k256.workspace = true
+rand.workspace = true
 serde_json = { workspace = true, features = ["std"] }
 tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 url.workspace = true
-
-[dev-dependencies]
-rand.workspace = true

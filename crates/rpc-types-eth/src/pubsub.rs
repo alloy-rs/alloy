@@ -1,13 +1,14 @@
 //! Ethereum types for pub-sub
 
 use crate::{Filter, Header, Log, Transaction};
+use alloc::{boxed::Box, format};
 use alloy_primitives::B256;
 use alloy_serde::WithOtherFields;
-use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Subscription result.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum SubscriptionResult<T = Transaction> {
     /// New block header.
     Header(Box<WithOtherFields<Header>>),
@@ -22,8 +23,9 @@ pub enum SubscriptionResult<T = Transaction> {
 }
 
 /// Response type for a SyncStatus subscription.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum PubSubSyncStatus {
     /// If not currently syncing, this should always be `false`.
     Simple(bool),
@@ -32,8 +34,9 @@ pub enum PubSubSyncStatus {
 }
 
 /// Sync status metadata.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SyncStatusMetadata {
     /// Whether the node is currently syncing.
     pub syncing: bool,
@@ -42,17 +45,18 @@ pub struct SyncStatusMetadata {
     /// The current block.
     pub current_block: u64,
     /// The highest block.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub highest_block: Option<u64>,
 }
 
-impl<T> Serialize for SubscriptionResult<T>
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for SubscriptionResult<T>
 where
-    T: Serialize,
+    T: serde::Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match *self {
             Self::Header(ref header) => header.serialize(serializer),
@@ -65,9 +69,10 @@ where
 }
 
 /// Subscription kind.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub enum SubscriptionKind {
     /// New block headers subscription.
     ///
@@ -125,10 +130,11 @@ impl Params {
     }
 }
 
-impl Serialize for Params {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Params {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::None => (&[] as &[serde_json::Value]).serialize(serializer),
@@ -138,11 +144,14 @@ impl Serialize for Params {
     }
 }
 
-impl<'a> Deserialize<'a> for Params {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for Params {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
+        use serde::de::Error;
+
         let v = serde_json::Value::deserialize(deserializer)?;
 
         if v.is_null() {
@@ -164,6 +173,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn params_serde() {
         let s: Params = serde_json::from_str("true").unwrap();
         assert_eq!(s, Params::Bool(true));
