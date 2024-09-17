@@ -119,7 +119,7 @@ where
         &self,
         request: TraceCallList<'a, N>,
     ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>> {
-        RpcWithBlock::new(self.weak_client(), "trace_callMany", (request,))
+        self.client().request("trace_callMany", (request,)).into()
     }
 
     async fn trace_transaction(
