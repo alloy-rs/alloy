@@ -107,12 +107,12 @@ where
 
     /// Create a new multicall instance checking if the chain_id is in the list of supported chains.
     pub async fn new_checked(provider: P) -> Result<Self, MultiCallError> {
-        if !MULTICALL_SUPPORTED_CHAINS
+        if MULTICALL_SUPPORTED_CHAINS
             .contains(&provider.get_chain_id().await.map_err(crate::Error::from)?)
         {
             Ok(Self::new(MULTICALL_ADDRESS, provider))
         } else {
-            Err(error::MultiCallError::MissingTargetAddress)
+            Err(error::MultiCallError::ChainNotSupported)
         }
     }
 
