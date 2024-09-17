@@ -19,7 +19,6 @@ use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_sol_types::sol;
 use alloy_transport::Transport;
-use IMulticall3::IMulticall3Instance;
 
 use crate::{CallBuilder, CallDecoder};
 
@@ -91,6 +90,8 @@ pub struct MultiCall<T, P, N: Network> {
     instance: IMulticall3::IMulticall3Instance<T, P, N>,
 }
 
+// todo: cant make the owned constructors const because they need to call drop on the `Multicall`
+// can refactor to take the multicall type rather than the instance
 impl<T, P, N> MultiCall<T, P, N>
 where
     T: Transport + Clone,
@@ -111,38 +112,38 @@ where
         {
             Ok(Self::new(MULTICALL_ADDRESS, provider))
         } else {
-            return Err(error::MultiCallError::MissingTargetAddress);
+            Err(error::MultiCallError::MissingTargetAddress)
         }
     }
 
     /// A builder for the aggregate call.
-    pub fn aggregate_owned<D: CallDecoder>(self) -> OwnedAggreagte<T, P, D, N> {
-        Aggregate { instance: self.instance, calls: Vec::new(), batch: None }
+    pub const fn aggregate_owned<D: CallDecoder>(self) -> OwnedAggreagte<T, P, D, N> {
+        Aggregate { instance: self, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the aggregate call.
-    pub fn aggregate<D: CallDecoder>(&self) -> AggregateRef<'_, T, P, D, N> {
-        Aggregate { instance: &self.instance, calls: Vec::new(), batch: None }
+    pub const fn aggregate<D: CallDecoder>(&self) -> AggregateRef<'_, T, P, D, N> {
+        Aggregate { instance: self, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the try_aggreate call.
-    pub fn try_aggregate_owned<D: CallDecoder>(self) -> OwnedTryAggregate<T, P, D, N> {
-        TryAggregate { instance: self.instance, calls: Vec::new(), batch: None }
+    pub const fn try_aggregate_owned<D: CallDecoder>(self) -> OwnedTryAggregate<T, P, D, N> {
+        TryAggregate { instance: self, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the try_aggreate call.
-    pub fn try_aggregate<D: CallDecoder>(&self) -> TryAggregateRef<'_, T, P, D, N> {
-        TryAggregate { instance: &self.instance, calls: Vec::new(), batch: None }
+    pub const fn try_aggregate<D: CallDecoder>(&self) -> TryAggregateRef<'_, T, P, D, N> {
+        TryAggregate { instance: self, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the aggregate3 call.
-    pub fn aggregate3_owned<D: CallDecoder>(self) -> OwnedAggregate3<T, P, D, N> {
-        Aggregate3 { instance: self.instance, calls: Vec::new(), batch: None }
+    pub const fn aggregate3_owned<D: CallDecoder>(self) -> OwnedAggregate3<T, P, D, N> {
+        Aggregate3 { instance: self, calls: Vec::new(), batch: None }
     }
 
     /// A builder for the aggregate3 call.
-    pub fn aggregate3<D: CallDecoder>(&self) -> Aggregate3Ref<'_, T, P, D, N> {
-        Aggregate3 { instance: &self.instance, calls: Vec::new(), batch: None }
+    pub const fn aggregate3<D: CallDecoder>(&self) -> Aggregate3Ref<'_, T, P, D, N> {
+        Aggregate3 { instance: self, calls: Vec::new(), batch: None }
     }
 }
 
@@ -174,10 +175,10 @@ mod aggregate {
     use super::{into_calls::*, *};
 
     /// An aggreagte call that owns its underlying instance.
-    pub type OwnedAggreagte<T, P, D, N> = Aggregate<IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type OwnedAggreagte<T, P, D, N> = Aggregate<MultiCall<T, P, N>, T, P, D, N>;
 
     /// An aggreagte call that borrows its underlying instance.
-    pub type AggregateRef<'a, T, P, D, N> = Aggregate<&'a IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type AggregateRef<'a, T, P, D, N> = Aggregate<&'a MultiCall<T, P, N>, T, P, D, N>;
 
     /// Represents a call to the aggregate method.
     ///
@@ -188,7 +189,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         pub(super) instance: I,
         pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
@@ -201,7 +202,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
@@ -217,7 +218,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
@@ -254,7 +255,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, this method will fail fast on any reverts
         pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
@@ -291,7 +292,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -307,12 +308,13 @@ mod aggregate {
 
                 for chunk in requests.chunks(batch) {
                     let chunk_results =
-                        self.instance.borrow().aggregate(chunk.to_vec()).call().await?;
+                        self.instance.borrow().instance.aggregate(chunk.to_vec()).call().await?;
 
                     results.extend(chunk_results.returnData);
                 }
             } else {
-                results = self.instance.borrow().aggregate(requests).call().await?.returnData;
+                results =
+                    self.instance.borrow().instance.aggregate(requests).call().await?.returnData;
             }
 
             results
@@ -345,7 +347,7 @@ mod aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("Aggregate")
@@ -361,11 +363,10 @@ mod try_aggregate {
     use std::{borrow::Borrow, fmt::Debug};
 
     /// A try aggregate call that owns its underlying instance.
-    pub type OwnedTryAggregate<T, P, D, N> = TryAggregate<IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type OwnedTryAggregate<T, P, D, N> = TryAggregate<MultiCall<T, P, N>, T, P, D, N>;
 
     /// A try aggregate call that borrows its underlying instance.
-    pub type TryAggregateRef<'a, T, P, D, N> =
-        TryAggregate<&'a IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type TryAggregateRef<'a, T, P, D, N> = TryAggregate<&'a MultiCall<T, P, N>, T, P, D, N>;
 
     /// Represents a call to the aggregate method.
     ///
@@ -376,7 +377,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         pub(super) instance: I,
         pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
@@ -389,7 +390,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
@@ -405,7 +406,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
@@ -421,7 +422,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
@@ -458,7 +459,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, filtering out any failed calls if require_success is false
         pub async fn call(
@@ -503,7 +504,7 @@ mod try_aggregate {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -522,6 +523,7 @@ mod try_aggregate {
                     let chunk_results = self
                         .instance
                         .borrow()
+                        .instance
                         .tryAggregate(require_success, chunk.to_vec())
                         .call()
                         .await?;
@@ -532,6 +534,7 @@ mod try_aggregate {
                 results = self
                     .instance
                     .borrow()
+                    .instance
                     .tryAggregate(require_success, requests)
                     .call()
                     .await?
@@ -574,11 +577,10 @@ mod aggregate3 {
     use std::{borrow::Borrow, fmt::Debug};
 
     /// A aggregate3 call that owns the underlying instance.
-    pub type OwnedAggregate3<T, P, D, N> = Aggregate3<IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type OwnedAggregate3<T, P, D, N> = Aggregate3<MultiCall<T, P, N>, T, P, D, N>;
 
     /// A aggregate3 call that borrows the underlying instance.
-    pub type Aggregate3Ref<'a, T, P, D, N> =
-        Aggregate3<&'a IMulticall3Instance<T, P, N>, T, P, D, N>;
+    pub type Aggregate3Ref<'a, T, P, D, N> = Aggregate3<&'a MultiCall<T, P, N>, T, P, D, N>;
 
     /// Represents a call to the aggregate method.
     ///
@@ -589,7 +591,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         pub(super) instance: I,
         pub(super) calls: Vec<(bool, CallBuilder<T, P, D, N>)>,
@@ -602,7 +604,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
@@ -618,7 +620,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
@@ -634,7 +636,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
@@ -671,7 +673,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate3 method, this method will fail fast on any reverts
         pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
@@ -708,7 +710,7 @@ mod aggregate3 {
         P: Provider<T, N>,
         D: CallDecoder,
         N: Network,
-        I: Borrow<IMulticall3::IMulticall3Instance<T, P, N>>,
+        I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, this method will revert on the first failure regardless of
         /// what you set
@@ -724,12 +726,13 @@ mod aggregate3 {
 
                 for chunk in requests.chunks(batch) {
                     let chunk_results =
-                        self.instance.borrow().aggregate3(chunk.to_vec()).call().await?;
+                        self.instance.borrow().instance.aggregate3(chunk.to_vec()).call().await?;
 
                     results.extend(chunk_results.returnData);
                 }
             } else {
-                results = self.instance.borrow().aggregate3(requests).call().await?.returnData;
+                results =
+                    self.instance.borrow().instance.aggregate3(requests).call().await?.returnData;
             }
 
             results
