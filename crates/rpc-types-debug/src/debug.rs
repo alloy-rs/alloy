@@ -15,5 +15,6 @@ pub struct ExecutionWitness {
     /// (unhashed account addresses and storage slots, respectively) that were required during
     /// the execution of the block. during the execution of the block.
     /// keccak(address|slot) => address|slot
+    #[serde(default)]
     pub keys: Option<HashMap<B256, Bytes>>,
 }
