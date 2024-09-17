@@ -1,13 +1,11 @@
 use core::mem;
 
-use alloy_eips::eip2930::AccessList;
+use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -232,6 +230,10 @@ impl Transaction for TxLegacy {
         self.gas_price
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -253,6 +255,10 @@ impl Transaction for TxLegacy {
     }
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
 }

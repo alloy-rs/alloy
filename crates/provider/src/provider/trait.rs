@@ -1309,10 +1309,10 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        let hash = block.header.hash.unwrap();
+        let hash = block.header.hash;
         let block =
             provider.get_block_by_hash(hash, BlockTransactionsKind::Full).await.unwrap().unwrap();
-        assert_eq!(block.header.hash.unwrap(), hash);
+        assert_eq!(block.header.hash, hash);
     }
 
     #[tokio::test]
@@ -1322,12 +1322,12 @@ mod tests {
         let num = 0;
         let tag: BlockNumberOrTag = num.into();
         let block = provider.get_block_by_number(tag, true).await.unwrap().unwrap();
-        let hash = block.header.hash.unwrap();
+        let hash = block.header.hash;
         let block: Block = provider
             .raw_request::<(B256, bool), Block>("eth_getBlockByHash".into(), (hash, true))
             .await
             .unwrap();
-        assert_eq!(block.header.hash.unwrap(), hash);
+        assert_eq!(block.header.hash, hash);
     }
 
     #[tokio::test]

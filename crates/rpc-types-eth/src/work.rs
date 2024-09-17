@@ -1,9 +1,5 @@
 use alloy_primitives::{B256, U256};
-use serde::{
-    de::{Error, SeqAccess, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use std::fmt;
+use core::fmt;
 
 /// The result of an `eth_getWork` request
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -18,10 +14,11 @@ pub struct Work {
     pub number: Option<u64>,
 }
 
-impl Serialize for Work {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Work {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self.number.as_ref() {
             Some(num) => {
@@ -32,14 +29,15 @@ impl Serialize for Work {
     }
 }
 
-impl<'a> Deserialize<'a> for Work {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for Work {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
         struct WorkVisitor;
 
-        impl<'a> Visitor<'a> for WorkVisitor {
+        impl<'a> serde::de::Visitor<'a> for WorkVisitor {
             type Value = Work;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -48,8 +46,9 @@ impl<'a> Deserialize<'a> for Work {
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
-                A: SeqAccess<'a>,
+                A: serde::de::SeqAccess<'a>,
             {
+                use serde::de::Error;
                 let pow_hash = seq
                     .next_element::<B256>()?
                     .ok_or_else(|| A::Error::custom("missing pow hash"))?;

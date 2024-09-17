@@ -567,6 +567,7 @@ pub struct CliqueConfig {
 }
 
 /// Consensus configuration for Parlia.
+///
 /// Parlia is the consensus engine for BNB Smart Chain.
 /// For the general introduction: <https://docs.bnbchain.org/docs/learn/consensus/>
 /// For the specification: <https://github.com/bnb-chain/bsc/blob/master/params/config.go#L558>

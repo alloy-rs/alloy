@@ -1,11 +1,9 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::eip2930::AccessList;
+use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -254,6 +252,10 @@ impl Transaction for TxEip2930 {
         self.gas_price
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -275,6 +277,10 @@ impl Transaction for TxEip2930 {
     }
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
 }

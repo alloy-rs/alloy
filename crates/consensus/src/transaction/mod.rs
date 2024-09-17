@@ -1,12 +1,10 @@
 //! Transaction types.
 
 use crate::Signed;
-use alloy_eips::eip2930::AccessList;
+use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -56,13 +54,20 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     ///
     /// For legacy transactions this is `gas_price`.
     ///
-    /// This is also commonly referred to as the "Gas Fee Cap" (`GasFeeCap`).
+    /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
     /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
     ///
     /// This will return `None` for non-EIP1559 transactions
     fn max_priority_fee_per_gas(&self) -> Option<u128>;
+
+    /// Max fee per blob gas for EIP-4844 transaction.
+    ///
+    /// Returns `None` for non-eip4844 transactions.
+    ///
+    /// This is also commonly referred to as the "Blob Gas Fee Cap".
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
     /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
     /// otherwise return the gas price.
@@ -107,13 +112,18 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Returns the transaction type
     fn ty(&self) -> u8;
 
-    /// Returns the EIP2930 `access_list` for the particular transaction type. Returns `None` for
+    /// Returns the EIP-2930 `access_list` for the particular transaction type. Returns `None` for
     /// older transaction types.
     fn access_list(&self) -> Option<&AccessList>;
 
     /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
     /// `None`.
     fn blob_versioned_hashes(&self) -> Option<&[B256]>;
+
+    /// Returns the [`SignedAuthorization`] list of the transaction.
+    ///
+    /// Returns `None` if this transaction is not EIP-7702.
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 }
 
 /// A signable transaction.

@@ -1,39 +1,41 @@
-use crate::{Log, TransactionReceipt};
+use crate::{collections::HashMap, Log, TransactionReceipt};
 use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+use alloc::vec::Vec;
 
 /// Options for conditional raw transaction submissions.
 // reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
 // See also <https://pkg.go.dev/github.com/aK0nshin/go-ethereum/arbitrum_types#ConditionalOptions>
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ConditionalOptions {
     /// A map of account addresses to their expected storage states.
     /// Each account can have a specified storage root or explicit slot-value pairs.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub known_accounts: HashMap<Address, AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_number_min: Option<BlockNumber>,
     /// The maximal block number at which the transaction can be included.
     /// `None` indicates no maximum block number constraint.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_number_max: Option<BlockNumber>,
     /// The minimal timestamp at which the transaction can be included.
     /// `None` indicates no minimum timestamp constraint.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub timestamp_min: Option<u64>,
     /// The maximal timestamp at which the transaction can be included.
     /// `None` indicates no maximum timestamp constraint.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub timestamp_max: Option<u64>,
 }
 
 /// Represents the expected state of an account for a transaction to be conditionally accepted.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum AccountStorage {
     /// Expected storage root hash of the account.
     RootHash(B256),
@@ -42,8 +44,9 @@ pub enum AccountStorage {
 }
 
 /// [`UserOperation`] in the spec: Entry Point V0.6
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct UserOperation {
     /// The address of the smart contract account
     pub sender: Address,
@@ -71,8 +74,9 @@ pub struct UserOperation {
 }
 
 /// [`PackedUserOperation`] in the spec: Entry Point V0.7
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct PackedUserOperation {
     /// The account making the operation.
     pub sender: Address,
@@ -112,7 +116,8 @@ pub struct PackedUserOperation {
 }
 
 /// Send User Operation
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SendUserOperation {
     /// User Operation
     EntryPointV06(UserOperation),
@@ -121,16 +126,18 @@ pub enum SendUserOperation {
 }
 
 /// Response to sending a user operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SendUserOperationResponse {
     /// The hash of the user operation.
     pub user_op_hash: Bytes,
 }
 
 /// Represents the receipt of a user operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct UserOperationReceipt {
     /// The hash of the user operation.
     pub user_op_hash: Bytes,
@@ -157,8 +164,9 @@ pub struct UserOperationReceipt {
 }
 
 /// Represents the gas estimation for a user operation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct UserOperationGasEstimation {
     /// The gas limit for the pre-verification.
     pub pre_verification_gas: U256,

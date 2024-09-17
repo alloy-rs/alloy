@@ -1,11 +1,9 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloy_eips::eip2930::AccessList;
+use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -290,6 +288,10 @@ impl Transaction for TxEip1559 {
         self.max_priority_fee_per_gas
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -303,7 +305,7 @@ impl Transaction for TxEip1559 {
     }
 
     fn ty(&self) -> u8 {
-        TxType::Eip2930 as u8
+        TxType::Eip1559 as u8
     }
 
     fn access_list(&self) -> Option<&AccessList> {
@@ -311,6 +313,10 @@ impl Transaction for TxEip1559 {
     }
 
     fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
 }

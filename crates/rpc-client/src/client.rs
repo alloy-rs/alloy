@@ -39,7 +39,7 @@ impl<T> Clone for RpcClient<T> {
 
 impl RpcClient<Identity> {
     /// Create a new [`ClientBuilder`].
-    pub fn builder() -> ClientBuilder<Identity> {
+    pub const fn builder() -> ClientBuilder<Identity> {
         ClientBuilder { builder: ServiceBuilder::new() }
     }
 }

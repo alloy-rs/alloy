@@ -1,5 +1,3 @@
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 use core::fmt;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
@@ -468,6 +466,16 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        match self {
+            Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip2930(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip1559(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip4844(tx) => tx.tx().max_fee_per_blob_gas(),
+            Self::Eip7702(tx) => tx.tx().max_fee_per_blob_gas(),
+        }
+    }
+
     fn input(&self) -> &[u8] {
         match self {
             Self::Legacy(tx) => tx.tx().input(),
@@ -535,6 +543,16 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip4844(tx) => tx.tx().blob_versioned_hashes(),
             Self::Eip7702(tx) => tx.tx().blob_versioned_hashes(),
+        }
+    }
+
+    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
+        match self {
+            Self::Legacy(tx) => tx.tx().authorization_list(),
+            Self::Eip2930(tx) => tx.tx().authorization_list(),
+            Self::Eip1559(tx) => tx.tx().authorization_list(),
+            Self::Eip4844(tx) => tx.tx().authorization_list(),
+            Self::Eip7702(tx) => tx.tx().authorization_list(),
         }
     }
 }
@@ -805,7 +823,7 @@ mod tests {
             gas_limit: 3,
             max_fee_per_gas: 4,
             max_priority_fee_per_gas: 5,
-            to: Address::left_padding_from(&[5]).into(),
+            to: Address::left_padding_from(&[5]),
             value: U256::from(6_u64),
             input: vec![7].into(),
             access_list: AccessList(vec![AccessListItem {
@@ -976,7 +994,7 @@ mod tests {
             gas_limit: u128::MAX,
             max_fee_per_gas: u128::MAX,
             max_priority_fee_per_gas: u128::MAX,
-            to: Address::random().into(),
+            to: Address::random(),
             value: U256::MAX,
             input: Bytes::new(),
             access_list: AccessList(vec![AccessListItem {

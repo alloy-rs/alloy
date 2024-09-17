@@ -1,7 +1,7 @@
 use crate::{CallDecoder, Error, EthCall, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
@@ -334,7 +334,10 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `sidecar` field in the transaction to the provided value.
-    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
         self.request.set_blob_sidecar(blob_sidecar);
         self
     }
@@ -371,7 +374,10 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `max_fee_per_blob_gas` in the transaction to the provided value
-    pub fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+    pub fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
         self.request.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
         self
     }

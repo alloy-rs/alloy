@@ -127,9 +127,11 @@ impl AddressFilter {
     }
 }
 
-/// `TraceFilterMatcher` is a filter used for matching `TransactionTrace` based on
-/// it's action and result(if available). It allows filtering traces by their mode, from address
-/// set, and to address set, and empty address set means match all addresses.
+/// `TraceFilterMatcher` is a filter used for matching `TransactionTrace` based on it's action and
+/// result (if available).
+///
+/// It allows filtering traces by their mode, from address set, and to address set, and empty
+/// address set means match all addresses.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TraceFilterMatcher {
     mode: TraceFilterMode,

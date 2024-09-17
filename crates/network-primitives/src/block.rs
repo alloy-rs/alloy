@@ -1,6 +1,9 @@
 use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 
+use alloc::{vec, vec::Vec};
+use core::slice;
+
 use crate::TransactionResponse;
 
 /// Block Transactions depending on the boolean attribute of `eth_getBlockBy*`,
@@ -69,10 +72,10 @@ impl<T> BlockTransactions<T> {
 
     /// Returns an iterator over the transactions (if any). This will be empty if the block is not
     /// full.
-    pub fn into_transactions(self) -> std::vec::IntoIter<T> {
+    pub fn into_transactions(self) -> vec::IntoIter<T> {
         match self {
             Self::Full(txs) => txs.into_iter(),
-            _ => std::vec::IntoIter::default(),
+            _ => vec::IntoIter::default(),
         }
     }
 
@@ -149,8 +152,8 @@ pub struct BlockTransactionHashes<'a, T>(BlockTransactionHashesInner<'a, T>);
 
 #[derive(Clone, Debug)]
 enum BlockTransactionHashesInner<'a, T> {
-    Hashes(std::slice::Iter<'a, B256>),
-    Full(std::slice::Iter<'a, T>),
+    Hashes(slice::Iter<'a, B256>),
+    Full(slice::Iter<'a, T>),
     Uncle,
 }
 
@@ -209,6 +212,7 @@ impl<T: TransactionResponse> DoubleEndedIterator for BlockTransactionHashes<'_, 
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a, T: TransactionResponse> std::iter::FusedIterator for BlockTransactionHashes<'a, T> {}
 
 /// Determines how the `transactions` field of block should be filled.

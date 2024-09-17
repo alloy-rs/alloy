@@ -1,6 +1,8 @@
 //! Contains types related to the Cancun hardfork that will be used by RPC to communicate with the
 //! beacon consensus engine.
 
+use alloc::vec::Vec;
+
 use alloy_primitives::B256;
 
 /// Fields introduced in `engine_newPayloadV3` that are not present in the `ExecutionPayload` RPC
@@ -8,7 +10,8 @@ use alloy_primitives::B256;
 ///
 /// See also:
 /// <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#request>
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CancunPayloadFields {
     /// The parent beacon block root.
     pub parent_beacon_block_root: B256,

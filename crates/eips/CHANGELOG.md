@@ -5,15 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Features
+
+- Add serde for NumHash ([#1277](https://github.com/alloy-rs/alloy/issues/1277))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+- Swap `BlockHashOrNumber` alias and struct name ([#1270](https://github.com/alloy-rs/alloy/issues/1270))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+- Swap BlockNumHash alias and struct name ([#1265](https://github.com/alloy-rs/alloy/issues/1265))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+- Add aliases for Num Hash ([#1253](https://github.com/alloy-rs/alloy/issues/1253))
+- [eip1898] Display `RpcBlockHash` ([#1242](https://github.com/alloy-rs/alloy/issues/1242))
+- Optional derive more ([#1239](https://github.com/alloy-rs/alloy/issues/1239))
+
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Bug Fixes
 
+- [eips] No-std compat ([#1222](https://github.com/alloy-rs/alloy/issues/1222))
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
+
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
+
+### Bug Fixes
+
+- [doc] Correct order of fields ([#1139](https://github.com/alloy-rs/alloy/issues/1139))
 - Correctly trim eip7251 bytecode ([#1105](https://github.com/alloy-rs/alloy/issues/1105))
 - [eips] Make SignedAuthorizationList arbitrary less fallible ([#1084](https://github.com/alloy-rs/alloy/issues/1084))
 - Require storageKeys value broken bincode serialization from [#955](https://github.com/alloy-rs/alloy/issues/955) ([#1058](https://github.com/alloy-rs/alloy/issues/1058))
 - Cargo fmt ([#1044](https://github.com/alloy-rs/alloy/issues/1044))
 - [eip7702] Add correct rlp decode/encode ([#1034](https://github.com/alloy-rs/alloy/issues/1034))
+
+### Dependencies
+
+- Rm 2930 and 7702 - use alloy-rs/eips ([#1181](https://github.com/alloy-rs/alloy/issues/1181))
+- Bump core and rm ssz feat ([#1167](https://github.com/alloy-rs/alloy/issues/1167))
+- [deps] Bump some deps ([#1141](https://github.com/alloy-rs/alloy/issues/1141))
 
 ### Features
 
@@ -25,11 +69,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
+- Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
+- [eip7702] Devnet3 changes ([#1056](https://github.com/alloy-rs/alloy/issues/1056))
+- Release 0.2.1
 - Release 0.2.0
 - Make auth mandatory in recovered auth ([#1047](https://github.com/alloy-rs/alloy/issues/1047))
 
 ### Other
 
+- Add conversion from BlockHashOrNumber to BlockId ([#1127](https://github.com/alloy-rs/alloy/issues/1127))
 - Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
 
 ### Styling
