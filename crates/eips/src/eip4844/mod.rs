@@ -13,6 +13,9 @@ pub mod trusted_setup_points;
 pub mod builder;
 pub mod utils;
 
+mod engine;
+pub use engine::*;
+
 /// Contains sidecar related types
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
