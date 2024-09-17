@@ -4,6 +4,7 @@ use crate::{utils::extract_endpoint, NodeError, NODE_STARTUP_TIMEOUT};
 use alloy_genesis::Genesis;
 use rand::Rng;
 use std::{
+    ffi::OsString,
     fs::create_dir,
     io::{BufRead, BufReader},
     path::PathBuf,
@@ -160,6 +161,7 @@ pub struct Reth {
     data_dir: Option<PathBuf>,
     chain_or_path: Option<String>,
     genesis: Option<Genesis>,
+    args: Vec<OsString>,
 }
 
 impl Reth {
@@ -184,6 +186,7 @@ impl Reth {
             data_dir: None,
             chain_or_path: None,
             genesis: None,
+            args: Vec::new(),
         }
     }
 
@@ -306,6 +309,28 @@ impl Reth {
         self
     }
 
+    /// Adds an argument to pass to `reth`.
+    ///
+    /// Pass any arg that is not supported by the builder.
+    pub fn arg<T: Into<OsString>>(mut self, arg: T) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Adds multiple arguments to pass to `reth`.
+    ///
+    /// Pass any args that is not supported by the builder.
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self = self.arg(arg);
+        }
+        self
+    }
+
     /// Consumes the builder and spawns `reth`.
     ///
     /// # Panics
@@ -412,6 +437,9 @@ impl Reth {
 
         // Disable color output to make parsing logs easier.
         cmd.arg("--color").arg("never");
+
+        // Add any additional arguments.
+        cmd.args(self.args);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
