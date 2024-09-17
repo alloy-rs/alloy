@@ -204,6 +204,7 @@ pub struct Geth {
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
+    args: Vec<String>,
 }
 
 impl Geth {
@@ -364,6 +365,28 @@ impl Geth {
     /// Sets the port for authenticated RPC connections.
     pub const fn authrpc_port(mut self, port: u16) -> Self {
         self.authrpc_port = Some(port);
+        self
+    }
+
+    /// Adds an argument to pass to `geth`.
+    ///
+    /// Pass any arg that is not supported by the builder.
+    pub fn arg<T: Into<String>>(mut self, arg: T) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Adds multiple arguments to pass to `geth`.
+    ///
+    /// Pass any args that is not supported by the builder.
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        for arg in args {
+            self = self.arg(arg);
+        }
         self
     }
 
@@ -542,6 +565,8 @@ impl Geth {
         if let Some(ipc) = &self.ipc_path {
             cmd.arg("--ipcpath").arg(ipc);
         }
+
+        cmd.args(self.args);
 
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
