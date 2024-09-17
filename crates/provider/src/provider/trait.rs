@@ -1052,13 +1052,12 @@ mod tests {
 
     #[cfg(feature = "hyper")]
     #[tokio::test]
-    async fn test_hyper_layer_transport_no_layers() {
+    async fn test_default_hyper_transport() {
         init_tracing();
         let anvil = Anvil::new().spawn();
-        let layer_transport = alloy_transport_http::HyperTransport::new(anvil.endpoint_url());
+        let hyper_t = alloy_transport_http::HyperTransport::new(anvil.endpoint_url());
 
-        let http_hyper =
-            alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
+        let http_hyper = alloy_transport_http::Http::with_client(hyper_t, anvil.endpoint_url());
 
         let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
