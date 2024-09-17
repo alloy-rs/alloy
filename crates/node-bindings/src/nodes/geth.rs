@@ -8,6 +8,7 @@ use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
+    ffi::OsString,
     fs::{create_dir, File},
     io::{BufRead, BufReader},
     path::PathBuf,
@@ -204,7 +205,7 @@ pub struct Geth {
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
-    args: Vec<String>,
+    args: Vec<OsString>,
 }
 
 impl Geth {
@@ -371,7 +372,7 @@ impl Geth {
     /// Adds an argument to pass to `geth`.
     ///
     /// Pass any arg that is not supported by the builder.
-    pub fn arg<T: Into<String>>(mut self, arg: T) -> Self {
+    pub fn arg<T: Into<OsString>>(mut self, arg: T) -> Self {
         self.args.push(arg.into());
         self
     }
@@ -382,7 +383,7 @@ impl Geth {
     pub fn args<I, S>(mut self, args: I) -> Self
     where
         I: IntoIterator<Item = S>,
-        S: Into<String>,
+        S: Into<OsString>,
     {
         for arg in args {
             self = self.arg(arg);
