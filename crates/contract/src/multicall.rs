@@ -95,7 +95,7 @@ sol! {
 ///     - [DynTryAggreagate] or [SolTryAggreagate] for the try_aggregate call
 ///     - [DynAggreagate3] or [SolAggreagate3] for the aggregate3 call
 #[derive(Debug, Clone)]
-pub struct MultiCall<T, P, N: Network> {
+pub struct MultiCall<T, P, N> {
     instance: IMulticall3::IMulticall3Instance<T, P, N>,
 }
 
@@ -192,7 +192,7 @@ mod aggregate {
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate`] multicalls will also fail fast.
-    pub struct Aggregate<I, T, P, D, N: Network> {
+    pub struct Aggregate<I, T, P, D, N> {
         pub(super) instance: I,
         pub(super) calls: Vec<(D, IMulticall3::Call)>,
         pub(super) batch: Option<usize>,
@@ -223,6 +223,9 @@ mod aggregate {
         }
 
         /// Add a call to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_call<T1, P1>(&mut self, call: CallBuilder<T1, P1, D, N>) -> &mut Self {
             let (decoder, call) = call.take_decoder();
 
@@ -234,6 +237,9 @@ mod aggregate {
         }
 
         /// Add multiple calls to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
             It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
@@ -354,7 +360,7 @@ mod try_aggregate {
     /// Represents a call to the aggregate method.
     ///
     /// [`TryAggregate`] multicalls will also fail fast.
-    pub struct TryAggregate<I, T, P, D, N: Network> {
+    pub struct TryAggregate<I, T, P, D, N> {
         pub(super) instance: I,
         pub(super) calls: Vec<(D, IMulticall3::Call)>,
         pub(super) batch: Option<usize>,
@@ -373,7 +379,7 @@ mod try_aggregate {
         }
     }
 
-    impl<I, T, P, D, N: Network> Debug for TryAggregate<I, T, P, D, N> {
+    impl<I, T, P, D, N> Debug for TryAggregate<I, T, P, D, N> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
                 .field("len", &self.calls.len())
@@ -394,6 +400,9 @@ mod try_aggregate {
         }
 
         /// Add a call to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_call<T1, P1>(&mut self, call: CallBuilder<T1, P1, D, N>) -> &mut Self {
             let (decoder, call) = call.take_decoder();
 
@@ -405,6 +414,9 @@ mod try_aggregate {
         }
 
         /// Add multiple calls to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
             It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
@@ -538,7 +550,7 @@ mod aggregate3 {
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate3`] multicalls will filter failed results
-    pub struct Aggregate3<I, T, P, D, N: Network> {
+    pub struct Aggregate3<I, T, P, D, N> {
         pub(super) instance: I,
         pub(super) calls: Vec<(D, IMulticall3::Call3)>,
         pub(super) batch: Option<usize>,
@@ -557,7 +569,7 @@ mod aggregate3 {
         }
     }
 
-    impl<I, T, P, D, N: Network> Debug for Aggregate3<I, T, P, D, N> {
+    impl<I, T, P, D, N> Debug for Aggregate3<I, T, P, D, N> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
                 .field("len", &self.calls.len())
@@ -578,6 +590,9 @@ mod aggregate3 {
         }
 
         /// Add a call to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_call(
             &mut self,
             allow_failure: bool,
@@ -593,6 +608,9 @@ mod aggregate3 {
         }
 
         /// Add multiple calls to the multicall
+        ///
+        /// # Note
+        /// This will filter out any calls that have no target address
         pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
             It: IntoIterator<Item = (bool, CallBuilder<T1, P1, D, N>)>,
