@@ -22,7 +22,7 @@ pub type HyperClient = hyper_util::client::legacy::Client<
 >;
 
 /// A [hyper] client that can be used with tower layers.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct HyperTransport<B = Full<Bytes>, S = HyperClient> {
     service: S,
     _pd: PhantomData<B>,
