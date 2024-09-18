@@ -161,7 +161,8 @@ impl EthSendBundle {
     pub fn bundle_hash(&self) -> B256 {
         let mut hasher = Keccak256::default();
         for tx in &self.txs {
-            // NB: the txs must contain envelopes, so the tx_hash is the
+            // NB: the txs must contain envelopes, so the tx_hash is just the
+            // keccak256 hash of the envelope. no need to deserialize the tx
             hasher.update(keccak256(tx));
         }
         hasher.finalize()
