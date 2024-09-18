@@ -136,8 +136,8 @@ where
     }
 }
 
-impl TransportConnect for HttpConnect<HyperClient> {
-    type Transport = Http<HyperClient>;
+impl TransportConnect for HttpConnect<HyperTransport> {
+    type Transport = HyperTransport;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
