@@ -7,7 +7,7 @@ use alloc::{
 use alloy_consensus::{Blob, Bytes48};
 use alloy_eips::{
     eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip6110::DepositRequest,
-    eip7002::WithdrawalRequest, eip7251::ConsolidationRequest,
+    eip7002::WithdrawalRequest, eip7251::ConsolidationRequest, BlockNumHash,
 };
 use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use core::iter::{FromIterator, IntoIterator};
@@ -190,6 +190,13 @@ pub struct ExecutionPayloadV1 {
     pub block_hash: B256,
     /// The transactions of the block.
     pub transactions: Vec<Bytes>,
+}
+
+impl ExecutionPayloadV1 {
+    /// Returns the block number and hash as a [`BlockNumHash`].
+    pub const fn block_num_hash(&self) -> BlockNumHash {
+        BlockNumHash::new(self.block_number, self.block_hash)
+    }
 }
 
 /// This structure maps on the ExecutionPayloadV2 structure of the beacon chain spec.
@@ -841,6 +848,11 @@ impl ExecutionPayload {
     /// Returns the block number for this payload.
     pub const fn block_number(&self) -> u64 {
         self.as_v1().block_number
+    }
+
+    /// Returns the block number for this payload.
+    pub const fn block_num_hash(&self) -> BlockNumHash {
+        self.as_v1().block_num_hash()
     }
 
     /// Returns the prev randao for this payload.
