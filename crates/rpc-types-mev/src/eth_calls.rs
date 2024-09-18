@@ -1,7 +1,7 @@
 use crate::{u256_numeric_string, Privacy, Validity};
 
 use alloy_eips::BlockNumberOrTag;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, Keccak256, B256, U256};
 use serde::{Deserialize, Serialize};
 
 /// Bundle of transactions for `eth_callBundle`
@@ -136,6 +136,36 @@ pub struct EthSendBundle {
     /// UUID that can be used to cancel/replace this bundle
     #[serde(default, rename = "replacementUuid", skip_serializing_if = "Option::is_none")]
     pub replacement_uuid: Option<String>,
+}
+
+impl EthSendBundle {
+    /// Returns the bundle hash.
+    ///
+    /// This is the keccak256 hash of the transaction hashes of the
+    /// transactions in the bundle.
+    ///
+    /// ## Note
+    ///
+    /// Logic for calculating the bundle hash is as follows:
+    /// - Calculate the hash of each transaction in the bundle
+    /// - Concatenate the hashes, in bundle order
+    /// - Calculate the keccak256 hash of the concatenated hashes
+    ///
+    /// See the [flashbots impl].
+    ///
+    /// This function will not verify transaction correctness. If the bundle
+    /// `txs` contains invalid transactions, the bundle hash will still be
+    /// calculated.
+    ///
+    /// [flashbots impl]: https://github.com/flashbots/mev-geth/blob/fddf97beec5877483f879a77b7dea2e58a58d653/internal/ethapi/api.go#L2067
+    pub fn bundle_hash(&self) -> B256 {
+        let mut hasher = Keccak256::default();
+        for tx in &self.txs {
+            // NB: the txs must contain envelopes, so the tx_hash is the
+            hasher.update(keccak256(tx));
+        }
+        hasher.finalize()
+    }
 }
 
 /// Response from the matchmaker after sending a bundle.
