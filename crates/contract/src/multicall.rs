@@ -2,16 +2,12 @@ use std::marker::PhantomData;
 
 /// The canon deployed address and chains
 pub mod constants;
-mod error;
 
 pub use aggregate::Aggregate;
 pub use aggregate3::Aggregate3;
 pub use try_aggregate::TryAggregate;
 
 pub use constants::{MULTICALL_ADDRESS, MULTICALL_SUPPORTED_CHAINS};
-
-#[doc(inline)]
-pub use error::MultiCallError;
 
 use alloy_json_abi::Function;
 use alloy_network::{Network, TransactionBuilder};
@@ -21,6 +17,19 @@ use alloy_sol_types::sol;
 use alloy_transport::Transport;
 
 use crate::{CallBuilder, CallDecoder};
+
+/// The error type that might be returned when trying to create the multicall instance.
+///
+/// Errors from the call will be a [`crate::Error`].
+#[derive(Debug, thiserror::Error)]
+pub enum MultiCallError {
+    /// The chain with the given id is not supported by the Multicall contract.
+    #[error("The chain with id={} is not supported by the Multicall contract", .0)]
+    ChainNotSupported(u64),
+    /// Can only happen if getting the chain ID fails in the constructor.
+    #[error("An error occurred while calling the Multicall contract: {0}")]
+    CallError(#[from] crate::Error),
+}
 
 sol! {
     #![sol(alloy_contract = crate)]
@@ -107,43 +116,43 @@ where
 
     /// Create a new multicall instance checking if the chain_id is in the list of supported chains.
     pub async fn new_checked(provider: P) -> Result<Self, MultiCallError> {
-        if MULTICALL_SUPPORTED_CHAINS
-            .contains(&provider.get_chain_id().await.map_err(crate::Error::from)?)
-        {
+        let chain_id = provider.get_chain_id().await.map_err(crate::Error::from)?;
+
+        if MULTICALL_SUPPORTED_CHAINS.contains(&chain_id) {
             Ok(Self::new(MULTICALL_ADDRESS, provider))
         } else {
-            Err(error::MultiCallError::ChainNotSupported)
+            Err(MultiCallError::ChainNotSupported(chain_id))
         }
     }
 
     /// A builder for the aggregate call.
     pub const fn aggregate_owned<D: CallDecoder>(self) -> OwnedAggreagte<T, P, D, N> {
-        Aggregate { instance: self, calls: Vec::new(), batch: None }
+        Aggregate { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 
     /// A builder for the aggregate call.
     pub const fn aggregate<D: CallDecoder>(&self) -> AggregateRef<'_, T, P, D, N> {
-        Aggregate { instance: self, calls: Vec::new(), batch: None }
+        Aggregate { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 
     /// A builder for the try_aggreate call.
     pub const fn try_aggregate_owned<D: CallDecoder>(self) -> OwnedTryAggregate<T, P, D, N> {
-        TryAggregate { instance: self, calls: Vec::new(), batch: None }
+        TryAggregate { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 
     /// A builder for the try_aggreate call.
     pub const fn try_aggregate<D: CallDecoder>(&self) -> TryAggregateRef<'_, T, P, D, N> {
-        TryAggregate { instance: self, calls: Vec::new(), batch: None }
+        TryAggregate { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 
     /// A builder for the aggregate3 call.
     pub const fn aggregate3_owned<D: CallDecoder>(self) -> OwnedAggregate3<T, P, D, N> {
-        Aggregate3 { instance: self, calls: Vec::new(), batch: None }
+        Aggregate3 { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 
     /// A builder for the aggregate3 call.
     pub const fn aggregate3<D: CallDecoder>(&self) -> Aggregate3Ref<'_, T, P, D, N> {
-        Aggregate3 { instance: self, calls: Vec::new(), batch: None }
+        Aggregate3 { instance: self, calls: Vec::new(), batch: None, _pd: PhantomData }
     }
 }
 
@@ -183,43 +192,26 @@ mod aggregate {
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate`] multicalls will also fail fast.
-    pub struct Aggregate<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    pub struct Aggregate<I, T, P, D, N: Network> {
         pub(super) instance: I,
-        pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
+        pub(super) calls: Vec<(D, IMulticall3::Call)>,
         pub(super) batch: Option<usize>,
+        pub(super) _pd: PhantomData<(T, P, N)>,
     }
 
-    impl<I, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for Aggregate<I, T, P, D, N>
+    impl<I, T, T1, P, P1, D, N> Extend<CallBuilder<T1, P1, D, N>> for Aggregate<I, T, P, D, N>
     where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
         N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
-            It: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+            It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
         {
-            self.add_calls(iter)
+            self.add_calls(iter);
         }
     }
 
-    impl<I, T, P, D, N> Aggregate<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    impl<I, T, P, D, N: Network> Aggregate<I, T, P, D, N> {
         /// Set the batch size for this multicall
         pub fn set_batch(&mut self, batch: Option<usize>) {
             self.batch = batch;
@@ -231,16 +223,28 @@ mod aggregate {
         }
 
         /// Add a call to the multicall
-        pub fn add_call(&mut self, call: CallBuilder<T, P, D, N>) {
-            self.calls.push(call);
+        pub fn add_call<T1, P1>(&mut self, call: CallBuilder<T1, P1, D, N>) -> &mut Self {
+            let (decoder, call) = call.take_decoder();
+
+            if let Some(call) = call_from_tx::<N>(call.into_transaction_request()) {
+                self.calls.push((decoder, call));
+            }
+
+            self
         }
 
         /// Add multiple calls to the multicall
-        pub fn add_calls<It>(&mut self, calls: It)
+        pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
-            It: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+            It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
         {
-            self.calls.extend(calls);
+            self.calls.extend(calls.into_iter().filter_map(|call| {
+                let (decoder, call) = call.take_decoder();
+
+                call_from_tx_ref::<N>(&call.into_transaction_request()).map(|call| (decoder, call))
+            }));
+
+            self
         }
 
         /// Reserve additional space for calls
@@ -258,31 +262,17 @@ mod aggregate {
         I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate method, this method will fail fast on any reverts
-        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
+        pub async fn call(&self) -> Result<Vec<D::CallOutput>, crate::Error> {
+            let (decoders, requests) = self.parts_clone();
 
-            self.aggregate_inner(
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx_ref::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
+            self.aggregate_inner(&decoders, requests).await
         }
 
         /// like [Self::call] but will consumes the call builder
-        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, crate::Error> {
             let (decoders, requests) = self.parts();
 
-            self.aggregate_inner(
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
+            self.aggregate_inner(&decoders.iter().collect::<Vec<_>>(), requests).await
         }
     }
 
@@ -300,7 +290,7 @@ mod aggregate {
             &self,
             decoders: &[&D],
             requests: Vec<IMulticall3::Call>,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        ) -> Result<Vec<D::CallOutput>, crate::Error> {
             let mut results;
 
             if let Some(batch) = self.batch {
@@ -325,19 +315,12 @@ mod aggregate {
                 .collect()
         }
 
-        fn parts(&mut self) -> (Vec<D>, Vec<N::TransactionRequest>) {
-            std::mem::take(&mut self.calls)
-                .into_iter()
-                .map(|call| {
-                    let (decoder, req) = call.take_decoder();
-
-                    (decoder, req.into_transaction_request())
-                })
-                .unzip()
+        fn parts(&mut self) -> (Vec<D>, Vec<IMulticall3::Call>) {
+            std::mem::take(&mut self.calls).into_iter().unzip()
         }
 
-        fn parts_ref(&self) -> (Vec<&D>, Vec<&N::TransactionRequest>) {
-            self.calls.iter().map(|call| (call.decoder(), call.as_ref())).unzip()
+        fn parts_clone(&self) -> (Vec<&D>, Vec<IMulticall3::Call>) {
+            self.calls.iter().map(|(d, c)| (d, c.clone())).unzip()
         }
     }
 
@@ -351,7 +334,7 @@ mod aggregate {
     {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("Aggregate")
-                .field("calls", &self.calls)
+                .field("len", &self.calls.len())
                 .field("batch", &self.batch)
                 .finish()
         }
@@ -371,59 +354,35 @@ mod try_aggregate {
     /// Represents a call to the aggregate method.
     ///
     /// [`TryAggregate`] multicalls will also fail fast.
-    pub struct TryAggregate<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    pub struct TryAggregate<I, T, P, D, N: Network> {
         pub(super) instance: I,
-        pub(super) calls: Vec<CallBuilder<T, P, D, N>>,
+        pub(super) calls: Vec<(D, IMulticall3::Call)>,
         pub(super) batch: Option<usize>,
+        pub(super) _pd: PhantomData<(T, P, N)>,
     }
 
-    impl<I, T, P, D, N> Extend<CallBuilder<T, P, D, N>> for TryAggregate<I, T, P, D, N>
+    impl<I, T, T1, P, P1, D, N> Extend<CallBuilder<T1, P1, D, N>> for TryAggregate<I, T, P, D, N>
     where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
         N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
-            It: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+            It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
         {
-            self.add_calls(iter)
+            self.add_calls(iter);
         }
     }
 
-    impl<I, T, P, D, N> Debug for TryAggregate<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    impl<I, T, P, D, N: Network> Debug for TryAggregate<I, T, P, D, N> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
-                .field("calls", &self.calls)
+                .field("len", &self.calls.len())
                 .field("batch", &self.batch)
                 .finish()
         }
     }
 
-    impl<I, T, P, D, N> TryAggregate<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    impl<I, T, P, D, N: Network> TryAggregate<I, T, P, D, N> {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
             self.calls.clear();
@@ -435,16 +394,28 @@ mod try_aggregate {
         }
 
         /// Add a call to the multicall
-        pub fn add_call(&mut self, call: CallBuilder<T, P, D, N>) {
-            self.calls.push(call);
+        pub fn add_call<T1, P1>(&mut self, call: CallBuilder<T1, P1, D, N>) -> &mut Self {
+            let (decoder, call) = call.take_decoder();
+
+            if let Some(call) = call_from_tx::<N>(call.into_transaction_request()) {
+                self.calls.push((decoder, call));
+            }
+
+            self
         }
 
         /// Add multiple calls to the multicall
-        pub fn add_calls<It>(&mut self, calls: It)
+        pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
-            It: IntoIterator<Item = CallBuilder<T, P, D, N>>,
+            It: IntoIterator<Item = CallBuilder<T1, P1, D, N>>,
         {
-            self.calls.extend(calls);
+            self.calls.extend(calls.into_iter().filter_map(|call| {
+                let (decoder, call) = call.take_decoder();
+
+                call_from_tx_ref::<N>(&call.into_transaction_request()).map(|call| (decoder, call))
+            }));
+
+            self
         }
 
         /// Reserve additional space for calls
@@ -465,34 +436,23 @@ mod try_aggregate {
         pub async fn call(
             &self,
             require_success: bool,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
+        ) -> Result<Vec<D::CallOutput>, crate::Error> {
+            let (decoders, requests) = self.parts_clone();
 
-            self.try_aggregate_inner(
-                require_success,
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx_ref::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
+            self.try_aggregate_inner(require_success, &decoders, requests).await
         }
 
         /// Like [Self::call] but will consumes this call builder
         pub async fn call_consume(
             mut self,
             require_success: bool,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        ) -> Result<Vec<D::CallOutput>, crate::Error> {
             let (decoders, requests) = self.parts();
 
             self.try_aggregate_inner(
                 require_success,
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|call| call_from_tx::<N>(call))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
+                &decoders.iter().collect::<Vec<_>>(),
+                requests,
             )
             .await
         }
@@ -513,7 +473,7 @@ mod try_aggregate {
             require_success: bool,
             decoders: &[&D],
             requests: Vec<IMulticall3::Call>,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        ) -> Result<Vec<D::CallOutput>, crate::Error> {
             let mut results;
 
             if let Some(batch) = self.batch {
@@ -555,19 +515,12 @@ mod try_aggregate {
                 .collect()
         }
 
-        fn parts(&mut self) -> (Vec<D>, Vec<N::TransactionRequest>) {
-            std::mem::take(&mut self.calls)
-                .into_iter()
-                .map(|call| {
-                    let (decoder, req) = call.take_decoder();
-
-                    (decoder, req.into_transaction_request())
-                })
-                .unzip()
+        fn parts(&mut self) -> (Vec<D>, Vec<IMulticall3::Call>) {
+            std::mem::take(&mut self.calls).into_iter().unzip()
         }
 
-        fn parts_ref(&self) -> (Vec<&D>, Vec<&N::TransactionRequest>) {
-            self.calls.iter().map(|call| (call.decoder(), call.as_ref())).unzip()
+        fn parts_clone(&self) -> (Vec<&D>, Vec<IMulticall3::Call>) {
+            self.calls.iter().map(|(d, c)| (d, c.clone())).unzip()
         }
     }
 }
@@ -585,59 +538,35 @@ mod aggregate3 {
     /// Represents a call to the aggregate method.
     ///
     /// [`Aggregate3`] multicalls will filter failed results
-    pub struct Aggregate3<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    pub struct Aggregate3<I, T, P, D, N: Network> {
         pub(super) instance: I,
-        pub(super) calls: Vec<(bool, CallBuilder<T, P, D, N>)>,
+        pub(super) calls: Vec<(D, IMulticall3::Call3)>,
         pub(super) batch: Option<usize>,
+        pub(super) _pd: PhantomData<(T, P, N)>,
     }
 
-    impl<I, T, P, D, N> Extend<(bool, CallBuilder<T, P, D, N>)> for Aggregate3<I, T, P, D, N>
+    impl<I, T, T1, P, P1, D, N> Extend<(bool, CallBuilder<T1, P1, D, N>)> for Aggregate3<I, T, P, D, N>
     where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
         N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
     {
         fn extend<It>(&mut self, iter: It)
         where
-            It: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
+            It: IntoIterator<Item = (bool, CallBuilder<T1, P1, D, N>)>,
         {
-            self.add_calls(iter)
+            self.add_calls(iter);
         }
     }
 
-    impl<I, T, P, D, N> Debug for Aggregate3<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    impl<I, T, P, D, N: Network> Debug for Aggregate3<I, T, P, D, N> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             f.debug_struct("TryAggregate")
-                .field("calls", &self.calls)
+                .field("len", &self.calls.len())
                 .field("batch", &self.batch)
                 .finish()
         }
     }
 
-    impl<I, T, P, D, N> Aggregate3<I, T, P, D, N>
-    where
-        T: Transport + Clone,
-        P: Provider<T, N>,
-        D: CallDecoder,
-        N: Network,
-        I: Borrow<MultiCall<T, P, N>>,
-    {
+    impl<I, T, P, D, N: Network> Aggregate3<I, T, P, D, N> {
         /// Clear the calls
         pub fn clear_calls(&mut self) {
             self.calls.clear();
@@ -649,16 +578,33 @@ mod aggregate3 {
         }
 
         /// Add a call to the multicall
-        pub fn add_call(&mut self, allow_failure: bool, call: CallBuilder<T, P, D, N>) {
-            self.calls.push((allow_failure, call));
+        pub fn add_call(
+            &mut self,
+            allow_failure: bool,
+            call: CallBuilder<T, P, D, N>,
+        ) -> &mut Self {
+            let (decoder, call) = call.take_decoder();
+
+            if let Some(call) = call3_from_tx::<N>(call.into_transaction_request(), allow_failure) {
+                self.calls.push((decoder, call));
+            }
+
+            self
         }
 
         /// Add multiple calls to the multicall
-        pub fn add_calls<It>(&mut self, calls: It)
+        pub fn add_calls<It, T1, P1>(&mut self, calls: It) -> &mut Self
         where
-            It: IntoIterator<Item = (bool, CallBuilder<T, P, D, N>)>,
+            It: IntoIterator<Item = (bool, CallBuilder<T1, P1, D, N>)>,
         {
-            self.calls.extend(calls);
+            self.calls.extend(calls.into_iter().filter_map(|(allow_failure, call)| {
+                let (decoder, call) = call.take_decoder();
+
+                call3_from_tx_ref::<N>(&call.into_transaction_request(), allow_failure)
+                    .map(|call| (decoder, call))
+            }));
+
+            self
         }
 
         /// Reserve additional space for calls
@@ -676,31 +622,17 @@ mod aggregate3 {
         I: Borrow<MultiCall<T, P, N>>,
     {
         /// Call the aggregate3 method, this method will fail fast on any reverts
-        pub async fn call(&self) -> Result<Vec<D::CallOutput>, MultiCallError> {
-            let (decoders, requests) = self.parts_ref();
+        pub async fn call(&self) -> Result<Vec<D::CallOutput>, crate::Error> {
+            let (decoders, requests) = self.parts_clone();
 
-            self.aggregate3_inner(
-                &decoders,
-                requests
-                    .into_iter()
-                    .map(|(allow_failure, call)| call3_from_tx_ref::<N>(call, allow_failure))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
+            self.aggregate3_inner(&decoders, requests).await
         }
 
         /// Like [Self::call] but will consume the call builder
-        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        pub async fn call_consume(mut self) -> Result<Vec<D::CallOutput>, crate::Error> {
             let (decoders, requests) = self.parts();
 
-            self.aggregate3_inner(
-                decoders.iter().collect::<Vec<_>>().as_slice(),
-                requests
-                    .into_iter()
-                    .map(|(allow_failure, call)| call3_from_tx::<N>(call, allow_failure))
-                    .collect::<Result<Vec<_>, MultiCallError>>()?,
-            )
-            .await
+            self.aggregate3_inner(decoders.iter().collect::<Vec<_>>().as_slice(), requests).await
         }
     }
 
@@ -718,7 +650,7 @@ mod aggregate3 {
             &self,
             decoders: &[&D],
             requests: Vec<IMulticall3::Call3>,
-        ) -> Result<Vec<D::CallOutput>, MultiCallError> {
+        ) -> Result<Vec<D::CallOutput>, crate::Error> {
             let mut results;
 
             if let Some(batch) = self.batch {
@@ -749,39 +681,29 @@ mod aggregate3 {
                 .collect()
         }
 
-        fn parts(&mut self) -> (Vec<D>, Vec<(bool, N::TransactionRequest)>) {
-            std::mem::take(&mut self.calls)
-                .into_iter()
-                .map(|(allow_failure, call)| {
-                    let (decoder, req) = call.take_decoder();
-
-                    (decoder, (allow_failure, req.into_transaction_request()))
-                })
-                .unzip()
+        fn parts(&mut self) -> (Vec<D>, Vec<IMulticall3::Call3>) {
+            std::mem::take(&mut self.calls).into_iter().unzip()
         }
 
-        fn parts_ref(&self) -> (Vec<&D>, Vec<(bool, &N::TransactionRequest)>) {
-            self.calls
-                .iter()
-                .map(|(allow_failure, call)| (call.decoder(), (*allow_failure, call.as_ref())))
-                .unzip()
+        fn parts_clone(&self) -> (Vec<&D>, Vec<IMulticall3::Call3>) {
+            self.calls.iter().map(|(d, c)| (d, c.clone())).unzip()
         }
     }
 }
 
 mod into_calls {
-    use super::{IMulticall3, MultiCallError, Network, TransactionBuilder};
+    use super::{IMulticall3, Network, TransactionBuilder};
 
     #[inline]
     pub(super) fn call3_from_tx<N>(
         tx: N::TransactionRequest,
         allow_failure: bool,
-    ) -> Result<IMulticall3::Call3, MultiCallError>
+    ) -> Option<IMulticall3::Call3>
     where
         N: Network,
     {
-        Ok(IMulticall3::Call3 {
-            target: tx.to().ok_or(MultiCallError::MissingTargetAddress)?,
+        Some(IMulticall3::Call3 {
+            target: tx.to()?,
             allowFailure: allow_failure,
             callData: tx.into_input().unwrap_or_default(),
         })
@@ -791,39 +713,32 @@ mod into_calls {
     pub(super) fn call3_from_tx_ref<N>(
         tx: &N::TransactionRequest,
         allow_failure: bool,
-    ) -> Result<IMulticall3::Call3, MultiCallError>
+    ) -> Option<IMulticall3::Call3>
     where
         N: Network,
     {
-        Ok(IMulticall3::Call3 {
-            target: tx.to().ok_or(MultiCallError::MissingTargetAddress)?,
+        Some(IMulticall3::Call3 {
+            target: tx.to()?,
             allowFailure: allow_failure,
             callData: tx.input().cloned().unwrap_or_default(),
         })
     }
 
     #[inline]
-    pub(super) fn call_from_tx<N>(
-        tx: N::TransactionRequest,
-    ) -> Result<IMulticall3::Call, MultiCallError>
+    pub(super) fn call_from_tx<N>(tx: N::TransactionRequest) -> Option<IMulticall3::Call>
     where
         N: Network,
     {
-        Ok(IMulticall3::Call {
-            target: tx.to().ok_or(MultiCallError::MissingTargetAddress)?,
-            callData: tx.into_input().unwrap_or_default(),
-        })
+        Some(IMulticall3::Call { target: tx.to()?, callData: tx.into_input().unwrap_or_default() })
     }
 
     #[inline]
-    pub(super) fn call_from_tx_ref<N>(
-        tx: &N::TransactionRequest,
-    ) -> Result<IMulticall3::Call, MultiCallError>
+    pub(super) fn call_from_tx_ref<N>(tx: &N::TransactionRequest) -> Option<IMulticall3::Call>
     where
         N: Network,
     {
-        Ok(IMulticall3::Call {
-            target: tx.to().ok_or(MultiCallError::MissingTargetAddress)?,
+        Some(IMulticall3::Call {
+            target: tx.to()?,
             callData: tx.input().cloned().unwrap_or_default(),
         })
     }
