@@ -67,7 +67,7 @@ impl<L> ClientBuilder<L> {
         L: Layer<alloy_transport_http::Http<alloy_transport_http::HyperTransport>>,
         L::Service: Transport,
     {
-        let hyper = alloy_transport_http::HyperTransport::new(url.clone());
+        let hyper = alloy_transport_http::HyperTransport::new();
         let transport = alloy_transport_http::Http::with_client(hyper, url);
         let is_local = transport.guess_local();
 

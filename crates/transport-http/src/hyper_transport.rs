@@ -24,7 +24,6 @@ pub type HyperClient = hyper_util::client::legacy::Client<
 /// A [hyper] client that can be used with tower layers.
 #[derive(Clone, Debug)]
 pub struct HyperTransport<B = Full<Bytes>, S = HyperClient> {
-    url: Url,
     service: S,
     _pd: PhantomData<B>,
 }
@@ -38,20 +37,20 @@ pub type HyperResponseFut<T = HyperResponse, E = Error> =
 
 impl HyperTransport {
     /// Create a new [HyperTransport] with the given URL and default hyper client.
-    pub fn new(url: Url) -> Self {
+    pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
 
         let service =
             hyper_util::client::legacy::Client::builder(executor).build_http::<Full<Bytes>>();
 
-        Self { url, service, _pd: PhantomData }
+        Self { service, _pd: PhantomData }
     }
 }
 
 impl<B, S> HyperTransport<B, S> {
     /// Create a new [HyperTransport] with the given URL and service.
-    pub const fn with_service(url: Url, service: S) -> Self {
-        Self { url, service, _pd: PhantomData }
+    pub const fn with_service(service: S) -> Self {
+        Self { service, _pd: PhantomData }
     }
 }
 
@@ -63,9 +62,9 @@ where
     B: From<Vec<u8>> + Send + 'static + Clone,
 {
     /// Make a request to the server using the given service.
-    pub fn request(&mut self, req: RequestPacket) -> TransportFut<'static> {
+    fn request(&mut self, req: RequestPacket, url: Url) -> TransportFut<'static> {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", url = %this.url);
+        let span = debug_span!("HyperTransport", %url);
         Box::pin(
             async move {
                 debug!(count = req.len(), "sending request packet to server");
@@ -75,7 +74,7 @@ where
 
                 let req = hyper::Request::builder()
                     .method(hyper::Method::POST)
-                    .uri(this.url.as_str())
+                    .uri(url.as_str())
                     .header(
                         header::CONTENT_TYPE,
                         header::HeaderValue::from_static("application/json"),
@@ -131,8 +130,8 @@ where
 {
     /// Make a request to the server using the underlying service that may or may not contain
     /// layers.
-    pub fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
-        self.client.request(req)
+    fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
+        self.client.request(req, self.url.clone())
     }
 }
 
@@ -147,7 +146,7 @@ impl TransportConnect for HttpConnect<HyperTransport> {
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
         Box::pin(async move {
-            let hyper_t = HyperTransport::new(self.url.clone());
+            let hyper_t = HyperTransport::new();
 
             Ok(Http::with_client(hyper_t, self.url.clone()))
         })
