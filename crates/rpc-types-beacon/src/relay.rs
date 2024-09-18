@@ -211,6 +211,20 @@ pub struct BuilderBlockValidationRequestV2 {
     pub withdrawals_root: B256,
 }
 
+/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV3 {
+    /// The [SubmitBlockRequest] data to be validated.
+    #[serde(flatten)]
+    pub request: SubmitBlockRequest,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
+}
+
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
 /// Provides [BidTrace]s for payloads that were delivered to proposers.
