@@ -145,7 +145,7 @@ pub struct SignedBidSubmissionV3 {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
 pub struct SignedBidSubmissionV4 {
-    /// The BidTrace message associated with the submission.
+    /// The [`BidTrace`] message associated with the submission.
     pub message: BidTrace,
     /// The execution payload for the submission.
     #[serde(with = "crate::payload::beacon_payload_v4")]
