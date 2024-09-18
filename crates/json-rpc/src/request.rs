@@ -78,6 +78,14 @@ impl<Params> Request<Params> {
     pub fn set_subscription_status(&mut self, sub: bool) {
         self.meta.set_subscription_status(sub);
     }
+
+    /// Change type of the request parameters.
+    pub fn map_params<NewParams>(
+        self,
+        map: impl FnOnce(Params) -> NewParams,
+    ) -> Request<NewParams> {
+        Request { meta: self.meta, params: map(self.params) }
+    }
 }
 
 /// A [`Request`] that has been partially serialized.
@@ -113,11 +121,12 @@ where
 
 impl<Params> Request<&Params>
 where
-    Params: Clone,
+    Params: ToOwned,
+    Params::Owned: RpcParam,
 {
     /// Clone the request, including the request parameters.
-    pub fn into_owned_params(self) -> Request<Params> {
-        Request { meta: self.meta, params: self.params.clone() }
+    pub fn into_owned_params(self) -> Request<Params::Owned> {
+        Request { meta: self.meta, params: self.params.to_owned() }
     }
 }
 

@@ -112,14 +112,14 @@ where
         trace_types: &'b [TraceType],
     ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
     {
-        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_types))
+        self.client().request("trace_call", (request, trace_types)).into()
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
     ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>> {
-        RpcWithBlock::new(self.weak_client(), "trace_callMany", (request,))
+        self.client().request("trace_callMany", (request,)).into()
     }
 
     async fn trace_transaction(
