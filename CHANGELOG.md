@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Bug Fixes
+
+- [types-eth] Optional Alloy Serde ([#1284](https://github.com/alloy-rs/alloy/issues/1284))
+- `eth_simulateV1` ([#1289](https://github.com/alloy-rs/alloy/issues/1289))
+
+### Features
+
+- Add block num hash helper ([#1304](https://github.com/alloy-rs/alloy/issues/1304))
+- ProviderCall ([#788](https://github.com/alloy-rs/alloy/issues/788))
+- [rpc-types-beacon] `SignedBidSubmissionV4` ([#1303](https://github.com/alloy-rs/alloy/issues/1303))
+- [transport-http] Layer client ([#1227](https://github.com/alloy-rs/alloy/issues/1227))
+- Add blob and proof v1 ([#1300](https://github.com/alloy-rs/alloy/issues/1300))
+- Add types for flat call tracer ([#1292](https://github.com/alloy-rs/alloy/issues/1292))
+- [`node-bindings`] Support appending extra args ([#1299](https://github.com/alloy-rs/alloy/issues/1299))
+
+### Miscellaneous Tasks
+
+- [rpc] Rename witness fields ([#1293](https://github.com/alloy-rs/alloy/issues/1293))
+- [engine] `no_std` Checks ([#1298](https://github.com/alloy-rs/alloy/issues/1298))
+
+### Refactor
+
+- Separate transaction builders for tx types ([#1259](https://github.com/alloy-rs/alloy/issues/1259))
+
 ## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 
 ### Bug Fixes
@@ -13,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.5
 - Release 0.3.5
 
 ## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
