@@ -1,21 +1,22 @@
 //! Ethereum types for pub-sub
 
-use crate::{Filter, Log, RichHeader, Transaction};
+use crate::{Filter, Header, Log, Transaction};
 use alloy_primitives::B256;
+use alloy_serde::WithOtherFields;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 /// Subscription result.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
-pub enum SubscriptionResult {
+pub enum SubscriptionResult<T = Transaction> {
     /// New block header.
-    Header(Box<RichHeader>),
+    Header(Box<WithOtherFields<Header>>),
     /// Log
     Log(Box<Log>),
     /// Transaction hash
     TransactionHash(B256),
     /// Full Transaction
-    FullTransaction(Box<Transaction>),
+    FullTransaction(Box<T>),
     /// SyncStatus
     SyncState(PubSubSyncStatus),
 }
@@ -45,7 +46,10 @@ pub struct SyncStatusMetadata {
     pub highest_block: Option<u64>,
 }
 
-impl Serialize for SubscriptionResult {
+impl<T> Serialize for SubscriptionResult<T>
+where
+    T: Serialize,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

@@ -149,6 +149,7 @@ impl LedgerSigner {
         let data = APDUData::new(&Self::path_to_bytes(derivation));
 
         let command = APDUCommand {
+            cla: 0xe0,
             ins: INS::GET_PUBLIC_KEY as u8,
             p1: P1::NON_CONFIRM as u8,
             p2: P2::NO_CHAINCODE as u8,
@@ -177,6 +178,7 @@ impl LedgerSigner {
         let transport = self.transport.lock().await;
 
         let command = APDUCommand {
+            cla: 0xe0,
             ins: INS::GET_APP_CONFIGURATION as u8,
             p1: P1::NON_CONFIRM as u8,
             p2: P2::NO_CHAINCODE as u8,
@@ -235,6 +237,7 @@ impl LedgerSigner {
     async fn sign_payload(&self, command: INS, payload: &[u8]) -> Result<Signature, LedgerError> {
         let transport = self.transport.lock().await;
         let mut command = APDUCommand {
+            cla: 0xe0,
             ins: command as u8,
             p1: P1_FIRST,
             p2: P2::NO_CHAINCODE as u8,

@@ -1,6 +1,7 @@
 //! Transaction types.
 
 use crate::Signed;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
 
@@ -51,6 +52,56 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;
 
+    /// Returns the EIP-1559 the maximum fee per gas the caller is willing to pay.
+    ///
+    /// For legacy transactions this is `gas_price`.
+    ///
+    /// This is also commonly referred to as the "Gas Fee Cap".
+    fn max_fee_per_gas(&self) -> u128;
+
+    /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
+    ///
+    /// This will return `None` for non-EIP1559 transactions
+    fn max_priority_fee_per_gas(&self) -> Option<u128>;
+
+    /// Max fee per blob gas for EIP-4844 transaction.
+    ///
+    /// Returns `None` for non-eip4844 transactions.
+    ///
+    /// This is also commonly referred to as the "Blob Gas Fee Cap".
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
+
+    /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
+    /// otherwise return the gas price.
+    ///
+    /// # Warning
+    ///
+    /// This is different than the `max_priority_fee_per_gas` method, which returns `None` for
+    /// non-EIP-1559 transactions.
+    fn priority_fee_or_price(&self) -> u128;
+
+    /// Returns the effective tip for this transaction.
+    ///
+    /// For EIP-1559 transactions: `min(max_fee_per_gas - base_fee, max_priority_fee_per_gas)`.
+    /// For legacy transactions: `gas_price - base_fee`.
+    fn effective_tip_per_gas(&self, base_fee: u64) -> Option<u128> {
+        let base_fee = base_fee as u128;
+
+        let max_fee_per_gas = self.max_fee_per_gas();
+
+        // Check if max_fee_per_gas is less than base_fee
+        if max_fee_per_gas < base_fee {
+            return None;
+        }
+
+        // Calculate the difference between max_fee_per_gas and base_fee
+        let fee = max_fee_per_gas - base_fee;
+
+        // Compare the fee with max_priority_fee_per_gas (or gas price for non-EIP1559 transactions)
+        self.max_priority_fee_per_gas()
+            .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
+    }
+
     /// Get `to`.
     fn to(&self) -> TxKind;
 
@@ -59,6 +110,22 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
 
     /// Get `data`.
     fn input(&self) -> &[u8];
+
+    /// Returns the transaction type
+    fn ty(&self) -> u8;
+
+    /// Returns the EIP-2930 `access_list` for the particular transaction type. Returns `None` for
+    /// older transaction types.
+    fn access_list(&self) -> Option<&AccessList>;
+
+    /// Blob versioned hashes for eip4844 transaction. For previous transaction types this is
+    /// `None`.
+    fn blob_versioned_hashes(&self) -> Option<&[B256]>;
+
+    /// Returns the [`SignedAuthorization`] list of the transaction.
+    ///
+    /// Returns `None` if this transaction is not EIP-7702.
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
 }
 
 /// A signable transaction.

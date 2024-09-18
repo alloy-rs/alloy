@@ -23,21 +23,23 @@ alloy-serde.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
 alloy-rpc-types-beacon = { workspace = true, optional = true }
+alloy-rpc-types-debug = { workspace = true, optional = true }
 alloy-rpc-types-engine = { workspace = true, optional = true }
 alloy-rpc-types-eth = { workspace = true, optional = true }
 alloy-rpc-types-mev = { workspace = true, optional = true }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive", "std"]}
+serde = { workspace = true, features = ["derive", "std"] }
 
 [dev-dependencies]
 serde_json.workspace = true
 
 [features]
-default = ["eth"]
+default = ["eth", "alloy-rpc-types-engine?/default"]
 admin = ["dep:alloy-rpc-types-admin"]
 anvil = ["dep:alloy-rpc-types-anvil"]
 beacon = ["dep:alloy-rpc-types-beacon"]
+debug = ["dep:alloy-rpc-types-debug"]
 engine = ["dep:alloy-rpc-types-engine"]
 eth = ["dep:alloy-rpc-types-eth"]
 mev = ["dep:alloy-rpc-types-mev"]
@@ -49,10 +51,6 @@ jsonrpsee-types = [
     "alloy-rpc-types-eth?/jsonrpsee-types",
     "alloy-rpc-types-engine?/jsonrpsee-types",
 ]
-ssz = [
-    "alloy-rpc-types-beacon?/ssz",
-    "alloy-rpc-types-engine?/ssz",
-    "alloy-rpc-types-eth?/ssz",
-]
+ssz = ["alloy-rpc-types-beacon?/ssz", "alloy-rpc-types-engine?/ssz"]
 k256 = ["alloy-rpc-types-eth?/k256"]
 kzg = ["alloy-rpc-types-engine?/kzg"]

@@ -5,17 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0](https://github.com/alloy-rs/alloy/releases/tag/v0.2.0) - 2024-07-16
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes
 
+- [node-bindings] Backport fix from ethers-rs ([#1081](https://github.com/alloy-rs/alloy/issues/1081))
 - [provider] Prevent panic from having 0 keys when calling `on_anvil_with_wallet_and_config` ([#1055](https://github.com/alloy-rs/alloy/issues/1055))
 - [admin] Id in NodeInfo is string instead of B256 ([#1038](https://github.com/alloy-rs/alloy/issues/1038))
 
 ### Miscellaneous Tasks
 
+- Release 0.2.1
 - Release 0.2.0
-- Release 0.2.0
+
+### Testing
+
+- Flaky rpc ([#1180](https://github.com/alloy-rs/alloy/issues/1180))
 
 ## [0.1.4](https://github.com/alloy-rs/alloy/releases/tag/v0.1.4) - 2024-07-08
 

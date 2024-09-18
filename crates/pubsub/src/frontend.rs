@@ -1,6 +1,6 @@
 use crate::{ix::PubSubInstruction, managers::InFlight, RawSubscription};
 use alloy_json_rpc::{RequestPacket, Response, ResponsePacket, SerializedRequest};
-use alloy_primitives::U256;
+use alloy_primitives::B256;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut, TransportResult};
 use futures::{future::try_join_all, FutureExt, TryFutureExt};
 use std::{
@@ -38,7 +38,7 @@ impl PubSubFrontend {
     /// Get the subscription ID for a local ID.
     pub fn get_subscription(
         &self,
-        id: U256,
+        id: B256,
     ) -> impl Future<Output = TransportResult<RawSubscription>> + Send + 'static {
         let backend_tx = self.tx.clone();
         async move {
@@ -51,7 +51,7 @@ impl PubSubFrontend {
     }
 
     /// Unsubscribe from a subscription.
-    pub fn unsubscribe(&self, id: U256) -> TransportResult<()> {
+    pub fn unsubscribe(&self, id: B256) -> TransportResult<()> {
         self.tx
             .send(PubSubInstruction::Unsubscribe(id))
             .map_err(|_| TransportErrorKind::backend_gone())

@@ -9,7 +9,6 @@
 use alloy_consensus::TxReceipt;
 use alloy_eips::eip2718::{Eip2718Envelope, Eip2718Error};
 use alloy_json_rpc::RpcObject;
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
 use core::fmt::{Debug, Display};
 
 mod transaction;
@@ -25,64 +24,9 @@ mod any;
 pub use any::{AnyNetwork, AnyTxType};
 
 pub use alloy_eips::eip2718;
-
-/// A receipt response.
-///
-/// This is distinct from [`TxReceipt`], since this is for JSON-RPC receipts.
-///
-/// [`TxReceipt`]: alloy_consensus::TxReceipt
-pub trait ReceiptResponse {
-    /// Address of the created contract, or `None` if the transaction was not a deployment.
-    fn contract_address(&self) -> Option<Address>;
-
-    /// Status of the transaction.
-    ///
-    /// ## Note
-    ///
-    /// Caution must be taken when using this method for deep-historical
-    /// receipts, as it may not accurately reflect the status of the
-    /// transaction. The transaction status is not knowable from the receipt
-    /// for transactions before [EIP-658].
-    ///
-    /// This can be handled using [`TxReceipt::status_or_post_state`].
-    ///
-    /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    /// [`TxReceipt::status_or_post_state`]: alloy_consensus::TxReceipt::status_or_post_state
-    fn status(&self) -> bool;
-
-    /// Hash of the block this transaction was included within.
-    fn block_hash(&self) -> Option<BlockHash>;
-
-    /// Number of the block this transaction was included within.
-    fn block_number(&self) -> Option<u64>;
-}
-
-/// Transaction Response
-///
-/// This is distinct from [`Transaction`], since this is a JSON-RPC response.
-///
-/// [`Transaction`]: alloy_consensus::Transaction
-pub trait TransactionResponse {
-    /// Hash of the transaction
-    #[doc(alias = "transaction_hash")]
-    fn tx_hash(&self) -> TxHash;
-
-    /// Sender of the transaction
-    fn from(&self) -> Address;
-
-    /// Recipient of the transaction
-    fn to(&self) -> Option<Address>;
-
-    /// Transferred value
-    fn value(&self) -> U256;
-
-    /// Gas limit
-    fn gas(&self) -> u128;
-
-    /// Input data
-    #[doc(alias = "calldata")]
-    fn input(&self) -> &Bytes;
-}
+pub use alloy_network_primitives::{
+    self as primitives, BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse,
+};
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
@@ -143,5 +87,9 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.
-    type HeaderResponse: RpcObject;
+    type HeaderResponse: RpcObject + HeaderResponse;
+
+    /// The JSON body of a block response.
+    type BlockResponse: RpcObject
+        + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }
