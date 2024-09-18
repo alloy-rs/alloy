@@ -67,7 +67,7 @@ where
     B: From<Vec<u8>> + Send + 'static + Clone,
 {
     /// Make a request to the server using the given service.
-    fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
+    fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
         let span = debug_span!("HyperTransport", url = %this.url);
         Box::pin(
@@ -145,6 +145,26 @@ impl TransportConnect for HttpConnect<HyperTransport> {
 }
 
 impl<B, S> Service<RequestPacket> for Http<HyperTransport<B, S>>
+where
+    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
+{
+    type Response = ResponsePacket;
+    type Error = TransportError;
+    type Future = TransportFut<'static>;
+
+    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
+        task::Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: RequestPacket) -> Self::Future {
+        self.request_hyper(req)
+    }
+}
+
+impl<B, S> Service<RequestPacket> for &Http<HyperTransport<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
