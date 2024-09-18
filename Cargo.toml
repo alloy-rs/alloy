@@ -138,6 +138,7 @@ thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
 derive_more = { version = "1.0.0", default-features = false }
+http = "1.1.0"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [
@@ -153,3 +154,4 @@ assert_matches = "1.5"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
+tower-http = "0.5.2"

@@ -38,8 +38,6 @@ alloy-transport-ws = { workspace = true, optional = true }
 
 reqwest = { workspace = true, optional = true }
 
-hyper-util = { workspace = true, optional = true }
-
 url = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -57,7 +55,7 @@ futures-util.workspace = true
 [features]
 default = ["reqwest"]
 reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
-hyper = ["dep:url", "dep:hyper-util", "alloy-transport-http/hyper"]
+hyper = ["dep:url", "alloy-transport-http/hyper"]
 pubsub = ["dep:alloy-pubsub", "dep:alloy-primitives"]
 ws = ["pubsub", "dep:alloy-transport-ws", "dep:url"]
 ipc = ["pubsub", "dep:alloy-transport-ipc"]
