@@ -354,17 +354,8 @@ impl<L, F, N> ProviderBuilder<L, F, N> {
     #[cfg(feature = "hyper")]
     pub fn on_hyper_http(self, url: url::Url) -> F::Provider
     where
-        L: ProviderLayer<
-            crate::HyperProvider<N>,
-            alloy_transport_http::Http<alloy_transport_http::HyperTransport>,
-            N,
-        >,
-        F: TxFiller<N>
-            + ProviderLayer<
-                L::Provider,
-                alloy_transport_http::Http<alloy_transport_http::HyperTransport>,
-                N,
-            >,
+        L: ProviderLayer<crate::HyperProvider<N>, alloy_transport_http::HyperTransport, N>,
+        F: TxFiller<N> + ProviderLayer<L::Provider, alloy_transport_http::HyperTransport, N>,
         N: Network,
     {
         let client = ClientBuilder::default().hyper_http(url);

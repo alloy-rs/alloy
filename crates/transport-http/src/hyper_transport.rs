@@ -14,15 +14,25 @@ use tracing::{debug, debug_span, trace, Instrument};
 
 use crate::{Http, HttpConnect};
 
-/// A [`hyper`] HTTP client.
-pub type HyperClient = hyper_util::client::legacy::Client<
+type Hyper = hyper_util::client::legacy::Client<
     hyper_util::client::legacy::connect::HttpConnector,
     http_body_util::Full<::hyper::body::Bytes>,
 >;
 
-/// A [hyper] client that can be used with tower layers.
+/// A [`hyper`] based transport client.
+pub type HyperTransport = Http<HyperClient>;
+
+impl HyperTransport {
+    /// Create a new [`HyperTransport`] with the given URL and default hyper client.
+    pub fn new_hyper(url: url::Url) -> Self {
+        let client = HyperClient::new();
+        Self::with_client(client, url)
+    }
+}
+
+/// A [hyper] based client that can be used with tower layers.
 #[derive(Clone, Debug)]
-pub struct HyperTransport<B = Full<Bytes>, S = HyperClient> {
+pub struct HyperClient<B = Full<Bytes>, S = Hyper> {
     service: S,
     _pd: PhantomData<B>,
 }
@@ -34,8 +44,8 @@ pub type HyperResponse = Response<Incoming>;
 pub type HyperResponseFut<T = HyperResponse, E = Error> =
     Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
 
-impl HyperTransport {
-    /// Create a new [HyperTransport] with the given URL and default hyper client.
+impl HyperClient {
+    /// Create a new [HyperClient] with the given URL and default hyper client.
     pub fn new() -> Self {
         let executor = hyper_util::rt::TokioExecutor::new();
 
@@ -46,20 +56,20 @@ impl HyperTransport {
     }
 }
 
-impl Default for HyperTransport {
+impl Default for HyperClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<B, S> HyperTransport<B, S> {
-    /// Create a new [HyperTransport] with the given URL and service.
+impl<B, S> HyperClient<B, S> {
+    /// Create a new [HyperClient] with the given URL and service.
     pub const fn with_service(service: S) -> Self {
         Self { service, _pd: PhantomData }
     }
 }
 
-impl<B, S> Http<HyperTransport<B, S>>
+impl<B, S> Http<HyperClient<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -69,7 +79,7 @@ where
     /// Make a request to the server using the given service.
     fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", url = %this.url);
+        let span = debug_span!("HyperClient", url = %this.url);
         Box::pin(
             async move {
                 debug!(count = req.len(), "sending request packet to server");
@@ -126,8 +136,8 @@ where
     }
 }
 
-impl TransportConnect for HttpConnect<HyperTransport> {
-    type Transport = Http<HyperTransport>;
+impl TransportConnect for HttpConnect<HyperClient> {
+    type Transport = Http<HyperClient>;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -137,14 +147,14 @@ impl TransportConnect for HttpConnect<HyperTransport> {
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
         Box::pin(async move {
-            let hyper_t = HyperTransport::new();
+            let hyper_t = HyperClient::new();
 
             Ok(Http::with_client(hyper_t, self.url.clone()))
         })
     }
 }
 
-impl<B, S> Service<RequestPacket> for Http<HyperTransport<B, S>>
+impl<B, S> Service<RequestPacket> for Http<HyperClient<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -164,7 +174,7 @@ where
     }
 }
 
-impl<B, S> Service<RequestPacket> for &Http<HyperTransport<B, S>>
+impl<B, S> Service<RequestPacket> for &Http<HyperClient<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
