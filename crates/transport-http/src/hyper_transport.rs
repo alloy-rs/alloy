@@ -11,7 +11,6 @@ use hyper_util::client::legacy::Error;
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 use tower::Service;
 use tracing::{debug, debug_span, trace, Instrument};
-use url::Url;
 
 use crate::{Http, HttpConnect};
 
@@ -60,7 +59,7 @@ impl<B, S> HyperTransport<B, S> {
     }
 }
 
-impl<B, S> HyperTransport<B, S>
+impl<B, S> Http<HyperTransport<B, S>>
 where
     S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
     S::Future: Send,
@@ -68,9 +67,9 @@ where
     B: From<Vec<u8>> + Send + 'static + Clone,
 {
     /// Make a request to the server using the given service.
-    fn request(&mut self, req: RequestPacket, url: Url) -> TransportFut<'static> {
+    fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
         let this = self.clone();
-        let span = debug_span!("HyperTransport", %url);
+        let span = debug_span!("HyperTransport", url = %this.url);
         Box::pin(
             async move {
                 debug!(count = req.len(), "sending request packet to server");
@@ -80,7 +79,7 @@ where
 
                 let req = hyper::Request::builder()
                     .method(hyper::Method::POST)
-                    .uri(url.as_str())
+                    .uri(this.url.as_str())
                     .header(
                         header::CONTENT_TYPE,
                         header::HeaderValue::from_static("application/json"),
@@ -88,7 +87,7 @@ where
                     .body(body)
                     .expect("request parts are invalid");
 
-                let mut service = this.service.clone();
+                let mut service = this.client.service.clone();
                 let resp = service.call(req).await.map_err(TransportErrorKind::custom)?;
 
                 let status = resp.status();
@@ -124,20 +123,6 @@ where
             }
             .instrument(span),
         )
-    }
-}
-
-impl<B, S> Http<HyperTransport<B, S>>
-where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Send + 'static + Clone,
-{
-    /// Make a request to the server using the underlying service that may or may not contain
-    /// layers.
-    fn request_hyper(&mut self, req: RequestPacket) -> TransportFut<'static> {
-        self.client.request(req, self.url.clone())
     }
 }
 
