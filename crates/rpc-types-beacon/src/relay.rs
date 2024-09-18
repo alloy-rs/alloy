@@ -6,6 +6,7 @@ use crate::{BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayloadV4,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -134,6 +135,22 @@ pub struct SignedBidSubmissionV3 {
     #[serde(with = "crate::payload::beacon_payload_v3")]
     pub execution_payload: ExecutionPayloadV3,
     /// The Deneb block bundle for this bid.
+    pub blobs_bundle: BlobsBundleV1,
+    /// The signature associated with the submission.
+    pub signature: BlsSignature,
+}
+
+/// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+pub struct SignedBidSubmissionV4 {
+    /// The BidTrace message associated with the submission.
+    pub message: BidTrace,
+    /// The execution payload for the submission.
+    #[serde(with = "crate::payload::beacon_payload_v4")]
+    pub execution_payload: ExecutionPayloadV4,
+    /// The Electra block bundle for this bid.
     pub blobs_bundle: BlobsBundleV1,
     /// The signature associated with the submission.
     pub signature: BlsSignature,
