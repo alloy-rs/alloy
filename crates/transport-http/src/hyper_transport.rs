@@ -136,14 +136,8 @@ where
     }
 }
 
-impl<B, S> TransportConnect for HttpConnect<HyperTransport<B, S>>
-where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
-    S::Future: Send,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
-{
-    type Transport = Http<HyperTransport<B, S>>;
+impl TransportConnect for HttpConnect<HyperTransport> {
+    type Transport = Http<HyperTransport>;
 
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -153,13 +147,9 @@ where
         &'a self,
     ) -> alloy_transport::Pbf<'b, Self::Transport, TransportError> {
         Box::pin(async move {
-            self.transport.as_ref().map_or_else(
-                || Err(TransportErrorKind::custom_str("transport not initialized")),
-                |t| {
-                    let transport = t.clone();
-                    Ok(Http::with_client(transport, self.url.clone()))
-                },
-            )
+            let hyper_t = HyperTransport::new(self.url.clone());
+
+            Ok(Http::with_client(hyper_t, self.url.clone()))
         })
     }
 }

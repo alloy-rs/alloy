@@ -1152,37 +1152,10 @@ mod tests {
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
 
-        // Test Cloning
+        // Test Cloning with service
         let cloned_t = provider.client().transport().clone();
 
         let rpc_client = alloy_rpc_client::RpcClient::new(cloned_t, true);
-
-        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
-        let num = provider.get_block_number().await.unwrap();
-        assert_eq!(0, num);
-    }
-
-    #[cfg(feature = "hyper")]
-    #[tokio::test]
-    async fn test_layer_transport_with_tower_http() {
-        use http::header::{self, HeaderValue};
-        use tower_http::set_header::SetRequestHeaderLayer;
-        init_tracing();
-        let anvil = Anvil::new().spawn();
-        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-        let service = tower::ServiceBuilder::new()
-            .layer(SetRequestHeaderLayer::if_not_present(
-                header::USER_AGENT,
-                HeaderValue::from_static("alloy app"),
-            ))
-            .service(hyper_client);
-        let layer_transport =
-            alloy_transport_http::HyperTransport::with_service(anvil.endpoint_url(), service);
-
-        let http_hyper =
-            alloy_transport_http::Http::with_client(layer_transport, anvil.endpoint_url());
-
-        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
         let num = provider.get_block_number().await.unwrap();
