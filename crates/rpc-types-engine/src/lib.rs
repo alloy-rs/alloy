@@ -35,6 +35,9 @@ pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;
 #[doc(inline)]
 pub use alloy_eips::eip7002::WithdrawalRequest as WithdrawalRequestV1;
 
+#[doc(inline)]
+pub use alloy_eips::eip4844::BlobAndProofV1;
+
 /// The list of all supported Engine capabilities available over the engine endpoint.
 ///
 /// Latest spec: Prague
