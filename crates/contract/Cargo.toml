@@ -22,7 +22,7 @@ workspace = true
 alloy-network.workspace = true
 alloy-network-primitives.workspace = true
 alloy-provider.workspace = true
-alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-transport.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["std"] }

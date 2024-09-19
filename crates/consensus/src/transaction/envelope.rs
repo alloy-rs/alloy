@@ -1,5 +1,3 @@
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 use core::fmt;
 
 use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
@@ -825,7 +823,7 @@ mod tests {
             gas_limit: 3,
             max_fee_per_gas: 4,
             max_priority_fee_per_gas: 5,
-            to: Address::left_padding_from(&[5]).into(),
+            to: Address::left_padding_from(&[5]),
             value: U256::from(6_u64),
             input: vec![7].into(),
             access_list: AccessList(vec![AccessListItem {
@@ -996,7 +994,7 @@ mod tests {
             gas_limit: u128::MAX,
             max_fee_per_gas: u128::MAX,
             max_priority_fee_per_gas: u128::MAX,
-            to: Address::random().into(),
+            to: Address::random(),
             value: U256::MAX,
             input: Bytes::new(),
             access_list: AccessList(vec![AccessListItem {

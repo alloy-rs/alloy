@@ -11,7 +11,7 @@ use alloy_rpc_types_trace::{
 use alloy_transport::{Transport, TransportResult};
 
 /// List of trace calls for use with [`TraceApi::trace_call_many`]
-pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, Vec<TraceType>)];
+pub type TraceCallList<'a, N> = &'a [(<N as Network>::TransactionRequest, &'a [TraceType])];
 
 /// Trace namespace rpc interface that gives access to several non-standard RPC methods.
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
@@ -43,7 +43,7 @@ where
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults>;
+    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>>;
 
     /// Parity trace transaction.
     async fn trace_transaction(
@@ -112,14 +112,14 @@ where
         trace_types: &'b [TraceType],
     ) -> RpcWithBlock<T, (&'a <N as Network>::TransactionRequest, &'b [TraceType]), TraceResults>
     {
-        RpcWithBlock::new(self.weak_client(), "trace_call", (request, trace_types))
+        self.client().request("trace_call", (request, trace_types)).into()
     }
 
     fn trace_call_many<'a>(
         &self,
         request: TraceCallList<'a, N>,
-    ) -> RpcWithBlock<T, TraceCallList<'a, N>, TraceResults> {
-        RpcWithBlock::new(self.weak_client(), "trace_callMany", request)
+    ) -> RpcWithBlock<T, (TraceCallList<'a, N>,), Vec<TraceResults>> {
+        self.client().request("trace_callMany", (request,)).into()
     }
 
     async fn trace_transaction(
@@ -178,6 +178,10 @@ where
 mod test {
     use crate::ProviderBuilder;
     use alloy_eips::BlockNumberOrTag;
+    use alloy_network::TransactionBuilder;
+    use alloy_node_bindings::{utils::run_with_tempdir, Reth};
+    use alloy_primitives::address;
+    use alloy_rpc_types_eth::TransactionRequest;
 
     use super::*;
 
@@ -186,10 +190,140 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_trace_block() {
+    async fn trace_block() {
         init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert_eq!(traces.len(), 0);
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn trace_call() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let tx = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
+
+            let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
+{
+  "output": "0x",
+  "stateDiff": null,
+  "trace": [
+    {
+      "type": "call",
+      "action": {
+        "from": "0x0000000000000000000000000000000000000123",
+        "callType": "call",
+        "gas": "0x2fa9e78",
+        "input": "0x",
+        "to": "0x0000000000000000000000000000000000000456",
+        "value": "0x0"
+      },
+      "result": {
+        "gasUsed": "0x0",
+        "output": "0x"
+      },
+      "subtraces": 0,
+      "traceAddress": []
+    }
+  ],
+  "vmTrace": null
+}
+"#
+                .trim(),
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(not(windows))]
+    async fn trace_call_many() {
+        run_with_tempdir("reth-test-", |temp_dir| async move {
+            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+
+            let tx1 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000123"))
+                .with_to(address!("0000000000000000000000000000000000000456"));
+
+            let tx2 = TransactionRequest::default()
+                .with_from(address!("0000000000000000000000000000000000000456"))
+                .with_to(address!("0000000000000000000000000000000000000789"));
+
+            let result = provider
+                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                .await;
+            assert!(result.is_ok());
+
+            let traces = result.unwrap();
+            assert_eq!(
+                serde_json::to_string_pretty(&traces).unwrap().trim(),
+                r#"
+[
+  {
+    "output": "0x",
+    "stateDiff": null,
+    "trace": [
+      {
+        "type": "call",
+        "action": {
+          "from": "0x0000000000000000000000000000000000000123",
+          "callType": "call",
+          "gas": "0x2fa9e78",
+          "input": "0x",
+          "to": "0x0000000000000000000000000000000000000456",
+          "value": "0x0"
+        },
+        "result": {
+          "gasUsed": "0x0",
+          "output": "0x"
+        },
+        "subtraces": 0,
+        "traceAddress": []
+      }
+    ],
+    "vmTrace": null
+  },
+  {
+    "output": "0x",
+    "stateDiff": null,
+    "trace": [
+      {
+        "type": "call",
+        "action": {
+          "from": "0x0000000000000000000000000000000000000456",
+          "callType": "call",
+          "gas": "0x2fa9e78",
+          "input": "0x",
+          "to": "0x0000000000000000000000000000000000000789",
+          "value": "0x0"
+        },
+        "result": {
+          "gasUsed": "0x0",
+          "output": "0x"
+        },
+        "subtraces": 0,
+        "traceAddress": []
+      }
+    ],
+    "vmTrace": null
+  }
+]
+"#
+                .trim()
+            );
+        })
+        .await;
     }
 }
