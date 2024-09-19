@@ -14,7 +14,8 @@ pub use transaction::TransactionInfo;
 
 mod traits;
 pub use traits::{
-    BlockResponse, Constructor, HeaderResponse, ReceiptResponse, TransactionResponse,
+    BlockResponse, Constructor, HeaderResponse, ReceiptResponse, TransactionRespConstructor,
+    TransactionResponse,
 };
 
 mod block;

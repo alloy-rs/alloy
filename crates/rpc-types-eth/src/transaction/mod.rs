@@ -5,7 +5,9 @@ use alloy_consensus::{
     TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_network_primitives::{Constructor, TransactionInfo, TransactionResponse};
+use alloy_network_primitives::{
+    Constructor, TransactionInfo, TransactionRespConstructor, TransactionResponse,
+};
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 
 use alloc::vec::Vec;
@@ -335,8 +337,18 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+impl TransactionRespConstructor for Transaction {
+    type UnsignedTx = TxEnvelope;
+    type Signature = Signature;
+    type BlockCtx = TransactionInfo;
+}
+
 impl Constructor for Transaction {
-    type Data<'a> = TransactionResponseData<TxEnvelope, Signature>;
+    type Data<'a> = TransactionResponseData<
+        <Self as TransactionRespConstructor>::UnsignedTx,
+        <Self as TransactionRespConstructor>::Signature,
+        <Self as TransactionRespConstructor>::BlockCtx,
+    >;
 
     fn new(data: Self::Data<'_>) -> Self {
         let TransactionResponseData { signed_tx, signer: from, tx_info } = data;
@@ -436,26 +448,26 @@ impl From<&Transaction> for TransactionInfo {
 
 /// Data needed to construct a [`Transaction`].
 #[derive(Debug, derive_more::Constructor)]
-pub struct TransactionResponseData<T, S> {
+pub struct TransactionResponseData<TxUnsigned, Signature, BlockCtx> {
     /// Transaction with signature.
-    signed_tx: Signed<T, S>,
+    signed_tx: Signed<TxUnsigned, Signature>,
     /// Transaction sender.
     signer: Address,
     /// Transaction context from block.
-    tx_info: TransactionInfo,
+    tx_info: BlockCtx,
 }
 
-impl<T, S> TransactionResponseData<T, S> {
+impl<TxUnsigned, Signature, BlockCtx> TransactionResponseData<TxUnsigned, Signature, BlockCtx> {
     /// Returns a new instance from the parts, without verifying the signature.
     pub const fn new_unchecked(
-        tx: T,
-        sig: S,
+        tx: TxUnsigned,
+        sig: Signature,
         tx_hash: B256,
         signer: Address,
-        tx_info: TransactionInfo,
+        tx_info: BlockCtx,
     ) -> Self
     where
-        T: SignableTransaction<S>,
+        TxUnsigned: SignableTransaction<Signature>,
     {
         Self::new(Signed::new_unchecked(tx, sig, tx_hash), signer, tx_info)
     }

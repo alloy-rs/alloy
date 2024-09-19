@@ -70,8 +70,18 @@ pub trait ReceiptResponse {
     fn state_root(&self) -> Option<B256>;
 }
 
+/// Constructs an RPC response transaction.
+pub trait TransactionRespConstructor: Constructor {
+    /// Transaction data.
+    type UnsignedTx;
+    /// Signature of transaction.
+    type Signature;
+    /// Block context required for assembling the transaction for a RPC response.
+    type BlockCtx;
+}
+
 /// Transaction JSON-RPC response.
-pub trait TransactionResponse: Constructor {
+pub trait TransactionResponse: TransactionRespConstructor {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
@@ -166,6 +176,12 @@ impl<T: Constructor> Constructor for WithOtherFields<T> {
     fn new(data: Self::Data<'_>) -> Self {
         Self { inner: T::new(data), other: Default::default() }
     }
+}
+
+impl<T: TransactionRespConstructor> TransactionRespConstructor for WithOtherFields<T> {
+    type UnsignedTx = T::UnsignedTx;
+    type Signature = T::Signature;
+    type BlockCtx = T::BlockCtx;
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
