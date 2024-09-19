@@ -1,7 +1,6 @@
 use super::{PayloadStatus, PayloadStatusEnum};
 use crate::PayloadId;
 use alloy_primitives::B256;
-use serde::{Deserialize, Serialize};
 
 /// invalid forkchoice state error code.
 pub const INVALID_FORK_CHOICE_STATE_ERROR: i32 = -38002;
@@ -19,8 +18,9 @@ pub const INVALID_PAYLOAD_ATTRIBUTES_ERROR_MSG: &str = "Invalid payload attribut
 pub type ForkChoiceUpdateResult = Result<ForkchoiceUpdated, ForkchoiceUpdateError>;
 
 /// This structure encapsulates the fork choice state
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ForkchoiceState {
     /// Hash of the head block.
     pub head_block_hash: B256,
@@ -30,25 +30,63 @@ pub struct ForkchoiceState {
     pub finalized_block_hash: B256,
 }
 
+impl ForkchoiceState {
+    /// Returns the `head_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
+    /// [`None`].
+    #[inline]
+    pub fn state_head_hash(&self) -> Option<B256> {
+        if self.head_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.head_block_hash)
+        }
+    }
+
+    /// Returns the `safe_block_hash`, only if it is not [`B256::ZERO`], otherwise this returns
+    /// [`None`].
+    #[inline]
+    pub fn state_safe_hash(&self) -> Option<B256> {
+        if self.safe_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.safe_block_hash)
+        }
+    }
+
+    /// Returns the `finalized_block_hash`, only if it is not [`B256::ZERO`], otherwise this
+    /// returns [`None`].
+    #[inline]
+    pub fn state_finalized_hash(&self) -> Option<B256> {
+        if self.finalized_block_hash.is_zero() {
+            None
+        } else {
+            Some(self.finalized_block_hash)
+        }
+    }
+}
+
 /// A standalone forkchoice update errors for RPC.
 ///
 /// These are considered hard RPC errors and are _not_ returned as [PayloadStatus] or
 /// [PayloadStatusEnum::Invalid].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::Display)]
 pub enum ForkchoiceUpdateError {
     /// The forkchoice update has been processed, but the requested contained invalid
     /// [PayloadAttributes](crate::PayloadAttributes).
     ///
     /// This is returned as an error because the payload attributes are invalid and the payload is not valid, See <https://github.com/ethereum/execution-apis/blob/6709c2a795b707202e93c4f2867fa0bf2640a84f/src/engine/paris.md#engine_forkchoiceupdatedv1>
-    #[error("invalid payload attributes")]
+    #[display("invalid payload attributes")]
     UpdatedInvalidPayloadAttributes,
     /// The given [ForkchoiceState] is invalid or inconsistent.
-    #[error("invalid forkchoice state")]
+    #[display("invalid forkchoice state")]
     InvalidState,
     /// Thrown when a forkchoice final block does not exist in the database.
-    #[error("final block not available in database")]
+    #[display("final block not available in database")]
     UnknownFinalBlock,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for ForkchoiceUpdateError {}
 
 #[cfg(feature = "jsonrpsee-types")]
 impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static> {
@@ -78,8 +116,9 @@ impl From<ForkchoiceUpdateError> for jsonrpsee_types::error::ErrorObject<'static
 /// Represents a successfully _processed_ forkchoice state update.
 ///
 /// Note: this can still be INVALID if the provided payload was invalid.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ForkchoiceUpdated {
     /// Represents the outcome of the validation of the payload, independently of the payload being
     /// valid or not.

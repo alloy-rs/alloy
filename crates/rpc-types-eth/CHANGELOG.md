@@ -5,18 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1](https://github.com/alloy-rs/alloy/releases/tag/v0.2.1) - 2024-08-02
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Bug Fixes
 
+- [types-eth] Optional Alloy Serde ([#1284](https://github.com/alloy-rs/alloy/issues/1284))
+- `eth_simulateV1` ([#1289](https://github.com/alloy-rs/alloy/issues/1289))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Bug Fixes
+
+- `debug_traceCallMany` and `trace_callMany` ([#1278](https://github.com/alloy-rs/alloy/issues/1278))
+- Serde for `eth_simulateV1` ([#1273](https://github.com/alloy-rs/alloy/issues/1273))
+
+### Features
+
+- [alloy-rpc-types-eth] Optional serde ([#1276](https://github.com/alloy-rs/alloy/issues/1276))
+- No_std eth rpc types ([#1252](https://github.com/alloy-rs/alloy/issues/1252))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+
+### Other
+
+- Add trait methods `cumulative_gas_used` and `state_root` to `ReceiptResponse` ([#1275](https://github.com/alloy-rs/alloy/issues/1275))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+- Require destination for 7702 ([#1262](https://github.com/alloy-rs/alloy/issues/1262))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Bug Fixes
+
+- [consensus] Remove Unused Alloc Vecs ([#1250](https://github.com/alloy-rs/alloy/issues/1250))
+
+### Features
+
+- No_std network primitives ([#1248](https://github.com/alloy-rs/alloy/issues/1248))
+- [rpc-types-eth] AnyBlock ([#1243](https://github.com/alloy-rs/alloy/issues/1243))
+- [network-primitives] Expose more fields via block response traits ([#1229](https://github.com/alloy-rs/alloy/issues/1229))
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
+### Other
+
+- Add getter trait methods to `ReceiptResponse` ([#1251](https://github.com/alloy-rs/alloy/issues/1251))
+
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
+
+## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
+
+### Bug Fixes
+
+- Make `Block::hash` required ([#1205](https://github.com/alloy-rs/alloy/issues/1205))
+- Remove optimism-related types ([#1203](https://github.com/alloy-rs/alloy/issues/1203))
+- Use `impl From<RangeInclusive> for FilterBlockOption` instead of `Range`  ([#1199](https://github.com/alloy-rs/alloy/issues/1199))
+- Serde for `depositReceiptVersion` ([#1196](https://github.com/alloy-rs/alloy/issues/1196))
+- Change generics order for `Block` ([#1192](https://github.com/alloy-rs/alloy/issues/1192))
+- Add missing op fields ([#1187](https://github.com/alloy-rs/alloy/issues/1187))
+- Remove `OtherFields` from Transaction and Block ([#1154](https://github.com/alloy-rs/alloy/issues/1154))
+- [rpc-types-eth] Match 7702 in TxReceipt.status() ([#1149](https://github.com/alloy-rs/alloy/issues/1149))
 - Trim conflicting key `max_fee_per_blob_gas` from Eip1559 tx type ([#1064](https://github.com/alloy-rs/alloy/issues/1064))
 
 ### Dependencies
 
+- Rm 2930 and 7702 - use alloy-rs/eips ([#1181](https://github.com/alloy-rs/alloy/issues/1181))
+- Bump core and rm ssz feat ([#1167](https://github.com/alloy-rs/alloy/issues/1167))
 - Bump jsonrpsee 0.24 ([#1067](https://github.com/alloy-rs/alloy/issues/1067))
 
 ### Features
 
+- Add erc4337 endpoint methods to provider ([#1176](https://github.com/alloy-rs/alloy/issues/1176))
+- Make block struct generic over header type ([#1179](https://github.com/alloy-rs/alloy/issues/1179))
+- Network-parameterized block responses ([#1106](https://github.com/alloy-rs/alloy/issues/1106))
+- Add 7702 tx enum ([#1059](https://github.com/alloy-rs/alloy/issues/1059))
+- Add authorization list to TransactionRequest ([#1125](https://github.com/alloy-rs/alloy/issues/1125))
 - Eth_simulateV1 Request / Response types ([#1042](https://github.com/alloy-rs/alloy/issues/1042))
 - Feat(rpc-type-eth) convert vec TxReq to bundle ([#1091](https://github.com/alloy-rs/alloy/issues/1091))
 - Feat(provider) : introduction to eth_sendRawTransactionConditional  RPC endpoint type ([#1009](https://github.com/alloy-rs/alloy/issues/1009))
@@ -25,6 +106,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.0
+- Rm Rich type ([#1195](https://github.com/alloy-rs/alloy/issues/1195))
+- Clippy für docs ([#1194](https://github.com/alloy-rs/alloy/issues/1194))
+- Remove RichBlock and RichHeader types ([#1185](https://github.com/alloy-rs/alloy/issues/1185))
+- Add deposit receipt version ([#1188](https://github.com/alloy-rs/alloy/issues/1188))
+- [eip7702] Devnet3 changes ([#1056](https://github.com/alloy-rs/alloy/issues/1056))
 - Release 0.2.1
 - [rpc] Make `Deserialize` impl for `FilterChanges` generic over transaction ([#1118](https://github.com/alloy-rs/alloy/issues/1118))
 - Export rpc account type ([#1075](https://github.com/alloy-rs/alloy/issues/1075))
@@ -33,6 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Other
 
+- Implement conversion between signature types ([#1198](https://github.com/alloy-rs/alloy/issues/1198))
+- Rm `PeerCount` ([#1140](https://github.com/alloy-rs/alloy/issues/1140))
+- TxRequest into EIP-4844 without sidecar ([#1093](https://github.com/alloy-rs/alloy/issues/1093))
+- Make `alloy_rpc_types_eth::SubscriptionResult` generic over tx ([#1123](https://github.com/alloy-rs/alloy/issues/1123))
 - Add `AccessListResult` type (EIP-2930) ([#1110](https://github.com/alloy-rs/alloy/issues/1110))
 - Derive arbitrary for `TransactionRequest` ([#1113](https://github.com/alloy-rs/alloy/issues/1113))
 - Added stages to the sync info rpc type ([#1079](https://github.com/alloy-rs/alloy/issues/1079))

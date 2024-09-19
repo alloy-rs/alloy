@@ -138,7 +138,7 @@ pub struct CachingService<S> {
 
 impl<S> CachingService<S> {
     /// Instantiate a new cache service.
-    pub fn new(inner: S, layer: CacheLayer) -> Self {
+    pub const fn new(inner: S, layer: CacheLayer) -> Self {
         Self { inner, layer }
     }
 
@@ -157,7 +157,7 @@ impl<S> CachingService<S> {
     }
 
     /// Handles a cache hit.
-    fn handle_cache_hit(&self, id: Id, raw: Box<RawValue>) -> ResponsePacket {
+    const fn handle_cache_hit(&self, id: Id, raw: Box<RawValue>) -> ResponsePacket {
         let payload = ResponsePayload::Success(raw);
         let response = Response { id, payload };
         ResponsePacket::Single(response)

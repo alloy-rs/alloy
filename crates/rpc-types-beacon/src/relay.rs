@@ -6,6 +6,7 @@ use crate::{BlsPublicKey, BlsSignature};
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types_engine::{
     BlobsBundleV1, ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
+    ExecutionPayloadV4,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
@@ -53,8 +54,10 @@ pub struct ValidatorRegistrationMessage {
 }
 
 /// Represents public information about a block sent by a builder to the relay, or from the relay to
-/// the proposer. Depending on the context, value might represent the claimed value by a builder
-/// (not necessarily a value confirmed by the relay).
+/// the proposer.
+///
+/// Depending on the context, value might represent the claimed value by a builder (not necessarily
+/// a value confirmed by the relay).
 #[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssz", derive(ssz_derive::Encode, ssz_derive::Decode))]
@@ -137,6 +140,22 @@ pub struct SignedBidSubmissionV3 {
     pub signature: BlsSignature,
 }
 
+/// Submission for the `/relay/v1/builder/blocks` endpoint (Electra).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "ssz", derive(ssz_derive::Decode, ssz_derive::Encode))]
+pub struct SignedBidSubmissionV4 {
+    /// The [`BidTrace`] message associated with the submission.
+    pub message: BidTrace,
+    /// The execution payload for the submission.
+    #[serde(with = "crate::payload::beacon_payload_v4")]
+    pub execution_payload: ExecutionPayloadV4,
+    /// The Electra block bundle for this bid.
+    pub blobs_bundle: BlobsBundleV1,
+    /// The signature associated with the submission.
+    pub signature: BlsSignature,
+}
+
 /// SubmitBlockRequest is the request from the builder to submit a block.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SubmitBlockRequest {
@@ -190,6 +209,20 @@ pub struct BuilderBlockValidationRequestV2 {
     pub registered_gas_limit: u64,
     /// The withdrawals root for the validation request.
     pub withdrawals_root: B256,
+}
+
+/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
+#[serde_as]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BuilderBlockValidationRequestV3 {
+    /// The [SubmitBlockRequest] data to be validated.
+    #[serde(flatten)]
+    pub request: SubmitBlockRequest,
+    /// The registered gas limit for the validation request.
+    #[serde_as(as = "DisplayFromStr")]
+    pub registered_gas_limit: u64,
+    /// The parent beacon block root for the validation request.
+    pub parent_beacon_block_root: B256,
 }
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
@@ -274,10 +307,10 @@ impl ProposerPayloadsDeliveredQuery {
     }
 }
 
-/// OrderBy : Sort results in either ascending or descending values.  * `-value` - descending value
-/// (highest value first)  * `value` - ascending value (lowest value first) Sort results in either
-/// ascending or descending values.  * `-value` - descending value (highest value first)  * `value`
-/// - ascending value (lowest value first)
+/// Sort results in either ascending or descending values.
+///
+/// - `-value` - descending value (highest value first)
+/// - `value` - ascending value (lowest value first)
 #[derive(
     Default, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize,
 )]

@@ -64,11 +64,11 @@ where
     }
 
     async fn peers(&self) -> TransportResult<Vec<PeerInfo>> {
-        self.client().request("admin_peers", ()).await
+        self.client().request_noparams("admin_peers").await
     }
 
     async fn node_info(&self) -> TransportResult<NodeInfo> {
-        self.client().request("admin_nodeInfo", ()).await
+        self.client().request_noparams("admin_nodeInfo").await
     }
 
     #[cfg(feature = "pubsub")]
@@ -76,7 +76,7 @@ where
         &self,
     ) -> TransportResult<alloy_pubsub::Subscription<alloy_rpc_types_admin::PeerEvent>> {
         self.root().pubsub_frontend()?;
-        let mut call = self.client().request("admin_peerEvents_subscribe", ());
+        let mut call = self.client().request_noparams("admin_peerEvents_subscribe");
         call.set_is_subscription();
         let id = call.await?;
         self.root().get_subscription(id).await
@@ -85,39 +85,43 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::ProviderBuilder;
-
     use super::*;
-    use alloy_node_bindings::Geth;
-    use tempfile::TempDir;
+    use crate::ProviderBuilder;
+    use alloy_node_bindings::{utils::run_with_tempdir, Geth};
 
     #[tokio::test]
     async fn node_info() {
-        let temp_dir = TempDir::with_prefix("geth-test-").unwrap();
-        let geth = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
-        let node_info = provider.node_info().await.unwrap();
-        assert!(node_info.enode.starts_with("enode://"));
+        run_with_tempdir("geth-test-", |temp_dir| async move {
+            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+            let node_info = provider.node_info().await.unwrap();
+            assert!(node_info.enode.starts_with("enode://"));
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn admin_peers() {
-        let temp_dir = TempDir::with_prefix("geth-test-1").unwrap();
-        let temp_dir_2 = TempDir::with_prefix("geth-test-2").unwrap();
-        let geth1 = Geth::new().disable_discovery().data_dir(temp_dir.path()).spawn();
-        let mut geth2 =
-            Geth::new().disable_discovery().port(0u16).data_dir(temp_dir_2.path()).spawn();
+        run_with_tempdir("geth-test-1", |temp_dir_1| async move {
+            run_with_tempdir("geth-test-2", |temp_dir_2| async move {
+                let geth1 = Geth::new().disable_discovery().data_dir(&temp_dir_1).spawn();
+                let mut geth2 =
+                    Geth::new().disable_discovery().port(0u16).data_dir(&temp_dir_2).spawn();
 
-        let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
-        let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
-        let node1_info = provider1.node_info().await.unwrap();
-        let node1_id = node1_info.id;
-        let node1_enode = node1_info.enode;
+                let provider1 = ProviderBuilder::new().on_http(geth1.endpoint_url());
+                let provider2 = ProviderBuilder::new().on_http(geth2.endpoint_url());
+                let node1_info = provider1.node_info().await.unwrap();
+                let node1_id = node1_info.id;
+                let node1_enode = node1_info.enode;
 
-        let added = provider2.add_peer(&node1_enode).await.unwrap();
-        assert!(added);
-        geth2.wait_to_add_peer(&node1_id).unwrap();
-        let peers = provider2.peers().await.unwrap();
-        assert_eq!(peers[0].enode, node1_enode);
+                let added = provider2.add_peer(&node1_enode).await.unwrap();
+                assert!(added);
+                geth2.wait_to_add_peer(&node1_id).unwrap();
+                let peers = provider2.peers().await.unwrap();
+                assert_eq!(peers[0].enode, node1_enode);
+            })
+            .await;
+        })
+        .await;
     }
 }

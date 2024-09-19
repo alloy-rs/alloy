@@ -1,53 +1,53 @@
 //! JWT (JSON Web Token) utilities for the Engine API.
 
+use alloc::{format, string::String};
 use alloy_primitives::hex;
+use core::{str::FromStr, time::Duration};
 use jsonwebtoken::{
     decode, errors::ErrorKind, get_current_timestamp, Algorithm, DecodingKey, Validation,
 };
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    str::FromStr,
-    time::Duration,
 };
-use thiserror::Error;
 
 /// Errors returned by the [`JwtSecret`]
-#[derive(Error, Debug)]
+#[derive(Debug, derive_more::Display)]
 pub enum JwtError {
     /// An error encountered while decoding the hexadecimal string for the JWT secret.
-    #[error(transparent)]
-    JwtSecretHexDecodeError(#[from] hex::FromHexError),
+    #[display("{_0}")]
+    JwtSecretHexDecodeError(hex::FromHexError),
 
     /// The JWT key length provided is invalid, expecting a specific length.
-    #[error("JWT key is expected to have a length of {0} digits. {1} digits key provided")]
+    #[display("JWT key is expected to have a length of {_0} digits. {_1} digits key provided")]
     InvalidLength(usize, usize),
 
     /// The signature algorithm used in the JWT is not supported. Only HS256 is supported.
-    #[error("unsupported signature algorithm. Only HS256 is supported")]
+    #[display("unsupported signature algorithm. Only HS256 is supported")]
     UnsupportedSignatureAlgorithm,
 
     /// The provided signature in the JWT is invalid.
-    #[error("provided signature is invalid")]
+    #[display("provided signature is invalid")]
     InvalidSignature,
 
     /// The "iat" (issued-at) claim in the JWT is not within the allowed ±60 seconds from the
     /// current time.
-    #[error("IAT (issued-at) claim is not within ±60 seconds from the current time")]
+    #[display("IAT (issued-at) claim is not within ±60 seconds from the current time")]
     InvalidIssuanceTimestamp,
 
     /// The Authorization header is missing or invalid in the context of JWT validation.
-    #[error("Authorization header is missing or invalid")]
+    #[display("Authorization header is missing or invalid")]
     MissingOrInvalidAuthorizationHeader,
 
     /// An error occurred during JWT decoding.
-    #[error("JWT decoding error: {0}")]
+    #[display("JWT decoding error: {_0}")]
     JwtDecodingError(String),
 
     /// An error occurred while creating a directory to store the JWT.
-    #[error("failed to create dir {path:?}: {source}")]
+    #[display("failed to create dir {path:?}: {source}")]
+    #[cfg(feature = "std")]
     CreateDir {
         /// The source `io::Error`.
         source: io::Error,
@@ -56,7 +56,8 @@ pub enum JwtError {
     },
 
     /// An error occurred while reading the JWT from a file.
-    #[error("failed to read from {path:?}: {source}")]
+    #[display("failed to read from {path:?}: {source}")]
+    #[cfg(feature = "std")]
     Read {
         /// The source `io::Error`.
         source: io::Error,
@@ -65,13 +66,33 @@ pub enum JwtError {
     },
 
     /// An error occurred while writing the JWT to a file.
-    #[error("failed to write to {path:?}: {source}")]
+    #[display("failed to write to {path:?}: {source}")]
+    #[cfg(feature = "std")]
     Write {
         /// The source `io::Error`.
         source: io::Error,
         /// The path related to the operation.
         path: PathBuf,
     },
+}
+
+impl From<hex::FromHexError> for JwtError {
+    fn from(err: hex::FromHexError) -> Self {
+        Self::JwtSecretHexDecodeError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for JwtError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::JwtSecretHexDecodeError(err) => Some(err),
+            Self::CreateDir { source, .. } => Some(source),
+            Self::Read { source, .. } => Some(source),
+            Self::Write { source, .. } => Some(source),
+            _ => None,
+        }
+    }
 }
 
 /// Length of the hex-encoded 256 bit secret key.
@@ -88,13 +109,15 @@ const JWT_MAX_IAT_DIFF: Duration = Duration::from_secs(60);
 const JWT_SIGNATURE_ALGO: Algorithm = Algorithm::HS256;
 
 /// Claims in JWT are used to represent a set of information about an entity.
+///
 /// Claims are essentially key-value pairs that are encoded as JSON objects and included in the
 /// payload of a JWT. They are used to transmit information such as the identity of the entity, the
 /// time the JWT was issued, and the expiration time of the JWT, among others.
 ///
 /// The Engine API spec requires that just the `iat` (issued-at) claim is provided.
 /// It ignores claims that are optional or additional for this specification.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Claims {
     /// The "iat" value MUST be a number containing a NumericDate value.
     /// According to the RFC A NumericDate represents the number of seconds since
@@ -128,6 +151,7 @@ impl Default for Claims {
 }
 
 /// Value-object holding a reference to a hex-encoded 256-bit secret key.
+///
 /// A JWT secret key is used to secure JWT-based authentication. The secret key is
 /// a shared secret between the server and the client and is used to calculate a digital signature
 /// for the JWT, which is included in the JWT along with its payload.
@@ -159,6 +183,7 @@ impl JwtSecret {
     /// Tries to load a [`JwtSecret`] from the specified file path.
     /// I/O or secret validation errors might occur during read operations in the form of
     /// a [`JwtError`].
+    #[cfg(feature = "std")]
     pub fn from_file(fpath: &Path) -> Result<Self, JwtError> {
         let hex = fs::read_to_string(fpath)
             .map_err(|err| JwtError::Read { source: err, path: fpath.into() })?;
@@ -168,6 +193,7 @@ impl JwtSecret {
 
     /// Creates a random [`JwtSecret`] and tries to store it at the specified path. I/O errors might
     /// occur during write operations in the form of a [`JwtError`]
+    #[cfg(feature = "std")]
     pub fn try_create_random(fpath: &Path) -> Result<Self, JwtError> {
         if let Some(dir) = fpath.parent() {
             // Create parent directory
@@ -189,6 +215,7 @@ impl JwtSecret {
     /// - The JWT `exp` (expiration time) claim is validated by default if defined.
     ///
     /// See also: [JWT Claims - Engine API specs](https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md#jwt-claims)
+    #[cfg(feature = "serde")]
     pub fn validate(&self, jwt: &str) -> Result<(), JwtError> {
         // Create a new validation object with the required signature algorithm
         // and ensure that the `iat` claim is present. The `exp` claim is validated if defined.
@@ -224,6 +251,7 @@ impl JwtSecret {
 
     /// Encode the header and claims given and sign the payload using the algorithm from the header
     /// and the key.
+    #[cfg(feature = "serde")]
     pub fn encode(&self, claims: &Claims) -> Result<String, jsonwebtoken::errors::Error> {
         let bytes = &self.0;
         let key = jsonwebtoken::EncodingKey::from_secret(bytes);
@@ -232,8 +260,8 @@ impl JwtSecret {
     }
 }
 
-impl std::fmt::Debug for JwtSecret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for JwtSecret {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("JwtSecretHash").field(&"{{}}").finish()
     }
 }
@@ -251,7 +279,8 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use jsonwebtoken::{encode, EncodingKey, Header};
-    use std::time::{SystemTime, UNIX_EPOCH};
+    #[cfg(feature = "std")]
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tempfile::tempdir;
 
     #[test]
@@ -304,6 +333,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_ok() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
@@ -315,6 +345,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_with_current_time_ok() {
         let secret = JwtSecret::random();
         let claims = Claims::default();
@@ -326,6 +357,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "std", feature = "serde"))]
     fn validation_error_iat_out_of_window() {
         let secret = JwtSecret::random();
 
@@ -351,6 +383,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_exp_expired() {
         let secret = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(1) };
@@ -362,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_wrong_signature() {
         let secret_1 = JwtSecret::random();
         let claims = Claims { iat: get_current_timestamp(), exp: Some(10000000000) };
@@ -374,6 +408,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn validation_error_unsupported_algorithm() {
         let secret = JwtSecret::random();
         let bytes = &secret.0;
@@ -389,6 +424,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn valid_without_exp_claim() {
         let secret = JwtSecret::random();
 
@@ -401,6 +437,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn ephemeral_secret_created() {
         let fpath: &Path = Path::new("secret0.hex");
         assert!(fs::metadata(fpath).is_err());
@@ -410,6 +447,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn valid_secret_provided() {
         let fpath = Path::new("secret1.hex");
         assert!(fs::metadata(fpath).is_err());
@@ -429,6 +467,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn invalid_hex_provided() {
         let fpath = Path::new("secret2.hex");
         fs::write(fpath, "invalid hex").unwrap();
@@ -438,6 +477,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn provided_file_not_exists() {
         let fpath = Path::new("secret3.hex");
         let result = JwtSecret::from_file(fpath);
@@ -446,12 +486,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn provided_file_is_a_directory() {
         let dir = tempdir().unwrap();
         let result = JwtSecret::from_file(dir.path());
         assert_matches!(result, Err(JwtError::Read {source: _,path}) if path == dir.into_path());
     }
 
+    #[cfg(feature = "std")]
     fn to_u64(time: SystemTime) -> u64 {
         time.duration_since(UNIX_EPOCH).unwrap().as_secs()
     }

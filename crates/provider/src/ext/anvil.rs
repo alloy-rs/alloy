@@ -166,7 +166,7 @@ where
     }
 
     async fn anvil_get_auto_mine(&self) -> TransportResult<bool> {
-        self.client().request("anvil_getAutomine", ()).await
+        self.client().request_noparams("anvil_getAutomine").await
     }
 
     async fn anvil_set_auto_mine(&self, enabled: bool) -> TransportResult<()> {
@@ -190,7 +190,7 @@ where
     }
 
     async fn anvil_drop_all_transactions(&self) -> TransportResult<()> {
-        self.client().request("anvil_dropAllTransactions", ()).await
+        self.client().request_noparams("anvil_dropAllTransactions").await
     }
 
     async fn anvil_reset(&self, forking: Option<Forking>) -> TransportResult<()> {
@@ -239,7 +239,7 @@ where
     }
 
     async fn anvil_dump_state(&self) -> TransportResult<Bytes> {
-        self.client().request("anvil_dumpState", ()).await
+        self.client().request_noparams("anvil_dumpState").await
     }
 
     async fn anvil_load_state(&self, buf: Bytes) -> TransportResult<bool> {
@@ -247,11 +247,11 @@ where
     }
 
     async fn anvil_node_info(&self) -> TransportResult<NodeInfo> {
-        self.client().request("anvil_nodeInfo", ()).await
+        self.client().request_noparams("anvil_nodeInfo").await
     }
 
     async fn anvil_metadata(&self) -> TransportResult<Metadata> {
-        self.client().request("anvil_metadata", ()).await
+        self.client().request_noparams("anvil_metadata").await
     }
 
     async fn anvil_remove_pool_transactions(&self, address: Address) -> TransportResult<()> {
@@ -259,7 +259,7 @@ where
     }
 
     async fn anvil_snapshot(&self) -> TransportResult<U256> {
-        self.client().request("evm_snapshot", ()).await
+        self.client().request_noparams("evm_snapshot").await
     }
 
     async fn anvil_revert(&self, id: U256) -> TransportResult<bool> {
@@ -287,7 +287,7 @@ where
     }
 
     async fn anvil_remove_block_timestamp_interval(&self) -> TransportResult<bool> {
-        self.client().request("anvil_removeBlockTimestampInterval", ()).await
+        self.client().request_noparams("anvil_removeBlockTimestampInterval").await
     }
 
     async fn evm_mine(&self, opts: Option<MineOptions>) -> TransportResult<String> {
@@ -652,7 +652,7 @@ mod tests {
 
         let node_info = provider.anvil_node_info().await.unwrap();
 
-        assert_eq!(node_info.current_block_number, latest_block.header.number.unwrap() + 1);
+        assert_eq!(node_info.current_block_number, latest_block.header.number + 1);
     }
 
     #[tokio::test]

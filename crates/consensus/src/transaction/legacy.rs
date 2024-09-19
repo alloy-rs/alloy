@@ -1,10 +1,11 @@
-use crate::{EncodableSignature, SignableTransaction, Signed, Transaction};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, U256};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
 use core::mem;
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header, Result};
+
+use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 
 /// Legacy transaction.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -170,6 +171,10 @@ impl TxLegacy {
         let mut tx = Self::decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
+        if !matches!(signature.v(), Parity::Eip155(_) | Parity::NonEip155(_)) {
+            return Err(alloy_rlp::Error::Custom("invalid parity for legacy transaction"));
+        }
+
         // extract chain id from signature
         let v = signature.v();
         tx.chain_id = v.chain_id();
@@ -217,6 +222,22 @@ impl Transaction for TxLegacy {
         Some(self.gas_price)
     }
 
+    fn max_fee_per_gas(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.gas_price
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
     fn to(&self) -> TxKind {
         self.to
     }
@@ -227,6 +248,22 @@ impl Transaction for TxLegacy {
 
     fn input(&self) -> &[u8] {
         &self.input
+    }
+
+    fn ty(&self) -> u8 {
+        TxType::Legacy as u8
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        None
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
     }
 }
 

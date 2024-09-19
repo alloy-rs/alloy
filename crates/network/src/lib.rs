@@ -13,8 +13,8 @@ use core::fmt::{Debug, Display};
 
 mod transaction;
 pub use transaction::{
-    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilderError, TxSigner,
-    TxSignerSync, UnbuiltTransactionError,
+    BuildResult, NetworkWallet, TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702,
+    TransactionBuilderError, TxSigner, TxSignerSync, UnbuiltTransactionError,
 };
 
 mod ethereum;
@@ -24,7 +24,9 @@ mod any;
 pub use any::{AnyNetwork, AnyTxType};
 
 pub use alloy_eips::eip2718;
-pub use alloy_network_primitives::{self as primitives, ReceiptResponse, TransactionResponse};
+pub use alloy_network_primitives::{
+    self as primitives, BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse,
+};
 
 /// Captures type info for network-specific RPC requests/responses.
 ///
@@ -85,5 +87,9 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
     type ReceiptResponse: RpcObject + ReceiptResponse;
 
     /// The JSON body of a header response.
-    type HeaderResponse: RpcObject;
+    type HeaderResponse: RpcObject + HeaderResponse;
+
+    /// The JSON body of a block response.
+    type BlockResponse: RpcObject
+        + BlockResponse<Transaction = Self::TransactionResponse, Header = Self::HeaderResponse>;
 }
