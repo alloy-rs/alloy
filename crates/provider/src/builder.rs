@@ -132,7 +132,7 @@ impl<L, N> ProviderBuilder<L, Identity, N> {
     /// management, and chain-id fetching.
     pub fn with_recommended_fillers(
         self,
-    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecomendedFillters>, N>
+    ) -> ProviderBuilder<L, JoinFill<Identity, N::RecomendedFillers>, N>
     where
         N: RecommendedFillers,
     {
