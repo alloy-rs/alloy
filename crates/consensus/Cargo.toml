@@ -23,7 +23,7 @@ alloy-primitives = { workspace = true, features = ["rlp"] }
 alloy-rlp.workspace = true
 alloy-eips = { workspace = true, features = ["kzg-sidecar"] }
 alloy-serde = { workspace = true, optional = true }
-derive-more.workspace = true
+derive_more.workspace = true
 
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }

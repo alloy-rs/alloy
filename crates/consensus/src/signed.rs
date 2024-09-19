@@ -1,8 +1,10 @@
 use crate::transaction::SignableTransaction;
+use crate::TxEnvelope;
 use alloy_primitives::{Signature, B256};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 
 /// A transaction with a signature and hash seal.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signed<T, Sig = Signature> {
     #[cfg_attr(feature = "serde", serde(flatten))]
@@ -40,6 +42,14 @@ impl<T, Sig> Signed<T, Sig> {
     /// Returns the transaction without signature.
     pub fn strip_signature(self) -> T {
         self.tx
+    }
+}
+
+impl Signed<TxEnvelope> {
+    /// Calculates a heuristic for the in-memory size of the [`Signed<TxEnvelope>`].
+    #[inline]
+    pub const fn size(&self) -> usize {
+        core::mem::size_of::<TxEnvelope>() + core::mem::size_of::<Signature>() + core::mem::size_of::<B256>()
     }
 }
 

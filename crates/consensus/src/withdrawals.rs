@@ -20,7 +20,6 @@ use derive_more::{AsRef, Deref, DerefMut, From, IntoIterator};
     IntoIterator,
     RlpEncodableWrapper,
     RlpDecodableWrapper,
-    Compact,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
@@ -81,45 +80,6 @@ impl<'a> IntoIterator for &'a mut Withdrawals {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::Address;
-    use alloy_rlp::{RlpDecodable, RlpEncodable};
-    use proptest::proptest;
-    use proptest_arbitrary_interop::arb;
-
-    /// This type is kept for compatibility tests after the codec support was added to alloy-eips
-    /// Withdrawal type natively
-    #[derive(
-        Debug,
-        Clone,
-        PartialEq,
-        Eq,
-        Default,
-        Hash,
-        RlpEncodable,
-        RlpDecodable,
-        Compact,
-    )]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-    struct RethWithdrawal {
-        /// Monotonically increasing identifier issued by consensus layer.
-        index: u64,
-        /// Index of validator associated with withdrawal.
-        validator_index: u64,
-        /// Target address for withdrawn ether.
-        address: Address,
-        /// Value of the withdrawal in gwei.
-        amount: u64,
-    }
-
-    impl PartialEq<Withdrawal> for RethWithdrawal {
-        fn eq(&self, other: &Withdrawal) -> bool {
-            self.index == other.index &&
-                self.validator_index == other.validator_index &&
-                self.address == other.address &&
-                self.amount == other.amount
-        }
-    }
 
     // <https://github.com/paradigmxyz/reth/issues/1614>
     #[test]
@@ -131,23 +91,4 @@ mod tests {
         let s = serde_json::to_string(&withdrawals).unwrap();
         assert_eq!(input, s);
     }
-
-    proptest!(
-        #[test]
-        fn test_roundtrip_withdrawal_compat(withdrawal in arb::<RethWithdrawal>()) {
-            // Convert to buffer and then create alloy_access_list from buffer and
-            // compare
-            let mut compacted_reth_withdrawal = Vec::<u8>::new();
-            let len = withdrawal.to_compact(&mut compacted_reth_withdrawal);
-
-            // decode the compacted buffer to AccessList
-            let alloy_withdrawal = Withdrawal::from_compact(&compacted_reth_withdrawal, len).0;
-            assert_eq!(withdrawal, alloy_withdrawal);
-
-            let mut compacted_alloy_withdrawal = Vec::<u8>::new();
-            let alloy_len = alloy_withdrawal.to_compact(&mut compacted_alloy_withdrawal);
-            assert_eq!(len, alloy_len);
-            assert_eq!(compacted_reth_withdrawal, compacted_alloy_withdrawal);
-        }
-    );
 }
