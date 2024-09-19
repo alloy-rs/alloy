@@ -1,0 +1,114 @@
+use crate::{
+    hyper::{
+        header::{HeaderMap, AUTHORIZATION},
+        Request,
+    },
+    hyper_util::client::legacy::Error,
+    HyperResponse, HyperResponseFut,
+};
+use alloy_rpc_types_engine::{Claims, JwtSecret};
+use hyper::header::HeaderValue;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tower::{Layer, Service};
+
+/// The [`AuthLayer`] is a that validates whether the bearer token in the request is valid or not.
+/// If invalid, it generates a valid token from the provided [`JwtSecret`] and inserts it into the
+/// request.
+///
+/// This layer also inserts the [`AUTHORIZATION`] header into the request with a valid token if its
+/// not already in the request.
+#[derive(Clone, Debug)]
+pub struct AuthLayer {
+    secret: JwtSecret,
+}
+
+impl AuthLayer {
+    /// Create a new [`AuthLayer`].
+    pub const fn new(secret: JwtSecret) -> Self {
+        Self { secret }
+    }
+}
+
+impl<S> Layer<S> for AuthLayer {
+    type Service = AuthService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        AuthService::new(inner, self.secret.clone())
+    }
+}
+
+/// A service that checks the jwt token in a request is valid. If invalid, it refreshes the token
+/// using the provided [`JwtSecret`] and inserts it into the request.
+#[derive(Clone, Debug)]
+pub struct AuthService<S> {
+    inner: S,
+    secret: JwtSecret,
+}
+
+impl<S> AuthService<S> {
+    /// Create a new [`AuthService`] with the given inner service.
+    pub fn new(inner: S, secret: JwtSecret) -> Self {
+        AuthService { inner, secret }
+    }
+}
+
+impl<S, B> Service<Request<B>> for AuthService<S>
+where
+    S: Service<hyper::Request<B>, Response = HyperResponse, Error = Error>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    S::Future: Send,
+    S::Error: std::error::Error + Send + Sync + 'static,
+    B: From<Vec<u8>> + Send + 'static + Clone + Sync,
+{
+    type Response = HyperResponse;
+    type Error = Error;
+    type Future = HyperResponseFut;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Request<B>) -> Self::Future {
+        let headers = req.headers();
+
+        match get_bearer_token(&headers).and_then(|token| self.secret.validate(&token).ok()) {
+            Some(_) => {
+                // The token is valid, hence forward the request.
+                Box::pin(self.inner.call(req))
+            }
+            None => {
+                // Generate a fresh token from the secret and insert it into the request.
+                // TODO: rm unwraps
+                let token = create_token_from_secret(&self.secret).unwrap();
+                let mut req = req.clone();
+                req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
+                Box::pin(self.inner.call(req))
+            }
+        }
+    }
+}
+
+fn get_bearer_token(headers: &HeaderMap) -> Option<String> {
+    let header = headers.get(AUTHORIZATION)?;
+    let auth: &str = header.to_str().ok()?;
+    let prefix = "Bearer ";
+    let index = auth.find(prefix)?;
+    let token: &str = &auth[index + prefix.len()..];
+    Some(token.into())
+}
+
+fn create_token_from_secret(secret: &JwtSecret) -> Result<String, jsonwebtoken::errors::Error> {
+    let token = secret.encode(&Claims {
+        iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap() + Duration::from_secs(60))
+            .as_secs(),
+        exp: None,
+    })?;
+
+    Ok(format!("Bearer {}", token))
+}
