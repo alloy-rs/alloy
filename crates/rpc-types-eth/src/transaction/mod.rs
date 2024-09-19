@@ -339,7 +339,7 @@ impl TryFrom<Transaction> for TxEnvelope {
 
 impl TransactionRespConstructor for Transaction {
     type UnsignedTx = TxEnvelope;
-    type Signature = Signature;
+    type Signature = alloy_primitives::Signature;
     type BlockCtx = TransactionInfo;
 }
 
@@ -390,7 +390,7 @@ impl Constructor for Transaction {
             gas_price: Some(gas_price),
             max_fee_per_gas,
             max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
-            signature: Some(signature),
+            signature: Some(signature.into()),
             gas: tx.gas_limit(),
             input: tx.input().to_vec().into(),
             chain_id: tx.chain_id(),
