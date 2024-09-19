@@ -9,8 +9,13 @@
 
 extern crate alloc;
 
+pub mod transaction;
+pub use transaction::TransactionInfo;
+
 mod traits;
-pub use traits::{BlockResponse, HeaderResponse, ReceiptResponse, TransactionResponse};
+pub use traits::{
+    BlockResponse, Constructor, HeaderResponse, ReceiptResponse, TransactionResponse,
+};
 
 mod block;
 pub use block::{BlockTransactionHashes, BlockTransactions, BlockTransactionsKind};

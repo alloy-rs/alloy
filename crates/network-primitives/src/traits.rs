@@ -4,6 +4,15 @@ use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
 
+/// Universal constructor trait.
+pub trait Constructor {
+    /// Data needed to construct type.
+    type Data<'a>;
+
+    /// Instantiates a new type from given data.
+    fn new(data: Self::Data<'_>) -> Self;
+}
+
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
@@ -62,7 +71,7 @@ pub trait ReceiptResponse {
 }
 
 /// Transaction JSON-RPC response.
-pub trait TransactionResponse {
+pub trait TransactionResponse: Constructor {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
@@ -148,6 +157,14 @@ pub trait BlockResponse {
     /// Returns the `other` field from `WithOtherFields` type.
     fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
         None
+    }
+}
+
+impl<T: Constructor> Constructor for WithOtherFields<T> {
+    type Data<'a> = T::Data<'a>;
+
+    fn new(data: Self::Data<'_>) -> Self {
+        Self { inner: T::new(data), other: Default::default() }
     }
 }
 

@@ -1,11 +1,11 @@
 //! RPC types for transactions
 
 use alloy_consensus::{
-    SignableTransaction, Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
-    TxEnvelope, TxLegacy, TxType,
+    SignableTransaction, Signed, Transaction as _, TxEip1559, TxEip2930, TxEip4844,
+    TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_network_primitives::TransactionResponse;
+use alloy_network_primitives::{Constructor, TransactionInfo, TransactionResponse};
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 
 use alloc::vec::Vec;
@@ -15,9 +15,6 @@ pub use alloy_eips::{
     eip2930::{AccessList, AccessListItem, AccessListResult},
     eip7702::Authorization,
 };
-
-mod common;
-pub use common::TransactionInfo;
 
 mod error;
 pub use error::ConversionError;
@@ -338,6 +335,65 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+impl Constructor for Transaction {
+    type Data<'a> = TransactionResponseData<TxEnvelope, Signature>;
+
+    fn new(data: Self::Data<'_>) -> Self {
+        let TransactionResponseData { signed_tx, signer: from, tx_info } = data;
+
+        let (tx, signature, hash) = signed_tx.into_parts();
+
+        let TransactionInfo {
+            block_hash, block_number, base_fee, index: transaction_index, ..
+        } = tx_info;
+
+        let transaction_type = TxType::try_from(tx.ty()).expect("should decode");
+
+        let max_fee_per_gas = match transaction_type {
+            TxType::Legacy | TxType::Eip2930 => None,
+            TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => Some(tx.max_fee_per_gas()),
+        };
+
+        let gas_price = match transaction_type {
+            TxType::Legacy | TxType::Eip2930 => tx.max_fee_per_gas(),
+            TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => {
+                // the gas price field for EIP1559 is set to `min(tip, gasFeeCap - baseFee) +
+                // baseFee`
+                base_fee
+                    .and_then(|base_fee| {
+                        tx.effective_tip_per_gas(base_fee as u64).map(|tip| tip + base_fee)
+                    })
+                    .unwrap_or_else(|| tx.max_fee_per_gas())
+            }
+        };
+
+        Self {
+            hash,
+            nonce: tx.nonce(),
+            from,
+            to: tx.to().to().copied(),
+            value: tx.value(),
+            gas_price: Some(gas_price),
+            max_fee_per_gas,
+            max_priority_fee_per_gas: tx.max_priority_fee_per_gas(),
+            signature: Some(signature),
+            gas: tx.gas_limit(),
+            input: tx.input().to_vec().into(),
+            chain_id: tx.chain_id(),
+            access_list: tx.access_list().cloned(),
+            transaction_type: Some(tx.ty()),
+            block_hash,
+            block_number,
+            transaction_index,
+            // EIP-4844 fields //
+            max_fee_per_blob_gas: tx.max_fee_per_blob_gas(),
+            blob_versioned_hashes: tx.blob_versioned_hashes().map(|hashes| hashes.to_vec()),
+            // --------------- //
+            authorization_list: tx.authorization_list().map(|l| l.to_vec()),
+        }
+    }
+}
+
 impl TransactionResponse for Transaction {
     fn tx_hash(&self) -> B256 {
         self.hash
@@ -363,6 +419,48 @@ impl TransactionResponse for Transaction {
         &self.input
     }
 }
+
+impl From<&Transaction> for TransactionInfo {
+    fn from(tx: &Transaction) -> Self {
+        Self {
+            hash: Some(tx.hash),
+            index: tx.transaction_index,
+            block_hash: tx.block_hash,
+            block_number: tx.block_number,
+            // We don't know the base fee of the block when we're constructing this from
+            // `Transaction`
+            base_fee: None,
+        }
+    }
+}
+
+/// Data needed to construct a [`Transaction`].
+#[derive(Debug, derive_more::Constructor)]
+pub struct TransactionResponseData<T, S> {
+    /// Transaction with signature.
+    signed_tx: Signed<T, S>,
+    /// Transaction sender.
+    signer: Address,
+    /// Transaction context from block.
+    tx_info: TransactionInfo,
+}
+
+impl<T, S> TransactionResponseData<T, S> {
+    /// Returns a new instance from the parts, without verifying the signature.
+    pub const fn new_unchecked(
+        tx: T,
+        sig: S,
+        tx_hash: B256,
+        signer: Address,
+        tx_info: TransactionInfo,
+    ) -> Self
+    where
+        T: SignableTransaction<S>,
+    {
+        Self::new(Signed::new_unchecked(tx, sig, tx_hash), signer, tx_info)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
