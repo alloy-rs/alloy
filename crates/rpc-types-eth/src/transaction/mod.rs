@@ -361,11 +361,13 @@ impl Constructor for Transaction {
 
         let transaction_type = TxType::try_from(tx.ty()).expect("should decode");
 
+        // formats max fee per gas for the rpc response w.r.t. hard fork
         let max_fee_per_gas = match transaction_type {
             TxType::Legacy | TxType::Eip2930 => None,
             TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => Some(tx.max_fee_per_gas()),
         };
 
+        // formats gas price for the rpc response, as it should be shown w.r.t. hard fork
         let gas_price = match transaction_type {
             TxType::Legacy | TxType::Eip2930 => tx.max_fee_per_gas(),
             TxType::Eip1559 | TxType::Eip4844 | TxType::Eip7702 => {
