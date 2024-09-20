@@ -119,7 +119,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_block_number(&self) -> ProviderCall<T, NoParams, U64, BlockNumber> {
         self.client()
             .request_noparams("eth_blockNumber")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -171,7 +171,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -199,7 +199,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -257,7 +257,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_gas_price(&self) -> ProviderCall<T, NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_gasPrice")
-            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::convert_u128 as fn(U128) -> u128)
             .into()
     }
 
@@ -560,7 +560,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
         self.client()
             .request("eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -708,7 +708,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         // Make sure to initialize heartbeat before we submit transaction, so that
         // we don't miss it if user will subscriber to it immediately after sending.
-        let _handle = self.root().get_heart();
+        let _handle = self.root().get_heart().await?;
 
         match tx {
             SendableTx::Builder(mut tx) => {
@@ -912,7 +912,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_net_version(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("net_version")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -1023,6 +1023,7 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
             };
 
         self.get_heart()
+            .await?
             .watch_tx(config, block_number)
             .await
             .map_err(|_| PendingTransactionError::FailedToRegister)

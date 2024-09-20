@@ -1,10 +1,9 @@
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
-use alloy_rpc_types_eth::Block;
-use alloy_transport::{RpcError, Transport};
+use alloy_transport::{RpcError, Transport, TransportResult};
 use async_stream::stream;
-use futures::{Stream, StreamExt};
+use futures::{future::Either, Stream, StreamExt};
 use lru::LruCache;
 use std::{marker::PhantomData, num::NonZeroUsize};
 
@@ -17,38 +16,48 @@ const MAX_RETRIES: usize = 3;
 /// Default block number for when we don't have a block yet.
 const NO_BLOCK_NUMBER: BlockNumber = BlockNumber::MAX;
 
-pub(crate) struct ChainStreamPoller<T, N = Ethereum> {
+/// Streams new blocks from the client.
+pub(crate) struct NewBlocks<T, N: Network = Ethereum> {
     client: WeakClient<T>,
-    poll_task: PollerBuilder<T, NoParams, U64>,
     next_yield: BlockNumber,
-    known_blocks: LruCache<BlockNumber, Block>,
+    known_blocks: LruCache<BlockNumber, N::BlockResponse>,
     _phantom: PhantomData<N>,
 }
 
-impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
-    pub(crate) fn from_weak_client(w: WeakClient<T>) -> Self {
-        Self::new(w)
-    }
-
+impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
     pub(crate) fn new(client: WeakClient<T>) -> Self {
-        Self::with_next_yield(client, NO_BLOCK_NUMBER)
-    }
-
-    /// Can be used to force the poller to start at a specific block number.
-    /// Mostly useful for tests.
-    fn with_next_yield(client: WeakClient<T>, next_yield: BlockNumber) -> Self {
         Self {
             client: client.clone(),
-            poll_task: PollerBuilder::new(client, "eth_blockNumber", []),
-            next_yield,
+            next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
             _phantom: PhantomData,
         }
     }
 
-    pub(crate) fn into_stream(mut self) -> impl Stream<Item = Block> + 'static {
+    pub(crate) async fn into_stream(
+        self,
+    ) -> TransportResult<impl Stream<Item = N::BlockResponse> + 'static> {
+        #[cfg(feature = "pubsub")]
+        if let Some(client) = self.client.upgrade() {
+            if let Some(pubsub) = client.pubsub_frontend() {
+                let id = client.request("eth_subscribe", ("newHeads",)).await?;
+                let sub = pubsub.get_subscription(id).await?;
+                return Ok(Either::Left(sub.into_typed::<N::BlockResponse>().into_stream()));
+            }
+        }
+
+        #[cfg(feature = "pubsub")]
+        let right = Either::Right;
+        #[cfg(not(feature = "pubsub"))]
+        let right = std::convert::identity;
+        Ok(right(self.into_poll_stream()))
+    }
+
+    fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
+        let poll_task_builder: PollerBuilder<T, NoParams, U64> =
+            PollerBuilder::new(self.client.clone(), "eth_blockNumber", []);
+        let mut poll_task = poll_task_builder.spawn().into_stream_raw();
         stream! {
-        let mut poll_task = self.poll_task.spawn().into_stream_raw();
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
@@ -62,11 +71,11 @@ impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
                 Some(Ok(block_number)) => block_number,
                 Some(Err(err)) => {
                     // This is fine.
-                    debug!(%err, "polling stream lagged");
+                    debug!(%err, "block number stream lagged");
                     continue 'task;
                 }
                 None => {
-                    debug!("polling stream ended");
+                    debug!("block number stream ended");
                     break 'task;
                 }
             };
@@ -125,14 +134,11 @@ impl<T: Transport + Clone, N: Network> ChainStreamPoller<T, N> {
 
 #[cfg(all(test, feature = "anvil-api"))] // Tests rely heavily on ability to mine blocks on demand.
 mod tests {
-    use std::{future::Future, time::Duration};
-
-    use crate::{ext::AnvilApi, ProviderBuilder};
+    use super::*;
+    use crate::{ext::AnvilApi, Provider, ProviderBuilder};
     use alloy_node_bindings::Anvil;
     use alloy_primitives::U256;
-    use alloy_rpc_client::ReqwestClient;
-
-    use super::*;
+    use std::{future::Future, time::Duration};
 
     fn init_tracing() {
         let _ = tracing_subscriber::fmt::try_init();
@@ -140,32 +146,48 @@ mod tests {
 
     async fn with_timeout<T: Future>(fut: T) -> T::Output {
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_secs(1)) => panic!("Operation timed out"),
+            _ = tokio::time::sleep(Duration::from_secs(2)) => panic!("Operation timed out"),
             out = fut => out,
         }
     }
 
     #[tokio::test]
-    async fn yield_block() {
+    async fn yield_block_http() {
+        yield_block(false).await;
+    }
+    #[tokio::test]
+    #[cfg(feature = "ws")]
+    async fn yield_block_ws() {
+        yield_block(true).await;
+    }
+    async fn yield_block(ws: bool) {
         init_tracing();
 
         let anvil = Anvil::new().spawn();
 
-        let client = ReqwestClient::new_http(anvil.endpoint_url());
-        let poller: ChainStreamPoller<_, Ethereum> =
-            ChainStreamPoller::with_next_yield(client.get_weak(), 1);
-        let mut stream = Box::pin(poller.into_stream());
+        let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
+        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+
+        let poller: NewBlocks<_, Ethereum> = NewBlocks::new(provider.weak_client());
+        let mut stream = Box::pin(poller.into_stream().await.unwrap());
 
         // We will also use provider to manipulate anvil instance via RPC.
-        let provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
         provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
 
         let block = with_timeout(stream.next()).await.expect("Block wasn't fetched");
-        assert_eq!(block.header.number, 1);
+        assert!(block.header.number <= 1);
     }
 
     #[tokio::test]
-    async fn yield_many_blocks() {
+    async fn yield_many_blocks_http() {
+        yield_many_blocks(false).await;
+    }
+    #[tokio::test]
+    #[cfg(feature = "ws")]
+    async fn yield_many_blocks_ws() {
+        yield_many_blocks(true).await;
+    }
+    async fn yield_many_blocks(ws: bool) {
         // Make sure that we can process more blocks than fits in the cache.
         const BLOCKS_TO_MINE: usize = BLOCK_CACHE_SIZE.get() + 1;
 
@@ -173,16 +195,21 @@ mod tests {
 
         let anvil = Anvil::new().spawn();
 
-        let client = ReqwestClient::new_http(anvil.endpoint_url());
-        let poller: ChainStreamPoller<_, Ethereum> =
-            ChainStreamPoller::with_next_yield(client.get_weak(), 1);
-        let stream = Box::pin(poller.into_stream());
+        let url = if ws { anvil.ws_endpoint() } else { anvil.endpoint() };
+        let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
+
+        let poller: NewBlocks<_, Ethereum> = NewBlocks::new(provider.weak_client());
+        let stream = Box::pin(poller.into_stream().await.unwrap());
 
         // We will also use provider to manipulate anvil instance via RPC.
-        let provider = ProviderBuilder::new().on_http(anvil.endpoint_url());
         provider.anvil_mine(Some(U256::from(BLOCKS_TO_MINE)), None).await.unwrap();
 
         let blocks = with_timeout(stream.take(BLOCKS_TO_MINE).collect::<Vec<_>>()).await;
         assert_eq!(blocks.len(), BLOCKS_TO_MINE);
+        let first = blocks[0].header.number;
+        assert!(first <= 1);
+        for (i, block) in blocks.iter().enumerate() {
+            assert_eq!(block.header.number, first + i as u64);
+        }
     }
 }

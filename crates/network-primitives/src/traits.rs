@@ -132,9 +132,9 @@ pub trait HeaderResponse {
 /// Block JSON-RPC response.
 pub trait BlockResponse {
     /// Header type
-    type Header;
+    type Header: HeaderResponse;
     /// Transaction type
-    type Transaction;
+    type Transaction: TransactionResponse;
 
     /// Block header
     fn header(&self) -> &Self::Header;
