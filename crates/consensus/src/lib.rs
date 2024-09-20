@@ -13,7 +13,7 @@ mod account;
 pub use account::Account;
 
 mod block;
-pub use block::{BlockBody, Block};
+pub use block::{Block, BlockBody};
 
 pub mod constants;
 
