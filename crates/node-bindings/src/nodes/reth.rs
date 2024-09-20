@@ -533,7 +533,7 @@ mod tests {
     use crate::utils::run_with_tempdir_sync;
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().data_dir(temp_dir_path).spawn();
@@ -543,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_sepolia() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
@@ -553,7 +553,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
@@ -563,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev_custom_genesis() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
@@ -578,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev_custom_blocktime() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new()
@@ -593,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_p2p_instances() {
         run_with_tempdir_sync("reth-test-", |temp_dir_path| {
             let reth = Reth::new().instance(100).data_dir(temp_dir_path).spawn();
@@ -611,7 +611,7 @@ mod tests {
     // Tests that occupy the same port are combined so they are ran sequentially, to prevent
     // flakiness.
     #[test]
-    #[cfg(not(windows))]
+    #[cfg_attr(windows, ignore)]
     fn can_launch_reth_custom_ports() {
         // Assert that all ports are default if no custom ports are set
         // and the instance is set to 0.
