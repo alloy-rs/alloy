@@ -4,8 +4,3 @@ mod retry;
 
 /// RetryBackoffLayer
 pub use retry::{RateLimitRetryPolicy, RetryBackoffLayer, RetryBackoffService, RetryPolicy};
-
-mod cache;
-
-/// CacheLayer
-pub use cache::{CacheConfig, CacheLayer, CachingService};

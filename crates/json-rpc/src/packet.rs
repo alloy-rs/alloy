@@ -276,15 +276,6 @@ impl<Payload, ErrData> ResponsePacket<Payload, ErrData> {
             Self::Batch(batch) => batch.iter().filter(|res| ids.contains(&res.id)).collect(),
         }
     }
-
-    /// Returns the underlying response if ResponsePacket is of type Single,
-    /// otherwise returns `None`.
-    pub const fn single_response(&self) -> Option<&Response<Payload, ErrData>> {
-        match self {
-            Self::Single(single) => Some(single),
-            Self::Batch(_) => None,
-        }
-    }
 }
 
 /// An Iterator over the [ErrorPayload]s in a [ResponsePacket].
