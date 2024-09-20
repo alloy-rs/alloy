@@ -3,6 +3,7 @@
 use crate::Header;
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawal;
+use alloy_eips::eip2718::{Encodable2718, Decodable2718};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -12,7 +13,7 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 /// Taken from [reth-primitives](https://github.com/paradigmxyz/reth)
 #[derive(Debug, Clone, PartialEq, Eq, Default, RlpEncodable, RlpDecodable)]
 #[rlp(trailing)]
-pub struct Block<T: Encodable + Decodable> {
+pub struct Block<T: Encodable + Decodable + Encodable2718 + Decodable2718> {
     /// Block header.
     pub header: Header,
     /// Block body.
@@ -23,7 +24,7 @@ pub struct Block<T: Encodable + Decodable> {
 /// A block body.
 #[derive(Debug, Clone, PartialEq, Eq, Default, RlpEncodable, RlpDecodable)]
 #[rlp(trailing)]
-pub struct BlockBody<T: Encodable + Decodable> {
+pub struct BlockBody<T: Encodable + Decodable + Encodable2718 + Decodable2718> {
     /// Transactions in this block.
     pub transactions: Vec<T>,
     /// Ommers/uncles header.
