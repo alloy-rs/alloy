@@ -57,10 +57,10 @@ impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
     }
 
     fn into_poll_stream(mut self) -> impl Stream<Item = N::BlockResponse> + 'static {
+        stream! {
         let poll_task_builder: PollerBuilder<T, NoParams, U64> =
             PollerBuilder::new(self.client.clone(), "eth_blockNumber", []);
         let mut poll_task = poll_task_builder.spawn().into_stream_raw();
-        stream! {
         'task: loop {
             // Clear any buffered blocks.
             while let Some(known_block) = self.known_blocks.pop(&self.next_yield) {
