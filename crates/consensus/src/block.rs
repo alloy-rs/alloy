@@ -14,10 +14,20 @@ use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 pub struct Block<T: Encodable + Decodable> {
     /// Block header.
     pub header: Header,
+    /// Block body.
+    #[rlp(flatten)]
+    pub body: BlockBody<T>,
+}
+
+/// A block body.
+#[derive(Debug, Clone, PartialEq, Eq, Default, RlpEncodable, RlpDecodable)]
+#[rlp(trailing)]
+pub struct BlockBody<T: Encodable + Decodable> {
     /// Transactions in this block.
-    pub body: Vec<T>,
+    pub transactions: Vec<T>,
     /// Ommers/uncles header.
     pub ommers: Vec<Header>,
     /// Block withdrawals.
     pub withdrawals: Option<Vec<Withdrawal>>,
+    // TODO: add request with rlp encoding support
 }
