@@ -145,6 +145,25 @@ where
     }
 }
 
+macro_rules! cache_get_or_fetch {
+    ($self:expr, $hash:expr, $fetch_fn:expr) => {{
+        if let Some(cached) = $self.get(&$hash).await? {
+            let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
+            println!("Cache hit");
+            return Ok(Some(result));
+        }
+
+        println!("Cache miss");
+        let result = $fetch_fn.await?;
+        if let Some(ref data) = result {
+            let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
+            let _ = $self.put($hash, json_str).await?;
+        }
+
+        Ok(result)
+    }};
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<P, T> Provider<T> for CacheProvider<P, T>
@@ -165,20 +184,7 @@ where
         let hash =
             RequestType::GetBlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
 
-        if let Some(block) = self.get(&hash).await? {
-            let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
-            println!("Cache hit");
-            return Ok(Some(block));
-        }
-
-        println!("Cache miss");
-        let block = self.inner.get_block_by_number(number, hydrate).await?;
-        if let Some(ref block) = block {
-            let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
-            let _ = self.put(hash, json_str).await?;
-        }
-
-        Ok(block)
+        cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
     }
 
     /// Gets a block by its [BlockHash], with full transactions or only hashes.
@@ -195,20 +201,7 @@ where
         let req_hash =
             RequestType::GetBlockByHash((hash, full)).params_hash(self.inner.client())?;
 
-        if let Some(block) = self.get(&req_hash).await? {
-            let block = serde_json::from_str(&block).map_err(TransportErrorKind::custom)?;
-            println!("Cache hit");
-            return Ok(Some(block));
-        }
-
-        println!("Cache miss");
-        let block = self.inner.get_block_by_hash(hash, kind).await?;
-        if let Some(ref block) = block {
-            let json_str = serde_json::to_string(block).map_err(TransportErrorKind::custom)?;
-            let _ = self.put(req_hash, json_str).await?;
-        }
-
-        Ok(block)
+        cache_get_or_fetch!(self, req_hash, self.inner.get_block_by_hash(hash, kind))
     }
 
     // TODO: Add other commonly used methods such as eth_getTransactionByHash
