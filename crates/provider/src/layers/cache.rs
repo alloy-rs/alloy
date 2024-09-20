@@ -336,7 +336,7 @@ mod tests {
 
         let latest_block =
             provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-        let latest_hash = latest_block.unwrap().header.hash.unwrap();
+        let latest_hash = latest_block.unwrap().header.hash;
 
         let block3 =
             provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
