@@ -3,9 +3,12 @@ use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
 use alloy_transport::{RpcError, Transport, TransportResult};
 use async_stream::stream;
-use futures::{future::Either, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use lru::LruCache;
 use std::{marker::PhantomData, num::NonZeroUsize};
+
+#[cfg(feature = "pubsub")]
+use futures::future::Either;
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
@@ -27,7 +30,7 @@ pub(crate) struct NewBlocks<T, N: Network = Ethereum> {
 impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
     pub(crate) fn new(client: WeakClient<T>) -> Self {
         Self {
-            client: client.clone(),
+            client,
             next_yield: NO_BLOCK_NUMBER,
             known_blocks: LruCache::new(BLOCK_CACHE_SIZE),
             _phantom: PhantomData,

@@ -629,13 +629,10 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 #[cfg(target_arch = "wasm32")]
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
-    pub(crate) fn spawn(self) -> HeartbeatHandle {
-        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
-        let (ix_tx, ixns) = mpsc::channel(16);
-
-        self.into_future(latest, ixns).spawn_task();
-
-        HeartbeatHandle { tx: ix_tx, latest: latest_rx }
+    pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
+        let (task, handle) = self.consume();
+        task.spawn_task();
+        handle
     }
 }
 
@@ -643,16 +640,19 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + Send + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle<N> {
-        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
-        let (ix_tx, ixns) = mpsc::channel(16);
-
-        self.into_future(latest, ixns).spawn_task();
-
-        HeartbeatHandle { tx: ix_tx, latest: latest_rx }
+        let (task, handle) = self.consume();
+        task.spawn_task();
+        handle
     }
 }
 
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
+    fn consume(self) -> (impl Future<Output = ()>, HeartbeatHandle<N>) {
+        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
+        let (ix_tx, ixns) = mpsc::channel(16);
+        (self.into_future(latest, ixns), HeartbeatHandle { tx: ix_tx, latest: latest_rx })
+    }
+
     async fn into_future(
         mut self,
         latest: watch::Sender<Option<N::BlockResponse>>,
