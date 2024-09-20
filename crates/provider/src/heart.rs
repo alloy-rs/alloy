@@ -630,7 +630,7 @@ impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat
 impl<N: Network, S: Stream<Item = N::BlockResponse> + Unpin + 'static> Heartbeat<N, S> {
     /// Spawn the heartbeat task, returning a [`HeartbeatHandle`].
     pub(crate) fn spawn(self) -> HeartbeatHandle {
-        let (latest, latest_rx) = watch::channel(None::<Block>);
+        let (latest, latest_rx) = watch::channel(None::<N::BlockResponse>);
         let (ix_tx, ixns) = mpsc::channel(16);
 
         self.into_future(latest, ixns).spawn_task();
