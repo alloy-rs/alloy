@@ -182,7 +182,7 @@ where
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
         let hash =
-            RequestType::GetBlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
+            RequestType::BlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
 
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
     }
@@ -198,8 +198,7 @@ where
             BlockTransactionsKind::Hashes => false,
         };
 
-        let req_hash =
-            RequestType::GetBlockByHash((hash, full)).params_hash(self.inner.client())?;
+        let req_hash = RequestType::BlockByHash((hash, full)).params_hash(self.inner.client())?;
 
         cache_get_or_fetch!(self, req_hash, self.inner.get_block_by_hash(hash, kind))
     }
@@ -222,7 +221,7 @@ where
             let client = client.clone();
             let cache = cache.clone();
             ProviderCall::BoxedFuture(Box::pin(async move {
-                let req = RequestType::GetProof((address, keys.clone(), block_id));
+                let req = RequestType::Proof((address, keys.clone(), block_id));
 
                 let client = client.upgrade().ok_or_else(|| {
                     TransportErrorKind::custom_str(
@@ -272,22 +271,23 @@ where
 /// Useful for handling hashing of various request parameters.
 enum RequestType<Params: RpcParam> {
     /// Get block by number.
-    GetBlockByNumber(Params),
+    BlockByNumber(Params),
     /// Get block by hash.
-    GetBlockByHash(Params),
+    BlockByHash(Params),
     /// Get proof.
-    GetProof(Params),
+    Proof(Params),
     /// Get storage at.
-    GetStorageAt(Params),
+    #[allow(dead_code)] // todo
+    StorageAt(Params),
 }
 
 impl<Params: RpcParam> RequestType<Params> {
     fn make_request<T: Transport>(&self, client: ClientRef<'_, T>) -> Request<Params> {
         let (method, params) = match self {
-            Self::GetBlockByNumber(params) => ("eth_getBlockByNumber", params),
-            Self::GetBlockByHash(params) => ("eth_getBlockByHash", params),
-            Self::GetProof(params) => ("eth_getProof", params),
-            Self::GetStorageAt(params) => ("eth_getStorageAt", params),
+            Self::BlockByNumber(params) => ("eth_getBlockByNumber", params),
+            Self::BlockByHash(params) => ("eth_getBlockByHash", params),
+            Self::Proof(params) => ("eth_getProof", params),
+            Self::StorageAt(params) => ("eth_getStorageAt", params),
         };
         client.make_request(method, params.to_owned())
     }
