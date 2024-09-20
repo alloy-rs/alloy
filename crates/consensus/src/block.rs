@@ -1,6 +1,7 @@
 //! Genesic Block Type
 
 use crate::Header;
+use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
