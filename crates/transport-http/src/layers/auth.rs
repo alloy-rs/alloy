@@ -1,14 +1,15 @@
-use crate::{
-    hyper::{
-        header::{HeaderMap, AUTHORIZATION},
-        Request,
-    },
-    hyper_util::client::legacy::Error,
-    HyperResponse, HyperResponseFut,
+use crate::hyper::{
+    header::{HeaderMap, AUTHORIZATION},
+    Request, Response,
 };
 use alloy_rpc_types_engine::{Claims, JwtSecret};
+use alloy_transport::{TransportError, TransportErrorKind};
 use hyper::header::HeaderValue;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    future::Future,
+    pin::Pin,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tower::{Layer, Service};
 
 /// The [`AuthLayer`] is a that validates whether the bearer token in the request is valid or not.
@@ -33,7 +34,7 @@ impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        AuthService::new(inner, self.secret.clone())
+        AuthService::new(inner, self.secret)
     }
 }
 
@@ -47,14 +48,14 @@ pub struct AuthService<S> {
 
 impl<S> AuthService<S> {
     /// Create a new [`AuthService`] with the given inner service.
-    pub fn new(inner: S, secret: JwtSecret) -> Self {
-        AuthService { inner, secret }
+    pub const fn new(inner: S, secret: JwtSecret) -> Self {
+        Self { inner, secret }
     }
 }
 
-impl<S, B> Service<Request<B>> for AuthService<S>
+impl<S, B, ResBody> Service<Request<B>> for AuthService<S>
 where
-    S: Service<hyper::Request<B>, Response = HyperResponse, Error = Error>
+    S: Service<hyper::Request<B>, Response = Response<ResBody>, Error = TransportError>
         + Clone
         + Send
         + Sync
@@ -62,10 +63,14 @@ where
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
     B: From<Vec<u8>> + Send + 'static + Clone + Sync,
+    ResBody: hyper::body::Body + Send + 'static,
+    ResBody::Error: std::error::Error + Send + Sync + 'static,
+    ResBody::Data: Send,
 {
-    type Response = HyperResponse;
-    type Error = Error;
-    type Future = HyperResponseFut;
+    type Response = Response<ResBody>;
+    type Error = TransportError;
+    type Future =
+        Pin<Box<dyn Future<Output = Result<Response<ResBody>, TransportError>> + Send + 'static>>;
 
     fn poll_ready(
         &mut self,
@@ -77,18 +82,24 @@ where
     fn call(&mut self, req: Request<B>) -> Self::Future {
         let headers = req.headers();
 
-        match get_bearer_token(&headers).and_then(|token| self.secret.validate(&token).ok()) {
-            Some(_) => {
-                // The token is valid, hence forward the request.
-                Box::pin(self.inner.call(req))
-            }
+        match get_bearer_token(headers).and_then(|token| self.secret.validate(&token).ok()) {
+            Some(_) => Box::pin(self.inner.call(req)),
             None => {
                 // Generate a fresh token from the secret and insert it into the request.
-                // TODO: rm unwraps
-                let token = create_token_from_secret(&self.secret).unwrap();
-                let mut req = req.clone();
-                req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
-                Box::pin(self.inner.call(req))
+                match create_token_from_secret(&self.secret) {
+                    Ok(token) => {
+                        let mut req = req.clone();
+
+                        req.headers_mut()
+                            .insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
+                        Box::pin(self.inner.call(req))
+                    }
+                    Err(e) => {
+                        let e = TransportErrorKind::custom(e);
+
+                        Box::pin(async move { Err(e) })
+                    }
+                }
             }
         }
     }

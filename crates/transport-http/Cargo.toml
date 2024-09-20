@@ -35,9 +35,7 @@ hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }
 
 # auth layer
-alloy-rpc-types-engine = { workspace = true, features = [
-    "jwt",
-], optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true }
 jsonwebtoken = { version = "9.3.0", optional = true }
 
 [features]
@@ -58,6 +56,8 @@ hyper = [
     "dep:tower",
     "dep:tracing",
     "dep:alloy-rpc-types-engine",
+    "alloy-rpc-types-engine/jwt",
+    "alloy-rpc-types-engine/serde",
     "dep:jsonwebtoken",
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
