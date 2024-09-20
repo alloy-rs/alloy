@@ -71,11 +71,11 @@ impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
                 Some(Ok(block_number)) => block_number,
                 Some(Err(err)) => {
                     // This is fine.
-                    debug!(%err, "block number stream lagged");
+                    debug!(%err, "polling stream lagged");
                     continue 'task;
                 }
                 None => {
-                    debug!("block number stream ended");
+                    debug!("polling stream ended");
                     break 'task;
                 }
             };
