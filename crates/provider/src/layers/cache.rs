@@ -218,7 +218,6 @@ where
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
-            let block_id = block_id.clone();
             let keys = keys.clone();
             let client = client.clone();
             let cache = cache.clone();
@@ -326,7 +325,7 @@ mod tests {
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{Bytes, FixedBytes};
-    use alloy_rpc_types_eth::TransactionRequest;
+    use alloy_rpc_types_eth::{BlockId, TransactionRequest};
 
     use super::*;
 

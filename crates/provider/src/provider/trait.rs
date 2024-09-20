@@ -1023,7 +1023,6 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
-    use alloy_rpc_client::ClientBuilder;
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     // For layer transport tests
     #[cfg(feature = "hyper")]
