@@ -7,6 +7,7 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
+use alloy_serde::WithOtherFields;
 
 use alloc::vec::Vec;
 
@@ -35,6 +36,15 @@ mod signature;
 pub use signature::{Parity, Signature};
 
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
+
+/// A transaction object that allows capturing additional fields not defined in the standard
+/// [`Transaction`].
+///
+/// This struct wraps around a [`Transaction`] and includes any extra fields present during
+/// deserialization. It is useful for scenarios where non-standard fields might be encountered.
+///
+/// See [`WithOtherFields`] for more information.
+pub type ExtendedTransaction = WithOtherFields<Transaction>;
 
 /// Transaction object used in RPC
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
