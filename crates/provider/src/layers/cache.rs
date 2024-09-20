@@ -1,10 +1,10 @@
-use crate::{Provider, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_json_rpc::{Request, RpcParam};
 use alloy_network::Ethereum;
 use alloy_primitives::{Address, BlockHash, StorageKey, StorageValue, B256, U256};
 use alloy_rpc_client::ClientRef;
 use alloy_rpc_types_eth::{
-    Block, BlockId, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
+    Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
@@ -204,8 +204,8 @@ where
         cache_get_or_fetch!(self, req_hash, self.inner.get_block_by_hash(hash, kind))
     }
 
-    // TODO: Add other commonly used methods such as eth_getTransactionByHash
-    // TODO: Any methods returning RpcWithBlock or RpcCall are blocked by https://github.com/alloy-rs/alloy/pull/788
+    // TODO: Add other commonly used methods such as eth_getTransactionByHash,
+    // eth_getTransactionReceipt, etc.
 
     /// Get the account and storage values of the specified account including the merkle proofs.
     ///
@@ -215,15 +215,53 @@ where
         address: Address,
         keys: Vec<StorageKey>,
     ) -> RpcWithBlock<T, (Address, Vec<StorageKey>), EIP1186AccountProofResponse> {
-        todo!()
-        // Blocked by https://github.com/alloy-rs/alloy/pull/788
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let block_id = block_id.clone();
+            let keys = keys.clone();
+            let client = client.clone();
+            let cache = cache.clone();
+            ProviderCall::BoxedFuture(Box::pin(async move {
+                let req = RequestType::GetProof((address, keys.clone(), block_id));
+
+                let client = client.upgrade().ok_or_else(|| {
+                    TransportErrorKind::custom_str(
+                        "RPC client was dropped before the request was made",
+                    )
+                })?;
+
+                let hash = req.params_hash(&client)?;
+
+                let mut cache = cache.write().await;
+
+                if let Some(cached) = cache.get(&hash).cloned() {
+                    let result =
+                        serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
+                    return Ok(result);
+                }
+
+                let result = client
+                    .request("eth_getProof", (address, keys))
+                    .map_params(|params| ParamsWithBlock { params, block_id })
+                    .map_resp(EIP1186AccountProofResponse::from);
+
+                let res = result.await?;
+
+                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+
+                let _ = cache.put(hash, json_str);
+
+                Ok(res)
+            }))
+        })
     }
 
     /// Gets the specified storage value from [Address].
     fn get_storage_at(
         &self,
-        address: Address,
-        key: U256,
+        _address: Address,
+        _key: U256,
     ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
         todo!()
         // Blocked by https://github.com/alloy-rs/alloy/pull/788
@@ -285,7 +323,10 @@ mod tests {
     use std::str::FromStr;
 
     use crate::ProviderBuilder;
+    use alloy_network::TransactionBuilder;
     use alloy_node_bindings::Anvil;
+    use alloy_primitives::{Bytes, FixedBytes};
+    use alloy_rpc_types_eth::TransactionRequest;
 
     use super::*;
 
@@ -295,7 +336,7 @@ mod tests {
         let anvil = Anvil::new().block_time_f64(0.3).spawn();
         let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
-        let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
+        let path = PathBuf::from_str("./rpc-cache-block-by-number.txt").unwrap();
         provider.load_cache(path.clone()).await.unwrap();
 
         let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
@@ -318,7 +359,7 @@ mod tests {
         let anvil = Anvil::new().block_time_f64(0.3).spawn();
         let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
-        let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
+        let path = PathBuf::from_str("./rpc-cache-block-by-hash.txt").unwrap();
         provider.load_cache(path.clone()).await.unwrap();
 
         let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
@@ -336,6 +377,58 @@ mod tests {
         let block4 =
             provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
         assert_eq!(block3, block4);
+
+        provider.save_cache(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_proof() {
+        let cache = CacheLayer::new(100);
+        let anvil = Anvil::new().block_time_f64(0.3).spawn();
+        let provider = ProviderBuilder::default()
+            // .with_recommended_fillers() - TODO: Issue here. Layer doesn't work with fillers. Fix.
+            .layer(cache)
+            .on_http(anvil.endpoint_url());
+
+        let from = anvil.addresses()[0];
+        let path = PathBuf::from_str("./rpc-cache-proof.txt").unwrap();
+
+        provider.load_cache(path.clone()).await.unwrap();
+
+        let calldata: Bytes = "0x6080604052348015600f57600080fd5b506101f28061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633fb5c1cb146100465780638381f58a14610062578063d09de08a14610080575b600080fd5b610060600480360381019061005b91906100ee565b61008a565b005b61006a610094565b604051610077919061012a565b60405180910390f35b61008861009a565b005b8060008190555050565b60005481565b6000808154809291906100ac90610174565b9190505550565b600080fd5b6000819050919050565b6100cb816100b8565b81146100d657600080fd5b50565b6000813590506100e8816100c2565b92915050565b600060208284031215610104576101036100b3565b5b6000610112848285016100d9565b91505092915050565b610124816100b8565b82525050565b600060208201905061013f600083018461011b565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061017f826100b8565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101b1576101b0610145565b5b60018201905091905056fea264697066735822122067ac0f21f648b0cacd1b7260772852ad4a0f63e2cc174168c51a6887fd5197a964736f6c634300081a0033".parse().unwrap();
+
+        let tx = TransactionRequest::default()
+            .with_from(from)
+            .with_input(calldata)
+            .with_max_fee_per_gas(1_000_000_000)
+            .with_max_priority_fee_per_gas(1_000_000)
+            .with_gas_limit(1_000_000)
+            .with_nonce(0);
+
+        let tx_receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+
+        let counter_addr = tx_receipt.contract_address.unwrap();
+
+        let keys = vec![
+            FixedBytes::with_last_byte(0),
+            FixedBytes::with_last_byte(0x1),
+            FixedBytes::with_last_byte(0x2),
+            FixedBytes::with_last_byte(0x3),
+            FixedBytes::with_last_byte(0x4),
+        ];
+
+        let start_t = std::time::Instant::now();
+        let _proof =
+            provider.get_proof(counter_addr, keys.clone()).block_id(1.into()).await.unwrap();
+        let end_t = std::time::Instant::now();
+
+        println!("Time taken: {:?}", end_t - start_t);
+
+        let start_t = std::time::Instant::now();
+        let _proof2 = provider.get_proof(counter_addr, keys).block_id(1.into()).await.unwrap();
+        let end_t = std::time::Instant::now();
+
+        println!("Time taken: {:?}", end_t - start_t);
 
         provider.save_cache(path).await.unwrap();
     }
