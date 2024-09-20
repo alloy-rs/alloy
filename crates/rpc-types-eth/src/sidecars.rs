@@ -2,30 +2,31 @@
 
 use alloy_eips::eip4844::BlobTransactionSidecar;
 use alloy_primitives::B256;
-use serde::{Deserialize, Serialize};
 
 /// Block sidecar representation
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct BlockSidecar {
     /// Transaction sidecar.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub blob_sidecar: BlobTransactionSidecar,
     /// Block hash.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: B256,
     /// Block number.
-    #[serde(default, with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub block_number: u64,
     /// Transaction hash.
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub tx_hash: B256,
     /// Transaction index.
-    #[serde(default, with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub tx_index: u64,
 }
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_block_sidecar() {
     let block_sidecar = BlockSidecar {
         blob_sidecar: BlobTransactionSidecar::default(),
