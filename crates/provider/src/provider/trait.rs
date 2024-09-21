@@ -1,4 +1,7 @@
 //! Ethereum JSON-RPC provider.
+
+#![allow(unknown_lints, elided_named_lifetimes)]
+
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
