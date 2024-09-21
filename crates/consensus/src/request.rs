@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_eips::{
     eip6110::DepositRequest,
     eip7002::WithdrawalRequest,
