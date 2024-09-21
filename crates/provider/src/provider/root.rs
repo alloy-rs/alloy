@@ -111,7 +111,6 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
             .get_or_try_init(|| async {
                 let new_blocks = NewBlocks::<T, N>::new(self.inner.weak_client());
                 let stream = new_blocks.into_stream().await?;
-                // TODO: Can we avoid `Box::pin` here?
                 Ok(Heartbeat::new(Box::pin(stream)).spawn())
             })
             .await
