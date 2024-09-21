@@ -226,7 +226,7 @@ pub struct BuilderBlockValidationRequestV3 {
 }
 
 /// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
-type BuilderBlockValidationRequestV4 = BuilderBlockValidationRequestV3;
+pub type BuilderBlockValidationRequestV4 = BuilderBlockValidationRequestV3;
 
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
