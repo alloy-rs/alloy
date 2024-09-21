@@ -4,6 +4,15 @@ use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
 
+/// Universal constructor trait.
+pub trait Constructor {
+    /// Data needed to construct type.
+    type Data<'a>;
+
+    /// Instantiates a new type from given data.
+    fn new(data: Self::Data<'_>) -> Self;
+}
+
 /// Receipt JSON-RPC response.
 pub trait ReceiptResponse {
     /// Address of the created contract, or `None` if the transaction was not a deployment.
@@ -61,8 +70,18 @@ pub trait ReceiptResponse {
     fn state_root(&self) -> Option<B256>;
 }
 
+/// Constructs an RPC response transaction.
+pub trait TransactionRespConstructor: Constructor {
+    /// Transaction data.
+    type UnsignedTx;
+    /// Signature of transaction.
+    type Signature;
+    /// Block context required for assembling the transaction for a RPC response.
+    type BlockCtx;
+}
+
 /// Transaction JSON-RPC response.
-pub trait TransactionResponse {
+pub trait TransactionResponse: TransactionRespConstructor {
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
@@ -149,6 +168,20 @@ pub trait BlockResponse {
     fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
         None
     }
+}
+
+impl<T: Constructor> Constructor for WithOtherFields<T> {
+    type Data<'a> = T::Data<'a>;
+
+    fn new(data: Self::Data<'_>) -> Self {
+        Self { inner: T::new(data), other: Default::default() }
+    }
+}
+
+impl<T: TransactionRespConstructor> TransactionRespConstructor for WithOtherFields<T> {
+    type UnsignedTx = T::UnsignedTx;
+    type Signature = T::Signature;
+    type BlockCtx = T::BlockCtx;
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
