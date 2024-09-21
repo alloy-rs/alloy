@@ -5,10 +5,12 @@ use crate::{
 };
 use alloy_network::{Ethereum, Network};
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, ClientRef, RpcClient, WeakClient};
-use alloy_transport::{
-    BoxTransport, BoxTransportConnect, Transport, TransportError, TransportResult,
+use alloy_transport::{BoxTransport, BoxTransportConnect, Transport, TransportError};
+use std::{
+    fmt,
+    marker::PhantomData,
+    sync::{Arc, OnceLock},
 };
-use std::{fmt, marker::PhantomData, sync::Arc};
 
 #[cfg(feature = "reqwest")]
 use alloy_transport_http::Http;
@@ -105,15 +107,12 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
     }
 
     #[inline]
-    pub(crate) async fn get_heart(&self) -> TransportResult<&HeartbeatHandle<N>> {
-        self.inner
-            .heart
-            .get_or_try_init(|| async {
-                let new_blocks = NewBlocks::<T, N>::new(self.inner.weak_client());
-                let stream = new_blocks.into_stream().await?;
-                Ok(Heartbeat::new(Box::pin(stream)).spawn())
-            })
-            .await
+    pub(crate) fn get_heart(&self) -> &HeartbeatHandle<N> {
+        self.inner.heart.get_or_init(|| {
+            let new_blocks = NewBlocks::<T, N>::new(self.inner.weak_client());
+            let stream = new_blocks.into_stream();
+            Heartbeat::new(Box::pin(stream)).spawn()
+        })
     }
 }
 
@@ -121,7 +120,7 @@ impl<T: Transport + Clone, N: Network> RootProvider<T, N> {
 /// base of every provider stack.
 pub(crate) struct RootProviderInner<T, N: Network = Ethereum> {
     client: RpcClient<T>,
-    heart: tokio::sync::OnceCell<HeartbeatHandle<N>>,
+    heart: OnceLock<HeartbeatHandle<N>>,
     _network: PhantomData<N>,
 }
 

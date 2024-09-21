@@ -708,7 +708,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
         // Make sure to initialize heartbeat before we submit transaction, so that
         // we don't miss it if user will subscriber to it immediately after sending.
-        let _handle = self.root().get_heart().await?;
+        let _handle = self.root().get_heart();
 
         match tx {
             SendableTx::Builder(mut tx) => {
@@ -1023,7 +1023,6 @@ impl<T: Transport + Clone, N: Network> Provider<T, N> for RootProvider<T, N> {
             };
 
         self.get_heart()
-            .await?
             .watch_tx(config, block_number)
             .await
             .map_err(|_| PendingTransactionError::FailedToRegister)

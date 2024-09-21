@@ -1,14 +1,14 @@
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::{BlockNumber, U64};
 use alloy_rpc_client::{NoParams, PollerBuilder, WeakClient};
-use alloy_transport::{RpcError, Transport, TransportResult};
+use alloy_transport::{RpcError, Transport};
 use async_stream::stream;
-use futures::{FutureExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use lru::LruCache;
 use std::{marker::PhantomData, num::NonZeroUsize};
 
 #[cfg(feature = "pubsub")]
-use futures::future::Either;
+use futures::{future::Either, FutureExt};
 
 /// The size of the block cache.
 const BLOCK_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
@@ -42,21 +42,19 @@ impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
     }
 
     #[cfg(test)]
-    fn with_next_yield(mut self, next_yield: u64) -> Self {
+    const fn with_next_yield(mut self, next_yield: u64) -> Self {
         self.next_yield = next_yield;
         self
     }
 
-    pub(crate) async fn into_stream(
-        self,
-    ) -> TransportResult<impl Stream<Item = N::BlockResponse> + 'static> {
+    pub(crate) fn into_stream(self) -> impl Stream<Item = N::BlockResponse> + 'static {
         // Return a stream that lazily subscribes to `newHeads` on the first poll.
         #[cfg(feature = "pubsub")]
         if let Some(client) = self.client.upgrade() {
             if client.pubsub_frontend().is_some() {
                 let subscriber = self.into_subscription_stream().map(futures::stream::iter);
                 let subscriber = futures::stream::once(subscriber);
-                return Ok(Either::Left(subscriber.flatten().flatten()));
+                return Either::Left(subscriber.flatten().flatten());
             }
         }
 
@@ -66,9 +64,10 @@ impl<T: Transport + Clone, N: Network> NewBlocks<T, N> {
         let right = Either::Right;
         #[cfg(not(feature = "pubsub"))]
         let right = std::convert::identity;
-        Ok(right(self.into_poll_stream()))
+        right(self.into_poll_stream())
     }
 
+    #[cfg(feature = "pubsub")]
     async fn into_subscription_stream(
         self,
     ) -> Option<impl Stream<Item = N::BlockResponse> + 'static> {
@@ -191,7 +190,11 @@ mod tests {
     }
 
     async fn timeout<T: Future>(future: T) -> T::Output {
-        tokio::time::timeout(Duration::from_secs(1), future).await.expect("timed out")
+        try_timeout(future).await.expect("Timeout")
+    }
+
+    async fn try_timeout<T: Future>(future: T) -> Option<T::Output> {
+        tokio::time::timeout(Duration::from_secs(2), future).await.ok()
     }
 
     #[tokio::test]
@@ -212,7 +215,10 @@ mod tests {
         let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<_, Ethereum>::new(provider.weak_client()).with_next_yield(1);
-        let mut stream = Box::pin(new_blocks.into_stream().await.unwrap());
+        let mut stream = Box::pin(new_blocks.into_stream());
+        if ws {
+            let _ = try_timeout(stream.next()).await; // Subscribe to newHeads.
+        }
 
         // We will also use provider to manipulate anvil instance via RPC.
         provider.anvil_mine(Some(U256::from(1)), None).await.unwrap();
@@ -242,7 +248,10 @@ mod tests {
         let provider = ProviderBuilder::new().on_builtin(&url).await.unwrap();
 
         let new_blocks = NewBlocks::<_, Ethereum>::new(provider.weak_client()).with_next_yield(1);
-        let stream = Box::pin(new_blocks.into_stream().await.unwrap());
+        let mut stream = Box::pin(new_blocks.into_stream());
+        if ws {
+            let _ = try_timeout(stream.next()).await; // Subscribe to newHeads.
+        }
 
         // We will also use provider to manipulate anvil instance via RPC.
         provider.anvil_mine(Some(U256::from(BLOCKS_TO_MINE)), None).await.unwrap();
