@@ -1,6 +1,5 @@
-use alloy_eips::eip7702::SignedAuthorization;
-use alloy_eips::eip2930::AccessList;
-use alloy_primitives::{Address, Signature, ChainId, BlockHash, Bytes, TxHash, B256, U256};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
