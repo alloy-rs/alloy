@@ -343,6 +343,22 @@ impl TransactionResponse for Transaction {
         self.hash
     }
 
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.block_hash
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.block_number
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.transaction_index
+    }
+
     fn from(&self) -> Address {
         self.from
     }
@@ -355,14 +371,55 @@ impl TransactionResponse for Transaction {
         self.value
     }
 
+    fn gas_price(&self) -> Option<u128> {
+        self.gas_price
+    }
+
     fn gas(&self) -> u128 {
         self.gas
+    }
+
+    fn max_fee_per_gas(&self) -> Option<u128> {
+        self.max_fee_per_gas
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.max_priority_fee_per_gas
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.max_fee_per_blob_gas
     }
 
     fn input(&self) -> &Bytes {
         &self.input
     }
+
+    fn signature(&self) -> Option<Signature> {
+        self.signature
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<B256>> {
+        self.blob_versioned_hashes.clone()
+    }
+
+    fn access_list(&self) -> Option<AccessList> {
+        self.access_list.clone()
+    }
+
+    fn transaction_type(&self) -> Option<u8> {
+        self.transaction_type
+    }
+
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
+        self.authorization_list.clone()
+    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
