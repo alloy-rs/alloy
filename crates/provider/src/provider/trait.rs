@@ -1,4 +1,7 @@
 //! Ethereum JSON-RPC provider.
+
+#![allow(unknown_lints, elided_named_lifetimes)]
+
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
@@ -17,6 +20,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
+    simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
     FilterChanges, Log, SyncStatus,
 };
@@ -150,6 +154,17 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     #[doc(alias = "call_with_overrides")]
     fn call<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, Bytes> {
         EthCall::new(self.weak_client(), tx)
+    }
+
+    /// Executes an arbitrary number of transactions on top of the requested state.
+    ///
+    /// The transactions are packed into individual blocks. Overrides can be provided.
+    #[doc(alias = "eth_simulateV1")]
+    fn simulate<'req>(
+        &self,
+        payload: &'req SimulatePayload,
+    ) -> RpcWithBlock<T, &'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
+        self.client().request("eth_simulateV1", payload).into()
     }
 
     /// Gets the chain ID.  

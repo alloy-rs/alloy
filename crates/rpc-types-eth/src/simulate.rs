@@ -10,7 +10,7 @@ pub const MAX_SIMULATE_BLOCKS: u64 = 256;
 /// Represents a batch of calls to be simulated sequentially within a block.
 /// This struct includes block and state overrides as well as the transaction requests to be
 /// executed.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimBlock {
@@ -22,6 +22,32 @@ pub struct SimBlock {
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
     pub calls: Vec<TransactionRequest>,
+}
+
+impl SimBlock {
+    /// Enables state overrides
+    pub fn with_state_overrides(mut self, overrides: StateOverride) -> Self {
+        self.state_overrides = Some(overrides);
+        self
+    }
+
+    /// Enables block overrides
+    pub fn with_block_overrides(mut self, overrides: BlockOverrides) -> Self {
+        self.block_overrides = Some(overrides);
+        self
+    }
+
+    /// Adds a call to the block.
+    pub fn call(mut self, call: TransactionRequest) -> Self {
+        self.calls.push(call);
+        self
+    }
+
+    /// Adds multiple calls to the block.
+    pub fn extend_calls(mut self, calls: impl IntoIterator<Item = TransactionRequest>) -> Self {
+        self.calls.extend(calls);
+        self
+    }
 }
 
 /// Represents the result of simulating a block.
@@ -62,7 +88,7 @@ pub struct SimCallResult {
 ///
 /// This struct configures how simulations are executed, including whether to trace token transfers,
 /// validate transaction sequences, and whether to return full transaction objects.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatePayload {
@@ -77,6 +103,38 @@ pub struct SimulatePayload {
     /// Flag to decide if full transactions should be returned instead of just their hashes.
     #[cfg_attr(feature = "serde", serde(default))]
     pub return_full_transactions: bool,
+}
+
+impl SimulatePayload {
+    /// Adds a block to the simulation payload.
+    pub fn extend(mut self, block: SimBlock) -> Self {
+        self.block_state_calls.push(block);
+        self
+    }
+
+    /// Adds multiple blocks to the simulation payload.
+    pub fn extend_blocks(mut self, blocks: impl IntoIterator<Item = SimBlock>) -> Self {
+        self.block_state_calls.extend(blocks);
+        self
+    }
+
+    /// Enables tracing of token transfers.
+    pub const fn with_trace_transfers(mut self) -> Self {
+        self.trace_transfers = true;
+        self
+    }
+
+    /// Enables validation of the transaction sequence.
+    pub const fn with_validation(mut self) -> Self {
+        self.validation = true;
+        self
+    }
+
+    /// Enables returning full transactions.
+    pub const fn with_full_transactions(mut self) -> Self {
+        self.return_full_transactions = true;
+        self
+    }
 }
 
 /// The error response returned by the `eth_simulateV1` method.

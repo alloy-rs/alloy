@@ -225,6 +225,9 @@ pub struct BuilderBlockValidationRequestV3 {
     pub parent_beacon_block_root: B256,
 }
 
+/// A Request to validate a [SubmitBlockRequest] <https://github.com/flashbots/builder/blob/7577ac81da21e760ec6693637ce2a81fe58ac9f8/eth/block-validation/api.go#L198-L202>
+pub type BuilderBlockValidationRequestV4 = BuilderBlockValidationRequestV3;
+
 /// Query for the GET `/relay/v1/data/bidtraces/proposer_payload_delivered`
 ///
 /// Provides [BidTrace]s for payloads that were delivered to proposers.

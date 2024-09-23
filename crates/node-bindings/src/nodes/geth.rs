@@ -648,9 +648,8 @@ impl Geth {
 // These tests should use a different datadir for each `geth` spawned.
 #[cfg(test)]
 mod tests {
-    use crate::utils::run_with_tempdir_sync;
-
     use super::*;
+    use crate::utils::run_with_tempdir_sync;
 
     #[test]
     fn port_0() {
