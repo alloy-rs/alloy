@@ -258,6 +258,11 @@ impl JwtSecret {
         let algo = jsonwebtoken::Header::new(Algorithm::HS256);
         jsonwebtoken::encode(&algo, claims, &key)
     }
+
+    /// Returns the secret key as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl core::fmt::Debug for JwtSecret {

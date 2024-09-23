@@ -39,7 +39,7 @@ alloy-rpc-types-engine = { workspace = true, optional = true }
 jsonwebtoken = { workspace = true, optional = true }
 
 [features]
-default = ["reqwest", "reqwest-default-tls", "hyper"]
+default = ["reqwest", "reqwest-default-tls"]
 reqwest = [
     "dep:reqwest",
     "dep:alloy-json-rpc",

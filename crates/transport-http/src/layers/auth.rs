@@ -5,6 +5,7 @@ use crate::hyper::{
 use alloy_rpc_types_engine::{Claims, JwtSecret};
 use alloy_transport::{TransportError, TransportErrorKind};
 use hyper::header::HeaderValue;
+use jsonwebtoken::{decode, get_current_timestamp, DecodingKey, Validation};
 use std::{
     future::Future,
     pin::Pin,
@@ -46,10 +47,38 @@ pub struct AuthService<S> {
     secret: JwtSecret,
 }
 
+/// This is used to prevent the request from the sending a VALID token to the server that may get
+/// expired by the time it reaches the server.
+const IAT_GRACE_BUFFER: u64 = 5;
+
 impl<S> AuthService<S> {
     /// Create a new [`AuthService`] with the given inner service.
     pub const fn new(inner: S, secret: JwtSecret) -> Self {
         Self { inner, secret }
+    }
+
+    /// Validate the token in the request headers.
+    ///
+    /// Returns `true` if the token is valid and `iat` is beyond the grace buffer.
+    pub fn validate(&self, headers: &HeaderMap) -> bool {
+        if let Some(token) = get_bearer_token(headers) {
+            let is_valid = self.secret.validate(&token).ok().and_then(|_| {
+                let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+                let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
+                decode::<Claims>(token.as_str(), &decoding_key, &validation).ok().and_then(|data| {
+                    let curr_secs = get_current_timestamp();
+                    if data.claims.iat.abs_diff(curr_secs) <= IAT_GRACE_BUFFER {
+                        None
+                    } else {
+                        Some(())
+                    }
+                })
+            });
+
+            is_valid.is_some()
+        } else {
+            false
+        }
     }
 }
 
@@ -82,9 +111,9 @@ where
     fn call(&mut self, req: Request<B>) -> Self::Future {
         let headers = req.headers();
 
-        match get_bearer_token(headers).and_then(|token| self.secret.validate(&token).ok()) {
-            Some(_) => Box::pin(self.inner.call(req)),
-            None => {
+        match self.validate(headers) {
+            true => Box::pin(self.inner.call(req)),
+            false => {
                 // Generate a fresh token from the secret and insert it into the request.
                 match create_token_from_secret(&self.secret) {
                     Ok(token) => {
