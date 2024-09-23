@@ -22,12 +22,21 @@ use tower::{Layer, Service};
 #[derive(Clone, Debug)]
 pub struct AuthLayer {
     secret: JwtSecret,
+    latency_buffer: u64,
 }
 
 impl AuthLayer {
     /// Create a new [`AuthLayer`].
     pub const fn new(secret: JwtSecret) -> Self {
-        Self { secret }
+        Self { secret, latency_buffer: 5000 }
+    }
+
+    /// We use this buffer to perfom an extra check on the `iat` field to prevent sending any
+    /// requests with tokens that are valid now but may not be upon reaching the server.
+    ///
+    /// In milliseconds. Default is 5s.
+    pub const fn with_latency_buffer(self, latency_buffer: u64) -> Self {
+        Self { latency_buffer, ..self }
     }
 }
 
@@ -35,7 +44,7 @@ impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        AuthService::new(inner, self.secret)
+        AuthService::new(inner, self.secret, self.latency_buffer)
     }
 }
 
@@ -45,40 +54,35 @@ impl<S> Layer<S> for AuthLayer {
 pub struct AuthService<S> {
     inner: S,
     secret: JwtSecret,
+    /// In milliseconds.
+    latency_buffer: u64,
 }
-
-/// This is used to prevent the client from the sending a VALID token that may get
-/// expired by the time it reaches the server.
-const IAT_GRACE_BUFFER_SECS: u64 = 5;
 
 impl<S> AuthService<S> {
     /// Create a new [`AuthService`] with the given inner service.
-    pub const fn new(inner: S, secret: JwtSecret) -> Self {
-        Self { inner, secret }
+    pub const fn new(inner: S, secret: JwtSecret, latency_buffer: u64) -> Self {
+        Self { inner, secret, latency_buffer }
     }
 
     /// Validate the token in the request headers.
     ///
     /// Returns `true` if the token is valid and `iat` is beyond the grace buffer.
     pub fn validate(&self, headers: &HeaderMap) -> bool {
-        if let Some(token) = get_bearer_token(headers) {
+        get_bearer_token(headers).map_or(false, |token| {
             let is_valid = self.secret.validate(&token).ok().and_then(|_| {
                 let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
                 let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
                 decode::<Claims>(token.as_str(), &decoding_key, &validation).ok().and_then(|data| {
                     let curr_secs = get_current_timestamp();
-                    if data.claims.iat.abs_diff(curr_secs) <= IAT_GRACE_BUFFER_SECS {
+                    if data.claims.iat.abs_diff(curr_secs) <= self.latency_buffer {
                         None
                     } else {
                         Some(())
                     }
                 })
             });
-
             is_valid.is_some()
-        } else {
-            false
-        }
+        })
     }
 }
 
