@@ -185,7 +185,7 @@ struct BeaconExecutionPayloadV1<'a> {
     #[serde_as(as = "DisplayFromStr")]
     block_number: u64,
     #[serde_as(as = "DisplayFromStr")]
-    gas_limit: u64,
+    gas_limit: u128,
     #[serde_as(as = "DisplayFromStr")]
     gas_used: u64,
     #[serde_as(as = "DisplayFromStr")]

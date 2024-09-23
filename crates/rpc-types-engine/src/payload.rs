@@ -175,7 +175,7 @@ pub struct ExecutionPayloadV1 {
     pub block_number: u64,
     /// The gas limit of the block.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u64,
+    pub gas_limit: u128,
     /// The gas used of the block.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u64,
