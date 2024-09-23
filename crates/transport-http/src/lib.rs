@@ -20,9 +20,9 @@ pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
 mod layers;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
 pub use layers::{AuthLayer, AuthService};
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]

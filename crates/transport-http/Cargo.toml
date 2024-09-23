@@ -36,7 +36,7 @@ hyper-util = { workspace = true, features = ["full"], optional = true }
 
 # auth layer
 alloy-rpc-types-engine = { workspace = true, optional = true }
-jsonwebtoken = { version = "9.3.0", optional = true }
+jsonwebtoken = { workspace = true, optional = true }
 
 [features]
 default = ["reqwest", "reqwest-default-tls", "hyper"]
@@ -55,6 +55,8 @@ hyper = [
     "dep:serde_json",
     "dep:tower",
     "dep:tracing",
+]
+jwt-auth = [
     "dep:alloy-rpc-types-engine",
     "alloy-rpc-types-engine/jwt",
     "alloy-rpc-types-engine/serde",
