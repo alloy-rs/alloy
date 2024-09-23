@@ -85,10 +85,12 @@ pub struct PackedUserOperation {
     pub nonce: U256,
     /// Deployer contract address: Required exclusively for deploying new accounts that don't yet
     /// exist on the blockchain.
-    pub factory: Address,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub factory: Option<Address>,
     /// Factory data for the account creation process, applicable only when using a deployer
     /// contract.
-    pub factory_data: Bytes,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub factory_data: Option<Bytes>,
     /// The call data.
     pub call_data: Bytes,
     /// The gas limit for the call.
@@ -104,13 +106,17 @@ pub struct PackedUserOperation {
     pub max_priority_fee_per_gas: U256,
     /// Paymaster contract address: Needed if a third party is covering transaction costs; left
     /// blank for self-funded accounts.
-    pub paymaster: Address,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster: Option<Address>,
     /// The gas limit for the paymaster verification.
-    pub paymaster_verification_gas_limit: U256,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_verification_gas_limit: Option<U256>,
     /// The gas limit for the paymaster post-operation.
-    pub paymaster_post_op_gas_limit: U256,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_post_op_gas_limit: Option<U256>,
     /// The paymaster data.
-    pub paymaster_data: Bytes,
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+    pub paymaster_data: Option<Bytes>,
     /// The signature of the transaction.
     pub signature: Bytes,
 }
