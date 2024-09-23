@@ -68,6 +68,7 @@ impl<N: Network> RootProvider<BoxTransport, N> {
     /// Creates a new root provider from the provided connection details.
     pub async fn connect_builtin(s: &str) -> Result<Self, TransportError> {
         let conn: BuiltInConnectionString = s.parse()?;
+
         let client = ClientBuilder::default().connect_boxed(conn).await?;
         Ok(Self::new(client))
     }
