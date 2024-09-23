@@ -1038,6 +1038,7 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rpc_client::BuiltInConnectionString;
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     // For layer transport tests
     #[cfg(feature = "hyper")]
@@ -1670,6 +1671,23 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn builtin_connect_boxed() {
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+
+        let conn: BuiltInConnectionString = anvil.endpoint().parse().unwrap();
+
+        let transport = conn.connect_boxed().await.unwrap();
+
+        let client = alloy_rpc_client::RpcClient::new(transport, true);
+
+        let provider = RootProvider::<BoxTransport, Ethereum>::new(client);
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[tokio::test]
