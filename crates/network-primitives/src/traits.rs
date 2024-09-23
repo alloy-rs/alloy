@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
@@ -63,6 +64,8 @@ pub trait ReceiptResponse {
 
 /// Transaction JSON-RPC response.
 pub trait TransactionResponse {
+    /// Signature type of the transaction
+    type Signature;
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
@@ -108,7 +111,7 @@ pub trait TransactionResponse {
     fn input(&self) -> &Bytes;
 
     /// Transaction signature
-    fn signature(&self) -> Option<Signature>;
+    fn signature(&self) -> Option<Self::Signature>;
 
     /// The chain id of the transaction
     fn chain_id(&self) -> Option<ChainId>;
@@ -194,6 +197,8 @@ pub trait BlockResponse {
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
+    type Signature = T::Signature;
+
     fn tx_hash(&self) -> TxHash {
         self.inner.tx_hash()
     }
@@ -250,7 +255,7 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.input()
     }
 
-    fn signature(&self) -> Option<Signature> {
+    fn signature(&self) -> Option<T::Signature> {
         self.inner.signature()
     }
 

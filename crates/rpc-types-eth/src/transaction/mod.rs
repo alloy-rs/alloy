@@ -339,6 +339,8 @@ impl TryFrom<Transaction> for TxEnvelope {
 }
 
 impl TransactionResponse for Transaction {
+    type Signature = Signature;
+
     fn tx_hash(&self) -> B256 {
         self.hash
     }
