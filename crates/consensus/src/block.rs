@@ -1,9 +1,11 @@
 //! Genesic Block Type
 
-use crate::Header;
+use crate::{Header, Requests};
 use alloc::vec::Vec;
-use alloy_eips::eip4895::Withdrawal;
-use alloy_eips::eip2718::{Encodable2718, Decodable2718};
+use alloy_eips::{
+    eip2718::{Decodable2718, Encodable2718},
+    eip4895::Withdrawal,
+};
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -31,5 +33,6 @@ pub struct BlockBody<T: Encodable + Decodable + Encodable2718 + Decodable2718> {
     pub ommers: Vec<Header>,
     /// Block withdrawals.
     pub withdrawals: Option<Vec<Withdrawal>>,
-    // TODO: add request with rlp encoding support
+    /// Block requests
+    pub requests: Option<Requests>,
 }

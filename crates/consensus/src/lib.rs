@@ -29,7 +29,7 @@ pub use receipt::{
 };
 
 mod request;
-pub use request::Request;
+pub use request::{Request, Requests};
 
 pub mod transaction;
 #[cfg(feature = "kzg")]
