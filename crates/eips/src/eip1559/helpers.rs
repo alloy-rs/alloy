@@ -126,7 +126,7 @@ mod tests {
                 next_base_fee[i],
                 calc_next_block_base_fee(
                     gas_used[i] as u128,
-                    gas_limit[i] as u128,
+                    gas_limit[i],
                     base_fee[i] as u128,
                     BaseFeeParams::optimism_sepolia(),
                 ) as u64
@@ -158,7 +158,7 @@ mod tests {
                 next_base_fee[i],
                 calc_next_block_base_fee(
                     gas_used[i] as u128,
-                    gas_limit[i] as u128,
+                    gas_limit[i],
                     base_fee[i] as u128,
                     BaseFeeParams::optimism(),
                 ) as u64
@@ -190,7 +190,7 @@ mod tests {
                 next_base_fee[i],
                 calc_next_block_base_fee(
                     gas_used[i] as u128,
-                    gas_limit[i] as u128,
+                    gas_limit[i],
                     base_fee[i] as u128,
                     BaseFeeParams::optimism_canyon(),
                 ) as u64
@@ -222,7 +222,7 @@ mod tests {
                 next_base_fee[i],
                 calc_next_block_base_fee(
                     gas_used[i] as u128,
-                    gas_limit[i] as u128,
+                    gas_limit[i],
                     base_fee[i] as u128,
                     BaseFeeParams::base_sepolia(),
                 ) as u64
