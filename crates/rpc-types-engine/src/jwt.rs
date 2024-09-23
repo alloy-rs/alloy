@@ -260,7 +260,7 @@ impl JwtSecret {
     }
 
     /// Returns the secret key as a byte slice.
-    pub fn as_bytes(&self) -> &[u8] {
+    pub const fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 }

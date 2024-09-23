@@ -47,9 +47,9 @@ pub struct AuthService<S> {
     secret: JwtSecret,
 }
 
-/// This is used to prevent the request from the sending a VALID token to the server that may get
+/// This is used to prevent the client from the sending a VALID token that may get
 /// expired by the time it reaches the server.
-const IAT_GRACE_BUFFER: u64 = 5;
+const IAT_GRACE_BUFFER_SECS: u64 = 5;
 
 impl<S> AuthService<S> {
     /// Create a new [`AuthService`] with the given inner service.
@@ -67,7 +67,7 @@ impl<S> AuthService<S> {
                 let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
                 decode::<Claims>(token.as_str(), &decoding_key, &validation).ok().and_then(|data| {
                     let curr_secs = get_current_timestamp();
-                    if data.claims.iat.abs_diff(curr_secs) <= IAT_GRACE_BUFFER {
+                    if data.claims.iat.abs_diff(curr_secs) <= IAT_GRACE_BUFFER_SECS {
                         None
                     } else {
                         Some(())
