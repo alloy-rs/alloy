@@ -63,7 +63,7 @@ pub struct Header {
     pub gas_limit: u64,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_used: u128,
+    pub gas_used: u64,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
     /// formally Hs.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
@@ -231,11 +231,11 @@ impl Header {
     /// Calculate base fee for next block according to the EIP-1559 spec.
     ///
     /// Returns a `None` if no base fee is set, no EIP-1559 support
-    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u128> {
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
         Some(calc_next_block_base_fee(
             self.gas_used,
             self.gas_limit,
-            self.base_fee_per_gas?,
+            self.base_fee_per_gas? as u64,
             base_fee_params,
         ))
     }
@@ -485,7 +485,7 @@ impl Decodable for Header {
             difficulty: Decodable::decode(buf)?,
             number: u64::decode(buf)?,
             gas_limit: u64::decode(buf)?,
-            gas_used: u128::decode(buf)?,
+            gas_used: u64::decode(buf)?,
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
@@ -674,7 +674,7 @@ pub trait BlockHeader {
     fn gas_limit(&self) -> u64;
 
     /// Retrieves the gas used by the block
-    fn gas_used(&self) -> u128;
+    fn gas_used(&self) -> u64;
 
     /// Retrieves the timestamp of the block
     fn timestamp(&self) -> u64;
@@ -749,7 +749,7 @@ impl BlockHeader for Header {
         self.gas_limit
     }
 
-    fn gas_used(&self) -> u128 {
+    fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
