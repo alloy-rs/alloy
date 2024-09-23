@@ -60,7 +60,7 @@ pub struct Header {
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_used: u128,
@@ -484,7 +484,7 @@ impl Decodable for Header {
             logs_bloom: Decodable::decode(buf)?,
             difficulty: Decodable::decode(buf)?,
             number: u64::decode(buf)?,
-            gas_limit: u128::decode(buf)?,
+            gas_limit: u64::decode(buf)?,
             gas_used: u128::decode(buf)?,
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
@@ -671,7 +671,7 @@ pub trait BlockHeader {
     fn number(&self) -> BlockNumber;
 
     /// Retrieves the gas limit of the block
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Retrieves the gas used by the block
     fn gas_used(&self) -> u128;
@@ -745,7 +745,7 @@ impl BlockHeader for Header {
         self.number
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
@@ -808,5 +808,17 @@ mod tests {
 
         let decoded: Header = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, header);
+
+        // Create a vector to store the encoded RLP
+        let mut encoded_rlp = Vec::new();
+
+        // Encode the header data
+        decoded.encode(&mut encoded_rlp);
+
+        // Decode the RLP data
+        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
+
+        // Check that the decoded RLP data matches the original header data
+        assert_eq!(decoded_rlp, decoded);
     }
 }

@@ -80,7 +80,7 @@ pub struct Header {
     pub number: u64,
     /// Gas Limit
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// Gas Used
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub gas_used: u128,
@@ -259,7 +259,7 @@ impl HeaderResponse for Header {
         self.miner
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 

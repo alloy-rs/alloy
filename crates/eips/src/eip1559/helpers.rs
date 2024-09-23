@@ -25,12 +25,12 @@ use crate::eip1559::BaseFeeParams;
 /// For more information, refer to the [EIP-1559 spec](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md).
 pub fn calc_next_block_base_fee(
     gas_used: u128,
-    gas_limit: u128,
+    gas_limit: u64,
     base_fee: u128,
     base_fee_params: BaseFeeParams,
 ) -> u128 {
     // Calculate the target gas by dividing the gas limit by the elasticity multiplier.
-    let gas_target = gas_limit / base_fee_params.elasticity_multiplier;
+    let gas_target = gas_limit as u128 / base_fee_params.elasticity_multiplier;
 
     match gas_used.cmp(&gas_target) {
         // If the gas used in the current block is equal to the gas target, the base fee remains the
