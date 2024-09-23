@@ -74,7 +74,7 @@ impl<S> AuthService<S> {
                 let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
                 decode::<Claims>(token.as_str(), &decoding_key, &validation).ok().and_then(|data| {
                     let curr_secs = get_current_timestamp();
-                    if data.claims.iat.abs_diff(curr_secs) <= self.latency_buffer {
+                    if data.claims.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
                         None
                     } else {
                         Some(())
