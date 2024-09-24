@@ -7,6 +7,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
+#[macro_use]
+#[allow(unused_imports)]
 extern crate alloc;
 
 /// Standardized collections across `std` and `no_std` environments.
