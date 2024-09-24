@@ -22,12 +22,12 @@ pub mod u8_via_ruint {
 /// serde functions for handling `Option<u8>` via [U8](alloy_primitives::U8)
 pub mod u8_opt_via_ruint {
     use alloy_primitives::U8;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes u64 as hex string
     pub fn serialize<S: Serializer>(value: &Option<u8>, s: S) -> Result<S::Ok, S::Error> {
         match value {
-            Some(val) => U8::from(*val).serialize(s),
+            Some(val) => s.serialize_some(&U8::from(*val)),
             None => s.serialize_none(),
         }
     }
@@ -63,12 +63,12 @@ pub mod u64_via_ruint {
 /// serde functions for handling `Option<u64>` via [U64](alloy_primitives::U64)
 pub mod u64_opt_via_ruint {
     use alloy_primitives::U64;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes u64 as hex string
     pub fn serialize<S: Serializer>(value: &Option<u64>, s: S) -> Result<S::Ok, S::Error> {
         match value {
-            Some(val) => U64::from(*val).serialize(s),
+            Some(val) => s.serialize_some(&U64::from(*val)),
             None => s.serialize_none(),
         }
     }
@@ -106,7 +106,7 @@ pub mod u128_via_ruint {
 /// serde functions for handling primitive optional `u128` via [U128](alloy_primitives::U128)
 pub mod u128_opt_via_ruint {
     use alloy_primitives::U128;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     /// Deserializes an `Option<u128>` accepting a hex quantity string with optional 0x prefix or
     /// a number
@@ -121,7 +121,7 @@ pub mod u128_opt_via_ruint {
     /// Serializes `Option<u128>` as hex string
     pub fn serialize<S: Serializer>(value: &Option<u128>, s: S) -> Result<S::Ok, S::Error> {
         match value {
-            Some(val) => U128::from(*val).serialize(s),
+            Some(val) => s.serialize_some(&U128::from(*val)),
             None => s.serialize_none(),
         }
     }
@@ -154,7 +154,7 @@ pub mod u128_vec_via_ruint {
 /// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
 pub mod u128_vec_vec_opt_via_ruint {
     use alloy_primitives::U128;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
@@ -186,7 +186,7 @@ pub mod u128_vec_vec_opt_via_ruint {
                     .iter()
                     .map(|v| v.iter().map(|val| U128::from(*val)).collect::<Vec<_>>())
                     .collect::<Vec<_>>();
-                vec.serialize(s)
+                s.serialize_some(&vec)
             }
             None => s.serialize_none(),
         }
