@@ -64,8 +64,8 @@ impl<S> AuthService<S> {
 
     /// Validate the token in the request headers.
     ///
-    /// Returns `true` if the token is valid and `iat` is beyond the grace buffer.
-    pub fn validate(&self) -> bool {
+    /// Returns `true` if the token is still valid and `iat` is beyond the grace buffer.
+   fn validate(&self) -> bool {
         if let Some(claim) = self.most_recent_claim.as_ref() {
             let curr_secs = get_current_timestamp();
             if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
