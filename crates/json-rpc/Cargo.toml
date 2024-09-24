@@ -25,3 +25,9 @@ serde_json = { workspace = true, features = ["std", "raw_value"] }
 thiserror.workspace = true
 tracing.workspace = true
 alloy-sol-types.workspace = true
+
+async-trait = { workspace = true, optional = true }
+axum = { version = "0.7.6", features = ["json"], optional = true }
+
+[features]
+axum = ["dep:axum"]
