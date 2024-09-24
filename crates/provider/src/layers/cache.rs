@@ -8,11 +8,10 @@ use alloy_rpc_types_eth::{
 };
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf, sync::Arc};
-use tokio::sync::RwLock;
-// TODO: Populate load cache from file on initialization.
-// TODO: Add method to dump cache to file.
+
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
 /// In order to initialize the caching layer, the path to the cache file is provided along with the
@@ -24,21 +23,26 @@ use tokio::sync::RwLock;
 /// Example usage:
 /// ```
 /// use alloy_node_bindings::Anvil;
-/// use alloy_provider::ProviderBuilder;
+/// use alloy_provider::{ProviderBuilder, Provider};
+/// use alloy_provider::layers::CacheLayer;
 /// use std::path::PathBuf;
+/// use std::str::FromStr;
 ///
+/// #[tokio::main]
+/// async fn main() {
 /// let cache = CacheLayer::new(100);
 /// let anvil = Anvil::new().block_time_f64(0.3).spawn();
 /// let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 /// let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
-/// provider.load_cache(path).await.unwrap(); // Load cache from file if it exists.
+/// provider.load_cache(path.clone()).unwrap(); // Load cache from file if it exists.
 ///
 /// let blk = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from RPC and saved to in-memory cache
 ///
 /// let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from in-memory cache
 /// assert_eq!(blk, blk2);
 ///
-/// provider.save_cache(path).await.unwrap(); // Save cache to file
+/// provider.save_cache(path).unwrap(); // Save cache to file
+/// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
@@ -97,15 +101,15 @@ where
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
-    pub async fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
-        let mut cache = self.cache.write().await;
+    pub fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
+        let mut cache = self.cache.write();
         Ok(cache.put(key, value))
     }
 
     /// Gets a value from the cache, if it exists.
-    pub async fn get(&self, key: &B256) -> TransportResult<Option<String>> {
+    pub fn get(&self, key: &B256) -> TransportResult<Option<String>> {
         // Need to acquire a write guard to change the order of keys in LRU cache.
-        let mut cache = self.cache.write().await;
+        let mut cache = self.cache.write();
         let val = cache.get(key).cloned();
         Ok(val)
     }
@@ -113,8 +117,8 @@ where
     /// Saves the cache to a file specified by the path.
     /// If the files does not exist, it creates one.
     /// If the file exists, it overwrites it.
-    pub async fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
-        let cache = self.cache.read().await;
+    pub fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
+        let cache = self.cache.read();
         let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
 
         // Iterate over the cache and dump to the file.
@@ -128,7 +132,7 @@ where
 
     /// Loads the cache from a file specified by the path.
     /// If the file does not exist, it returns without error.
-    pub async fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
+    pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
         if !path.exists() {
             return Ok(());
         };
@@ -136,7 +140,7 @@ where
         let file = BufReader::new(file);
         let entries: Vec<FsCacheEntry> =
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
-        let mut cache = self.cache.write().await;
+        let mut cache = self.cache.write();
         for entry in entries {
             cache.put(entry.key, entry.value);
         }
@@ -147,7 +151,7 @@ where
 
 macro_rules! cache_get_or_fetch {
     ($self:expr, $hash:expr, $fetch_fn:expr) => {{
-        if let Some(cached) = $self.get(&$hash).await? {
+        if let Some(cached) = $self.get(&$hash)? {
             let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
             println!("Cache hit");
             return Ok(Some(result));
@@ -157,7 +161,7 @@ macro_rules! cache_get_or_fetch {
         let result = $fetch_fn.await?;
         if let Some(ref data) = result {
             let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
-            let _ = $self.put($hash, json_str).await?;
+            let _ = $self.put($hash, json_str)?;
         }
 
         Ok(result)
@@ -231,9 +235,7 @@ where
 
                 let hash = req.params_hash(&client)?;
 
-                let mut cache = cache.write().await;
-
-                if let Some(cached) = cache.get(&hash).cloned() {
+                if let Some(cached) = cache.write().get(&hash).cloned() {
                     let result =
                         serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
                     return Ok(result);
@@ -248,7 +250,7 @@ where
 
                 let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
 
-                let _ = cache.put(hash, json_str);
+                let _ = cache.write().put(hash, json_str);
 
                 Ok(res)
             }))
@@ -336,7 +338,7 @@ mod tests {
         let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
         let path = PathBuf::from_str("./rpc-cache-block-by-number.txt").unwrap();
-        provider.load_cache(path.clone()).await.unwrap();
+        provider.load_cache(path.clone()).unwrap();
 
         let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
         let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap();
@@ -349,7 +351,7 @@ mod tests {
         let blk4 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
         assert_eq!(blk3, blk4);
 
-        provider.save_cache(path).await.unwrap();
+        provider.save_cache(path).unwrap();
     }
 
     #[tokio::test]
@@ -359,7 +361,7 @@ mod tests {
         let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
         let path = PathBuf::from_str("./rpc-cache-block-by-hash.txt").unwrap();
-        provider.load_cache(path.clone()).await.unwrap();
+        provider.load_cache(path.clone()).unwrap();
 
         let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
         let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
@@ -377,7 +379,7 @@ mod tests {
             provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
         assert_eq!(block3, block4);
 
-        provider.save_cache(path).await.unwrap();
+        provider.save_cache(path).unwrap();
     }
 
     #[tokio::test]
@@ -392,7 +394,7 @@ mod tests {
         let from = anvil.addresses()[0];
         let path = PathBuf::from_str("./rpc-cache-proof.txt").unwrap();
 
-        provider.load_cache(path.clone()).await.unwrap();
+        provider.load_cache(path.clone()).unwrap();
 
         let calldata: Bytes = "0x6080604052348015600f57600080fd5b506101f28061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633fb5c1cb146100465780638381f58a14610062578063d09de08a14610080575b600080fd5b610060600480360381019061005b91906100ee565b61008a565b005b61006a610094565b604051610077919061012a565b60405180910390f35b61008861009a565b005b8060008190555050565b60005481565b6000808154809291906100ac90610174565b9190505550565b600080fd5b6000819050919050565b6100cb816100b8565b81146100d657600080fd5b50565b6000813590506100e8816100c2565b92915050565b600060208284031215610104576101036100b3565b5b6000610112848285016100d9565b91505092915050565b610124816100b8565b82525050565b600060208201905061013f600083018461011b565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061017f826100b8565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101b1576101b0610145565b5b60018201905091905056fea264697066735822122067ac0f21f648b0cacd1b7260772852ad4a0f63e2cc174168c51a6887fd5197a964736f6c634300081a0033".parse().unwrap();
 
@@ -429,6 +431,6 @@ mod tests {
 
         println!("Time taken: {:?}", end_t - start_t);
 
-        provider.save_cache(path).await.unwrap();
+        provider.save_cache(path).unwrap();
     }
 }
