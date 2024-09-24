@@ -93,7 +93,7 @@ impl CallConfig {
 ///
 /// That is equivalent to parity's [`LocalizedTransactionTrace`]
 /// <https://github.com/ethereum/go-ethereum/blob/0dd173a727dd2d2409b8e401b22e85d20c25b71f/eth/tracers/native/call_flat.go#L62-L62>
-pub type FlatCallFrame = LocalizedTransactionTrace;
+pub type FlatCallFrame = Vec<LocalizedTransactionTrace>;
 
 /// The configuration for the flat call tracer.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
