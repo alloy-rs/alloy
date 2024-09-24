@@ -1,5 +1,6 @@
-use alloy_eips::eip7702::SignedAuthorization;
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
+use alloc::vec::Vec;
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
@@ -63,9 +64,23 @@ pub trait ReceiptResponse {
 
 /// Transaction JSON-RPC response.
 pub trait TransactionResponse {
+    /// Signature type of the transaction
+    type Signature;
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
+
+    /// Nonce
+    fn nonce(&self) -> u64;
+
+    /// Block hash
+    fn block_hash(&self) -> Option<BlockHash>;
+
+    /// Block number
+    fn block_number(&self) -> Option<u64>;
+
+    /// Transaction Index
+    fn transaction_index(&self) -> Option<u64>;
 
     /// Sender of the transaction
     fn from(&self) -> Address;
@@ -76,12 +91,42 @@ pub trait TransactionResponse {
     /// Transferred value
     fn value(&self) -> U256;
 
+    /// Gas Price
+    fn gas_price(&self) -> Option<u128>;
+
     /// Gas limit
     fn gas(&self) -> u128;
+
+    /// Max BaseFeePerGas the user is willing to pay
+    fn max_fee_per_gas(&self) -> Option<u128>;
+
+    /// The miner's tip
+    fn max_priority_fee_per_gas(&self) -> Option<u128>;
+
+    /// Configured max fee per blob gas for eip-4844 transactions
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
 
     /// Input data
     #[doc(alias = "calldata")]
     fn input(&self) -> &Bytes;
+
+    /// Transaction signature
+    fn signature(&self) -> Option<Self::Signature>;
+
+    /// The chain id of the transaction
+    fn chain_id(&self) -> Option<ChainId>;
+
+    /// Contains the blob hashes for eip-4844 transactions
+    fn blob_versioned_hashes(&self) -> Option<Vec<B256>>;
+
+    /// EIP2930 access list
+    fn access_list(&self) -> Option<AccessList>;
+
+    /// Transaction type
+    fn transaction_type(&self) -> Option<u8>;
+
+    /// The signed authorization list
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>>;
 }
 
 /// Header JSON-RPC response.
@@ -132,9 +177,9 @@ pub trait HeaderResponse {
 /// Block JSON-RPC response.
 pub trait BlockResponse {
     /// Header type
-    type Header;
+    type Header: HeaderResponse;
     /// Transaction type
-    type Transaction;
+    type Transaction: TransactionResponse;
 
     /// Block header
     fn header(&self) -> &Self::Header;
@@ -152,8 +197,26 @@ pub trait BlockResponse {
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
+    type Signature = T::Signature;
+
     fn tx_hash(&self) -> TxHash {
         self.inner.tx_hash()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.inner.nonce()
+    }
+
+    fn block_hash(&self) -> Option<BlockHash> {
+        self.inner.block_hash()
+    }
+
+    fn block_number(&self) -> Option<u64> {
+        self.inner.block_number()
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index()
     }
 
     fn from(&self) -> Address {
@@ -168,12 +231,52 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.value()
     }
 
+    fn gas_price(&self) -> Option<u128> {
+        self.inner.gas_price()
+    }
+
     fn gas(&self) -> u128 {
         self.inner.gas()
     }
 
+    fn max_fee_per_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_blob_gas()
+    }
+
     fn input(&self) -> &Bytes {
         self.inner.input()
+    }
+
+    fn signature(&self) -> Option<T::Signature> {
+        self.inner.signature()
+    }
+
+    fn chain_id(&self) -> Option<ChainId> {
+        self.inner.chain_id()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<Vec<B256>> {
+        self.inner.blob_versioned_hashes()
+    }
+
+    fn access_list(&self) -> Option<AccessList> {
+        self.inner.access_list()
+    }
+
+    fn transaction_type(&self) -> Option<u8> {
+        self.inner.transaction_type()
+    }
+
+    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
+        self.inner.authorization_list()
     }
 }
 

@@ -638,6 +638,158 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
     }
 }
 
+/// Trait for extracting specific Ethereum block data from a header
+pub trait BlockHeader {
+    /// Retrieves the parent hash of the block
+    fn parent_hash(&self) -> B256;
+
+    /// Retrieves the ommers hash of the block
+    fn ommers_hash(&self) -> B256;
+
+    /// Retrieves the beneficiary (miner) of the block
+    fn beneficiary(&self) -> Address;
+
+    /// Retrieves the state root hash of the block
+    fn state_root(&self) -> B256;
+
+    /// Retrieves the transactions root hash of the block
+    fn transactions_root(&self) -> B256;
+
+    /// Retrieves the receipts root hash of the block
+    fn receipts_root(&self) -> B256;
+
+    /// Retrieves the withdrawals root hash of the block, if available
+    fn withdrawals_root(&self) -> Option<B256>;
+
+    /// Retrieves the logs bloom filter of the block
+    fn logs_bloom(&self) -> Bloom;
+
+    /// Retrieves the difficulty of the block
+    fn difficulty(&self) -> U256;
+
+    /// Retrieves the block number
+    fn number(&self) -> BlockNumber;
+
+    /// Retrieves the gas limit of the block
+    fn gas_limit(&self) -> u128;
+
+    /// Retrieves the gas used by the block
+    fn gas_used(&self) -> u128;
+
+    /// Retrieves the timestamp of the block
+    fn timestamp(&self) -> u64;
+
+    /// Retrieves the mix hash of the block
+    fn mix_hash(&self) -> B256;
+
+    /// Retrieves the nonce of the block
+    fn nonce(&self) -> B64;
+
+    /// Retrieves the base fee per gas of the block, if available
+    fn base_fee_per_gas(&self) -> Option<u128>;
+
+    /// Retrieves the blob gas used by the block, if available
+    fn blob_gas_used(&self) -> Option<u128>;
+
+    /// Retrieves the excess blob gas of the block, if available
+    fn excess_blob_gas(&self) -> Option<u128>;
+
+    /// Retrieves the parent beacon block root of the block, if available
+    fn parent_beacon_block_root(&self) -> Option<B256>;
+
+    /// Retrieves the requests root of the block, if available
+    fn requests_root(&self) -> Option<B256>;
+
+    /// Retrieves the block's extra data field
+    fn extra_data(&self) -> &Bytes;
+}
+
+impl BlockHeader for Header {
+    fn parent_hash(&self) -> B256 {
+        self.parent_hash
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.ommers_hash
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.beneficiary
+    }
+
+    fn state_root(&self) -> B256 {
+        self.state_root
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.transactions_root
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.receipts_root
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.withdrawals_root
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.logs_bloom
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.difficulty
+    }
+
+    fn number(&self) -> BlockNumber {
+        self.number
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.gas_limit
+    }
+
+    fn gas_used(&self) -> u128 {
+        self.gas_used
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    fn mix_hash(&self) -> B256 {
+        self.mix_hash
+    }
+
+    fn nonce(&self) -> B64 {
+        self.nonce
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
+    }
+
+    fn blob_gas_used(&self) -> Option<u128> {
+        self.blob_gas_used
+    }
+
+    fn excess_blob_gas(&self) -> Option<u128> {
+        self.excess_blob_gas
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.parent_beacon_block_root
+    }
+
+    fn requests_root(&self) -> Option<B256> {
+        self.requests_root
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
+    }
+}
+
 #[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;

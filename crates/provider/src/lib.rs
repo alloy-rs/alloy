@@ -28,7 +28,7 @@ extern crate tracing;
 mod builder;
 pub use builder::{Identity, ProviderBuilder, ProviderLayer, Stack};
 
-mod chain;
+mod blocks;
 
 pub mod ext;
 

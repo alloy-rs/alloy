@@ -1,4 +1,7 @@
 //! Ethereum JSON-RPC provider.
+
+#![allow(unknown_lints, elided_named_lifetimes)]
+
 use crate::{
     heart::PendingTransactionError,
     utils::{self, Eip1559Estimation, EstimatorFunction},
@@ -17,6 +20,7 @@ use alloy_primitives::{
 };
 use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
+    simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
     FilterChanges, Log, SyncStatus,
 };
@@ -115,7 +119,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_block_number(&self) -> ProviderCall<T, NoParams, U64, BlockNumber> {
         self.client()
             .request_noparams("eth_blockNumber")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -152,11 +156,22 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         EthCall::new(self.weak_client(), tx)
     }
 
+    /// Executes an arbitrary number of transactions on top of the requested state.
+    ///
+    /// The transactions are packed into individual blocks. Overrides can be provided.
+    #[doc(alias = "eth_simulateV1")]
+    fn simulate<'req>(
+        &self,
+        payload: &'req SimulatePayload,
+    ) -> RpcWithBlock<T, &'req SimulatePayload, Vec<SimulatedBlock<N::BlockResponse>>> {
+        self.client().request("eth_simulateV1", payload).into()
+    }
+
     /// Gets the chain ID.  
     fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -184,7 +199,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -242,7 +257,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_gas_price(&self) -> ProviderCall<T, NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_gasPrice")
-            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::convert_u128 as fn(U128) -> u128)
             .into()
     }
 
@@ -545,7 +560,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
         self.client()
             .request("eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -897,7 +912,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_net_version(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("net_version")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -1023,6 +1038,7 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rpc_client::BuiltInConnectionString;
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     // For layer transport tests
     #[cfg(feature = "hyper")]
@@ -1655,6 +1671,23 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn builtin_connect_boxed() {
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+
+        let conn: BuiltInConnectionString = anvil.endpoint().parse().unwrap();
+
+        let transport = conn.connect_boxed().await.unwrap();
+
+        let client = alloy_rpc_client::RpcClient::new(transport, true);
+
+        let provider = RootProvider::<BoxTransport, Ethereum>::new(client);
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[tokio::test]
