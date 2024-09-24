@@ -1,8 +1,9 @@
+use crate::constants::{EMPTY_ROOT_HASH, KECCAK_EMPTY};
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
 /// Represents an Account in the account trie.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, RlpDecodable, RlpEncodable)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, RlpDecodable, RlpEncodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -16,6 +17,17 @@ pub struct Account {
     pub storage_root: B256,
     /// The hash of the code of the account.
     pub code_hash: B256,
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            nonce: 0,
+            balance: U256::ZERO,
+            storage_root: EMPTY_ROOT_HASH,
+            code_hash: KECCAK_EMPTY,
+        }
+    }
 }
 
 impl Account {

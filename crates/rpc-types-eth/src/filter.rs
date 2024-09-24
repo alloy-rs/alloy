@@ -230,8 +230,8 @@ impl FilterBlockOption {
     pub fn ensure_valid_block_range(&self) -> Result<(), FilterBlockError> {
         // Check if from_block is greater than to_block
         if let (Some(from), Some(to)) = (
-            self.get_from_block().as_ref().and_then(|from| from.as_number()),
-            self.get_to_block().as_ref().and_then(|to| to.as_number()),
+            self.get_from_block().and_then(|from| from.as_number()),
+            self.get_to_block().and_then(|to| to.as_number()),
         ) {
             if from > to {
                 return Err(FilterBlockError::FromBlockGreaterThanToBlock { from, to });

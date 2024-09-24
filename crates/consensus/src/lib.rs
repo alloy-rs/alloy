@@ -18,7 +18,7 @@ mod encodable_signature;
 pub use encodable_signature::EncodableSignature;
 
 mod header;
-pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
+pub use header::{BlockHeader, Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
@@ -26,7 +26,7 @@ pub use receipt::{
 };
 
 mod request;
-pub use request::Request;
+pub use request::{Request, Requests};
 
 pub mod transaction;
 #[cfg(feature = "kzg")]

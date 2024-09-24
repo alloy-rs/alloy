@@ -797,7 +797,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_anvil_set_block_timestamp_interval_anvil_remove_block_timestamp_interval() {
+    async fn test_anvil_block_timestamp_interval() {
         let provider = ProviderBuilder::new().on_anvil();
 
         provider.anvil_set_block_timestamp_interval(1).await.unwrap();
