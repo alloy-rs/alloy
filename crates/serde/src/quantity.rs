@@ -34,7 +34,7 @@ where
 /// See [`quantity`](self) for more information.
 pub mod opt {
     use super::private::ConvertRuint;
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     /// Serializes an optional primitive number as a "quantity" hex string.
     pub fn serialize<T, S>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
@@ -43,7 +43,7 @@ pub mod opt {
         S: Serializer,
     {
         match value {
-            Some(value) => super::serialize(value, serializer),
+            Some(value) => Some(value.into_ruint()).serialize(serializer),
             None => serializer.serialize_none(),
         }
     }
