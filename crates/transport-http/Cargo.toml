@@ -57,6 +57,7 @@ hyper = [
     "dep:tracing",
 ]
 jwt-auth = [
+    "hyper",
     "dep:alloy-rpc-types-engine",
     "alloy-rpc-types-engine/jwt",
     "alloy-rpc-types-engine/serde",

@@ -13,12 +13,10 @@ use std::{
 };
 use tower::{Layer, Service};
 
-/// The [`AuthLayer`] is a that validates whether the bearer token in the request is valid or not.
-/// If invalid, it generates a valid token from the provided [`JwtSecret`] and inserts it into the
-/// request.
+/// The [`AuthLayer`] uses the provided [`JwtSecret`] to generate and validate the jwt token
+/// in the requests.
 ///
-/// This layer also inserts the [`AUTHORIZATION`] header into the request with a valid token if its
-/// not already in the request.
+/// The generated token is inserted into the [`AUTHORIZATION`] header of the request.
 #[derive(Clone, Debug)]
 pub struct AuthLayer {
     secret: JwtSecret,
@@ -48,41 +46,34 @@ impl<S> Layer<S> for AuthLayer {
     }
 }
 
-/// A service that checks the jwt token in a request is valid. If invalid, it refreshes the token
-/// using the provided [`JwtSecret`] and inserts it into the request.
+/// A service that generates and validates the jwt token in the requests using the provided secret.
 #[derive(Clone, Debug)]
 pub struct AuthService<S> {
     inner: S,
     secret: JwtSecret,
     /// In milliseconds.
     latency_buffer: u64,
+    most_recent_claim: Option<Claims>,
 }
 
 impl<S> AuthService<S> {
     /// Create a new [`AuthService`] with the given inner service.
     pub const fn new(inner: S, secret: JwtSecret, latency_buffer: u64) -> Self {
-        Self { inner, secret, latency_buffer }
+        Self { inner, secret, latency_buffer, most_recent_claim: None }
     }
 
     /// Validate the token in the request headers.
     ///
     /// Returns `true` if the token is valid and `iat` is beyond the grace buffer.
-    pub fn validate(&self, headers: &HeaderMap) -> bool {
-        get_bearer_token(headers).map_or(false, |token| {
-            let is_valid = self.secret.validate(&token).ok().and_then(|_| {
-                let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
-                let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
-                decode::<Claims>(token.as_str(), &decoding_key, &validation).ok().and_then(|data| {
-                    let curr_secs = get_current_timestamp();
-                    if data.claims.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
-                        None
-                    } else {
-                        Some(())
-                    }
-                })
-            });
-            is_valid.is_some()
-        })
+    pub fn validate(&self) -> bool {
+        if let Some(claim) = self.most_recent_claim.as_ref() {
+            let curr_secs = get_current_timestamp();
+            if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -113,38 +104,30 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        let headers = req.headers();
+        if self.validate() {
+            Box::pin(self.inner.call(req))
+        } else {
+            // Generate a fresh token from the secret and insert it into the request.
+            match create_token_from_secret(&self.secret) {
+                Ok(token) => {
+                    // Decode the token to get the claims.
+                    let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+                    let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
+                    let token_data = decode::<Claims>(&token, &decoding_key, &validation);
+                    self.most_recent_claim = token_data.ok().map(|data| data.claims);
 
-        match self.validate(headers) {
-            true => Box::pin(self.inner.call(req)),
-            false => {
-                // Generate a fresh token from the secret and insert it into the request.
-                match create_token_from_secret(&self.secret) {
-                    Ok(token) => {
-                        let mut req = req.clone();
+                    let mut req = req;
+                    req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
+                    Box::pin(self.inner.call(req))
+                }
+                Err(e) => {
+                    let e = TransportErrorKind::custom(e);
 
-                        req.headers_mut()
-                            .insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
-                        Box::pin(self.inner.call(req))
-                    }
-                    Err(e) => {
-                        let e = TransportErrorKind::custom(e);
-
-                        Box::pin(async move { Err(e) })
-                    }
+                    Box::pin(async move { Err(e) })
                 }
             }
         }
     }
-}
-
-fn get_bearer_token(headers: &HeaderMap) -> Option<String> {
-    let header = headers.get(AUTHORIZATION)?;
-    let auth: &str = header.to_str().ok()?;
-    let prefix = "Bearer ";
-    let index = auth.find(prefix)?;
-    let token: &str = &auth[index + prefix.len()..];
-    Some(token.into())
 }
 
 fn create_token_from_secret(secret: &JwtSecret) -> Result<String, jsonwebtoken::errors::Error> {
