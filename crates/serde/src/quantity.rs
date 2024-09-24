@@ -43,7 +43,7 @@ pub mod opt {
         S: Serializer,
     {
         match value {
-            Some(value) => super::serialize(value, serializer),
+            Some(value) => serializer.serialize_some(&value.into_ruint()),
             None => serializer.serialize_none(),
         }
     }
@@ -136,7 +136,7 @@ mod private {
 /// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
 pub mod u128_vec_vec_opt {
     use alloy_primitives::U128;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer};
 
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
@@ -168,7 +168,7 @@ pub mod u128_vec_vec_opt {
                     .iter()
                     .map(|v| v.iter().map(|val| U128::from(*val)).collect::<Vec<_>>())
                     .collect::<Vec<_>>();
-                vec.serialize(s)
+                s.serialize_some(&vec)
             }
             None => s.serialize_none(),
         }
