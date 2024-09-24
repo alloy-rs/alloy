@@ -62,6 +62,12 @@ pub trait ReceiptResponse {
     fn state_root(&self) -> Option<B256>;
 }
 
+/// Extension trait for [`TransactionResponse`] to support Otterscan-specific API.
+pub trait OtterscanTxResp: TransactionResponse {
+    /// Truncate the input for Otterscan API.
+    fn otterscan_api_truncate_input(&mut self);
+}
+
 /// Transaction JSON-RPC response.
 pub trait TransactionResponse {
     /// Signature type of the transaction
