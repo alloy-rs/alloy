@@ -11,6 +11,10 @@ pub struct ExecutionWitness {
     /// the block, including during state root recomputation.
     /// keccak(rlp(node)) => rlp(node)
     pub state: HashMap<B256, Bytes>,
+    /// Map of all contract codes (created / accessed) to their preimages that were required during
+    /// the execution of the block, including during state root recomputation.
+    /// keccak(address) => bytecodes
+    pub codes: HashMap<B256, Bytes>,
     /// Map of all hashed account and storage keys (addresses and slots) to their preimages
     /// (unhashed account addresses and storage slots, respectively) that were required during
     /// the execution of the block. during the execution of the block.
