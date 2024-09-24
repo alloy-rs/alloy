@@ -1,11 +1,8 @@
-use crate::hyper::{
-    header::{HeaderMap, AUTHORIZATION},
-    Request, Response,
-};
+use crate::hyper::{header::AUTHORIZATION, Request, Response};
 use alloy_rpc_types_engine::{Claims, JwtSecret};
 use alloy_transport::{TransportError, TransportErrorKind};
 use hyper::header::HeaderValue;
-use jsonwebtoken::{decode, get_current_timestamp, DecodingKey, Validation};
+use jsonwebtoken::get_current_timestamp;
 use std::{
     future::Future,
     pin::Pin,
@@ -65,7 +62,7 @@ impl<S> AuthService<S> {
     /// Validate the token in the request headers.
     ///
     /// Returns `true` if the token is still valid and `iat` is beyond the grace buffer.
-   fn validate(&self) -> bool {
+    fn validate(&self) -> bool {
         if let Some(claim) = self.most_recent_claim.as_ref() {
             let curr_secs = get_current_timestamp();
             if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
@@ -74,6 +71,23 @@ impl<S> AuthService<S> {
         }
 
         true
+    }
+
+    /// Create a new token from the secret.
+    ///
+    /// Updates the most_recent_claim with the new claim.
+    fn create_token_from_secret(&mut self) -> Result<String, jsonwebtoken::errors::Error> {
+        let claims = Claims {
+            iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap() + Duration::from_secs(60))
+                .as_secs(),
+            exp: None,
+        };
+
+        self.most_recent_claim = Some(claims);
+
+        let token = self.secret.encode(&claims)?;
+
+        Ok(format!("Bearer {}", token))
     }
 }
 
@@ -104,38 +118,24 @@ where
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
-        if self.validate() {
-            Box::pin(self.inner.call(req))
+        let mut req = req;
+        let res = if self.validate() {
+            // Encodes the most recent claim into a token.
+            self.secret.encode(self.most_recent_claim.as_ref().unwrap())
         } else {
-            // Generate a fresh token from the secret and insert it into the request.
-            match create_token_from_secret(&self.secret) {
-                Ok(token) => {
-                    // Decode the token to get the claims.
-                    let validation = Validation::new(jsonwebtoken::Algorithm::HS256);
-                    let decoding_key = DecodingKey::from_secret(self.secret.as_bytes());
-                    let token_data = decode::<Claims>(&token, &decoding_key, &validation);
-                    self.most_recent_claim = token_data.ok().map(|data| data.claims);
+            // Creates a new Claim and encodes it into a token.
+            self.create_token_from_secret()
+        };
 
-                    let mut req = req;
-                    req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
-                    Box::pin(self.inner.call(req))
-                }
-                Err(e) => {
-                    let e = TransportErrorKind::custom(e);
-
-                    Box::pin(async move { Err(e) })
-                }
+        match res {
+            Ok(token) => {
+                req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
+                Box::pin(self.inner.call(req))
+            }
+            Err(e) => {
+                let e = TransportErrorKind::custom(e);
+                Box::pin(async move { Err(e) })
             }
         }
     }
-}
-
-fn create_token_from_secret(secret: &JwtSecret) -> Result<String, jsonwebtoken::errors::Error> {
-    let token = secret.encode(&Claims {
-        iat: (SystemTime::now().duration_since(UNIX_EPOCH).unwrap() + Duration::from_secs(60))
-            .as_secs(),
-        exp: None,
-    })?;
-
-    Ok(format!("Bearer {}", token))
 }
