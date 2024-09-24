@@ -1,7 +1,8 @@
-#[cfg(not(feature = "std"))]
-use alloc::string::{String, ToString};
-use alloc::{collections::BTreeMap, fmt::Write};
-
+use alloc::{
+    collections::BTreeMap,
+    fmt::Write,
+    string::{String, ToString},
+};
 use alloy_primitives::{Bytes, B256, U256};
 use serde::{Deserialize, Deserializer, Serialize};
 
