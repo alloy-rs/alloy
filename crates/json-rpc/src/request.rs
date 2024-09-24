@@ -266,11 +266,7 @@ where
                 if params.is_none() {
                     if std::mem::size_of::<Params>() == 0 {
                         // SAFETY: params is a ZST, so it's safe to fail to initialize it
-                        unsafe {
-                            params = Some(std::mem::transmute(
-                                MaybeUninit::<Params>::uninit().assume_init(),
-                            ))
-                        }
+                        unsafe { params = Some(MaybeUninit::<Params>::zeroed().assume_init()) }
                     } else {
                         return Err(serde::de::Error::missing_field("params"));
                     }
