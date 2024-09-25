@@ -63,7 +63,7 @@ pub struct MethodId(usize);
 
 impl From<usize> for MethodId {
     fn from(id: usize) -> Self {
-        MethodId(id)
+        Self(id)
     }
 }
 
@@ -71,7 +71,7 @@ impl Add for MethodId {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        MethodId(self.0 + rhs.0)
+        Self(self.0 + rhs.0)
     }
 }
 
@@ -79,7 +79,7 @@ impl Add<usize> for MethodId {
     type Output = Self;
 
     fn add(self, rhs: usize) -> Self::Output {
-        MethodId(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }
 
@@ -141,6 +141,7 @@ enum Method<S> {
 }
 
 /// The inner state of a [`Router`]. Maps methods to their handlers.
+#[derive(Default)]
 pub struct RouterInner<S> {
     routes: BTreeMap<MethodId, Method<S>>,
 
@@ -158,7 +159,7 @@ impl<S> fmt::Debug for RouterInner<S> {
 impl<S> RouterInner<S> {
     /// Create a new, empty router.
     pub fn new() -> Self {
-        RouterInner {
+        Self {
             routes: BTreeMap::new(),
             last_id: Default::default(),
             name_to_id: BTreeMap::new(),
@@ -178,7 +179,7 @@ impl<S> RouterInner<S> {
     }
 
     fn enroll_method_name(&mut self, method: Cow<'static, str>) -> MethodId {
-        if let Some(_) = self.name_to_id.get(&method) {
+        if self.name_to_id.contains_key(&method) {
             panic!("Method name already exists in the router.");
         }
 
@@ -239,12 +240,12 @@ impl<S> RouterInner<S> {
     }
 
     /// Call a method on the router, with the provided state.
-    fn call_with_state<'a>(
-        &'a self,
+    fn call_with_state(
+        &self,
         method: impl Into<Cow<'static, str>>,
         params: Box<RawValue>,
         state: S,
-    ) -> impl Future<Output = ResponsePayload> + Captures<'a> {
+    ) -> impl Future<Output = ResponsePayload> + Captures<'_> {
         let method = method.into();
         let method =
             self.method_by_name(method.as_ref()).ok_or_else(ResponsePayload::method_not_found);
@@ -303,7 +304,7 @@ where
 
 impl<H, T, S> HandlerService<H, T, S> {
     /// Create a new handler service.
-    pub fn new(handler: H, state: S) -> Self {
+    pub const fn new(handler: H, state: S) -> Self {
         Self { handler, state, _marker: PhantomData }
     }
 }
