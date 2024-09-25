@@ -659,7 +659,10 @@ mod tests {
             value: U256::from(7_u64),
             ..Default::default()
         };
-        test_encode_decode_roundtrip(tx, Some(Signature::test_signature().with_parity(Parity::NonEip155(true))));
+        test_encode_decode_roundtrip(
+            tx,
+            Some(Signature::test_signature().with_parity(Parity::NonEip155(true))),
+        );
     }
 
     #[test]
