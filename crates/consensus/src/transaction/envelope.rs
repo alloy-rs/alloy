@@ -278,22 +278,25 @@ impl TxEnvelope {
         }
     }
 
-    /// Return the length of the inner txn, __without a type byte__.
-    pub fn inner_length(&self) -> usize {
+    /// Return the length of the inner txn, including type byte length
+    pub fn rlp_payload_length(&self) -> usize {
         match self {
-            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip2930(t) => {
+            Self::Legacy(t) => {
                 let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
                 Header { list: true, payload_length }.length() + payload_length
             }
+            Self::Eip2930(t) => {
+                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
+                Header { list: true, payload_length }.length() + payload_length + 1
+            }
             Self::Eip1559(t) => {
                 let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length
+                Header { list: true, payload_length }.length() + payload_length + 1
             }
             Self::Eip4844(t) => match t.tx() {
                 TxEip4844Variant::TxEip4844(tx) => {
                     let payload_length = tx.fields_len() + t.signature().rlp_vrs_len();
-                    Header { list: true, payload_length }.length() + payload_length
+                    Header { list: true, payload_length }.length() + payload_length + 1
                 }
                 TxEip4844Variant::TxEip4844WithSidecar(tx) => {
                     let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
@@ -303,26 +306,14 @@ impl TxEnvelope {
                         inner_header.length() + inner_payload_length + tx.sidecar.fields_len();
                     let outer_header = Header { list: true, payload_length: outer_payload_length };
 
-                    outer_header.length() + outer_payload_length
+                    outer_header.length() + outer_payload_length + 1
                 }
             },
             Self::Eip7702(t) => {
                 let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length
+                Header { list: true, payload_length }.length() + payload_length + 1
             }
         }
-    }
-
-    /// Return the RLP payload length of the network-serialized wrapper
-    fn rlp_payload_length(&self) -> usize {
-        if let Self::Legacy(t) = self {
-            let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-            return Header { list: true, payload_length }.length() + payload_length;
-        }
-        // length of inner tx body
-        let inner_length = self.inner_length();
-        // with tx type byte
-        inner_length + 1
     }
 }
 
@@ -382,7 +373,7 @@ impl Encodable2718 for TxEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.inner_length() + !self.is_legacy() as usize
+        self.rlp_payload_length()
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -673,6 +664,20 @@ mod tests {
         let decoded = TxEnvelope::decode_2718(&mut encoded.as_ref()).unwrap();
         assert_eq!(encoded.len(), tx_envelope.encode_2718_len());
         assert_eq!(decoded, tx_envelope);
+    }
+
+    #[test]
+    fn test_encode_decode_legacy() {
+        let tx = TxLegacy {
+            chain_id: None,
+            nonce: 2,
+            gas_limit: 1000000,
+            gas_price: 10000000000,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            ..Default::default()
+        };
+        test_encode_decode_roundtrip(tx, Some(Signature::test_signature().with_parity(Parity::NonEip155(true))));
     }
 
     #[test]
