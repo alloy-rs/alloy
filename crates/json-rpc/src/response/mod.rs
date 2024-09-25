@@ -119,7 +119,7 @@ impl<Payload, ErrData> Response<Payload, ErrData> {
     }
 }
 
-impl<'a, Payload, ErrData> Response<Payload, ErrData>
+impl<Payload, ErrData> Response<Payload, ErrData>
 where
     Payload: RpcObject,
     ErrData: RpcObject,
