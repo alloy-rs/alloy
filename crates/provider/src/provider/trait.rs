@@ -1186,6 +1186,43 @@ mod tests {
         assert_eq!(0, num);
     }
 
+    #[cfg(all(feature = "hyper", not(windows)))]
+    #[tokio::test]
+    async fn test_auth_layer_transport() {
+        use alloy_node_bindings::Reth;
+        use alloy_rpc_types_engine::JwtSecret;
+        use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
+
+        init_tracing();
+        let secret = JwtSecret::random();
+
+        let reth = Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
+
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+
+        let service =
+            tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
+
+        let layer_transport: HyperClient<
+            Full<HyperBytes>,
+            AuthService<
+                Client<
+                    alloy_transport_http::hyper_util::client::legacy::connect::HttpConnector,
+                    Full<HyperBytes>,
+                >,
+            >,
+        > = HyperClient::with_service(service);
+
+        let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
     #[tokio::test]
     async fn test_builder_helper_fn_any_network() {
         init_tracing();

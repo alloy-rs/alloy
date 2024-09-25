@@ -139,6 +139,7 @@ thiserror-no-std = "2.0.2"
 url = "2.5"
 derive_more = { version = "1.0.0", default-features = false }
 http = "1.1.0"
+jsonwebtoken = "9.3.0"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [
