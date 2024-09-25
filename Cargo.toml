@@ -84,8 +84,8 @@ alloy-eip2930 = { version = "0.1.0", default-features = false }
 alloy-eip7702 = { version = "0.1.0", default-features = false }
 
 # ethereum
-ethereum_ssz_derive = "0.7.1"
-ethereum_ssz = "0.7.1"
+ethereum_ssz_derive = "0.8"
+ethereum_ssz = "0.8"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
@@ -112,7 +112,7 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 tokio-test = "0.4"
-tokio-tungstenite = "0.23"
+tokio-tungstenite = "0.24"
 tower = { version = "0.5", features = ["util"] }
 
 # tracing
@@ -154,4 +154,4 @@ assert_matches = "1.5"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
-tower-http = "0.5.2"
+tower-http = "0.6.1"
