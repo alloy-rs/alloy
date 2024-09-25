@@ -1198,7 +1198,6 @@ mod tests {
 
         let reth = Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
 
-        println!("Reth Spawned!");
         let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
 
         let service =
