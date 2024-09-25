@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
@@ -5,15 +6,12 @@ use alloy_eips::{
     BlockNumHash,
 };
 use alloy_primitives::{
-    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, B256, B64, U256,
+    b256, keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
@@ -135,6 +133,12 @@ pub struct Header {
     pub extra_data: Bytes,
 }
 
+impl AsRef<Self> for Header {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
 impl Default for Header {
     fn default() -> Self {
         Self {
@@ -170,13 +174,6 @@ impl Sealable for Header {
 }
 
 impl Header {
-    // TODO: re-enable
-
-    // /// Returns the parent block's number and hash
-    // pub fn parent_num_hash(&self) -> BlockNumHash {
-    //     BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
-    // }
-
     /// Heavy function that will calculate hash of data and will *not* save the change to metadata.
     ///
     /// Use [`Header::seal_slow`] and unlock if you need the hash to be persistent.
@@ -372,6 +369,14 @@ impl Header {
     /// Note: This check is relevant only pre-merge.
     pub const fn exceeds_allowed_future_timestamp(&self, present_timestamp: u64) -> bool {
         self.timestamp > present_timestamp + ALLOWED_FUTURE_BLOCK_TIME_SECONDS
+    }
+
+    /// Seal the header with a known hash.
+    ///
+    /// WARNING: This method does not perform validation whether the hash is correct.
+    #[inline]
+    pub const fn seal(self, hash: B256) -> Sealed<Self> {
+        Sealed::new_unchecked(self, hash)
     }
 }
 
@@ -633,11 +638,162 @@ impl<'a> arbitrary::Arbitrary<'a> for Header {
     }
 }
 
-#[cfg(test)]
+/// Trait for extracting specific Ethereum block data from a header
+pub trait BlockHeader {
+    /// Retrieves the parent hash of the block
+    fn parent_hash(&self) -> B256;
+
+    /// Retrieves the ommers hash of the block
+    fn ommers_hash(&self) -> B256;
+
+    /// Retrieves the beneficiary (miner) of the block
+    fn beneficiary(&self) -> Address;
+
+    /// Retrieves the state root hash of the block
+    fn state_root(&self) -> B256;
+
+    /// Retrieves the transactions root hash of the block
+    fn transactions_root(&self) -> B256;
+
+    /// Retrieves the receipts root hash of the block
+    fn receipts_root(&self) -> B256;
+
+    /// Retrieves the withdrawals root hash of the block, if available
+    fn withdrawals_root(&self) -> Option<B256>;
+
+    /// Retrieves the logs bloom filter of the block
+    fn logs_bloom(&self) -> Bloom;
+
+    /// Retrieves the difficulty of the block
+    fn difficulty(&self) -> U256;
+
+    /// Retrieves the block number
+    fn number(&self) -> BlockNumber;
+
+    /// Retrieves the gas limit of the block
+    fn gas_limit(&self) -> u128;
+
+    /// Retrieves the gas used by the block
+    fn gas_used(&self) -> u128;
+
+    /// Retrieves the timestamp of the block
+    fn timestamp(&self) -> u64;
+
+    /// Retrieves the mix hash of the block
+    fn mix_hash(&self) -> B256;
+
+    /// Retrieves the nonce of the block
+    fn nonce(&self) -> B64;
+
+    /// Retrieves the base fee per gas of the block, if available
+    fn base_fee_per_gas(&self) -> Option<u128>;
+
+    /// Retrieves the blob gas used by the block, if available
+    fn blob_gas_used(&self) -> Option<u128>;
+
+    /// Retrieves the excess blob gas of the block, if available
+    fn excess_blob_gas(&self) -> Option<u128>;
+
+    /// Retrieves the parent beacon block root of the block, if available
+    fn parent_beacon_block_root(&self) -> Option<B256>;
+
+    /// Retrieves the requests root of the block, if available
+    fn requests_root(&self) -> Option<B256>;
+
+    /// Retrieves the block's extra data field
+    fn extra_data(&self) -> &Bytes;
+}
+
+impl BlockHeader for Header {
+    fn parent_hash(&self) -> B256 {
+        self.parent_hash
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.ommers_hash
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.beneficiary
+    }
+
+    fn state_root(&self) -> B256 {
+        self.state_root
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.transactions_root
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.receipts_root
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.withdrawals_root
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.logs_bloom
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.difficulty
+    }
+
+    fn number(&self) -> BlockNumber {
+        self.number
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.gas_limit
+    }
+
+    fn gas_used(&self) -> u128 {
+        self.gas_used
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    fn mix_hash(&self) -> B256 {
+        self.mix_hash
+    }
+
+    fn nonce(&self) -> B64 {
+        self.nonce
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u128> {
+        self.base_fee_per_gas
+    }
+
+    fn blob_gas_used(&self) -> Option<u128> {
+        self.blob_gas_used
+    }
+
+    fn excess_blob_gas(&self) -> Option<u128> {
+        self.excess_blob_gas
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.parent_beacon_block_root
+    }
+
+    fn requests_root(&self) -> Option<B256> {
+        self.requests_root
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        &self.extra_data
+    }
+}
+
+#[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "serde")]
     #[test]
     fn header_serde() {
         let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;

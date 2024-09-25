@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+- [consensus] Remove Header Method ([#1271](https://github.com/alloy-rs/alloy/issues/1271))
+- [consensus] Alloc by Default ([#1272](https://github.com/alloy-rs/alloy/issues/1272))
+
+### Other
+
+- Implement `seal` helper for `Header` ([#1269](https://github.com/alloy-rs/alloy/issues/1269))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+- Require destination for 7702 ([#1262](https://github.com/alloy-rs/alloy/issues/1262))
+
+### Other
+
+- Implement `AsRef` for `Header` ([#1260](https://github.com/alloy-rs/alloy/issues/1260))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Bug Fixes
+
+- [consensus] Remove Unused Alloc Vecs ([#1250](https://github.com/alloy-rs/alloy/issues/1250))
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
+### Other
+
+- Impl `exceeds_allowed_future_timestamp` for `Header` ([#1237](https://github.com/alloy-rs/alloy/issues/1237))
+- Impl `is_zero_difficulty` for `Header` ([#1236](https://github.com/alloy-rs/alloy/issues/1236))
+- Impl parent_num_hash for Header ([#1238](https://github.com/alloy-rs/alloy/issues/1238))
+- Implement `Arbitrary` for `Header` ([#1235](https://github.com/alloy-rs/alloy/issues/1235))
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Bug Fixes
@@ -15,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Derive `arbitrary::Arbitrary` for `TxEip7702` ([#1216](https://github.com/alloy-rs/alloy/issues/1216))
 - Implement `tx_type` for `TxEip7702` ([#1214](https://github.com/alloy-rs/alloy/issues/1214))
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
 
 ### Other
 

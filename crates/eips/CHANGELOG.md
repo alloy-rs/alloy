@@ -5,11 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Features
+
+- [rpc-types-beacon] `SignedBidSubmissionV4` ([#1303](https://github.com/alloy-rs/alloy/issues/1303))
+- Add blob and proof v1 ([#1300](https://github.com/alloy-rs/alloy/issues/1300))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Features
+
+- Add serde for NumHash ([#1277](https://github.com/alloy-rs/alloy/issues/1277))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+- Swap `BlockHashOrNumber` alias and struct name ([#1270](https://github.com/alloy-rs/alloy/issues/1270))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+- Swap BlockNumHash alias and struct name ([#1265](https://github.com/alloy-rs/alloy/issues/1265))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+- Add aliases for Num Hash ([#1253](https://github.com/alloy-rs/alloy/issues/1253))
+- [eip1898] Display `RpcBlockHash` ([#1242](https://github.com/alloy-rs/alloy/issues/1242))
+- Optional derive more ([#1239](https://github.com/alloy-rs/alloy/issues/1239))
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Bug Fixes
 
 - [eips] No-std compat ([#1222](https://github.com/alloy-rs/alloy/issues/1222))
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
 
 ## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 

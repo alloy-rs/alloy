@@ -1,11 +1,15 @@
-use crate::{common::Id, RpcParam};
+use crate::{common::Id, RpcObject, RpcParam};
 use alloy_primitives::{keccak256, B256};
-use serde::{de::DeserializeOwned, ser::SerializeMap, Deserialize, Serialize};
+use serde::{
+    de::{DeserializeOwned, MapAccess},
+    ser::SerializeMap,
+    Deserialize, Serialize,
+};
 use serde_json::value::RawValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData, mem::MaybeUninit};
 
 /// `RequestMeta` contains the [`Id`] and method name of a request.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RequestMeta {
     /// The method name.
     pub method: Cow<'static, str>,
@@ -48,7 +52,7 @@ impl RequestMeta {
 /// ### Note
 ///
 /// The value of `method` should be known at compile time.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Request<Params> {
     /// The request metadata (ID and method).
     pub meta: RequestMeta,
@@ -77,6 +81,14 @@ impl<Params> Request<Params> {
     /// triggers a stream of notifications.
     pub fn set_subscription_status(&mut self, sub: bool) {
         self.meta.set_subscription_status(sub);
+    }
+
+    /// Change type of the request parameters.
+    pub fn map_params<NewParams>(
+        self,
+        map: impl FnOnce(Params) -> NewParams,
+    ) -> Request<NewParams> {
+        Request { meta: self.meta, params: map(self.params) }
     }
 }
 
@@ -113,11 +125,12 @@ where
 
 impl<Params> Request<&Params>
 where
-    Params: Clone,
+    Params: ToOwned,
+    Params::Owned: RpcParam,
 {
     /// Clone the request, including the request parameters.
-    pub fn into_owned_params(self) -> Request<Params> {
-        Request { meta: self.meta, params: self.params.clone() }
+    pub fn into_owned_params(self) -> Request<Params::Owned> {
+        Request { meta: self.meta, params: self.params.to_owned() }
     }
 }
 
@@ -170,6 +183,103 @@ where
         map.serialize_entry("id", &self.meta.id)?;
         map.serialize_entry("jsonrpc", "2.0")?;
         map.end()
+    }
+}
+
+impl<'de, Params> Deserialize<'de> for Request<Params>
+where
+    Params: RpcObject,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor<Params>(PhantomData<Params>);
+        impl<'de, Params> serde::de::Visitor<'de> for Visitor<Params>
+        where
+            Params: RpcObject,
+        {
+            type Value = Request<Params>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(
+                    formatter,
+                    "a JSON-RPC 2.0 request object with params of type {}",
+                    std::any::type_name::<Params>()
+                )
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut id = None;
+                let mut params = None;
+                let mut method = None;
+                let mut jsonrpc = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "id" => {
+                            if id.is_some() {
+                                return Err(serde::de::Error::duplicate_field("id"));
+                            }
+                            id = Some(map.next_value()?);
+                        }
+                        "params" => {
+                            if params.is_some() {
+                                return Err(serde::de::Error::duplicate_field("params"));
+                            }
+                            params = Some(map.next_value()?);
+                        }
+                        "method" => {
+                            if method.is_some() {
+                                return Err(serde::de::Error::duplicate_field("method"));
+                            }
+                            method = Some(map.next_value()?);
+                        }
+                        "jsonrpc" => {
+                            let version: String = map.next_value()?;
+                            if version != "2.0" {
+                                return Err(serde::de::Error::custom(format!(
+                                    "unsupported JSON-RPC version: {}",
+                                    version
+                                )));
+                            }
+                            jsonrpc = Some(());
+                        }
+                        other => {
+                            return Err(serde::de::Error::unknown_field(
+                                other,
+                                &["id", "params", "method", "jsonrpc"],
+                            ));
+                        }
+                    }
+                }
+                if jsonrpc.is_none() {
+                    return Err(serde::de::Error::missing_field("jsonrpc"));
+                }
+                if method.is_none() {
+                    return Err(serde::de::Error::missing_field("method"));
+                }
+
+                if params.is_none() {
+                    if std::mem::size_of::<Params>() == 0 {
+                        // SAFETY: params is a ZST, so it's safe to fail to initialize it
+                        unsafe { params = Some(MaybeUninit::<Params>::zeroed().assume_init()) }
+                    } else {
+                        return Err(serde::de::Error::missing_field("params"));
+                    }
+                }
+
+                Ok(Request {
+                    meta: RequestMeta::new(method.unwrap(), id.unwrap_or(Id::None)),
+                    params: params.unwrap(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(Visitor(PhantomData))
     }
 }
 
@@ -274,5 +384,26 @@ impl Serialize for SerializedRequest {
         S: serde::Serializer,
     {
         self.request.serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn test_inner<T: RpcObject + PartialEq>(t: T) {
+        let ser = serde_json::to_string(&t).unwrap();
+        let de: T = serde_json::from_str(&ser).unwrap();
+        let reser = serde_json::to_string(&de).unwrap();
+        assert_eq!(de, t, "deser error for {}", std::any::type_name::<T>());
+        assert_eq!(ser, reser, "reser error for {}", std::any::type_name::<T>());
+    }
+
+    #[test]
+    fn test_ser_deser() {
+        test_inner(Request::<()>::new("test", 1.into(), ()));
+        test_inner(Request::<u64>::new("test", "hello".to_string().into(), 1));
+        test_inner(Request::<String>::new("test", Id::None, "test".to_string()));
+        test_inner(Request::<Vec<u64>>::new("test", u64::MAX.into(), vec![1, 2, 3]));
     }
 }

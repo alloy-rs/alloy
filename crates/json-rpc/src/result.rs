@@ -52,11 +52,11 @@ where
 }
 
 /// Attempt to deserialize the `Ok(_)` variant of an [`RpcResult`].
-pub fn try_deserialize_ok<'a, J, T, E, ErrResp>(
+pub fn try_deserialize_ok<J, T, E, ErrResp>(
     result: RpcResult<J, E, ErrResp>,
 ) -> RpcResult<T, E, ErrResp>
 where
-    J: Borrow<RawValue> + 'a,
+    J: Borrow<RawValue>,
     T: RpcReturn,
     ErrResp: RpcReturn,
 {

@@ -1,14 +1,19 @@
 use crate::{request::TransactionRequest, BlockId, BlockOverrides};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use alloy_primitives::Bytes;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Bundle of transactions
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct Bundle {
     /// All transactions to execute
     pub transactions: Vec<TransactionRequest>,
     /// Block overrides to apply
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_override: Option<BlockOverrides>,
 }
 
@@ -20,27 +25,29 @@ impl From<Vec<TransactionRequest>> for Bundle {
 }
 
 /// State context for callMany
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct StateContext {
     /// Block Number
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub block_number: Option<BlockId>,
     /// Inclusive number of tx to replay in block. -1 means replay all
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     #[doc(alias = "tx_index")]
     pub transaction_index: Option<TransactionIndex>,
 }
 
 /// CallResponse for eth_callMany
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct EthCallResponse {
     /// eth_call output (if no error)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub value: Option<Bytes>,
     /// eth_call output (if error)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub error: Option<String>,
 }
 
@@ -90,10 +97,11 @@ impl From<usize> for TransactionIndex {
     }
 }
 
-impl Serialize for TransactionIndex {
+#[cfg(feature = "serde")]
+impl serde::Serialize for TransactionIndex {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         match self {
             Self::All => serializer.serialize_i8(-1),
@@ -102,10 +110,11 @@ impl Serialize for TransactionIndex {
     }
 }
 
-impl<'de> Deserialize<'de> for TransactionIndex {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for TransactionIndex {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         match isize::deserialize(deserializer)? {
             -1 => Ok(Self::All),
@@ -124,6 +133,7 @@ mod tests {
     use crate::BlockNumberOrTag;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn transaction_index() {
         let s = "-1";
         let idx = serde_json::from_str::<TransactionIndex>(s).unwrap();
@@ -139,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_state_context() {
         let s = r#"{"blockNumber":"pending"}"#;
         let state_context = serde_json::from_str::<StateContext>(s).unwrap();
@@ -148,6 +159,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_bundle() {
         let s = r#"{"transactions":[{"data":"0x70a08231000000000000000000000000000000dbc80bf780c6dc0ca16ed071b1f00cc000","to":"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"}],"blockOverride":{"timestamp":1711546233}}"#;
         let bundle = serde_json::from_str::<Bundle>(s).unwrap();
@@ -156,6 +168,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn full_bundle() {
         // <https://github.com/paradigmxyz/reth/issues/7542>
         let s = r#"{"transactions":[{"from":"0x0000000000000011110000000000000000000000","to":"0x1100000000000000000000000000000000000000","value":"0x1111111","maxFeePerGas":"0x3a35294400","maxPriorityFeePerGas":"0x3b9aca00"}]}"#;

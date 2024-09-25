@@ -1,13 +1,14 @@
 //! Utilities for launching a Geth dev-mode instance.
 
 use crate::{
-    extract_endpoint, extract_value, unused_port, NodeError, NodeInstanceError,
-    NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+    utils::{extract_endpoint, extract_value, unused_port},
+    NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
 };
 use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
+    ffi::OsString,
     fs::{create_dir, File},
     io::{BufRead, BufReader},
     path::PathBuf,
@@ -139,22 +140,22 @@ impl GethInstance {
     ///
     /// This leaves a `None` in its place, so calling methods that require a stderr to be present
     /// will fail if called after this.
-    pub fn stderr(&mut self) -> Result<ChildStderr, NodeInstanceError> {
-        self.pid.stderr.take().ok_or(NodeInstanceError::NoStderr)
+    pub fn stderr(&mut self) -> Result<ChildStderr, NodeError> {
+        self.pid.stderr.take().ok_or(NodeError::NoStderr)
     }
 
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeInstanceError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeInstanceError::NoStderr)?;
+    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
+        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
         let start = Instant::now();
 
         while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
             line.clear();
-            err_reader.read_line(&mut line).map_err(NodeInstanceError::ReadLineError)?;
+            err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             // geth ids are truncated
             let truncated_id = if id.len() > 16 { &id[..16] } else { id };
@@ -162,7 +163,7 @@ impl GethInstance {
                 return Ok(());
             }
         }
-        Err(NodeInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
+        Err(NodeError::Timeout)
     }
 }
 
@@ -204,6 +205,7 @@ pub struct Geth {
     genesis: Option<Genesis>,
     mode: NodeMode,
     clique_private_key: Option<SigningKey>,
+    args: Vec<OsString>,
 }
 
 impl Geth {
@@ -364,6 +366,28 @@ impl Geth {
     /// Sets the port for authenticated RPC connections.
     pub const fn authrpc_port(mut self, port: u16) -> Self {
         self.authrpc_port = Some(port);
+        self
+    }
+
+    /// Adds an argument to pass to `geth`.
+    ///
+    /// Pass any arg that is not supported by the builder.
+    pub fn arg<T: Into<OsString>>(mut self, arg: T) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Adds multiple arguments to pass to `geth`.
+    ///
+    /// Pass any args that is not supported by the builder.
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self = self.arg(arg);
+        }
         self
     }
 
@@ -543,6 +567,8 @@ impl Geth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
+        cmd.args(self.args);
+
         let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
 
         let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
@@ -623,32 +649,18 @@ impl Geth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
+    use crate::utils::run_with_tempdir_sync;
 
     #[test]
     fn port_0() {
-        run_with_tempdir(|_| {
+        run_with_tempdir_sync("geth-test-", |_| {
             let _geth = Geth::new().disable_discovery().port(0u16).spawn();
         });
     }
 
-    /// Allows running tests with a temporary directory, which is cleaned up after the function is
-    /// called.
-    ///
-    /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
-    /// directory is cleaned up.
-    #[track_caller]
-    fn run_with_tempdir(f: impl Fn(&Path)) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_dir_path = temp_dir.path();
-        f(temp_dir_path);
-        #[cfg(not(windows))]
-        temp_dir.close().unwrap();
-    }
-
     #[test]
     fn p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
             assert!(p2p_port.is_some());
@@ -657,7 +669,7 @@ mod tests {
 
     #[test]
     fn explicit_p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // if a p2p port is explicitly set, it should be used
             let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -667,7 +679,7 @@ mod tests {
 
     #[test]
     fn dev_mode() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // dev mode should not have a p2p port, and dev should be the default
             let geth = Geth::new().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -679,7 +691,7 @@ mod tests {
     #[ignore = "fails on geth >=1.14"]
     #[allow(deprecated)]
     fn clique_correctly_configured() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let private_key = SigningKey::random(&mut rand::thread_rng());
             let geth = Geth::new()
                 .set_clique_private_key(private_key)

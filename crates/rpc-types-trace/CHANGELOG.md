@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Features
+
+- Add types for flat call tracer ([#1292](https://github.com/alloy-rs/alloy/issues/1292))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Features
+
+- [alloy-rpc-types-eth] Optional serde ([#1276](https://github.com/alloy-rs/alloy/issues/1276))
+- No_std eth rpc types ([#1252](https://github.com/alloy-rs/alloy/issues/1252))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Bug Fixes
+
+- [rpc-types-trace] Use rpc-types Log in OtsReceipt ([#1261](https://github.com/alloy-rs/alloy/issues/1261))
+
+### Features
+
+- [rpc-types-trace] Always serialize result if no error ([#1258](https://github.com/alloy-rs/alloy/issues/1258))
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
+
 ## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes

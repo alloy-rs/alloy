@@ -1,4 +1,5 @@
 use crate::receipt::{Eip658Value, TxReceipt};
+use alloc::vec::Vec;
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::borrow::Borrow;

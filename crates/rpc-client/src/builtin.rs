@@ -62,17 +62,15 @@ impl BuiltInConnectionString {
             // reqwest is enabled, hyper is not
             #[cfg(all(not(feature = "hyper"), feature = "reqwest"))]
             Self::Http(url) => {
-                Ok(
-                    alloy_transport::Transport::boxed(
-                        alloy_transport_http::Http::<reqwest::Client>::new(url.clone())
-                    )
-                )
-            },
+                Ok(alloy_transport::Transport::boxed(
+                    alloy_transport_http::Http::<reqwest::Client>::new(url.clone()),
+                ))
+            }
 
             // hyper is enabled, reqwest is not
             #[cfg(feature = "hyper")]
-            Self::Http(_) => Err(TransportErrorKind::custom_str(
-                "hyper not supported by BuiltinConnectionString. Please instantiate a hyper client manually",
+            Self::Http(url) => Ok(alloy_transport::Transport::boxed(
+                alloy_transport_http::HyperTransport::new_hyper(url.clone()),
             )),
 
             #[cfg(all(not(target_arch = "wasm32"), feature = "ws"))]
@@ -95,7 +93,12 @@ impl BuiltInConnectionString {
                 .await
                 .map(alloy_transport::Transport::boxed),
 
-            #[cfg(not(any(feature = "reqwest", feature = "hyper", feature = "ws", feature = "ipc")))]
+            #[cfg(not(any(
+                feature = "reqwest",
+                feature = "hyper",
+                feature = "ws",
+                feature = "ipc"
+            )))]
             _ => Err(TransportErrorKind::custom_str(
                 "No transports enabled. Enable one of: reqwest, hyper, ws, ipc",
             )),

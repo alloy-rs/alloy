@@ -1,9 +1,4 @@
 use alloy_primitives::U256;
-use serde::{
-    de::{Error, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-use std::fmt;
 
 /// A hex encoded or decimal index that's intended to be used as a rust index, hence it's
 /// deserialized into a `usize`.
@@ -28,59 +23,56 @@ impl From<usize> for Index {
     }
 }
 
-impl Serialize for Index {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Index {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         serializer.serialize_str(&format!("0x{:x}", self.0))
     }
 }
 
-impl<'a> Deserialize<'a> for Index {
+#[cfg(feature = "serde")]
+impl<'a> serde::Deserialize<'a> for Index {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: serde::Deserializer<'a>,
     {
         struct IndexVisitor;
 
-        impl<'a> Visitor<'a> for IndexVisitor {
+        impl<'a> serde::de::Visitor<'a> for IndexVisitor {
             type Value = Index;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "hex-encoded or decimal index")
             }
 
             fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
             where
-                E: Error,
+                E: serde::de::Error,
             {
                 Ok(Index(value as usize))
             }
 
             fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where
-                E: Error,
+                E: serde::de::Error,
             {
                 value.strip_prefix("0x").map_or_else(
                     || {
                         value.parse::<usize>().map(Index).map_err(|e| {
-                            Error::custom(format!("Failed to parse numeric index: {e}"))
+                            serde::de::Error::custom(format!("Failed to parse numeric index: {e}"))
                         })
                     },
                     |val| {
                         usize::from_str_radix(val, 16).map(Index).map_err(|e| {
-                            Error::custom(format!("Failed to parse hex encoded index value: {e}"))
+                            serde::de::Error::custom(format!(
+                                "Failed to parse hex encoded index value: {e}"
+                            ))
                         })
                     },
                 )
-            }
-
-            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-            where
-                E: Error,
-            {
-                self.visit_str(value.as_ref())
             }
         }
 
@@ -95,6 +87,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_serde_index_rand() {
         let mut rng = thread_rng();
         for _ in 0..100 {
@@ -106,6 +99,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_serde_index_deserialization() {
         // Test decimal index
         let json_data = json!(42);

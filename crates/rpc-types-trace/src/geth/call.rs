@@ -1,5 +1,6 @@
 //! Geth call tracer types.
 
+use crate::parity::LocalizedTransactionTrace;
 use alloy_primitives::{Address, Bytes, B256, U256};
 use serde::{Deserialize, Serialize};
 
@@ -84,6 +85,38 @@ impl CallConfig {
     /// Sets the with log flag.
     pub const fn with_log(mut self) -> Self {
         self.with_log = Some(true);
+        self
+    }
+}
+
+/// The response object for `debug_traceTransaction` with `"tracer": "flatCallTracer"`.
+///
+/// That is equivalent to parity's [`LocalizedTransactionTrace`]
+/// <https://github.com/ethereum/go-ethereum/blob/0dd173a727dd2d2409b8e401b22e85d20c25b71f/eth/tracers/native/call_flat.go#L62-L62>
+pub type FlatCallFrame = Vec<LocalizedTransactionTrace>;
+
+/// The configuration for the flat call tracer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlatCallConfig {
+    /// If true, call tracer converts errors to parity format
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub convert_parity_errors: Option<bool>,
+    /// If true, call tracer includes calls to precompiled contracts
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_precompiles: Option<bool>,
+}
+
+impl FlatCallConfig {
+    /// Converts errors to parity format.
+    pub const fn parity_errors(mut self) -> Self {
+        self.convert_parity_errors = Some(true);
+        self
+    }
+
+    /// Include calls to precompiled contracts.
+    pub const fn with_precompiles(mut self) -> Self {
+        self.include_precompiles = Some(true);
         self
     }
 }

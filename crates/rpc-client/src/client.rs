@@ -39,7 +39,7 @@ impl<T> Clone for RpcClient<T> {
 
 impl RpcClient<Identity> {
     /// Create a new [`ClientBuilder`].
-    pub fn builder() -> ClientBuilder<Identity> {
+    pub const fn builder() -> ClientBuilder<Identity> {
         ClientBuilder { builder: ServiceBuilder::new() }
     }
 }
@@ -216,6 +216,19 @@ impl<T> RpcClientInner<T> {
     #[inline]
     pub fn into_transport(self) -> T {
         self.transport
+    }
+
+    /// Returns a reference to the pubsub frontend if the transport supports it.
+    #[cfg(feature = "pubsub")]
+    pub fn pubsub_frontend(&self) -> Option<&alloy_pubsub::PubSubFrontend>
+    where
+        T: std::any::Any,
+    {
+        let t = self.transport() as &dyn std::any::Any;
+        t.downcast_ref::<alloy_pubsub::PubSubFrontend>().or_else(|| {
+            t.downcast_ref::<BoxTransport>()
+                .and_then(|t| t.as_any().downcast_ref::<alloy_pubsub::PubSubFrontend>())
+        })
     }
 
     /// Build a `JsonRpcRequest` with the given method and params.

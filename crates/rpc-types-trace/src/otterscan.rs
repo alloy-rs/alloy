@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Transaction, TransactionReceipt, Withdrawal};
+use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawal};
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -21,6 +21,8 @@ pub enum OperationType {
     OpCreate = 2,
     /// Operation Create2
     OpCreate2 = 3,
+    /// Operation EofCreate
+    OpEofCreate = 4,
 }
 
 // Implement Serialize for OperationType
@@ -46,6 +48,7 @@ impl<'de> Deserialize<'de> for OperationType {
             1 => Ok(Self::OpSelfDestruct),
             2 => Ok(Self::OpCreate),
             3 => Ok(Self::OpCreate2),
+            4 => Ok(Self::OpEofCreate),
             other => Err(de::Error::invalid_value(
                 Unexpected::Unsigned(other as u64),
                 &"a valid OperationType",
@@ -204,7 +207,7 @@ pub struct OtsReceipt {
     /// The logs sent from contracts.
     ///
     /// Note: this is set to null.
-    pub logs: Option<Vec<alloy_primitives::Log>>,
+    pub logs: Option<Vec<Log>>,
     /// The bloom filter.
     ///
     /// Note: this is set to null.

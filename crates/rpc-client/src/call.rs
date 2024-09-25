@@ -4,13 +4,14 @@ use alloy_json_rpc::{
 };
 use alloy_transport::{RpcFut, Transport, TransportError, TransportResult};
 use core::panic;
+use futures::FutureExt;
 use serde_json::value::RawValue;
 use std::{
     fmt,
     future::Future,
     marker::PhantomData,
     pin::Pin,
-    task::{self, Poll::Ready},
+    task::{self, ready, Poll::Ready},
 };
 use tower::Service;
 
@@ -139,11 +140,11 @@ pub struct RpcCall<Conn, Params, Resp, Output = Resp, Map = fn(Resp) -> Output>
 where
     Conn: Transport + Clone,
     Params: RpcParam,
-    Map: Fn(Resp) -> Output,
+    Map: FnOnce(Resp) -> Output,
 {
     #[pin]
     state: CallState<Params, Conn>,
-    map: Map,
+    map: Option<Map>,
     _pd: core::marker::PhantomData<fn() -> (Resp, Output)>,
 }
 
@@ -151,7 +152,7 @@ impl<Conn, Params, Resp, Output, Map> core::fmt::Debug for RpcCall<Conn, Params,
 where
     Conn: Transport + Clone,
     Params: RpcParam,
-    Map: Fn(Resp) -> Output,
+    Map: FnOnce(Resp) -> Output,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("RpcCall").field("state", &self.state).finish()
@@ -167,7 +168,7 @@ where
     pub fn new(req: Request<Params>, connection: Conn) -> Self {
         Self {
             state: CallState::Prepared { request: Some(req), connection },
-            map: std::convert::identity,
+            map: Some(std::convert::identity),
             _pd: PhantomData,
         }
     }
@@ -177,17 +178,27 @@ impl<Conn, Params, Resp, Output, Map> RpcCall<Conn, Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
     Params: RpcParam,
-    Map: Fn(Resp) -> Output,
+    Map: FnOnce(Resp) -> Output,
 {
-    /// Set a function to map the response into a different type.
+    /// Map the response to a different type. This is usable for converting
+    /// the response to a more usable type, e.g. changing `U64` to `u64`.
+    ///
+    /// ## Note
+    ///
+    /// Carefully review the rust documentation on [fn pointers] before passing
+    /// them to this function. Unless the pointer is specifically coerced to a
+    /// `fn(_) -> _`, the `NewMap` will be inferred as that function's unique
+    /// type. This can lead to confusing error messages.
+    ///
+    /// [fn pointers]: https://doc.rust-lang.org/std/primitive.fn.html#creating-function-pointers
     pub fn map_resp<NewOutput, NewMap>(
         self,
         map: NewMap,
     ) -> RpcCall<Conn, Params, Resp, NewOutput, NewMap>
     where
-        NewMap: Fn(Resp) -> NewOutput,
+        NewMap: FnOnce(Resp) -> NewOutput,
     {
-        RpcCall { state: self.state, map, _pd: PhantomData }
+        RpcCall { state: self.state, map: Some(map), _pd: PhantomData }
     }
 
     /// Returns `true` if the request is a subscription.
@@ -249,20 +260,37 @@ where
         };
         request.as_mut().expect("no request in prepared")
     }
+
+    /// Map the params of the request into a new type.
+    pub fn map_params<NewParams: RpcParam>(
+        self,
+        map: impl Fn(Params) -> NewParams,
+    ) -> RpcCall<Conn, NewParams, Resp, Output, Map> {
+        let CallState::Prepared { request, connection } = self.state else {
+            panic!("Cannot get request after request has been sent");
+        };
+        let request = request.expect("no request in prepared").map_params(map);
+        RpcCall {
+            state: CallState::Prepared { request: Some(request), connection },
+            map: self.map,
+            _pd: PhantomData,
+        }
+    }
 }
 
 impl<Conn, Params, Resp, Output, Map> RpcCall<Conn, &Params, Resp, Output, Map>
 where
     Conn: Transport + Clone,
-    Params: RpcParam + Clone,
-    Map: Fn(Resp) -> Output,
+    Params: RpcParam + ToOwned,
+    Params::Owned: RpcParam,
+    Map: FnOnce(Resp) -> Output,
 {
     /// Convert this call into one with owned params, by cloning the params.
     ///
     /// # Panics
     ///
-    /// Panics if called after the request has been sent.
-    pub fn into_owned_params(self) -> RpcCall<Conn, Params, Resp, Output, Map> {
+    /// Panics if called after the request has been polled.
+    pub fn into_owned_params(self) -> RpcCall<Conn, Params::Owned, Resp, Output, Map> {
         let CallState::Prepared { request, connection } = self.state else {
             panic!("Cannot get params after request has been sent");
         };
@@ -282,7 +310,7 @@ where
     Params: RpcParam + 'a,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output + Send + 'a,
+    Map: FnOnce(Resp) -> Output + Send + 'a,
 {
     /// Convert this future into a boxed, pinned future, erasing its type.
     pub fn boxed(self) -> RpcFut<'a, Output> {
@@ -296,13 +324,16 @@ where
     Params: RpcParam,
     Resp: RpcReturn,
     Output: 'static,
-    Map: Fn(Resp) -> Output,
+    Map: FnOnce(Resp) -> Output,
 {
     type Output = TransportResult<Output>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         trace!(?self.state, "polling RpcCall");
-        let this = self.project();
-        this.state.poll(cx).map(try_deserialize_ok).map(|r| r.map(this.map))
+
+        let this = self.get_mut();
+        let resp = try_deserialize_ok(ready!(this.state.poll_unpin(cx)));
+
+        Ready(resp.map(this.map.take().expect("polled after completion")))
     }
 }

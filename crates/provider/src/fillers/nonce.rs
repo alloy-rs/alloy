@@ -46,6 +46,8 @@ impl NonceManager for SimpleNonceManager {
     }
 }
 
+/// Cached nonce manager
+///
 /// This [`NonceManager`] implementation will fetch the transaction count for any new account it
 /// sees, store it locally and increment the locally stored nonce as transactions are sent via
 /// [`Provider::send_transaction`].

@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Bug Fixes
+
+- [types-eth] Optional Alloy Serde ([#1284](https://github.com/alloy-rs/alloy/issues/1284))
+- `eth_simulateV1` ([#1289](https://github.com/alloy-rs/alloy/issues/1289))
+
+### Features
+
+- Add block num hash helper ([#1304](https://github.com/alloy-rs/alloy/issues/1304))
+- ProviderCall ([#788](https://github.com/alloy-rs/alloy/issues/788))
+- [rpc-types-beacon] `SignedBidSubmissionV4` ([#1303](https://github.com/alloy-rs/alloy/issues/1303))
+- [transport-http] Layer client ([#1227](https://github.com/alloy-rs/alloy/issues/1227))
+- Add blob and proof v1 ([#1300](https://github.com/alloy-rs/alloy/issues/1300))
+- Add types for flat call tracer ([#1292](https://github.com/alloy-rs/alloy/issues/1292))
+- [`node-bindings`] Support appending extra args ([#1299](https://github.com/alloy-rs/alloy/issues/1299))
+
+### Miscellaneous Tasks
+
+- [rpc] Rename witness fields ([#1293](https://github.com/alloy-rs/alloy/issues/1293))
+- [engine] `no_std` Checks ([#1298](https://github.com/alloy-rs/alloy/issues/1298))
+
+### Refactor
+
+- Separate transaction builders for tx types ([#1259](https://github.com/alloy-rs/alloy/issues/1259))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Bug Fixes
+
+- Add missing conversion ([#1287](https://github.com/alloy-rs/alloy/issues/1287))
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Bug Fixes
+
+- `debug_traceCallMany` and `trace_callMany` ([#1278](https://github.com/alloy-rs/alloy/issues/1278))
+- Serde for `eth_simulateV1` ([#1273](https://github.com/alloy-rs/alloy/issues/1273))
+
+### Features
+
+- [engine] Optional Serde ([#1283](https://github.com/alloy-rs/alloy/issues/1283))
+- [alloy-rpc-types-eth] Optional serde ([#1276](https://github.com/alloy-rs/alloy/issues/1276))
+- Improve node bindings ([#1279](https://github.com/alloy-rs/alloy/issues/1279))
+- Add serde for NumHash ([#1277](https://github.com/alloy-rs/alloy/issues/1277))
+- [engine] No_std engine types ([#1268](https://github.com/alloy-rs/alloy/issues/1268))
+- No_std eth rpc types ([#1252](https://github.com/alloy-rs/alloy/issues/1252))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+- Remove eth rpc types dep from engine types ([#1280](https://github.com/alloy-rs/alloy/issues/1280))
+- Swap `BlockHashOrNumber` alias and struct name ([#1270](https://github.com/alloy-rs/alloy/issues/1270))
+- [consensus] Remove Header Method ([#1271](https://github.com/alloy-rs/alloy/issues/1271))
+- [consensus] Alloc by Default ([#1272](https://github.com/alloy-rs/alloy/issues/1272))
+- [network-primitives] Remove alloc Vec Dep ([#1267](https://github.com/alloy-rs/alloy/issues/1267))
+
+### Other
+
+- Add trait methods `cumulative_gas_used` and `state_root` to `ReceiptResponse` ([#1275](https://github.com/alloy-rs/alloy/issues/1275))
+- Implement `seal` helper for `Header` ([#1269](https://github.com/alloy-rs/alloy/issues/1269))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Bug Fixes
+
+- [rpc-types-trace] Use rpc-types Log in OtsReceipt ([#1261](https://github.com/alloy-rs/alloy/issues/1261))
+
+### Features
+
+- [rpc-types-trace] Always serialize result if no error ([#1258](https://github.com/alloy-rs/alloy/issues/1258))
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+- Require destination for 7702 ([#1262](https://github.com/alloy-rs/alloy/issues/1262))
+- Swap BlockNumHash alias and struct name ([#1265](https://github.com/alloy-rs/alloy/issues/1265))
+
+### Other
+
+- Implement `AsRef` for `Header` ([#1260](https://github.com/alloy-rs/alloy/issues/1260))
+
+### Testing
+
+- Dont use fork test ([#1263](https://github.com/alloy-rs/alloy/issues/1263))
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Bug Fixes
+
+- [consensus] Remove Unused Alloc Vecs ([#1250](https://github.com/alloy-rs/alloy/issues/1250))
+
+### Dependencies
+
+- Bump tower to 0.5 ([#1249](https://github.com/alloy-rs/alloy/issues/1249))
+
+### Features
+
+- No_std network primitives ([#1248](https://github.com/alloy-rs/alloy/issues/1248))
+- [rpc-types-eth] AnyBlock ([#1243](https://github.com/alloy-rs/alloy/issues/1243))
+- Add Reth node bindings ([#1092](https://github.com/alloy-rs/alloy/issues/1092))
+- [rpc-types-engine] Add forkchoice state zero helpers ([#1231](https://github.com/alloy-rs/alloy/issues/1231))
+- [network-primitives] Expose more fields via block response traits ([#1229](https://github.com/alloy-rs/alloy/issues/1229))
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+- Add aliases for Num Hash ([#1253](https://github.com/alloy-rs/alloy/issues/1253))
+- Add helpers for beacon blob bundle ([#1254](https://github.com/alloy-rs/alloy/issues/1254))
+- [eip1898] Display `RpcBlockHash` ([#1242](https://github.com/alloy-rs/alloy/issues/1242))
+- Optional derive more ([#1239](https://github.com/alloy-rs/alloy/issues/1239))
+- Derive more default features false ([#1230](https://github.com/alloy-rs/alloy/issues/1230))
+
+### Other
+
+- Add getter trait methods to `ReceiptResponse` ([#1251](https://github.com/alloy-rs/alloy/issues/1251))
+- Impl `exceeds_allowed_future_timestamp` for `Header` ([#1237](https://github.com/alloy-rs/alloy/issues/1237))
+- Impl `is_zero_difficulty` for `Header` ([#1236](https://github.com/alloy-rs/alloy/issues/1236))
+- Impl parent_num_hash for Header ([#1238](https://github.com/alloy-rs/alloy/issues/1238))
+- Implement `Arbitrary` for `Header` ([#1235](https://github.com/alloy-rs/alloy/issues/1235))
+
 ## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
 
 ### Bug Fixes
@@ -31,6 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.3.1
 - [README] Add a link to `rpc-types-debug` ([#1212](https://github.com/alloy-rs/alloy/issues/1212))
 - [features] Enable `consensus` and `network` along with `providers` ([#1207](https://github.com/alloy-rs/alloy/issues/1207))
 

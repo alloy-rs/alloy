@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Features
+
+- Add block num hash helper ([#1304](https://github.com/alloy-rs/alloy/issues/1304))
+- [rpc-types-beacon] `SignedBidSubmissionV4` ([#1303](https://github.com/alloy-rs/alloy/issues/1303))
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
+
+### Bug Fixes
+
+- Add missing conversion ([#1287](https://github.com/alloy-rs/alloy/issues/1287))
+
+### Miscellaneous Tasks
+
+- Release 0.3.5
+
+## [0.3.4](https://github.com/alloy-rs/alloy/releases/tag/v0.3.4) - 2024-09-13
+
+### Features
+
+- [engine] Optional Serde ([#1283](https://github.com/alloy-rs/alloy/issues/1283))
+- [engine] No_std engine types ([#1268](https://github.com/alloy-rs/alloy/issues/1268))
+
+### Miscellaneous Tasks
+
+- Release 0.3.4
+- Remove eth rpc types dep from engine types ([#1280](https://github.com/alloy-rs/alloy/issues/1280))
+
+## [0.3.3](https://github.com/alloy-rs/alloy/releases/tag/v0.3.3) - 2024-09-10
+
+### Miscellaneous Tasks
+
+- Release 0.3.3
+
+## [0.3.2](https://github.com/alloy-rs/alloy/releases/tag/v0.3.2) - 2024-09-09
+
+### Features
+
+- [rpc-types-engine] Add forkchoice state zero helpers ([#1231](https://github.com/alloy-rs/alloy/issues/1231))
+
+### Miscellaneous Tasks
+
+- Release 0.3.2
+
+## [0.3.1](https://github.com/alloy-rs/alloy/releases/tag/v0.3.1) - 2024-09-02
+
+### Miscellaneous Tasks
+
+- Release 0.3.1
+
 ## [0.3.0](https://github.com/alloy-rs/alloy/releases/tag/v0.3.0) - 2024-08-28
 
 ### Bug Fixes

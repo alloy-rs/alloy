@@ -9,9 +9,16 @@ use std::collections::HashMap;
 pub struct ExecutionWitness {
     /// Map of all hashed trie nodes to their preimages that were required during the execution of
     /// the block, including during state root recomputation.
-    pub witness: HashMap<B256, Bytes>,
-    /// Map of all hashed account addresses and storage slots to their preimages (unhashed account
-    /// addresses and storage slots, respectively) that were required during the execution of the
-    /// block. during the execution of the block.
-    pub state_preimages: Option<HashMap<B256, Bytes>>,
+    /// keccak(rlp(node)) => rlp(node)
+    pub state: HashMap<B256, Bytes>,
+    /// Map of all contract codes (created / accessed) to their preimages that were required during
+    /// the execution of the block, including during state root recomputation.
+    /// keccak(address) => bytecodes
+    pub codes: HashMap<B256, Bytes>,
+    /// Map of all hashed account and storage keys (addresses and slots) to their preimages
+    /// (unhashed account addresses and storage slots, respectively) that were required during
+    /// the execution of the block. during the execution of the block.
+    /// keccak(address|slot) => address|slot
+    #[serde(default)]
+    pub keys: Option<HashMap<B256, Bytes>>,
 }
