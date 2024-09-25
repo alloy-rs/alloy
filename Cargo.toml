@@ -41,6 +41,7 @@ alloy-eips = { version = "0.4", path = "crates/eips", default-features = false }
 alloy-eip7547 = { version = "0.4", path = "crates/eip7547", default-features = false }
 alloy-genesis = { version = "0.4", path = "crates/genesis", default-features = false }
 alloy-json-rpc = { version = "0.4", path = "crates/json-rpc", default-features = false }
+alloy-json-rpc-router = { version = "0.3", path = "crates/json-rpc-router", default-features = false }
 alloy-network = { version = "0.4", path = "crates/network", default-features = false }
 alloy-network-primitives = { version = "0.4", path = "crates/network-primitives", default-features = false }
 alloy-node-bindings = { version = "0.4", path = "crates/node-bindings", default-features = false }
