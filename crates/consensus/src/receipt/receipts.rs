@@ -123,19 +123,19 @@ impl<T> Receipts<T> {
     }
 
     /// Push a new vector of receipts into the [`Receipts`] collection.
-    pub fn push(&mut self, receipts: Vec<Receipt<T>>) {
+    pub fn push(&mut self, receipts: Vec<T>) {
         self.receipt_vec.push(receipts);
     }
 }
 
-impl<T> From<Vec<Receipt<T>>> for Receipts<T> {
-    fn from(block_receipts: Vec<Receipt<T>>) -> Self {
+impl<T> From<Vec<T>> for Receipts<T> {
+    fn from(block_receipts: Vec<T>) -> Self {
         Self { receipt_vec: vec![block_receipts] }
     }
 }
 
-impl<T> FromIterator<Vec<Receipt<T>>> for Receipts<T> {
-    fn from_iter<I: IntoIterator<Item = Vec<Receipt<T>>>>(iter: I) -> Self {
+impl<T> FromIterator<Vec<T>> for Receipts<T> {
+    fn from_iter<I: IntoIterator<Item = Vec<T>>>(iter: I) -> Self {
         Self { receipt_vec: iter.into_iter().collect() }
     }
 }
