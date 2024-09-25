@@ -1189,14 +1189,17 @@ mod tests {
     #[cfg(feature = "hyper")]
     #[tokio::test]
     async fn test_auth_layer_transport() {
+        use alloy_node_bindings::Reth;
         use alloy_rpc_types_engine::JwtSecret;
         use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
 
         init_tracing();
-        let anvil = Anvil::new().spawn();
-        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
-
         let secret = JwtSecret::random();
+
+        let reth = Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
+
+        println!("Reth Spawned!");
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
 
         let service =
             tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
@@ -1211,7 +1214,7 @@ mod tests {
             >,
         > = HyperClient::with_service(service);
 
-        let http_hyper = Http::with_client(layer_transport, anvil.endpoint_url());
+        let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
 
         let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
 
