@@ -3,6 +3,7 @@
 use crate::eip4844::{
     kzg_to_versioned_hash, Blob, Bytes48, BYTES_PER_BLOB, BYTES_PER_COMMITMENT, BYTES_PER_PROOF,
 };
+use alloc::boxed::Box;
 use alloy_primitives::{bytes::BufMut, B256};
 use alloy_rlp::{Decodable, Encodable};
 
@@ -11,6 +12,10 @@ use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+
+/// The versioned hash version for KZG.
+#[cfg(feature = "kzg")]
+pub(crate) const VERSIONED_HASH_VERSION_KZG: u8 = 0x01;
 
 /// This represents a set of blobs, and its corresponding commitments and proofs.
 ///
@@ -30,6 +35,96 @@ pub struct BlobTransactionSidecar {
     pub commitments: Vec<Bytes48>,
     /// The blob proofs.
     pub proofs: Vec<Bytes48>,
+}
+
+impl IntoIterator for BlobTransactionSidecar {
+    type Item = BlobTransactionSidecarItem;
+    type IntoIter = alloc::vec::IntoIter<BlobTransactionSidecarItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.blobs
+            .into_iter()
+            .zip(self.commitments)
+            .zip(self.proofs)
+            .enumerate()
+            .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
+                index,
+                blob: Box::new(blob),
+                kzg_commitment: commitment,
+                kzg_proof: proof,
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+/// A single blob sidecar.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[repr(C)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BlobTransactionSidecarItem {
+    /// The index of this item within the [BlobTransactionSidecar].
+    pub index: usize,
+    /// The blob in this sidecar item.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "super::deserialize_blob"))]
+    pub blob: Box<Blob>,
+    /// The KZG commitment.
+    pub kzg_commitment: Bytes48,
+    /// The KZG proof.
+    pub kzg_proof: Bytes48,
+}
+
+#[cfg(feature = "kzg")]
+impl BlobTransactionSidecarItem {
+    /// `VERSIONED_HASH_VERSION_KZG ++ sha256(commitment)[1..]`
+    pub fn to_kzg_versioned_hash(&self) -> [u8; 32] {
+        use sha2::Digest;
+        let commitment = self.kzg_commitment.as_slice();
+        let mut hash: [u8; 32] = sha2::Sha256::digest(commitment).into();
+        hash[0] = VERSIONED_HASH_VERSION_KZG;
+        hash
+    }
+
+    /// Verifies the KZG proof of a blob to ensure its integrity and correctness.
+    pub fn verify_blob_kzg_proof(&self) -> Result<(), BlobTransactionValidationError> {
+        let binding = crate::eip4844::env_settings::EnvKzgSettings::Default;
+        let settings = binding.get();
+
+        let blob = c_kzg::Blob::from_bytes(self.blob.as_slice())
+            .map_err(BlobTransactionValidationError::KZGError)?;
+
+        let commitment = c_kzg::Bytes48::from_bytes(self.kzg_commitment.as_slice())
+            .map_err(BlobTransactionValidationError::KZGError)?;
+
+        let proof = c_kzg::Bytes48::from_bytes(self.kzg_proof.as_slice())
+            .map_err(BlobTransactionValidationError::KZGError)?;
+
+        let result = c_kzg::KzgProof::verify_blob_kzg_proof(&blob, &commitment, &proof, settings)
+            .map_err(BlobTransactionValidationError::KZGError)?;
+
+        result.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
+    }
+
+    /// Verify the blob sidecar against its [crate::NumHash].
+    pub fn verify_blob(&self, hash: &crate::NumHash) -> Result<(), BlobTransactionValidationError> {
+        if self.index != hash.number as usize {
+            let blob_hash_part = B256::from_slice(&self.blob[0..32]);
+            return Err(BlobTransactionValidationError::WrongVersionedHash {
+                have: blob_hash_part,
+                expected: hash.hash,
+            });
+        }
+
+        let computed_hash = self.to_kzg_versioned_hash();
+        if computed_hash != hash.hash {
+            return Err(BlobTransactionValidationError::WrongVersionedHash {
+                have: computed_hash.into(),
+                expected: hash.hash,
+            });
+        }
+
+        self.verify_blob_kzg_proof()
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
@@ -139,11 +234,7 @@ impl BlobTransactionSidecar {
         }
         .map_err(BlobTransactionValidationError::KZGError)?;
 
-        if res {
-            Ok(())
-        } else {
-            Err(BlobTransactionValidationError::InvalidProof)
-        }
+        res.then_some(()).ok_or(BlobTransactionValidationError::InvalidProof)
     }
 
     /// Returns an iterator over the versioned hashes of the commitments.

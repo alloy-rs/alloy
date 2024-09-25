@@ -1,10 +1,9 @@
 use crate::Log;
-use alloy_consensus::{AnyReceiptEnvelope, ReceiptEnvelope, TxReceipt, TxType};
+use alloc::vec::Vec;
+use alloy_consensus::{ReceiptEnvelope, TxReceipt, TxType};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, BlockHash, TxHash, B256};
-
-use alloc::vec::Vec;
 
 /// Transaction receipt
 ///
@@ -145,7 +144,7 @@ impl<T> TransactionReceipt<T> {
 #[doc(alias = "AnyTxReceipt")]
 #[cfg(feature = "serde")]
 pub type AnyTransactionReceipt =
-    alloy_serde::WithOtherFields<TransactionReceipt<AnyReceiptEnvelope<Log>>>;
+    alloy_serde::WithOtherFields<TransactionReceipt<alloy_consensus::AnyReceiptEnvelope<Log>>>;
 
 impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
     fn contract_address(&self) -> Option<Address> {

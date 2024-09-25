@@ -12,6 +12,9 @@ extern crate alloc;
 mod account;
 pub use account::Account;
 
+mod block;
+pub use block::{Block, BlockBody};
+
 pub mod constants;
 
 mod encodable_signature;

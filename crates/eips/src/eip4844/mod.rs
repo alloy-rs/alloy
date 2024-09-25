@@ -85,6 +85,20 @@ pub const BYTES_PER_PROOF: usize = 48;
 /// A Blob serialized as 0x-prefixed hex string
 pub type Blob = FixedBytes<BYTES_PER_BLOB>;
 
+/// Helper function to deserialize boxed blobs.
+#[cfg(feature = "serde")]
+pub fn deserialize_blob<'de, D>(deserializer: D) -> Result<alloc::boxed::Box<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let raw_blob = <alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let blob = alloc::boxed::Box::new(
+        Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?,
+    );
+    Ok(blob)
+}
+
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
 

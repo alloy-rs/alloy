@@ -1,5 +1,4 @@
-use alloy_primitives::{B256, U256};
-use core::fmt;
+use alloy_primitives::B256;
 
 /// The result of an `eth_getWork` request
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -20,10 +19,8 @@ impl serde::Serialize for Work {
     where
         S: serde::Serializer,
     {
-        match self.number.as_ref() {
-            Some(num) => {
-                (&self.pow_hash, &self.seed_hash, &self.target, U256::from(*num)).serialize(s)
-            }
+        match self.number.map(alloy_primitives::U64::from) {
+            Some(num) => (&self.pow_hash, &self.seed_hash, &self.target, num).serialize(s),
             None => (&self.pow_hash, &self.seed_hash, &self.target).serialize(s),
         }
     }
@@ -40,7 +37,7 @@ impl<'a> serde::Deserialize<'a> for Work {
         impl<'a> serde::de::Visitor<'a> for WorkVisitor {
             type Value = Work;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(formatter, "Work object")
             }
 

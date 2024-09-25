@@ -345,8 +345,17 @@ impl Header {
     }
 
     /// Returns the parent block's number and hash
+    ///
+    /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
     pub const fn parent_num_hash(&self) -> BlockNumHash {
         BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
+    }
+
+    /// Returns the block's number and hash.
+    ///
+    /// Note: this hashes the header.
+    pub fn num_hash_slow(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number, hash: self.hash_slow() }
     }
 
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
