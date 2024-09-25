@@ -26,13 +26,19 @@ alloy-serde = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }
-derive_more = { workspace = true, features = ["deref", "deref_mut", "from", "into_iterator"] }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
+
+derive_more = { workspace = true, features = [
+    "from",
+    "deref",
+    "deref_mut",
+    "into_iterator"
+], default-features = false }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["arbitrary", "rand"] }
