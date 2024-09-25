@@ -49,7 +49,7 @@ impl From<Eip2718Error> for alloy_rlp::Error {
     fn from(err: Eip2718Error) -> Self {
         match err {
             Eip2718Error::RlpError(err) => err,
-            Eip2718Error::UnexpectedType(_) => alloy_rlp::Error::Custom("Unexpected type flag"),
+            Eip2718Error::UnexpectedType(_) => Self::Custom("Unexpected type flag"),
         }
     }
 }
