@@ -108,7 +108,7 @@ impl<T> From<ReceiptWithBloom<T>> for Receipt<T> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Receipts<T> {
     /// A two-dimensional vector of [`Receipt`] instances.
-    pub receipt_vec: Vec<Vec<Receipt<T>>>,
+    pub receipt_vec: Vec<Vec<T>>,
 }
 
 impl<T> Receipts<T> {
