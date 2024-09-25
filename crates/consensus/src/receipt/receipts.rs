@@ -5,9 +5,6 @@ use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::borrow::Borrow;
 use derive_more::{DerefMut, From, IntoIterator};
 
-#[cfg(not(feature = "std"))]
-use alloc::{vec, vec::Vec};
-
 /// Receipt containing result of transaction execution.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
