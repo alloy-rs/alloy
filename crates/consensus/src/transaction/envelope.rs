@@ -280,40 +280,22 @@ impl TxEnvelope {
 
     /// Return the length of the inner txn, including type byte length
     pub fn rlp_payload_length(&self) -> usize {
-        match self {
-            Self::Legacy(t) => {
-                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length
-            }
-            Self::Eip2930(t) => {
-                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length + 1
-            }
-            Self::Eip1559(t) => {
-                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length + 1
-            }
+        let payload_length = match self {
+            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Eip2930(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Eip1559(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
             Self::Eip4844(t) => match t.tx() {
-                TxEip4844Variant::TxEip4844(tx) => {
-                    let payload_length = tx.fields_len() + t.signature().rlp_vrs_len();
-                    Header { list: true, payload_length }.length() + payload_length + 1
-                }
+                TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + t.signature().rlp_vrs_len(),
                 TxEip4844Variant::TxEip4844WithSidecar(tx) => {
                     let inner_payload_length = tx.tx().fields_len() + t.signature().rlp_vrs_len();
                     let inner_header = Header { list: true, payload_length: inner_payload_length };
 
-                    let outer_payload_length =
-                        inner_header.length() + inner_payload_length + tx.sidecar.fields_len();
-                    let outer_header = Header { list: true, payload_length: outer_payload_length };
-
-                    outer_header.length() + outer_payload_length + 1
+                    inner_header.length() + inner_payload_length + tx.sidecar.fields_len()
                 }
             },
-            Self::Eip7702(t) => {
-                let payload_length = t.tx().fields_len() + t.signature().rlp_vrs_len();
-                Header { list: true, payload_length }.length() + payload_length + 1
-            }
-        }
+            Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+        };
+        Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
     }
 }
 
