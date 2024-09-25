@@ -68,9 +68,11 @@ impl<S> AuthService<S> {
             if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
                 return false;
             }
+
+            return true;
         }
 
-        true
+        false
     }
 
     /// Create a new token from the secret.
@@ -93,11 +95,7 @@ impl<S> AuthService<S> {
 
 impl<S, B, ResBody> Service<Request<B>> for AuthService<S>
 where
-    S: Service<hyper::Request<B>, Response = Response<ResBody>, Error = TransportError>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    S: Service<hyper::Request<B>, Response = Response<ResBody>> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
     B: From<Vec<u8>> + Send + 'static + Clone + Sync,
@@ -108,13 +106,13 @@ where
     type Response = Response<ResBody>;
     type Error = TransportError;
     type Future =
-        Pin<Box<dyn Future<Output = Result<Response<ResBody>, TransportError>> + Send + 'static>>;
+        Pin<Box<dyn Future<Output = Result<Response<ResBody>, Self::Error>> + Send + 'static>>;
 
     fn poll_ready(
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        self.inner.poll_ready(cx).map_err(TransportErrorKind::custom)
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {
@@ -130,7 +128,12 @@ where
         match res {
             Ok(token) => {
                 req.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&token).unwrap());
-                Box::pin(self.inner.call(req))
+
+                let mut this = self.clone();
+
+                Box::pin(
+                    async move { this.inner.call(req).await.map_err(TransportErrorKind::custom) },
+                )
             }
             Err(e) => {
                 let e = TransportErrorKind::custom(e);
