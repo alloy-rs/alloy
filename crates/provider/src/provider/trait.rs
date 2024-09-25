@@ -1186,7 +1186,7 @@ mod tests {
         assert_eq!(0, num);
     }
 
-    #[cfg(feature = "hyper")]
+    #[cfg(all(feature = "hyper", not(windows)))]
     #[tokio::test]
     async fn test_auth_layer_transport() {
         use alloy_node_bindings::Reth;
