@@ -5,8 +5,7 @@ use crate::parity::{
 };
 use alloy_primitives::Address;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-
+use alloy_primitives::map::HashSet;
 /// Trace filter.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

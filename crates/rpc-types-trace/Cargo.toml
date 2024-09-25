@@ -19,7 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
+alloy-primitives = { workspace = true, features = ["rlp", "serde", "map"] }
 alloy-rpc-types-eth = { workspace = true, features = ["std", "serde"] }
 alloy-serde.workspace = true
 

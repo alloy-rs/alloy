@@ -18,10 +18,10 @@ use std::fmt::Display;
 /// This type implements [`Hash`] so that it can be used as a key in a
 /// [`HashMap`] or an item in a [`HashSet`].
 ///
-/// [`BTreeMap`]: std::collections::BTreeMap
-/// [`BTreeSet`]: std::collections::BTreeSet
-/// [`HashMap`]: std::collections::HashMap
-/// [`HashSet`]: std::collections::HashSet
+/// [`BTreeMap`]:  alloy_primitives::map::BTreeMap
+/// [`BTreeSet`]: alloy_primitives::map::BTreeSet
+/// [`HashMap`]: alloy_primitives::map::HashMap
+/// [`HashSet`]: alloy_primitives::map::HashSet
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Id {
     /// A number.

@@ -5,7 +5,8 @@ use alloy_rpc_types_eth::{
     request::TransactionRequest, state::StateOverride, BlockId, BlockOverrides,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use alloy_primitives::map::HashSet;
 
 /// Container type for `trace_call` arguments
 #[derive(Debug, Default, Serialize, Deserialize)]

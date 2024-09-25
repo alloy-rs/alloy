@@ -2,8 +2,8 @@
 
 use alloy_primitives::{Bytes, B256};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
+//use std::collections::HashMap;
+use alloy_primitives::map::HashMap;
 /// Represents the execution witness of a block. Contains an optional map of state preimages.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionWitness {
@@ -22,3 +22,4 @@ pub struct ExecutionWitness {
     #[serde(default)]
     pub keys: Option<HashMap<B256, Bytes>>,
 }
+

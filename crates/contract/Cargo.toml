@@ -27,13 +27,11 @@ alloy-transport.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["std"] }
 alloy-json-abi.workspace = true
-alloy-primitives.workspace = true
 alloy-sol-types.workspace = true
-
 futures-util.workspace = true
 futures.workspace = true
 thiserror.workspace = true
-
+alloy-primitives = {  features = ["map"], workspace = true }
 alloy-pubsub = { workspace = true, optional = true }
 
 [dev-dependencies]

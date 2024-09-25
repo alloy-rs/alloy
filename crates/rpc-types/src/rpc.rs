@@ -1,7 +1,6 @@
 //! Types for the `rpc` API.
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
+use alloy_primitives::map::HashMap;
 /// Represents the `rpc_modules` response, which returns the
 /// list of all available modules on that transport and their version
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -28,13 +27,16 @@ mod tests {
     #[test]
     fn test_parse_module_versions_roundtrip() {
         let s = r#"{"txpool":"1.0","trace":"1.0","eth":"1.0","web3":"1.0","net":"1.0"}"#;
-        let module_map = HashMap::from([
+        let mut module_map: HashMap<String, String> = HashMap::default(); // Change to FxHashMap
+
+         module_map.extend([
             ("txpool".to_owned(), "1.0".to_owned()),
             ("trace".to_owned(), "1.0".to_owned()),
             ("eth".to_owned(), "1.0".to_owned()),
             ("web3".to_owned(), "1.0".to_owned()),
             ("net".to_owned(), "1.0".to_owned()),
         ]);
+        
         let m = RpcModules::new(module_map);
         let de_serialized: RpcModules = serde_json::from_str(s).unwrap();
         assert_eq!(de_serialized, m);

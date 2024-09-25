@@ -2,8 +2,8 @@ use crate::{ContractInstance, Error, Result};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector};
-use std::collections::{BTreeMap, HashMap};
-
+use std::collections::{BTreeMap};
+use alloy_primitives::map::{HashMap};
 /// A smart contract interface.
 #[derive(Clone, Debug)]
 pub struct Interface {
