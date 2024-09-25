@@ -65,11 +65,9 @@ impl<S> AuthService<S> {
     fn validate(&self) -> bool {
         if let Some(claim) = self.most_recent_claim.as_ref() {
             let curr_secs = get_current_timestamp();
-            if claim.iat.abs_diff(curr_secs) * 1000 <= self.latency_buffer {
-                return false;
+            if claim.iat.abs_diff(curr_secs) * 1000 > self.latency_buffer {
+                return true;
             }
-
-            return true;
         }
 
         false
