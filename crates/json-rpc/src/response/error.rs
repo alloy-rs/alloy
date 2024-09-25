@@ -132,7 +132,7 @@ where
     T: std::error::Error + RpcObject,
 {
     fn from(value: T) -> Self {
-        Self { code: -32603, message: INTERNAL_ERROR, data: Some(value) }
+        Self { code: -32603, message: INTERNAL_ERROR, data: Some(value.into()) }
     }
 }
 
