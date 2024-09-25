@@ -636,9 +636,11 @@ mod tests {
         let tx_signed = tx.into_signed(signature);
         let tx_envelope: TxEnvelope = tx_signed.into();
         let encoded = tx_envelope.encoded_2718();
-        let decoded = TxEnvelope::decode_2718(&mut encoded.as_ref()).unwrap();
+        let mut slice = encoded.as_slice();
+        let decoded = TxEnvelope::decode_2718(&mut slice).unwrap();
         assert_eq!(encoded.len(), tx_envelope.encode_2718_len());
         assert_eq!(decoded, tx_envelope);
+        assert_eq!(slice.len(), 0);
     }
 
     #[test]
