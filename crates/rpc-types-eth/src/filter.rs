@@ -1,5 +1,5 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
-use alloc::{format, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use alloy_primitives::{keccak256, Address, BlockHash, Bloom, BloomInput, B256, U256, U64};
 use itertools::{EitherOrBoth::*, Itertools};
 
@@ -584,15 +584,15 @@ impl serde::Serialize for Filter {
     }
 }
 
-type RawAddressFilter = ValueOrArray<Option<Address>>;
-type RawTopicsFilter = Vec<Option<ValueOrArray<Option<B256>>>>;
-
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for Filter {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
+        type RawAddressFilter = ValueOrArray<Option<Address>>;
+        type RawTopicsFilter = Vec<Option<ValueOrArray<Option<B256>>>>;
+
         struct FilterVisitor;
 
         impl<'de> serde::de::Visitor<'de> for FilterVisitor {
