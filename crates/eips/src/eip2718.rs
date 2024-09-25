@@ -113,7 +113,10 @@ pub trait Decodable2718: Sized {
     /// [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
     fn decode_2718(buf: &mut &[u8]) -> Eip2718Result<Self> {
         Self::extract_type_byte(buf)
-            .map(|ty| Self::typed_decode(ty, &mut &buf[1..]))
+            .map(|ty| {
+                buf.advance(1);
+                Self::typed_decode(ty, buf)
+            })
             .unwrap_or_else(|| Self::fallback_decode(buf))
     }
 
