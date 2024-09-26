@@ -224,6 +224,7 @@ where
             .ok_or(RpcError::NullResp)?
             .header()
             .next_block_blob_fee()
+            .map(Into::into)
             .ok_or(RpcError::UnsupportedFeature("eip4844"))
     }
 
