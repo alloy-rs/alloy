@@ -1,12 +1,14 @@
 //! Client identification: <https://github.com/ethereum/execution-apis/blob/main/src/engine/identification.md>
 
-use alloc::string::{String, ToString};
-use core::str::FromStr;
+use alloc::string::String;
 
 /// This enum defines a standard for specifying a client with just two letters. Clients teams which
 /// have a code reserved in this list MUST use this code when identifying themselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[derive(strum::IntoStaticStr)] // Into<&'static str>, AsRef<str>, fmt::Display and serde::Serialize
+#[derive(strum::EnumString)] // FromStr, TryFrom<&str>
+#[non_exhaustive]
 pub enum ClientCode {
     /// Besu
     BU,
@@ -38,22 +40,8 @@ pub enum ClientCode {
 
 impl ClientCode {
     /// Returns the client identifier as str.
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::BU => "BU",
-            Self::EJ => "EJ",
-            Self::EG => "EG",
-            Self::GE => "GE",
-            Self::GR => "GR",
-            Self::LH => "LH",
-            Self::LS => "LS",
-            Self::NM => "NM",
-            Self::NB => "NB",
-            Self::TE => "TE",
-            Self::TK => "TK",
-            Self::PM => "PM",
-            Self::RH => "RH",
-        }
+    pub fn as_str(&self) -> &'static str {
+        (*self).into()
     }
 
     /// Returns the human readable client name for the given code.
@@ -76,32 +64,16 @@ impl ClientCode {
     }
 }
 
-impl FromStr for ClientCode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "BU" => Ok(Self::BU),
-            "EJ" => Ok(Self::EJ),
-            "EG" => Ok(Self::EG),
-            "GE" => Ok(Self::GE),
-            "GR" => Ok(Self::GR),
-            "LH" => Ok(Self::LH),
-            "LS" => Ok(Self::LS),
-            "NM" => Ok(Self::NM),
-            "NB" => Ok(Self::NB),
-            "TE" => Ok(Self::TE),
-            "TK" => Ok(Self::TK),
-            "PM" => Ok(Self::PM),
-            "RH" => Ok(Self::RH),
-            s => Err(s.to_string()),
-        }
+#[cfg(feature = "serde")]
+impl serde::Serialize for ClientCode {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
     }
 }
 
 impl core::fmt::Display for ClientCode {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.as_str())
+        self.as_str().fmt(f)
     }
 }
 
