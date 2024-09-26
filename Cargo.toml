@@ -69,11 +69,11 @@ alloy-transport-http = { version = "0.3", path = "crates/transport-http", defaul
 alloy-transport-ipc = { version = "0.3", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "0.3", path = "crates/transport-ws", default-features = false }
 
-alloy-core = { version = "0.8.4", default-features = false }
-alloy-dyn-abi = { version = "0.8.4", default-features = false }
-alloy-json-abi = { version = "0.8.4", default-features = false }
-alloy-primitives = { version = "0.8.4", default-features = false }
-alloy-sol-types = { version = "0.8.4", default-features = false }
+alloy-core = { version = "0.8.5", default-features = false }
+alloy-dyn-abi = { version = "0.8.5", default-features = false }
+alloy-json-abi = { version = "0.8.5", default-features = false }
+alloy-primitives = { version = "0.8.5", default-features = false }
+alloy-sol-types = { version = "0.8.5", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 
