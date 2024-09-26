@@ -57,6 +57,152 @@ impl<S> fmt::Debug for Router<S> {
     }
 }
 
+/// The inner state of a [`Router`]. Maps methods to their handlers.
+#[derive(Default)]
+pub struct RouterInner<S> {
+    routes: BTreeMap<MethodId, Method<S>>,
+
+    last_id: MethodId,
+    name_to_id: BTreeMap<Cow<'static, str>, MethodId>,
+    id_to_name: BTreeMap<MethodId, Cow<'static, str>>,
+}
+
+impl<S> fmt::Debug for RouterInner<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RouterInner").finish_non_exhaustive()
+    }
+}
+
+impl<S> RouterInner<S> {
+    /// Create a new, empty router.
+    pub fn new() -> Self {
+        Self {
+            routes: BTreeMap::new(),
+            last_id: Default::default(),
+            name_to_id: BTreeMap::new(),
+            id_to_name: BTreeMap::new(),
+        }
+    }
+
+    /// Add state to the router, readying methods that require that state.
+    pub fn with_state<S2>(self, state: &S) -> RouterInner<S2>
+    where
+        S: Clone,
+    {
+        RouterInner {
+            routes: self
+                .routes
+                .into_iter()
+                .map(|(id, method)| (id, method.with_state(state)))
+                .collect(),
+            last_id: self.last_id,
+            name_to_id: self.name_to_id,
+            id_to_name: self.id_to_name,
+        }
+    }
+
+    /// Get the next available ID.
+    fn get_id(&mut self) -> MethodId {
+        self.last_id += 1;
+        self.last_id
+    }
+
+    /// Get a method by its name.
+    fn method_by_name(&self, name: &str) -> Option<&Method<S>> {
+        self.name_to_id.get(name).and_then(|id| self.routes.get(id))
+    }
+
+    /// Enroll a method name, returning an ID assignment. Panics if the method
+    /// name already exists in the router. Future: don't panic.
+    fn enroll_method_name(&mut self, method: Cow<'static, str>) -> MethodId {
+        if self.name_to_id.contains_key(&method) {
+            panic!("Method name already exists in the router.");
+        }
+
+        let id = self.get_id();
+        self.name_to_id.insert(method.clone(), id);
+        self.id_to_name.insert(id, method.clone());
+        id
+    }
+
+    /// Add a handler to the router. This method is complete and ready to call.
+    fn route(mut self, method: impl Into<Cow<'static, str>>, handler: Route) -> Self {
+        let method = method.into();
+        let id = self.get_id();
+
+        self.name_to_id.insert(method.clone(), id);
+        self.id_to_name.insert(id, method.clone());
+        self.routes.insert(id, Method::Ready(handler));
+
+        self
+    }
+
+    /// Add a method to the router. This method may be missing state `S`.
+    pub fn route_erased<H>(mut self, method: impl Into<Cow<'static, str>>, handler: H) -> Self
+    where
+        H: ErasedIntoRoute<S>,
+    {
+        let method = method.into();
+        let handler = handler.clone_box();
+
+        add_method_inner(&mut self, method, handler);
+
+        fn add_method_inner<S>(
+            this: &mut RouterInner<S>,
+            method: Cow<'static, str>,
+            handler: Box<dyn ErasedIntoRoute<S>>,
+        ) {
+            let id = this.enroll_method_name(method);
+
+            this.routes.insert(id, Method::Needs(BoxedIntoHandler(handler)));
+        }
+
+        self
+    }
+
+    /// Add a service to the router.
+    pub fn route_service<T>(self, method: impl Into<Cow<'static, str>>, service: T) -> Self
+    where
+        T: Service<
+                Box<RawValue>,
+                Response = ResponsePayload,
+                Error = Infallible,
+                Future: Send + 'static,
+            > + Clone
+            + Send
+            + 'static,
+    {
+        self.route(method, BoxCloneService::new(service))
+    }
+
+    /// Call a method on the router, with the provided state.
+    fn call_with_state(
+        &self,
+        method: impl Into<Cow<'static, str>>,
+        params: Box<RawValue>,
+        state: S,
+    ) -> impl Future<Output = ResponsePayload> + Captures<'_> {
+        let method = method.into();
+        let method =
+            self.method_by_name(method.as_ref()).ok_or_else(ResponsePayload::method_not_found);
+
+        async move {
+            match method {
+                Err(err) => return err,
+                Ok(method) => match method {
+                    Method::Needs(handler) => {
+                        let h = handler.clone();
+                        h.0.into_route(state).call(params)
+                    }
+                    Method::Ready(handler) => handler.clone().call(params),
+                },
+            }
+            .await
+            .unwrap()
+        }
+    }
+}
+
 /// A unique internal identifier for a method.
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MethodId(usize);
@@ -67,25 +213,11 @@ impl From<usize> for MethodId {
     }
 }
 
-impl Add for MethodId {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
-    }
-}
-
 impl Add<usize> for MethodId {
     type Output = Self;
 
     fn add(self, rhs: usize) -> Self::Output {
         Self(self.0 + rhs)
-    }
-}
-
-impl AddAssign for MethodId {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 += rhs.0;
     }
 }
 
@@ -121,6 +253,8 @@ pub trait ErasedIntoRoute<S>: Send {
 /// A boxed, erased type that can be converted into a handler.
 ///
 /// Similar to axum's `BoxedIntoRoute`
+///
+/// Currently this is a placeholder to enable future convenience functions
 struct BoxedIntoHandler<S>(Box<dyn ErasedIntoRoute<S>>);
 
 impl<S> Clone for BoxedIntoHandler<S> {
@@ -140,135 +274,18 @@ enum Method<S> {
     Ready(Route),
 }
 
-/// The inner state of a [`Router`]. Maps methods to their handlers.
-#[derive(Default)]
-pub struct RouterInner<S> {
-    routes: BTreeMap<MethodId, Method<S>>,
-
-    last_id: MethodId,
-    name_to_id: BTreeMap<Cow<'static, str>, MethodId>,
-    id_to_name: BTreeMap<MethodId, Cow<'static, str>>,
-}
-
-impl<S> fmt::Debug for RouterInner<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RouterInner").finish_non_exhaustive()
-    }
-}
-
-impl<S> RouterInner<S> {
-    /// Create a new, empty router.
-    pub fn new() -> Self {
-        Self {
-            routes: BTreeMap::new(),
-            last_id: Default::default(),
-            name_to_id: BTreeMap::new(),
-            id_to_name: BTreeMap::new(),
-        }
-    }
-
-    /// Get the next available ID.
-    fn get_id(&mut self) -> MethodId {
-        self.last_id += 1;
-        self.last_id
-    }
-
-    /// Get a method by its name.
-    fn method_by_name(&self, name: &str) -> Option<&Method<S>> {
-        self.name_to_id.get(name).and_then(|id| self.routes.get(id))
-    }
-
-    fn enroll_method_name(&mut self, method: Cow<'static, str>) -> MethodId {
-        if self.name_to_id.contains_key(&method) {
-            panic!("Method name already exists in the router.");
-        }
-
-        let id = self.get_id();
-        self.name_to_id.insert(method.clone(), id);
-        self.id_to_name.insert(id, method.clone());
-        id
-    }
-
-    /// Add a method to the router. This method may be missing state `S`.
-    pub fn add_into_route<H>(mut self, method: impl Into<Cow<'static, str>>, handler: H) -> Self
-    where
-        H: ErasedIntoRoute<S>,
-    {
-        let method = method.into();
-        let handler = handler.clone_box();
-
-        add_method_inner(&mut self, method, handler);
-
-        fn add_method_inner<S>(
-            this: &mut RouterInner<S>,
-            method: Cow<'static, str>,
-            handler: Box<dyn ErasedIntoRoute<S>>,
-        ) {
-            let id = this.enroll_method_name(method);
-
-            this.routes.insert(id, Method::Needs(BoxedIntoHandler(handler)));
-        }
-
-        self
-    }
-
-    /// Add a handler to the router. This method is complete and ready to call.
-    pub fn add_route(mut self, method: impl Into<Cow<'static, str>>, handler: Route) -> Self {
-        let method = method.into();
-        let id = self.get_id();
-
-        self.name_to_id.insert(method.clone(), id);
-        self.id_to_name.insert(id, method.clone());
-        self.routes.insert(id, Method::Ready(handler));
-
-        self
-    }
-
-    /// Add a service to the router.
-    pub fn route_service<T>(self, method: impl Into<Cow<'static, str>>, service: T) -> Self
-    where
-        T: Service<
-                Box<RawValue>,
-                Response = ResponsePayload,
-                Error = Infallible,
-                Future: Send + 'static,
-            > + Clone
-            + Send
-            + 'static,
-    {
-        self.add_route(method, BoxCloneService::new(service))
-    }
-
-    /// Call a method on the router, with the provided state.
-    fn call_with_state(
-        &self,
-        method: impl Into<Cow<'static, str>>,
-        params: Box<RawValue>,
-        state: S,
-    ) -> impl Future<Output = ResponsePayload> + Captures<'_> {
-        let method = method.into();
-        let method =
-            self.method_by_name(method.as_ref()).ok_or_else(ResponsePayload::method_not_found);
-
-        async move {
-            match method {
-                Err(err) => return err,
-                Ok(method) => match method {
-                    Method::Needs(handler) => {
-                        let h = handler.clone();
-                        h.0.into_route(state).call(params)
-                    }
-                    Method::Ready(handler) => handler.clone().call(params),
-                },
-            }
-            .await
-            .unwrap()
+impl<S> Method<S>
+where
+    S: Clone,
+{
+    /// Add state to a method, converting
+    fn with_state<S2>(self, state: &S) -> Method<S2> {
+        match self {
+            Self::Ready(route) => Method::Ready(route),
+            Self::Needs(handler) => Method::Ready(handler.0.into_route(state.clone())),
         }
     }
 }
-
-trait Captures<'a> {}
-impl<'a, T: ?Sized> Captures<'a> for T {}
 
 /// A handler for a JSON-RPC method.
 pub trait Handler<T, S>: Clone + Send + Sized + 'static {
@@ -333,7 +350,7 @@ where
 impl<F, Fut, Params, Payload, ErrData, S> Handler<(Params,), S> for F
 where
     F: FnOnce(Params) -> Fut + Clone + Send + 'static,
-    Fut: Future<Output = ResponsePayload<Payload, ErrData>> + Send + 'static,
+    Fut: Future<Output = Result<Payload, ErrData>> + Send + 'static,
     Params: RpcObject,
     Payload: RpcObject,
     ErrData: RpcObject,
@@ -348,6 +365,8 @@ where
 
             self(params)
                 .await
+                .map(ResponsePayload::Success)
+                .unwrap_or_else(ResponsePayload::internal_error_with_obj)
                 .serialize_payload()
                 .ok()
                 .unwrap_or_else(ResponsePayload::internal_error)
@@ -358,7 +377,7 @@ where
 impl<F, Fut, Params, Payload, ErrData, S> Handler<(Params, S), S> for F
 where
     F: FnOnce(Params, S) -> Fut + Clone + Send + 'static,
-    Fut: Future<Output = ResponsePayload<Payload, ErrData>> + Send + 'static,
+    Fut: Future<Output = Result<Payload, ErrData>> + Send + 'static,
     Params: RpcObject,
     Payload: RpcObject,
     ErrData: RpcObject,
@@ -372,12 +391,21 @@ where
                 return ResponsePayload::invalid_params();
             };
 
-            self(params, state).await.serialize_payload().ok().unwrap_or_else(|| {
-                ResponsePayload::internal_error_message("Failed to serialize response".into())
-            })
+            self(params, state)
+                .await
+                .map(ResponsePayload::Success)
+                .unwrap_or_else(ResponsePayload::internal_error_with_obj)
+                .serialize_payload()
+                .ok()
+                .unwrap_or_else(|| {
+                    ResponsePayload::internal_error_message("Failed to serialize response".into())
+                })
         })
     }
 }
+
+trait Captures<'a> {}
+impl<'a, T: ?Sized> Captures<'a> for T {}
 
 #[cfg(test)]
 mod test {
@@ -388,17 +416,25 @@ mod test {
 
     #[tokio::test]
     async fn example() {
-        let router: RouterInner<()> = RouterInner::new().route_service(
-            "hello_world",
-            tower::service_fn(|_: Box<RawValue>| async {
-                Ok(ResponsePayload::<(), u8>::internal_error_with_message_and_obj(
-                    Cow::Borrowed("Hello, world!"),
-                    30u8,
-                )
-                .serialize_payload()
-                .unwrap())
-            }),
-        );
+        let router: RouterInner<()> = RouterInner::new()
+            .route_service(
+                "hello_world",
+                tower::service_fn(|_: Box<RawValue>| async {
+                    Ok(ResponsePayload::<(), u8>::internal_error_with_message_and_obj(
+                        Cow::Borrowed("Hello, world!"),
+                        30u8,
+                    )
+                    .serialize_payload()
+                    .unwrap())
+                }),
+            )
+            .route_service(
+                "foo",
+                Handler::with_state(
+                    |a: Box<RawValue>| async move { Ok::<_, ()>(a.get().to_owned()) },
+                    (),
+                ),
+            );
 
         let res = router
             .call_with_state("hello_world", Default::default(), ())
@@ -414,5 +450,17 @@ mod test {
                 data: Some(30u8)
             })
         ),);
+
+        let res2 = dbg!(
+            router
+                .call_with_state("foo", RawValue::from_string("{}".to_owned()).unwrap(), ())
+                .await
+        )
+        .deserialize_success::<String>()
+        .unwrap()
+        .deserialize_error::<()>()
+        .unwrap();
+
+        assert_eq!(res2, ResponsePayload::Success("{}".to_owned()));
     }
 }
