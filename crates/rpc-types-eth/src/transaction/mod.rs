@@ -75,7 +75,7 @@ pub struct Transaction {
     pub gas_price: Option<u128>,
     /// Gas amount
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas: u128,
+    pub gas: u64,
     /// Max BaseFeePerGas the user is willing to pay.
     #[cfg_attr(
         feature = "serde",
@@ -377,7 +377,7 @@ impl TransactionResponse for Transaction {
         self.gas_price
     }
 
-    fn gas(&self) -> u128 {
+    fn gas(&self) -> u64 {
         self.gas
     }
 

@@ -249,13 +249,13 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self
     }
     /// Get the gas limit for the transaction.
-    fn gas_limit(&self) -> Option<u128>;
+    fn gas_limit(&self) -> Option<u64>;
 
     /// Set the gas limit for the transaction.
-    fn set_gas_limit(&mut self, gas_limit: u128);
+    fn set_gas_limit(&mut self, gas_limit: u64);
 
     /// Builder-pattern method for setting the gas limit.
-    fn with_gas_limit(mut self, gas_limit: u128) -> Self {
+    fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.set_gas_limit(gas_limit);
         self
     }

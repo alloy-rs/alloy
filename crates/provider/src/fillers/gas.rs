@@ -17,8 +17,8 @@ use futures::FutureExt;
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasFillable {
-    Legacy { gas_limit: u128, gas_price: u128 },
-    Eip1559 { gas_limit: u128, estimate: Eip1559Estimation },
+    Legacy { gas_limit: u64, gas_price: u128 },
+    Eip1559 { gas_limit: u64, estimate: Eip1559Estimation },
 }
 
 /// A [`TxFiller`] that populates gas related fields in transaction requests if
