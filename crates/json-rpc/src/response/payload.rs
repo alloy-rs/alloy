@@ -1,7 +1,7 @@
-use crate::ErrorPayload;
+use crate::{ErrorPayload, RpcObject};
 use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::value::RawValue;
-use std::borrow::Borrow;
+use serde_json::value::{to_raw_value, RawValue};
+use std::borrow::{Borrow, Cow};
 
 /// A JSON-RPC 2.0 response payload.
 ///
@@ -15,7 +15,7 @@ use std::borrow::Borrow;
 /// deserialized as part of the [`Response`] type.
 ///
 /// [`Response`]: crate::Response
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResponsePayload<Payload = Box<RawValue>, ErrData = Box<RawValue>> {
     /// A successful response payload.
     Success(Payload),
@@ -44,6 +44,57 @@ impl BorrowedResponsePayload<'_> {
 }
 
 impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
+    /// Create a new error payload for a parse error.
+    pub const fn parse_error() -> Self {
+        Self::Failure(ErrorPayload::parse_error())
+    }
+
+    /// Create a new error payload for an invalid request.
+    pub const fn invalid_request() -> Self {
+        Self::Failure(ErrorPayload::invalid_request())
+    }
+
+    /// Create a new error payload for a method not found error.
+    pub const fn method_not_found() -> Self {
+        Self::Failure(ErrorPayload::method_not_found())
+    }
+
+    /// Create a new error payload for an invalid params error.
+    pub const fn invalid_params() -> Self {
+        Self::Failure(ErrorPayload::invalid_params())
+    }
+
+    /// Create a new error payload for an internal error.
+    pub const fn internal_error() -> Self {
+        Self::Failure(ErrorPayload::internal_error())
+    }
+
+    /// Create a new error payload for an internal error with a custom message.
+    pub const fn internal_error_message(message: Cow<'static, str>) -> Self {
+        Self::Failure(ErrorPayload::internal_error_message(message))
+    }
+
+    /// Create a new error payload for an internal error with a custom message
+    /// and additional data.
+    pub const fn internal_error_with_obj(data: ErrData) -> Self
+    where
+        ErrData: RpcObject,
+    {
+        Self::Failure(ErrorPayload::internal_error_with_obj(data))
+    }
+
+    /// Create a new error payload for an internal error with a custom message
+    /// and additional data.
+    pub const fn internal_error_with_message_and_obj(
+        message: Cow<'static, str>,
+        data: ErrData,
+    ) -> Self
+    where
+        ErrData: RpcObject,
+    {
+        Self::Failure(ErrorPayload::internal_error_with_message_and_obj(message, data))
+    }
+
     /// Fallible conversion to the successful payload.
     pub const fn as_success(&self) -> Option<&Payload> {
         match self {
@@ -68,6 +119,20 @@ impl<Payload, ErrData> ResponsePayload<Payload, ErrData> {
     /// Returns `true` if the response payload is an error.
     pub const fn is_error(&self) -> bool {
         matches!(self, Self::Failure(_))
+    }
+}
+
+impl<Payload, ErrData> ResponsePayload<Payload, ErrData>
+where
+    Payload: RpcObject,
+    ErrData: RpcObject,
+{
+    /// Convert the inner types into a [`RawValue`] by serializing them.
+    pub fn serialize_payload(&self) -> serde_json::Result<ResponsePayload> {
+        match self {
+            Self::Success(payload) => Ok(ResponsePayload::Success(to_raw_value(payload)?)),
+            Self::Failure(error) => Ok(ResponsePayload::Failure(error.serialize_payload()?)),
+        }
     }
 }
 
