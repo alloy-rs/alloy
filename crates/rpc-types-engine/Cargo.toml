@@ -27,7 +27,7 @@ alloy-eips = { workspace = true, features = ["serde"] }
 
 # misc
 derive_more = { workspace = true, features = ["display"] }
-strum.workspace = true
+strum = { workspace = true, features = ["derive"] }
 
 # serde
 alloy-serde = { workspace = true, optional = true }
