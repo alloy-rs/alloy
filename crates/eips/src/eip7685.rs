@@ -7,7 +7,7 @@
 #[cfg(not(feature = "std"))]
 use crate::alloc::{vec, vec::Vec};
 
-use alloy_rlp::BufMut;
+use alloy_rlp::{Buf, BufMut};
 use core::{
     fmt,
     fmt::{Display, Formatter},
@@ -19,8 +19,8 @@ use core::{
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub enum Eip7685Error {
-    /// Rlp error from [`alloy_rlp`].
-    RlpError(alloy_rlp::Error),
+    /// The buffer was too small to completely decode the request.
+    InputTooShort,
     /// Got an unexpected request type while decoding.
     UnexpectedType(u8),
     /// There was no request type in the buffer.
@@ -30,23 +30,17 @@ pub enum Eip7685Error {
 impl Display for Eip7685Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RlpError(err) => write!(f, "{err}"),
+            Self::InputTooShort => write!(f, "Input too short"),
             Self::UnexpectedType(t) => write!(f, "Unexpected request type. Got {t}."),
             Self::MissingType => write!(f, "There was no type flag"),
         }
     }
 }
 
-impl From<alloy_rlp::Error> for Eip7685Error {
-    fn from(err: alloy_rlp::Error) -> Self {
-        Self::RlpError(err)
-    }
-}
-
 impl From<Eip7685Error> for alloy_rlp::Error {
     fn from(err: Eip7685Error) -> Self {
         match err {
-            Eip7685Error::RlpError(err) => err,
+            Eip7685Error::InputTooShort => Self::Custom("eip7685 decoding failed: input too short"),
             Eip7685Error::MissingType => Self::Custom("eip7685 decoding failed: missing type"),
             Eip7685Error::UnexpectedType(_) => {
                 Self::Custom("eip7685 decoding failed: unexpected type")
@@ -134,3 +128,16 @@ pub trait Encodable7685: Sized + Send + Sync + 'static {
 /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
 pub trait Eip7685RequestEnvelope: Decodable7685 + Encodable7685 {}
 impl<T> Eip7685RequestEnvelope for T where T: Decodable7685 + Encodable7685 {}
+
+/// A helper to read `cnt` bytes from `buf`, advancing it.
+///
+/// Returns an `Err` if there is not enough bytes remaining in `buf`.
+pub(crate) fn read_exact<'a>(buf: &mut &'a [u8], cnt: usize) -> Result<&'a [u8], Eip7685Error> {
+    if buf.remaining() < cnt {
+        // todo: fix error
+        return Err(Eip7685Error::InputTooShort);
+    }
+    let bytes = &buf[..cnt];
+    buf.advance(cnt);
+    Ok(bytes)
+}

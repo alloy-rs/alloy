@@ -5,6 +5,8 @@
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
+use crate::eip7685::{read_exact, Decodable7685, Eip7685Error, Encodable7685};
+
 /// The address for the EIP-7251 consolidation requests contract:
 /// `0x00b42dbF2194e931E80326D950320f7d9Dbeac02`
 pub const CONSOLIDATION_REQUEST_PREDEPLOY_ADDRESS: Address =
@@ -29,4 +31,29 @@ pub struct ConsolidationRequest {
     pub source_pubkey: FixedBytes<48>,
     /// Target public key
     pub target_pubkey: FixedBytes<48>,
+}
+
+impl Decodable7685 for ConsolidationRequest {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, crate::eip7685::Eip7685Error> {
+        Ok(match ty {
+            CONSOLIDATION_REQUEST_TYPE => Self {
+                source_address: Address::from_slice(read_exact(buf, 20)?),
+                source_pubkey: FixedBytes::<48>::from_slice(read_exact(buf, 48)?),
+                target_pubkey: FixedBytes::<48>::from_slice(read_exact(buf, 48)?),
+            },
+            ty => return Err(Eip7685Error::UnexpectedType(ty)),
+        })
+    }
+}
+
+impl Encodable7685 for ConsolidationRequest {
+    fn request_type(&self) -> u8 {
+        CONSOLIDATION_REQUEST_TYPE
+    }
+
+    fn encode_payload_7685(&self, out: &mut dyn alloy_rlp::BufMut) {
+        out.put_slice(self.source_address.as_slice());
+        out.put_slice(self.source_pubkey.as_slice());
+        out.put_slice(self.target_pubkey.as_slice());
+    }
 }

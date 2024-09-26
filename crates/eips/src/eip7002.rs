@@ -3,7 +3,9 @@
 //! See also [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002): Execution layer triggerable withdrawals
 
 use alloy_primitives::{address, bytes, Address, Bytes, FixedBytes};
-use alloy_rlp::{RlpDecodable, RlpEncodable};
+use alloy_rlp::{Buf, RlpDecodable, RlpEncodable};
+
+use crate::eip7685::{read_exact, Decodable7685, Eip7685Error, Encodable7685};
 
 /// The caller to be used when calling the EIP-7002 withdrawal requests contract at the end of the
 /// block.
@@ -35,4 +37,29 @@ pub struct WithdrawalRequest {
     /// Amount of withdrawn ether in gwei.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,
+}
+
+impl Decodable7685 for WithdrawalRequest {
+    fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, crate::eip7685::Eip7685Error> {
+        Ok(match ty {
+            WITHDRAWAL_REQUEST_TYPE => Self {
+                source_address: Address::from_slice(read_exact(buf, 20)?),
+                validator_pubkey: FixedBytes::<48>::from_slice(read_exact(buf, 48)?),
+                amount: buf.get_u64(),
+            },
+            ty => return Err(Eip7685Error::UnexpectedType(ty)),
+        })
+    }
+}
+
+impl Encodable7685 for WithdrawalRequest {
+    fn request_type(&self) -> u8 {
+        WITHDRAWAL_REQUEST_TYPE
+    }
+
+    fn encode_payload_7685(&self, out: &mut dyn alloy_rlp::BufMut) {
+        out.put_slice(self.source_address.as_slice());
+        out.put_slice(self.validator_pubkey.as_slice());
+        out.put_u64(self.amount);
+    }
 }
