@@ -9,6 +9,7 @@
 //! See also <https://github.com/ethereum/consensus-specs/blob/master/specs/deneb/beacon-chain.md#executionpayload>
 
 use crate::{withdrawals::BeaconWithdrawal, BlsPublicKey};
+use alloy_consensus::Requests;
 use alloy_eips::{
     eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest,
     eip7251::ConsolidationRequest,
@@ -412,42 +413,20 @@ struct BeaconExecutionPayloadV4<'a> {
     /// Inner V1 payload
     #[serde(flatten)]
     payload_inner: BeaconExecutionPayloadV3<'a>,
-    deposit_requests: Vec<DepositRequest>,
-    withdrawal_requests: Vec<WithdrawalRequest>,
-    consolidation_requests: Vec<ConsolidationRequest>,
+    requests: Requests,
 }
 
 impl<'a> From<BeaconExecutionPayloadV4<'a>> for ExecutionPayloadV4 {
     fn from(payload: BeaconExecutionPayloadV4<'a>) -> Self {
-        let BeaconExecutionPayloadV4 {
-            payload_inner,
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        } = payload;
-        Self {
-            payload_inner: payload_inner.into(),
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        }
+        let BeaconExecutionPayloadV4 { payload_inner, requests } = payload;
+        Self { payload_inner: payload_inner.into(), requests }
     }
 }
 
 impl<'a> From<&'a ExecutionPayloadV4> for BeaconExecutionPayloadV4<'a> {
     fn from(value: &'a ExecutionPayloadV4) -> Self {
-        let ExecutionPayloadV4 {
-            payload_inner,
-            deposit_requests,
-            withdrawal_requests,
-            consolidation_requests,
-        } = value;
-        BeaconExecutionPayloadV4 {
-            payload_inner: payload_inner.into(),
-            deposit_requests: deposit_requests.clone(),
-            withdrawal_requests: withdrawal_requests.clone(),
-            consolidation_requests: consolidation_requests.clone(),
-        }
+        let ExecutionPayloadV4 { payload_inner, requests } = value;
+        BeaconExecutionPayloadV4 { payload_inner: payload_inner.into(), requests: requests.clone() }
     }
 }
 

@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use alloy_consensus::{Blob, Bytes48};
+use alloy_consensus::{Blob, Bytes48, Requests};
 use alloy_eips::{
     eip4844::BlobTransactionSidecar, eip4895::Withdrawal, eip6110::DepositRequest,
     eip7002::WithdrawalRequest, eip7251::ConsolidationRequest, BlockNumHash,
@@ -460,15 +460,8 @@ pub struct ExecutionPayloadV4 {
     /// Array of deposit requests.
     ///
     /// This maps directly to the deposit requests defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_requests: Vec<DepositRequest>,
-    /// Array of execution layer triggerable withdrawal requests.
-    ///
-    /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-    pub withdrawal_requests: Vec<WithdrawalRequest>,
-    /// Array of consolidation requests.
-    ///
-    /// See [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251).
-    pub consolidation_requests: Vec<ConsolidationRequest>,
+    // todo
+    pub requests: Requests,
 }
 
 impl ExecutionPayloadV4 {
@@ -539,9 +532,7 @@ impl ssz::Decode for ExecutionPayloadV4 {
                 blob_gas_used: decoder.decode_next()?,
                 excess_blob_gas: decoder.decode_next()?,
             },
-            deposit_requests: decoder.decode_next()?,
-            withdrawal_requests: decoder.decode_next()?,
-            consolidation_requests: decoder.decode_next()?,
+            requests: decoder.decode_next()?,
         })
     }
 }
@@ -579,9 +570,7 @@ impl ssz::Encode for ExecutionPayloadV4 {
         encoder.append(&self.payload_inner.payload_inner.withdrawals);
         encoder.append(&self.payload_inner.blob_gas_used);
         encoder.append(&self.payload_inner.excess_blob_gas);
-        encoder.append(&self.deposit_requests);
-        encoder.append(&self.withdrawal_requests);
-        encoder.append(&self.consolidation_requests);
+        encoder.append(&self.requests);
 
         encoder.finalize();
     }
@@ -589,9 +578,7 @@ impl ssz::Encode for ExecutionPayloadV4 {
     fn ssz_bytes_len(&self) -> usize {
         <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
             + ssz::BYTES_PER_LENGTH_OFFSET * 3
-            + self.deposit_requests.ssz_bytes_len()
-            + self.withdrawal_requests.ssz_bytes_len()
-            + self.consolidation_requests.ssz_bytes_len()
+            + self.requests.ssz_bytes_len()
     }
 }
 
@@ -1020,8 +1007,9 @@ pub struct ExecutionPayloadBodyV1 {
     pub withdrawals: Option<Vec<Withdrawal>>,
 }
 
+// todo update
 /// This structure has the syntax of [`ExecutionPayloadBodyV1`] and appends the new fields:
-/// depositRequests and withdrawalRequests.
+/// requests.
 ///
 /// See also: <https://github.com/ethereum/execution-apis/blob/3ae3d29fc9900e5c48924c238dff7643fdc3680e/src/engine/prague.md#executionpayloadbodyv2>
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1034,18 +1022,11 @@ pub struct ExecutionPayloadBodyV2 {
     ///
     /// Will always be `None` if pre shanghai.
     pub withdrawals: Option<Vec<Withdrawal>>,
+    // todo update
     /// Array of deposits requests.
     ///
     /// Will always be `None` if pre prague.
-    pub deposit_requests: Option<Vec<DepositRequest>>,
-    /// Array of withdrawal requests.
-    ///
-    /// Will always be `None` if pre prague.
-    pub withdrawal_requests: Option<Vec<WithdrawalRequest>>,
-    /// Array of consolidation requests.
-    ///
-    /// Will always be `None` if pre prague.
-    pub consolidation_requests: Option<Vec<ConsolidationRequest>>,
+    pub requests: Option<Requests>,
 }
 
 /// This structure contains the attributes required to initiate a payload build process in the
