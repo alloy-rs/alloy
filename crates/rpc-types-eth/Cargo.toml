@@ -70,7 +70,7 @@ arbitrary = [
     "std",
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
-    "alloy-serde/arbitrary",
+    "alloy-serde?/arbitrary",
     "alloy-eips/arbitrary",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]
