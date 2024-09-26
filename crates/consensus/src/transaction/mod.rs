@@ -4,6 +4,7 @@ use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use alloy_serde::WithOtherFields;
 use core::any;
 
 mod eip1559;
@@ -47,9 +48,6 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// Get `gas_limit`.
     fn gas_limit(&self) -> u64;
 
-    /// Get `gas_price`.
-    fn gas_price(&self) -> Option<u128>;
-
     /// Returns the EIP-1559 the maximum fee per gas the caller is willing to pay.
     ///
     /// For legacy transactions this is `gas_price`.
@@ -57,10 +55,9 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     /// This is also commonly referred to as the "Gas Fee Cap".
     fn max_fee_per_gas(&self) -> u128;
 
-    /// Returns the EIP-1559 Priority fee the caller is paying to the block author.
-    ///
-    /// This will return `None` for non-EIP1559 transactions
-    fn max_priority_fee_per_gas(&self) -> Option<u128>;
+    /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
+    /// otherwise return the gas price.
+    fn max_priority_fee_per_gas(&self) -> u128;
 
     /// Max fee per blob gas for EIP-4844 transaction.
     ///
@@ -68,15 +65,6 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     ///
     /// This is also commonly referred to as the "Blob Gas Fee Cap".
     fn max_fee_per_blob_gas(&self) -> Option<u128>;
-
-    /// Return the max priority fee per gas if the transaction is an EIP-1559 transaction, and
-    /// otherwise return the gas price.
-    ///
-    /// # Warning
-    ///
-    /// This is different than the `max_priority_fee_per_gas` method, which returns `None` for
-    /// non-EIP-1559 transactions.
-    fn priority_fee_or_price(&self) -> u128;
 
     /// Returns the effective tip for this transaction.
     ///
@@ -96,8 +84,11 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
         let fee = max_fee_per_gas - base_fee;
 
         // Compare the fee with max_priority_fee_per_gas (or gas price for non-EIP1559 transactions)
-        self.max_priority_fee_per_gas()
-            .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
+        if self.ty() < 2 {
+            return Some(fee);
+        }
+
+        Some(fee.min(self.max_priority_fee_per_gas()))
     }
 
     /// Get `to`.
@@ -197,5 +188,59 @@ impl<S: 'static> dyn SignableTransaction<S> {
         } else {
             None
         }
+    }
+}
+
+impl<T: Transaction> Transaction for WithOtherFields<T> {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.inner.chain_id()
+    }
+
+    fn nonce(&self) -> u64 {
+        self.inner.nonce()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.inner.gas_limit()
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.inner.max_fee_per_gas()
+    }
+
+    fn max_priority_fee_per_gas(&self) -> u128 {
+        self.inner.max_priority_fee_per_gas()
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.inner.max_fee_per_blob_gas()
+    }
+
+    fn to(&self) -> TxKind {
+        self.inner.to()
+    }
+
+    fn value(&self) -> U256 {
+        self.inner.value()
+    }
+
+    fn input(&self) -> &[u8] {
+        self.inner.input()
+    }
+
+    fn ty(&self) -> u8 {
+        self.inner.ty()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.inner.access_list()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.inner.blob_versioned_hashes()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner.authorization_list()
     }
 }

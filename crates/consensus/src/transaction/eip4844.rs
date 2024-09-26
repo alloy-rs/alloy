@@ -210,10 +210,6 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn gas_price(&self) -> Option<u128> {
-        None
-    }
-
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_gas(),
@@ -221,17 +217,10 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+    fn max_priority_fee_per_gas(&self) -> u128 {
         match self {
             Self::TxEip4844(tx) => tx.max_priority_fee_per_gas(),
             Self::TxEip4844WithSidecar(tx) => tx.max_priority_fee_per_gas(),
-        }
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::TxEip4844(tx) => tx.priority_fee_or_price(),
-            Self::TxEip4844WithSidecar(tx) => tx.priority_fee_or_price(),
         }
     }
 
@@ -697,19 +686,11 @@ impl Transaction for TxEip4844 {
         self.gas_limit
     }
 
-    fn gas_price(&self) -> Option<u128> {
-        None
-    }
-
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        Some(self.max_priority_fee_per_gas)
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
+    fn max_priority_fee_per_gas(&self) -> u128 {
         self.max_priority_fee_per_gas
     }
 
@@ -970,20 +951,12 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.gas_limit()
     }
 
-    fn gas_price(&self) -> Option<u128> {
-        self.tx.gas_price()
-    }
-
     fn max_fee_per_gas(&self) -> u128 {
         self.tx.max_fee_per_gas()
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+    fn max_priority_fee_per_gas(&self) -> u128 {
         self.tx.max_priority_fee_per_gas()
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        self.tx.priority_fee_or_price()
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {

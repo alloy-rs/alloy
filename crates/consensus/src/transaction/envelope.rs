@@ -392,16 +392,6 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn gas_price(&self) -> Option<u128> {
-        match self {
-            Self::Legacy(tx) => tx.tx().gas_price(),
-            Self::Eip2930(tx) => tx.tx().gas_price(),
-            Self::Eip1559(tx) => tx.tx().gas_price(),
-            Self::Eip4844(tx) => tx.tx().gas_price(),
-            Self::Eip7702(tx) => tx.tx().gas_price(),
-        }
-    }
-
     fn max_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_gas(),
@@ -412,23 +402,13 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+    fn max_priority_fee_per_gas(&self) -> u128 {
         match self {
             Self::Legacy(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip2930(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip1559(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip4844(tx) => tx.tx().max_priority_fee_per_gas(),
             Self::Eip7702(tx) => tx.tx().max_priority_fee_per_gas(),
-        }
-    }
-
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
         }
     }
 

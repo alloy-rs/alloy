@@ -1,6 +1,6 @@
-use alloc::vec::Vec;
-use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, B256, U256};
+use alloy_consensus::Transaction;
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, TxKind, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
@@ -62,16 +62,14 @@ pub trait ReceiptResponse {
     fn state_root(&self) -> Option<B256>;
 }
 
-/// Transaction JSON-RPC response.
-pub trait TransactionResponse {
+/// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
+pub trait TransactionResponse: Transaction {
     /// Signature type of the transaction
     type Signature;
+
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
-
-    /// Nonce
-    fn nonce(&self) -> u64;
 
     /// Block hash
     fn block_hash(&self) -> Option<BlockHash>;
@@ -85,48 +83,42 @@ pub trait TransactionResponse {
     /// Sender of the transaction
     fn from(&self) -> Address;
 
-    /// Recipient of the transaction
-    fn to(&self) -> Option<Address>;
+    /// Recipient of the transaction. Returns `None`if transaction is a contract creation.
+    fn to(&self) -> Option<Address> {
+        // todo: replace with Transaction::to(self).into() with next alloy core release
+        match Transaction::to(self) {
+            TxKind::Create => None,
+            TxKind::Call(addr) => Some(addr),
+        }
+    }
 
-    /// Transferred value
-    fn value(&self) -> U256;
+    /// Gas Price, this is the RPC format for `max_fee_per_gas`, pre-eip-1559.
+    fn gas_price(&self) -> Option<u128> {
+        if self.ty() < 2 {
+            return Some(Transaction::max_fee_per_gas(self));
+        }
+        None
+    }
 
-    /// Gas Price
-    fn gas_price(&self) -> Option<u128>;
-
-    /// Gas limit
-    fn gas(&self) -> u64;
-
-    /// Max BaseFeePerGas the user is willing to pay
-    fn max_fee_per_gas(&self) -> Option<u128>;
-
-    /// The miner's tip
-    fn max_priority_fee_per_gas(&self) -> Option<u128>;
-
-    /// Configured max fee per blob gas for eip-4844 transactions
-    fn max_fee_per_blob_gas(&self) -> Option<u128>;
-
-    /// Input data
-    #[doc(alias = "calldata")]
-    fn input(&self) -> &Bytes;
+    /// Max BaseFeePerGas the user is willing to pay. For pre-eip-1559 transactions, the field
+    /// label `gas_price` is used instead.
+    fn max_fee_per_gas(&self) -> Option<u128> {
+        if self.ty() < 2 {
+            return None;
+        }
+        Some(Transaction::max_fee_per_gas(self))
+    }
 
     /// Transaction signature
     fn signature(&self) -> Option<Self::Signature>;
 
-    /// The chain id of the transaction
-    fn chain_id(&self) -> Option<ChainId>;
-
-    /// Contains the blob hashes for eip-4844 transactions
-    fn blob_versioned_hashes(&self) -> Option<Vec<B256>>;
-
-    /// EIP2930 access list
-    fn access_list(&self) -> Option<AccessList>;
-
-    /// Transaction type
-    fn transaction_type(&self) -> Option<u8>;
-
-    /// The signed authorization list
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>>;
+    /// Transaction type format for RPC. This field is included since eip-2930.
+    fn transaction_type(&self) -> Option<u8> {
+        match self.ty() {
+            0 => None,
+            ty => Some(ty),
+        }
+    }
 }
 
 /// Header JSON-RPC response.
@@ -203,10 +195,6 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.tx_hash()
     }
 
-    fn nonce(&self) -> u64 {
-        self.inner.nonce()
-    }
-
     fn block_hash(&self) -> Option<BlockHash> {
         self.inner.block_hash()
     }
@@ -223,60 +211,8 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.from()
     }
 
-    fn to(&self) -> Option<Address> {
-        self.inner.to()
-    }
-
-    fn value(&self) -> U256 {
-        self.inner.value()
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        self.inner.gas_price()
-    }
-
-    fn gas(&self) -> u64 {
-        self.inner.gas()
-    }
-
-    fn max_fee_per_gas(&self) -> Option<u128> {
-        self.inner.max_fee_per_gas()
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.inner.max_priority_fee_per_gas()
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.inner.max_fee_per_blob_gas()
-    }
-
-    fn input(&self) -> &Bytes {
-        self.inner.input()
-    }
-
     fn signature(&self) -> Option<T::Signature> {
         self.inner.signature()
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        self.inner.chain_id()
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<Vec<B256>> {
-        self.inner.blob_versioned_hashes()
-    }
-
-    fn access_list(&self) -> Option<AccessList> {
-        self.inner.access_list()
-    }
-
-    fn transaction_type(&self) -> Option<u8> {
-        self.inner.transaction_type()
-    }
-
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
-        self.inner.authorization_list()
     }
 }
 

@@ -338,15 +338,65 @@ impl TryFrom<Transaction> for TxEnvelope {
     }
 }
 
+impl alloy_consensus::Transaction for Transaction {
+    fn chain_id(&self) -> Option<ChainId> {
+        self.chain_id
+    }
+
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.gas
+    }
+
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas.unwrap_or(self.gas_price.unwrap_or_default())
+    }
+
+    fn max_priority_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas.unwrap_or(self.gas_price.unwrap_or_default())
+    }
+
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.max_fee_per_blob_gas
+    }
+
+    fn to(&self) -> TxKind {
+        self.to.into()
+    }
+
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    fn input(&self) -> &[u8] {
+        &self.input
+    }
+
+    fn ty(&self) -> u8 {
+        self.transaction_type.unwrap_or_default()
+    }
+
+    fn access_list(&self) -> Option<&AccessList> {
+        self.access_list.as_ref()
+    }
+
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        self.blob_versioned_hashes.as_deref()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.authorization_list.as_deref()
+    }
+}
+
 impl TransactionResponse for Transaction {
     type Signature = Signature;
 
     fn tx_hash(&self) -> B256 {
         self.hash
-    }
-
-    fn nonce(&self) -> u64 {
-        self.nonce
     }
 
     fn block_hash(&self) -> Option<BlockHash> {
@@ -369,56 +419,8 @@ impl TransactionResponse for Transaction {
         self.to
     }
 
-    fn value(&self) -> U256 {
-        self.value
-    }
-
-    fn gas_price(&self) -> Option<u128> {
-        self.gas_price
-    }
-
-    fn gas(&self) -> u64 {
-        self.gas
-    }
-
-    fn max_fee_per_gas(&self) -> Option<u128> {
-        self.max_fee_per_gas
-    }
-
-    fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.max_priority_fee_per_gas
-    }
-
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn input(&self) -> &Bytes {
-        &self.input
-    }
-
     fn signature(&self) -> Option<Signature> {
         self.signature
-    }
-
-    fn chain_id(&self) -> Option<ChainId> {
-        self.chain_id
-    }
-
-    fn blob_versioned_hashes(&self) -> Option<Vec<B256>> {
-        self.blob_versioned_hashes.clone()
-    }
-
-    fn access_list(&self) -> Option<AccessList> {
-        self.access_list.clone()
-    }
-
-    fn transaction_type(&self) -> Option<u8> {
-        self.transaction_type
-    }
-
-    fn authorization_list(&self) -> Option<Vec<SignedAuthorization>> {
-        self.authorization_list.clone()
     }
 }
 
