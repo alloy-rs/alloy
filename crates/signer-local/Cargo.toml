@@ -58,6 +58,7 @@ yubihsm = { version = "0.42", features = ["mockhsm"] }
 
 [features]
 keystore = ["dep:eth-keystore", "dep:elliptic-curve"]
+keystore-geth-compat = ["keystore", "eth-keystore?/geth-compat"]
 mnemonic = ["dep:coins-bip32", "dep:coins-bip39"]
 mnemonic-all-languages = ["mnemonic", "coins-bip39?/all-langs"]
 yubihsm = ["dep:yubihsm", "dep:elliptic-curve"]
