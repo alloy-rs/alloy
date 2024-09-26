@@ -1,17 +1,15 @@
 use crate::{BlockNumberOrTag, Log as RpcLog, Transaction};
 use alloc::{string::String, vec::Vec};
-use alloy_primitives::{keccak256, Address, BlockHash, Bloom, BloomInput, B256, U256, U64};
-use itertools::{EitherOrBoth::*, Itertools};
-
-use crate::collections::{
-    hash_set::{IntoIter, Iter},
-    HashSet,
+use alloy_primitives::{
+    keccak256,
+    map::{hash_set, HashSet},
+    Address, BlockHash, Bloom, BloomInput, B256, U256, U64,
 };
 use core::{
     hash::Hash,
-    iter::{FromIterator, IntoIterator},
     ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
+use itertools::{EitherOrBoth::*, Itertools};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -32,14 +30,14 @@ impl BloomFilter {
     }
 }
 
+/// FilterSet is a set of values that will be used to filter logs.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
-/// FilterSet is a set of values that will be used to filter logs
 pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        Self([src].into())
+        Self(FromIterator::from_iter(core::iter::once(src)))
     }
 }
 
@@ -88,7 +86,7 @@ impl<T: Eq + Hash> From<ValueOrArray<Option<T>>> for FilterSet<T> {
 
 impl<T: Eq + Hash> IntoIterator for FilterSet<T> {
     type Item = T;
-    type IntoIter = IntoIter<T>;
+    type IntoIter = hash_set::IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -115,7 +113,7 @@ impl<T: Eq + Hash> FilterSet<T> {
 
     /// Returns an iterator over the underlying HashSet. Values are visited
     /// in an arbitrary order.
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> hash_set::Iter<'_, T> {
         self.0.iter()
     }
 }

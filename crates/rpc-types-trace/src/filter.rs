@@ -1,11 +1,11 @@
-//! `trace_filter` types and support
+//! `trace_filter` types and support.
+
 use crate::parity::{
     Action, CallAction, CreateAction, CreateOutput, RewardAction, SelfdestructAction, TraceOutput,
     TransactionTrace,
 };
-use alloy_primitives::Address;
+use alloy_primitives::{map::AddressHashSet, Address};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// Trace filter.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,7 +101,7 @@ pub enum TraceFilterMode {
 /// This is a set of addresses to match against.
 /// An empty set matches all addresses.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct AddressFilter(pub HashSet<Address>);
+pub struct AddressFilter(pub AddressHashSet);
 
 impl FromIterator<Address> for AddressFilter {
     fn from_iter<I: IntoIterator<Item = Address>>(iter: I) -> Self {

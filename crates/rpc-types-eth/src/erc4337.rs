@@ -1,7 +1,9 @@
-use crate::{collections::HashMap, Log, TransactionReceipt};
-use alloy_primitives::{Address, BlockNumber, Bytes, B256, U256};
-
+use crate::{Log, TransactionReceipt};
 use alloc::vec::Vec;
+use alloy_primitives::{
+    map::{AddressHashMap, HashMap},
+    Address, BlockNumber, Bytes, B256, U256,
+};
 
 /// Options for conditional raw transaction submissions.
 // reference for the implementation <https://notes.ethereum.org/@yoav/SkaX2lS9j#>
@@ -13,7 +15,7 @@ pub struct ConditionalOptions {
     /// A map of account addresses to their expected storage states.
     /// Each account can have a specified storage root or explicit slot-value pairs.
     #[cfg_attr(feature = "serde", serde(default))]
-    pub known_accounts: HashMap<Address, AccountStorage>,
+    pub known_accounts: AddressHashMap<AccountStorage>,
     /// The minimal block number at which the transaction can be included.
     /// `None` indicates no minimum block number constraint.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]

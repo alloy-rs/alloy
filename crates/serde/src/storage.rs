@@ -94,13 +94,13 @@ where
     Ok(B256::from_slice(&padded))
 }
 
-/// Deserializes the input into an Option<HashMap<B256, B256>>, using [from_bytes_to_b256] which
-/// allows cropped values:
+/// Deserializes the input into a storage map, using [from_bytes_to_b256] which allows cropped
+/// values:
 ///
 /// ```json
-///  {
-///      "0x0000000000000000000000000000000000000000000000000000000000000001": "0x22"
-///   }
+/// {
+///     "0x0000000000000000000000000000000000000000000000000000000000000001": "0x22"
+/// }
 /// ```
 pub fn deserialize_storage_map<'de, D>(
     deserializer: D,

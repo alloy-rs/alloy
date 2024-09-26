@@ -1,11 +1,11 @@
 //! Builder style functions for `trace_call`
 
 use crate::parity::TraceType;
+use alloy_primitives::map::HashSet;
 use alloy_rpc_types_eth::{
     request::TransactionRequest, state::StateOverride, BlockId, BlockOverrides,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// Container type for `trace_call` arguments
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -27,7 +27,7 @@ impl TraceCallRequest {
     pub fn new(call: TransactionRequest) -> Self {
         Self {
             call,
-            trace_types: HashSet::new(),
+            trace_types: HashSet::default(),
             block_id: None,
             state_overrides: None,
             block_overrides: None,
