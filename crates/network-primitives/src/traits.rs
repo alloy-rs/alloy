@@ -95,7 +95,7 @@ pub trait TransactionResponse {
     fn gas_price(&self) -> Option<u128>;
 
     /// Gas limit
-    fn gas(&self) -> u128;
+    fn gas(&self) -> u64;
 
     /// Max BaseFeePerGas the user is willing to pay
     fn max_fee_per_gas(&self) -> Option<u128>;
@@ -235,7 +235,7 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.gas_price()
     }
 
-    fn gas(&self) -> u128 {
+    fn gas(&self) -> u64 {
         self.inner.gas()
     }
 

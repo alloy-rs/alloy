@@ -382,7 +382,7 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().gas_limit(),
             Self::Eip2930(tx) => tx.tx().gas_limit(),
@@ -918,7 +918,7 @@ mod tests {
             chain_id: u64::MAX,
             nonce: u64::MAX,
             gas_price: u128::MAX,
-            gas_limit: u128::MAX,
+            gas_limit: u64::MAX,
             to: Address::random().into(),
             value: U256::MAX,
             input: Bytes::new(),
@@ -976,7 +976,7 @@ mod tests {
         let tx = TxEip7702 {
             chain_id: u64::MAX,
             nonce: u64::MAX,
-            gas_limit: u128::MAX,
+            gas_limit: u64::MAX,
             max_fee_per_gas: u128::MAX,
             max_priority_fee_per_gas: u128::MAX,
             to: Address::random(),
