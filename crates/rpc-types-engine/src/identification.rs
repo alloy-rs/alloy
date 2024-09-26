@@ -26,6 +26,8 @@ pub enum ClientCode {
     NM,
     /// Nimbus
     NB,
+    /// Trin Execution
+    TE,
     /// Teku
     TK,
     /// Prysm
@@ -47,6 +49,7 @@ impl ClientCode {
             Self::LS => "LS",
             Self::NM => "NM",
             Self::NB => "NB",
+            Self::TE => "TE",
             Self::TK => "TK",
             Self::PM => "PM",
             Self::RH => "RH",
@@ -65,6 +68,7 @@ impl ClientCode {
             Self::LS => "Lodestar",
             Self::NM => "Nethermind",
             Self::NB => "Nimbus",
+            Self::TE => "Trin Execution",
             Self::TK => "Teku",
             Self::PM => "Prysm",
             Self::RH => "Reth",
@@ -86,6 +90,7 @@ impl FromStr for ClientCode {
             "LS" => Ok(Self::LS),
             "NM" => Ok(Self::NM),
             "NB" => Ok(Self::NB),
+            "TE" => Ok(Self::TE),
             "TK" => Ok(Self::TK),
             "PM" => Ok(Self::PM),
             "RH" => Ok(Self::RH),
