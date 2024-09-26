@@ -153,7 +153,7 @@ pub trait HeaderResponse {
     fn coinbase(&self) -> Address;
 
     /// Gas limit of the block
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Mix hash of the block
     ///
@@ -392,7 +392,7 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
         self.inner.coinbase()
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }
 
