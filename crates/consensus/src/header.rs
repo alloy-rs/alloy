@@ -100,7 +100,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
     /// with above-target blob gas consumption increase this value, blocks with below-target blob
     /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
@@ -112,7 +112,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// The hash of the parent beacon block's root is included in execution blocks, as proposed by
     /// EIP-4788.
     ///
@@ -244,7 +244,7 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
+    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 
@@ -529,7 +529,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.blob_gas_used = Some(U256::decode(buf)?.to::<u128>());
+                this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -537,7 +537,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u128>());
+                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -582,8 +582,8 @@ impl Decodable for Header {
 pub(crate) const fn generate_valid_header(
     mut header: Header,
     eip_4844_active: bool,
-    blob_gas_used: u128,
-    excess_blob_gas: u128,
+    blob_gas_used: u64,
+    excess_blob_gas: u64,
     parent_beacon_block_root: B256,
 ) -> Header {
     // Clear all related fields if EIP-1559 is inactive
@@ -698,10 +698,10 @@ pub trait BlockHeader {
     fn base_fee_per_gas(&self) -> Option<u128>;
 
     /// Retrieves the blob gas used by the block, if available
-    fn blob_gas_used(&self) -> Option<u128>;
+    fn blob_gas_used(&self) -> Option<u64>;
 
     /// Retrieves the excess blob gas of the block, if available
-    fn excess_blob_gas(&self) -> Option<u128>;
+    fn excess_blob_gas(&self) -> Option<u64>;
 
     /// Retrieves the parent beacon block root of the block, if available
     fn parent_beacon_block_root(&self) -> Option<B256>;
@@ -778,11 +778,11 @@ impl BlockHeader for Header {
         self.base_fee_per_gas
     }
 
-    fn blob_gas_used(&self) -> Option<u128> {
+    fn blob_gas_used(&self) -> Option<u64> {
         self.blob_gas_used
     }
 
-    fn excess_blob_gas(&self) -> Option<u128> {
+    fn excess_blob_gas(&self) -> Option<u64> {
         self.excess_blob_gas
     }
 
