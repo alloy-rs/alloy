@@ -365,13 +365,13 @@ pub struct BlockOverrides {
         serde(default, skip_serializing_if = "Option::is_none", alias = "baseFeePerGas")
     )]
     pub base_fee: Option<U256>,
-    /// A dictionary that maps blockNumber to a user-defined hash. It could be queried from the
-    /// solidity opcode BLOCKHASH.
+    /// A dictionary that maps blockNumber to a user-defined hash. It can be queried from the
+    /// EVM opcode BLOCKHASH.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub block_hash: Option<BTreeMap<u64, B256>>,
 }
 
-impl<T, H> BlockResponse for Block<T, H> {
+impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
     type Transaction = T;
     type Header = H;
 

@@ -34,6 +34,10 @@ http-body-util = { workspace = true, optional = true }
 hyper = { workspace = true, default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["full"], optional = true }
 
+# auth layer
+alloy-rpc-types-engine = { workspace = true, optional = true }
+jsonwebtoken = { workspace = true, optional = true }
+
 [features]
 default = ["reqwest", "reqwest-default-tls"]
 reqwest = [
@@ -51,6 +55,13 @@ hyper = [
     "dep:serde_json",
     "dep:tower",
     "dep:tracing",
+]
+jwt-auth = [
+    "hyper",
+    "dep:alloy-rpc-types-engine",
+    "alloy-rpc-types-engine/jwt",
+    "alloy-rpc-types-engine/serde",
+    "dep:jsonwebtoken",
 ]
 reqwest-default-tls = ["reqwest?/default-tls"]
 reqwest-native-tls = ["reqwest?/native-tls"]

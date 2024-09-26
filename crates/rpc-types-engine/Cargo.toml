@@ -41,7 +41,7 @@ jsonrpsee-types = { version = "0.24", optional = true }
 
 # jwt
 rand = { workspace = true, optional = true }
-jsonwebtoken = { version = "9.3.0", optional = true }
+jsonwebtoken = { workspace = true, optional = true }
 
 [features]
 default = ["jwt", "std", "serde"]

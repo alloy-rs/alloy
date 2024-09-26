@@ -21,6 +21,7 @@ pub struct SimBlock {
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub state_overrides: Option<StateOverride>,
     /// A vector of transactions to be simulated.
+    #[cfg_attr(feature = "serde", serde(default))]
     pub calls: Vec<TransactionRequest>,
 }
 
@@ -69,7 +70,7 @@ pub struct SimulatedBlock<B = Block> {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimCallResult {
     /// The raw bytes returned by the transaction.
-    pub return_value: Bytes,
+    pub return_data: Bytes,
     /// Logs generated during the execution of the transaction.
     #[cfg_attr(feature = "serde", serde(default))]
     pub logs: Vec<Log>,
@@ -93,6 +94,7 @@ pub struct SimCallResult {
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct SimulatePayload {
     /// Array of block state calls to be executed at specific, optional block/state.
+    #[cfg_attr(feature = "serde", serde(default))]
     pub block_state_calls: Vec<SimBlock>,
     /// Flag to determine whether to trace ERC20/ERC721 token transfers within transactions.
     #[cfg_attr(feature = "serde", serde(default))]

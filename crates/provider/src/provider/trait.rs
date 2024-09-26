@@ -119,7 +119,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_block_number(&self) -> ProviderCall<T, NoParams, U64, BlockNumber> {
         self.client()
             .request_noparams("eth_blockNumber")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -171,7 +171,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -199,7 +199,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: &'req N::TransactionRequest,
     ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(crate::utils::convert_u128)
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u128)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -257,7 +257,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_gas_price(&self) -> ProviderCall<T, NoParams, U128, u128> {
         self.client()
             .request_noparams("eth_gasPrice")
-            .map_resp(crate::utils::convert_u128 as fn(U128) -> u128)
+            .map_resp(utils::convert_u128 as fn(U128) -> u128)
             .into()
     }
 
@@ -560,7 +560,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     ) -> RpcWithBlock<T, Address, U64, u64, fn(U64) -> u64> {
         self.client()
             .request("eth_getTransactionCount", address)
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -912,7 +912,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     fn get_net_version(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("net_version")
-            .map_resp(crate::utils::convert_u64 as fn(U64) -> u64)
+            .map_resp(utils::convert_u64 as fn(U64) -> u64)
             .into()
     }
 
@@ -1038,6 +1038,7 @@ mod tests {
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
+    use alloy_rpc_client::BuiltInConnectionString;
     use alloy_rpc_types_eth::{request::TransactionRequest, Block};
     // For layer transport tests
     #[cfg(feature = "hyper")]
@@ -1181,6 +1182,43 @@ mod tests {
         let rpc_client = alloy_rpc_client::RpcClient::new(cloned_t, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[cfg(all(feature = "hyper", not(windows)))]
+    #[tokio::test]
+    async fn test_auth_layer_transport() {
+        use alloy_node_bindings::Reth;
+        use alloy_rpc_types_engine::JwtSecret;
+        use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
+
+        init_tracing();
+        let secret = JwtSecret::random();
+
+        let reth = Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
+
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+
+        let service =
+            tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
+
+        let layer_transport: HyperClient<
+            Full<HyperBytes>,
+            AuthService<
+                Client<
+                    alloy_transport_http::hyper_util::client::legacy::connect::HttpConnector,
+                    Full<HyperBytes>,
+                >,
+            >,
+        > = HyperClient::with_service(service);
+
+        let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }
@@ -1670,6 +1708,23 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn builtin_connect_boxed() {
+        init_tracing();
+        let anvil = Anvil::new().spawn();
+
+        let conn: BuiltInConnectionString = anvil.endpoint().parse().unwrap();
+
+        let transport = conn.connect_boxed().await.unwrap();
+
+        let client = alloy_rpc_client::RpcClient::new(transport, true);
+
+        let provider = RootProvider::<BoxTransport, Ethereum>::new(client);
+
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
     }
 
     #[tokio::test]
