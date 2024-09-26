@@ -3,12 +3,13 @@ use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Selector};
 use std::collections::{BTreeMap};
-use alloy_primitives::map::{HashMap};
+use alloy_primitives::map::{SelectorHashMap, FbBuildHasher};
+use alloy_primitives::FixedBytes;
 /// A smart contract interface.
 #[derive(Clone, Debug)]
 pub struct Interface {
     abi: JsonAbi,
-    functions: HashMap<Selector, (String, usize)>,
+    functions: SelectorHashMap<(String, usize)>,
 }
 
 // TODO: events/errors
@@ -127,13 +128,12 @@ impl Interface {
 
 /// Utility function for creating a mapping between a unique signature and a
 /// name-index pair for accessing contract ABI items.
-fn create_mapping<T, S, F>(
+fn create_mapping<T, F>(
     elements: &BTreeMap<String, Vec<T>>,
     signature: F,
-) -> HashMap<S, (String, usize)>
+) -> SelectorHashMap<(String, usize)>
 where
-    S: std::hash::Hash + Eq,
-    F: Fn(&T) -> S + Copy,
+    F: Fn(&T) ->  FixedBytes<4> + Copy,
 {
     elements
         .iter()
@@ -143,5 +143,15 @@ where
                 .enumerate()
                 .map(move |(index, element)| (signature(element), (name.to_owned(), index)))
         })
-        .collect()
+        .collect::<SelectorHashMap<(String, usize)>>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_json_abi::{JsonAbi, Function};
+    use std::collections::BTreeMap;
+//     fn mock_abi() -> JsonAbi {
+//         let mut 
+// }
 }

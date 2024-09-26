@@ -12,16 +12,7 @@
 extern crate alloc;
 
 /// Standardized collections across `std` and `no_std` environments.
-pub mod collections {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "std")] {
-            pub use alloy_primitives::map::{hash_set, HashMap, HashSet};
-            use hashbrown as _;
-        } else {
-            pub use hashbrown::{hash_set, HashMap, HashSet};
-        }
-    }
-}
+
 
 pub use alloy_eips::eip4895::Withdrawal;
 
