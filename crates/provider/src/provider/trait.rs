@@ -167,7 +167,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_simulateV1", payload).into()
     }
 
-    /// Gets the chain ID.  
+    /// Gets the chain ID.
     fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
@@ -230,6 +230,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
                     .header()
                     .base_fee_per_gas()
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
+                    .into()
             }
         };
 

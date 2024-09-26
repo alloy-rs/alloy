@@ -89,7 +89,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub base_fee_per_gas: Option<u128>,
+    pub base_fee_per_gas: Option<u64>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
     #[cfg_attr(
@@ -235,7 +235,7 @@ impl Header {
         Some(calc_next_block_base_fee(
             self.gas_used,
             self.gas_limit,
-            self.base_fee_per_gas? as u64,
+            self.base_fee_per_gas?,
             base_fee_params,
         ))
     }
@@ -511,7 +511,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u128>());
+                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -695,7 +695,7 @@ pub trait BlockHeader {
     fn nonce(&self) -> B64;
 
     /// Retrieves the base fee per gas of the block, if available
-    fn base_fee_per_gas(&self) -> Option<u128>;
+    fn base_fee_per_gas(&self) -> Option<u64>;
 
     /// Retrieves the blob gas used by the block, if available
     fn blob_gas_used(&self) -> Option<u128>;
@@ -774,7 +774,7 @@ impl BlockHeader for Header {
         self.nonce
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.base_fee_per_gas
     }
 

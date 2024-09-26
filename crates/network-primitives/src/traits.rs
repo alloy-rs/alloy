@@ -144,7 +144,7 @@ pub trait HeaderResponse {
     fn extra_data(&self) -> &Bytes;
 
     /// Base fee per unit of gas (If EIP-1559 is supported)
-    fn base_fee_per_gas(&self) -> Option<u128>;
+    fn base_fee_per_gas(&self) -> Option<u64>;
 
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
@@ -380,7 +380,7 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
         self.inner.extra_data()
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.inner.base_fee_per_gas()
     }
 

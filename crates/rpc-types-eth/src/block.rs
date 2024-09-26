@@ -117,7 +117,7 @@ pub struct Header {
             with = "alloy_serde::quantity::opt"
         )
     )]
-    pub base_fee_per_gas: Option<u128>,
+    pub base_fee_per_gas: Option<u64>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals_root: Option<B256>,
@@ -247,7 +247,7 @@ impl HeaderResponse for Header {
         &self.extra_data
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.base_fee_per_gas
     }
 
