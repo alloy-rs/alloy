@@ -3,11 +3,14 @@
 use crate::{Provider, RootProvider};
 use alloy_json_rpc::RpcError;
 use alloy_network::{BlockResponse, HeaderResponse, Network};
-use alloy_primitives::{TxHash, B256};
+use alloy_primitives::{
+    map::{B256HashMap, B256HashSet},
+    TxHash, B256,
+};
 use alloy_transport::{utils::Spawnable, Transport, TransportError};
 use futures::{stream::StreamExt, FutureExt, Stream};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
     time::{Duration, Instant},
@@ -434,10 +437,10 @@ pub(crate) struct Heartbeat<N, S> {
     stream: futures::stream::Fuse<S>,
 
     /// Lookbehind blocks in form of mapping block number -> vector of transaction hashes.
-    past_blocks: VecDeque<(u64, HashSet<B256>)>,
+    past_blocks: VecDeque<(u64, B256HashSet)>,
 
     /// Transactions to watch for.
-    unconfirmed: HashMap<B256, TxWatcher>,
+    unconfirmed: B256HashMap<TxWatcher>,
 
     /// Ordered map of transactions waiting for confirmations.
     waiting_confs: BTreeMap<u64, Vec<TxWatcher>>,
