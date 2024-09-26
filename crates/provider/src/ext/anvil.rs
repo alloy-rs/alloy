@@ -611,7 +611,7 @@ mod tests {
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
 
-        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u128>()));
+        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
     }
 
     #[tokio::test]
