@@ -1,4 +1,5 @@
-use crate::{Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
 use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
@@ -149,8 +150,9 @@ where
 }
 
 macro_rules! cache_get_or_fetch {
-    ($self:expr, $hash:expr, $fetch_fn:expr) => {{
-        if let Some(cached) = $self.get(&$hash)? {
+    ($self:expr, $req:expr, $fetch_fn:expr) => {{
+        let hash = $req.params_hash()?;
+        if let Some(cached) = $self.get(&hash)? {
             let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
             return Ok(Some(result));
         }
@@ -158,7 +160,7 @@ macro_rules! cache_get_or_fetch {
         let result = $fetch_fn.await?;
         if let Some(ref data) = result {
             let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
-            let _ = $self.put($hash, json_str)?;
+            let _ = $self.put(hash, json_str)?;
         }
 
         Ok(result)
@@ -186,7 +188,9 @@ macro_rules! cache_rpc_call_with_block {
         ProviderCall::BoxedFuture(Box::pin(async move {
             let client = client?;
 
-            let result = client.request($req.method(), $req.params());
+            let result = client.request($req.method(), $req.params()).map_params(|params| {
+                ParamsWithBlock { params, block_id: $req.block_id.unwrap_or(BlockId::latest()) }
+            });
 
             let res = result.await?;
 
@@ -218,7 +222,8 @@ where
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        let hash = RequestType::BlockByNumber((number, hydrate)).params_hash()?;
+        // let hash = RequestType::BlockByNumber((number, hydrate)).params_hash()?;
+        let hash = RequestType::new("eth_getBlockByNumber", (number, hydrate));
 
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
     }
@@ -234,13 +239,10 @@ where
             BlockTransactionsKind::Hashes => false,
         };
 
-        let req_hash = RequestType::BlockByHash((hash, full)).params_hash()?;
+        let req_hash = RequestType::new("eth_getBlockByHash", (hash, full));
 
         cache_get_or_fetch!(self, req_hash, self.inner.get_block_by_hash(hash, kind))
     }
-
-    // TODO: Add other commonly used methods such as eth_getTransactionByHash,
-    // eth_getTransactionReceipt, etc.
 
     /// Get the account and storage values of the specified account including the merkle proofs.
     ///
@@ -253,7 +255,8 @@ where
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::Proof((address, keys.clone(), block_id));
+            let req =
+                RequestType::new("eth_getProof", (address, keys.clone())).with_block_id(block_id);
             cache_rpc_call_with_block!(cache, client, req)
         })
     }
@@ -267,54 +270,42 @@ where
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
-            let req = RequestType::StorageAt((address, key, block_id));
+            let req = RequestType::new("eth_getStorageAt", (address, key)).with_block_id(block_id);
             cache_rpc_call_with_block!(cache, client, req)
         })
     }
 }
 
-/// Enum representing different RPC requests.
-///
-/// Useful for handling hashing of various request parameters.
-enum RequestType<Params: RpcParam> {
-    /// Get block by number.
-    BlockByNumber(Params),
-    /// Get block by hash.
-    BlockByHash(Params),
-    /// Get proof.
-    Proof(Params),
-    /// Get storage at.
-    #[allow(dead_code)] // todo
-    StorageAt(Params),
+struct RequestType<Params: RpcParam> {
+    method: &'static str,
+    params: Params,
+    block_id: Option<BlockId>,
 }
 
 impl<Params: RpcParam> RequestType<Params> {
-    fn method(&self) -> &'static str {
-        match self {
-            Self::BlockByNumber(_) => "eth_getBlockByNumber",
-            Self::BlockByHash(_) => "eth_getBlockByHash",
-            Self::Proof(_) => "eth_getProof",
-            Self::StorageAt(_) => "eth_getStorageAt",
-        }
+    fn new(method: &'static str, params: Params) -> Self {
+        Self { method, params, block_id: None }
     }
 
-    fn params(&self) -> Params {
-        match self {
-            Self::BlockByNumber(params) => params.clone(),
-            Self::BlockByHash(params) => params.clone(),
-            Self::Proof(params) => params.clone(),
-            Self::StorageAt(params) => params.clone(),
-        }
+    fn with_block_id(mut self, block_id: BlockId) -> Self {
+        self.block_id = Some(block_id);
+        self
     }
 
     fn params_hash(&self) -> TransportResult<B256> {
-        let params = self.params();
-
-        let hash = serde_json::to_string(&params)
+        let hash = serde_json::to_string(&self.params())
             .map(|p| keccak256(p.as_bytes()))
             .map_err(RpcError::ser_err)?;
 
         Ok(hash)
+    }
+
+    fn method(&self) -> &'static str {
+        self.method
+    }
+
+    fn params(&self) -> Params {
+        self.params.clone()
     }
 }
 
@@ -430,18 +421,11 @@ mod tests {
             FixedBytes::with_last_byte(0x4),
         ];
 
-        let start_t = std::time::Instant::now();
-        let _proof =
+        let proof =
             provider.get_proof(counter_addr, keys.clone()).block_id(1.into()).await.unwrap();
-        let end_t = std::time::Instant::now();
+        let proof2 = provider.get_proof(counter_addr, keys).block_id(1.into()).await.unwrap();
 
-        println!("Time taken: {:?}", end_t - start_t);
-
-        let start_t = std::time::Instant::now();
-        let _proof2 = provider.get_proof(counter_addr, keys).block_id(1.into()).await.unwrap();
-        let end_t = std::time::Instant::now();
-
-        println!("Time taken: {:?}", end_t - start_t);
+        assert_eq!(proof, proof2);
 
         provider.save_cache(path).unwrap();
     }
