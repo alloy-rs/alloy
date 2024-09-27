@@ -217,25 +217,28 @@ where
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
-            let keys = keys.clone();
-            let client = client.clone();
-            let cache = cache.clone();
-            ProviderCall::BoxedFuture(Box::pin(async move {
-                let req = RequestType::Proof((address, keys.clone(), block_id));
+            let req = RequestType::Proof((address, keys.clone(), block_id));
+            let hash = req.params_hash().ok();
 
-                let client = client.upgrade().ok_or_else(|| {
-                    TransportErrorKind::custom_str(
-                        "RPC client was dropped before the request was made",
-                    )
-                })?;
+            if let Some(hash) = hash {
+                // let cache = cache.read();
+                if let Some(cached) = cache.write().get(&hash) {
+                    let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
 
-                let hash = req.params_hash()?;
-
-                if let Some(cached) = cache.write().get(&hash).cloned() {
-                    let result =
-                        serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
-                    return Ok(result);
+                    return ProviderCall::BoxedFuture(Box::pin(async move {
+                        let res = result?;
+                        Ok(res)
+                    }));
                 }
+            }
+
+            let client = client.upgrade().ok_or_else(|| {
+                TransportErrorKind::custom_str("RPC client was dropped before the request was made")
+            });
+            let cache = cache.clone();
+            let keys = keys.clone();
+            ProviderCall::BoxedFuture(Box::pin(async move {
+                let client = client?;
 
                 let result = client
                     .request("eth_getProof", (address, keys))
@@ -244,9 +247,11 @@ where
 
                 let res = result.await?;
 
+                // Insert into cache.
                 let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-
-                let _ = cache.write().put(hash, json_str);
+                let hash = req.params_hash()?;
+                let mut cache = cache.write();
+                let _ = cache.put(hash, json_str);
 
                 Ok(res)
             }))
