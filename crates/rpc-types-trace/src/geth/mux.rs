@@ -1,8 +1,8 @@
 //! Geth `muxTracer` types.
 
 use crate::geth::{GethDebugBuiltInTracerType, GethDebugTracerConfig, GethTrace};
+use alloy_primitives::map::HashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// A `muxTracer` config that contains the configuration for running multiple tracers in one go.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,7 +61,7 @@ mod tests {
         let call_config = CallConfig { only_top_call: Some(true), with_log: Some(true) };
         let prestate_config = PreStateConfig { diff_mode: Some(true) };
 
-        opts.tracing_options.tracer_config = MuxConfig(HashMap::from([
+        opts.tracing_options.tracer_config = MuxConfig(HashMap::from_iter([
             (GethDebugBuiltInTracerType::FourByteTracer, None),
             (GethDebugBuiltInTracerType::CallTracer, Some(call_config.into())),
             (GethDebugBuiltInTracerType::PreStateTracer, Some(prestate_config.into())),

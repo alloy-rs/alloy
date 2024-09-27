@@ -7,19 +7,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(any(test, feature = "std")), no_std)]
 
+#[macro_use]
+#[allow(unused_imports)]
 extern crate alloc;
-
-/// Standardized collections across `std` and `no_std` environments.
-pub mod collections {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "std")] {
-            pub use std::collections::{hash_set, HashMap, HashSet};
-            use hashbrown as _;
-        } else {
-            pub use hashbrown::{hash_set, HashMap, HashSet};
-        }
-    }
-}
 
 pub use alloy_eips::eip4895::Withdrawal;
 

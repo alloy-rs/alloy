@@ -69,7 +69,7 @@ alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 alloy-signer.workspace = true
 alloy-signer-local.workspace = true
-alloy-transport-http = { workspace = true, features = ["reqwest"] }
+alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
 
 itertools.workspace = true
 reqwest.workspace = true
@@ -83,6 +83,7 @@ tower-http = { workspace = true, features = [
 ] }
 http-body-util.workspace = true
 http.workspace = true
+alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

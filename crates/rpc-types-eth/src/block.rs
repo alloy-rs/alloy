@@ -80,10 +80,10 @@ pub struct Header {
     pub number: u64,
     /// Gas Limit
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// Gas Used
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
-    pub gas_used: u128,
+    pub gas_used: u64,
     /// Timestamp
     #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity"))]
     pub timestamp: u64,
@@ -117,7 +117,7 @@ pub struct Header {
             with = "alloy_serde::quantity::opt"
         )
     )]
-    pub base_fee_per_gas: Option<u128>,
+    pub base_fee_per_gas: Option<u64>,
     /// Withdrawals root hash added by EIP-4895 and is ignored in legacy headers.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub withdrawals_root: Option<B256>,
@@ -130,7 +130,7 @@ pub struct Header {
             with = "alloy_serde::quantity::opt"
         )
     )]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// Excess blob gas
     #[cfg_attr(
         feature = "serde",
@@ -140,7 +140,7 @@ pub struct Header {
             with = "alloy_serde::quantity::opt"
         )
     )]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// EIP-4788 parent beacon block root
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
@@ -170,7 +170,7 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
+    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 }
@@ -247,7 +247,7 @@ impl HeaderResponse for Header {
         &self.extra_data
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.base_fee_per_gas
     }
 
@@ -259,7 +259,7 @@ impl HeaderResponse for Header {
         self.miner
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 

@@ -611,7 +611,7 @@ mod tests {
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
 
-        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u128>()));
+        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
     }
 
     #[tokio::test]
@@ -793,7 +793,7 @@ mod tests {
 
         let latest_block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-        assert_eq!(block_gas_limit.to::<u128>(), latest_block.header.gas_limit);
+        assert_eq!(block_gas_limit.to::<u64>(), latest_block.header.gas_limit);
     }
 
     #[tokio::test]

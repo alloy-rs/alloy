@@ -84,11 +84,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
-    fn gas_limit(&self) -> Option<u128> {
+    fn gas_limit(&self) -> Option<u64> {
         self.gas
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u128) {
+    fn set_gas_limit(&mut self, gas_limit: u64) {
         self.gas = Some(gas_limit);
     }
 

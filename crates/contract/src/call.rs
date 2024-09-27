@@ -348,7 +348,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub fn gas(mut self, gas: u128) -> Self {
+    pub fn gas(mut self, gas: u64) -> Self {
         self.request.set_gas_limit(gas);
         self
     }
@@ -432,7 +432,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
-    pub async fn estimate_gas(&self) -> Result<u128> {
+    pub async fn estimate_gas(&self) -> Result<u64> {
         let mut estimate = self.provider.estimate_gas(&self.request);
         if let Some(state) = &self.state {
             estimate = estimate.overrides(state);

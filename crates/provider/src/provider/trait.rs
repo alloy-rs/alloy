@@ -167,7 +167,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_simulateV1", payload).into()
     }
 
-    /// Gets the chain ID.  
+    /// Gets the chain ID.
     fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
         self.client()
             .request_noparams("eth_chainId")
@@ -195,11 +195,8 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     /// # Note
     ///
     /// Not all client implementations support state overrides for eth_estimateGas.
-    fn estimate_gas<'req>(
-        &self,
-        tx: &'req N::TransactionRequest,
-    ) -> EthCall<'req, T, N, U128, u128> {
-        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u128)
+    fn estimate_gas<'req>(&self, tx: &'req N::TransactionRequest) -> EthCall<'req, T, N, U64, u64> {
+        EthCall::gas_estimate(self.weak_client(), tx).map_resp(utils::convert_u64)
     }
 
     /// Estimates the EIP1559 `maxFeePerGas` and `maxPriorityFeePerGas` fields.
@@ -230,6 +227,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
                     .header()
                     .base_fee_per_gas()
                     .ok_or(RpcError::UnsupportedFeature("eip1559"))?
+                    .into()
             }
         };
 
@@ -1182,6 +1180,43 @@ mod tests {
         let rpc_client = alloy_rpc_client::RpcClient::new(cloned_t, true);
 
         let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+        let num = provider.get_block_number().await.unwrap();
+        assert_eq!(0, num);
+    }
+
+    #[cfg(all(feature = "hyper", not(windows)))]
+    #[tokio::test]
+    async fn test_auth_layer_transport() {
+        use alloy_node_bindings::Reth;
+        use alloy_rpc_types_engine::JwtSecret;
+        use alloy_transport_http::{AuthLayer, AuthService, Http, HyperClient};
+
+        init_tracing();
+        let secret = JwtSecret::random();
+
+        let reth = Reth::new().arg("--rpc.jwtsecret").arg(hex::encode(secret.as_bytes())).spawn();
+
+        let hyper_client = Client::builder(TokioExecutor::new()).build_http::<Full<HyperBytes>>();
+
+        let service =
+            tower::ServiceBuilder::new().layer(AuthLayer::new(secret)).service(hyper_client);
+
+        let layer_transport: HyperClient<
+            Full<HyperBytes>,
+            AuthService<
+                Client<
+                    alloy_transport_http::hyper_util::client::legacy::connect::HttpConnector,
+                    Full<HyperBytes>,
+                >,
+            >,
+        > = HyperClient::with_service(service);
+
+        let http_hyper = Http::with_client(layer_transport, reth.endpoint_url());
+
+        let rpc_client = alloy_rpc_client::RpcClient::new(http_hyper, true);
+
+        let provider = RootProvider::<_, Ethereum>::new(rpc_client);
+
         let num = provider.get_block_number().await.unwrap();
         assert_eq!(0, num);
     }

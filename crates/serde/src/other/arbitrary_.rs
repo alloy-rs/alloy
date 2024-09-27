@@ -1,8 +1,5 @@
 use crate::OtherFields;
-use alloc::collections::BTreeMap;
-
-#[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 impl arbitrary::Arbitrary<'_> for OtherFields {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {

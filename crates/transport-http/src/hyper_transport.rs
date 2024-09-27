@@ -69,12 +69,15 @@ impl<B, S> HyperClient<B, S> {
     }
 }
 
-impl<B, S> Http<HyperClient<B, S>>
+impl<B, S, ResBody> Http<HyperClient<B, S>>
 where
-    S: Service<Request<B>, Response = HyperResponse> + Clone + Send + Sync + 'static,
+    S: Service<Request<B>, Response = Response<ResBody>> + Clone + Send + Sync + 'static,
     S::Future: Send,
     S::Error: std::error::Error + Send + Sync + 'static,
     B: From<Vec<u8>> + Send + 'static + Clone,
+    ResBody: BodyExt + Send + 'static,
+    ResBody::Error: std::error::Error + Send + Sync + 'static,
+    ResBody::Data: Send,
 {
     /// Make a request to the server using the given service.
     fn request_hyper(&self, req: RequestPacket) -> TransportFut<'static> {
