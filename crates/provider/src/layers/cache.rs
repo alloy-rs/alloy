@@ -3,6 +3,7 @@ use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
 use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
+use alloy_rpc_client::NoParams;
 use alloy_rpc_types_eth::{
     Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
@@ -226,12 +227,48 @@ where
         self.inner.root()
     }
 
+    /// Gets the accounts in the remote node. This is usually empty unless you're using a local
+    /// node.
+    fn get_accounts(&self) -> ProviderCall<T, NoParams, Vec<Address>> {
+        let req = RequestType::new("eth_accounts", NoParams::default());
+
+        let hash = req.params_hash().ok();
+
+        if let Some(hash) = hash {
+            if let Some(cached) = self.get(&hash).unwrap() {
+                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
+                return ProviderCall::BoxedFuture(Box::pin(async move {
+                    let res = result?;
+                    Ok(res)
+                }));
+            }
+        }
+
+        let client = self
+            .inner
+            .weak_client()
+            .upgrade()
+            .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
+        let cache = self.cache.clone();
+
+        ProviderCall::BoxedFuture(Box::pin(async move {
+            let client = client?;
+
+            let res = client.request_noparams(req.method()).await?;
+
+            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+            let hash = req.params_hash()?;
+            let mut cache = cache.write();
+            let _ = cache.put(hash, json_str);
+            Ok(res)
+        }))
+    }
+
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        // let hash = RequestType::BlockByNumber((number, hydrate)).params_hash()?;
         let hash = RequestType::new("eth_getBlockByNumber", (number, hydrate));
 
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
@@ -358,6 +395,22 @@ mod tests {
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_get_accounts() {
+        let cache = CacheLayer::new(100);
+        let anvil = Anvil::new().block_time_f64(0.3).spawn();
+        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+
+        let path = PathBuf::from_str("./rpc-cache-accounts.txt").unwrap();
+        provider.load_cache(path.clone()).unwrap();
+
+        let accounts = provider.get_accounts().await.unwrap();
+        let accounts2 = provider.get_accounts().await.unwrap();
+        assert_eq!(accounts, accounts2);
+
+        provider.save_cache(path).unwrap();
+    }
 
     #[tokio::test]
     async fn test_cache_provider() {
