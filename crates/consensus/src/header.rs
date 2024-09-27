@@ -201,17 +201,6 @@ impl Header {
         self.transactions_root == EMPTY_ROOT_HASH
     }
 
-    // TODO: re-enable
-
-    // /// Converts all roots in the header to a [BlockBodyRoots] struct.
-    // pub fn body_roots(&self) -> BlockBodyRoots {
-    //     BlockBodyRoots {
-    //         tx_root: self.transactions_root,
-    //         ommers_hash: self.ommers_hash,
-    //         withdrawals_root: self.withdrawals_root,
-    //     }
-    // }
-
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
