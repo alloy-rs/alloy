@@ -1,8 +1,7 @@
 use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
-use alloy_json_rpc::{Request, RpcParam};
+use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
-use alloy_primitives::{Address, BlockHash, StorageKey, StorageValue, B256, U256};
-use alloy_rpc_client::ClientRef;
+use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
 use alloy_rpc_types_eth::{
     Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
@@ -153,11 +152,9 @@ macro_rules! cache_get_or_fetch {
     ($self:expr, $hash:expr, $fetch_fn:expr) => {{
         if let Some(cached) = $self.get(&$hash)? {
             let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
-            println!("Cache hit");
             return Ok(Some(result));
         }
 
-        println!("Cache miss");
         let result = $fetch_fn.await?;
         if let Some(ref data) = result {
             let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
@@ -185,8 +182,7 @@ where
         number: BlockNumberOrTag,
         hydrate: bool,
     ) -> TransportResult<Option<Block>> {
-        let hash =
-            RequestType::BlockByNumber((number, hydrate)).params_hash(self.inner.client())?;
+        let hash = RequestType::BlockByNumber((number, hydrate)).params_hash()?;
 
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
     }
@@ -202,7 +198,7 @@ where
             BlockTransactionsKind::Hashes => false,
         };
 
-        let req_hash = RequestType::BlockByHash((hash, full)).params_hash(self.inner.client())?;
+        let req_hash = RequestType::BlockByHash((hash, full)).params_hash()?;
 
         cache_get_or_fetch!(self, req_hash, self.inner.get_block_by_hash(hash, kind))
     }
@@ -233,7 +229,7 @@ where
                     )
                 })?;
 
-                let hash = req.params_hash(&client)?;
+                let hash = req.params_hash()?;
 
                 if let Some(cached) = cache.write().get(&hash).cloned() {
                     let result =
@@ -284,22 +280,19 @@ enum RequestType<Params: RpcParam> {
 }
 
 impl<Params: RpcParam> RequestType<Params> {
-    fn make_request<T: Transport>(&self, client: ClientRef<'_, T>) -> Request<Params> {
-        let (method, params) = match self {
+    fn params_hash(&self) -> TransportResult<B256> {
+        let (_method, params) = match self {
             Self::BlockByNumber(params) => ("eth_getBlockByNumber", params),
             Self::BlockByHash(params) => ("eth_getBlockByHash", params),
             Self::Proof(params) => ("eth_getProof", params),
             Self::StorageAt(params) => ("eth_getStorageAt", params),
         };
-        client.make_request(method, params.to_owned())
-    }
 
-    /// `keccak256` hash the request params.
-    fn params_hash<T: Transport>(&self, client: ClientRef<'_, T>) -> TransportResult<B256> {
-        let req = self.make_request(client);
-        let ser_req = req.serialize().map_err(TransportErrorKind::custom)?;
+        let hash = serde_json::to_string(&params)
+            .map(|p| keccak256(p.as_bytes()))
+            .map_err(RpcError::ser_err)?;
 
-        Ok(ser_req.params_hash())
+        Ok(hash)
     }
 }
 
