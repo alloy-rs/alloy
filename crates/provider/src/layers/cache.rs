@@ -1,4 +1,4 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
 use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
@@ -165,6 +165,42 @@ macro_rules! cache_get_or_fetch {
     }};
 }
 
+macro_rules! cache_rpc_call_with_block {
+    ($cache:expr, $client:expr, $req:expr) => {{
+        let hash = $req.params_hash().ok();
+
+        if let Some(hash) = hash {
+            if let Some(cached) = $cache.write().get(&hash) {
+                let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
+                return ProviderCall::BoxedFuture(Box::pin(async move {
+                    let res = result?;
+                    Ok(res)
+                }));
+            }
+        }
+
+        let client =
+            $client.upgrade().ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
+        let cache = $cache.clone();
+        // let params = $params.clone();
+        ProviderCall::BoxedFuture(Box::pin(async move {
+            let client = client?;
+
+            let result = client.request($req.method(), $req.params());
+
+            let res = result.await?;
+
+            // Insert into cache.
+            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+            let hash = $req.params_hash()?;
+            let mut cache = cache.write();
+            let _ = cache.put(hash, json_str);
+
+            Ok(res)
+        }))
+    }};
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl<P, T> Provider<T> for CacheProvider<P, T>
@@ -218,54 +254,22 @@ where
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
             let req = RequestType::Proof((address, keys.clone(), block_id));
-            let hash = req.params_hash().ok();
-
-            if let Some(hash) = hash {
-                // let cache = cache.read();
-                if let Some(cached) = cache.write().get(&hash) {
-                    let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
-
-                    return ProviderCall::BoxedFuture(Box::pin(async move {
-                        let res = result?;
-                        Ok(res)
-                    }));
-                }
-            }
-
-            let client = client.upgrade().ok_or_else(|| {
-                TransportErrorKind::custom_str("RPC client was dropped before the request was made")
-            });
-            let cache = cache.clone();
-            let keys = keys.clone();
-            ProviderCall::BoxedFuture(Box::pin(async move {
-                let client = client?;
-
-                let result = client
-                    .request("eth_getProof", (address, keys))
-                    .map_params(|params| ParamsWithBlock { params, block_id })
-                    .map_resp(EIP1186AccountProofResponse::from);
-
-                let res = result.await?;
-
-                // Insert into cache.
-                let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
-                let hash = req.params_hash()?;
-                let mut cache = cache.write();
-                let _ = cache.put(hash, json_str);
-
-                Ok(res)
-            }))
+            cache_rpc_call_with_block!(cache, client, req)
         })
     }
 
     /// Gets the specified storage value from [Address].
     fn get_storage_at(
         &self,
-        _address: Address,
-        _key: U256,
+        address: Address,
+        key: U256,
     ) -> RpcWithBlock<T, (Address, U256), StorageValue> {
-        todo!()
-        // Blocked by https://github.com/alloy-rs/alloy/pull/788
+        let client = self.inner.weak_client();
+        let cache = self.cache.clone();
+        RpcWithBlock::new_provider(move |block_id| {
+            let req = RequestType::StorageAt((address, key, block_id));
+            cache_rpc_call_with_block!(cache, client, req)
+        })
     }
 }
 
@@ -285,13 +289,26 @@ enum RequestType<Params: RpcParam> {
 }
 
 impl<Params: RpcParam> RequestType<Params> {
+    fn method(&self) -> &'static str {
+        match self {
+            Self::BlockByNumber(_) => "eth_getBlockByNumber",
+            Self::BlockByHash(_) => "eth_getBlockByHash",
+            Self::Proof(_) => "eth_getProof",
+            Self::StorageAt(_) => "eth_getStorageAt",
+        }
+    }
+
+    fn params(&self) -> Params {
+        match self {
+            Self::BlockByNumber(params) => params.clone(),
+            Self::BlockByHash(params) => params.clone(),
+            Self::Proof(params) => params.clone(),
+            Self::StorageAt(params) => params.clone(),
+        }
+    }
+
     fn params_hash(&self) -> TransportResult<B256> {
-        let (_method, params) = match self {
-            Self::BlockByNumber(params) => ("eth_getBlockByNumber", params),
-            Self::BlockByHash(params) => ("eth_getBlockByHash", params),
-            Self::Proof(params) => ("eth_getProof", params),
-            Self::StorageAt(params) => ("eth_getStorageAt", params),
-        };
+        let params = self.params();
 
         let hash = serde_json::to_string(&params)
             .map(|p| keccak256(p.as_bytes()))
@@ -384,10 +401,7 @@ mod tests {
     async fn test_get_proof() {
         let cache = CacheLayer::new(100);
         let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default()
-            // .with_recommended_fillers() - TODO: Issue here. Layer doesn't work with fillers. Fix.
-            .layer(cache)
-            .on_http(anvil.endpoint_url());
+        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
         let from = anvil.addresses()[0];
         let path = PathBuf::from_str("./rpc-cache-proof.txt").unwrap();
