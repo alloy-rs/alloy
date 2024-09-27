@@ -1,8 +1,10 @@
-use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
+use crate::{
+    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
+};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
-use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
+use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256, U64};
 use alloy_rpc_client::NoParams;
 use alloy_rpc_types_eth::{
     Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
@@ -264,6 +266,45 @@ where
         }))
     }
 
+    /// Gets the chain ID.
+    fn get_chain_id(&self) -> ProviderCall<T, NoParams, U64, u64> {
+        let req = RequestType::new("eth_chainId", NoParams::default());
+
+        let hash = req.params_hash().ok();
+
+        if let Some(hash) = hash {
+            if let Some(cached) = self.get(&hash).unwrap() {
+                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
+                return ProviderCall::BoxedFuture(Box::pin(async move {
+                    let res = result?;
+                    Ok(res)
+                }));
+            }
+        }
+
+        let client = self
+            .inner
+            .weak_client()
+            .upgrade()
+            .ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
+        let cache = self.cache.clone();
+
+        ProviderCall::BoxedFuture(Box::pin(async move {
+            let client = client?;
+
+            let res = client
+                .request_noparams(req.method())
+                .map_resp(utils::convert_u64 as fn(U64) -> u64)
+                .await?;
+
+            let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
+            let hash = req.params_hash()?;
+            let mut cache = cache.write();
+            let _ = cache.put(hash, json_str);
+            Ok(res)
+        }))
+    }
+
     async fn get_block_by_number(
         &self,
         number: BlockNumberOrTag,
@@ -408,6 +449,22 @@ mod tests {
         let accounts = provider.get_accounts().await.unwrap();
         let accounts2 = provider.get_accounts().await.unwrap();
         assert_eq!(accounts, accounts2);
+
+        provider.save_cache(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_chain_id() {
+        let cache = CacheLayer::new(100);
+        let anvil = Anvil::new().block_time_f64(0.3).spawn();
+        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+
+        let path = PathBuf::from_str("./rpc-cache-chain-id.txt").unwrap();
+        provider.load_cache(path.clone()).unwrap();
+
+        let chain_id = provider.get_chain_id().await.unwrap();
+        let chain_id2 = provider.get_chain_id().await.unwrap();
+        assert_eq!(chain_id, chain_id2);
 
         provider.save_cache(path).unwrap();
     }
