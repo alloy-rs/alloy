@@ -153,6 +153,7 @@ serde_with = "3.3.0"
 ## misc-testing
 arbitrary = "1.3"
 assert_matches = "1.5"
+ci_info = "0.14.14"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"

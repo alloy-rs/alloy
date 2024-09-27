@@ -530,82 +530,94 @@ impl Reth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::run_with_tempdir_sync;
+    use crate::{nodes::test::ci_only, utils::run_with_tempdir_sync};
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().data_dir(temp_dir_path).spawn();
+        ci_only(|| {
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().data_dir(temp_dir_path).spawn();
 
-            assert_ports(&reth, false);
+                assert_ports(&reth, false);
+            });
         });
     }
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_sepolia() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
+        ci_only(|| {
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().chain_or_path("sepolia").data_dir(temp_dir_path).spawn();
 
-            assert_ports(&reth, false);
-        });
+                assert_ports(&reth, false);
+            });
+        })
     }
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
+        ci_only(|| {
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir_path).spawn();
 
-            assert_ports(&reth, true);
-        });
+                assert_ports(&reth, true);
+            });
+        })
     }
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev_custom_genesis() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new()
-                .dev()
-                .disable_discovery()
-                .data_dir(temp_dir_path)
-                .genesis(Genesis::default())
-                .spawn();
+        ci_only(|| {
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new()
+                    .dev()
+                    .disable_discovery()
+                    .data_dir(temp_dir_path)
+                    .genesis(Genesis::default())
+                    .spawn();
 
-            assert_ports(&reth, true);
-        });
+                assert_ports(&reth, true);
+            });
+        })
     }
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_dev_custom_blocktime() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new()
-                .dev()
-                .disable_discovery()
-                .block_time("1sec")
-                .data_dir(temp_dir_path)
-                .spawn();
+        ci_only(|| {
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new()
+                    .dev()
+                    .disable_discovery()
+                    .block_time("1sec")
+                    .data_dir(temp_dir_path)
+                    .spawn();
 
-            assert_ports(&reth, true);
-        });
+                assert_ports(&reth, true);
+            });
+        })
     }
 
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_p2p_instances() {
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().instance(100).data_dir(temp_dir_path).spawn();
-
-            assert_ports(&reth, false);
-
+        ci_only(|| {
             run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-                let reth = Reth::new().instance(101).data_dir(temp_dir_path).spawn();
+                let reth = Reth::new().instance(100).data_dir(temp_dir_path).spawn();
 
                 assert_ports(&reth, false);
+
+                run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                    let reth = Reth::new().instance(101).data_dir(temp_dir_path).spawn();
+
+                    assert_ports(&reth, false);
+                });
             });
-        });
+        })
     }
 
     // Tests that occupy the same port are combined so they are ran sequentially, to prevent
@@ -613,54 +625,56 @@ mod tests {
     #[test]
     #[cfg_attr(windows, ignore)]
     fn can_launch_reth_custom_ports() {
-        // Assert that all ports are default if no custom ports are set
-        // and the instance is set to 0.
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().instance(0).data_dir(temp_dir_path).spawn();
+        ci_only(|| {
+            // Assert that all ports are default if no custom ports are set
+            // and the instance is set to 0.
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().instance(0).data_dir(temp_dir_path).spawn();
 
-            assert_eq!(reth.http_port(), DEFAULT_HTTP_PORT);
-            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
-            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
-            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
-        });
+                assert_eq!(reth.http_port(), DEFAULT_HTTP_PORT);
+                assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+                assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+                assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
+            });
 
-        // Assert that only the HTTP port is set and the rest are default.
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().http_port(8577).data_dir(temp_dir_path).spawn();
+            // Assert that only the HTTP port is set and the rest are default.
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().http_port(8577).data_dir(temp_dir_path).spawn();
 
-            assert_eq!(reth.http_port(), 8577);
-            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
-            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
-            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
-        });
+                assert_eq!(reth.http_port(), 8577);
+                assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+                assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+                assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
+            });
 
-        // Assert that all ports can be set.
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new()
-                .http_port(8577)
-                .ws_port(8578)
-                .auth_port(8579)
-                .p2p_port(30307)
-                .data_dir(temp_dir_path)
-                .spawn();
+            // Assert that all ports can be set.
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new()
+                    .http_port(8577)
+                    .ws_port(8578)
+                    .auth_port(8579)
+                    .p2p_port(30307)
+                    .data_dir(temp_dir_path)
+                    .spawn();
 
-            assert_eq!(reth.http_port(), 8577);
-            assert_eq!(reth.ws_port(), 8578);
-            assert_eq!(reth.auth_port(), Some(8579));
-            assert_eq!(reth.p2p_port(), Some(30307));
-        });
+                assert_eq!(reth.http_port(), 8577);
+                assert_eq!(reth.ws_port(), 8578);
+                assert_eq!(reth.auth_port(), Some(8579));
+                assert_eq!(reth.p2p_port(), Some(30307));
+            });
 
-        // Assert that the HTTP port is picked by the OS and the rest are default.
-        run_with_tempdir_sync("reth-test-", |temp_dir_path| {
-            let reth = Reth::new().http_port(0).data_dir(temp_dir_path).spawn();
+            // Assert that the HTTP port is picked by the OS and the rest are default.
+            run_with_tempdir_sync("reth-test-", |temp_dir_path| {
+                let reth = Reth::new().http_port(0).data_dir(temp_dir_path).spawn();
 
-            // Assert that a random unused port is used picked by the OS.
-            assert_ne!(reth.http_port(), DEFAULT_HTTP_PORT);
+                // Assert that a random unused port is used picked by the OS.
+                assert_ne!(reth.http_port(), DEFAULT_HTTP_PORT);
 
-            assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
-            assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
-            assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
-        });
+                assert_eq!(reth.ws_port(), DEFAULT_WS_PORT);
+                assert_eq!(reth.auth_port(), Some(DEFAULT_AUTH_PORT));
+                assert_eq!(reth.p2p_port(), Some(DEFAULT_P2P_PORT));
+            });
+        })
     }
 
     // Asserts that the ports are set correctly for the given Reth instance.
