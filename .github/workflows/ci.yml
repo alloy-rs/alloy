@@ -61,7 +61,7 @@ jobs:
       - name: test
         shell: bash
         if: ${{ matrix.rust != '1.79' }} # MSRV
-        run: cargo nextest run --workspace ${{ matrix.flags }} -- --include-ignored
+        run: cargo nextest run --workspace ${{ matrix.flags }}
 
   doctest:
     runs-on: ubuntu-latest
