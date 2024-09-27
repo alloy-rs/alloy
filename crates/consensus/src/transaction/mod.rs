@@ -4,7 +4,6 @@ use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
-use alloy_serde::WithOtherFields;
 use core::any;
 
 mod eip1559;
@@ -191,7 +190,8 @@ impl<S: 'static> dyn SignableTransaction<S> {
     }
 }
 
-impl<T: Transaction> Transaction for WithOtherFields<T> {
+#[cfg(feature = "serde")]
+impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
     fn chain_id(&self) -> Option<ChainId> {
         self.inner.chain_id()
     }
