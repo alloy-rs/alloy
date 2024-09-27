@@ -30,4 +30,4 @@ tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-ci_info = "0.14.14"
+ci_info.workspace = true
