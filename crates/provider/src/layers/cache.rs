@@ -167,24 +167,11 @@ macro_rules! cache_get_or_fetch {
     }};
 }
 
-macro_rules! cache_rpc_call_with_block {
+macro_rules! rpc_prov_call {
     ($cache:expr, $client:expr, $req:expr) => {{
-        let hash = $req.params_hash().ok();
-
-        if let Some(hash) = hash {
-            if let Some(cached) = $cache.write().get(&hash) {
-                let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
-            }
-        }
-
         let client =
             $client.upgrade().ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
         let cache = $cache.clone();
-        // let params = $params.clone();
         ProviderCall::BoxedFuture(Box::pin(async move {
             let client = client?;
 
@@ -202,6 +189,28 @@ macro_rules! cache_rpc_call_with_block {
 
             Ok(res)
         }))
+    }};
+}
+
+macro_rules! cache_rpc_call_with_block {
+    ($cache:expr, $client:expr, $req:expr) => {{
+        if $req.has_block_tag() {
+            return rpc_prov_call!($cache, $client, $req);
+        }
+
+        let hash = $req.params_hash().ok();
+
+        if let Some(hash) = hash {
+            if let Some(cached) = $cache.write().get(&hash) {
+                let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
+                return ProviderCall::BoxedFuture(Box::pin(async move {
+                    let res = result?;
+                    Ok(res)
+                }));
+            }
+        }
+
+        rpc_prov_call!($cache, $client, $req)
     }};
 }
 
@@ -306,6 +315,19 @@ impl<Params: RpcParam> RequestType<Params> {
 
     fn params(&self) -> Params {
         self.params.clone()
+    }
+
+    /// Returns true if the BlockId has been set to a tag value such as "latest", "earliest", or
+    /// "pending".
+    fn has_block_tag(&self) -> bool {
+        if let Some(block_id) = self.block_id {
+            match block_id {
+                BlockId::Hash(_) => return false,
+                BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
+                _ => return true,
+            }
+        }
+        false
     }
 }
 
