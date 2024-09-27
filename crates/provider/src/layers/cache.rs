@@ -292,11 +292,11 @@ struct RequestType<Params: RpcParam> {
 }
 
 impl<Params: RpcParam> RequestType<Params> {
-    fn new(method: &'static str, params: Params) -> Self {
+    const fn new(method: &'static str, params: Params) -> Self {
         Self { method, params, block_id: None }
     }
 
-    fn with_block_id(mut self, block_id: BlockId) -> Self {
+    const fn with_block_id(mut self, block_id: BlockId) -> Self {
         self.block_id = Some(block_id);
         self
     }
@@ -309,7 +309,7 @@ impl<Params: RpcParam> RequestType<Params> {
         Ok(hash)
     }
 
-    fn method(&self) -> &'static str {
+    const fn method(&self) -> &'static str {
         self.method
     }
 
@@ -319,7 +319,7 @@ impl<Params: RpcParam> RequestType<Params> {
 
     /// Returns true if the BlockId has been set to a tag value such as "latest", "earliest", or
     /// "pending".
-    fn has_block_tag(&self) -> bool {
+    const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
             match block_id {
                 BlockId::Hash(_) => return false,
