@@ -6,6 +6,7 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
+use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
 use alloy_network_primitives::{BlockResponse, HeaderResponse};
@@ -216,7 +217,9 @@ where
         T: Transport + Clone,
     {
         if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas() {
-            return Ok(max_fee_per_blob_gas);
+            if max_fee_per_blob_gas >= BLOB_TX_MIN_BLOB_GASPRICE {
+                return Ok(max_fee_per_blob_gas);
+            }
         }
         provider
             .get_block_by_number(BlockNumberOrTag::Latest, false)
