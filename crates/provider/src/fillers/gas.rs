@@ -64,10 +64,6 @@ pub enum GasFillable {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GasFiller;
 
-/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BlobGasFiller;
-
 impl GasFiller {
     async fn prepare_legacy<P, T, N>(
         &self,
@@ -188,6 +184,10 @@ impl<N: Network> TxFiller<N> for GasFiller {
         Ok(tx)
     }
 }
+
+/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BlobGasFiller;
 
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
