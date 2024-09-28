@@ -360,7 +360,7 @@ impl alloy_consensus::Transaction for Transaction {
     }
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
-        self.max_fee_per_gas
+        self.max_priority_fee_per_gas
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
