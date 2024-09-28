@@ -95,7 +95,7 @@ pub trait TransactionResponse {
     fn gas_price(&self) -> Option<u128>;
 
     /// Gas limit
-    fn gas(&self) -> u128;
+    fn gas(&self) -> u64;
 
     /// Max BaseFeePerGas the user is willing to pay
     fn max_fee_per_gas(&self) -> Option<u128>;
@@ -144,7 +144,7 @@ pub trait HeaderResponse {
     fn extra_data(&self) -> &Bytes;
 
     /// Base fee per unit of gas (If EIP-1559 is supported)
-    fn base_fee_per_gas(&self) -> Option<u128>;
+    fn base_fee_per_gas(&self) -> Option<u64>;
 
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
@@ -153,7 +153,7 @@ pub trait HeaderResponse {
     fn coinbase(&self) -> Address;
 
     /// Gas limit of the block
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Mix hash of the block
     ///
@@ -235,7 +235,7 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
         self.inner.gas_price()
     }
 
-    fn gas(&self) -> u128 {
+    fn gas(&self) -> u64 {
         self.inner.gas()
     }
 
@@ -380,7 +380,7 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
         self.inner.extra_data()
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.inner.base_fee_per_gas()
     }
 
@@ -392,7 +392,7 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
         self.inner.coinbase()
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.inner.gas_limit()
     }
 

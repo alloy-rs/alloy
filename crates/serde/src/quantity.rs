@@ -89,6 +89,48 @@ pub mod vec {
     }
 }
 
+/// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
+pub mod u128_vec_vec_opt {
+    use alloy_primitives::U128;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
+
+    /// Deserializes an `u128` accepting a hex quantity string with optional 0x prefix or
+    /// a number
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<Vec<u128>>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
+            || Ok(None),
+            |vec| {
+                Ok(Some(
+                    vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
+                ))
+            },
+        )
+    }
+
+    /// Serializes u128 as hex string
+    pub fn serialize<S: Serializer>(
+        value: &Option<Vec<Vec<u128>>>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(vec) => {
+                let vec = vec
+                    .iter()
+                    .map(|v| v.iter().map(|val| U128::from(*val)).collect::<Vec<_>>())
+                    .collect::<Vec<_>>();
+                s.serialize_some(&vec)
+            }
+            None => s.serialize_none(),
+        }
+    }
+}
+
 /// Private implementation details of the [`quantity`](self) module.
 #[allow(unnameable_types)]
 mod private {
@@ -130,48 +172,6 @@ mod private {
         u32  = alloy_primitives::U32,
         u64  = alloy_primitives::U64,
         u128 = alloy_primitives::U128,
-    }
-}
-
-/// serde functions for handling `Vec<Vec<u128>>` via [U128](alloy_primitives::U128)
-pub mod u128_vec_vec_opt {
-    use alloy_primitives::U128;
-    use serde::{Deserialize, Deserializer, Serializer};
-
-    #[cfg(not(feature = "std"))]
-    use alloc::vec::Vec;
-
-    /// Deserializes an `u128` accepting a hex quantity string with optional 0x prefix or
-    /// a number
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<Vec<u128>>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Option::<Vec<Vec<U128>>>::deserialize(deserializer)?.map_or_else(
-            || Ok(None),
-            |vec| {
-                Ok(Some(
-                    vec.into_iter().map(|v| v.into_iter().map(|val| val.to()).collect()).collect(),
-                ))
-            },
-        )
-    }
-
-    /// Serializes u128 as hex string
-    pub fn serialize<S: Serializer>(
-        value: &Option<Vec<Vec<u128>>>,
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
-        match value {
-            Some(vec) => {
-                let vec = vec
-                    .iter()
-                    .map(|v| v.iter().map(|val| U128::from(*val)).collect::<Vec<_>>())
-                    .collect::<Vec<_>>();
-                s.serialize_some(&vec)
-            }
-            None => s.serialize_none(),
-        }
     }
 }
 

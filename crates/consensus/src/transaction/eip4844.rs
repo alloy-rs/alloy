@@ -203,7 +203,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         match self {
             Self::TxEip4844(tx) => tx.gas_limit,
             Self::TxEip4844WithSidecar(tx) => tx.tx().gas_limit,
@@ -351,7 +351,7 @@ pub struct TxEip4844 {
     /// computation is done and may not be increased
     /// later; formally Tg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
@@ -693,7 +693,7 @@ impl Transaction for TxEip4844 {
         self.nonce
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
@@ -966,7 +966,7 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.nonce()
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.tx.gas_limit()
     }
 

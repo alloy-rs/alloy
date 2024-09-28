@@ -77,7 +77,7 @@ pub struct TransactionRequest {
             with = "alloy_serde::quantity::opt"
         )
     )]
-    pub gas: Option<u128>,
+    pub gas: Option<u64>,
     /// The value transferred in the transaction, in wei.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub value: Option<U256>,
@@ -149,7 +149,7 @@ impl TransactionRequest {
     }
 
     /// Sets the gas limit for the transaction.
-    pub const fn gas_limit(mut self, gas_limit: u128) -> Self {
+    pub const fn gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas = Some(gas_limit);
         self
     }

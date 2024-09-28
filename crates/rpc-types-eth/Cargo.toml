@@ -23,7 +23,7 @@ alloy-eips.workspace = true
 alloy-consensus.workspace = true
 alloy-network-primitives.workspace = true
 alloy-rlp = { workspace = true, features = ["arrayvec", "derive"] }
-alloy-primitives = { workspace = true, features = ["rlp"] }
+alloy-primitives = { workspace = true, features = ["rlp", "map"] }
 
 itertools.workspace = true
 derive_more = { workspace = true, features = ["display"] }
@@ -32,10 +32,6 @@ derive_more = { workspace = true, features = ["display"] }
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
-
-# `no_std` compatibility
-cfg-if.workspace = true
-hashbrown = { workspace = true, features = ["serde"] }
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
@@ -62,12 +58,19 @@ assert_matches.workspace = true
 [features]
 default = ["std", "serde"]
 std = ["alloy-primitives/std", "alloy-consensus/std", "alloy-eips/std"]
-serde = ["dep:serde", "dep:serde_json", "dep:alloy-serde", "alloy-primitives/serde", "alloy-consensus/serde", "alloy-eips/serde"]
+serde = [
+    "dep:serde",
+    "dep:serde_json",
+    "dep:alloy-serde",
+    "alloy-primitives/serde",
+    "alloy-consensus/serde",
+    "alloy-eips/serde",
+]
 arbitrary = [
     "std",
     "dep:arbitrary",
     "alloy-primitives/arbitrary",
-    "alloy-serde/arbitrary",
+    "alloy-serde?/arbitrary",
     "alloy-eips/arbitrary",
 ]
 jsonrpsee-types = ["dep:jsonrpsee-types"]

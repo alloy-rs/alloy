@@ -26,7 +26,6 @@ alloy-serde = { workspace = true, optional = true }
 
 # kzg
 c-kzg = { workspace = true, features = ["serde"], optional = true }
-derive_more = { workspace = true, features = ["deref", "deref_mut", "from", "into_iterator"] }
 
 # arbitrary
 arbitrary = { workspace = true, features = ["derive"], optional = true }
@@ -34,6 +33,15 @@ arbitrary = { workspace = true, features = ["derive"], optional = true }
 # serde
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_with = { workspace = true, optional = true }
+
+# misc
+derive_more = { workspace = true, features = [
+    "from",
+    "deref",
+    "deref_mut",
+    "into_iterator"
+], default-features = false }
+auto_impl.workspace = true
 
 [dev-dependencies]
 alloy-eips = { workspace = true, features = ["arbitrary"] }

@@ -253,6 +253,28 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "keystore-geth-compat")]
+    fn test_encrypted_json_keystore_with_address() {
+        // create and store an encrypted JSON keystore in this directory
+
+        use std::fs::File;
+
+        use eth_keystore::EthKeystore;
+        let dir = tempdir().unwrap();
+        let mut rng = rand::thread_rng();
+        let (key, uuid) =
+            LocalSigner::<SigningKey>::new_keystore(&dir, &mut rng, "randpsswd", None).unwrap();
+
+        let path = Path::new(dir.path()).join(uuid.clone());
+        let file = File::open(path).unwrap();
+        let keystore = serde_json::from_reader::<_, EthKeystore>(file).unwrap();
+
+        assert!(!keystore.address.is_zero());
+
+        test_encrypted_json_keystore(key, &uuid, dir.path());
+    }
+
+    #[test]
     fn signs_msg() {
         let message = "Some data";
         let hash = alloy_primitives::utils::eip191_hash_message(message);

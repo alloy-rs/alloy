@@ -51,7 +51,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;

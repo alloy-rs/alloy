@@ -19,6 +19,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-alloy-primitives = { workspace = true, features = ["serde", "std"] }
+alloy-primitives = { workspace = true, features = ["serde", "std", "map"] }
 
 serde.workspace = true

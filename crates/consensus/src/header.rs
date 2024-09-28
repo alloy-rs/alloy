@@ -60,10 +60,10 @@ pub struct Header {
     pub number: BlockNumber,
     /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_used: u128,
+    pub gas_used: u64,
     /// A scalar value equal to the reasonable output of Unix’s time() at this block’s inception;
     /// formally Hs.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
@@ -89,7 +89,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub base_fee_per_gas: Option<u128>,
+    pub base_fee_per_gas: Option<u64>,
     /// The total amount of blob gas consumed by the transactions within the block, added in
     /// EIP-4844.
     #[cfg_attr(
@@ -100,7 +100,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// A running total of blob gas consumed in excess of the target, prior to the block. Blocks
     /// with above-target blob gas consumption increase this value, blocks with below-target blob
     /// gas consumption decrease it (bounded at 0). This was added in EIP-4844.
@@ -112,7 +112,7 @@ pub struct Header {
             skip_serializing_if = "Option::is_none"
         )
     )]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// The hash of the parent beacon block's root is included in execution blocks, as proposed by
     /// EIP-4788.
     ///
@@ -201,17 +201,6 @@ impl Header {
         self.transactions_root == EMPTY_ROOT_HASH
     }
 
-    // TODO: re-enable
-
-    // /// Converts all roots in the header to a [BlockBodyRoots] struct.
-    // pub fn body_roots(&self) -> BlockBodyRoots {
-    //     BlockBodyRoots {
-    //         tx_root: self.transactions_root,
-    //         ommers_hash: self.ommers_hash,
-    //         withdrawals_root: self.withdrawals_root,
-    //     }
-    // }
-
     /// Returns the blob fee for _this_ block according to the EIP-4844 spec.
     ///
     /// Returns `None` if `excess_blob_gas` is None
@@ -231,7 +220,7 @@ impl Header {
     /// Calculate base fee for next block according to the EIP-1559 spec.
     ///
     /// Returns a `None` if no base fee is set, no EIP-1559 support
-    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u128> {
+    pub fn next_block_base_fee(&self, base_fee_params: BaseFeeParams) -> Option<u64> {
         Some(calc_next_block_base_fee(
             self.gas_used,
             self.gas_limit,
@@ -244,7 +233,7 @@ impl Header {
     /// spec.
     ///
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
-    pub fn next_block_excess_blob_gas(&self) -> Option<u128> {
+    pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
     }
 
@@ -345,8 +334,17 @@ impl Header {
     }
 
     /// Returns the parent block's number and hash
+    ///
+    /// Note: for the genesis block the parent number is 0 and the parent hash is the zero hash.
     pub const fn parent_num_hash(&self) -> BlockNumHash {
         BlockNumHash { number: self.number.saturating_sub(1), hash: self.parent_hash }
+    }
+
+    /// Returns the block's number and hash.
+    ///
+    /// Note: this hashes the header.
+    pub fn num_hash_slow(&self) -> BlockNumHash {
+        BlockNumHash { number: self.number, hash: self.hash_slow() }
     }
 
     /// Checks if the block's difficulty is set to zero, indicating a Proof-of-Stake header.
@@ -484,8 +482,8 @@ impl Decodable for Header {
             logs_bloom: Decodable::decode(buf)?,
             difficulty: Decodable::decode(buf)?,
             number: u64::decode(buf)?,
-            gas_limit: u128::decode(buf)?,
-            gas_used: u128::decode(buf)?,
+            gas_limit: u64::decode(buf)?,
+            gas_used: u64::decode(buf)?,
             timestamp: Decodable::decode(buf)?,
             extra_data: Decodable::decode(buf)?,
             mix_hash: Decodable::decode(buf)?,
@@ -502,7 +500,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u128>());
+                this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -520,7 +518,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.blob_gas_used = Some(U256::decode(buf)?.to::<u128>());
+                this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -528,7 +526,7 @@ impl Decodable for Header {
             if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
                 buf.advance(1)
             } else {
-                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u128>());
+                this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());
             }
         }
 
@@ -573,8 +571,8 @@ impl Decodable for Header {
 pub(crate) const fn generate_valid_header(
     mut header: Header,
     eip_4844_active: bool,
-    blob_gas_used: u128,
-    excess_blob_gas: u128,
+    blob_gas_used: u64,
+    excess_blob_gas: u64,
     parent_beacon_block_root: B256,
 ) -> Header {
     // Clear all related fields if EIP-1559 is inactive
@@ -671,10 +669,10 @@ pub trait BlockHeader {
     fn number(&self) -> BlockNumber;
 
     /// Retrieves the gas limit of the block
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Retrieves the gas used by the block
-    fn gas_used(&self) -> u128;
+    fn gas_used(&self) -> u64;
 
     /// Retrieves the timestamp of the block
     fn timestamp(&self) -> u64;
@@ -686,13 +684,13 @@ pub trait BlockHeader {
     fn nonce(&self) -> B64;
 
     /// Retrieves the base fee per gas of the block, if available
-    fn base_fee_per_gas(&self) -> Option<u128>;
+    fn base_fee_per_gas(&self) -> Option<u64>;
 
     /// Retrieves the blob gas used by the block, if available
-    fn blob_gas_used(&self) -> Option<u128>;
+    fn blob_gas_used(&self) -> Option<u64>;
 
     /// Retrieves the excess blob gas of the block, if available
-    fn excess_blob_gas(&self) -> Option<u128>;
+    fn excess_blob_gas(&self) -> Option<u64>;
 
     /// Retrieves the parent beacon block root of the block, if available
     fn parent_beacon_block_root(&self) -> Option<B256>;
@@ -745,11 +743,11 @@ impl BlockHeader for Header {
         self.number
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 
-    fn gas_used(&self) -> u128 {
+    fn gas_used(&self) -> u64 {
         self.gas_used
     }
 
@@ -765,15 +763,15 @@ impl BlockHeader for Header {
         self.nonce
     }
 
-    fn base_fee_per_gas(&self) -> Option<u128> {
+    fn base_fee_per_gas(&self) -> Option<u64> {
         self.base_fee_per_gas
     }
 
-    fn blob_gas_used(&self) -> Option<u128> {
+    fn blob_gas_used(&self) -> Option<u64> {
         self.blob_gas_used
     }
 
-    fn excess_blob_gas(&self) -> Option<u128> {
+    fn excess_blob_gas(&self) -> Option<u64> {
         self.excess_blob_gas
     }
 
@@ -808,6 +806,18 @@ mod tests {
 
         let decoded: Header = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, header);
+
+        // Create a vector to store the encoded RLP
+        let mut encoded_rlp = Vec::new();
+
+        // Encode the header data
+        decoded.encode(&mut encoded_rlp);
+
+        // Decode the RLP data
+        let decoded_rlp = Header::decode(&mut encoded_rlp.as_slice()).unwrap();
+
+        // Check that the decoded RLP data matches the original header data
+        assert_eq!(decoded_rlp, decoded);
     }
 }
 
