@@ -1,6 +1,6 @@
 use alloy_consensus::Transaction;
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, TxKind, B256, U256};
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
