@@ -85,11 +85,7 @@ pub trait TransactionResponse: Transaction {
 
     /// Recipient of the transaction. Returns `None`if transaction is a contract creation.
     fn to(&self) -> Option<Address> {
-        // todo: replace with Transaction::to(self).into() with next alloy core release
-        match Transaction::to(self) {
-            TxKind::Create => None,
-            TxKind::Call(addr) => Some(addr),
-        }
+        Transaction::to(self).to().copied()
     }
 
     /// Gas Price, this is the RPC format for `max_fee_per_gas`, pre-eip-1559.

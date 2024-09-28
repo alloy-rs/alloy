@@ -427,10 +427,6 @@ impl TransactionResponse for Transaction {
         self.from
     }
 
-    fn to(&self) -> Option<Address> {
-        self.to
-    }
-
     fn signature(&self) -> Option<Signature> {
         self.signature
     }
