@@ -848,16 +848,16 @@ pub(super) mod bincode_compat {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
     pub struct Header<'a> {
-        parent_hash: Cow<'a, B256>,
-        ommers_hash: Cow<'a, B256>,
-        beneficiary: Cow<'a, Address>,
-        state_root: Cow<'a, B256>,
-        transactions_root: Cow<'a, B256>,
-        receipts_root: Cow<'a, B256>,
+        parent_hash: B256,
+        ommers_hash: B256,
+        beneficiary: Address,
+        state_root: B256,
+        transactions_root: B256,
+        receipts_root: B256,
         #[serde(default)]
-        withdrawals_root: Cow<'a, Option<B256>>,
-        logs_bloom: Cow<'a, Bloom>,
-        difficulty: Cow<'a, U256>,
+        withdrawals_root: Option<B256>,
+        logs_bloom: Bloom,
+        difficulty: U256,
         #[serde(with = "alloy_serde::quantity")]
         number: BlockNumber,
         #[serde(with = "alloy_serde::quantity")]
@@ -866,7 +866,7 @@ pub(super) mod bincode_compat {
         gas_used: u64,
         #[serde(with = "alloy_serde::quantity")]
         timestamp: u64,
-        mix_hash: Cow<'a, B256>,
+        mix_hash: B256,
         nonce: B64,
         #[serde(default, with = "alloy_serde::quantity::opt")]
         base_fee_per_gas: Option<u64>,
@@ -875,35 +875,35 @@ pub(super) mod bincode_compat {
         #[serde(default, with = "alloy_serde::quantity::opt")]
         excess_blob_gas: Option<u64>,
         #[serde(default)]
-        parent_beacon_block_root: Cow<'a, Option<B256>>,
+        parent_beacon_block_root: Option<B256>,
         #[serde(default)]
-        requests_root: Cow<'a, Option<B256>>,
+        requests_root: Option<B256>,
         extra_data: Cow<'a, Bytes>,
     }
 
     impl<'a> From<&'a super::Header> for Header<'a> {
         fn from(value: &'a super::Header) -> Self {
             Self {
-                parent_hash: Cow::Borrowed(&value.parent_hash),
-                ommers_hash: Cow::Borrowed(&value.ommers_hash),
-                beneficiary: Cow::Borrowed(&value.beneficiary),
-                state_root: Cow::Borrowed(&value.state_root),
-                transactions_root: Cow::Borrowed(&value.transactions_root),
-                receipts_root: Cow::Borrowed(&value.receipts_root),
-                withdrawals_root: Cow::Borrowed(&value.withdrawals_root),
-                logs_bloom: Cow::Borrowed(&value.logs_bloom),
-                difficulty: Cow::Borrowed(&value.difficulty),
+                parent_hash: value.parent_hash,
+                ommers_hash: value.ommers_hash,
+                beneficiary: value.beneficiary,
+                state_root: value.state_root,
+                transactions_root: value.transactions_root,
+                receipts_root: value.receipts_root,
+                withdrawals_root: value.withdrawals_root,
+                logs_bloom: value.logs_bloom,
+                difficulty: value.difficulty,
                 number: value.number,
                 gas_limit: value.gas_limit,
                 gas_used: value.gas_used,
                 timestamp: value.timestamp,
-                mix_hash: Cow::Borrowed(&value.mix_hash),
+                mix_hash: value.mix_hash,
                 nonce: value.nonce,
                 base_fee_per_gas: value.base_fee_per_gas,
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
-                parent_beacon_block_root: Cow::Borrowed(&value.parent_beacon_block_root),
-                requests_root: Cow::Borrowed(&value.requests_root),
+                parent_beacon_block_root: value.parent_beacon_block_root,
+                requests_root: value.requests_root,
                 extra_data: Cow::Borrowed(&value.extra_data),
             }
         }
@@ -912,26 +912,26 @@ pub(super) mod bincode_compat {
     impl<'a> From<Header<'a>> for super::Header {
         fn from(value: Header<'a>) -> Self {
             Self {
-                parent_hash: value.parent_hash.into_owned(),
-                ommers_hash: value.ommers_hash.into_owned(),
-                beneficiary: value.beneficiary.into_owned(),
-                state_root: value.state_root.into_owned(),
-                transactions_root: value.transactions_root.into_owned(),
-                receipts_root: value.receipts_root.into_owned(),
-                withdrawals_root: value.withdrawals_root.into_owned(),
-                logs_bloom: value.logs_bloom.into_owned(),
-                difficulty: value.difficulty.into_owned(),
+                parent_hash: value.parent_hash,
+                ommers_hash: value.ommers_hash,
+                beneficiary: value.beneficiary,
+                state_root: value.state_root,
+                transactions_root: value.transactions_root,
+                receipts_root: value.receipts_root,
+                withdrawals_root: value.withdrawals_root,
+                logs_bloom: value.logs_bloom,
+                difficulty: value.difficulty,
                 number: value.number,
                 gas_limit: value.gas_limit,
                 gas_used: value.gas_used,
                 timestamp: value.timestamp,
-                mix_hash: value.mix_hash.into_owned(),
+                mix_hash: value.mix_hash,
                 nonce: value.nonce,
                 base_fee_per_gas: value.base_fee_per_gas,
                 blob_gas_used: value.blob_gas_used,
                 excess_blob_gas: value.excess_blob_gas,
-                parent_beacon_block_root: value.parent_beacon_block_root.into_owned(),
-                requests_root: value.requests_root.into_owned(),
+                parent_beacon_block_root: value.parent_beacon_block_root,
+                requests_root: value.requests_root,
                 extra_data: value.extra_data.into_owned(),
             }
         }
