@@ -345,7 +345,70 @@ impl Decodable for TxEip2930 {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::TxEip2930;
+    use crate::{SignableTransaction, TxEnvelope};
+    use alloy_primitives::{Address, Signature, TxKind, U256};
+    use alloy_rlp::{Decodable, Encodable};
+
+    #[test]
+    fn test_decode_create() {
+        // tests that a contract creation tx encodes and decodes properly
+        let tx = TxEip2930 {
+            chain_id: 1u64,
+            nonce: 0,
+            gas_price: 1,
+            gas_limit: 2,
+            to: TxKind::Create,
+            value: U256::from(3_u64),
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+        };
+        let signature = Signature::test_signature();
+
+        let mut encoded = Vec::new();
+        tx.encode_with_signature_fields(&signature, &mut encoded);
+
+        let decoded = TxEip2930::decode_signed_fields(&mut &*encoded).unwrap();
+        assert_eq!(decoded, tx.into_signed(signature));
+    }
+
+    #[test]
+    fn test_decode_call() {
+        let request = TxEip2930 {
+            chain_id: 1u64,
+            nonce: 0,
+            gas_price: 1,
+            gas_limit: 2,
+            to: Address::default().into(),
+            value: U256::from(3_u64),
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+        };
+
+        let signature = Signature::test_signature();
+
+        let tx = request.into_signed(signature);
+
+        let envelope = TxEnvelope::Eip2930(tx);
+
+        let mut encoded = Vec::new();
+        envelope.encode(&mut encoded);
+        assert_eq!(encoded.len(), envelope.length());
+
+        assert_eq!(
+            alloy_primitives::hex::encode(&encoded),
+            "b86401f8610180010294000000000000000000000000000000000000000003820102c080a0840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565a025e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"
+        );
+
+        let decoded = TxEnvelope::decode(&mut encoded.as_ref()).unwrap();
+        assert_eq!(decoded, envelope);
+    }
+}
+
 /// Bincode-compatible [`TxEip2930`] serde implementation.
+#[cfg(all(feature = "serde", feature = "bincode-compat"))]
 pub(super) mod bincode_compat {
     use alloc::borrow::Cow;
     use alloy_eips::eip2930::AccessList;
@@ -464,90 +527,35 @@ pub(super) mod bincode_compat {
             TxEip2930::deserialize(deserializer).map(Into::into)
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::{bincode_compat, TxEip2930};
-    use crate::{SignableTransaction, TxEnvelope};
-    use alloy_primitives::{Address, Signature, TxKind, U256};
-    use alloy_rlp::{Decodable, Encodable};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
-    use serde::{Deserialize, Serialize};
-    use serde_with::serde_as;
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
 
-    #[test]
-    fn test_decode_create() {
-        // tests that a contract creation tx encodes and decodes properly
-        let tx = TxEip2930 {
-            chain_id: 1u64,
-            nonce: 0,
-            gas_price: 1,
-            gas_limit: 2,
-            to: TxKind::Create,
-            value: U256::from(3_u64),
-            input: vec![1, 2].into(),
-            access_list: Default::default(),
-        };
-        let signature = Signature::test_signature();
+        use super::super::{bincode_compat, TxEip2930};
 
-        let mut encoded = Vec::new();
-        tx.encode_with_signature_fields(&signature, &mut encoded);
+        #[test]
+        fn test_tx_eip2930_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "bincode_compat::TxEip2930")]
+                transaction: TxEip2930,
+            }
 
-        let decoded = TxEip2930::decode_signed_fields(&mut &*encoded).unwrap();
-        assert_eq!(decoded, tx.into_signed(signature));
-    }
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TxEip2930::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .unwrap(),
+            };
 
-    #[test]
-    fn test_decode_call() {
-        let request = TxEip2930 {
-            chain_id: 1u64,
-            nonce: 0,
-            gas_price: 1,
-            gas_limit: 2,
-            to: Address::default().into(),
-            value: U256::from(3_u64),
-            input: vec![1, 2].into(),
-            access_list: Default::default(),
-        };
-
-        let signature = Signature::test_signature();
-
-        let tx = request.into_signed(signature);
-
-        let envelope = TxEnvelope::Eip2930(tx);
-
-        let mut encoded = Vec::new();
-        envelope.encode(&mut encoded);
-        assert_eq!(encoded.len(), envelope.length());
-
-        assert_eq!(
-            alloy_primitives::hex::encode(&encoded),
-            "b86401f8610180010294000000000000000000000000000000000000000003820102c080a0840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565a025e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"
-        );
-
-        let decoded = TxEnvelope::decode(&mut encoded.as_ref()).unwrap();
-        assert_eq!(decoded, envelope);
-    }
-
-    #[test]
-    fn test_tx_eip2930_bincode_roundtrip() {
-        #[serde_as]
-        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct Data {
-            #[serde_as(as = "bincode_compat::TxEip2930")]
-            transaction: TxEip2930,
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
         }
-
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let data = Data {
-            transaction: TxEip2930::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
-        };
-
-        let encoded = bincode::serialize(&data).unwrap();
-        let decoded: Data = bincode::deserialize(&encoded).unwrap();
-        assert_eq!(decoded, data);
     }
 }

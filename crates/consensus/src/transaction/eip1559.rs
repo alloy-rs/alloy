@@ -378,7 +378,80 @@ impl Decodable for TxEip1559 {
     }
 }
 
+#[cfg(all(test, feature = "k256"))]
+mod tests {
+    use super::TxEip1559;
+    use crate::SignableTransaction;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+
+    #[test]
+    fn recover_signer_eip1559() {
+        let signer: Address = address!("dd6b8b3dc6b7ad97db52f08a275ff4483e024cea");
+        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
+
+        let tx =  TxEip1559 {
+            chain_id: 1,
+            nonce: 0x42,
+            gas_limit: 44386,
+            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
+            value: U256::from(0_u64),
+            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            access_list: AccessList::default(),
+        };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            tx.signature_hash(),
+            hex!("0d5688ac3897124635b6cf1bc0e29d6dfebceebdc10a54d74f2ef8b56535b682")
+        );
+
+        let signed_tx = tx.into_signed(sig);
+        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
+        assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
+    }
+
+    #[test]
+    fn encode_decode_eip1559() {
+        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
+
+        let tx =  TxEip1559 {
+            chain_id: 1,
+            nonce: 0x42,
+            gas_limit: 44386,
+            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
+            value: U256::from(0_u64),
+            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            access_list: AccessList::default(),
+        };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+        assert_eq!(*decoded.hash(), hash);
+    }
+}
+
 /// Bincode-compatible [`TxEip1559`] serde implementation.
+#[cfg(all(feature = "serde", feature = "bincode-compat"))]
 pub(super) mod bincode_compat {
     use alloc::borrow::Cow;
     use alloy_eips::eip2930::AccessList;
@@ -512,100 +585,35 @@ pub(super) mod bincode_compat {
             TxEip1559::deserialize(deserializer).map(Into::into)
         }
     }
-}
 
-#[cfg(all(test, feature = "k256"))]
-mod tests {
-    use super::{bincode_compat, TxEip1559};
-    use crate::SignableTransaction;
-    use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
-    use arbitrary::Arbitrary;
-    use rand::Rng;
-    use serde::{Deserialize, Serialize};
-    use serde_with::serde_as;
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
 
-    #[test]
-    fn recover_signer_eip1559() {
-        let signer: Address = address!("dd6b8b3dc6b7ad97db52f08a275ff4483e024cea");
-        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
+        use super::super::{bincode_compat, TxEip1559};
 
-        let tx =  TxEip1559 {
-            chain_id: 1,
-            nonce: 0x42,
-            gas_limit: 44386,
-            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
-            value: U256::from(0_u64),
-            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            access_list: AccessList::default(),
-        };
+        #[test]
+        fn test_tx_eip1559_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "bincode_compat::TxEip1559")]
+                transaction: TxEip1559,
+            }
 
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TxEip1559::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .unwrap(),
+            };
 
-        assert_eq!(
-            tx.signature_hash(),
-            hex!("0d5688ac3897124635b6cf1bc0e29d6dfebceebdc10a54d74f2ef8b56535b682")
-        );
-
-        let signed_tx = tx.into_signed(sig);
-        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
-        assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
-    }
-
-    #[test]
-    fn encode_decode_eip1559() {
-        let hash: B256 = b256!("0ec0b6a2df4d87424e5f6ad2a654e27aaeb7dac20ae9e8385cc09087ad532ee0");
-
-        let tx =  TxEip1559 {
-            chain_id: 1,
-            nonce: 0x42,
-            gas_limit: 44386,
-            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
-            value: U256::from(0_u64),
-            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            access_list: AccessList::default(),
-        };
-
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
-
-        let mut buf = vec![];
-        tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
-        assert_eq!(decoded, tx.into_signed(sig));
-        assert_eq!(*decoded.hash(), hash);
-    }
-
-    #[test]
-    fn test_tx_eip1559_bincode_roundtrip() {
-        #[serde_as]
-        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct Data {
-            #[serde_as(as = "bincode_compat::TxEip1559")]
-            transaction: TxEip1559,
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
         }
-
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let data = Data {
-            transaction: TxEip1559::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
-        };
-
-        let encoded = bincode::serialize(&data).unwrap();
-        let decoded: Data = bincode::deserialize(&encoded).unwrap();
-        assert_eq!(decoded, data);
     }
 }

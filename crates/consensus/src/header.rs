@@ -790,7 +790,29 @@ impl BlockHeader for Header {
     }
 }
 
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_header_serde_json_roundtrip() {
+        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
+        let header = Header {
+            base_fee_per_gas: Some(1),
+            withdrawals_root: Some(EMPTY_ROOT_HASH),
+            ..Default::default()
+        };
+
+        let encoded = serde_json::to_string(&header).unwrap();
+        assert_eq!(encoded, raw);
+
+        let decoded: Header = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, header);
+    }
+}
+
 /// Bincode-compatibl [`Header`] serde implementation.
+#[cfg(all(feature = "serde", feature = "bincode-compat"))]
 pub(super) mod bincode_compat {
     use alloc::borrow::Cow;
     use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
@@ -978,49 +1000,34 @@ pub(super) mod bincode_compat {
             Header::deserialize(deserializer).map(Into::into)
         }
     }
-}
 
-#[cfg(all(test, feature = "serde"))]
-mod tests {
-    use arbitrary::Arbitrary;
-    use rand::Rng;
-    use serde::{Deserialize, Serialize};
-    use serde_with::serde_as;
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
 
-    use super::{bincode_compat, *};
+        use super::super::{bincode_compat, Header};
 
-    #[test]
-    fn test_header_serde_json_roundtrip() {
-        let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
-        let header = Header {
-            base_fee_per_gas: Some(1),
-            withdrawals_root: Some(EMPTY_ROOT_HASH),
-            ..Default::default()
-        };
+        #[test]
+        fn test_header_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "bincode_compat::Header")]
+                header: Header,
+            }
 
-        let encoded = serde_json::to_string(&header).unwrap();
-        assert_eq!(encoded, raw);
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+            };
 
-        let decoded: Header = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded, header);
-    }
-
-    #[test]
-    fn test_header_bincode_roundtrip() {
-        #[serde_as]
-        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct Data {
-            #[serde_as(as = "bincode_compat::Header")]
-            header: Header,
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
         }
-
-        let mut bytes = [0u8; 1024];
-        rand::thread_rng().fill(bytes.as_mut_slice());
-        let data =
-            Data { header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap() };
-
-        let encoded = bincode::serialize(&data).unwrap();
-        let decoded: Data = bincode::deserialize(&encoded).unwrap();
-        assert_eq!(decoded, data);
     }
 }

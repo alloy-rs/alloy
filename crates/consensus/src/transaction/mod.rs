@@ -36,6 +36,7 @@ mod typed;
 pub use typed::TypedTransaction;
 
 /// Bincode-compatible serde implementations for transaction types.
+#[cfg(all(feature = "serde", feature = "bincode-compat"))]
 pub mod bincode_compat {
     pub use super::{eip1559::bincode_compat::*, eip2930::bincode_compat::*};
 }
