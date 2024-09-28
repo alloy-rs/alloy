@@ -471,69 +471,28 @@ pub(super) mod bincode_compat {
     /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     /// struct Data {
     ///     #[serde_as(as = "bincode_compat::transaction::TxEip1559")]
-    ///     header: TxEip1559,
+    ///     transaction: TxEip1559,
     /// }
     /// ```
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
     pub struct TxEip1559<'a> {
-        /// EIP-155: Simple replay attack protection
         #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-        pub chain_id: ChainId,
-        /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
+        chain_id: ChainId,
         #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-        pub nonce: u64,
-        /// A scalar value equal to the maximum
-        /// amount of gas that should be used in executing
-        /// this transaction. This is paid up-front, before any
-        /// computation is done and may not be increased
-        /// later; formally Tg.
+        nonce: u64,
         #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-        pub gas_limit: u128,
-        /// A scalar value equal to the maximum
-        /// amount of gas that should be used in executing
-        /// this transaction. This is paid up-front, before any
-        /// computation is done and may not be increased
-        /// later; formally Tg.
-        ///
-        /// As ethereum circulation is around 120mil eth as of 2022 that is around
-        /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
-        /// 340282366920938463463374607431768211455
-        ///
-        /// This is also known as `GasFeeCap`
+        gas_limit: u64,
         #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-        pub max_fee_per_gas: u128,
-        /// Max Priority fee that transaction is paying
-        ///
-        /// As ethereum circulation is around 120mil eth as of 2022 that is around
-        /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
-        /// 340282366920938463463374607431768211455
-        ///
-        /// This is also known as `GasTipCap`
+        max_fee_per_gas: u128,
         #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-        pub max_priority_fee_per_gas: u128,
-        /// The 160-bit address of the message call’s recipient or, for a contract creation
-        /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
+        max_priority_fee_per_gas: u128,
         #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
-        pub to: TxKind,
-        /// A scalar value equal to the number of Wei to
-        /// be transferred to the message call’s recipient or,
-        /// in the case of contract creation, as an endowment
-        /// to the newly created account; formally Tv.
-        pub value: U256,
-        /// The accessList specifies a list of addresses and storage keys;
-        /// these addresses and storage keys are added into the `accessed_addresses`
-        /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
-        /// A gas cost is charged, though at a discount relative to the cost of
-        /// accessing outside the list.
-        pub access_list: Cow<'a, AccessList>,
-        /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-        /// Some). pub init: An unlimited size byte array specifying the
-        /// EVM-code for the account initialisation procedure CREATE,
-        /// data: An unlimited size byte array specifying the
-        /// input data of the message call, formally Td.
-        pub input: Cow<'a, Bytes>,
+        to: TxKind,
+        value: U256,
+        access_list: Cow<'a, AccessList>,
+        input: Cow<'a, Bytes>,
     }
 
     impl<'a> From<&'a super::TxEip1559> for TxEip1559<'a> {

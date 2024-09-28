@@ -389,3 +389,122 @@ mod tests {
         assert_eq!(expected, recovered, "Expected same signer");
     }
 }
+
+/// Bincode-compatible [`TxLegacy`] serde implementation.
+#[cfg(all(feature = "serde", feature = "bincode-compat"))]
+pub(super) mod bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_primitives::{Bytes, ChainId, TxKind, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::TxLegacy`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{bincode_compat, TxEip1559};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "bincode_compat::transaction::TxLegacy")]
+    ///     header: TxLegacy,
+    /// }
+    /// ```
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    pub struct TxLegacy<'a> {
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        chain_id: Option<ChainId>,
+        #[serde(with = "alloy_serde::quantity")]
+        nonce: u64,
+        #[serde(with = "alloy_serde::quantity")]
+        gas_price: u128,
+        #[serde(with = "alloy_serde::quantity")]
+        gas_limit: u64,
+        #[serde(default)]
+        to: TxKind,
+        value: U256,
+        input: Cow<'a, Bytes>,
+    }
+
+    impl<'a> From<&'a super::TxLegacy> for TxLegacy<'a> {
+        fn from(value: &'a super::TxLegacy) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_price: value.gas_price,
+                gas_limit: value.gas_limit,
+                to: value.to,
+                value: value.value,
+                input: Cow::Borrowed(&value.input),
+            }
+        }
+    }
+
+    impl<'a> From<TxLegacy<'a>> for super::TxLegacy {
+        fn from(value: TxLegacy<'a>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_price: value.gas_price,
+                gas_limit: value.gas_limit,
+                to: value.to,
+                value: value.value,
+                input: value.input.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::TxLegacy> for TxLegacy<'a> {
+        fn serialize_as<S>(source: &super::TxLegacy, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TxLegacy::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TxLegacy> for TxLegacy<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TxLegacy, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TxLegacy::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::{bincode_compat, TxLegacy};
+
+        #[test]
+        fn test_tx_eip1559_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "bincode_compat::TxLegacy")]
+                transaction: TxLegacy,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TxLegacy::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .unwrap(),
+            };
+
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
+        }
+    }
+}

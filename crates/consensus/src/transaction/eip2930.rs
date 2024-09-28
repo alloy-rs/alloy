@@ -428,56 +428,26 @@ pub(super) mod bincode_compat {
     /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     /// struct Data {
     ///     #[serde_as(as = "bincode_compat::transaction::TxEip2930")]
-    ///     header: TxEip2930,
+    ///     transaction: TxEip2930,
     /// }
     /// ```
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
     pub struct TxEip2930<'a> {
-        /// Added as EIP-pub 155: Simple replay attack protection
         #[serde(with = "alloy_serde::quantity")]
-        pub chain_id: ChainId,
-        /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
+        chain_id: ChainId,
         #[serde(with = "alloy_serde::quantity")]
-        pub nonce: u64,
-        /// A scalar value equal to the number of
-        /// Wei to be paid per unit of gas for all computation
-        /// costs incurred as a result of the execution of this transaction; formally Tp.
-        ///
-        /// As ethereum circulation is around 120mil eth as of 2022 that is around
-        /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
-        /// 340282366920938463463374607431768211455
+        nonce: u64,
         #[serde(with = "alloy_serde::quantity")]
-        pub gas_price: u128,
-        /// A scalar value equal to the maximum
-        /// amount of gas that should be used in executing
-        /// this transaction. This is paid up-front, before any
-        /// computation is done and may not be increased
-        /// later; formally Tg.
+        gas_price: u128,
         #[serde(with = "alloy_serde::quantity")]
-        pub gas_limit: u128,
-        /// The 160-bit address of the message call’s recipient or, for a contract creation
-        /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
+        gas_limit: u64,
         #[serde(default)]
-        pub to: TxKind,
-        /// A scalar value equal to the number of Wei to
-        /// be transferred to the message call’s recipient or,
-        /// in the case of contract creation, as an endowment
-        /// to the newly created account; formally Tv.
-        pub value: U256,
-        /// The accessList specifies a list of addresses and storage keys;
-        /// these addresses and storage keys are added into the `accessed_addresses`
-        /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
-        /// A gas cost is charged, though at a discount relative to the cost of
-        /// accessing outside the list.
-        pub access_list: Cow<'a, AccessList>,
-        /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
-        /// Some). pub init: An unlimited size byte array specifying the
-        /// EVM-code for the account initialisation procedure CREATE,
-        /// data: An unlimited size byte array specifying the
-        /// input data of the message call, formally Td.
-        pub input: Cow<'a, Bytes>,
+        to: TxKind,
+        value: U256,
+        access_list: Cow<'a, AccessList>,
+        input: Cow<'a, Bytes>,
     }
 
     impl<'a> From<&'a super::TxEip2930> for TxEip2930<'a> {
