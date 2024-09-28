@@ -1,4 +1,4 @@
-use crate::{Receipt, ReceiptWithBloom, TxReceipt, TxType};
+use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
@@ -108,8 +108,8 @@ impl<T> ReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for ReceiptEnvelope<T> {
-    fn status_or_post_state(&self) -> &crate::Eip658Value {
-        &self.as_receipt().unwrap().status
+    fn status_or_post_state(&self) -> Eip658Value {
+        self.as_receipt().unwrap().status
     }
 
     fn status(&self) -> bool {

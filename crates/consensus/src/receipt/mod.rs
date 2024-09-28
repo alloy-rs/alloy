@@ -23,7 +23,7 @@ pub trait TxReceipt<T = Log> {
     /// is pre-[EIP-658].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    fn status_or_post_state(&self) -> &Eip658Value;
+    fn status_or_post_state(&self) -> Eip658Value;
 
     /// Returns true if the transaction was successful OR if the transaction is
     /// pre-[EIP-658]. Results for transactions before [EIP-658] are not
