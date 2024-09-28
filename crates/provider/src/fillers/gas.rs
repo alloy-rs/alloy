@@ -6,6 +6,7 @@ use crate::{
     utils::Eip1559Estimation,
     Provider,
 };
+use alloy_eips::eip4844::BLOB_TX_MIN_BLOB_GASPRICE;
 use alloy_json_rpc::RpcError;
 use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
 use alloy_network_primitives::{BlockResponse, HeaderResponse};
@@ -63,10 +64,6 @@ pub enum GasFillable {
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GasFiller;
-
-/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BlobGasFiller;
 
 impl GasFiller {
     async fn prepare_legacy<P, T, N>(
@@ -189,6 +186,10 @@ impl<N: Network> TxFiller<N> for GasFiller {
     }
 }
 
+/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BlobGasFiller;
+
 impl<N: Network> TxFiller<N> for BlobGasFiller
 where
     N::TransactionRequest: TransactionBuilder4844,
@@ -196,8 +197,11 @@ where
     type Fillable = u128;
 
     fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
-        // nothing to fill if non-eip4844 tx or max_fee_per_blob_gas is already set
-        if tx.blob_sidecar().is_none() || tx.max_fee_per_blob_gas().is_some() {
+        // Nothing to fill if non-eip4844 tx or `max_fee_per_blob_gas` is already set to a valid
+        // value.
+        if tx.blob_sidecar().is_none()
+            || tx.max_fee_per_blob_gas().is_some_and(|gas| gas >= BLOB_TX_MIN_BLOB_GASPRICE)
+        {
             return FillerControlFlow::Finished;
         }
 
@@ -216,8 +220,11 @@ where
         T: Transport + Clone,
     {
         if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas() {
-            return Ok(max_fee_per_blob_gas);
+            if max_fee_per_blob_gas >= BLOB_TX_MIN_BLOB_GASPRICE {
+                return Ok(max_fee_per_blob_gas);
+            }
         }
+
         provider
             .get_block_by_number(BlockNumberOrTag::Latest, false)
             .await?
@@ -244,17 +251,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ProviderBuilder, WalletProvider};
+    use crate::ProviderBuilder;
+    use alloy_consensus::{SidecarBuilder, SimpleCoder};
+    use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
+    fn init_tracing() {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
+
     #[tokio::test]
     async fn no_gas_price_or_limit() {
+        init_tracing();
+
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
-        let from = provider.default_signer_address();
+
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest {
-            from: Some(from),
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             chain_id: Some(31337),
@@ -263,21 +277,20 @@ mod tests {
 
         let tx = provider.send_transaction(tx).await.unwrap();
 
-        let tx = tx.get_receipt().await.unwrap();
+        let receipt = tx.get_receipt().await.unwrap();
 
-        assert_eq!(tx.effective_gas_price, 0x3b9aca01);
-        assert_eq!(tx.gas_used, 0x5208);
+        assert_eq!(receipt.effective_gas_price, 1_000_000_001);
+        assert_eq!(receipt.gas_used, 21000);
     }
 
     #[tokio::test]
     async fn no_gas_limit() {
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+        init_tracing();
 
-        let from = provider.default_signer_address();
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let gas_price = provider.get_gas_price().await.unwrap();
         let tx = TransactionRequest {
-            from: Some(from),
             value: Some(U256::from(100)),
             to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
             gas_price: Some(gas_price),
@@ -288,6 +301,65 @@ mod tests {
 
         let receipt = tx.get_receipt().await.unwrap();
 
-        assert_eq!(receipt.gas_used, 0x5208);
+        assert_eq!(receipt.gas_used, 21000);
+    }
+
+    #[tokio::test]
+    async fn no_max_fee_per_blob_gas() {
+        init_tracing();
+
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+
+        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
+        let sidecar = sidecar.build().unwrap();
+
+        let tx = TransactionRequest {
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            sidecar: Some(sidecar),
+            ..Default::default()
+        };
+
+        let tx = provider.send_transaction(tx).await.unwrap();
+
+        let receipt = tx.get_receipt().await.unwrap();
+
+        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
+
+        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert_eq!(receipt.gas_used, 21000);
+        assert_eq!(
+            receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
+            DATA_GAS_PER_BLOB as u128
+        );
+    }
+
+    #[tokio::test]
+    async fn zero_max_fee_per_blob_gas() {
+        init_tracing();
+
+        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+
+        let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
+        let sidecar = sidecar.build().unwrap();
+
+        let tx = TransactionRequest {
+            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
+            max_fee_per_blob_gas: Some(0),
+            sidecar: Some(sidecar),
+            ..Default::default()
+        };
+
+        let tx = provider.send_transaction(tx).await.unwrap();
+
+        let receipt = tx.get_receipt().await.unwrap();
+
+        let tx = provider.get_transaction_by_hash(receipt.transaction_hash).await.unwrap().unwrap();
+
+        assert!(tx.max_fee_per_blob_gas.unwrap() >= BLOB_TX_MIN_BLOB_GASPRICE);
+        assert_eq!(receipt.gas_used, 21000);
+        assert_eq!(
+            receipt.blob_gas_used.expect("Expected to be EIP-4844 transaction"),
+            DATA_GAS_PER_BLOB as u128
+        );
     }
 }
