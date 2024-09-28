@@ -378,12 +378,152 @@ impl Decodable for TxEip1559 {
     }
 }
 
+/// Bincode-compatible [`TxEip1559`] serde implementation.
+pub(super) mod bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Bytes, ChainId, TxKind, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::TxEip1559`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{bincode_compat, TxEip1559};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "bincode_compat::transaction::TxEip1559")]
+    ///     header: TxEip1559,
+    /// }
+    /// ```
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    pub struct TxEip1559<'a> {
+        /// EIP-155: Simple replay attack protection
+        #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+        pub chain_id: ChainId,
+        /// A scalar value equal to the number of transactions sent by the sender; formally Tn.
+        #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+        pub nonce: u64,
+        /// A scalar value equal to the maximum
+        /// amount of gas that should be used in executing
+        /// this transaction. This is paid up-front, before any
+        /// computation is done and may not be increased
+        /// later; formally Tg.
+        #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+        pub gas_limit: u128,
+        /// A scalar value equal to the maximum
+        /// amount of gas that should be used in executing
+        /// this transaction. This is paid up-front, before any
+        /// computation is done and may not be increased
+        /// later; formally Tg.
+        ///
+        /// As ethereum circulation is around 120mil eth as of 2022 that is around
+        /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
+        /// 340282366920938463463374607431768211455
+        ///
+        /// This is also known as `GasFeeCap`
+        #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+        pub max_fee_per_gas: u128,
+        /// Max Priority fee that transaction is paying
+        ///
+        /// As ethereum circulation is around 120mil eth as of 2022 that is around
+        /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
+        /// 340282366920938463463374607431768211455
+        ///
+        /// This is also known as `GasTipCap`
+        #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+        pub max_priority_fee_per_gas: u128,
+        /// The 160-bit address of the message call’s recipient or, for a contract creation
+        /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
+        #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
+        pub to: TxKind,
+        /// A scalar value equal to the number of Wei to
+        /// be transferred to the message call’s recipient or,
+        /// in the case of contract creation, as an endowment
+        /// to the newly created account; formally Tv.
+        pub value: U256,
+        /// The accessList specifies a list of addresses and storage keys;
+        /// these addresses and storage keys are added into the `accessed_addresses`
+        /// and `accessed_storage_keys` global sets (introduced in EIP-2929).
+        /// A gas cost is charged, though at a discount relative to the cost of
+        /// accessing outside the list.
+        pub access_list: Cow<'a, AccessList>,
+        /// Input has two uses depending if transaction is Create or Call (if `to` field is None or
+        /// Some). pub init: An unlimited size byte array specifying the
+        /// EVM-code for the account initialisation procedure CREATE,
+        /// data: An unlimited size byte array specifying the
+        /// input data of the message call, formally Td.
+        pub input: Cow<'a, Bytes>,
+    }
+
+    impl<'a> From<&'a super::TxEip1559> for TxEip1559<'a> {
+        fn from(value: &'a super::TxEip1559) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_limit: value.gas_limit,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                to: value.to,
+                value: value.value,
+                access_list: Cow::Borrowed(&value.access_list),
+                input: Cow::Borrowed(&value.input),
+            }
+        }
+    }
+
+    impl<'a> From<TxEip1559<'a>> for super::TxEip1559 {
+        fn from(value: TxEip1559<'a>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_limit: value.gas_limit,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                to: value.to,
+                value: value.value,
+                access_list: value.access_list.into_owned(),
+                input: value.input.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::TxEip1559> for TxEip1559<'a> {
+        fn serialize_as<S>(source: &super::TxEip1559, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TxEip1559::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TxEip1559> for TxEip1559<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TxEip1559, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TxEip1559::deserialize(deserializer).map(Into::into)
+        }
+    }
+}
+
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use super::TxEip1559;
+    use super::{bincode_compat, TxEip1559};
     use crate::SignableTransaction;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
 
     #[test]
     fn recover_signer_eip1559() {
@@ -447,5 +587,25 @@ mod tests {
         let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
         assert_eq!(decoded, tx.into_signed(sig));
         assert_eq!(*decoded.hash(), hash);
+    }
+
+    #[test]
+    fn test_tx_eip1559_bincode_roundtrip() {
+        #[serde_as]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Data {
+            #[serde_as(as = "bincode_compat::TxEip1559")]
+            transaction: TxEip1559,
+        }
+
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let data = Data {
+            transaction: TxEip1559::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+        };
+
+        let encoded = bincode::serialize(&data).unwrap();
+        let decoded: Data = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, data);
     }
 }

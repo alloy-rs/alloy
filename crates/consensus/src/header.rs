@@ -790,12 +790,207 @@ impl BlockHeader for Header {
     }
 }
 
+/// Bincode-compatibl [`Header`] serde implementation.
+pub(super) mod bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::Header`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{bincode_compat, Header};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "bincode_compat::Header")]
+    ///     header: Header,
+    /// }
+    /// ```
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    pub struct Header<'a> {
+        /// The Keccak 256-bit hash of the parent
+        /// block’s header, in its entirety; formally Hp.
+        pub parent_hash: Cow<'a, B256>,
+        /// The Keccak 256-bit hash of the ommers list portion of this block; formally Ho.
+        pub ommers_hash: Cow<'a, B256>,
+        /// The 160-bit address to which all fees collected from the successful mining of this
+        /// block be transferred; formally Hc.
+        pub beneficiary: Cow<'a, Address>,
+        /// The Keccak 256-bit hash of the root node of the state trie, after all transactions are
+        /// executed and finalisations applied; formally Hr.
+        pub state_root: Cow<'a, B256>,
+        /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+        /// transaction in the transactions list portion of the block; formally Ht.
+        pub transactions_root: Cow<'a, B256>,
+        /// The Keccak 256-bit hash of the root node of the trie structure populated with the
+        /// receipts of each transaction in the transactions list portion of the block;
+        /// formally He.
+        pub receipts_root: Cow<'a, B256>,
+        /// The Keccak 256-bit hash of the withdrawals list portion of this block.
+        /// <https://eips.ethereum.org/EIPS/eip-4895>
+        #[serde(default)]
+        pub withdrawals_root: Cow<'a, Option<B256>>,
+        /// The Bloom filter composed from indexable information (logger address and log topics)
+        /// contained in each log entry from the receipt of each transaction in the transactions
+        /// list; formally Hb.
+        pub logs_bloom: Cow<'a, Bloom>,
+        /// A scalar value corresponding to the difficulty level of this block. This can be
+        /// calculated from the previous block’s difficulty level and the timestamp;
+        /// formally Hd.
+        pub difficulty: Cow<'a, U256>,
+        /// A scalar value equal to the number of ancestor blocks. The genesis block has a number
+        /// of zero; formally Hi.
+        #[serde(with = "alloy_serde::quantity")]
+        pub number: BlockNumber,
+        /// A scalar value equal to the current limit of gas expenditure per block; formally Hl.
+        #[serde(with = "alloy_serde::quantity")]
+        pub gas_limit: u128,
+        /// A scalar value equal to the total gas used in transactions in this block; formally Hg.
+        #[serde(with = "alloy_serde::quantity")]
+        pub gas_used: u128,
+        /// A scalar value equal to the reasonable output of Unix’s time() at this block’s
+        /// inception; formally Hs.
+        #[serde(with = "alloy_serde::quantity")]
+        pub timestamp: u64,
+        /// A 256-bit hash which, combined with the
+        /// nonce, proves that a sufficient amount of computation has been carried out on this
+        /// block; formally Hm.
+        pub mix_hash: Cow<'a, B256>,
+        /// A 64-bit value which, combined with the mixhash, proves that a sufficient amount of
+        /// computation has been carried out on this block; formally Hn.
+        pub nonce: B64,
+        /// A scalar representing EIP1559 base fee which can move up or down each block according
+        /// to a formula which is a function of gas used in parent block and gas target
+        /// (block gas limit divided by elasticity multiplier) of parent block.
+        /// The algorithm results in the base fee per gas increasing when blocks are
+        /// above the gas target, and decreasing when blocks are below the gas target. The base fee
+        /// per gas is burned.
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        pub base_fee_per_gas: Option<u128>,
+        /// The total amount of blob gas consumed by the transactions within the block, added in
+        /// EIP-4844.
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        pub blob_gas_used: Option<u128>,
+        /// A running total of blob gas consumed in excess of the target, prior to the block.
+        /// Blocks with above-target blob gas consumption increase this value, blocks with
+        /// below-target blob gas consumption decrease it (bounded at 0). This was added in
+        /// EIP-4844.
+        #[serde(default, with = "alloy_serde::quantity::opt")]
+        pub excess_blob_gas: Option<u128>,
+        /// The hash of the parent beacon block's root is included in execution blocks, as proposed
+        /// by EIP-4788.
+        ///
+        /// This enables trust-minimized access to consensus state, supporting staking pools,
+        /// bridges, and more.
+        ///
+        /// The beacon roots contract handles root storage, enhancing Ethereum's functionalities.
+        #[serde(default)]
+        pub parent_beacon_block_root: Cow<'a, Option<B256>>,
+        /// The Keccak 256-bit hash of the root node of the trie structure populated with each
+        /// [EIP-7685] request in the block body.
+        ///
+        /// [EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
+        #[serde(default)]
+        pub requests_root: Cow<'a, Option<B256>>,
+        /// An arbitrary byte array containing data relevant to this block. This must be 32 bytes
+        /// or fewer; formally Hx.
+        pub extra_data: Cow<'a, Bytes>,
+    }
+
+    impl<'a> From<&'a super::Header> for Header<'a> {
+        fn from(value: &'a super::Header) -> Self {
+            Self {
+                parent_hash: Cow::Borrowed(&value.parent_hash),
+                ommers_hash: Cow::Borrowed(&value.ommers_hash),
+                beneficiary: Cow::Borrowed(&value.beneficiary),
+                state_root: Cow::Borrowed(&value.state_root),
+                transactions_root: Cow::Borrowed(&value.transactions_root),
+                receipts_root: Cow::Borrowed(&value.receipts_root),
+                withdrawals_root: Cow::Borrowed(&value.withdrawals_root),
+                logs_bloom: Cow::Borrowed(&value.logs_bloom),
+                difficulty: Cow::Borrowed(&value.difficulty),
+                number: value.number,
+                gas_limit: value.gas_limit,
+                gas_used: value.gas_used,
+                timestamp: value.timestamp,
+                mix_hash: Cow::Borrowed(&value.mix_hash),
+                nonce: value.nonce,
+                base_fee_per_gas: value.base_fee_per_gas,
+                blob_gas_used: value.blob_gas_used,
+                excess_blob_gas: value.excess_blob_gas,
+                parent_beacon_block_root: Cow::Borrowed(&value.parent_beacon_block_root),
+                requests_root: Cow::Borrowed(&value.requests_root),
+                extra_data: Cow::Borrowed(&value.extra_data),
+            }
+        }
+    }
+
+    impl<'a> From<Header<'a>> for super::Header {
+        fn from(value: Header<'a>) -> Self {
+            Self {
+                parent_hash: value.parent_hash.into_owned(),
+                ommers_hash: value.ommers_hash.into_owned(),
+                beneficiary: value.beneficiary.into_owned(),
+                state_root: value.state_root.into_owned(),
+                transactions_root: value.transactions_root.into_owned(),
+                receipts_root: value.receipts_root.into_owned(),
+                withdrawals_root: value.withdrawals_root.into_owned(),
+                logs_bloom: value.logs_bloom.into_owned(),
+                difficulty: value.difficulty.into_owned(),
+                number: value.number,
+                gas_limit: value.gas_limit,
+                gas_used: value.gas_used,
+                timestamp: value.timestamp,
+                mix_hash: value.mix_hash.into_owned(),
+                nonce: value.nonce,
+                base_fee_per_gas: value.base_fee_per_gas,
+                blob_gas_used: value.blob_gas_used,
+                excess_blob_gas: value.excess_blob_gas,
+                parent_beacon_block_root: value.parent_beacon_block_root.into_owned(),
+                requests_root: value.requests_root.into_owned(),
+                extra_data: value.extra_data.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::Header> for Header<'a> {
+        fn serialize_as<S>(source: &super::Header, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Header::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::Header> for Header<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::Header, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Header::deserialize(deserializer).map(Into::into)
+        }
+    }
+}
+
 #[cfg(all(test, feature = "serde"))]
 mod tests {
-    use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+
+    use super::{bincode_compat, *};
 
     #[test]
-    fn header_serde() {
+    fn test_header_serde_json_roundtrip() {
         let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
         let header = Header {
             base_fee_per_gas: Some(1),
@@ -803,10 +998,29 @@ mod tests {
             ..Default::default()
         };
 
-        let json = serde_json::to_string(&header).unwrap();
-        assert_eq!(json, raw);
+        let encoded = serde_json::to_string(&header).unwrap();
+        assert_eq!(encoded, raw);
 
-        let decoded: Header = serde_json::from_str(&json).unwrap();
+        let decoded: Header = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, header);
+    }
+
+    #[test]
+    fn test_header_bincode_roundtrip() {
+        #[serde_as]
+        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct Data {
+            #[serde_as(as = "bincode_compat::Header")]
+            header: Header,
+        }
+
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        let data =
+            Data { header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap() };
+
+        let encoded = bincode::serialize(&data).unwrap();
+        let decoded: Data = bincode::deserialize(&encoded).unwrap();
+        assert_eq!(decoded, data);
     }
 }

@@ -35,6 +35,10 @@ pub use legacy::TxLegacy;
 mod typed;
 pub use typed::TypedTransaction;
 
+pub mod bincode_compat {
+    pub use super::{eip1559::bincode_compat::*, eip2930::bincode_compat::*};
+}
+
 /// Represents a minimal EVM transaction.
 #[doc(alias = "Tx")]
 pub trait Transaction: any::Any + Send + Sync + 'static {
