@@ -351,16 +351,28 @@ impl alloy_consensus::Transaction for Transaction {
         self.gas
     }
 
+    fn gas_price(&self) -> Option<u128> {
+        self.gas_price
+    }
+
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas.unwrap_or(self.gas_price.unwrap_or_default())
     }
 
-    fn max_priority_fee_per_gas(&self) -> u128 {
-        self.max_fee_per_gas.unwrap_or(self.gas_price.unwrap_or_default())
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        self.max_fee_per_gas
     }
 
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.max_fee_per_blob_gas
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        debug_assert!(
+            self.max_fee_per_gas.is_some() || self.gas_price.is_some(),
+            "mutually exclusive fields"
+        );
+        self.max_fee_per_gas.unwrap_or(self.gas_price.unwrap_or_default())
     }
 
     fn to(&self) -> TxKind {

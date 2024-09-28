@@ -276,11 +276,19 @@ impl Transaction for TxEip1559 {
         self.gas_limit
     }
 
+    fn gas_price(&self) -> Option<u128> {
+        None
+    }
+
     fn max_fee_per_gas(&self) -> u128 {
         self.max_fee_per_gas
     }
 
-    fn max_priority_fee_per_gas(&self) -> u128 {
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.max_priority_fee_per_gas)
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
         self.max_priority_fee_per_gas
     }
 
