@@ -5,7 +5,7 @@ use alloy_consensus::{
     TxEnvelope, TxLegacy, TxType,
 };
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_network_primitives::TransactionResponse;
+use alloy_network_primitives::{OtterscanTxResp, TransactionResponse};
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
 
 use alloc::vec::Vec;
@@ -335,6 +335,12 @@ impl TryFrom<Transaction> for TxEnvelope {
             TxType::Eip4844 => Ok(Self::Eip4844(tx.try_into()?)),
             TxType::Eip7702 => Ok(Self::Eip7702(tx.try_into()?)),
         }
+    }
+}
+
+impl OtterscanTxResp for Transaction {
+    fn otterscan_api_truncate_input(&mut self) {
+        self.input = self.input.slice(..4);
     }
 }
 
