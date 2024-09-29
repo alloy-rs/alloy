@@ -73,8 +73,8 @@ impl<T> TxReceipt<T> for Receipt<T>
 where
     T: Borrow<Log>,
 {
-    fn status_or_post_state(&self) -> &Eip658Value {
-        &self.status
+    fn status_or_post_state(&self) -> Eip658Value {
+        self.status
     }
 
     fn status(&self) -> bool {
@@ -159,8 +159,8 @@ pub struct ReceiptWithBloom<T = Log> {
 }
 
 impl<T> TxReceipt<T> for ReceiptWithBloom<T> {
-    fn status_or_post_state(&self) -> &Eip658Value {
-        &self.receipt.status
+    fn status_or_post_state(&self) -> Eip658Value {
+        self.receipt.status
     }
 
     fn status(&self) -> bool {
