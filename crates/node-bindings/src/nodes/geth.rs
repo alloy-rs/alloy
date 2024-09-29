@@ -1,27 +1,22 @@
-//! Utilities for launching a go-ethereum dev-mode instance.
+//! Utilities for launching a Geth dev-mode instance.
 
-use crate::unused_port;
+use crate::{
+    utils::{extract_endpoint, extract_value, unused_port},
+    NodeError, NODE_DIAL_LOOP_TIMEOUT, NODE_STARTUP_TIMEOUT,
+};
 use alloy_genesis::{CliqueConfig, Genesis};
 use alloy_primitives::Address;
 use k256::ecdsa::SigningKey;
 use std::{
-    borrow::Cow,
+    ffi::OsString,
     fs::{create_dir, File},
     io::{BufRead, BufReader},
-    net::SocketAddr,
     path::PathBuf,
     process::{Child, ChildStderr, Command, Stdio},
-    time::{Duration, Instant},
+    time::Instant,
 };
 use tempfile::tempdir;
-use thiserror::Error;
 use url::Url;
-
-/// How long we will wait for geth to indicate that it is ready.
-const GETH_STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// Timeout for waiting for geth to add a peer.
-const GETH_DIAL_LOOP_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// The exposed APIs
 const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
@@ -29,17 +24,42 @@ const API: &str = "eth,net,web3,txpool,admin,personal,miner,debug";
 /// The geth command
 const GETH: &str = "geth";
 
-/// Errors that can occur when working with the [`GethInstance`].
-#[derive(Debug)]
-pub enum GethInstanceError {
-    /// Timed out waiting for a message from geth's stderr.
-    Timeout(String),
+/// Whether or not node is in `dev` mode and configuration options that depend on the mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NodeMode {
+    /// Options that can be set in dev mode
+    Dev(DevOptions),
+    /// Options that cannot be set in dev mode
+    NonDev(PrivateNetOptions),
+}
 
-    /// A line could not be read from the geth stderr.
-    ReadLineError(std::io::Error),
+impl Default for NodeMode {
+    fn default() -> Self {
+        Self::Dev(Default::default())
+    }
+}
 
-    /// The child geth process's stderr was not captured.
-    NoStderr,
+/// Configuration options that can be set in dev mode.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DevOptions {
+    /// The interval at which the dev chain will mine new blocks.
+    pub block_time: Option<u64>,
+}
+
+/// Configuration options that cannot be set in dev mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrivateNetOptions {
+    /// The p2p port to use.
+    pub p2p_port: Option<u16>,
+
+    /// Whether or not peer discovery is enabled.
+    pub discovery: bool,
+}
+
+impl Default for PrivateNetOptions {
+    fn default() -> Self {
+        Self { p2p_port: None, discovery: true }
+    }
 }
 
 /// A geth instance. Will close the instance when dropped.
@@ -49,9 +69,10 @@ pub enum GethInstanceError {
 pub struct GethInstance {
     pid: Child,
     port: u16,
+    p2p_port: Option<u16>,
+    auth_port: Option<u16>,
     ipc: Option<PathBuf>,
     data_dir: Option<PathBuf>,
-    p2p_port: Option<u16>,
     genesis: Option<Genesis>,
     clique_private_key: Option<SigningKey>,
 }
@@ -65,6 +86,11 @@ impl GethInstance {
     /// Returns the p2p port of this instance
     pub const fn p2p_port(&self) -> Option<u16> {
         self.p2p_port
+    }
+
+    /// Returns the auth port of this instance
+    pub const fn auth_port(&self) -> Option<u16> {
+        self.auth_port
     }
 
     /// Returns the HTTP endpoint of this instance
@@ -114,22 +140,22 @@ impl GethInstance {
     ///
     /// This leaves a `None` in its place, so calling methods that require a stderr to be present
     /// will fail if called after this.
-    pub fn stderr(&mut self) -> Result<ChildStderr, GethInstanceError> {
-        self.pid.stderr.take().ok_or(GethInstanceError::NoStderr)
+    pub fn stderr(&mut self) -> Result<ChildStderr, NodeError> {
+        self.pid.stderr.take().ok_or(NodeError::NoStderr)
     }
 
     /// Blocks until geth adds the specified peer, using 20s as the timeout.
     ///
     /// Requires the stderr to be present in the `GethInstance`.
-    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), GethInstanceError> {
-        let mut stderr = self.pid.stderr.as_mut().ok_or(GethInstanceError::NoStderr)?;
+    pub fn wait_to_add_peer(&mut self, id: &str) -> Result<(), NodeError> {
+        let mut stderr = self.pid.stderr.as_mut().ok_or(NodeError::NoStderr)?;
         let mut err_reader = BufReader::new(&mut stderr);
         let mut line = String::new();
         let start = Instant::now();
 
-        while start.elapsed() < GETH_DIAL_LOOP_TIMEOUT {
+        while start.elapsed() < NODE_DIAL_LOOP_TIMEOUT {
             line.clear();
-            err_reader.read_line(&mut line).map_err(GethInstanceError::ReadLineError)?;
+            err_reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
             // geth ids are truncated
             let truncated_id = if id.len() > 16 { &id[..16] } else { id };
@@ -137,7 +163,7 @@ impl GethInstance {
                 return Ok(());
             }
         }
-        Err(GethInstanceError::Timeout("Timed out waiting for geth to add a peer".into()))
+        Err(NodeError::Timeout)
     }
 }
 
@@ -145,82 +171,6 @@ impl Drop for GethInstance {
     fn drop(&mut self) {
         self.pid.kill().expect("could not kill geth");
     }
-}
-
-/// Whether or not geth is in `dev` mode and configuration options that depend on the mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GethMode {
-    /// Options that can be set in dev mode
-    Dev(DevOptions),
-    /// Options that cannot be set in dev mode
-    NonDev(PrivateNetOptions),
-}
-
-impl Default for GethMode {
-    fn default() -> Self {
-        Self::Dev(Default::default())
-    }
-}
-
-/// Configuration options that can be set in dev mode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct DevOptions {
-    /// The interval at which the dev chain will mine new blocks.
-    pub block_time: Option<u64>,
-}
-
-/// Configuration options that cannot be set in dev mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PrivateNetOptions {
-    /// The p2p port to use.
-    pub p2p_port: Option<u16>,
-
-    /// Whether or not peer discovery is enabled.
-    pub discovery: bool,
-}
-
-impl Default for PrivateNetOptions {
-    fn default() -> Self {
-        Self { p2p_port: None, discovery: true }
-    }
-}
-
-/// Errors that can occur when working with the [`Geth`].
-#[derive(Debug, Error)]
-pub enum GethError {
-    /// Clique private key error
-    #[error("clique address error: {0}")]
-    CliqueAddressError(String),
-    /// The chain id was not set.
-    #[error("the chain ID was not set")]
-    ChainIdNotSet,
-    /// Could not create the data directory.
-    #[error("could not create directory: {0}")]
-    CreateDirError(std::io::Error),
-    /// No stderr was captured from the child process.
-    #[error("no stderr was captured from the process")]
-    NoStderr,
-    /// Timed out waiting for geth to start.
-    #[error("timed out waiting for geth to spawn; is geth installed?")]
-    Timeout,
-    /// Encountered a fatal error.
-    #[error("fatal error: {0}")]
-    Fatal(String),
-    /// A line could not be read from the geth stderr.
-    #[error("could not read line from geth stderr: {0}")]
-    ReadLineError(std::io::Error),
-    /// Genesis error
-    #[error("genesis error occurred: {0}")]
-    GenesisError(String),
-    /// Geth init error
-    #[error("geth init error occurred")]
-    InitError,
-    /// Spawn geth error
-    #[error("could not spawn geth: {0}")]
-    SpawnError(std::io::Error),
-    /// Wait error
-    #[error("could not wait for geth to exit: {0}")]
-    WaitError(std::io::Error),
 }
 
 /// Builder for launching `geth`.
@@ -253,8 +203,9 @@ pub struct Geth {
     chain_id: Option<u64>,
     insecure_unlock: bool,
     genesis: Option<Genesis>,
-    mode: GethMode,
+    mode: NodeMode,
     clique_private_key: Option<SigningKey>,
+    args: Vec<OsString>,
 }
 
 impl Geth {
@@ -281,6 +232,21 @@ impl Geth {
         Self::new().path(path)
     }
 
+    /// Sets the `path` to the `geth` executable
+    ///
+    /// By default, it's expected that `geth` is in `$PATH`, see also
+    /// [`std::process::Command::new()`]
+    pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
+        self.program = Some(path.into());
+        self
+    }
+
+    /// Puts the `geth` instance in `dev` mode.
+    pub fn dev(mut self) -> Self {
+        self.mode = NodeMode::Dev(Default::default());
+        self
+    }
+
     /// Returns whether the node is launched in Clique consensus mode.
     pub const fn is_clique(&self) -> bool {
         self.clique_private_key.is_some()
@@ -289,15 +255,6 @@ impl Geth {
     /// Calculates the address of the Clique consensus address.
     pub fn clique_address(&self) -> Option<Address> {
         self.clique_private_key.as_ref().map(|pk| Address::from_public_key(pk.verifying_key()))
-    }
-
-    /// Sets the `path` to the `geth` executable
-    ///
-    /// By default, it's expected that `geth` is in `$PATH`, see also
-    /// [`std::process::Command::new()`]
-    pub fn path<T: Into<PathBuf>>(mut self, path: T) -> Self {
-        self.program = Some(path.into());
-        self
     }
 
     /// Sets the Clique Private Key to the `geth` executable, which will be later
@@ -326,13 +283,13 @@ impl Geth {
     /// options.
     pub fn p2p_port(mut self, port: u16) -> Self {
         match &mut self.mode {
-            GethMode::Dev(_) => {
-                self.mode = GethMode::NonDev(PrivateNetOptions {
+            NodeMode::Dev(_) => {
+                self.mode = NodeMode::NonDev(PrivateNetOptions {
                     p2p_port: Some(port),
                     ..Default::default()
                 })
             }
-            GethMode::NonDev(opts) => opts.p2p_port = Some(port),
+            NodeMode::NonDev(opts) => opts.p2p_port = Some(port),
         }
         self
     }
@@ -342,7 +299,7 @@ impl Geth {
     /// This will put the geth instance in `dev` mode, discarding any previously set options that
     /// cannot be used in dev mode.
     pub const fn block_time(mut self, block_time: u64) -> Self {
-        self.mode = GethMode::Dev(DevOptions { block_time: Some(block_time) });
+        self.mode = NodeMode::Dev(DevOptions { block_time: Some(block_time) });
         self
     }
 
@@ -375,11 +332,11 @@ impl Geth {
 
     fn inner_disable_discovery(&mut self) {
         match &mut self.mode {
-            GethMode::Dev(_) => {
+            NodeMode::Dev(_) => {
                 self.mode =
-                    GethMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
+                    NodeMode::NonDev(PrivateNetOptions { discovery: false, ..Default::default() })
             }
-            GethMode::NonDev(opts) => opts.discovery = false,
+            NodeMode::NonDev(opts) => opts.discovery = false,
         }
     }
 
@@ -412,6 +369,28 @@ impl Geth {
         self
     }
 
+    /// Adds an argument to pass to `geth`.
+    ///
+    /// Pass any arg that is not supported by the builder.
+    pub fn arg<T: Into<OsString>>(mut self, arg: T) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Adds multiple arguments to pass to `geth`.
+    ///
+    /// Pass any args that is not supported by the builder.
+    pub fn args<I, S>(mut self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<OsString>,
+    {
+        for arg in args {
+            self = self.arg(arg);
+        }
+        self
+    }
+
     /// Consumes the builder and spawns `geth`.
     ///
     /// # Panics
@@ -423,14 +402,14 @@ impl Geth {
     }
 
     /// Consumes the builder and spawns `geth`. If spawning fails, returns an error.
-    pub fn try_spawn(mut self) -> Result<GethInstance, GethError> {
+    pub fn try_spawn(mut self) -> Result<GethInstance, NodeError> {
         let bin_path = self
             .program
             .as_ref()
             .map_or_else(|| GETH.as_ref(), |bin| bin.as_os_str())
             .to_os_string();
         let mut cmd = Command::new(&bin_path);
-        // geth uses stderr for its logs
+        // `geth` uses stderr for its logs
         cmd.stderr(Stdio::piped());
 
         // If no port provided, let the os chose it for us
@@ -474,7 +453,7 @@ impl Geth {
                 let clique_config = CliqueConfig { period: Some(0), epoch: Some(8) };
                 genesis.config.clique = Some(clique_config);
 
-                let clique_addr = clique_addr.ok_or(GethError::CliqueAddressError(
+                let clique_addr = clique_addr.ok_or(NodeError::CliqueAddressError(
                     "could not calculates the address of the Clique consensus address.".to_string(),
                 ))?;
 
@@ -489,12 +468,12 @@ impl Geth {
                 cmd.arg("--miner.etherbase").arg(format!("{clique_addr:?}"));
             }
 
-            let clique_addr = self.clique_address().ok_or(GethError::CliqueAddressError(
+            let clique_addr = self.clique_address().ok_or(NodeError::CliqueAddressError(
                 "could not calculates the address of the Clique consensus address.".to_string(),
             ))?;
 
             self.genesis = Some(Genesis::clique_genesis(
-                self.chain_id.ok_or(GethError::ChainIdNotSet)?,
+                self.chain_id.ok_or(NodeError::ChainIdNotSet)?,
                 clique_addr,
             ));
 
@@ -506,19 +485,19 @@ impl Geth {
 
         if let Some(genesis) = &self.genesis {
             // create a temp dir to store the genesis file
-            let temp_genesis_dir_path = tempdir().map_err(GethError::CreateDirError)?.into_path();
+            let temp_genesis_dir_path = tempdir().map_err(NodeError::CreateDirError)?.into_path();
 
             // create a temp dir to store the genesis file
             let temp_genesis_path = temp_genesis_dir_path.join("genesis.json");
 
             // create the genesis file
             let mut file = File::create(&temp_genesis_path).map_err(|_| {
-                GethError::GenesisError("could not create genesis file".to_string())
+                NodeError::GenesisError("could not create genesis file".to_string())
             })?;
 
             // serialize genesis and write to file
             serde_json::to_writer_pretty(&mut file, &genesis).map_err(|_| {
-                GethError::GenesisError("could not write genesis to file".to_string())
+                NodeError::GenesisError("could not write genesis to file".to_string())
             })?;
 
             let mut init_cmd = Command::new(bin_path);
@@ -532,17 +511,17 @@ impl Geth {
             init_cmd.arg("init").arg(temp_genesis_path);
             let res = init_cmd
                 .spawn()
-                .map_err(GethError::SpawnError)?
+                .map_err(NodeError::SpawnError)?
                 .wait()
-                .map_err(GethError::WaitError)?;
+                .map_err(NodeError::WaitError)?;
             // .expect("failed to wait for geth init to exit");
             if !res.success() {
-                return Err(GethError::InitError);
+                return Err(NodeError::InitError);
             }
 
             // clean up the temp dir which is now persisted
             std::fs::remove_dir_all(temp_genesis_dir_path).map_err(|_| {
-                GethError::GenesisError("could not remove genesis temp dir".to_string())
+                NodeError::GenesisError("could not remove genesis temp dir".to_string())
             })?;
         }
 
@@ -551,20 +530,20 @@ impl Geth {
 
             // create the directory if it doesn't exist
             if !data_dir.exists() {
-                create_dir(data_dir).map_err(GethError::CreateDirError)?;
+                create_dir(data_dir).map_err(NodeError::CreateDirError)?;
             }
         }
 
         // Dev mode with custom block time
         let mut p2p_port = match self.mode {
-            GethMode::Dev(DevOptions { block_time }) => {
+            NodeMode::Dev(DevOptions { block_time }) => {
                 cmd.arg("--dev");
                 if let Some(block_time) = block_time {
                     cmd.arg("--dev.period").arg(block_time.to_string());
                 }
                 None
             }
-            GethMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
+            NodeMode::NonDev(PrivateNetOptions { p2p_port, discovery }) => {
                 // if no port provided, let the os chose it for us
                 let port = p2p_port.unwrap_or(0);
                 cmd.arg("--port").arg(port.to_string());
@@ -588,31 +567,34 @@ impl Geth {
             cmd.arg("--ipcpath").arg(ipc);
         }
 
-        let mut child = cmd.spawn().map_err(GethError::SpawnError)?;
+        cmd.args(self.args);
 
-        let stderr = child.stderr.ok_or(GethError::NoStderr)?;
+        let mut child = cmd.spawn().map_err(NodeError::SpawnError)?;
+
+        let stderr = child.stderr.take().ok_or(NodeError::NoStderr)?;
 
         let start = Instant::now();
         let mut reader = BufReader::new(stderr);
 
         // we shouldn't need to wait for p2p to start if geth is in dev mode - p2p is disabled in
         // dev mode
-        let mut p2p_started = matches!(self.mode, GethMode::Dev(_));
-        let mut http_started = false;
+        let mut p2p_started = matches!(self.mode, NodeMode::Dev(_));
+        let mut ports_started = false;
 
         loop {
-            if start + GETH_STARTUP_TIMEOUT <= Instant::now() {
-                return Err(GethError::Timeout);
+            if start + NODE_STARTUP_TIMEOUT <= Instant::now() {
+                let _ = child.kill();
+                return Err(NodeError::Timeout);
             }
 
             let mut line = String::with_capacity(120);
-            reader.read_line(&mut line).map_err(GethError::ReadLineError)?;
+            reader.read_line(&mut line).map_err(NodeError::ReadLineError)?;
 
-            if matches!(self.mode, GethMode::NonDev(_)) && line.contains("Started P2P networking") {
+            if matches!(self.mode, NodeMode::NonDev(_)) && line.contains("Started P2P networking") {
                 p2p_started = true;
             }
 
-            if !matches!(self.mode, GethMode::Dev(_)) {
+            if !matches!(self.mode, NodeMode::Dev(_)) {
                 // try to find the p2p port, if not in dev mode
                 if line.contains("New local node record") {
                     if let Some(port) = extract_value("tcp=", &line) {
@@ -627,21 +609,23 @@ impl Geth {
                 || (line.contains("HTTP server started") && !line.contains("auth=true"))
             {
                 // Extracts the address from the output
-                if let Some(addr) = extract_endpoint(&line) {
+                if let Some(addr) = extract_endpoint("endpoint=", &line) {
                     // use the actual http port
                     port = addr.port();
                 }
 
-                http_started = true;
+                ports_started = true;
             }
 
             // Encountered an error such as Fatal: Error starting protocol stack: listen tcp
             // 127.0.0.1:8545: bind: address already in use
             if line.contains("Fatal:") {
-                return Err(GethError::Fatal(line));
+                let _ = child.kill();
+                return Err(NodeError::Fatal(line));
             }
 
-            if p2p_started && http_started {
+            // If all ports have started we are ready to be queried.
+            if ports_started && p2p_started {
                 break;
             }
         }
@@ -654,67 +638,29 @@ impl Geth {
             ipc: self.ipc_path,
             data_dir: self.data_dir,
             p2p_port,
+            auth_port: self.authrpc_port,
             genesis: self.genesis,
             clique_private_key: self.clique_private_key,
         })
     }
 }
 
-// extracts the value for the given key and line
-fn extract_value<'a>(key: &str, line: &'a str) -> Option<&'a str> {
-    let mut key = Cow::from(key);
-    if !key.ends_with('=') {
-        key = format!("{}=", key).into();
-    }
-    line.find(key.as_ref()).map(|pos| {
-        let start = pos + key.len();
-        let end = line[start..].find(' ').map(|i| start + i).unwrap_or(line.len());
-        line[start..end].trim()
-    })
-}
-
-// extracts the value for the given key and line
-fn extract_endpoint(line: &str) -> Option<SocketAddr> {
-    let val = extract_value("endpoint=", line)?;
-    val.parse::<SocketAddr>().ok()
-}
-
-// These tests should use a different datadir for each `Geth` spawned
+// These tests should use a different datadir for each `geth` spawned.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
-
-    #[test]
-    fn test_extract_address() {
-        let line = "INFO [07-01|13:20:42.774] HTTP server started                      endpoint=127.0.0.1:8545 auth=false prefix= cors= vhosts=localhost";
-        assert_eq!(extract_endpoint(line), Some(SocketAddr::from(([127, 0, 0, 1], 8545))));
-    }
+    use crate::utils::run_with_tempdir_sync;
 
     #[test]
     fn port_0() {
-        run_with_tempdir(|_| {
+        run_with_tempdir_sync("geth-test-", |_| {
             let _geth = Geth::new().disable_discovery().port(0u16).spawn();
         });
     }
 
-    /// Allows running tests with a temporary directory, which is cleaned up after the function is
-    /// called.
-    ///
-    /// Helps with tests that spawn a helper instance, which has to be dropped before the temporary
-    /// directory is cleaned up.
-    #[track_caller]
-    fn run_with_tempdir(f: impl Fn(&Path)) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_dir_path = temp_dir.path();
-        f(temp_dir_path);
-        #[cfg(not(windows))]
-        temp_dir.close().unwrap();
-    }
-
     #[test]
     fn p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let geth = Geth::new().disable_discovery().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
             assert!(p2p_port.is_some());
@@ -723,7 +669,7 @@ mod tests {
 
     #[test]
     fn explicit_p2p_port() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // if a p2p port is explicitly set, it should be used
             let geth = Geth::new().p2p_port(1234).data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -733,7 +679,7 @@ mod tests {
 
     #[test]
     fn dev_mode() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             // dev mode should not have a p2p port, and dev should be the default
             let geth = Geth::new().data_dir(temp_dir_path).spawn();
             let p2p_port = geth.p2p_port();
@@ -745,7 +691,7 @@ mod tests {
     #[ignore = "fails on geth >=1.14"]
     #[allow(deprecated)]
     fn clique_correctly_configured() {
-        run_with_tempdir(|temp_dir_path| {
+        run_with_tempdir_sync("geth-test-", |temp_dir_path| {
             let private_key = SigningKey::random(&mut rand::thread_rng());
             let geth = Geth::new()
                 .set_clique_private_key(private_key)

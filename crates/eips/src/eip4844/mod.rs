@@ -13,6 +13,9 @@ pub mod trusted_setup_points;
 pub mod builder;
 pub mod utils;
 
+mod engine;
+pub use engine::*;
+
 /// Contains sidecar related types
 #[cfg(feature = "kzg-sidecar")]
 mod sidecar;
@@ -82,6 +85,20 @@ pub const BYTES_PER_PROOF: usize = 48;
 /// A Blob serialized as 0x-prefixed hex string
 pub type Blob = FixedBytes<BYTES_PER_BLOB>;
 
+/// Helper function to deserialize boxed blobs.
+#[cfg(feature = "serde")]
+pub fn deserialize_blob<'de, D>(deserializer: D) -> Result<alloc::boxed::Box<Blob>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let raw_blob = <alloy_primitives::Bytes>::deserialize(deserializer)?;
+    let blob = alloc::boxed::Box::new(
+        Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?,
+    );
+    Ok(blob)
+}
+
 /// A commitment/proof serialized as 0x-prefixed hex string
 pub type Bytes48 = FixedBytes<48>;
 
@@ -107,12 +124,8 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`calc_excess_blob_gas`).
 #[inline]
-pub const fn calc_excess_blob_gas(
-    parent_excess_blob_gas: u128,
-    parent_blob_gas_used: u128,
-) -> u128 {
-    (parent_excess_blob_gas + parent_blob_gas_used)
-        .saturating_sub(TARGET_DATA_GAS_PER_BLOCK as u128)
+pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
+    (parent_excess_blob_gas + parent_blob_gas_used).saturating_sub(TARGET_DATA_GAS_PER_BLOCK)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -120,8 +133,12 @@ pub const fn calc_excess_blob_gas(
 /// See also [the EIP-4844 helpers](https://eips.ethereum.org/EIPS/eip-4844#helpers)
 /// (`get_blob_gasprice`).
 #[inline]
-pub fn calc_blob_gasprice(excess_blob_gas: u128) -> u128 {
-    fake_exponential(BLOB_TX_MIN_BLOB_GASPRICE, excess_blob_gas, BLOB_GASPRICE_UPDATE_FRACTION)
+pub fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
+    fake_exponential(
+        BLOB_TX_MIN_BLOB_GASPRICE,
+        excess_blob_gas as u128,
+        BLOB_GASPRICE_UPDATE_FRACTION,
+    )
 }
 
 /// Approximates `factor * e ** (numerator / denominator)` using Taylor expansion.
@@ -188,8 +205,8 @@ mod tests {
             ),
             (DATA_GAS_PER_BLOB - 1, (TARGET_DATA_GAS_PER_BLOCK / DATA_GAS_PER_BLOB) - 1, 0),
         ] {
-            let actual = calc_excess_blob_gas(excess as u128, (blobs * DATA_GAS_PER_BLOB) as u128);
-            assert_eq!(actual, expected as u128, "test: {t:?}");
+            let actual = calc_excess_blob_gas(excess, blobs * DATA_GAS_PER_BLOB);
+            assert_eq!(actual, expected, "test: {t:?}");
         }
     }
 

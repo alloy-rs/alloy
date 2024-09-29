@@ -1,12 +1,10 @@
 //! Transaction types.
 
 use crate::Signed;
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
 use core::any;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 mod eip1559;
 pub use eip1559::TxEip1559;
@@ -47,7 +45,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     fn nonce(&self) -> u64;
 
     /// Get `gas_limit`.
-    fn gas_limit(&self) -> u128;
+    fn gas_limit(&self) -> u64;
 
     /// Get `gas_price`.
     fn gas_price(&self) -> Option<u128>;

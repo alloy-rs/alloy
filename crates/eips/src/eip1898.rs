@@ -1,6 +1,6 @@
 //! [EIP-1898]: https://eips.ethereum.org/EIPS/eip-1898
 
-use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, BlockNumber, B256, U64};
+use alloy_primitives::{hex::FromHexError, ruint::ParseError, BlockHash, B256, U64};
 use alloy_rlp::{bytes, Decodable, Encodable, Error as RlpError};
 use core::{
     fmt::{self, Debug, Display, Formatter},
@@ -53,6 +53,16 @@ impl From<RpcBlockHash> for B256 {
 impl AsRef<B256> for RpcBlockHash {
     fn as_ref(&self) -> &B256 {
         &self.block_hash
+    }
+}
+
+impl Display for RpcBlockHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let Self { block_hash, require_canonical } = self;
+        if *require_canonical == Some(true) {
+            write!(f, "canonical ")?
+        }
+        write!(f, "hash {}", block_hash)
     }
 }
 
@@ -383,13 +393,13 @@ impl From<BlockNumberOrTag> for BlockId {
     }
 }
 
-impl From<BlockHashOrNumber> for BlockId {
-    fn from(block: BlockHashOrNumber) -> Self {
+impl From<HashOrNumber> for BlockId {
+    fn from(block: HashOrNumber) -> Self {
         match block {
-            BlockHashOrNumber::Hash(hash) => {
+            HashOrNumber::Hash(hash) => {
                 Self::Hash(RpcBlockHash { block_hash: hash, require_canonical: None })
             }
-            BlockHashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
+            HashOrNumber::Number(num) => Self::Number(BlockNumberOrTag::Number(num)),
         }
     }
 }
@@ -515,11 +525,27 @@ impl<'de> Deserialize<'de> for BlockId {
     }
 }
 
+impl Display for BlockId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(hash) => write!(f, "{}", hash),
+            Self::Number(num) => {
+                if num.is_number() {
+                    return write!(f, "number {}", num);
+                }
+                write!(f, "{}", num)
+            }
+        }
+    }
+}
+
 /// Error thrown when parsing a [BlockId] from a string.
 #[derive(Debug)]
 pub enum ParseBlockIdError {
     /// Failed to parse a block id from a number.
     ParseIntError(ParseIntError),
+    /// Failed to parse hex number
+    ParseError(ParseError),
     /// Failed to parse a block id as a hex string.
     FromHexError(FromHexError),
 }
@@ -528,6 +554,7 @@ impl Display for ParseBlockIdError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ParseIntError(err) => write!(f, "{err}"),
+            Self::ParseError(err) => write!(f, "{err}"),
             Self::FromHexError(err) => write!(f, "{err}"),
         }
     }
@@ -539,6 +566,7 @@ impl std::error::Error for ParseBlockIdError {
         match self {
             Self::ParseIntError(err) => std::error::Error::source(err),
             Self::FromHexError(err) => std::error::Error::source(err),
+            Self::ParseError(err) => std::error::Error::source(err),
         }
     }
 }
@@ -559,7 +587,11 @@ impl FromStr for BlockId {
     type Err = ParseBlockIdError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("0x") {
-            return B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError);
+            return if s.len() == 66 {
+                B256::from_str(s).map(Into::into).map_err(ParseBlockIdError::FromHexError)
+            } else {
+                U64::from_str(s).map(Into::into).map_err(ParseBlockIdError::ParseError)
+            };
         }
 
         match s {
@@ -576,65 +608,72 @@ impl FromStr for BlockId {
     }
 }
 
-/// Block number and hash.
+/// A number and a hash.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct BlockNumHash {
-    /// Block number
-    pub number: BlockNumber,
-    /// Block hash
-    pub hash: BlockHash,
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct NumHash {
+    /// The number
+    pub number: u64,
+    /// The hash.
+    pub hash: B256,
 }
 
 /// Block number and hash of the forked block.
-pub type ForkBlock = BlockNumHash;
+pub type ForkBlock = NumHash;
 
-impl BlockNumHash {
-    /// Creates a new `BlockNumHash` from a block number and hash.
-    pub const fn new(number: BlockNumber, hash: BlockHash) -> Self {
+/// A block number and a hash
+pub type BlockNumHash = NumHash;
+
+impl NumHash {
+    /// Creates a new `NumHash` from a number and hash.
+    pub const fn new(number: u64, hash: B256) -> Self {
         Self { number, hash }
     }
 
-    /// Consumes `Self` and returns [`BlockNumber`], [`BlockHash`]
-    pub const fn into_components(self) -> (BlockNumber, BlockHash) {
+    /// Consumes `Self` and returns the number and hash
+    pub const fn into_components(self) -> (u64, B256) {
         (self.number, self.hash)
     }
 
-    /// Returns whether or not the block matches the given [BlockHashOrNumber].
-    pub fn matches_block_or_num(&self, block: &BlockHashOrNumber) -> bool {
+    /// Returns whether or not the block matches the given [HashOrNumber].
+    pub fn matches_block_or_num(&self, block: &HashOrNumber) -> bool {
         match block {
-            BlockHashOrNumber::Hash(hash) => self.hash == *hash,
-            BlockHashOrNumber::Number(number) => self.number == *number,
+            HashOrNumber::Hash(hash) => self.hash == *hash,
+            HashOrNumber::Number(number) => self.number == *number,
         }
     }
 }
 
-impl From<(BlockNumber, BlockHash)> for BlockNumHash {
-    fn from(val: (BlockNumber, BlockHash)) -> Self {
+impl From<(u64, B256)> for NumHash {
+    fn from(val: (u64, B256)) -> Self {
         Self { number: val.0, hash: val.1 }
     }
 }
 
-impl From<(BlockHash, BlockNumber)> for BlockNumHash {
-    fn from(val: (BlockHash, BlockNumber)) -> Self {
+impl From<(B256, u64)> for NumHash {
+    fn from(val: (B256, u64)) -> Self {
         Self { hash: val.0, number: val.1 }
     }
 }
 
-/// Either a block hash _or_ a block number
+/// Either a hash _or_ a block number
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-pub enum BlockHashOrNumber {
-    /// A block hash
+pub enum HashOrNumber {
+    /// The hash
     Hash(B256),
-    /// A block number
+    /// The number
     Number(u64),
 }
 
-// === impl BlockHashOrNumber ===
+/// A block hash _or_ a block number
+pub type BlockHashOrNumber = HashOrNumber;
 
-impl BlockHashOrNumber {
-    /// Returns the block number if it is a [`BlockHashOrNumber::Number`].
+// === impl HashOrNumber ===
+
+impl HashOrNumber {
+    /// Returns the block number if it is a [`HashOrNumber::Number`].
     #[inline]
     pub const fn as_number(self) -> Option<u64> {
         match self {
@@ -644,32 +683,32 @@ impl BlockHashOrNumber {
     }
 }
 
-impl From<B256> for BlockHashOrNumber {
+impl From<B256> for HashOrNumber {
     fn from(value: B256) -> Self {
         Self::Hash(value)
     }
 }
 
-impl From<u64> for BlockHashOrNumber {
+impl From<u64> for HashOrNumber {
     fn from(value: u64) -> Self {
         Self::Number(value)
     }
 }
 
-impl From<U64> for BlockHashOrNumber {
+impl From<U64> for HashOrNumber {
     fn from(value: U64) -> Self {
         value.to::<u64>().into()
     }
 }
 
-impl From<RpcBlockHash> for BlockHashOrNumber {
+impl From<RpcBlockHash> for HashOrNumber {
     fn from(value: RpcBlockHash) -> Self {
         Self::Hash(value.into())
     }
 }
 
-/// Allows for RLP encoding of either a block hash or block number
-impl Encodable for BlockHashOrNumber {
+/// Allows for RLP encoding of either a hash or a number
+impl Encodable for HashOrNumber {
     fn encode(&self, out: &mut dyn bytes::BufMut) {
         match self {
             Self::Hash(block_hash) => block_hash.encode(out),
@@ -684,8 +723,8 @@ impl Encodable for BlockHashOrNumber {
     }
 }
 
-/// Allows for RLP decoding of a block hash or block number
-impl Decodable for BlockHashOrNumber {
+/// Allows for RLP decoding of a hash or number
+impl Decodable for HashOrNumber {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header: u8 = *buf.first().ok_or(RlpError::InputTooShort)?;
         // if the byte string is exactly 32 bytes, decode it into a Hash
@@ -706,7 +745,7 @@ impl Decodable for BlockHashOrNumber {
     }
 }
 
-impl fmt::Display for BlockHashOrNumber {
+impl fmt::Display for HashOrNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Hash(hash) => write!(f, "{}", hash),
@@ -715,7 +754,7 @@ impl fmt::Display for BlockHashOrNumber {
     }
 }
 
-/// Error thrown when parsing a [BlockHashOrNumber] from a string.
+/// Error thrown when parsing a [HashOrNumber] from a string.
 #[derive(Debug)]
 pub struct ParseBlockHashOrNumberError {
     input: alloc::string::String,
@@ -736,7 +775,7 @@ impl fmt::Display for ParseBlockHashOrNumberError {
 #[cfg(feature = "std")]
 impl std::error::Error for ParseBlockHashOrNumberError {}
 
-impl FromStr for BlockHashOrNumber {
+impl FromStr for HashOrNumber {
     type Err = ParseBlockHashOrNumberError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -757,11 +796,28 @@ impl FromStr for BlockHashOrNumber {
     }
 }
 
-#[cfg(all(test, feature = "serde"))]
+#[cfg(test)]
 mod tests {
+    use alloy_primitives::b256;
+
     use super::*;
 
+    const HASH: B256 = b256!("1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9");
+
     #[test]
+    fn block_id_from_str() {
+        assert_eq!("0x0".parse::<BlockId>().unwrap(), BlockId::number(0));
+        assert_eq!("0x24A931".parse::<BlockId>().unwrap(), BlockId::number(2402609));
+        assert_eq!(
+            "0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+                .parse::<BlockId>()
+                .unwrap(),
+            HASH.into()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
     fn compact_block_number_serde() {
         let num: BlockNumberOrTag = 1u64.into();
         let serialized = serde_json::to_string(&num).unwrap();
@@ -781,6 +837,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn can_parse_eip1898_block_ids() {
         let num = serde_json::json!(
             { "blockNumber": "0x0" }
@@ -855,5 +912,63 @@ mod tests {
                     .into()
             )
         );
+    }
+
+    #[test]
+    fn display_rpc_block_hash() {
+        let hash = RpcBlockHash::from_hash(HASH, Some(true));
+
+        assert_eq!(
+            hash.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let hash = RpcBlockHash::from_hash(HASH, None);
+
+        assert_eq!(
+            hash.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+    }
+
+    #[test]
+    fn display_block_id() {
+        let id = BlockId::hash(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::hash_canonical(HASH);
+
+        assert_eq!(
+            id.to_string(),
+            "canonical hash 0x1a15e3c30cf094a99826869517b16d185d45831d3a494f01030b0001a9d3ebb9"
+        );
+
+        let id = BlockId::number(100000);
+
+        assert_eq!(id.to_string(), "number 0x186a0");
+
+        let id = BlockId::latest();
+
+        assert_eq!(id.to_string(), "latest");
+
+        let id = BlockId::safe();
+
+        assert_eq!(id.to_string(), "safe");
+
+        let id = BlockId::finalized();
+
+        assert_eq!(id.to_string(), "finalized");
+
+        let id = BlockId::earliest();
+
+        assert_eq!(id.to_string(), "earliest");
+
+        let id = BlockId::pending();
+
+        assert_eq!(id.to_string(), "pending");
     }
 }

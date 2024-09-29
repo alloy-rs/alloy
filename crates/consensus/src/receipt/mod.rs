@@ -7,13 +7,14 @@ mod envelope;
 pub use envelope::ReceiptEnvelope;
 
 mod receipts;
-pub use receipts::{Receipt, ReceiptWithBloom};
+pub use receipts::{Receipt, ReceiptWithBloom, Receipts};
 
 mod status;
 pub use status::Eip658Value;
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
+#[auto_impl::auto_impl(&, Arc)]
 pub trait TxReceipt<T = Log> {
     /// Returns the status or post state of the transaction.
     ///

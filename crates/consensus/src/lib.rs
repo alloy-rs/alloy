@@ -7,11 +7,13 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(not(feature = "std"))]
 extern crate alloc;
 
 mod account;
 pub use account::Account;
+
+mod block;
+pub use block::{Block, BlockBody};
 
 pub mod constants;
 
@@ -19,15 +21,16 @@ mod encodable_signature;
 pub use encodable_signature::EncodableSignature;
 
 mod header;
-pub use header::{Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
+pub use header::{BlockHeader, Header, EMPTY_OMMER_ROOT_HASH, EMPTY_ROOT_HASH};
 
 mod receipt;
 pub use receipt::{
-    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, TxReceipt,
+    AnyReceiptEnvelope, Eip658Value, Receipt, ReceiptEnvelope, ReceiptWithBloom, Receipts,
+    TxReceipt,
 };
 
 mod request;
-pub use request::Request;
+pub use request::{Request, Requests};
 
 pub mod transaction;
 #[cfg(feature = "kzg")]

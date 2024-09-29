@@ -1,6 +1,6 @@
 use crate::header::Header;
-use alloy_eips::eip4844::{Blob, BlobTransactionSidecar, Bytes48};
-use alloy_primitives::{Bytes, B256};
+use alloy_eips::eip4844::{deserialize_blob, Blob, BlobTransactionSidecar, Bytes48};
+use alloy_primitives::B256;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::vec::IntoIter;
@@ -10,7 +10,29 @@ use std::vec::IntoIter;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BeaconBlobBundle {
     /// Vec of individual blob data
-    data: Vec<BlobData>,
+    pub data: Vec<BlobData>,
+}
+
+impl BeaconBlobBundle {
+    /// Creates a new [`BeaconBlobBundle`] from a given vector of [`BlobData`].
+    pub const fn new(data: Vec<BlobData>) -> Self {
+        Self { data }
+    }
+
+    /// Returns the number of blobs in the bundle.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns if the bundle is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Returns the blob with the given index.
+    pub fn get_blob(&self, index: u64) -> Option<&BlobData> {
+        self.data.iter().find(|blob| blob.index == index)
+    }
 }
 
 /// Yields an iterator for BlobData
@@ -77,18 +99,6 @@ pub struct BlobData {
     pub signed_block_header: Header,
     /// The blob's inclusion proofs
     pub kzg_commitment_inclusion_proof: Vec<B256>,
-}
-
-/// Helper function to deserialize boxed blobs
-fn deserialize_blob<'de, D>(deserializer: D) -> Result<Box<Blob>, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    let raw_blob = <Bytes>::deserialize(deserializer)?;
-
-    let blob = Box::new(Blob::try_from(raw_blob.as_ref()).map_err(serde::de::Error::custom)?);
-
-    Ok(blob)
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use crate::{CallDecoder, Error, EthCall, Result};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_network::{Ethereum, Network, TransactionBuilder};
+use alloy_network::{Ethereum, Network, TransactionBuilder, TransactionBuilder4844};
 use alloy_network_primitives::ReceiptResponse;
 use alloy_primitives::{Address, Bytes, ChainId, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
@@ -334,7 +334,10 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `sidecar` field in the transaction to the provided value.
-    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self {
+    pub fn sidecar(mut self, blob_sidecar: BlobTransactionSidecar) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
         self.request.set_blob_sidecar(blob_sidecar);
         self
     }
@@ -345,7 +348,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `gas` field in the transaction to the provided value
-    pub fn gas(mut self, gas: u128) -> Self {
+    pub fn gas(mut self, gas: u64) -> Self {
         self.request.set_gas_limit(gas);
         self
     }
@@ -371,7 +374,10 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     }
 
     /// Sets the `max_fee_per_blob_gas` in the transaction to the provided value
-    pub fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+    pub fn max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self
+    where
+        N::TransactionRequest: TransactionBuilder4844,
+    {
         self.request.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
         self
     }
@@ -426,7 +432,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
 
     /// Returns the estimated gas cost for the underlying transaction to be executed
     /// If [`state overrides`](Self::state) are set, they will be applied to the gas estimation.
-    pub async fn estimate_gas(&self) -> Result<u128> {
+    pub async fn estimate_gas(&self) -> Result<u64> {
         let mut estimate = self.provider.estimate_gas(&self.request);
         if let Some(state) = &self.state {
             estimate = estimate.overrides(state);
@@ -441,7 +447,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// If this is not desired, use [`call_raw`](Self::call_raw) to get the raw output data.
     #[doc(alias = "eth_call")]
     #[doc(alias = "call_with_overrides")]
-    pub fn call(&self) -> EthCall<'_, '_, '_, D, T, N> {
+    pub fn call(&self) -> EthCall<'_, '_, D, T, N> {
         self.call_raw().with_decoder(&self.decoder)
     }
 
@@ -451,7 +457,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     /// Does not decode the output of the call, returning the raw output data instead.
     ///
     /// See [`call`](Self::call) for more information.
-    pub fn call_raw(&self) -> EthCall<'_, '_, '_, (), T, N> {
+    pub fn call_raw(&self) -> EthCall<'_, '_, (), T, N> {
         let call = self.provider.call(&self.request).block(self.block);
         let call = match &self.state {
             Some(state) => call.overrides(state),

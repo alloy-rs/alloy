@@ -33,7 +33,7 @@ pub struct Genesis {
     pub extra_data: Bytes,
     /// The genesis header gas limit.
     #[serde(with = "alloy_serde::quantity")]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// The genesis header difficulty.
     pub difficulty: U256,
     /// The genesis header mix hash.
@@ -144,7 +144,7 @@ impl Genesis {
     }
 
     /// Set the gas limit.
-    pub const fn with_gas_limit(mut self, gas_limit: u128) -> Self {
+    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = gas_limit;
         self
     }

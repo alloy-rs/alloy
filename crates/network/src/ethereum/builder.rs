@@ -1,5 +1,6 @@
 use crate::{
-    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilderError,
+    BuildResult, Ethereum, Network, NetworkWallet, TransactionBuilder, TransactionBuilder4844,
+    TransactionBuilder7702, TransactionBuilderError,
 };
 use alloy_consensus::{BlobTransactionSidecar, TxType, TypedTransaction};
 use alloy_eips::eip7702::SignedAuthorization;
@@ -83,19 +84,11 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
         self.max_priority_fee_per_gas = Some(max_priority_fee_per_gas);
     }
 
-    fn max_fee_per_blob_gas(&self) -> Option<u128> {
-        self.max_fee_per_blob_gas
-    }
-
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
-        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
-    }
-
-    fn gas_limit(&self) -> Option<u128> {
+    fn gas_limit(&self) -> Option<u64> {
         self.gas
     }
 
-    fn set_gas_limit(&mut self, gas_limit: u128) {
+    fn set_gas_limit(&mut self, gas_limit: u64) {
         self.gas = Some(gas_limit);
     }
 
@@ -105,23 +98,6 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
 
     fn set_access_list(&mut self, access_list: AccessList) {
         self.access_list = Some(access_list);
-    }
-
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
-        self.sidecar.as_ref()
-    }
-
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
-        self.sidecar = Some(sidecar);
-        self.populate_blob_hashes();
-    }
-
-    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
-        self.authorization_list.as_ref()
-    }
-
-    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
-        self.authorization_list = Some(authorization_list);
     }
 
     fn complete_type(&self, ty: TxType) -> Result<(), Vec<&'static str>> {
@@ -191,9 +167,40 @@ impl TransactionBuilder<Ethereum> for TransactionRequest {
     }
 }
 
+impl TransactionBuilder4844 for TransactionRequest {
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        self.max_fee_per_blob_gas
+    }
+
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128) {
+        self.max_fee_per_blob_gas = Some(max_fee_per_blob_gas)
+    }
+
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar> {
+        self.sidecar.as_ref()
+    }
+
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar) {
+        self.sidecar = Some(sidecar);
+        self.populate_blob_hashes();
+    }
+}
+
+impl TransactionBuilder7702 for TransactionRequest {
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>> {
+        self.authorization_list.as_ref()
+    }
+
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>) {
+        self.authorization_list = Some(authorization_list);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{TransactionBuilder, TransactionBuilderError};
+    use crate::{
+        TransactionBuilder, TransactionBuilder4844, TransactionBuilder7702, TransactionBuilderError,
+    };
     use alloy_consensus::{BlobTransactionSidecar, TxEip1559, TxType, TypedTransaction};
     use alloy_eips::eip7702::Authorization;
     use alloy_primitives::{Address, Signature, U256};

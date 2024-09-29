@@ -5,6 +5,11 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
+
+#[macro_use]
+#[allow(unused_imports)]
+extern crate alloc;
 
 pub use alloy_eips::eip4895::Withdrawal;
 
@@ -13,6 +18,13 @@ pub use account::*;
 
 mod block;
 pub use block::*;
+
+#[cfg(feature = "serde")]
+use alloy_serde::WithOtherFields;
+
+/// A catch-all block type for handling blocks on multiple networks.
+#[cfg(feature = "serde")]
+pub type AnyNetworkBlock = WithOtherFields<Block<WithOtherFields<Transaction>>>;
 
 pub use alloy_network_primitives::{
     BlockTransactionHashes, BlockTransactions, BlockTransactionsKind,
@@ -35,6 +47,7 @@ pub use index::Index;
 mod log;
 pub use log::*;
 
+#[cfg(feature = "serde")]
 pub mod pubsub;
 
 mod raw_log;

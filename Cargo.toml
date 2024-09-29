@@ -3,9 +3,9 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.6"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.79"
 authors = ["Alloy Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/alloy-rs/alloy"
@@ -69,11 +69,11 @@ alloy-transport-http = { version = "0.3", path = "crates/transport-http", defaul
 alloy-transport-ipc = { version = "0.3", path = "crates/transport-ipc", default-features = false }
 alloy-transport-ws = { version = "0.3", path = "crates/transport-ws", default-features = false }
 
-alloy-core = { version = "0.8.0", default-features = false }
-alloy-dyn-abi = { version = "0.8.0", default-features = false }
-alloy-json-abi = { version = "0.8.0", default-features = false }
-alloy-primitives = { version = "0.8.0", default-features = false }
-alloy-sol-types = { version = "0.8.0", default-features = false }
+alloy-core = { version = "0.8.5", default-features = false }
+alloy-dyn-abi = { version = "0.8.5", default-features = false }
+alloy-json-abi = { version = "0.8.5", default-features = false }
+alloy-primitives = { version = "0.8.5", default-features = false }
+alloy-sol-types = { version = "0.8.5", default-features = false }
 
 alloy-rlp = { version = "0.3", default-features = false }
 
@@ -84,8 +84,8 @@ alloy-eip2930 = { version = "0.1.0", default-features = false }
 alloy-eip7702 = { version = "0.1.0", default-features = false }
 
 # ethereum
-ethereum_ssz_derive = "0.7.1"
-ethereum_ssz = "0.7.1"
+ethereum_ssz_derive = "0.8"
+ethereum_ssz = "0.8"
 
 # crypto
 c-kzg = { version = "1.0", default-features = false }
@@ -112,19 +112,23 @@ rustls = { version = "0.23", default-features = false, features = [
     "tls12",
 ] }
 tokio-test = "0.4"
-tokio-tungstenite = "0.23"
-tower = { version = "0.4", features = ["util"] }
+tokio-tungstenite = "0.24"
+tower = { version = "0.5", features = ["util"] }
 
 # tracing
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+# no_std
+cfg-if = "1"
+hashbrown = "0.14.5"
 
 # misc
 auto_impl = "1.2"
 base64 = "0.22"
 bimap = "0.6"
 home = "0.5"
-itertools = "0.13"
+itertools = { version = "0.13", default-features = false }
 once_cell = { version = "1.19", default-features = false }
 pin-project = "1.1"
 rand = "0.8"
@@ -133,7 +137,10 @@ semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
-derive_more = "1.0.0"
+derive_more = { version = "1.0.0", default-features = false }
+strum = { version = "0.26", default-features = false }
+http = "1.1.0"
+jsonwebtoken = "9.3.0"
 
 ## serde
 serde = { version = "1.0", default-features = false, features = [
@@ -149,3 +156,4 @@ assert_matches = "1.5"
 serial_test = "3.0"
 similar-asserts = "1.5"
 tempfile = "3.10"
+tower-http = "0.6.1"

@@ -90,7 +90,7 @@ impl BaseFeeParams {
     ///
     /// See also [calc_next_block_base_fee]
     #[inline]
-    pub fn next_block_base_fee(self, gas_used: u128, gas_limit: u128, base_fee: u128) -> u128 {
+    pub fn next_block_base_fee(self, gas_used: u64, gas_limit: u64, base_fee: u64) -> u64 {
         calc_next_block_base_fee(gas_used, gas_limit, base_fee, self)
     }
 }

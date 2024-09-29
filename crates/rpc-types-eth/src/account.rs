@@ -1,23 +1,27 @@
+#![allow(unused_imports)]
+
+use alloc::{string::String, vec::Vec};
 use alloy_primitives::{Address, Bytes, B256, B512, U256};
-use alloy_serde::storage::JsonStorageKey;
-use serde::{Deserialize, Serialize};
 
 // re-export account type for `eth_getAccount`
 pub use alloy_consensus::Account;
 
 /// Account information.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountInfo {
     /// Account name
     pub name: String,
 }
 
 /// Data structure with proof for one single storage-entry
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg(feature = "serde")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct EIP1186StorageProof {
     /// Storage key.
-    pub key: JsonStorageKey,
+    pub key: alloy_serde::storage::JsonStorageKey,
     /// Value that the key holds
     pub value: U256,
     /// proof for the pair
@@ -25,8 +29,10 @@ pub struct EIP1186StorageProof {
 }
 
 /// Response for EIP-1186 account proof `eth_getProof`
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg(feature = "serde")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct EIP1186AccountProofResponse {
     /// The account address.
     pub address: Address,
@@ -35,7 +41,7 @@ pub struct EIP1186AccountProofResponse {
     /// The hash of the code of the account.
     pub code_hash: B256,
     /// The account nonce.
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
     /// The hash of the storage of the account.
     pub storage_hash: B256,
@@ -46,22 +52,24 @@ pub struct EIP1186AccountProofResponse {
 }
 
 /// Extended account information (used by `parity_allAccountInfo`).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExtAccountInfo {
     /// Account name
     pub name: String,
     /// Account meta JSON
     pub meta: String,
     /// Account UUID (`None` for address book entries)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub uuid: Option<String>,
 }
 
 /// account derived from a signature
 /// as well as information that tells if it is valid for
 /// the current chain
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct RecoveredAccount {
     /// address of the recovered account
     pub address: Address,
@@ -74,6 +82,7 @@ pub struct RecoveredAccount {
 }
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_eip_1186_account_without_storage_proof() {
     let response = r#"{
        "address":"0xc36442b4a4522e871399cd717abdd847ab11fe88",

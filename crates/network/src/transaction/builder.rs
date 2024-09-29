@@ -248,27 +248,14 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self.set_max_priority_fee_per_gas(max_priority_fee_per_gas);
         self
     }
-
-    /// Get the max fee per blob gas for the transaction.
-    fn max_fee_per_blob_gas(&self) -> Option<u128>;
-
-    /// Set the max fee per blob gas  for the transaction.
-    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128);
-
-    /// Builder-pattern method for setting max fee per blob gas .
-    fn with_max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
-        self.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
-        self
-    }
-
     /// Get the gas limit for the transaction.
-    fn gas_limit(&self) -> Option<u128>;
+    fn gas_limit(&self) -> Option<u64>;
 
     /// Set the gas limit for the transaction.
-    fn set_gas_limit(&mut self, gas_limit: u128);
+    fn set_gas_limit(&mut self, gas_limit: u64);
 
     /// Builder-pattern method for setting the gas limit.
-    fn with_gas_limit(mut self, gas_limit: u128) -> Self {
+    fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.set_gas_limit(gas_limit);
         self
     }
@@ -282,33 +269,6 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
     /// Builder-pattern method for setting the access list.
     fn with_access_list(mut self, access_list: AccessList) -> Self {
         self.set_access_list(access_list);
-        self
-    }
-
-    /// Gets the EIP-4844 blob sidecar of the transaction.
-    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
-
-    /// Sets the EIP-4844 blob sidecar of the transaction.
-    ///
-    /// Note: This will also set the versioned blob hashes accordingly:
-    /// [BlobTransactionSidecar::versioned_hashes]
-    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar);
-
-    /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
-    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecar) -> Self {
-        self.set_blob_sidecar(sidecar);
-        self
-    }
-
-    /// Get the EIP-7702 authorization list for the transaction.
-    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>>;
-
-    /// Sets the EIP-7702 authorization list.
-    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>);
-
-    /// Builder-pattern method for setting the authorization list.
-    fn with_authorization_list(mut self, authorization_list: Vec<SignedAuthorization>) -> Self {
-        self.set_authorization_list(authorization_list);
         self
     }
 
@@ -382,4 +342,49 @@ pub trait TransactionBuilder<N: Network>: Default + Sized + Send + Sync + 'stati
         self,
         wallet: &W,
     ) -> impl_future!(<Output = Result<N::TxEnvelope, TransactionBuilderError<N>>>);
+}
+
+/// Transaction builder type supporting EIP-4844 transaction fields.
+pub trait TransactionBuilder4844: Default + Sized + Send + Sync + 'static {
+    /// Get the max fee per blob gas for the transaction.
+    fn max_fee_per_blob_gas(&self) -> Option<u128>;
+
+    /// Set the max fee per blob gas  for the transaction.
+    fn set_max_fee_per_blob_gas(&mut self, max_fee_per_blob_gas: u128);
+
+    /// Builder-pattern method for setting max fee per blob gas .
+    fn with_max_fee_per_blob_gas(mut self, max_fee_per_blob_gas: u128) -> Self {
+        self.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
+        self
+    }
+
+    /// Gets the EIP-4844 blob sidecar of the transaction.
+    fn blob_sidecar(&self) -> Option<&BlobTransactionSidecar>;
+
+    /// Sets the EIP-4844 blob sidecar of the transaction.
+    ///
+    /// Note: This will also set the versioned blob hashes accordingly:
+    /// [BlobTransactionSidecar::versioned_hashes]
+    fn set_blob_sidecar(&mut self, sidecar: BlobTransactionSidecar);
+
+    /// Builder-pattern method for setting the EIP-4844 blob sidecar of the transaction.
+    fn with_blob_sidecar(mut self, sidecar: BlobTransactionSidecar) -> Self {
+        self.set_blob_sidecar(sidecar);
+        self
+    }
+}
+
+/// Transaction builder type supporting EIP-7702 transaction fields.
+pub trait TransactionBuilder7702: Default + Sized + Send + Sync + 'static {
+    /// Get the EIP-7702 authorization list for the transaction.
+    fn authorization_list(&self) -> Option<&Vec<SignedAuthorization>>;
+
+    /// Sets the EIP-7702 authorization list.
+    fn set_authorization_list(&mut self, authorization_list: Vec<SignedAuthorization>);
+
+    /// Builder-pattern method for setting the authorization list.
+    fn with_authorization_list(mut self, authorization_list: Vec<SignedAuthorization>) -> Self {
+        self.set_authorization_list(authorization_list);
+        self
+    }
 }

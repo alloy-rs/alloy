@@ -1,11 +1,9 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -26,7 +24,7 @@ pub struct TxEip1559 {
     /// computation is done and may not be increased
     /// later; formally Tg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
     /// this transaction. This is paid up-front, before any
@@ -214,6 +212,10 @@ impl TxEip1559 {
         let tx = Self::decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
+        if !matches!(signature.v(), Parity::Parity(_)) {
+            return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
+        }
+
         let signed = tx.into_signed(signature);
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -270,7 +272,7 @@ impl Transaction for TxEip1559 {
         self.nonce
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 

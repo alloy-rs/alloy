@@ -1,11 +1,9 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// Transaction with an [`AccessList`] ([EIP-2930](https://eips.ethereum.org/EIPS/eip-2930)).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -35,7 +33,7 @@ pub struct TxEip2930 {
     /// computation is done and may not be increased
     /// later; formally Tg.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
-    pub gas_limit: u128,
+    pub gas_limit: u64,
     /// The 160-bit address of the message call’s recipient or, for a contract creation
     /// transaction, ∅, used here to denote the only member of B0 ; formally Tt.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "TxKind::is_create"))]
@@ -207,6 +205,10 @@ impl TxEip2930 {
         let tx = Self::decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
+        if !matches!(signature.v(), Parity::Parity(_)) {
+            return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
+        }
+
         let signed = tx.into_signed(signature);
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
@@ -234,7 +236,7 @@ impl Transaction for TxEip2930 {
         self.nonce
     }
 
-    fn gas_limit(&self) -> u128 {
+    fn gas_limit(&self) -> u64 {
         self.gas_limit
     }
 

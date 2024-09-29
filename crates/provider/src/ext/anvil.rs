@@ -611,7 +611,7 @@ mod tests {
         let block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
 
-        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u128>()));
+        assert_eq!(block.header.base_fee_per_gas, Some(basefee.to::<u64>()));
     }
 
     #[tokio::test]
@@ -793,11 +793,11 @@ mod tests {
 
         let latest_block =
             provider.get_block_by_number(BlockNumberOrTag::Latest, false).await.unwrap().unwrap();
-        assert_eq!(block_gas_limit.to::<u128>(), latest_block.header.gas_limit);
+        assert_eq!(block_gas_limit.to::<u64>(), latest_block.header.gas_limit);
     }
 
     #[tokio::test]
-    async fn test_anvil_set_block_timestamp_interval_anvil_remove_block_timestamp_interval() {
+    async fn test_anvil_block_timestamp_interval() {
         let provider = ProviderBuilder::new().on_anvil();
 
         provider.anvil_set_block_timestamp_interval(1).await.unwrap();

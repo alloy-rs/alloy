@@ -19,6 +19,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+alloy-primitives = { workspace = true, features = ["map"] }
 alloy-json-rpc.workspace = true
 alloy-transport-http.workspace = true
 alloy-transport.workspace = true
@@ -32,13 +33,10 @@ tokio-stream = { workspace = true, features = ["sync"] }
 tower.workspace = true
 tracing.workspace = true
 
-alloy-primitives = { workspace = true, optional = true }
 alloy-pubsub = { workspace = true, optional = true }
 alloy-transport-ws = { workspace = true, optional = true }
 
 reqwest = { workspace = true, optional = true }
-
-hyper-util = { workspace = true, optional = true }
 
 url = { workspace = true, optional = true }
 
@@ -57,7 +55,7 @@ futures-util.workspace = true
 [features]
 default = ["reqwest"]
 reqwest = ["dep:url", "dep:reqwest", "alloy-transport-http/reqwest"]
-hyper = ["dep:url", "dep:hyper-util", "alloy-transport-http/hyper"]
-pubsub = ["dep:alloy-pubsub", "dep:alloy-primitives"]
+hyper = ["dep:url", "alloy-transport-http/hyper"]
+pubsub = ["dep:alloy-pubsub"]
 ws = ["pubsub", "dep:alloy-transport-ws", "dep:url"]
 ipc = ["pubsub", "dep:alloy-transport-ipc"]

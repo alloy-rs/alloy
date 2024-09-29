@@ -7,28 +7,33 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(feature = "reqwest")]
+pub use reqwest;
+#[cfg(feature = "reqwest")]
 mod reqwest_transport;
 
 #[cfg(feature = "reqwest")]
 #[doc(inline)]
 pub use reqwest_transport::*;
 
-#[cfg(feature = "reqwest")]
-pub use reqwest;
-
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-mod hyper_transport;
-#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
-#[doc(inline)]
-pub use hyper_transport::*;
-
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper;
 #[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
 pub use hyper_util;
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
+mod layers;
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper", feature = "jwt-auth"))]
+pub use layers::{AuthLayer, AuthService};
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+mod hyper_transport;
+#[cfg(all(not(target_arch = "wasm32"), feature = "hyper"))]
+#[doc(inline)]
+pub use hyper_transport::{HyperClient, HyperResponse, HyperResponseFut, HyperTransport};
+
 use alloy_transport::utils::guess_local_url;
-use core::{marker::PhantomData, str::FromStr};
+use core::str::FromStr;
+use std::marker::PhantomData;
 use url::Url;
 
 /// Connection details for an HTTP transport.
@@ -37,6 +42,7 @@ use url::Url;
 pub struct HttpConnect<T> {
     /// The URL to connect to.
     url: Url,
+
     _pd: PhantomData<T>,
 }
 

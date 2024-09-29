@@ -29,10 +29,12 @@ alloy-signer-local = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
-alloy-rpc-types-eth.workspace = true
+alloy-rpc-types-eth = { workspace = true, features = ["serde"] }
 alloy-rpc-types-trace = { workspace = true, optional = true }
 alloy-rpc-types-txpool = { workspace = true, optional = true }
-alloy-rpc-types-engine = { workspace = true, optional = true }
+alloy-rpc-types-engine = { workspace = true, optional = true, features = [
+    "serde",
+] }
 alloy-rpc-types = { workspace = true, optional = true }
 alloy-transport-http = { workspace = true, optional = true }
 alloy-transport-ipc = { workspace = true, optional = true }
@@ -59,6 +61,7 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [dev-dependencies]
+alloy-consensus = { workspace = true, features = ["kzg"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
@@ -66,13 +69,21 @@ alloy-rlp.workspace = true
 alloy-sol-types.workspace = true
 alloy-signer.workspace = true
 alloy-signer-local.workspace = true
-alloy-transport-http = { workspace = true, features = ["reqwest"] }
+alloy-transport-http = { workspace = true, features = ["reqwest", "jwt-auth"] }
 
 itertools.workspace = true
 reqwest.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 tracing-subscriber = { workspace = true, features = ["fmt"] }
 tempfile.workspace = true
+tower.workspace = true
+tower-http = { workspace = true, features = [
+    "set-header",
+    "sensitive-headers",
+] }
+http-body-util.workspace = true
+http.workspace = true
+alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]

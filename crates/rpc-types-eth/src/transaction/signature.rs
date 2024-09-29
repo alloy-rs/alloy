@@ -1,10 +1,11 @@
-//! Signature related RPC values
+//! Signature related RPC values.
+
 use alloy_primitives::U256;
-use serde::{Deserialize, Serialize};
 
 /// Container type for all signature fields in RPC
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signature {
     /// The R field of the signature; the point on the curve.
     pub r: U256,
@@ -20,7 +21,10 @@ pub struct Signature {
     /// See also <https://ethereum.github.io/execution-apis/api-documentation/> and <https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash>
     pub v: U256,
     /// The y parity of the signature. This is only used for typed (non-legacy) transactions.
-    #[serde(default, rename = "yParity", skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, rename = "yParity", skip_serializing_if = "Option::is_none")
+    )]
     pub y_parity: Option<Parity>,
 }
 
@@ -28,9 +32,14 @@ pub struct Signature {
 ///
 /// This will be serialized as "0x0" if false, and "0x1" if true.
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Parity(
-    #[serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")] pub bool,
+    #[cfg_attr(
+        feature = "serde",
+        serde(serialize_with = "serialize_parity", deserialize_with = "deserialize_parity")
+    )]
+    pub bool,
 );
 
 impl From<bool> for Parity {
@@ -39,6 +48,7 @@ impl From<bool> for Parity {
     }
 }
 
+#[cfg(feature = "serde")]
 fn serialize_parity<S>(parity: &bool, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
@@ -47,11 +57,13 @@ where
 }
 
 /// This implementation disallows serialization of the y parity bit that are not `"0x0"` or `"0x1"`.
+#[cfg(feature = "serde")]
 fn deserialize_parity<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let s = String::deserialize(deserializer)?;
+    use serde::Deserialize;
+    let s = alloc::string::String::deserialize(deserializer)?;
     match s.as_str() {
         "0x0" => Ok(false),
         "0x1" => Ok(true),
@@ -89,9 +101,10 @@ impl From<alloy_primitives::Signature> for Signature {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use core::str::FromStr;
 
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_without_parity() {
         let raw_signature_without_y_parity = r#"{
             "r":"0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0",
@@ -113,6 +126,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_with_parity() {
         let raw_signature_with_y_parity = r#"{
             "r":"0xc569c92f176a3be1a6352dd5005bfc751dcb32f57623dd2a23693e64bf4447b0",
@@ -135,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_both_parity() {
         // this test should be removed if the struct moves to an enum based on tx type
         let signature = Signature {
@@ -154,6 +169,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_v_only() {
         // this test should be removed if the struct moves to an enum based on tx type
         let signature = Signature {
@@ -172,6 +188,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serialize_parity() {
         let parity = Parity(true);
         let serialized = serde_json::to_string(&parity).unwrap();
@@ -183,6 +200,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_parity() {
         let raw_parity = r#""0x1""#;
         let parity: Parity = serde_json::from_str(raw_parity).unwrap();
@@ -194,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn deserialize_parity_invalid() {
         let raw_parity = r#""0x2""#;
         let parity: Result<Parity, _> = serde_json::from_str(raw_parity);
