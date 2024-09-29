@@ -67,4 +67,4 @@ serde = [
     "dep:alloy-serde",
     "alloy-eips/serde",
 ]
-bincode-compat = ["serde_with"]
+serde-bincode-compat = ["serde_with"]

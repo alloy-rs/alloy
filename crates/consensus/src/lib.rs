@@ -54,7 +54,9 @@ mod signed;
 pub use signed::Signed;
 
 /// Bincode-compatible serde implementations for consensus types.
-#[cfg(all(feature = "serde", feature = "bincode-compat"))]
-pub mod bincode_compat {
-    pub use super::{header::bincode_compat::*, transaction::bincode_compat as transaction};
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub mod serde_bincode_compat {
+    pub use super::{
+        header::serde_bincode_compat::*, transaction::serde_bincode_compat as transaction,
+    };
 }

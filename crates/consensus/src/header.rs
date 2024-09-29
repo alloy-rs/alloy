@@ -822,8 +822,8 @@ mod tests {
 }
 
 /// Bincode-compatibl [`Header`] serde implementation.
-#[cfg(all(feature = "serde", feature = "bincode-compat"))]
-pub(super) mod bincode_compat {
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -833,14 +833,14 @@ pub(super) mod bincode_compat {
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
     /// ```rust
-    /// use alloy_consensus::{bincode_compat, Header};
+    /// use alloy_consensus::{serde_bincode_compat, Header};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
     /// #[serde_as]
     /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     /// struct Data {
-    ///     #[serde_as(as = "bincode_compat::Header")]
+    ///     #[serde_as(as = "serde_bincode_compat::Header")]
     ///     header: Header,
     /// }
     /// ```
@@ -962,14 +962,14 @@ pub(super) mod bincode_compat {
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 
-        use super::super::{bincode_compat, Header};
+        use super::super::{serde_bincode_compat, Header};
 
         #[test]
         fn test_header_bincode_roundtrip() {
             #[serde_as]
             #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
             struct Data {
-                #[serde_as(as = "bincode_compat::Header")]
+                #[serde_as(as = "serde_bincode_compat::Header")]
                 header: Header,
             }
 

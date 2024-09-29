@@ -450,9 +450,9 @@ mod tests {
     }
 }
 
-/// Bincode-compatible [`TxEip1559`] serde implementation.
-#[cfg(all(feature = "serde", feature = "bincode-compat"))]
-pub(super) mod bincode_compat {
+/// serde-bincode-compatible [`TxEip1559`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{Bytes, ChainId, TxKind, U256};
@@ -463,14 +463,14 @@ pub(super) mod bincode_compat {
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
     /// ```rust
-    /// use alloy_consensus::{bincode_compat, TxEip1559};
+    /// use alloy_consensus::{serde_bincode_compat, TxEip1559};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
     /// #[serde_as]
     /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     /// struct Data {
-    ///     #[serde_as(as = "bincode_compat::transaction::TxEip1559")]
+    ///     #[serde_as(as = "serde_bincode_compat::transaction::TxEip1559")]
     ///     transaction: TxEip1559,
     /// }
     /// ```
@@ -552,14 +552,14 @@ pub(super) mod bincode_compat {
         use serde::{Deserialize, Serialize};
         use serde_with::serde_as;
 
-        use super::super::{bincode_compat, TxEip1559};
+        use super::super::{serde_bincode_compat, TxEip1559};
 
         #[test]
         fn test_tx_eip1559_bincode_roundtrip() {
             #[serde_as]
             #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
             struct Data {
-                #[serde_as(as = "bincode_compat::TxEip1559")]
+                #[serde_as(as = "serde_bincode_compat::TxEip1559")]
                 transaction: TxEip1559,
             }
 
