@@ -14,6 +14,7 @@ pub use status::Eip658Value;
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
+#[auto_impl::auto_impl(&, Arc)]
 pub trait TxReceipt<T = Log> {
     /// Returns the status or post state of the transaction.
     ///
