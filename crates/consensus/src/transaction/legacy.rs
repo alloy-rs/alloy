@@ -402,7 +402,7 @@ pub(super) mod bincode_compat {
     ///
     /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
     /// ```rust
-    /// use alloy_consensus::{bincode_compat, TxEip1559};
+    /// use alloy_consensus::{bincode_compat, TxLegacy};
     /// use serde::{Deserialize, Serialize};
     /// use serde_with::serde_as;
     ///
