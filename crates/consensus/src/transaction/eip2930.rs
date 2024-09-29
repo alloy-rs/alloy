@@ -435,13 +435,9 @@ pub(super) mod serde_bincode_compat {
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
     pub struct TxEip2930<'a> {
-        #[serde(with = "alloy_serde::quantity")]
         chain_id: ChainId,
-        #[serde(with = "alloy_serde::quantity")]
         nonce: u64,
-        #[serde(with = "alloy_serde::quantity")]
         gas_price: u128,
-        #[serde(with = "alloy_serde::quantity")]
         gas_limit: u64,
         #[serde(default)]
         to: TxKind,

@@ -419,11 +419,8 @@ pub(super) mod serde_bincode_compat {
     pub struct TxLegacy<'a> {
         #[serde(default, with = "alloy_serde::quantity::opt")]
         chain_id: Option<ChainId>,
-        #[serde(with = "alloy_serde::quantity")]
         nonce: u64,
-        #[serde(with = "alloy_serde::quantity")]
         gas_price: u128,
-        #[serde(with = "alloy_serde::quantity")]
         gas_limit: u64,
         #[serde(default)]
         to: TxKind,

@@ -858,21 +858,17 @@ pub(super) mod serde_bincode_compat {
         withdrawals_root: Option<B256>,
         logs_bloom: Bloom,
         difficulty: U256,
-        #[serde(with = "alloy_serde::quantity")]
         number: BlockNumber,
-        #[serde(with = "alloy_serde::quantity")]
         gas_limit: u64,
-        #[serde(with = "alloy_serde::quantity")]
         gas_used: u64,
-        #[serde(with = "alloy_serde::quantity")]
         timestamp: u64,
         mix_hash: B256,
         nonce: B64,
-        #[serde(default, with = "alloy_serde::quantity::opt")]
+        #[serde(default)]
         base_fee_per_gas: Option<u64>,
-        #[serde(default, with = "alloy_serde::quantity::opt")]
+        #[serde(default)]
         blob_gas_used: Option<u64>,
-        #[serde(default, with = "alloy_serde::quantity::opt")]
+        #[serde(default)]
         excess_blob_gas: Option<u64>,
         #[serde(default)]
         parent_beacon_block_root: Option<B256>,
