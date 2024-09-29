@@ -83,7 +83,7 @@ pub trait TransactionResponse: Transaction {
     /// Sender of the transaction
     fn from(&self) -> Address;
 
-    /// Recipient of the transaction. Returns `None`if transaction is a contract creation.
+    /// Recipient of the transaction. Returns `None` if transaction is a contract creation.
     fn to(&self) -> Option<Address> {
         Transaction::to(self).to().copied()
     }
