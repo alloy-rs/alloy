@@ -63,6 +63,7 @@ pub use signed::Signed;
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub mod serde_bincode_compat {
     pub use super::{
-        header::serde_bincode_compat::*, transaction::serde_bincode_compat as transaction,
+        header::serde_bincode_compat::*,
+        transaction::{serde_bincode_compat as transaction, serde_bincode_compat::*},
     };
 }

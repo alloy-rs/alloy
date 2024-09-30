@@ -425,7 +425,7 @@ pub(super) mod serde_bincode_compat {
     /// use serde_with::serde_as;
     ///
     /// #[serde_as]
-    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// #[derive(Serialize, Deserialize)]
     /// struct Data {
     ///     #[serde_as(as = "serde_bincode_compat::transaction::TxEip2930")]
     ///     transaction: TxEip2930,
