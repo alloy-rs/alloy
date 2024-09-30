@@ -413,9 +413,7 @@ pub(super) mod serde_bincode_compat {
     ///     header: TxLegacy,
     /// }
     /// ```
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct TxLegacy<'a> {
         #[serde(default, with = "alloy_serde::quantity::opt")]
         chain_id: Option<ChainId>,
@@ -484,7 +482,7 @@ pub(super) mod serde_bincode_compat {
         use super::super::{serde_bincode_compat, TxLegacy};
 
         #[test]
-        fn test_tx_eip1559_bincode_roundtrip() {
+        fn test_tx_legacy_bincode_roundtrip() {
             #[serde_as]
             #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
             struct Data {

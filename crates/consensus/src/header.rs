@@ -844,9 +844,7 @@ pub(super) mod serde_bincode_compat {
     ///     header: Header,
     /// }
     /// ```
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct Header<'a> {
         parent_hash: B256,
         ommers_hash: B256,
