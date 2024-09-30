@@ -21,7 +21,6 @@ workspace = true
 [dependencies]
 alloy-json-rpc.workspace = true
 
-async-trait = { workspace = true, optional = true }
 serde_json = { version = "1.0.128" }
 tower.workspace = true
 
