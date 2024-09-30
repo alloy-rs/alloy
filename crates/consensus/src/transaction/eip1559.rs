@@ -468,15 +468,13 @@ pub(super) mod serde_bincode_compat {
     /// use serde_with::serde_as;
     ///
     /// #[serde_as]
-    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// #[derive(Serialize, Deserialize)]
     /// struct Data {
     ///     #[serde_as(as = "serde_bincode_compat::transaction::TxEip1559")]
     ///     transaction: TxEip1559,
     /// }
     /// ```
-    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct TxEip1559<'a> {
         chain_id: ChainId,
         nonce: u64,
