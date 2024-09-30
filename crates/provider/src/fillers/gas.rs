@@ -257,14 +257,8 @@ mod tests {
     use alloy_primitives::{address, U256};
     use alloy_rpc_types_eth::TransactionRequest;
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     #[tokio::test]
     async fn no_gas_price_or_limit() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
@@ -285,8 +279,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_gas_limit() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let gas_price = provider.get_gas_price().await.unwrap();
@@ -306,8 +298,6 @@ mod tests {
 
     #[tokio::test]
     async fn no_max_fee_per_blob_gas() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
@@ -335,8 +325,6 @@ mod tests {
 
     #[tokio::test]
     async fn zero_max_fee_per_blob_gas() {
-        init_tracing();
-
         let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
 
         let sidecar: SidecarBuilder<SimpleCoder> = SidecarBuilder::from_slice(b"Hello World");
