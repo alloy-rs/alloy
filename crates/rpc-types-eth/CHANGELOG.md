@@ -5,12 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Bug Fixes
+
+- `eth_simulateV1` serde ([#1345](https://github.com/alloy-rs/alloy/issues/1345))
+
+### Features
+
+- Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
+- [serde] Remove deprecated `num` module ([#1350](https://github.com/alloy-rs/alloy/issues/1350))
+- [provider] Subscribe to new blocks if possible in heartbeat ([#1321](https://github.com/alloy-rs/alloy/issues/1321))
+- Add getters into TransactionResponse and update implementations  ([#1328](https://github.com/alloy-rs/alloy/issues/1328))
+- Add builder style function to simulate payload args ([#1324](https://github.com/alloy-rs/alloy/issues/1324))
+
+### Miscellaneous Tasks
+
+- Fix warnings on no_std ([#1355](https://github.com/alloy-rs/alloy/issues/1355))
+
+### Other
+
+- Add supertrait alloy_consensus::Transaction to RPC TransactionResponse ([#1387](https://github.com/alloy-rs/alloy/issues/1387))
+- Make `gas_limit` u64 for transactions ([#1382](https://github.com/alloy-rs/alloy/issues/1382))
+- Make `Header` blob fees u64 ([#1377](https://github.com/alloy-rs/alloy/issues/1377))
+- Make `Header` `base_fee_per_gas` u64 ([#1375](https://github.com/alloy-rs/alloy/issues/1375))
+- Make `Header` gas limit u64 ([#1333](https://github.com/alloy-rs/alloy/issues/1333))
+- Make factory and paymaster fields optional in `PackedUserOperation` ([#1330](https://github.com/alloy-rs/alloy/issues/1330))
+- Remove repetitive as_ref ([#1329](https://github.com/alloy-rs/alloy/issues/1329))
+
+### Testing
+
+- Update test cases with addresses ([#1358](https://github.com/alloy-rs/alloy/issues/1358))
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Bug Fixes
 
 - [types-eth] Optional Alloy Serde ([#1284](https://github.com/alloy-rs/alloy/issues/1284))
 - `eth_simulateV1` ([#1289](https://github.com/alloy-rs/alloy/issues/1289))
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
 
 ## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 
