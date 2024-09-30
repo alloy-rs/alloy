@@ -22,31 +22,6 @@ use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf, 
 ///
 /// One can load the cache from the file system by calling `load_cache` and save the cache to the
 /// file system by calling `save_cache`.
-///
-/// Example usage:
-/// ```
-/// use alloy_node_bindings::Anvil;
-/// use alloy_provider::{ProviderBuilder, Provider};
-/// use alloy_provider::layers::CacheLayer;
-/// use std::path::PathBuf;
-/// use std::str::FromStr;
-///
-/// #[tokio::main]
-/// async fn main() {
-/// let cache = CacheLayer::new(100);
-/// let anvil = Anvil::new().block_time_f64(0.3).spawn();
-/// let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
-/// let path = PathBuf::from_str("./rpc-cache.txt").unwrap();
-/// provider.load_cache(path.clone()).unwrap(); // Load cache from file if it exists.
-///
-/// let blk = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from RPC and saved to in-memory cache
-///
-/// let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap(); // Fetched from in-memory cache
-/// assert_eq!(blk, blk2);
-///
-/// provider.save_cache(path).unwrap(); // Save cache to file
-/// }
-/// ```
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
     config: CacheConfig,

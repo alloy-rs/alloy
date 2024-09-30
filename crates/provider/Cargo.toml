@@ -51,7 +51,6 @@ dashmap = "6.0"
 futures-utils-wasm.workspace = true
 futures.workspace = true
 lru = "0.12"
-parking_lot.workspace = true
 pin-project.workspace = true
 reqwest = { workspace = true, optional = true }
 serde_json.workspace = true
@@ -60,6 +59,9 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["sync", "macros"] }
 tracing.workspace = true
 url = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+parking_lot = { workspace = true }
 
 [dev-dependencies]
 alloy-primitives = { workspace = true, features = ["rand"] }
