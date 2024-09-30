@@ -47,6 +47,7 @@ pub use erc4337::Erc4337Api;
 
 #[cfg(test)]
 pub(crate) mod test {
+    #[allow(dead_code)] // dead only when all features off
     /// Run the given function only if we are in a CI environment.
     pub(crate) async fn async_ci_only<F, Fut>(f: F)
     where
