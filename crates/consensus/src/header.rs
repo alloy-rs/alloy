@@ -793,7 +793,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn header_serde() {
+    fn test_header_serde_json_roundtrip() {
         let raw = r#"{"parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","beneficiary":"0x0000000000000000000000000000000000000000","stateRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","difficulty":"0x0","number":"0x0","gasLimit":"0x0","gasUsed":"0x0","timestamp":"0x0","mixHash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":"0x0000000000000000","baseFeePerGas":"0x1","extraData":"0x"}"#;
         let header = Header {
             base_fee_per_gas: Some(1),
@@ -801,10 +801,10 @@ mod tests {
             ..Default::default()
         };
 
-        let json = serde_json::to_string(&header).unwrap();
-        assert_eq!(json, raw);
+        let encoded = serde_json::to_string(&header).unwrap();
+        assert_eq!(encoded, raw);
 
-        let decoded: Header = serde_json::from_str(&json).unwrap();
+        let decoded: Header = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, header);
 
         // Create a vector to store the encoded RLP
@@ -818,5 +818,166 @@ mod tests {
 
         // Check that the decoded RLP data matches the original header data
         assert_eq!(decoded_rlp, decoded);
+    }
+}
+
+/// Bincode-compatibl [`Header`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_primitives::{Address, BlockNumber, Bloom, Bytes, B256, B64, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::Header`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, Header};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::Header")]
+    ///     header: Header,
+    /// }
+    /// ```
+    #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    pub struct Header<'a> {
+        parent_hash: B256,
+        ommers_hash: B256,
+        beneficiary: Address,
+        state_root: B256,
+        transactions_root: B256,
+        receipts_root: B256,
+        #[serde(default)]
+        withdrawals_root: Option<B256>,
+        logs_bloom: Bloom,
+        difficulty: U256,
+        number: BlockNumber,
+        gas_limit: u64,
+        gas_used: u64,
+        timestamp: u64,
+        mix_hash: B256,
+        nonce: B64,
+        #[serde(default)]
+        base_fee_per_gas: Option<u64>,
+        #[serde(default)]
+        blob_gas_used: Option<u64>,
+        #[serde(default)]
+        excess_blob_gas: Option<u64>,
+        #[serde(default)]
+        parent_beacon_block_root: Option<B256>,
+        #[serde(default)]
+        requests_root: Option<B256>,
+        extra_data: Cow<'a, Bytes>,
+    }
+
+    impl<'a> From<&'a super::Header> for Header<'a> {
+        fn from(value: &'a super::Header) -> Self {
+            Self {
+                parent_hash: value.parent_hash,
+                ommers_hash: value.ommers_hash,
+                beneficiary: value.beneficiary,
+                state_root: value.state_root,
+                transactions_root: value.transactions_root,
+                receipts_root: value.receipts_root,
+                withdrawals_root: value.withdrawals_root,
+                logs_bloom: value.logs_bloom,
+                difficulty: value.difficulty,
+                number: value.number,
+                gas_limit: value.gas_limit,
+                gas_used: value.gas_used,
+                timestamp: value.timestamp,
+                mix_hash: value.mix_hash,
+                nonce: value.nonce,
+                base_fee_per_gas: value.base_fee_per_gas,
+                blob_gas_used: value.blob_gas_used,
+                excess_blob_gas: value.excess_blob_gas,
+                parent_beacon_block_root: value.parent_beacon_block_root,
+                requests_root: value.requests_root,
+                extra_data: Cow::Borrowed(&value.extra_data),
+            }
+        }
+    }
+
+    impl<'a> From<Header<'a>> for super::Header {
+        fn from(value: Header<'a>) -> Self {
+            Self {
+                parent_hash: value.parent_hash,
+                ommers_hash: value.ommers_hash,
+                beneficiary: value.beneficiary,
+                state_root: value.state_root,
+                transactions_root: value.transactions_root,
+                receipts_root: value.receipts_root,
+                withdrawals_root: value.withdrawals_root,
+                logs_bloom: value.logs_bloom,
+                difficulty: value.difficulty,
+                number: value.number,
+                gas_limit: value.gas_limit,
+                gas_used: value.gas_used,
+                timestamp: value.timestamp,
+                mix_hash: value.mix_hash,
+                nonce: value.nonce,
+                base_fee_per_gas: value.base_fee_per_gas,
+                blob_gas_used: value.blob_gas_used,
+                excess_blob_gas: value.excess_blob_gas,
+                parent_beacon_block_root: value.parent_beacon_block_root,
+                requests_root: value.requests_root,
+                extra_data: value.extra_data.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::Header> for Header<'a> {
+        fn serialize_as<S>(source: &super::Header, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Header::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::Header> for Header<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::Header, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Header::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::{serde_bincode_compat, Header};
+
+        #[test]
+        fn test_header_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::Header")]
+                header: Header,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                header: Header::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap(),
+            };
+
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 }
