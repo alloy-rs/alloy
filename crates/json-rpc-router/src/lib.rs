@@ -29,9 +29,15 @@ use tower::{util::BoxCloneService, Service};
 pub type Route<E = Infallible> = BoxCloneService<Box<RawValue>, ResponsePayload, E>;
 
 /// A JSON-RPC router.
-#[derive(Clone)]
+#[must_use = "Routers do nothing unless served."]
 pub struct Router<S> {
     inner: Arc<RouterInner<S>>,
+}
+
+impl<S> Clone for Router<S> {
+    fn clone(&self) -> Self {
+        Self { inner: Arc::clone(&self.inner) }
+    }
 }
 
 impl<S> Router<S> {

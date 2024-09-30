@@ -30,4 +30,4 @@ async-trait = { workspace = true, optional = true }
 axum = { version = "0.7.6", features = ["json"], optional = true }
 
 [features]
-axum = ["dep:axum"]
+axum = ["dep:axum", "dep:async-trait"]

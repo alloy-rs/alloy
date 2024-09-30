@@ -3,7 +3,7 @@ use axum::extract;
 
 impl From<extract::rejection::JsonRejection> for Response<(), ()> {
     fn from(value: extract::rejection::JsonRejection) -> Self {
-        Response {
+        Self {
             id: Id::None,
             payload: ResponsePayload::Failure(ErrorPayload {
                 code: -32600,
@@ -34,7 +34,7 @@ where
     type Rejection = Response<(), ()>;
 
     async fn from_request(req: extract::Request, state: &S) -> Result<Self, Self::Rejection> {
-        let json = extract::Json::<Request<Params>>::from_request(req, state).await?;
+        let json = extract::Json::<Self>::from_request(req, state).await?;
 
         Ok(json.0)
     }
