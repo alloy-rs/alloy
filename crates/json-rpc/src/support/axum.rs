@@ -7,7 +7,7 @@ impl From<extract::rejection::JsonRejection> for Response<(), ()> {
             id: Id::None,
             payload: ResponsePayload::Failure(ErrorPayload {
                 code: -32600,
-                message: value.to_string(),
+                message: value.to_string().into(),
                 data: None,
             }),
         }
