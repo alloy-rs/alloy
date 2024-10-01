@@ -138,7 +138,24 @@ jobs:
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check --feature-powerset
+        run: cargo hack check --feature-powerset --depth 1
+
+  feature-checks-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: cargo hack
+        run: |
+          cargo hack check --feature-powerset \
+            -p alloy-consensus \
+            -p alloy-eips \
+            -p alloy-genesis
 
   check-no-std:
     name: check no_std ${{ matrix.features }}
