@@ -138,7 +138,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check --feature-powerset --depth 1
+        run: cargo hack check --feature-powerset --depth 2
 
   feature-checks-full:
     runs-on: ubuntu-latest
