@@ -450,7 +450,7 @@ mod tests {
     }
 }
 
-/// serde-bincode-compatible [`TxEip1559`] serde implementation.
+/// Bincode-compatible [`TxEip1559`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
     use alloc::borrow::Cow;
