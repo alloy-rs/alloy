@@ -230,12 +230,12 @@ impl Transaction for TxLegacy {
         None
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        self.gas_price
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.gas_price
     }
 
     fn to(&self) -> TxKind {

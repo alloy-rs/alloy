@@ -76,14 +76,14 @@ mod block_rlp {
     }
 
     impl<T: Encodable> Encodable for Block<T> {
-        fn length(&self) -> usize {
-            let helper: HelperRef<'_, T> = self.into();
-            helper.length()
-        }
-
         fn encode(&self, out: &mut dyn alloy_rlp::bytes::BufMut) {
             let helper: HelperRef<'_, T> = self.into();
             helper.encode(out)
+        }
+
+        fn length(&self) -> usize {
+            let helper: HelperRef<'_, T> = self.into();
+            helper.length()
         }
     }
 
