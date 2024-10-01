@@ -388,101 +388,10 @@ impl Decodable for TxEip7702 {
     }
 }
 
-#[cfg(all(test, feature = "k256"))]
-mod tests {
-    use super::TxEip7702;
-    use crate::SignableTransaction;
-    use alloy_eips::eip2930::AccessList;
-    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
-
-    #[test]
-    fn encode_decode_eip7702() {
-        let tx =  TxEip7702 {
-            chain_id: 1,
-            nonce: 0x42,
-            gas_limit: 44386,
-            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6"),
-            value: U256::from(0_u64),
-            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            access_list: AccessList::default(),
-            authorization_list: vec![],
-        };
-
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
-
-        let mut buf = vec![];
-        tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
-        assert_eq!(decoded, tx.into_signed(sig));
-    }
-
-    #[test]
-    fn test_decode_create() {
-        // tests that a contract creation tx encodes and decodes properly
-        let tx = TxEip7702 {
-            chain_id: 1u64,
-            nonce: 0,
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            gas_limit: 2,
-            to: Address::default(),
-            value: U256::ZERO,
-            input: vec![1, 2].into(),
-            access_list: Default::default(),
-            authorization_list: Default::default(),
-        };
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
-        let mut buf = vec![];
-        tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
-        assert_eq!(decoded, tx.into_signed(sig));
-    }
-
-    #[test]
-    fn test_decode_call() {
-        let tx = TxEip7702 {
-            chain_id: 1u64,
-            nonce: 0,
-            max_fee_per_gas: 0x4a817c800,
-            max_priority_fee_per_gas: 0x3b9aca00,
-            gas_limit: 2,
-            to: Address::default(),
-            value: U256::ZERO,
-            input: vec![1, 2].into(),
-            access_list: Default::default(),
-            authorization_list: Default::default(),
-        };
-
-        let sig = Signature::from_scalars_and_parity(
-            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
-            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
-            false,
-        )
-        .unwrap();
-
-        let mut buf = vec![];
-        tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
-        assert_eq!(decoded, tx.into_signed(sig));
-    }
-}
-
 /// Bincode-compatible [`TxEip7702`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
-    use alloc::borrow::Cow;
+    use alloc::{borrow::Cow, vec::Vec};
     use alloy_eips::{eip2930::AccessList, eip7702::serde_bincode_compat::SignedAuthorization};
     use alloy_primitives::{Address, Bytes, ChainId, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -598,5 +507,96 @@ pub(super) mod serde_bincode_compat {
             let decoded: Data = bincode::deserialize(&encoded).unwrap();
             assert_eq!(decoded, data);
         }
+    }
+}
+
+#[cfg(all(test, feature = "k256"))]
+mod tests {
+    use super::TxEip7702;
+    use crate::SignableTransaction;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{address, b256, hex, Address, Signature, U256};
+
+    #[test]
+    fn encode_decode_eip7702() {
+        let tx =  TxEip7702 {
+            chain_id: 1,
+            nonce: 0x42,
+            gas_limit: 44386,
+            to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6"),
+            value: U256::from(0_u64),
+            input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            access_list: AccessList::default(),
+            authorization_list: vec![],
+        };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+    }
+
+    #[test]
+    fn test_decode_create() {
+        // tests that a contract creation tx encodes and decodes properly
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: Address::default(),
+            value: U256::ZERO,
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+    }
+
+    #[test]
+    fn test_decode_call() {
+        let tx = TxEip7702 {
+            chain_id: 1u64,
+            nonce: 0,
+            max_fee_per_gas: 0x4a817c800,
+            max_priority_fee_per_gas: 0x3b9aca00,
+            gas_limit: 2,
+            to: Address::default(),
+            value: U256::ZERO,
+            input: vec![1, 2].into(),
+            access_list: Default::default(),
+            authorization_list: Default::default(),
+        };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        )
+        .unwrap();
+
+        let mut buf = vec![];
+        tx.encode_with_signature_fields(&sig, &mut buf);
+        let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
     }
 }
