@@ -391,8 +391,7 @@ impl Decodable for TxEip7702 {
 /// Bincode-compatible [`TxEip7702`] serde implementation.
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(super) mod serde_bincode_compat {
-    use alloc::borrow::Cow;
-    use alloc::vec::Vec;
+    use alloc::{borrow::Cow, vec::Vec};
     use alloy_eips::{eip2930::AccessList, eip7702::serde_bincode_compat::SignedAuthorization};
     use alloy_primitives::{Address, Bytes, ChainId, U256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -511,7 +510,6 @@ pub(super) mod serde_bincode_compat {
     }
 }
 
-
 #[cfg(all(test, feature = "k256"))]
 mod tests {
     use super::TxEip7702;
@@ -539,7 +537,7 @@ mod tests {
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
         )
-            .unwrap();
+        .unwrap();
 
         let mut buf = vec![];
         tx.encode_with_signature_fields(&sig, &mut buf);
@@ -567,7 +565,7 @@ mod tests {
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
         )
-            .unwrap();
+        .unwrap();
         let mut buf = vec![];
         tx.encode_with_signature_fields(&sig, &mut buf);
         let decoded = TxEip7702::decode_signed_fields(&mut &buf[..]).unwrap();
@@ -594,7 +592,7 @@ mod tests {
             b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
             false,
         )
-            .unwrap();
+        .unwrap();
 
         let mut buf = vec![];
         tx.encode_with_signature_fields(&sig, &mut buf);
