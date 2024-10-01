@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.4.0
 - Fix warnings on no_std ([#1355](https://github.com/alloy-rs/alloy/issues/1355))
 
 ### Other

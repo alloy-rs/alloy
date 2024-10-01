@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
 
+### Miscellaneous Tasks
+
+- Release 0.4.0
+
 ### Other
 
 - Add `OperationType::OpEofCreate` ([#1327](https://github.com/alloy-rs/alloy/issues/1327))

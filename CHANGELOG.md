@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Bug Fixes
+
+- Safe match for next base fee ([#1399](https://github.com/alloy-rs/alloy/issues/1399))
+
+### Dependencies
+
+- Bump alloy-eip7702
+
+### Features
+
+- [consensus] Bincode compatibility for EIP-7702 ([#1404](https://github.com/alloy-rs/alloy/issues/1404))
+
+### Miscellaneous Tasks
+
+- [consensus] Less derives for bincode compatible types ([#1401](https://github.com/alloy-rs/alloy/issues/1401))
+
 ## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
 
 ### Bug Fixes
@@ -55,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.4.0
 - Rm outdated comments ([#1392](https://github.com/alloy-rs/alloy/issues/1392))
 - Move type def to where it belongs ([#1391](https://github.com/alloy-rs/alloy/issues/1391))
 - Update comment to be more accurate ([#1390](https://github.com/alloy-rs/alloy/issues/1390))

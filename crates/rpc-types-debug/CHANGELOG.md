@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.4.0
 - Update comment to be more accurate ([#1390](https://github.com/alloy-rs/alloy/issues/1390))
 - Add codes into execution witness ([#1352](https://github.com/alloy-rs/alloy/issues/1352))
 
