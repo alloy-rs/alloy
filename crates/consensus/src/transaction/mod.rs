@@ -40,7 +40,7 @@ pub use typed::TypedTransaction;
 pub mod serde_bincode_compat {
     pub use super::{
         eip1559::serde_bincode_compat::*, eip2930::serde_bincode_compat::*,
-        legacy::serde_bincode_compat::*,
+        eip7702::serde_bincode_compat::*, legacy::serde_bincode_compat::*,
     };
 }
 
