@@ -689,6 +689,12 @@ impl From<B256> for HashOrNumber {
     }
 }
 
+impl From<&B256> for HashOrNumber {
+    fn from(value: &B256) -> Self {
+        Self::Hash(*value)
+    }
+}
+
 impl From<u64> for HashOrNumber {
     fn from(value: u64) -> Self {
         Self::Number(value)
