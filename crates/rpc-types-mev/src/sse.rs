@@ -110,44 +110,44 @@ pub struct EventHistoryParams {
 
 #[allow(missing_docs)]
 impl EventHistoryParams {
-    pub fn with_block_start(mut self, block_start: u64) -> Self {
+    pub const fn with_block_start(mut self, block_start: u64) -> Self {
         self.block_start = Some(block_start);
         self
     }
 
-    pub fn with_block_end(mut self, block_end: u64) -> Self {
+    pub const fn with_block_end(mut self, block_end: u64) -> Self {
         self.block_end = Some(block_end);
         self
     }
 
-    pub fn with_block_range(mut self, block_start: u64, block_end: u64) -> Self {
+    pub const fn with_block_range(mut self, block_start: u64, block_end: u64) -> Self {
         self.block_start = Some(block_start);
         self.block_end = Some(block_end);
         self
     }
 
-    pub fn with_timestamp_start(mut self, timestamp_start: u64) -> Self {
+    pub const fn with_timestamp_start(mut self, timestamp_start: u64) -> Self {
         self.timestamp_start = Some(timestamp_start);
         self
     }
 
-    pub fn with_timestamp_end(mut self, timestamp_end: u64) -> Self {
+    pub const fn with_timestamp_end(mut self, timestamp_end: u64) -> Self {
         self.timestamp_end = Some(timestamp_end);
         self
     }
 
-    pub fn with_timestamp_range(mut self, timestamp_start: u64, timestamp_end: u64) -> Self {
+    pub const fn with_timestamp_range(mut self, timestamp_start: u64, timestamp_end: u64) -> Self {
         self.timestamp_start = Some(timestamp_start);
         self.timestamp_end = Some(timestamp_end);
         self
     }
 
-    pub fn with_limit(mut self, limit: u64) -> Self {
+    pub const fn with_limit(mut self, limit: u64) -> Self {
         self.limit = Some(limit);
         self
     }
 
-    pub fn with_offset(mut self, offset: u64) -> Self {
+    pub const fn with_offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset);
         self
     }
@@ -190,7 +190,7 @@ impl<'de> Deserialize<'de> for FunctionSelector {
 
         let bytes = hex::decode(s).map_err(serde::de::Error::custom)?;
         let selector =
-            FunctionSelector::try_from(bytes.as_slice()).map_err(serde::de::Error::custom)?;
+            Self::try_from(bytes.as_slice()).map_err(serde::de::Error::custom)?;
         Ok(selector)
     }
 }
