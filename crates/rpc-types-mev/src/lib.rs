@@ -12,7 +12,7 @@ pub use eth_calls::*;
 mod mev_calls;
 pub use mev_calls::*;
 
-pub mod sse;
+pub mod mevshare;
 
 // types for stats endpoint like flashbots_getUserStats and flashbots_getBundleStats
 mod stats;
