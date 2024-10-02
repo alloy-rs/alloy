@@ -1,4 +1,6 @@
 use alloc::vec::Vec;
+use core::mem;
+
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
@@ -11,7 +13,6 @@ use alloy_primitives::{
 use alloy_rlp::{
     length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
 };
-use core::mem;
 
 /// Ommer root of empty list.
 pub const EMPTY_OMMER_ROOT_HASH: B256 =
@@ -235,32 +236,6 @@ impl Header {
     /// Returns a `None` if no excess blob gas is set, no EIP-4844 support
     pub fn next_block_excess_blob_gas(&self) -> Option<u64> {
         Some(calc_excess_blob_gas(self.excess_blob_gas?, self.blob_gas_used?))
-    }
-
-    /// Calculate a heuristic for the in-memory size of the [Header].
-    #[inline]
-    pub fn size(&self) -> usize {
-        mem::size_of::<B256>() + // parent hash
-        mem::size_of::<B256>() + // ommers hash
-        mem::size_of::<Address>() + // beneficiary
-        mem::size_of::<B256>() + // state root
-        mem::size_of::<B256>() + // transactions root
-        mem::size_of::<B256>() + // receipts root
-        mem::size_of::<Option<B256>>() + // withdrawals root
-        mem::size_of::<Bloom>() + // logs bloom
-        mem::size_of::<U256>() + // difficulty
-        mem::size_of::<BlockNumber>() + // number
-        mem::size_of::<u128>() + // gas limit
-        mem::size_of::<u128>() + // gas used
-        mem::size_of::<u64>() + // timestamp
-        mem::size_of::<B256>() + // mix hash
-        mem::size_of::<u64>() + // nonce
-        mem::size_of::<Option<u128>>() + // base fee per gas
-        mem::size_of::<Option<u128>>() + // blob gas used
-        mem::size_of::<Option<u128>>() + // excess blob gas
-        mem::size_of::<Option<B256>>() + // parent beacon block root
-        mem::size_of::<Option<B256>>() + // requests root
-        self.extra_data.len() // extra data
     }
 
     fn header_payload_length(&self) -> usize {
@@ -700,6 +675,9 @@ pub trait BlockHeader {
 
     /// Retrieves the block's extra data field
     fn extra_data(&self) -> &Bytes;
+
+    /// Calculate a heuristic for the in-memory size of the [Header].
+    fn size(&self) -> usize;
 }
 
 impl BlockHeader for Header {
@@ -785,6 +763,31 @@ impl BlockHeader for Header {
 
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        mem::size_of::<B256>() + // parent hash
+            mem::size_of::<B256>() + // ommers hash
+            mem::size_of::<Address>() + // beneficiary
+            mem::size_of::<B256>() + // state root
+            mem::size_of::<B256>() + // transactions root
+            mem::size_of::<B256>() + // receipts root
+            mem::size_of::<Option<B256>>() + // withdrawals root
+            mem::size_of::<Bloom>() + // logs bloom
+            mem::size_of::<U256>() + // difficulty
+            mem::size_of::<BlockNumber>() + // number
+            mem::size_of::<u128>() + // gas limit
+            mem::size_of::<u128>() + // gas used
+            mem::size_of::<u64>() + // timestamp
+            mem::size_of::<B256>() + // mix hash
+            mem::size_of::<u64>() + // nonce
+            mem::size_of::<Option<u128>>() + // base fee per gas
+            mem::size_of::<Option<u128>>() + // blob gas used
+            mem::size_of::<Option<u128>>() + // excess blob gas
+            mem::size_of::<Option<B256>>() + // parent beacon block root
+            mem::size_of::<Option<B256>>() + // requests root
+            self.extra_data.len() // extra data
     }
 }
 
