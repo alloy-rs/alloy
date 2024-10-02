@@ -1,4 +1,6 @@
 use alloc::vec::Vec;
+use core::ops;
+
 use alloy_eips::{
     eip1559::{calc_next_block_base_fee, BaseFeeParams},
     eip4844::{calc_blob_gasprice, calc_excess_blob_gas},
@@ -785,6 +787,95 @@ impl BlockHeader for Header {
 
     fn extra_data(&self) -> &Bytes {
         &self.extra_data
+    }
+}
+
+impl<T> BlockHeader for T
+where
+    T: ops::Deref<Target: BlockHeader>,
+{
+    fn parent_hash(&self) -> B256 {
+        self.deref().parent_hash()
+    }
+
+    fn ommers_hash(&self) -> B256 {
+        self.deref().ommers_hash()
+    }
+
+    fn beneficiary(&self) -> Address {
+        self.deref().beneficiary()
+    }
+
+    fn state_root(&self) -> B256 {
+        self.deref().state_root()
+    }
+
+    fn transactions_root(&self) -> B256 {
+        self.deref().transactions_root()
+    }
+
+    fn receipts_root(&self) -> B256 {
+        self.deref().receipts_root()
+    }
+
+    fn withdrawals_root(&self) -> Option<B256> {
+        self.deref().withdrawals_root()
+    }
+
+    fn logs_bloom(&self) -> Bloom {
+        self.deref().logs_bloom()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.deref().difficulty()
+    }
+
+    fn number(&self) -> BlockNumber {
+        self.deref().number()
+    }
+
+    fn gas_limit(&self) -> u64 {
+        self.deref().gas_limit()
+    }
+
+    fn gas_used(&self) -> u64 {
+        self.deref().gas_used()
+    }
+
+    fn timestamp(&self) -> u64 {
+        self.deref().timestamp()
+    }
+
+    fn mix_hash(&self) -> B256 {
+        self.deref().mix_hash()
+    }
+
+    fn nonce(&self) -> B64 {
+        self.deref().nonce()
+    }
+
+    fn base_fee_per_gas(&self) -> Option<u64> {
+        self.deref().base_fee_per_gas()
+    }
+
+    fn blob_gas_used(&self) -> Option<u64> {
+        self.deref().blob_gas_used()
+    }
+
+    fn excess_blob_gas(&self) -> Option<u64> {
+        self.deref().excess_blob_gas()
+    }
+
+    fn parent_beacon_block_root(&self) -> Option<B256> {
+        self.deref().parent_beacon_block_root()
+    }
+
+    fn requests_root(&self) -> Option<B256> {
+        self.deref().requests_root()
+    }
+
+    fn extra_data(&self) -> &Bytes {
+        self.deref().extra_data()
     }
 }
 
