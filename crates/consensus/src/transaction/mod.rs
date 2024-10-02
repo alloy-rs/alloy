@@ -133,6 +133,9 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     ///
     /// Returns `None` if this transaction is not EIP-7702.
     fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// Calculate a heuristic for the in-memory size of the transaction.
+    fn size(&self) -> usize;
 }
 
 /// A signable transaction.
