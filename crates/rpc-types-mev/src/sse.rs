@@ -189,8 +189,7 @@ impl<'de> Deserialize<'de> for FunctionSelector {
         }
 
         let bytes = hex::decode(s).map_err(serde::de::Error::custom)?;
-        let selector =
-            Self::try_from(bytes.as_slice()).map_err(serde::de::Error::custom)?;
+        let selector = Self::try_from(bytes.as_slice()).map_err(serde::de::Error::custom)?;
         Ok(selector)
     }
 }
