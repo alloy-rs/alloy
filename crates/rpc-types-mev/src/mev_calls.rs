@@ -94,7 +94,7 @@ pub enum BundleItem {
         /// If true, the transaction can revert without the bundle being considered invalid.
         can_revert: bool,
     },
-    /// A nested bundle request. 
+    /// A nested bundle request.
     #[serde(rename_all = "camelCase")]
     Bundle {
         /// A bundle request of type SendBundleRequest
