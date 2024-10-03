@@ -119,7 +119,11 @@ impl<C: PrehashSigner<(ecdsa::Signature, RecoveryId)>> SignerSync for LocalSigne
     #[inline]
     fn sign_hash_sync(&self, hash: &B256) -> Result<Signature> {
         let (recoverable_sig, recovery_id) = self.credential.sign_prehash(hash.as_ref())?;
-        Ok(Signature::from_signature_and_parity(recoverable_sig, recovery_id)?)
+        dbg!(&recoverable_sig);
+        dbg!(&recovery_id);
+        Ok(Signature::from_signature_and_parity(recoverable_sig, recovery_id).inspect(|s| {
+            dbg!(&s);
+        })?)
     }
 
     #[inline]

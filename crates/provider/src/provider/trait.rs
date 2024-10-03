@@ -678,6 +678,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: N::TransactionRequest,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        dbg!("here");
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
@@ -704,12 +705,15 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         &self,
         tx: SendableTx<N>,
     ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+        dbg!("here2");
+        dbg!(&tx);
         // Make sure to initialize heartbeat before we submit transaction, so that
         // we don't miss it if user will subscriber to it immediately after sending.
         let _handle = self.root().get_heart();
 
         match tx {
             SendableTx::Builder(mut tx) => {
+                dbg!("here3");
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
                 Ok(PendingTransactionBuilder::new(self.root(), tx_hash))

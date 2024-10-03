@@ -173,6 +173,7 @@ mod tests {
     use super::*;
     use crate::{ProviderBuilder, WalletProvider};
     use alloy_primitives::{address, U256};
+    use tracing_subscriber::fmt::init;
     use alloy_rpc_types_eth::TransactionRequest;
 
     async fn check_nonces<P, T, N, M>(
@@ -252,6 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn increments_nonce() {
+        init();
         let provider = ProviderBuilder::new().with_cached_nonce_management().on_anvil_with_wallet();
 
         let from = provider.default_signer_address();
