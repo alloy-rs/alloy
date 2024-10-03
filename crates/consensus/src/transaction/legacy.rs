@@ -290,6 +290,12 @@ impl SignableTransaction<Signature> for TxLegacy {
     }
 
     fn into_signed(self, signature: Signature) -> Signed<Self> {
+        // Enforce correct parity for legacy transactions (EIP-155, 27 or 28).
+        let signature = if let Parity::Parity(parity) = signature.v() {
+            signature.with_parity(Parity::NonEip155(parity))
+        } else {
+            signature
+        };
         let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature));
         self.encode_with_signature_fields(&signature, &mut buf);
         let hash = keccak256(&buf);
