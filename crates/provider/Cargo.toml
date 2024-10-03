@@ -26,6 +26,7 @@ alloy-network.workspace = true
 alloy-network-primitives.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
+alloy-signer = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
@@ -107,6 +108,7 @@ anvil-node = [
     "reqwest",
     "dep:alloy-node-bindings",
     "dep:alloy-signer-local",
+    "dep:alloy-signer",
 ]
 debug-api = ["dep:alloy-rpc-types-trace"]
 erc4337-api = []
