@@ -4,11 +4,16 @@ use alloy_transport::{utils::Spawnable, Authorization, TransportErrorKind, Trans
 use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
-use tokio::time::sleep;
 use tokio_tungstenite::{
     tungstenite::{self, client::IntoClientRequest, Message},
     MaybeTlsStream, WebSocketStream,
 };
+
+#[cfg(target_arch = "wasm32")]
+use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
 
 type TungsteniteStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
