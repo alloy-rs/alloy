@@ -10,7 +10,6 @@ use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
-use alloy_signer::Signer;
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -483,6 +482,8 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             alloy_transport_http::Http<reqwest::Client>,
         >,
     {
+        use alloy_signer_local::Signer;
+
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
 
