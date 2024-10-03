@@ -259,8 +259,8 @@ mod tests {
 
         let with_other: WithOtherFields<InnerWrapper> =
             serde_json::from_str("{\"a\": 1, \"b\": 2}").unwrap();
-        assert_eq!(with_other.inner.inner.a, 1);
-        assert_eq!(
+        similar_asserts::assert_eq!(with_other.inner.inner.a, 1);
+        similar_asserts::assert_eq!(
             with_other.other,
             OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
         );

@@ -22,6 +22,7 @@ workspace = true
 alloy-primitives = { workspace = true, features = ["rlp", "serde"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["alloc"] }
+similar-asserts.workspace = true
 
 # arbitrary
 arbitrary = { version = "1.3", features = ["derive"], optional = true }
