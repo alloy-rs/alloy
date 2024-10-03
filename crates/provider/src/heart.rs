@@ -9,23 +9,22 @@ use alloy_primitives::{
 };
 use alloy_transport::{utils::Spawnable, Transport, TransportError};
 use futures::{stream::StreamExt, FutureExt, Stream};
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant};
 use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     future::Future,
+    time::Duration,
 };
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::time::sleep_until;
-#[cfg(target_arch = "wasm32")]
-use tokio::time::Duration;
 use tokio::{
     select,
     sync::{mpsc, oneshot, watch},
 };
+
 #[cfg(target_arch = "wasm32")]
 use wasmtimer::{std::Instant, tokio::sleep_until};
+
+#[cfg(not(target_arch = "wasm32"))]
+use {std::time::Instant, tokio::time::sleep_until};
 
 /// Errors which may occur when watching a pending transaction.
 #[derive(Debug, thiserror::Error)]
