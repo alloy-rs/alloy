@@ -482,7 +482,7 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             alloy_transport_http::Http<reqwest::Client>,
         >,
     {
-        use alloy_signer_local::Signer;
+        use alloy_signer::Signer;
 
         let anvil_layer = crate::layers::AnvilLayer::from(f(Default::default()));
         let url = anvil_layer.endpoint_url();
