@@ -10,6 +10,7 @@ use alloy_chains::NamedChain;
 use alloy_network::{Ethereum, Network};
 use alloy_primitives::ChainId;
 use alloy_rpc_client::{BuiltInConnectionString, ClientBuilder, RpcClient};
+use alloy_signer::Signer;
 use alloy_transport::{BoxTransport, Transport, TransportError, TransportResult};
 use std::marker::PhantomData;
 
@@ -489,7 +490,8 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
         let (default_key, remaining_keys) =
             default_keys.split_first().ok_or(alloy_node_bindings::NodeError::NoKeysAvailable)?;
 
-        let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone());
+        let default_signer = alloy_signer_local::LocalSigner::from(default_key.clone())
+            .with_chain_id(Some(anvil_layer.instance().chain_id()));
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);
 
         remaining_keys.iter().for_each(|key| {
