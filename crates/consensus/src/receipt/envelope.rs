@@ -158,11 +158,7 @@ impl Encodable for ReceiptEnvelope {
     }
 
     fn length(&self) -> usize {
-        let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
-            payload_length += length_of_length(payload_length);
-        }
-        payload_length
+        self.network_len()
     }
 }
 
