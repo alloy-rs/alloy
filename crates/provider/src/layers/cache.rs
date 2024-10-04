@@ -241,17 +241,23 @@ where
     ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,));
 
-        // TODO: Redirect to RPC if BlockId is a tag.
+        let redirect = match block {
+            BlockId::Hash(_) => false,
+            BlockId::Number(BlockNumberOrTag::Number(_)) => false,
+            _ => true,
+        };
 
-        let params_hash = req.params_hash().ok();
+        if !redirect {
+            let params_hash = req.params_hash().ok();
 
-        if let Some(hash) = params_hash {
-            if let Ok(Some(cached)) = self.cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
+            if let Some(hash) = params_hash {
+                if let Ok(Some(cached)) = self.cache.get(&hash) {
+                    let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
+                    return ProviderCall::BoxedFuture(Box::pin(async move {
+                        let res = result?;
+                        Ok(res)
+                    }));
+                }
             }
         }
 
@@ -266,8 +272,11 @@ where
             let result = client.request(req.method(), req.params()).await?;
 
             let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
-            let hash = req.params_hash()?;
-            let _ = cache.put(hash, json_str);
+
+            if !redirect {
+                let hash = req.params_hash()?;
+                let _ = cache.put(hash, json_str);
+            }
 
             Ok(result)
         }))
