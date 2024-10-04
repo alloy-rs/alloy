@@ -241,11 +241,8 @@ where
     ) -> ProviderCall<T, (BlockId,), Option<Vec<N::ReceiptResponse>>> {
         let req = RequestType::new("eth_getBlockReceipts", (block,));
 
-        let redirect = match block {
-            BlockId::Hash(_) => false,
-            BlockId::Number(BlockNumberOrTag::Number(_)) => false,
-            _ => true,
-        };
+        let redirect =
+            !matches!(block, BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)));
 
         if !redirect {
             let params_hash = req.params_hash().ok();
