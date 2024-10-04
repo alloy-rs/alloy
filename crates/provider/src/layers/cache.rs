@@ -59,7 +59,7 @@ where
 /// cache miss.
 ///
 /// Most importantly, the [`CacheProvider`] adds `save_cache` and `load_cache` methods to the
-/// provider interface to lets users save cache to the disk and load from it on method.
+/// provider interface to lets users save cache to the disk and load from it on demand.
 #[derive(Debug, Clone)]
 pub struct CacheProvider<P, T, N> {
     /// Inner provider.
