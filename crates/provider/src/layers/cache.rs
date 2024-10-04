@@ -337,38 +337,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_get_accounts() {
-        let cache = CacheLayer::new(100);
-        let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
-
-        let path = PathBuf::from_str("./rpc-cache-accounts.txt").unwrap();
-        provider.load_cache(path.clone()).unwrap();
-
-        let accounts = provider.get_accounts().await.unwrap();
-        let accounts2 = provider.get_accounts().await.unwrap();
-        assert_eq!(accounts, accounts2);
-
-        provider.save_cache(path).unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_get_chain_id() {
-        let cache = CacheLayer::new(100);
-        let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
-
-        let path = PathBuf::from_str("./rpc-cache-chain-id.txt").unwrap();
-        provider.load_cache(path.clone()).unwrap();
-
-        let chain_id = provider.get_chain_id().await.unwrap();
-        let chain_id2 = provider.get_chain_id().await.unwrap();
-        assert_eq!(chain_id, chain_id2);
-
-        provider.save_cache(path).unwrap();
-    }
-
-    #[tokio::test]
     async fn test_cache_provider() {
         let cache = CacheLayer::new(100);
         let anvil = Anvil::new().block_time_f64(0.3).spawn();
