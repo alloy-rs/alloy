@@ -1,8 +1,10 @@
 use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
-use alloy_network::Ethereum;
-use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
+use alloy_network::{Ethereum, Network};
+use alloy_primitives::{
+    keccak256, Address, BlockHash, StorageKey, StorageValue, TxHash, B256, U256,
+};
 use alloy_rpc_types_eth::{
     Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
@@ -39,12 +41,13 @@ impl CacheLayer {
     }
 }
 
-impl<P, T> ProviderLayer<P, T, Ethereum> for CacheLayer
+impl<P, T, N> ProviderLayer<P, T, N> for CacheLayer
 where
-    P: Provider<T>,
+    P: Provider<T, N>,
     T: Transport + Clone,
+    N: Network,
 {
-    type Provider = CacheProvider<P, T>;
+    type Provider = CacheProvider<P, T, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
         CacheProvider::new(inner, self.max_items())
@@ -53,19 +56,20 @@ where
 
 /// A provider that caches responses to RPC requests.
 #[derive(Debug, Clone)]
-pub struct CacheProvider<P, T> {
+pub struct CacheProvider<P, T, N> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
     cache: SharedCache,
     /// Phantom data
-    _pd: PhantomData<T>,
+    _pd: PhantomData<(T, N)>,
 }
 
-impl<P, T> CacheProvider<P, T>
+impl<P, T, N> CacheProvider<P, T, N>
 where
-    P: Provider<T>,
+    P: Provider<T, N>,
     T: Transport + Clone,
+    N: Network,
 {
     /// Instantiate a new cache provider.
     pub fn new(inner: P, max_items: usize) -> Self {
@@ -143,7 +147,6 @@ macro_rules! rpc_prov_call {
             // Insert into cache.
             let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
             let hash = $req.params_hash()?;
-            let mut cache = cache.write();
             let _ = cache.put(hash, json_str);
 
             Ok(res)
@@ -175,13 +178,14 @@ macro_rules! cache_rpc_call_with_block {
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl<P, T> Provider<T> for CacheProvider<P, T>
+impl<P, T, N> Provider<T, N> for CacheProvider<P, T, N>
 where
-    P: Provider<T>,
+    P: Provider<T, N>,
     T: Transport + Clone,
+    N: Network,
 {
     #[inline(always)]
-    fn root(&self) -> &RootProvider<T> {
+    fn root(&self) -> &RootProvider<T, N> {
         self.inner.root()
     }
 
@@ -189,7 +193,7 @@ where
         &self,
         number: BlockNumberOrTag,
         hydrate: bool,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         let hash = RequestType::new("eth_getBlockByNumber", (number, hydrate));
 
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
@@ -200,7 +204,7 @@ where
         &self,
         hash: BlockHash,
         kind: BlockTransactionsKind,
-    ) -> TransportResult<Option<Block>> {
+    ) -> TransportResult<Option<N::BlockResponse>> {
         let full = match kind {
             BlockTransactionsKind::Full => true,
             BlockTransactionsKind::Hashes => false,
@@ -344,7 +348,7 @@ impl SharedCache {
 #[cfg(test)]
 mod tests {
     use crate::ProviderBuilder;
-    use alloy_network::TransactionBuilder;
+    use alloy_network::{AnyNetwork, TransactionBuilder};
     use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{Bytes, FixedBytes};
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
@@ -356,7 +360,41 @@ mod tests {
         run_with_tempdir("get-block", |dir| async move {
             let cache = CacheLayer::new(100);
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+
+            let path = dir.join("rpc-cache-block.txt");
+            provider.load_cache(path.clone()).unwrap();
+
+            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            assert_eq!(block, block2);
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            let latest_block =
+                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_hash = latest_block.unwrap().header.hash;
+
+            let block3 =
+                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let block4 =
+                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            assert_eq!(block3, block4);
+
+            provider.save_cache(path).unwrap();
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_get_block_any_network() {
+        run_with_tempdir("get-block", |dir| async move {
+            let cache = CacheLayer::new(100);
+            let anvil = Anvil::new().block_time_f64(0.3).spawn();
+            let provider = ProviderBuilder::new()
+                .network::<AnyNetwork>()
+                .layer(cache)
+                .on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block.txt");
             provider.load_cache(path.clone()).unwrap();
@@ -387,7 +425,7 @@ mod tests {
         run_with_tempdir("get-proof", |dir| async move {
             let cache = CacheLayer::new(100);
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
 
             let from = anvil.addresses()[0];
             let path = dir.join("rpc-cache-proof.txt");
