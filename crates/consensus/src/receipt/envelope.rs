@@ -1,7 +1,7 @@
 use crate::{Eip658Value, Receipt, ReceiptWithBloom, TxReceipt, TxType};
 use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718};
 use alloy_primitives::{Bloom, Log};
-use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable};
 
 /// Receipt envelope, as defined in [EIP-2718].
 ///
@@ -158,11 +158,7 @@ impl Encodable for ReceiptEnvelope {
     }
 
     fn length(&self) -> usize {
-        let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
-            payload_length += length_of_length(payload_length);
-        }
-        payload_length
+        self.network_len()
     }
 }
 

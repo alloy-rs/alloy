@@ -305,12 +305,7 @@ impl Encodable for TxEnvelope {
     }
 
     fn length(&self) -> usize {
-        let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
-            payload_length += Header { list: false, payload_length }.length();
-        }
-
-        payload_length
+        self.network_len()
     }
 }
 
