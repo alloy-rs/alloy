@@ -26,6 +26,7 @@ alloy-network.workspace = true
 alloy-network-primitives.workspace = true
 alloy-node-bindings = { workspace = true, optional = true }
 alloy-signer-local = { workspace = true, optional = true }
+alloy-signer = { workspace = true, optional = true }
 alloy-rpc-client.workspace = true
 alloy-rpc-types-admin = { workspace = true, optional = true }
 alloy-rpc-types-anvil = { workspace = true, optional = true }
@@ -61,9 +62,12 @@ tracing.workspace = true
 url = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-parking_lot = { workspace = true }
+parking_lot.workspace = true
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasmtimer.workspace = true
 
 [dev-dependencies]
+alloy-consensus = { workspace = true, features = ["kzg"] }
 alloy-primitives = { workspace = true, features = ["rand"] }
 alloy-node-bindings.workspace = true
 alloy-rpc-client = { workspace = true, features = ["reqwest"] }
@@ -109,6 +113,7 @@ anvil-node = [
     "reqwest",
     "dep:alloy-node-bindings",
     "dep:alloy-signer-local",
+    "dep:alloy-signer",
 ]
 debug-api = ["dep:alloy-rpc-types-trace"]
 erc4337-api = []

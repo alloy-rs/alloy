@@ -87,7 +87,7 @@ impl<T> AnyReceiptEnvelope<T> {
 }
 
 impl<T> TxReceipt<T> for AnyReceiptEnvelope<T> {
-    fn status_or_post_state(&self) -> &Eip658Value {
+    fn status_or_post_state(&self) -> Eip658Value {
         self.inner.status_or_post_state()
     }
 

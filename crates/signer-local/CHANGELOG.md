@@ -5,7 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Features
+
+- Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
+- [signer-local] Add `keystore-geth-compat` feature ([#1381](https://github.com/alloy-rs/alloy/issues/1381))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
+
+## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 
 ### Miscellaneous Tasks
 

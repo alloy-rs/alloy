@@ -14,6 +14,7 @@ pub use status::Eip658Value;
 
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
+#[auto_impl::auto_impl(&, Arc)]
 pub trait TxReceipt<T = Log> {
     /// Returns the status or post state of the transaction.
     ///
@@ -23,7 +24,7 @@ pub trait TxReceipt<T = Log> {
     /// is pre-[EIP-658].
     ///
     /// [EIP-658]: https://eips.ethereum.org/EIPS/eip-658
-    fn status_or_post_state(&self) -> &Eip658Value;
+    fn status_or_post_state(&self) -> Eip658Value;
 
     /// Returns true if the transaction was successful OR if the transaction is
     /// pre-[EIP-658]. Results for transactions before [EIP-658] are not

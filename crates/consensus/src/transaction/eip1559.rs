@@ -288,12 +288,12 @@ impl Transaction for TxEip1559 {
         Some(self.max_priority_fee_per_gas)
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        self.max_priority_fee_per_gas
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         None
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
     }
 
     fn to(&self) -> TxKind {
@@ -447,5 +447,125 @@ mod tests {
         let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
         assert_eq!(decoded, tx.into_signed(sig));
         assert_eq!(*decoded.hash(), hash);
+    }
+}
+
+/// Bincode-compatible [`TxEip1559`] serde implementation.
+#[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
+pub(super) mod serde_bincode_compat {
+    use alloc::borrow::Cow;
+    use alloy_eips::eip2930::AccessList;
+    use alloy_primitives::{Bytes, ChainId, TxKind, U256};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde_with::{DeserializeAs, SerializeAs};
+
+    /// Bincode-compatible [`super::TxEip1559`] serde implementation.
+    ///
+    /// Intended to use with the [`serde_with::serde_as`] macro in the following way:
+    /// ```rust
+    /// use alloy_consensus::{serde_bincode_compat, TxEip1559};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_with::serde_as;
+    ///
+    /// #[serde_as]
+    /// #[derive(Serialize, Deserialize)]
+    /// struct Data {
+    ///     #[serde_as(as = "serde_bincode_compat::transaction::TxEip1559")]
+    ///     transaction: TxEip1559,
+    /// }
+    /// ```
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct TxEip1559<'a> {
+        chain_id: ChainId,
+        nonce: u64,
+        gas_limit: u64,
+        max_fee_per_gas: u128,
+        max_priority_fee_per_gas: u128,
+        #[serde(default)]
+        to: TxKind,
+        value: U256,
+        access_list: Cow<'a, AccessList>,
+        input: Cow<'a, Bytes>,
+    }
+
+    impl<'a> From<&'a super::TxEip1559> for TxEip1559<'a> {
+        fn from(value: &'a super::TxEip1559) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_limit: value.gas_limit,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                to: value.to,
+                value: value.value,
+                access_list: Cow::Borrowed(&value.access_list),
+                input: Cow::Borrowed(&value.input),
+            }
+        }
+    }
+
+    impl<'a> From<TxEip1559<'a>> for super::TxEip1559 {
+        fn from(value: TxEip1559<'a>) -> Self {
+            Self {
+                chain_id: value.chain_id,
+                nonce: value.nonce,
+                gas_limit: value.gas_limit,
+                max_fee_per_gas: value.max_fee_per_gas,
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas,
+                to: value.to,
+                value: value.value,
+                access_list: value.access_list.into_owned(),
+                input: value.input.into_owned(),
+            }
+        }
+    }
+
+    impl<'a> SerializeAs<super::TxEip1559> for TxEip1559<'a> {
+        fn serialize_as<S>(source: &super::TxEip1559, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            TxEip1559::from(source).serialize(serializer)
+        }
+    }
+
+    impl<'de> DeserializeAs<'de, super::TxEip1559> for TxEip1559<'de> {
+        fn deserialize_as<D>(deserializer: D) -> Result<super::TxEip1559, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            TxEip1559::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use arbitrary::Arbitrary;
+        use rand::Rng;
+        use serde::{Deserialize, Serialize};
+        use serde_with::serde_as;
+
+        use super::super::{serde_bincode_compat, TxEip1559};
+
+        #[test]
+        fn test_tx_eip1559_bincode_roundtrip() {
+            #[serde_as]
+            #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+            struct Data {
+                #[serde_as(as = "serde_bincode_compat::TxEip1559")]
+                transaction: TxEip1559,
+            }
+
+            let mut bytes = [0u8; 1024];
+            rand::thread_rng().fill(bytes.as_mut_slice());
+            let data = Data {
+                transaction: TxEip1559::arbitrary(&mut arbitrary::Unstructured::new(&bytes))
+                    .unwrap(),
+            };
+
+            let encoded = bincode::serialize(&data).unwrap();
+            let decoded: Data = bincode::deserialize(&encoded).unwrap();
+            assert_eq!(decoded, data);
+        }
     }
 }

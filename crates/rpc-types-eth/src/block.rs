@@ -372,8 +372,8 @@ pub struct BlockOverrides {
 }
 
 impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
-    type Transaction = T;
     type Header = H;
+    type Transaction = T;
 
     fn header(&self) -> &Self::Header {
         &self.header
