@@ -1,11 +1,8 @@
-use crate::{
-    utils, ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock,
-};
+use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider, RpcWithBlock};
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Ethereum;
-use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256, U64};
-use alloy_rpc_client::NoParams;
+use alloy_primitives::{keccak256, Address, BlockHash, StorageKey, StorageValue, B256, U256};
 use alloy_rpc_types_eth::{
     Block, BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
 };
@@ -60,7 +57,7 @@ pub struct CacheProvider<P, T> {
     /// Inner provider.
     inner: P,
     /// In-memory LRU cache, mapping requests to responses.
-    cache: Arc<RwLock<LruCache<B256, String>>>,
+    cache: SharedCache,
     /// Phantom data
     _pd: PhantomData<T>,
 }
@@ -72,24 +69,8 @@ where
 {
     /// Instantiate a new cache provider.
     pub fn new(inner: P, max_items: usize) -> Self {
-        let cache = Arc::new(RwLock::new(LruCache::<B256, String>::new(
-            NonZeroUsize::new(max_items).unwrap(),
-        )));
+        let cache = SharedCache::new(max_items);
         Self { inner, cache, _pd: PhantomData }
-    }
-
-    /// Puts a value into the cache, and returns the old value if it existed.
-    pub fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
-        let mut cache = self.cache.write();
-        Ok(cache.put(key, value))
-    }
-
-    /// Gets a value from the cache, if it exists.
-    pub fn get(&self, key: &B256) -> TransportResult<Option<String>> {
-        // Need to acquire a write guard to change the order of keys in LRU cache.
-        let mut cache = self.cache.write();
-        let val = cache.get(key).cloned();
-        Ok(val)
     }
 
     /// Saves the cache to a file specified by the path.
@@ -130,7 +111,7 @@ where
 macro_rules! cache_get_or_fetch {
     ($self:expr, $req:expr, $fetch_fn:expr) => {{
         let hash = $req.params_hash()?;
-        if let Some(cached) = $self.get(&hash)? {
+        if let Some(cached) = $self.cache.get(&hash)? {
             let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
             return Ok(Some(result));
         }
@@ -138,7 +119,7 @@ macro_rules! cache_get_or_fetch {
         let result = $fetch_fn.await?;
         if let Some(ref data) = result {
             let json_str = serde_json::to_string(data).map_err(TransportErrorKind::custom)?;
-            let _ = $self.put(hash, json_str)?;
+            let _ = $self.cache.put(hash, json_str)?;
         }
 
         Ok(result)
@@ -322,6 +303,42 @@ struct FsCacheEntry {
 pub struct CacheConfig {
     /// Maximum number of items to store in the cache.
     pub max_items: usize,
+}
+
+/// Shareable cache.
+#[derive(Debug, Clone)]
+pub struct SharedCache {
+    inner: Arc<RwLock<LruCache<B256, String>>>,
+}
+
+impl SharedCache {
+    /// Instantiate a new shared cache.
+    pub fn new(max_items: usize) -> Self {
+        let cache = Arc::new(RwLock::new(LruCache::<B256, String>::new(
+            NonZeroUsize::new(max_items).unwrap(),
+        )));
+        Self { inner: cache }
+    }
+
+    /// Puts a value into the cache, and returns the old value if it existed.
+    pub fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
+        Ok(self.inner.write().put(key, value))
+    }
+
+    /// Gets a value from the cache, if it exists.
+    pub fn get(&self, key: &B256) -> TransportResult<Option<String>> {
+        // Need to acquire a write guard to change the order of keys in LRU cache.
+        let val = self.inner.write().get(key).cloned();
+        Ok(val)
+    }
+
+    fn read(&self) -> parking_lot::RwLockReadGuard<'_, LruCache<B256, String>> {
+        self.inner.read()
+    }
+
+    fn write(&self) -> parking_lot::RwLockWriteGuard<'_, LruCache<B256, String>> {
+        self.inner.write()
+    }
 }
 
 #[cfg(test)]
