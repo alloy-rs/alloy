@@ -94,6 +94,8 @@ pub use packet::{BorrowedResponsePacket, RequestPacket, ResponsePacket};
 mod request;
 pub use request::{PartiallySerializedRequest, Request, RequestMeta, SerializedRequest};
 
+mod support;
+
 mod response;
 pub use response::{
     BorrowedErrorPayload, BorrowedResponse, BorrowedResponsePayload, ErrorPayload, Response,
