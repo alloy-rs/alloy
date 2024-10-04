@@ -326,106 +326,86 @@ pub struct CacheConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use crate::ProviderBuilder;
     use alloy_network::TransactionBuilder;
-    use alloy_node_bindings::Anvil;
+    use alloy_node_bindings::{utils::run_with_tempdir, Anvil};
     use alloy_primitives::{Bytes, FixedBytes};
     use alloy_rpc_types_eth::{BlockId, TransactionRequest};
 
     use super::*;
 
     #[tokio::test]
-    async fn test_cache_provider() {
-        let cache = CacheLayer::new(100);
-        let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
-
-        let path = PathBuf::from_str("./rpc-cache-block-by-number.txt").unwrap();
-        provider.load_cache(path.clone()).unwrap();
-
-        let blk = provider.get_block_by_number(0.into(), true).await.unwrap();
-        let blk2 = provider.get_block_by_number(0.into(), true).await.unwrap();
-        assert_eq!(blk, blk2);
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-        let latest_block_num = provider.get_block_number().await.unwrap();
-        let blk3 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
-        let blk4 = provider.get_block_by_number(latest_block_num.into(), true).await.unwrap();
-        assert_eq!(blk3, blk4);
-
-        provider.save_cache(path).unwrap();
-    }
-
-    #[tokio::test]
     async fn test_get_block() {
-        let cache = CacheLayer::new(100);
-        let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+        run_with_tempdir("get-block", |dir| async move {
+            let cache = CacheLayer::new(100);
+            let anvil = Anvil::new().block_time_f64(0.3).spawn();
+            let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
-        let path = PathBuf::from_str("./rpc-cache-block-by-hash.txt").unwrap();
-        provider.load_cache(path.clone()).unwrap();
+            let path = dir.join("rpc-cache-block.txt");
+            provider.load_cache(path.clone()).unwrap();
 
-        let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-        let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-        assert_eq!(block, block2);
+            let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            assert_eq!(block, block2);
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        let latest_block =
-            provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-        let latest_hash = latest_block.unwrap().header.hash;
+            let latest_block =
+                provider.get_block(BlockId::latest(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let latest_hash = latest_block.unwrap().header.hash;
 
-        let block3 =
-            provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
-        let block4 =
-            provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
-        assert_eq!(block3, block4);
+            let block3 =
+                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
+            let block4 =
+                provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
+            assert_eq!(block3, block4);
 
-        provider.save_cache(path).unwrap();
+            provider.save_cache(path).unwrap();
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_get_proof() {
-        let cache = CacheLayer::new(100);
-        let anvil = Anvil::new().block_time_f64(0.3).spawn();
-        let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
+        run_with_tempdir("get-proof", |dir| async move {
+            let cache = CacheLayer::new(100);
+            let anvil = Anvil::new().block_time_f64(0.3).spawn();
+            let provider = ProviderBuilder::default().layer(cache).on_http(anvil.endpoint_url());
 
-        let from = anvil.addresses()[0];
-        let path = PathBuf::from_str("./rpc-cache-proof.txt").unwrap();
+            let from = anvil.addresses()[0];
+            let path = dir.join("rpc-cache-proof.txt");
 
-        provider.load_cache(path.clone()).unwrap();
+            provider.load_cache(path.clone()).unwrap();
 
-        let calldata: Bytes = "0x6080604052348015600f57600080fd5b506101f28061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633fb5c1cb146100465780638381f58a14610062578063d09de08a14610080575b600080fd5b610060600480360381019061005b91906100ee565b61008a565b005b61006a610094565b604051610077919061012a565b60405180910390f35b61008861009a565b005b8060008190555050565b60005481565b6000808154809291906100ac90610174565b9190505550565b600080fd5b6000819050919050565b6100cb816100b8565b81146100d657600080fd5b50565b6000813590506100e8816100c2565b92915050565b600060208284031215610104576101036100b3565b5b6000610112848285016100d9565b91505092915050565b610124816100b8565b82525050565b600060208201905061013f600083018461011b565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061017f826100b8565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101b1576101b0610145565b5b60018201905091905056fea264697066735822122067ac0f21f648b0cacd1b7260772852ad4a0f63e2cc174168c51a6887fd5197a964736f6c634300081a0033".parse().unwrap();
+            let calldata: Bytes = "0x6080604052348015600f57600080fd5b506101f28061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633fb5c1cb146100465780638381f58a14610062578063d09de08a14610080575b600080fd5b610060600480360381019061005b91906100ee565b61008a565b005b61006a610094565b604051610077919061012a565b60405180910390f35b61008861009a565b005b8060008190555050565b60005481565b6000808154809291906100ac90610174565b9190505550565b600080fd5b6000819050919050565b6100cb816100b8565b81146100d657600080fd5b50565b6000813590506100e8816100c2565b92915050565b600060208284031215610104576101036100b3565b5b6000610112848285016100d9565b91505092915050565b610124816100b8565b82525050565b600060208201905061013f600083018461011b565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061017f826100b8565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101b1576101b0610145565b5b60018201905091905056fea264697066735822122067ac0f21f648b0cacd1b7260772852ad4a0f63e2cc174168c51a6887fd5197a964736f6c634300081a0033".parse().unwrap();
 
-        let tx = TransactionRequest::default()
-            .with_from(from)
-            .with_input(calldata)
-            .with_max_fee_per_gas(1_000_000_000)
-            .with_max_priority_fee_per_gas(1_000_000)
-            .with_gas_limit(1_000_000)
-            .with_nonce(0);
+            let tx = TransactionRequest::default()
+                .with_from(from)
+                .with_input(calldata)
+                .with_max_fee_per_gas(1_000_000_000)
+                .with_max_priority_fee_per_gas(1_000_000)
+                .with_gas_limit(1_000_000)
+                .with_nonce(0);
 
-        let tx_receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
+            let tx_receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-        let counter_addr = tx_receipt.contract_address.unwrap();
+            let counter_addr = tx_receipt.contract_address.unwrap();
 
-        let keys = vec![
-            FixedBytes::with_last_byte(0),
-            FixedBytes::with_last_byte(0x1),
-            FixedBytes::with_last_byte(0x2),
-            FixedBytes::with_last_byte(0x3),
-            FixedBytes::with_last_byte(0x4),
-        ];
+            let keys = vec![
+                FixedBytes::with_last_byte(0),
+                FixedBytes::with_last_byte(0x1),
+                FixedBytes::with_last_byte(0x2),
+                FixedBytes::with_last_byte(0x3),
+                FixedBytes::with_last_byte(0x4),
+            ];
 
-        let proof =
-            provider.get_proof(counter_addr, keys.clone()).block_id(1.into()).await.unwrap();
-        let proof2 = provider.get_proof(counter_addr, keys).block_id(1.into()).await.unwrap();
+            let proof =
+                provider.get_proof(counter_addr, keys.clone()).block_id(1.into()).await.unwrap();
+            let proof2 = provider.get_proof(counter_addr, keys).block_id(1.into()).await.unwrap();
 
-        assert_eq!(proof, proof2);
+            assert_eq!(proof, proof2);
 
-        provider.save_cache(path).unwrap();
+            provider.save_cache(path).unwrap();
+        }).await;
     }
 }
