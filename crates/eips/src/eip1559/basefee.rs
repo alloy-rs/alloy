@@ -14,6 +14,7 @@ use crate::{
 
 /// BaseFeeParams contains the config parameters that control block base fee computation
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BaseFeeParams {
     /// The base_fee_max_change_denominator from EIP-1559
@@ -92,5 +93,19 @@ impl BaseFeeParams {
     #[inline]
     pub fn next_block_base_fee(self, gas_used: u64, gas_limit: u64, base_fee: u64) -> u64 {
         calc_next_block_base_fee(gas_used, gas_limit, base_fee, self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arbitrary::Arbitrary;
+    use rand::Rng;
+
+    #[test]
+    fn test_arbitrary_base_fee_params() {
+        let mut bytes = [0u8; 1024];
+        rand::thread_rng().fill(bytes.as_mut_slice());
+        BaseFeeParams::arbitrary(&mut arbitrary::Unstructured::new(&bytes)).unwrap();
     }
 }

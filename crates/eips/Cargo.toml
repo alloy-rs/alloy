@@ -56,6 +56,7 @@ alloy-primitives = { workspace = true, features = [
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+rand.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
