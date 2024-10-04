@@ -2,13 +2,11 @@ use crate::{ParamsWithBlock, Provider, ProviderCall, ProviderLayer, RootProvider
 use alloy_eips::BlockId;
 use alloy_json_rpc::{RpcError, RpcParam};
 use alloy_network::Network;
-use alloy_rpc_types_eth::{Filter, Log};
 use alloy_primitives::{
-    keccak256, Address, BlockHash, StorageKey, StorageValue, TxHash, B256, U256,Bytes
+    keccak256, Address, BlockHash, Bytes, StorageKey, StorageValue, TxHash, B256, U256, U64,
 };
-use alloy_primitives::U64;
 use alloy_rpc_types_eth::{
-    BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse,
+    BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
 };
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use lru::LruCache;
@@ -132,14 +130,13 @@ macro_rules! cache_get_or_fetch {
     }};
 }
 
+///
 macro_rules! rpc_call_with_block {
     ($cache:expr, $client:expr, $req:expr) => {{
         let client =
             $client.upgrade().ok_or_else(|| TransportErrorKind::custom_str("RPC client dropped"));
         let cache = $cache.clone();
         ProviderCall::BoxedFuture(Box::pin(async move {
-            println!("Cache miss");
-
             let client = client?;
 
             let result = client.request($req.method(), $req.params()).map_params(|params| {
@@ -147,7 +144,6 @@ macro_rules! rpc_call_with_block {
             });
 
             let res = result.await?;
-
             // Insert into cache.
             let json_str = serde_json::to_string(&res).map_err(TransportErrorKind::custom)?;
             let hash = $req.params_hash()?;
@@ -168,7 +164,6 @@ macro_rules! cache_rpc_call_with_block {
 
         if let Some(hash) = hash {
             if let Some(cached) = $cache.write().get(&hash) {
-                println!("Cache hit");
                 let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
                 return ProviderCall::BoxedFuture(Box::pin(async move {
                     let res = result?;
@@ -258,7 +253,6 @@ where
         }))
     }
 
-
     /// Get the account and storage values of the specified account including the merkle proofs.
     ///
     /// This call can be used to verify that the data has not been tampered with.
@@ -299,10 +293,7 @@ where
         })
     }
 
-    fn get_transaction_count(
-        &self,
-        address: Address,
-    ) -> RpcWithBlock<T, Address, U64, u64> {
+    fn get_transaction_count(&self, address: Address) -> RpcWithBlock<T, Address, U64, u64> {
         let client = self.inner.weak_client();
         let cache = self.cache.clone();
         RpcWithBlock::new_provider(move |block_id| {
@@ -312,7 +303,6 @@ where
         })
     }
 
-
     async fn get_logs(&self, filter: &Filter) -> TransportResult<Vec<Log>> {
         let req = RequestType::new("eth_getLogs", filter.clone());
 
@@ -320,13 +310,11 @@ where
 
         if let Some(hash) = params_hash {
             if let Ok(Some(cached)) = self.cache.get(&hash) {
-                println!("Cache hit");
                 let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
                 return result;
             }
         }
 
-        println!("Cache miss");
         let result = self.inner.get_logs(filter).await?;
 
         let json_str = serde_json::to_string(&result).map_err(TransportErrorKind::custom)?;
@@ -441,6 +429,7 @@ where
     }
 }
 
+/// Internal type to handle different types of requests and generating their param hashes.
 struct RequestType<Params: RpcParam> {
     method: &'static str,
     params: Params,
@@ -458,7 +447,7 @@ impl<Params: RpcParam> RequestType<Params> {
     }
 
     fn params_hash(&self) -> TransportResult<B256> {
-        // Merge the method and params and hash them.
+        // Merge the method + params and hash them.
         let hash = serde_json::to_string(&self.params())
             .map(|p| keccak256(format!("{}{}", self.method(), p).as_bytes()))
             .map_err(RpcError::ser_err)?;
@@ -739,8 +728,6 @@ mod tests {
                 // solc v0.8.26; solc Counter.sol --via-ir --optimize --bin
                 "6080806040523460135760df908160198239f35b600080fdfe6080806040526004361015601257600080fd5b60003560e01c9081633fb5c1cb1460925781638381f58a146079575063d09de08a14603c57600080fd5b3460745760003660031901126074576000546000198114605e57600101600055005b634e487b7160e01b600052601160045260246000fd5b600080fd5b3460745760003660031901126074576020906000548152f35b34607457602036600319011260745760043560005500fea2646970667358221220e978270883b7baed10810c4079c941512e93a7ba1cd1108c781d4bc738d9090564736f6c634300081a0033"
             ).unwrap();
-            
-            
             let tx = TransactionRequest::default().with_deploy_code(bytecode);
 
             let receipt = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
@@ -757,5 +744,4 @@ mod tests {
         })
         .await;
     }
-
 }
