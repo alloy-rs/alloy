@@ -117,6 +117,11 @@ where
     }
 }
 
+/// Attempts to fetch the response from the cache by using the hash of the request params.
+///
+/// In case of a cache miss, fetches from the RPC and saves the response to the cache.
+///
+/// This helps overriding [`Provider`] methods that return [`TransportResult<T>`].
 macro_rules! cache_get_or_fetch {
     ($self:expr, $req:expr, $fetch_fn:expr) => {{
         let hash = $req.params_hash()?;
@@ -135,7 +140,13 @@ macro_rules! cache_get_or_fetch {
     }};
 }
 
+/// Uses underlying transport client to fetch data from the RPC.
 ///
+/// This is specific to RPC requests that require the `block_id` parameter.
+///
+/// Fetches from the RPC and saves the response to the cache.
+///
+/// Returns a ProviderCall::BoxedFuture
 macro_rules! rpc_call_with_block {
     ($cache:expr, $client:expr, $req:expr) => {{
         let client =
@@ -159,6 +170,11 @@ macro_rules! rpc_call_with_block {
     }};
 }
 
+/// Attempts to fetch the response from the cache by using the hash of the request params.
+///
+/// Fetches from the RPC in case of a cache miss
+///
+/// This helps overriding [`Provider`] methods that return `RpcWithBlock`.
 macro_rules! cache_rpc_call_with_block {
     ($cache:expr, $client:expr, $req:expr) => {{
         if $req.has_block_tag() {
@@ -204,7 +220,6 @@ where
         cache_get_or_fetch!(self, hash, self.inner.get_block_by_number(number, hydrate))
     }
 
-    /// Gets a block by its [BlockHash], with full transactions or only hashes.
     async fn get_block_by_hash(
         &self,
         hash: BlockHash,
@@ -258,9 +273,6 @@ where
         }))
     }
 
-    /// Get the account and storage values of the specified account including the merkle proofs.
-    ///
-    /// This call can be used to verify that the data has not been tampered with.
     fn get_proof(
         &self,
         address: Address,
@@ -275,7 +287,6 @@ where
         })
     }
 
-    /// Gets the specified storage value from [Address].
     fn get_storage_at(
         &self,
         address: Address,
