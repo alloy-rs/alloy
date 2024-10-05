@@ -1,7 +1,4 @@
-use crate::{
-    common::{Privacy, ProtocolVersion, Validity},
-    u256_numeric_string,
-};
+use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
 use alloy_primitives::{Address, Bytes, Log, TxHash, U256};
@@ -147,13 +144,11 @@ pub struct SimBundleResponse {
     #[serde(with = "alloy_serde::quantity")]
     pub state_block: u64,
     /// The gas price of the simulated block.
-    #[serde(with = "u256_numeric_string")]
     pub mev_gas_price: U256,
     /// The profit of the simulated block.
-    #[serde(with = "u256_numeric_string")]
-    pub profit: U256,
+    #[serde(rename = "profit")]
+    pub total_profit: U256,
     /// The refundable value of the simulated block.
-    #[serde(with = "u256_numeric_string")]
     pub refundable_value: U256,
     /// The gas used by the simulated block.
     #[serde(with = "alloy_serde::quantity")]
