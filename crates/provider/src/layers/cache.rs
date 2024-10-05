@@ -84,7 +84,7 @@ where
     N: Network,
 {
     /// Instantiate a new cache provider.
-    pub fn new(inner: P, cache: SharedCache) -> Self {
+    pub const fn new(inner: P, cache: SharedCache) -> Self {
         Self { inner, cache, _pd: PhantomData }
     }
 }
@@ -97,9 +97,8 @@ where
 macro_rules! cache_get_or_fetch {
     ($self:expr, $req:expr, $fetch_fn:expr) => {{
         let hash = $req.params_hash()?;
-        if let Some(cached) = $self.cache.get(&hash)? {
-            let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
-            return Ok(Some(result));
+        if let Some(cached) = $self.cache.get_deserialized(&hash)? {
+            return Ok(Some(cached));
         }
 
         let result = $fetch_fn.await?;
@@ -156,12 +155,8 @@ macro_rules! cache_rpc_call_with_block {
         let hash = $req.params_hash().ok();
 
         if let Some(hash) = hash {
-            if let Ok(Some(cached)) = $cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
+            if let Ok(Some(cached)) = $cache.get_deserialized(&hash) {
+                return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
             }
         }
 
@@ -220,12 +215,8 @@ where
             let params_hash = req.params_hash().ok();
 
             if let Some(hash) = params_hash {
-                if let Ok(Some(cached)) = self.cache.get(&hash) {
-                    let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                    return ProviderCall::BoxedFuture(Box::pin(async move {
-                        let res = result?;
-                        Ok(res)
-                    }));
+                if let Ok(Some(cached)) = self.cache.get_deserialized(&hash) {
+                    return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
                 }
             }
         }
@@ -303,9 +294,8 @@ where
         let params_hash = req.params_hash().ok();
 
         if let Some(hash) = params_hash {
-            if let Ok(Some(cached)) = self.cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return result;
+            if let Some(cached) = self.cache.get_deserialized(&hash)? {
+                return Ok(cached);
             }
         }
 
@@ -328,12 +318,8 @@ where
         let params_hash = req.params_hash().ok();
 
         if let Some(hash) = params_hash {
-            if let Ok(Some(cached)) = self.cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
+            if let Ok(Some(cached)) = self.cache.get_deserialized(&hash) {
+                return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
             }
         }
         let client = self.inner.weak_client();
@@ -361,12 +347,8 @@ where
         let params_hash = req.params_hash().ok();
 
         if let Some(hash) = params_hash {
-            if let Ok(Some(cached)) = self.cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
+            if let Ok(Some(cached)) = self.cache.get_deserialized(&hash) {
+                return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
             }
         }
 
@@ -396,12 +378,8 @@ where
         let params_hash = req.params_hash().ok();
 
         if let Some(hash) = params_hash {
-            if let Ok(Some(cached)) = self.cache.get(&hash) {
-                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
-                return ProviderCall::BoxedFuture(Box::pin(async move {
-                    let res = result?;
-                    Ok(res)
-                }));
+            if let Ok(Some(cached)) = self.cache.get_deserialized(&hash) {
+                return ProviderCall::BoxedFuture(Box::pin(async move { Ok(cached) }));
             }
         }
 
@@ -496,8 +474,8 @@ pub struct SharedCache {
 impl SharedCache {
     /// Instantiate a new shared cache.
     pub fn new(max_items: u32) -> Self {
-        let cache = Arc::new(RwLock::new(LruMap::<B256, String>::new(ByLength::new(max_items))));
-        Self { inner: cache }
+        let inner = Arc::new(RwLock::new(LruMap::<B256, String>::new(ByLength::new(max_items))));
+        Self { inner }
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
@@ -510,6 +488,19 @@ impl SharedCache {
         // Need to acquire a write guard to change the order of keys in LRU cache.
         let val = self.inner.write().get(key).cloned();
         Ok(val)
+    }
+
+    /// Get deserialized value from the cache.
+    pub fn get_deserialized<T>(&self, key: &B256) -> TransportResult<Option<T>>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        if let Some(cached) = self.get(key)? {
+            let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
+            Ok(Some(result))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Saves the cache to a file specified by the path.
