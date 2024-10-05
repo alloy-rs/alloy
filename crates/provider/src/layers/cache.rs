@@ -9,10 +9,10 @@ use alloy_rpc_types_eth::{
     BlockNumberOrTag, BlockTransactionsKind, EIP1186AccountProofResponse, Filter, Log,
 };
 use alloy_transport::{Transport, TransportErrorKind, TransportResult};
-use lru::LruCache;
 use parking_lot::RwLock;
+use schnellru::{ByLength, LruMap};
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{io::BufReader, marker::PhantomData, path::PathBuf, sync::Arc};
 
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
@@ -32,13 +32,13 @@ pub struct CacheLayer {
 impl CacheLayer {
     /// Instantiate a new cache layer with the the maximum number of
     /// items to store.
-    pub fn new(max_items: usize) -> Self {
+    pub fn new(max_items: u32) -> Self {
         Self { config: CacheConfig { max_items }, cache: SharedCache::new(max_items) }
     }
 
     /// Returns the maximum number of items that can be stored in the cache, set at initialization.
     #[inline]
-    pub const fn max_items(&self) -> usize {
+    pub const fn max_items(&self) -> u32 {
         self.config.max_items
     }
 
@@ -484,27 +484,25 @@ struct FsCacheEntry {
 #[derive(Debug, Clone)]
 pub struct CacheConfig {
     /// Maximum number of items to store in the cache.
-    pub max_items: usize,
+    pub max_items: u32,
 }
 
 /// Shareable cache.
 #[derive(Debug, Clone)]
 pub struct SharedCache {
-    inner: Arc<RwLock<LruCache<B256, String>>>,
+    inner: Arc<RwLock<LruMap<B256, String>>>,
 }
 
 impl SharedCache {
     /// Instantiate a new shared cache.
-    pub fn new(max_items: usize) -> Self {
-        let cache = Arc::new(RwLock::new(LruCache::<B256, String>::new(
-            NonZeroUsize::new(max_items).unwrap(),
-        )));
+    pub fn new(max_items: u32) -> Self {
+        let cache = Arc::new(RwLock::new(LruMap::<B256, String>::new(ByLength::new(max_items))));
         Self { inner: cache }
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
-    pub fn put(&self, key: B256, value: String) -> TransportResult<Option<String>> {
-        Ok(self.inner.write().put(key, value))
+    pub fn put(&self, key: B256, value: String) -> TransportResult<bool> {
+        Ok(self.inner.write().insert(key, value))
     }
 
     /// Gets a value from the cache, if it exists.
@@ -542,7 +540,7 @@ impl SharedCache {
             serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
         let mut cache = self.inner.write();
         for entry in entries {
-            cache.put(entry.key, entry.value);
+            cache.insert(entry.key, entry.value);
         }
 
         Ok(())

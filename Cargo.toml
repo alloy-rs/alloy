@@ -138,6 +138,7 @@ semver = "1.0"
 thiserror = "1.0"
 thiserror-no-std = "2.0.2"
 url = "2.5"
+schnellru = "0.2.3"
 lru = "0.12"
 parking_lot = "0.12.3"
 derive_more = { version = "1.0.0", default-features = false }
