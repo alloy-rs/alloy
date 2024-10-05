@@ -23,21 +23,28 @@ use std::{io::BufReader, marker::PhantomData, num::NonZeroUsize, path::PathBuf, 
 /// file system by calling `save_cache`.
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
+    /// Configuration for the cache layer.
     config: CacheConfig,
+    /// In-memory LRU cache, mapping requests to responses.
+    cache: SharedCache,
 }
 
 impl CacheLayer {
     /// Instantiate a new cache layer with the the maximum number of
     /// items to store.
-    #[inline]
-    pub const fn new(max_items: usize) -> Self {
-        Self { config: CacheConfig { max_items } }
+    pub fn new(max_items: usize) -> Self {
+        Self { config: CacheConfig { max_items }, cache: SharedCache::new(max_items) }
     }
 
     /// Returns the maximum number of items that can be stored in the cache, set at initialization.
     #[inline]
     pub const fn max_items(&self) -> usize {
         self.config.max_items
+    }
+
+    /// Returns the shared cache.
+    pub fn cache(&self) -> SharedCache {
+        self.cache.clone()
     }
 }
 
@@ -50,7 +57,7 @@ where
     type Provider = CacheProvider<P, T, N>;
 
     fn layer(&self, inner: P) -> Self::Provider {
-        CacheProvider::new(inner, self.max_items())
+        CacheProvider::new(inner, self.cache())
     }
 }
 
@@ -77,43 +84,8 @@ where
     N: Network,
 {
     /// Instantiate a new cache provider.
-    pub fn new(inner: P, max_items: usize) -> Self {
-        let cache = SharedCache::new(max_items);
+    pub fn new(inner: P, cache: SharedCache) -> Self {
         Self { inner, cache, _pd: PhantomData }
-    }
-
-    /// Saves the cache to a file specified by the path.
-    /// If the files does not exist, it creates one.
-    /// If the file exists, it overwrites it.
-    pub fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
-        let cache = self.cache.read();
-        let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
-
-        // Iterate over the cache and dump to the file.
-        let entries = cache
-            .iter()
-            .map(|(key, value)| FsCacheEntry { key: *key, value: value.clone() })
-            .collect::<Vec<_>>();
-        serde_json::to_writer(file, &entries).map_err(TransportErrorKind::custom)?;
-        Ok(())
-    }
-
-    /// Loads the cache from a file specified by the path.
-    /// If the file does not exist, it returns without error.
-    pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
-        if !path.exists() {
-            return Ok(());
-        };
-        let file = std::fs::File::open(path).map_err(TransportErrorKind::custom)?;
-        let file = BufReader::new(file);
-        let entries: Vec<FsCacheEntry> =
-            serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
-        let mut cache = self.cache.write();
-        for entry in entries {
-            cache.put(entry.key, entry.value);
-        }
-
-        Ok(())
     }
 }
 
@@ -184,8 +156,8 @@ macro_rules! cache_rpc_call_with_block {
         let hash = $req.params_hash().ok();
 
         if let Some(hash) = hash {
-            if let Some(cached) = $cache.write().get(&hash) {
-                let result = serde_json::from_str(cached).map_err(TransportErrorKind::custom);
+            if let Ok(Some(cached)) = $cache.get(&hash) {
+                let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom);
                 return ProviderCall::BoxedFuture(Box::pin(async move {
                     let res = result?;
                     Ok(res)
@@ -542,12 +514,38 @@ impl SharedCache {
         Ok(val)
     }
 
-    fn read(&self) -> parking_lot::RwLockReadGuard<'_, LruCache<B256, String>> {
-        self.inner.read()
+    /// Saves the cache to a file specified by the path.
+    /// If the files does not exist, it creates one.
+    /// If the file exists, it overwrites it.
+    pub fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
+        let cache = self.inner.read();
+        let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
+
+        // Iterate over the cache and dump to the file.
+        let entries = cache
+            .iter()
+            .map(|(key, value)| FsCacheEntry { key: *key, value: value.clone() })
+            .collect::<Vec<_>>();
+        serde_json::to_writer(file, &entries).map_err(TransportErrorKind::custom)?;
+        Ok(())
     }
 
-    fn write(&self) -> parking_lot::RwLockWriteGuard<'_, LruCache<B256, String>> {
-        self.inner.write()
+    /// Loads the cache from a file specified by the path.
+    /// If the file does not exist, it returns without error.
+    pub fn load_cache(&self, path: PathBuf) -> TransportResult<()> {
+        if !path.exists() {
+            return Ok(());
+        };
+        let file = std::fs::File::open(path).map_err(TransportErrorKind::custom)?;
+        let file = BufReader::new(file);
+        let entries: Vec<FsCacheEntry> =
+            serde_json::from_reader(file).map_err(TransportErrorKind::custom)?;
+        let mut cache = self.inner.write();
+        for entry in entries {
+            cache.put(entry.key, entry.value);
+        }
+
+        Ok(())
     }
 }
 
@@ -563,12 +561,13 @@ mod tests {
     #[tokio::test]
     async fn test_get_block() {
         run_with_tempdir("get-block", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block.txt");
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
             let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
@@ -586,7 +585,7 @@ mod tests {
                 provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         })
         .await;
     }
@@ -594,15 +593,16 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_any_network() {
         run_with_tempdir("get-block", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
             let provider = ProviderBuilder::new()
                 .network::<AnyNetwork>()
-                .layer(cache)
+                .layer(cache_layer)
                 .on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block.txt");
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             let block = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from RPC.
             let block2 = provider.get_block(0.into(), BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
@@ -620,7 +620,7 @@ mod tests {
                 provider.get_block_by_hash(latest_hash, BlockTransactionsKind::Full).await.unwrap(); // Received from cache.
             assert_eq!(block3, block4);
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         })
         .await;
     }
@@ -628,14 +628,15 @@ mod tests {
     #[tokio::test]
     async fn test_get_proof() {
         run_with_tempdir("get-proof", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
 
             let from = anvil.addresses()[0];
             let path = dir.join("rpc-cache-proof.txt");
 
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             let calldata: Bytes = "0x6080604052348015600f57600080fd5b506101f28061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c80633fb5c1cb146100465780638381f58a14610062578063d09de08a14610080575b600080fd5b610060600480360381019061005b91906100ee565b61008a565b005b61006a610094565b604051610077919061012a565b60405180910390f35b61008861009a565b005b8060008190555050565b60005481565b6000808154809291906100ac90610174565b9190505550565b600080fd5b6000819050919050565b6100cb816100b8565b81146100d657600080fd5b50565b6000813590506100e8816100c2565b92915050565b600060208284031215610104576101036100b3565b5b6000610112848285016100d9565b91505092915050565b610124816100b8565b82525050565b600060208201905061013f600083018461011b565b92915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b600061017f826100b8565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101b1576101b0610145565b5b60018201905091905056fea264697066735822122067ac0f21f648b0cacd1b7260772852ad4a0f63e2cc174168c51a6887fd5197a964736f6c634300081a0033".parse().unwrap();
 
@@ -665,19 +666,20 @@ mod tests {
 
             assert_eq!(proof, proof2);
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         }).await;
     }
 
     #[tokio::test]
     async fn test_get_tx_by_hash_and_receipt() {
         run_with_tempdir("get-tx-by-hash", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().block_time_f64(0.3).spawn();
-            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-tx.txt");
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             let req = TransactionRequest::default()
                 .from(anvil.addresses()[0])
@@ -697,7 +699,7 @@ mod tests {
 
             assert_eq!(receipt, receipt2);
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         })
         .await;
     }
@@ -705,12 +707,13 @@ mod tests {
     #[tokio::test]
     async fn test_block_receipts() {
         run_with_tempdir("get-block-receipts", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-block-receipts.txt");
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             // Send txs
 
@@ -731,7 +734,7 @@ mod tests {
 
             assert!(receipts.is_some_and(|r| r[0] == receipt));
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         })
         .await
     }
@@ -739,12 +742,13 @@ mod tests {
     #[tokio::test]
     async fn test_get_code() {
         run_with_tempdir("get-code", |dir| async move {
-            let cache = CacheLayer::new(100);
+            let cache_layer = CacheLayer::new(100);
+            let shared_cache = cache_layer.cache();
             let anvil = Anvil::new().spawn();
-            let provider = ProviderBuilder::new().layer(cache).on_http(anvil.endpoint_url());
+            let provider = ProviderBuilder::new().layer(cache_layer).on_http(anvil.endpoint_url());
 
             let path = dir.join("rpc-cache-code.txt");
-            provider.load_cache(path.clone()).unwrap();
+            shared_cache.load_cache(path.clone()).unwrap();
 
             let bytecode = hex::decode(
                 // solc v0.8.26; solc Counter.sol --via-ir --optimize --bin
@@ -762,7 +766,7 @@ mod tests {
             let code2 = provider.get_code_at(counter_addr).block_id(block_id).await.unwrap(); // Received from cache.
             assert_eq!(code, code2);
 
-            provider.save_cache(path).unwrap();
+            shared_cache.save_cache(path).unwrap();
         })
         .await;
     }
