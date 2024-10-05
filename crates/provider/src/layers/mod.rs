@@ -13,4 +13,4 @@ pub use chain::ChainLayer;
 #[cfg(not(target_arch = "wasm32"))]
 mod cache;
 #[cfg(not(target_arch = "wasm32"))]
-pub use cache::{CacheConfig, CacheLayer, CacheProvider, SharedCache};
+pub use cache::{CacheLayer, CacheProvider, SharedCache};

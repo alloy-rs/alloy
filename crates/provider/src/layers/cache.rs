@@ -23,8 +23,6 @@ use std::{io::BufReader, marker::PhantomData, path::PathBuf, sync::Arc};
 /// file system by calling `save_cache`.
 #[derive(Debug, Clone)]
 pub struct CacheLayer {
-    /// Configuration for the cache layer.
-    config: CacheConfig,
     /// In-memory LRU cache, mapping requests to responses.
     cache: SharedCache,
 }
@@ -33,13 +31,12 @@ impl CacheLayer {
     /// Instantiate a new cache layer with the the maximum number of
     /// items to store.
     pub fn new(max_items: u32) -> Self {
-        Self { config: CacheConfig { max_items }, cache: SharedCache::new(max_items) }
+        Self { cache: SharedCache::new(max_items) }
     }
 
     /// Returns the maximum number of items that can be stored in the cache, set at initialization.
-    #[inline]
     pub const fn max_items(&self) -> u32 {
-        self.config.max_items
+        self.cache.max_items()
     }
 
     /// Returns the shared cache.
@@ -456,26 +453,23 @@ struct FsCacheEntry {
     /// Serialized response to the request from which the hash was computed.
     value: String,
 }
-
-/// Configuration for the cache layer.
-/// For future extensibility of the configurations.
-#[derive(Debug, Clone)]
-pub struct CacheConfig {
-    /// Maximum number of items to store in the cache.
-    pub max_items: u32,
-}
-
 /// Shareable cache.
 #[derive(Debug, Clone)]
 pub struct SharedCache {
     inner: Arc<RwLock<LruMap<B256, String>>>,
+    max_items: u32,
 }
 
 impl SharedCache {
     /// Instantiate a new shared cache.
     pub fn new(max_items: u32) -> Self {
-        let inner = Arc::new(RwLock::new(LruMap::<B256, String>::new(ByLength::new(max_items))));
-        Self { inner }
+        let inner = Arc::new(RwLock::new(LruMap::new(ByLength::new(max_items))));
+        Self { inner, max_items }
+    }
+
+    /// Maximum number of items that can be stored in the cache.
+    pub const fn max_items(&self) -> u32 {
+        self.max_items
     }
 
     /// Puts a value into the cache, and returns the old value if it existed.
@@ -484,10 +478,9 @@ impl SharedCache {
     }
 
     /// Gets a value from the cache, if it exists.
-    pub fn get(&self, key: &B256) -> TransportResult<Option<String>> {
+    pub fn get(&self, key: &B256) -> Option<String> {
         // Need to acquire a write guard to change the order of keys in LRU cache.
-        let val = self.inner.write().get(key).cloned();
-        Ok(val)
+        self.inner.write().get(key).cloned()
     }
 
     /// Get deserialized value from the cache.
@@ -495,19 +488,17 @@ impl SharedCache {
     where
         T: for<'de> Deserialize<'de>,
     {
-        if let Some(cached) = self.get(key)? {
-            let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
-            Ok(Some(result))
-        } else {
-            Ok(None)
-        }
+        let Some(cached) = self.get(key) else { return Ok(None) };
+        let result = serde_json::from_str(&cached).map_err(TransportErrorKind::custom)?;
+        Ok(Some(result))
     }
 
     /// Saves the cache to a file specified by the path.
     /// If the files does not exist, it creates one.
     /// If the file exists, it overwrites it.
     pub fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
-        let cache = self.inner.read();
+        let cloned = self.inner.clone();
+        let cache = cloned.read();
         let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
 
         // Iterate over the cache and dump to the file.
