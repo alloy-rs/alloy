@@ -1,7 +1,10 @@
-use crate::common::{Privacy, ProtocolVersion, Validity};
+use crate::{
+    common::{Privacy, ProtocolVersion, Validity},
+    u256_numeric_string,
+};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Address, Bytes, Log, TxHash};
+use alloy_primitives::{Address, Bytes, Log, TxHash, U256};
 use serde::{Deserialize, Serialize};
 
 /// A bundle of transactions to send to the matchmaker.
@@ -125,7 +128,7 @@ pub struct SimBundleOverrides {
     pub gas_limit: Option<u64>,
     /// Base fee used for simulation, defaults to parentBlock.baseFeePerGas
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
-    pub base_fee: Option<u64>,
+    pub base_fee: Option<u128>,
     /// Timeout in seconds, defaults to 5
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
@@ -144,14 +147,14 @@ pub struct SimBundleResponse {
     #[serde(with = "alloy_serde::quantity")]
     pub state_block: u64,
     /// The gas price of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub mev_gas_price: u64,
+    #[serde(with = "u256_numeric_string")]
+    pub mev_gas_price: U256,
     /// The profit of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub profit: u64,
+    #[serde(with = "u256_numeric_string")]
+    pub profit: U256,
     /// The refundable value of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub refundable_value: u64,
+    #[serde(with = "u256_numeric_string")]
+    pub refundable_value: U256,
     /// The gas used by the simulated block.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
