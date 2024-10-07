@@ -1259,6 +1259,7 @@ impl std::error::Error for PayloadValidationError {}
 mod tests {
     use super::*;
     use alloc::vec;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]
@@ -1325,7 +1326,7 @@ mod tests {
                 .to_string(),
             },
         };
-        similar_asserts::assert_eq!(q, serde_json::from_str(s).unwrap());
+        assert_eq!(q, serde_json::from_str(s).unwrap());
     }
 
     #[test]

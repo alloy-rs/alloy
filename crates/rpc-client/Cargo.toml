@@ -55,6 +55,7 @@ alloy-transport-ws.workspace = true
 ci_info.workspace = true
 tempfile = "3"
 futures-util.workspace = true
+similar-asserts.workspace = true
 
 [features]
 default = ["reqwest"]

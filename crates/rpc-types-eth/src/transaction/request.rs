@@ -1045,6 +1045,7 @@ mod tests {
     use alloy_primitives::b256;
     use alloy_serde::WithOtherFields;
     use assert_matches::assert_matches;
+    use similar_asserts::assert_eq;
 
     // <https://github.com/paradigmxyz/reth/issues/6670>
     #[test]

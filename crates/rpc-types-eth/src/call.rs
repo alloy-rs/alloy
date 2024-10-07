@@ -131,6 +131,7 @@ impl<'de> serde::Deserialize<'de> for TransactionIndex {
 mod tests {
     use super::*;
     use crate::BlockNumberOrTag;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

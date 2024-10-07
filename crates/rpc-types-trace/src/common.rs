@@ -77,6 +77,7 @@ impl<Ok, Err> TraceResult<Ok, Err> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
     struct OkResult {
