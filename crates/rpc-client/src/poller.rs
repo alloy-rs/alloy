@@ -11,12 +11,14 @@ use std::{
     time::Duration,
 };
 use tokio::sync::broadcast;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::time::sleep;
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::Instrument;
+
 #[cfg(target_arch = "wasm32")]
 use wasmtimer::tokio::sleep;
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::sleep;
 
 /// The number of retries for polling a request.
 const MAX_RETRIES: usize = 3;
