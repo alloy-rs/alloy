@@ -374,6 +374,11 @@ impl From<CallConfig> for GethDebugTracerConfig {
         Self(serde_json::to_value(value).expect("is serializable"))
     }
 }
+impl From<FlatCallConfig> for GethDebugTracerConfig {
+    fn from(value: FlatCallConfig) -> Self {
+        Self(serde_json::to_value(value).expect("is serializable"))
+    }
+}
 
 impl From<PreStateConfig> for GethDebugTracerConfig {
     fn from(value: PreStateConfig) -> Self {
@@ -418,10 +423,45 @@ pub struct GethDebugTracingOptions {
 }
 
 impl GethDebugTracingOptions {
+    /// Creates a new instance with given [`GethDebugTracerType`] configured
+    pub fn new_tracer(tracer: impl Into<GethDebugTracerType>) -> Self {
+        Self::default().with_tracer(tracer.into())
+    }
+
     /// Sets the tracer to use
     pub fn with_tracer(mut self, tracer: GethDebugTracerType) -> Self {
         self.tracer = Some(tracer);
         self
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::CallTracer`].
+    pub fn call_tracer(config: CallConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::CallTracer).with_call_config(config)
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::FlatCallTracer`].
+    pub fn flat_call_tracer(config: FlatCallConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::FlatCallTracer).with_config(config)
+    }
+
+    /// Creates new Options for [`GethDebugBuiltInTracerType::MuxTracer`].
+    pub fn mux_tracer(config: MuxConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::MuxTracer).with_config(config)
+    }
+
+    /// Creates new options for [`GethDebugBuiltInTracerType::PreStateTracer`]
+    pub fn prestate_tracer(config: PreStateConfig) -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::PreStateTracer).with_prestate_config(config)
+    }
+
+    /// Creates new options for [`GethDebugBuiltInTracerType::FourByteTracer`]
+    pub fn four_byte_tracer() -> Self {
+        Self::new_tracer(GethDebugBuiltInTracerType::FourByteTracer)
+    }
+
+    /// Creates an [`GethDebugTracerType::JsTracer`] with the given js code.
+    pub fn js_tracer(code: impl Into<String>) -> Self {
+        Self::new_tracer(GethDebugTracerType::JsTracer(code.into()))
     }
 
     /// Sets the timeout to use for tracing
