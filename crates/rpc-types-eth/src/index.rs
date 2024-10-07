@@ -85,6 +85,7 @@ mod tests {
     use super::*;
     use rand::{thread_rng, Rng};
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

@@ -427,6 +427,7 @@ pub mod error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_validator() {
@@ -435,7 +436,7 @@ mod tests {
         let validators: Vec<Validator> = serde_json::from_str(s).unwrap();
         let json: serde_json::Value = serde_json::from_str(s).unwrap();
 
-        similar_asserts::assert_eq!(json, serde_json::to_value(validators).unwrap());
+        assert_eq!(json, serde_json::to_value(validators).unwrap());
     }
 
     #[test]

@@ -178,6 +178,7 @@ pub struct TxpoolStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_txpool_content() {
@@ -352,11 +353,8 @@ mod tests {
 
         let origin: serde_json::Value = serde_json::from_str(txpool_content_json).unwrap();
         let serialized_value = serde_json::to_value(deserialized.clone()).unwrap();
-        similar_asserts::assert_eq!(origin, serialized_value);
-        similar_asserts::assert_eq!(
-            deserialized,
-            serde_json::from_str::<TxpoolContent>(&serialized).unwrap()
-        );
+        assert_eq!(origin, serialized_value);
+        assert_eq!(deserialized, serde_json::from_str::<TxpoolContent>(&serialized).unwrap());
     }
 
     #[test]

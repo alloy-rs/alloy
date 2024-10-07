@@ -287,6 +287,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use similar_asserts::assert_eq;
     #[cfg(feature = "std")]
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     use tempfile::tempdir;

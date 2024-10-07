@@ -374,6 +374,7 @@ mod pubsub_impl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_client_with_poll_interval() {

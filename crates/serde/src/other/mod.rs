@@ -235,6 +235,7 @@ where
 mod tests {
     use super::*;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn other_fields_arbitrary() {
@@ -259,8 +260,8 @@ mod tests {
 
         let with_other: WithOtherFields<InnerWrapper> =
             serde_json::from_str("{\"a\": 1, \"b\": 2}").unwrap();
-        similar_asserts::assert_eq!(with_other.inner.inner.a, 1);
-        similar_asserts::assert_eq!(
+        assert_eq!(with_other.inner.inner.a, 1);
+        assert_eq!(
             with_other.other,
             OtherFields::new(BTreeMap::from_iter([("b".to_string(), serde_json::json!(2))]))
         );
