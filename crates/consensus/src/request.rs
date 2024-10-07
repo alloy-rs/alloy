@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 use alloy_eips::{
-    eip6110::DepositRequest,
-    eip7002::WithdrawalRequest,
-    eip7251::ConsolidationRequest,
+    eip6110::{DepositRequest, DEPOSIT_REQUEST_TYPE},
+    eip7002::{WithdrawalRequest, WITHDRAWAL_REQUEST_TYPE},
+    eip7251::{ConsolidationRequest, CONSOLIDATION_REQUEST_TYPE},
     eip7685::{Decodable7685, Eip7685Error, Encodable7685},
 };
 use alloy_primitives::{bytes, Bytes};
@@ -94,17 +94,17 @@ impl Request {
 impl Encodable7685 for Request {
     fn request_type(&self) -> u8 {
         match self {
-            Self::DepositRequest(_) => 0,
-            Self::WithdrawalRequest(_) => 1,
-            Self::ConsolidationRequest(_) => 2,
+            Self::DepositRequest(req) => req.request_type(),
+            Self::WithdrawalRequest(req) => req.request_type(),
+            Self::ConsolidationRequest(req) => req.request_type(),
         }
     }
 
     fn encode_payload_7685(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
-            Self::DepositRequest(deposit) => deposit.encode(out),
-            Self::WithdrawalRequest(withdrawal) => withdrawal.encode(out),
-            Self::ConsolidationRequest(consolidation) => consolidation.encode(out),
+            Self::DepositRequest(deposit) => deposit.encode_payload_7685(out),
+            Self::WithdrawalRequest(withdrawal) => withdrawal.encode_payload_7685(out),
+            Self::ConsolidationRequest(consolidation) => consolidation.encode_payload_7685(out),
         }
     }
 }
@@ -112,9 +112,13 @@ impl Encodable7685 for Request {
 impl Decodable7685 for Request {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Result<Self, alloy_eips::eip7685::Eip7685Error> {
         Ok(match ty {
-            0 => Self::DepositRequest(DepositRequest::decode(buf)?),
-            1 => Self::WithdrawalRequest(WithdrawalRequest::decode(buf)?),
-            2 => Self::ConsolidationRequest(ConsolidationRequest::decode(buf)?),
+            DEPOSIT_REQUEST_TYPE => Self::DepositRequest(DepositRequest::typed_decode(ty, buf)?),
+            WITHDRAWAL_REQUEST_TYPE => {
+                Self::WithdrawalRequest(WithdrawalRequest::typed_decode(ty, buf)?)
+            }
+            CONSOLIDATION_REQUEST_TYPE => {
+                Self::ConsolidationRequest(ConsolidationRequest::typed_decode(ty, buf)?)
+            }
             ty => return Err(Eip7685Error::UnexpectedType(ty)),
         })
     }
