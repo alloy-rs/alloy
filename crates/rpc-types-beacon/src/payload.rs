@@ -589,6 +589,7 @@ pub mod beacon_payload {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_get_payload_header_response() {

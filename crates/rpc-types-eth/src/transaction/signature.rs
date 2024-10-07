@@ -102,6 +102,7 @@ impl From<alloy_primitives::Signature> for Signature {
 mod tests {
     use super::*;
     use core::str::FromStr;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

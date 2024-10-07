@@ -216,6 +216,7 @@ mod test {
     use alloy_primitives::{address, b256, bloom, Bloom};
     use arbitrary::Arbitrary;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn transaction_receipt_arbitrary() {
