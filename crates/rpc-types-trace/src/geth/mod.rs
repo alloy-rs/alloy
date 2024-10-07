@@ -706,6 +706,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_tracer_config() {
@@ -764,7 +765,7 @@ mod tests {
         let log: StructLog = serde_json::from_str(s).unwrap();
         let val = serde_json::to_value(&log).unwrap();
         let input = serde_json::from_str::<serde_json::Value>(s).unwrap();
-        similar_asserts::assert_eq!(input, val);
+        assert_eq!(input, val);
     }
 
     #[test]
@@ -792,7 +793,7 @@ mod tests {
 
         let de = serde_json::to_value(&result).unwrap();
         let val = serde_json::from_str::<serde_json::Value>(s).unwrap();
-        similar_asserts::assert_eq!(val, de);
+        assert_eq!(val, de);
     }
 
     #[test]
