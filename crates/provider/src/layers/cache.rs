@@ -12,7 +12,13 @@ use alloy_transport::{Transport, TransportErrorKind, TransportResult};
 use parking_lot::RwLock;
 use schnellru::{ByLength, LruMap};
 use serde::{Deserialize, Serialize};
-use std::{io::BufReader, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{
+    io::BufReader,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::Arc,
+};
 
 /// A provider layer that caches RPC responses and serves them on subsequent requests.
 ///
@@ -460,6 +466,20 @@ pub struct SharedCache {
     max_items: u32,
 }
 
+impl Deref for SharedCache {
+    type Target = Arc<RwLock<LruMap<B256, String>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for SharedCache {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
 impl SharedCache {
     /// Instantiate a new shared cache.
     pub fn new(max_items: u32) -> Self {
@@ -497,15 +517,14 @@ impl SharedCache {
     /// If the files does not exist, it creates one.
     /// If the file exists, it overwrites it.
     pub fn save_cache(&self, path: PathBuf) -> TransportResult<()> {
-        let cloned = self.inner.clone();
-        let cache = cloned.read();
+        let entries: Vec<FsCacheEntry> = {
+            self.inner
+                .read()
+                .iter()
+                .map(|(key, value)| FsCacheEntry { key: *key, value: value.clone() })
+                .collect()
+        };
         let file = std::fs::File::create(path).map_err(TransportErrorKind::custom)?;
-
-        // Iterate over the cache and dump to the file.
-        let entries = cache
-            .iter()
-            .map(|(key, value)| FsCacheEntry { key: *key, value: value.clone() })
-            .collect::<Vec<_>>();
         serde_json::to_writer(file, &entries).map_err(TransportErrorKind::custom)?;
         Ok(())
     }
