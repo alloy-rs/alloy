@@ -7,7 +7,7 @@ use crate::{
     Provider,
 };
 use alloy_json_rpc::RpcError;
-use alloy_network::{Network, TransactionBuilder};
+use alloy_network::{Network, TransactionBuilder, TransactionBuilder4844};
 use alloy_network_primitives::{BlockResponse, HeaderResponse};
 use alloy_rpc_types_eth::BlockNumberOrTag;
 use alloy_transport::{Transport, TransportResult};
@@ -19,7 +19,6 @@ use futures::FutureExt;
 pub enum GasFillable {
     Legacy { gas_limit: u128, gas_price: u128 },
     Eip1559 { gas_limit: u128, estimate: Eip1559Estimation },
-    Eip4844 { gas_limit: u128, estimate: Eip1559Estimation, max_fee_per_blob_gas: u128 },
 }
 
 /// A [`TxFiller`] that populates gas related fields in transaction requests if
@@ -64,6 +63,10 @@ pub enum GasFillable {
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GasFiller;
+
+/// Filler for the `max_fee_per_blob_gas` field in EIP-4844 transactions.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BlobGasFiller;
 
 impl GasFiller {
     async fn prepare_legacy<P, T, N>(
@@ -119,52 +122,6 @@ impl GasFiller {
 
         Ok(GasFillable::Eip1559 { gas_limit, estimate })
     }
-
-    async fn prepare_4844<P, T, N>(
-        &self,
-        provider: &P,
-        tx: &N::TransactionRequest,
-    ) -> TransportResult<GasFillable>
-    where
-        P: Provider<T, N>,
-        T: Transport + Clone,
-        N: Network,
-    {
-        let gas_limit_fut = tx.gas_limit().map_or_else(
-            || provider.estimate_gas(tx).into_future().right_future(),
-            |gas_limit| async move { Ok(gas_limit) }.left_future(),
-        );
-
-        let eip1559_fees_fut = if let (Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) =
-            (tx.max_fee_per_gas(), tx.max_priority_fee_per_gas())
-        {
-            async move { Ok(Eip1559Estimation { max_fee_per_gas, max_priority_fee_per_gas }) }
-                .left_future()
-        } else {
-            provider.estimate_eip1559_fees(None).right_future()
-        };
-
-        let max_fee_per_blob_gas_fut = tx.max_fee_per_blob_gas().map_or_else(
-            || {
-                async {
-                    provider
-                        .get_block_by_number(BlockNumberOrTag::Latest, false)
-                        .await?
-                        .ok_or(RpcError::NullResp)?
-                        .header()
-                        .next_block_blob_fee()
-                        .ok_or(RpcError::UnsupportedFeature("eip4844"))
-                }
-                .right_future()
-            },
-            |max_fee_per_blob_gas| async move { Ok(max_fee_per_blob_gas) }.left_future(),
-        );
-
-        let (gas_limit, estimate, max_fee_per_blob_gas) =
-            futures::try_join!(gas_limit_fut, eip1559_fees_fut, max_fee_per_blob_gas_fut)?;
-
-        Ok(GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas })
-    }
 }
 
 impl<N: Network> TxFiller<N> for GasFiller {
@@ -176,18 +133,8 @@ impl<N: Network> TxFiller<N> for GasFiller {
             return FillerControlFlow::Finished;
         }
 
-        // 4844
-        if tx.max_fee_per_blob_gas().is_some()
-            && tx.max_fee_per_gas().is_some()
-            && tx.max_priority_fee_per_gas().is_some()
-            && tx.gas_limit().is_some()
-        {
-            return FillerControlFlow::Finished;
-        }
-
         // eip1559
-        if tx.blob_sidecar().is_none()
-            && tx.max_fee_per_gas().is_some()
+        if tx.max_fee_per_gas().is_some()
             && tx.max_priority_fee_per_gas().is_some()
             && tx.gas_limit().is_some()
         {
@@ -208,10 +155,8 @@ impl<N: Network> TxFiller<N> for GasFiller {
         P: Provider<T, N>,
         T: Transport + Clone,
     {
-        if tx.gas_price().is_some() || tx.access_list().is_some() {
+        if tx.gas_price().is_some() {
             self.prepare_legacy(provider, tx).await
-        } else if tx.blob_sidecar().is_some() {
-            self.prepare_4844(provider, tx).await
         } else {
             match self.prepare_1559(provider, tx).await {
                 // fallback to legacy
@@ -238,14 +183,58 @@ impl<N: Network> TxFiller<N> for GasFiller {
                     builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
                     builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
                 }
-                GasFillable::Eip4844 { gas_limit, estimate, max_fee_per_blob_gas } => {
-                    builder.set_gas_limit(gas_limit);
-                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
-                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
-                    builder.set_max_fee_per_blob_gas(max_fee_per_blob_gas);
-                }
             }
         };
+        Ok(tx)
+    }
+}
+
+impl<N: Network> TxFiller<N> for BlobGasFiller
+where
+    N::TransactionRequest: TransactionBuilder4844,
+{
+    type Fillable = u128;
+
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        // nothing to fill if non-eip4844 tx or max_fee_per_blob_gas is already set
+        if tx.blob_sidecar().is_none() || tx.max_fee_per_blob_gas().is_some() {
+            return FillerControlFlow::Finished;
+        }
+
+        FillerControlFlow::Ready
+    }
+
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
+    async fn prepare<P, T>(
+        &self,
+        provider: &P,
+        tx: &<N as Network>::TransactionRequest,
+    ) -> TransportResult<Self::Fillable>
+    where
+        P: Provider<T, N>,
+        T: Transport + Clone,
+    {
+        if let Some(max_fee_per_blob_gas) = tx.max_fee_per_blob_gas() {
+            return Ok(max_fee_per_blob_gas);
+        }
+        provider
+            .get_block_by_number(BlockNumberOrTag::Latest, false)
+            .await?
+            .ok_or(RpcError::NullResp)?
+            .header()
+            .next_block_blob_fee()
+            .ok_or(RpcError::UnsupportedFeature("eip4844"))
+    }
+
+    async fn fill(
+        &self,
+        fillable: Self::Fillable,
+        mut tx: SendableTx<N>,
+    ) -> TransportResult<SendableTx<N>> {
+        if let Some(builder) = tx.as_mut_builder() {
+            builder.set_max_fee_per_blob_gas(fillable);
+        }
         Ok(tx)
     }
 }
@@ -299,29 +288,5 @@ mod tests {
         let receipt = tx.get_receipt().await.unwrap();
 
         assert_eq!(receipt.gas_used, 0x5208);
-    }
-
-    #[tokio::test]
-    async fn non_eip1559_network() {
-        let provider = ProviderBuilder::new()
-            .filler(crate::fillers::GasFiller)
-            .filler(crate::fillers::NonceFiller::default())
-            .filler(crate::fillers::ChainIdFiller::default())
-            .on_anvil();
-
-        let tx = TransactionRequest {
-            from: Some(address!("f39Fd6e51aad88F6F4ce6aB8827279cffFb92266")),
-            value: Some(U256::from(100)),
-            to: Some(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045").into()),
-            // access list forces legacy gassing
-            access_list: Some(vec![Default::default()].into()),
-            ..Default::default()
-        };
-
-        let tx = provider.send_transaction(tx).await.unwrap();
-
-        let receipt = tx.get_receipt().await.unwrap();
-
-        assert_eq!(receipt.effective_gas_price, 2000000000);
     }
 }

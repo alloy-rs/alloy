@@ -4,7 +4,7 @@
 //! <https://github.com/otterscan/otterscan/blob/develop/docs/custom-jsonrpc.md>
 
 use alloy_primitives::{Address, Bloom, Bytes, TxHash, B256, U256};
-use alloy_rpc_types_eth::{Block, Header, Transaction, TransactionReceipt, Withdrawal};
+use alloy_rpc_types_eth::{Block, Header, Log, Transaction, TransactionReceipt, Withdrawal};
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer, Serialize, Serializer,
@@ -204,7 +204,7 @@ pub struct OtsReceipt {
     /// The logs sent from contracts.
     ///
     /// Note: this is set to null.
-    pub logs: Option<Vec<alloy_primitives::Log>>,
+    pub logs: Option<Vec<Log>>,
     /// The bloom filter.
     ///
     /// Note: this is set to null.

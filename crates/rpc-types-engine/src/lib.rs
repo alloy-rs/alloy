@@ -5,19 +5,29 @@
 )]
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 mod cancun;
+pub use cancun::*;
+
 mod forkchoice;
+pub use forkchoice::*;
+
 mod identification;
+pub use identification::*;
+
 #[cfg(feature = "jwt")]
 mod jwt;
-pub mod payload;
-mod transition;
-
-pub use self::{cancun::*, forkchoice::*, identification::*, payload::*, transition::*};
-
 #[cfg(feature = "jwt")]
-pub use self::jwt::*;
+pub use jwt::*;
+
+pub mod payload;
+pub use payload::*;
+
+mod transition;
+pub use transition::*;
 
 #[doc(inline)]
 pub use alloy_eips::eip6110::DepositRequest as DepositRequestV1;

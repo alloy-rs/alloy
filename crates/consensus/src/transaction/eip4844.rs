@@ -1,5 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
 
+use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
 use alloy_primitives::{keccak256, Address, Bytes, ChainId, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
@@ -11,9 +12,6 @@ pub use alloy_eips::eip4844::BlobTransactionSidecar;
 #[cfg(feature = "kzg")]
 #[doc(inline)]
 pub use alloy_eips::eip4844::BlobTransactionValidationError;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 /// [EIP-4844 Blob Transaction](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)
 ///

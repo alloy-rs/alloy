@@ -1,4 +1,5 @@
-use alloy_primitives::{Address, BlockHash, Bytes, TxHash, U256};
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_primitives::{Address, BlockHash, Bytes, TxHash, B256, U256};
 use alloy_serde::WithOtherFields;
 
 use crate::BlockTransactions;
@@ -23,6 +24,41 @@ pub trait ReceiptResponse {
 
     /// Number of the block this transaction was included within.
     fn block_number(&self) -> Option<u64>;
+
+    /// Transaction Hash.
+    fn transaction_hash(&self) -> TxHash;
+
+    /// Index within the block.
+    fn transaction_index(&self) -> Option<u64>;
+
+    /// Gas used by this transaction alone.
+    fn gas_used(&self) -> u128;
+
+    /// Effective gas price.
+    fn effective_gas_price(&self) -> u128;
+
+    /// Blob gas used by the eip-4844 transaction.
+    fn blob_gas_used(&self) -> Option<u128>;
+
+    /// Blob gas price paid by the eip-4844 transaction.
+    fn blob_gas_price(&self) -> Option<u128>;
+
+    /// Address of the sender.
+    fn from(&self) -> Address;
+
+    /// Address of the receiver.
+    fn to(&self) -> Option<Address>;
+
+    /// EIP-7702 Authorization list.
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]>;
+
+    /// Returns the cumulative gas used at this receipt.
+    fn cumulative_gas_used(&self) -> u128;
+
+    /// The post-transaction state root (pre Byzantium)
+    ///
+    /// EIP98 makes this field optional.
+    fn state_root(&self) -> Option<B256>;
 }
 
 /// Transaction JSON-RPC response.
@@ -67,6 +103,30 @@ pub trait HeaderResponse {
 
     /// Blob fee for the next block (if EIP-4844 is supported)
     fn next_block_blob_fee(&self) -> Option<u128>;
+
+    /// Coinbase/Miner of the block
+    fn coinbase(&self) -> Address;
+
+    /// Gas limit of the block
+    fn gas_limit(&self) -> u128;
+
+    /// Mix hash of the block
+    ///
+    /// Before the merge this proves, combined with the nonce, that a sufficient amount of
+    /// computation has been carried out on this block: the Proof-of-Work (PoW).
+    ///
+    /// After the merge this is `prevRandao`: Randomness value for the generated payload.
+    ///
+    /// This is an Option because it is not always set by non-ethereum networks.
+    ///
+    /// See also <https://eips.ethereum.org/EIPS/eip-4399>
+    /// And <https://github.com/ethereum/execution-apis/issues/328>
+    fn mix_hash(&self) -> Option<B256>;
+
+    /// Difficulty of the block
+    ///
+    /// Unused after the Paris (AKA the merge) upgrade, and replaced by `prevrandao`.
+    fn difficulty(&self) -> U256;
 }
 
 /// Block JSON-RPC response.
@@ -84,6 +144,11 @@ pub trait BlockResponse {
 
     /// Mutable reference to block transactions
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction>;
+
+    /// Returns the `other` field from `WithOtherFields` type.
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        None
+    }
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
@@ -128,6 +193,50 @@ impl<T: ReceiptResponse> ReceiptResponse for WithOtherFields<T> {
     fn block_number(&self) -> Option<u64> {
         self.inner.block_number()
     }
+
+    fn transaction_hash(&self) -> TxHash {
+        self.inner.transaction_hash()
+    }
+
+    fn transaction_index(&self) -> Option<u64> {
+        self.inner.transaction_index()
+    }
+
+    fn gas_used(&self) -> u128 {
+        self.inner.gas_used()
+    }
+
+    fn effective_gas_price(&self) -> u128 {
+        self.inner.effective_gas_price()
+    }
+
+    fn blob_gas_used(&self) -> Option<u128> {
+        self.inner.blob_gas_used()
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        self.inner.blob_gas_price()
+    }
+
+    fn from(&self) -> Address {
+        self.inner.from()
+    }
+
+    fn to(&self) -> Option<Address> {
+        self.inner.to()
+    }
+
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        self.inner.authorization_list()
+    }
+
+    fn cumulative_gas_used(&self) -> u128 {
+        self.inner.cumulative_gas_used()
+    }
+
+    fn state_root(&self) -> Option<B256> {
+        self.inner.state_root()
+    }
 }
 
 impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
@@ -144,6 +253,10 @@ impl<T: BlockResponse> BlockResponse for WithOtherFields<T> {
 
     fn transactions_mut(&mut self) -> &mut BlockTransactions<Self::Transaction> {
         self.inner.transactions_mut()
+    }
+
+    fn other_fields(&self) -> Option<&alloy_serde::OtherFields> {
+        Some(&self.other)
     }
 }
 
@@ -170,5 +283,21 @@ impl<T: HeaderResponse> HeaderResponse for WithOtherFields<T> {
 
     fn next_block_blob_fee(&self) -> Option<u128> {
         self.inner.next_block_blob_fee()
+    }
+
+    fn coinbase(&self) -> Address {
+        self.inner.coinbase()
+    }
+
+    fn gas_limit(&self) -> u128 {
+        self.inner.gas_limit()
+    }
+
+    fn mix_hash(&self) -> Option<B256> {
+        self.inner.mix_hash()
+    }
+
+    fn difficulty(&self) -> U256 {
+        self.inner.difficulty()
     }
 }

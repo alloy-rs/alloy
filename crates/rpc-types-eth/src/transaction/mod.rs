@@ -7,7 +7,8 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxHash, TxKind, B256, U256};
-use serde::{Deserialize, Serialize};
+
+use alloc::vec::Vec;
 
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::{
@@ -22,7 +23,10 @@ mod error;
 pub use error::ConversionError;
 
 mod receipt;
-pub use receipt::{AnyTransactionReceipt, TransactionReceipt};
+pub use receipt::TransactionReceipt;
+
+#[cfg(feature = "serde")]
+pub use receipt::AnyTransactionReceipt;
 
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
@@ -33,24 +37,25 @@ pub use signature::{Parity, Signature};
 pub use alloy_consensus::{AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom};
 
 /// Transaction object used in RPC
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
-#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[doc(alias = "Tx")]
 pub struct Transaction {
     /// Hash
     pub hash: TxHash,
     /// Nonce
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub nonce: u64,
     /// Block hash
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub block_hash: Option<BlockHash>,
     /// Block number
-    #[serde(default, with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub block_number: Option<u64>,
     /// Transaction Index
-    #[serde(default, with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(feature = "serde", serde(default, with = "alloy_serde::quantity::opt"))]
     pub transaction_index: Option<u64>,
     /// Sender
     pub from: Address,
@@ -59,54 +64,92 @@ pub struct Transaction {
     /// Transferred value
     pub value: U256,
     /// Gas Price
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub gas_price: Option<u128>,
     /// Gas amount
-    #[serde(with = "alloy_serde::quantity")]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas: u128,
     /// Max BaseFeePerGas the user is willing to pay.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_fee_per_gas: Option<u128>,
     /// The miner's tip.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_priority_fee_per_gas: Option<u128>,
     /// Configured max fee per blob gas for eip-4844 transactions
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub max_fee_per_blob_gas: Option<u128>,
     /// Data
     pub input: Bytes,
     /// All _flattened_ fields of the transaction signature.
     ///
     /// Note: this is an option so special transaction types without a signature (e.g. <https://github.com/ethereum-optimism/optimism/blob/0bf643c4147b43cd6f25a759d331ef3a2a61a2a3/specs/deposits.md#the-deposited-transaction-type>) can be supported.
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(flatten, skip_serializing_if = "Option::is_none"))]
     pub signature: Option<Signature>,
     /// The chain id of the transaction, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
+    )]
     pub chain_id: Option<ChainId>,
     /// Contains the blob hashes for eip-4844 transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub blob_versioned_hashes: Option<Vec<B256>>,
     /// EIP2930
     ///
     /// Pre-pay to warm storage access.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub access_list: Option<AccessList>,
     /// EIP2718
     ///
     /// Transaction type,
     /// Some(4) for EIP-7702 transaction, Some(3) for EIP-4844 transaction, Some(2) for EIP-1559
     /// transaction, Some(1) for AccessList transaction, None or Some(0) for Legacy
-    #[serde(
-        default,
-        rename = "type",
-        skip_serializing_if = "Option::is_none",
-        with = "alloy_serde::quantity::opt"
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            default,
+            rename = "type",
+            skip_serializing_if = "Option::is_none",
+            with = "alloy_serde::quantity::opt"
+        )
     )]
     #[doc(alias = "tx_type")]
     pub transaction_type: Option<u8>,
     /// The signed authorization list is a list of tuples that store the address to code which the
     /// signer desires to execute in the context of their EOA and their signature.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub authorization_list: Option<Vec<SignedAuthorization>>,
 }
 
@@ -269,7 +312,7 @@ impl TryFrom<Transaction> for Signed<TxEip7702> {
             max_priority_fee_per_gas: tx
                 .max_priority_fee_per_gas
                 .ok_or(ConversionError::MissingMaxPriorityFeePerGas)?,
-            to: tx.to.into(),
+            to: tx.to.ok_or(ConversionError::MissingTo)?,
             value: tx.value,
             access_list: tx.access_list.ok_or(ConversionError::MissingAccessList)?,
             authorization_list: tx
@@ -325,8 +368,8 @@ mod tests {
     use super::*;
     use alloy_primitives::Signature as AlloySignature;
     use arbitrary::Arbitrary;
+    use core::str::FromStr;
     use rand::Rng;
-    use std::str::FromStr;
 
     #[test]
     fn arbitrary_transaction() {
@@ -337,6 +380,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_transaction() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
@@ -373,13 +417,14 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_transaction_with_parity_bit() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
@@ -416,13 +461,14 @@ mod tests {
         let serialized = serde_json::to_string(&transaction).unwrap();
         assert_eq!(
             serialized,
-            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":27}]}"#
+            r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000001","nonce":"0x2","blockHash":"0x0000000000000000000000000000000000000000000000000000000000000003","blockNumber":"0x4","transactionIndex":"0x5","from":"0x0000000000000000000000000000000000000006","to":"0x0000000000000000000000000000000000000007","value":"0x8","gasPrice":"0x9","gas":"0xa","maxFeePerGas":"0x15","maxPriorityFeePerGas":"0x16","input":"0x0b0c0d","r":"0xe","s":"0xe","v":"0xe","yParity":"0x1","chainId":"0x11","type":"0x14","authorizationList":[{"chainId":"0x1","address":"0x0000000000000000000000000000000000000006","nonce":"0x1","r":"0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353","s":"0xefffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c804","v":"0x1b"}]}"#
         );
         let deserialized: Transaction = serde_json::from_str(&serialized).unwrap();
         assert_eq!(transaction, deserialized);
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn serde_minimal_transaction() {
         let transaction = Transaction {
             hash: B256::with_last_byte(1),
@@ -443,6 +489,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn into_request_legacy() {
         // cast rpc eth_getTransactionByHash
         // 0xe9e91f1ee4b56c0df2e9f06c2b8c27c6076195a88a7b8537ba8313d80e6f124e --rpc-url mainnet
@@ -455,6 +502,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     fn into_request_eip1559() {
         // cast rpc eth_getTransactionByHash
         // 0x0e07d8b53ed3d91314c80e53cf25bcde02084939395845cbb625b029d568135c --rpc-url mainnet
