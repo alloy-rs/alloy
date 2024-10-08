@@ -175,6 +175,7 @@ mod tests {
 
     use crate::{common::PrivacyHint, RefundConfig};
     use alloy_primitives::Bytes;
+    use similar_asserts::assert_eq;
 
     use super::*;
 

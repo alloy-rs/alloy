@@ -185,6 +185,7 @@ impl FromStr for BuiltInConnectionString {
 #[cfg(test)]
 mod test {
     use super::*;
+    use similar_asserts::assert_eq;
     use url::Url;
 
     #[test]

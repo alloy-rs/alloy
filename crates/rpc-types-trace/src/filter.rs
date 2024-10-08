@@ -198,6 +198,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{Bytes, U256};
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_parse_filter() {

@@ -439,6 +439,7 @@ mod tests {
     use arbitrary::Arbitrary;
     use core::str::FromStr;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn arbitrary_transaction() {

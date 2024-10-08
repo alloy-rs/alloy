@@ -125,6 +125,7 @@ impl FlatCallConfig {
 mod tests {
     use super::*;
     use crate::geth::*;
+    use similar_asserts::assert_eq;
 
     // See <https://github.com/ethereum/go-ethereum/tree/master/eth/tracers/internal/tracetest/testdata>
     const DEFAULT: &str = include_str!("../../test_data/call_tracer/default.json");

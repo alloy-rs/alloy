@@ -351,6 +351,7 @@ pub struct PayloadAttributesData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn serde_payload_attributes_event() {

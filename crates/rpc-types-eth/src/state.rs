@@ -109,6 +109,7 @@ impl EvmOverrides {
 mod tests {
     use super::*;
     use alloy_primitives::address;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_default_account_override() {
