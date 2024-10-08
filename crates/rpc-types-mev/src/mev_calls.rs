@@ -125,7 +125,7 @@ pub struct SimBundleOverrides {
     pub gas_limit: Option<u64>,
     /// Base fee used for simulation, defaults to parentBlock.baseFeePerGas
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
-    pub base_fee: Option<u128>,
+    pub base_fee: Option<u64>,
     /// Timeout in seconds, defaults to 5
     #[serde(default, with = "alloy_serde::quantity::opt", skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
@@ -146,8 +146,7 @@ pub struct SimBundleResponse {
     /// The gas price of the simulated block.
     pub mev_gas_price: U256,
     /// The profit of the simulated block.
-    #[serde(rename = "profit")]
-    pub total_profit: U256,
+    pub profit: U256,
     /// The refundable value of the simulated block.
     pub refundable_value: U256,
     /// The gas used by the simulated block.
