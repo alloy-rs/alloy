@@ -27,4 +27,3 @@ serde.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
-similar-asserts.workspace = true
