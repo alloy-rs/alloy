@@ -128,7 +128,7 @@ pub struct CallBuilder<T, P, D, N: Network = Ethereum> {
     /// The provider.
     // NOTE: This is public due to usage in `sol!`, please avoid changing it.
     pub provider: P,
-    decoder: D,
+    pub decoder: D,
     transport: PhantomData<T>,
 }
 
