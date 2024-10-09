@@ -1,0 +1,30 @@
+[package]
+name = "wallet-rpc-types"
+description = "Types for the 'wallet' Ethereum JSON-RPC namespace"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+
+alloy-serde = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = [
+    "dep:serde",
+    "dep:serde_json",
+    "dep:alloy-serde",
+]
+
+[lints]
+workspace = true
