@@ -188,11 +188,11 @@ mod tests {
         let txpool_content_json = r#"
 {
   "pending": {
-    "0x00000000863B56a3C1f0F1be8BC4F8b7BD78F57a": {
+    "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a": {
       "29": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x00000000863B56a3C1f0F1be8BC4F8b7BD78F57a",
+        "from": "0x00000000863b56a3c1f0f1be8bc4f8b7bd78f57a",
         "gas": "0x2af9e",
         "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
@@ -200,7 +200,7 @@ mod tests {
         "hash": "0xfbc6fd04ba1c4114f06574263f04099b4fb2da72acc6f9709f0a3d2361308344",
         "input": "0x5ae401dc00000000000000000000000000000000000000000000000000000000636c757700000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e404e45aaf000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000006b175474e89094c44da98b954eedeac495271d0f000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000863b56a3c1f0f1be8bc4f8b7bd78f57a000000000000000000000000000000000000000000000000000000007781df4000000000000000000000000000000000000000000000006c240454bf9c87cd84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x1d",
-        "to": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+        "to": "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
@@ -211,17 +211,17 @@ mod tests {
         "s": "0x65a2aa7e0e70356f765205a611d580de8e84fa79086f117fd9ab4765f5cf1339"
       }
     },
-    "0x000042429c09De5881F05a0c2a068222F4F5b091": {
+    "0x000042429c09de5881f05a0c2a068222f4f5b091": {
       "38": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x000042429c09De5881F05a0c2a068222F4F5b091",
+        "from": "0x000042429c09de5881f05a0c2a068222f4f5b091",
         "gas": "0x61a80",
         "gasPrice": "0x2540be400",
         "hash": "0x054ad1ccf5917139a9b1952f62048f742255a7c11100f593c4f18c1ed49b8dfd",
         "input": "0x27dc297e800332e506f28f49a13c1edf087bdd6482d6cb3abdf2a4c455642aef1e98fc240000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002d7b22444149223a313439332e37342c2254555344223a313438392e36362c2255534443223a313439322e34387d00000000000000000000000000000000000000",
         "nonce": "0x26",
-        "to": "0xabD279FEbe00c93Fb0c9E683c6919ec4f107241F",
+        "to": "0xabd279febe00c93fb0c9e683c6919ec4f107241f",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x0",
@@ -231,11 +231,11 @@ mod tests {
         "s": "0x21d6d24d58ec361379ffffe4cc17bec8ce2b9f5f9759a91afc9a54dfdfa519c2"
       }
     },
-    "0x000Fab888651fbCEb55de230493562159EAD0340": {
+    "0x000fab888651fbceb55de230493562159ead0340": {
       "12": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x000Fab888651fbCEb55de230493562159EAD0340",
+        "from": "0x000fab888651fbceb55de230493562159ead0340",
         "gas": "0x12fed",
         "gasPrice": "0x1a13b8600",
         "maxFeePerGas": "0x1a13b8600",
@@ -243,7 +243,7 @@ mod tests {
         "hash": "0xfae0cffdae6774abe11662a2cdbea019fce48fca87ba9ebf5e9e7c2454c01715",
         "input": "0xa9059cbb00000000000000000000000050272a56ef9aff7238e8b40347da62e87c1f69e200000000000000000000000000000000000000000000000000000000428d3dfc",
         "nonce": "0xc",
-        "to": "0x8e8D6aB093905C400D583EfD37fbeEB1ee1c0c39",
+        "to": "0x8e8d6ab093905c400d583efd37fbeeb1ee1c0c39",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
@@ -256,11 +256,11 @@ mod tests {
     }
   },
   "queued": {
-    "0x00B846f07f5e7c61569437CA16f88a9dFA00F1BF": {
+    "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf": {
       "143": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x00B846f07f5e7c61569437CA16f88a9dFA00F1BF",
+        "from": "0x00b846f07f5e7c61569437ca16f88a9dfa00f1bf",
         "gas": "0x33c3b",
         "gasPrice": "0x218711a00",
         "maxFeePerGas": "0x218711a00",
@@ -268,7 +268,7 @@ mod tests {
         "hash": "0x68959706857f7a58d752ede0a5118a5f55f4ae40801f31377e1af201944720b2",
         "input": "0x03a9ea6d00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000f2ff840000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000041d0c4694374d7893d63605625687be2f01028a5b49eca00f72901e773ad8ba7906e58d43e114a28353efaf8abd6a2675de83a3a07af579b8b268e6b714376610d1c00000000000000000000000000000000000000000000000000000000000000",
         "nonce": "0x8f",
-        "to": "0xFbdDaDD80fe7bda00B901FbAf73803F2238Ae655",
+        "to": "0xfbddadd80fe7bda00b901fbaf73803f2238ae655",
         "transactionIndex": null,
         "value": "0x1f58a57c1794eb",
         "type": "0x2",
@@ -279,11 +279,11 @@ mod tests {
         "s": "0x358d79063d702f0c3fb46ad0f6ce5db61f5fdb0b20359c8da2e72a11988db283"
       }
     },
-    "0x025276Ec2DE8ee570Cfd4c1010319f14A6d9f0dD": {
+    "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd": {
       "1": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x025276Ec2DE8ee570Cfd4c1010319f14A6d9f0dD",
+        "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7918",
         "gasPrice": "0x12e531724e",
         "maxFeePerGas": "0x12e531724e",
@@ -291,7 +291,7 @@ mod tests {
         "hash": "0x35109918ab6129a4d69480514ebec0ea08dc4a4de032fec59003ea66718828c4",
         "input": "0x",
         "nonce": "0x1",
-        "to": "0x025276Ec2DE8ee570Cfd4c1010319f14A6d9f0dD",
+        "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
@@ -304,7 +304,7 @@ mod tests {
       "4": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x025276Ec2DE8ee570Cfd4c1010319f14A6d9f0dD",
+        "from": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "gas": "0x7530",
         "gasPrice": "0x1919617600",
         "maxFeePerGas": "0x1919617600",
@@ -312,7 +312,7 @@ mod tests {
         "hash": "0xa58e54464b2ca62a5e2d976604ed9a53b13f8823a170ee4c3ae0cd91cde2a6c5",
         "input": "0x",
         "nonce": "0x4",
-        "to": "0x025276Ec2DE8ee570Cfd4c1010319f14A6d9f0dD",
+        "to": "0x025276ec2de8ee570cfd4c1010319f14a6d9f0dd",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",
@@ -323,11 +323,11 @@ mod tests {
         "s": "0x248a72dab9b24568dd9cbe289c205eaba1a6b58b32b5a96c48554945d3fd0d86"
       }
     },
-    "0x02666081cfb787De3562eFbBcA5f0Fe890E927F1": {
+    "0x02666081cfb787de3562efbbca5f0fe890e927f1": {
       "44": {
         "blockHash": null,
         "blockNumber": null,
-        "from": "0x02666081cfb787De3562eFbBcA5f0Fe890E927F1",
+        "from": "0x02666081cfb787de3562efbbca5f0fe890e927f1",
         "gas": "0x16404",
         "gasPrice": "0x4bad00695",
         "maxFeePerGas": "0x4bad00695",
@@ -335,7 +335,7 @@ mod tests {
         "hash": "0xf627e59d7a59eb650f4c9df222858572601a566263809fdacbb755ac2277a4a7",
         "input": "0x095ea7b300000000000000000000000029fbd00940df70cfc5dad3f2370686991e2bbf5cffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "nonce": "0x2c",
-        "to": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "to": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
         "transactionIndex": null,
         "value": "0x0",
         "type": "0x2",

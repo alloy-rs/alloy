@@ -19,7 +19,7 @@ pub type ExecutionPayloadBodiesV1 = Vec<Option<ExecutionPayloadBodyV1>>;
 pub type ExecutionPayloadBodiesV2 = Vec<Option<ExecutionPayloadBodyV2>>;
 
 /// And 8-byte identifier for an execution payload.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PayloadId(pub B64);
 
