@@ -257,6 +257,7 @@ mod handshake {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn deserialize_peer_info() {

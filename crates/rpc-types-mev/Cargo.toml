@@ -23,5 +23,8 @@ alloy-serde.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+similar-asserts.workspace = true
+
 [lints]
 workspace = true

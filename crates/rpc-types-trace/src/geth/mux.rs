@@ -17,6 +17,7 @@ pub struct MuxFrame(pub HashMap<GethDebugBuiltInTracerType, GethTrace>);
 mod tests {
     use super::*;
     use crate::geth::*;
+    use similar_asserts::assert_eq;
 
     const FOUR_BYTE_FRAME: &str = r#"{
         "0x27dc297e-128": 1,

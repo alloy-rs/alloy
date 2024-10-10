@@ -305,12 +305,7 @@ impl Encodable for TxEnvelope {
     }
 
     fn length(&self) -> usize {
-        let mut payload_length = self.rlp_payload_length();
-        if !self.is_legacy() {
-            payload_length += Header { list: false, payload_length }.length();
-        }
-
-        payload_length
+        self.network_len()
     }
 }
 
@@ -382,6 +377,16 @@ impl Transaction for TxEnvelope {
         }
     }
 
+    fn nonce(&self) -> u64 {
+        match self {
+            Self::Legacy(tx) => tx.tx().nonce(),
+            Self::Eip2930(tx) => tx.tx().nonce(),
+            Self::Eip1559(tx) => tx.tx().nonce(),
+            Self::Eip4844(tx) => tx.tx().nonce(),
+            Self::Eip7702(tx) => tx.tx().nonce(),
+        }
+    }
+
     fn gas_limit(&self) -> u64 {
         match self {
             Self::Legacy(tx) => tx.tx().gas_limit(),
@@ -422,16 +427,6 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
-        }
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.tx().max_fee_per_blob_gas(),
@@ -442,23 +437,13 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn priority_fee_or_price(&self) -> u128 {
         match self {
-            Self::Legacy(tx) => tx.tx().input(),
-            Self::Eip2930(tx) => tx.tx().input(),
-            Self::Eip1559(tx) => tx.tx().input(),
-            Self::Eip4844(tx) => tx.tx().input(),
-            Self::Eip7702(tx) => tx.tx().input(),
-        }
-    }
-
-    fn nonce(&self) -> u64 {
-        match self {
-            Self::Legacy(tx) => tx.tx().nonce(),
-            Self::Eip2930(tx) => tx.tx().nonce(),
-            Self::Eip1559(tx) => tx.tx().nonce(),
-            Self::Eip4844(tx) => tx.tx().nonce(),
-            Self::Eip7702(tx) => tx.tx().nonce(),
+            Self::Legacy(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.tx().priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.tx().priority_fee_or_price(),
         }
     }
 
@@ -479,6 +464,16 @@ impl Transaction for TxEnvelope {
             Self::Eip1559(tx) => tx.tx().value(),
             Self::Eip4844(tx) => tx.tx().value(),
             Self::Eip7702(tx) => tx.tx().value(),
+        }
+    }
+
+    fn input(&self) -> &[u8] {
+        match self {
+            Self::Legacy(tx) => tx.tx().input(),
+            Self::Eip2930(tx) => tx.tx().input(),
+            Self::Eip1559(tx) => tx.tx().input(),
+            Self::Eip4844(tx) => tx.tx().input(),
+            Self::Eip7702(tx) => tx.tx().input(),
         }
     }
 

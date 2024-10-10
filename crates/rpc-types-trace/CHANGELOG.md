@@ -5,11 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Bug Fixes
+
+- Use vec for flat call frame ([#1343](https://github.com/alloy-rs/alloy/issues/1343))
+
+### Features
+
+- Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+
+### Other
+
+- Add `OperationType::OpEofCreate` ([#1327](https://github.com/alloy-rs/alloy/issues/1327))
+
+### Testing
+
+- Update test cases with addresses ([#1358](https://github.com/alloy-rs/alloy/issues/1358))
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Features
 
 - Add types for flat call tracer ([#1292](https://github.com/alloy-rs/alloy/issues/1292))
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
 
 ## [0.3.5](https://github.com/alloy-rs/alloy/releases/tag/v0.3.5) - 2024-09-13
 

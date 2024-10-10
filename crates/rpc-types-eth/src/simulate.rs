@@ -157,6 +157,7 @@ mod tests {
     use super::*;
     use alloy_primitives::{Address, TxKind};
     use serde_json::json;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

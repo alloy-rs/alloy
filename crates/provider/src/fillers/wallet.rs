@@ -128,7 +128,7 @@ mod tests {
         let node_hash = *builder.tx_hash();
         assert_eq!(
             node_hash,
-            b256!("eb56033eab0279c6e9b685a5ec55ea0ff8d06056b62b7f36974898d4fbb57e64")
+            b256!("4b56f1a6bdceb76d1b843e978c70ab88e38aa19f1a67be851b10ce4eec65b7d4")
         );
 
         let pending = builder.register().await.unwrap();

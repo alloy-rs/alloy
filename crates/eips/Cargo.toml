@@ -56,6 +56,7 @@ alloy-primitives = { workspace = true, features = [
 ] }
 arbitrary = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+rand.workspace = true
 
 [features]
 default = ["std", "kzg-sidecar"]
@@ -63,6 +64,7 @@ std = ["alloy-primitives/std", "alloy-rlp/std", "derive_more?/std",
 "serde?/std", "c-kzg?/std", "once_cell?/std"]
 serde = ["dep:alloy-serde", "dep:serde", "alloy-primitives/serde", 
 "c-kzg?/serde", "alloy-eip2930/serde", "alloy-eip7702/serde"]
+serde-bincode-compat = ["alloy-eip7702/serde-bincode-compat"]
 kzg = ["kzg-sidecar", "sha2", "dep:derive_more", "dep:c-kzg", "dep:once_cell"]
 kzg-sidecar = ["sha2"]
 k256 = ["alloy-eip7702/k256"]

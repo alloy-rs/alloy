@@ -235,6 +235,7 @@ where
 mod tests {
     use super::*;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn other_fields_arbitrary() {

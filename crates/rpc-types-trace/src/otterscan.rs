@@ -255,6 +255,7 @@ pub struct ContractCreator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     fn test_otterscan_receipt() {

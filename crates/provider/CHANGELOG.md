@@ -5,12 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.1
+
+## [0.4.0](https://github.com/alloy-rs/alloy/releases/tag/v0.4.0) - 2024-09-30
+
+### Bug Fixes
+
+- Ensure `max_fee_per_blob_gas` field handles `Some(0)` gracefully ([#1389](https://github.com/alloy-rs/alloy/issues/1389))
+- [`rpc-client`] Add test for BuiltInConnString.connect_boxed ([#1331](https://github.com/alloy-rs/alloy/issues/1331))
+- RecommendedFillers typo ([#1311](https://github.com/alloy-rs/alloy/issues/1311))
+
+### Features
+
+- Replace std/hashbrown with alloy_primitives::map ([#1384](https://github.com/alloy-rs/alloy/issues/1384))
+- [transport-http] JWT auth layer ([#1314](https://github.com/alloy-rs/alloy/issues/1314))
+- [provider] Subscribe to new blocks if possible in heartbeat ([#1321](https://github.com/alloy-rs/alloy/issues/1321))
+- Add eth_simulateV1 ([#1323](https://github.com/alloy-rs/alloy/issues/1323))
+
+### Miscellaneous Tasks
+
+- Release 0.4.0
+- Move type def to where it belongs ([#1391](https://github.com/alloy-rs/alloy/issues/1391))
+- Fix some warnings ([#1320](https://github.com/alloy-rs/alloy/issues/1320))
+
+### Other
+
+- Make `gas_limit` u64 for transactions ([#1382](https://github.com/alloy-rs/alloy/issues/1382))
+- Make `Header` blob fees u64 ([#1377](https://github.com/alloy-rs/alloy/issues/1377))
+- Make `Header` `base_fee_per_gas` u64 ([#1375](https://github.com/alloy-rs/alloy/issues/1375))
+- Make `Header` gas limit u64 ([#1333](https://github.com/alloy-rs/alloy/issues/1333))
+
 ## [0.3.6](https://github.com/alloy-rs/alloy/releases/tag/v0.3.6) - 2024-09-18
 
 ### Features
 
 - ProviderCall ([#788](https://github.com/alloy-rs/alloy/issues/788))
 - [transport-http] Layer client ([#1227](https://github.com/alloy-rs/alloy/issues/1227))
+
+### Miscellaneous Tasks
+
+- Release 0.3.6
 
 ### Refactor
 

@@ -43,14 +43,19 @@ url = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 alloy-transport-ipc = { workspace = true, optional = true }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasmtimer.workspace = true
+
 [dev-dependencies]
 alloy-primitives.workspace = true
 alloy-node-bindings.workspace = true
 alloy-transport-ipc = { workspace = true, features = ["mock"] }
 alloy-transport-ws.workspace = true
 
+ci_info.workspace = true
 tempfile = "3"
 futures-util.workspace = true
+similar-asserts.workspace = true
 
 [features]
 default = ["reqwest"]

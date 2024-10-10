@@ -61,7 +61,7 @@ alloy-transport-ws = { workspace = true, optional = true }
 # ----------------------------------------- Configuration ---------------------------------------- #
 
 [features]
-default = ["std", "reqwest"]
+default = ["std", "reqwest", "alloy-core/default"]
 
 # std
 std = [
@@ -80,11 +80,11 @@ full = [
     "k256",
     "kzg",
     "network",
-    "provider-http", # includes `providers`
-    "provider-ws",   # includes `providers`
-    "provider-ipc",  # includes `providers`
-    "rpc-types",     # includes `rpc-types-eth`
-    "signer-local",  # includes `signers`
+    "provider-http",
+    "provider-ws",
+    "provider-ipc",
+    "rpc-types",
+    "signer-local",
 ]
 
 # configuration
@@ -257,22 +257,21 @@ json-abi = ["alloy-core/json-abi"]
 json = ["alloy-core/json"]
 sol-types = ["alloy-core/sol-types"]
 
-tiny-keccak = ["alloy-core/tiny-keccak"]
-native-keccak = ["alloy-core/native-keccak"]
 asm-keccak = ["alloy-core/asm-keccak"]
+native-keccak = ["alloy-core/native-keccak"]
+sha3-keccak = ["alloy-core/sha3-keccak"]
+tiny-keccak = ["alloy-core/tiny-keccak"]
 
-postgres = ["alloy-core/postgres"]
+map = ["alloy-core/map"]
+map-hashbrown = ["alloy-core/map-hashbrown"]
+map-indexmap = ["alloy-core/map-indexmap"]
+map-fxhash = ["alloy-core/map-fxhash"]
+
 getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
 serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
 ssz = ["alloy-rpc-types?/ssz"]
-arbitrary = [
-    "alloy-core/arbitrary",
-    "alloy-consensus?/arbitrary",
-    "alloy-eips?/arbitrary",
-    "alloy-rpc-types?/arbitrary",
-]
 k256 = [
     "alloy-core/k256",
     "alloy-consensus?/k256",
@@ -290,3 +289,11 @@ eip712 = [
     # TODO: https://github.com/alloy-rs/alloy/issues/201
     # "alloy-signer-trezor?/eip712",
 ]
+
+arbitrary = [
+    "alloy-core/arbitrary",
+    "alloy-consensus?/arbitrary",
+    "alloy-eips?/arbitrary",
+    "alloy-rpc-types?/arbitrary",
+]
+postgres = ["alloy-core/postgres"]

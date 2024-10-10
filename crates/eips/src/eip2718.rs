@@ -229,6 +229,17 @@ pub trait Encodable2718: Sized + Send + Sync + 'static {
         Sealed::new_unchecked(self, hash)
     }
 
+    /// The length of the 2718 encoded envelope in network format. This is the length of the header
+    /// + the length of the type flag and inner encoding.
+    fn network_len(&self) -> usize {
+        let mut payload_length = self.encode_2718_len();
+        if !self.is_legacy() {
+            payload_length += Header { list: false, payload_length }.length();
+        }
+
+        payload_length
+    }
+
     /// Encode in the network format. The network format is used ONLY by the
     /// Ethereum p2p protocol. Do not call this method unless you are building
     /// a p2p protocol client.

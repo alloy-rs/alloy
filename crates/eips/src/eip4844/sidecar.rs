@@ -48,7 +48,7 @@ impl IntoIterator for BlobTransactionSidecar {
             .zip(self.proofs)
             .enumerate()
             .map(|(index, ((blob, commitment), proof))| BlobTransactionSidecarItem {
-                index,
+                index: index as u64,
                 blob: Box::new(blob),
                 kzg_commitment: commitment,
                 kzg_proof: proof,
@@ -64,7 +64,8 @@ impl IntoIterator for BlobTransactionSidecar {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobTransactionSidecarItem {
     /// The index of this item within the [BlobTransactionSidecar].
-    pub index: usize,
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    pub index: u64,
     /// The blob in this sidecar item.
     #[cfg_attr(feature = "serde", serde(deserialize_with = "super::deserialize_blob"))]
     pub blob: Box<Blob>,
@@ -107,7 +108,7 @@ impl BlobTransactionSidecarItem {
 
     /// Verify the blob sidecar against its [crate::NumHash].
     pub fn verify_blob(&self, hash: &crate::NumHash) -> Result<(), BlobTransactionValidationError> {
-        if self.index != hash.number as usize {
+        if self.index != hash.number {
             let blob_hash_part = B256::from_slice(&self.blob[0..32]);
             return Err(BlobTransactionValidationError::WrongVersionedHash {
                 have: blob_hash_part,
@@ -409,5 +410,19 @@ mod tests {
     fn test_arbitrary_blob() {
         let mut unstructured = arbitrary::Unstructured::new(b"unstructured blob");
         let _blob = BlobTransactionSidecar::arbitrary(&mut unstructured).unwrap();
+    }
+
+    #[test]
+    fn test_blob_item_serde_roundtrip() {
+        let blob_item = BlobTransactionSidecarItem {
+            index: 0,
+            blob: Box::new(Blob::default()),
+            kzg_commitment: Bytes48::default(),
+            kzg_proof: Bytes48::default(),
+        };
+
+        let s = serde_json::to_string(&blob_item).unwrap();
+        let deserialized: BlobTransactionSidecarItem = serde_json::from_str(&s).unwrap();
+        assert_eq!(blob_item, deserialized);
     }
 }

@@ -104,6 +104,7 @@ pub struct BlobData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     /// Should deserialize json containing 6 blobs
     #[test]

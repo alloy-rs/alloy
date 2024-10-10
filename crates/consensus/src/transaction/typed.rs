@@ -196,16 +196,6 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::Legacy(tx) => tx.priority_fee_or_price(),
-            Self::Eip2930(tx) => tx.priority_fee_or_price(),
-            Self::Eip1559(tx) => tx.priority_fee_or_price(),
-            Self::Eip4844(tx) => tx.priority_fee_or_price(),
-            Self::Eip7702(tx) => tx.priority_fee_or_price(),
-        }
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::Legacy(tx) => tx.max_fee_per_blob_gas(),
@@ -213,6 +203,16 @@ impl Transaction for TypedTransaction {
             Self::Eip1559(tx) => tx.max_fee_per_blob_gas(),
             Self::Eip4844(tx) => tx.max_fee_per_blob_gas(),
             Self::Eip7702(tx) => tx.max_fee_per_blob_gas(),
+        }
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::Legacy(tx) => tx.priority_fee_or_price(),
+            Self::Eip2930(tx) => tx.priority_fee_or_price(),
+            Self::Eip1559(tx) => tx.priority_fee_or_price(),
+            Self::Eip4844(tx) => tx.priority_fee_or_price(),
+            Self::Eip7702(tx) => tx.priority_fee_or_price(),
         }
     }
 

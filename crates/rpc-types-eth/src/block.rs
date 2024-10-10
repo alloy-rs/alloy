@@ -372,8 +372,8 @@ pub struct BlockOverrides {
 }
 
 impl<T: TransactionResponse, H: HeaderResponse> BlockResponse for Block<T, H> {
-    type Transaction = T;
     type Header = H;
+    type Transaction = T;
 
     fn header(&self) -> &Self::Header {
         &self.header
@@ -393,6 +393,7 @@ mod tests {
     use alloy_primitives::keccak256;
     use arbitrary::Arbitrary;
     use rand::Rng;
+    use similar_asserts::assert_eq;
 
     use super::*;
 

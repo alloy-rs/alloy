@@ -96,6 +96,7 @@ pub struct ClientVersionV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use similar_asserts::assert_eq;
 
     #[test]
     #[cfg(feature = "serde")]

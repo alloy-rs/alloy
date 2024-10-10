@@ -228,17 +228,17 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        match self {
-            Self::TxEip4844(tx) => tx.priority_fee_or_price(),
-            Self::TxEip4844WithSidecar(tx) => tx.priority_fee_or_price(),
-        }
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         match self {
             Self::TxEip4844(tx) => tx.max_fee_per_blob_gas(),
             Self::TxEip4844WithSidecar(tx) => tx.max_fee_per_blob_gas(),
+        }
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        match self {
+            Self::TxEip4844(tx) => tx.priority_fee_or_price(),
+            Self::TxEip4844WithSidecar(tx) => tx.priority_fee_or_price(),
         }
     }
 
@@ -709,12 +709,12 @@ impl Transaction for TxEip4844 {
         Some(self.max_priority_fee_per_gas)
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        self.max_priority_fee_per_gas
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         Some(self.max_fee_per_blob_gas)
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
     }
 
     fn to(&self) -> TxKind {
@@ -982,12 +982,12 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.max_priority_fee_per_gas()
     }
 
-    fn priority_fee_or_price(&self) -> u128 {
-        self.tx.priority_fee_or_price()
-    }
-
     fn max_fee_per_blob_gas(&self) -> Option<u128> {
         self.tx.max_fee_per_blob_gas()
+    }
+
+    fn priority_fee_or_price(&self) -> u128 {
+        self.tx.priority_fee_or_price()
     }
 
     fn to(&self) -> TxKind {

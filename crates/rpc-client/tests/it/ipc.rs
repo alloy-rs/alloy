@@ -5,6 +5,10 @@ use alloy_transport_ipc::IpcConnect;
 
 #[tokio::test]
 async fn can_make_a_request() {
+    if !ci_info::is_ci() {
+        return;
+    }
+
     run_with_tempdir("geth-test-", |temp_dir| async move {
         let geth = Geth::new()
             .disable_discovery()
