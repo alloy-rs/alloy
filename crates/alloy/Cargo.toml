@@ -270,7 +270,12 @@ map-fxhash = ["alloy-core/map-fxhash"]
 getrandom = ["alloy-core/getrandom"]
 rand = ["alloy-core/rand"]
 rlp = ["alloy-core/rlp"]
-serde = ["alloy-core/serde", "alloy-eips?/serde", "dep:alloy-serde"]
+serde = [
+    "alloy-core/serde",
+    "alloy-eips?/serde",
+    "alloy-consensus?/serde",
+    "dep:alloy-serde",
+]
 ssz = ["alloy-rpc-types?/ssz"]
 k256 = [
     "alloy-core/k256",
