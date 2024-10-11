@@ -50,6 +50,20 @@ pub struct CallParams {
     pub chain_id: Option<ChainId>
 }
 
+impl SendCallsRequest {
+    /// Creates new [SendCallsRequest]
+    pub const fn new(version: String, from: Address, calls: Vec<CallParams>, capabilities: Option<HashMap<String, PermissionValue>>) -> Self {
+        Self {version, from, calls, capabilities}
+    }
+}
+
+impl CallParams {
+    /// Creates new [CallParams]
+    pub const fn new(to: Option<Address>, data: Option<Bytes>, value: Option<U256>, chain_id: Option<ChainId>) -> Self {
+        Self {to, data, value, chain_id}
+    }
+}
+
 /// Response type for RPC call.
 /// 
 /// See [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792#wallet_getcapabilities)
