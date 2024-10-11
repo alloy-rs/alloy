@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use std::vec::Vec;
-use alloy_primitives::{Address, Bytes, ChainId, U256};
+use alloy_primitives::{map::HashMap, Address, Bytes, ChainId, U256};
 
 /// Type of permisssion values
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,6 +27,7 @@ pub struct SendCallsRequest {
     /// A batch of calls to be submitted
     pub calls: Vec<CallParams>,
     /// Enabled permissions per chain
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub capabilities: Option<HashMap<String, PermissionValue>>
 }
 

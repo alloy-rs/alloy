@@ -12,18 +12,17 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-primitives.workspace = true
-
+alloy-primitives = { workspace = true, features = ["map"] }
 alloy-serde = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 
 [features]
-default = ["serde"]
+default = ["serde", "std"]
+std = ["alloy-primitives/map"]
 serde = [
     "dep:serde",
-    "dep:serde_json",
-    "dep:alloy-serde",
+    "dep:alloy-serde"
 ]
 
 [lints]
