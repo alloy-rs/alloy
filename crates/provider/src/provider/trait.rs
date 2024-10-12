@@ -22,7 +22,7 @@ use alloy_rpc_client::{ClientRef, NoParams, PollerBuilder, WeakClient};
 use alloy_rpc_types_eth::{
     simulate::{SimulatePayload, SimulatedBlock},
     AccessListResult, BlockId, BlockNumberOrTag, EIP1186AccountProofResponse, FeeHistory, Filter,
-    FilterChanges, Log, SyncStatus,
+    FilterChanges, Index, Log, SyncStatus,
 };
 use alloy_transport::{BoxTransport, Transport, TransportResult};
 use serde_json::value::RawValue;
@@ -532,6 +532,50 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         hash: TxHash,
     ) -> ProviderCall<T, (TxHash,), Option<N::TransactionResponse>> {
         self.client().request("eth_getTransactionByHash", (hash,)).into()
+    }
+
+    /// Returns the transaction by block hash and transaction index position.
+    fn get_transaction_by_block_hash_and_index(
+        &self,
+        block_hash: B256,
+        index: usize,
+    ) -> ProviderCall<T, (B256, Index), Option<N::TransactionResponse>> {
+        self.client()
+            .request("eth_getTransactionByBlockHashAndIndex", (block_hash, Index(index)))
+            .into()
+    }
+
+    /// Returns the raw transaction by block hash and transaction index position.
+    fn get_raw_transaction_by_block_hash_and_index(
+        &self,
+        block_hash: B256,
+        index: usize,
+    ) -> ProviderCall<T, (B256, Index), Option<Bytes>> {
+        self.client()
+            .request("eth_getRawTransactionByBlockHashAndIndex", (block_hash, Index(index)))
+            .into()
+    }
+
+    /// Returns the transaction by block number and transaction index position.
+    fn get_transaction_by_block_number_and_index(
+        &self,
+        block_number: BlockNumberOrTag,
+        index: usize,
+    ) -> ProviderCall<T, (BlockNumberOrTag, Index), Option<N::TransactionResponse>> {
+        self.client()
+            .request("eth_getTransactionByBlockNumberAndIndex", (block_number, Index(index)))
+            .into()
+    }
+
+    /// Returns the raw transaction by block number and transaction index position.
+    fn get_raw_transaction_by_block_number_and_index(
+        &self,
+        block_number: BlockNumberOrTag,
+        index: usize,
+    ) -> ProviderCall<T, (BlockNumberOrTag, Index), Option<Bytes>> {
+        self.client()
+            .request("eth_getRawTransactionByBlockNumberAndIndex", (block_number, Index(index)))
+            .into()
     }
 
     /// Returns the EIP-2718 encoded transaction if it exists, see also
