@@ -1032,9 +1032,9 @@ impl std::error::Error for TransactionInputError {}
 
 /// Error thrown when a transaction request cannot be built into a transaction.
 #[derive(Debug)]
-pub struct BuildTransactionErr {
+pub struct BuildTransactionErr<T = TransactionRequest> {
     /// Transaction request that failed to build into a transaction.
-    pub tx: TransactionRequest,
+    pub tx: T,
     /// Error message.
     pub error: String,
 }
