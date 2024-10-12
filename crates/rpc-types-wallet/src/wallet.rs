@@ -1,5 +1,5 @@
 use std::vec::Vec;
-use alloy_primitives::{map::HashMap, Address, Bytes, ChainId, U256};
+use alloy_primitives::{map::HashMap, map::Entry::{Vacant, Occupied}, Address, Bytes, ChainId, U256};
 
 /// Type of permisssion values
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,16 +51,22 @@ pub struct CallParams {
 }
 
 impl SendCallsRequest {
-    /// Creates new [SendCallsRequest]
-    pub const fn new(version: String, from: Address, calls: Vec<CallParams>, capabilities: Option<HashMap<String, PermissionValue>>) -> Self {
-        Self {version, from, calls, capabilities}
-    }
-}
-
-impl CallParams {
-    /// Creates new [CallParams]
-    pub const fn new(to: Option<Address>, data: Option<Bytes>, value: Option<U256>, chain_id: Option<ChainId>) -> Self {
-        Self {to, data, value, chain_id}
+    /// Returns map of capabilites specified for chain
+    pub fn get_capabilities(mut self, id: String) -> Option<PermissionValue> {
+        if self.capabilities.is_some() {
+            let capabilities = self.capabilities.as_mut().unwrap();
+            let value = match capabilities.entry(id) {
+                Occupied(entry) => {
+                    Option::Some(entry.get().clone())
+                },
+                Vacant(_entry) => {
+                    Option::None
+                }
+            };
+            value
+        } else {
+            Option::None
+        }
     }
 }
 
@@ -76,5 +82,6 @@ pub type SendCallsResult = String;
 pub type GetCapabilitiesParams = Vec<Address>;
 
 /// Alias for wallet_sendCalls params
+/// 
+/// See [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792#wallet_sendcalls)
 pub type SendCallsParams = CallParams;
- 
