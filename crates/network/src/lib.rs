@@ -83,7 +83,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The JSON body of a transaction response.
     #[doc(alias = "TxResponse")]
-    type TransactionResponse: RpcObject + TransactionResponse;
+    type TransactionResponse: RpcObject + TransactionResponse + AsRef<Self::TxEnvelope>;
 
     /// The JSON body of a transaction receipt.
     #[doc(alias = "TransactionReceiptResponse", alias = "TxReceiptResponse")]
