@@ -2,6 +2,7 @@
 //!
 //! [EIP-4895]: https://eips.ethereum.org/EIPS/eip-4895
 
+use alloc::vec::Vec;
 use alloy_primitives::{Address, U256};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 
