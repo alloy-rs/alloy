@@ -2,6 +2,7 @@
 //! when working with RPC types, such as [Transaction]
 
 use crate::Transaction;
+use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{BlockHash, TxHash};
 
 /// Additional fields in the context of a block that contains this transaction.
@@ -31,7 +32,7 @@ impl TransactionInfo {
 impl From<&Transaction> for TransactionInfo {
     fn from(tx: &Transaction) -> Self {
         Self {
-            hash: Some(tx.hash),
+            hash: Some(tx.tx_hash()),
             index: tx.transaction_index,
             block_hash: tx.block_hash,
             block_number: tx.block_number,
