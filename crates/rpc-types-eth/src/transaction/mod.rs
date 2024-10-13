@@ -58,9 +58,8 @@ pub struct Transaction<T = TxEnvelope> {
 
     /// Sender
     pub from: Address,
-
-    /// Transaction hash
-    pub hash: B256,
+    // /// Transaction hash
+    // pub hash: B256,
 }
 
 impl<T> Transaction<T>
@@ -237,7 +236,8 @@ impl<T: TransactionTrait> TransactionTrait for Transaction<T> {
 
 impl<T: TransactionTrait> TransactionResponse for Transaction<T> {
     fn tx_hash(&self) -> B256 {
-        self.hash
+        Default::default()
+        // self.hash
     }
 
     fn block_hash(&self) -> Option<BlockHash> {
