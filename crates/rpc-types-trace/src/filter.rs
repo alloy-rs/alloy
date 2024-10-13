@@ -80,8 +80,8 @@ impl TraceFilter {
 
     /// Returns a `TraceFilterMatcher` for this filter.
     pub fn matcher(&self) -> TraceFilterMatcher {
-        let from_addresses = self.from_address.iter().cloned().collect();
-        let to_addresses = self.to_address.iter().cloned().collect();
+        let from_addresses = self.from_address.iter().copied().collect();
+        let to_addresses = self.to_address.iter().copied().collect();
         TraceFilterMatcher { mode: self.mode, from_addresses, to_addresses }
     }
 }

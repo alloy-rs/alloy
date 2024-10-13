@@ -692,7 +692,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
         None => s.serialize_none(),
         Some(storage) => {
             let mut m = s.serialize_map(Some(storage.len()))?;
-            for (key, val) in storage.iter() {
+            for (key, val) in storage {
                 let key = format!("{:?}", key);
                 let val = format!("{:?}", val);
                 // skip the 0x prefix
