@@ -6,7 +6,6 @@ use alloy_consensus::{
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_network_primitives::TransactionResponse;
 use alloy_primitives::{Address, BlockHash, Bytes, ChainId, TxKind, B256, U256};
-use serde::{de::DeserializeOwned, Serialize};
 
 pub use alloy_consensus::BlobTransactionSidecar;
 pub use alloy_eips::{
@@ -41,7 +40,7 @@ pub use alloy_consensus::{
 #[doc(alias = "Tx")]
 pub struct Transaction<T = TxEnvelope> {
     /// The inner transaction object
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub inner: T,
 
     /// Hash of block where transaction was included, `None` if pending
@@ -64,7 +63,7 @@ pub struct Transaction<T = TxEnvelope> {
 
 impl<T> Transaction<T>
 where
-    T: TransactionTrait + Serialize + DeserializeOwned,
+    T: TransactionTrait,
 {
     /// Returns true if the transaction is a legacy or 2930 transaction.
     pub fn is_legacy_gas(&self) -> bool {
