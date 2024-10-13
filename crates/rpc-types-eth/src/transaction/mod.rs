@@ -29,9 +29,6 @@ pub use receipt::AnyTransactionReceipt;
 pub mod request;
 pub use request::{TransactionInput, TransactionRequest};
 
-mod signature;
-pub use signature::{Parity, Signature};
-
 pub use alloy_consensus::{
     AnyReceiptEnvelope, Receipt, ReceiptEnvelope, ReceiptWithBloom, Transaction as TransactionTrait,
 };
@@ -135,7 +132,7 @@ impl TryFrom<Transaction> for Signed<TxEip4844> {
 
         let (tx, sig, hash) = tx.into_parts();
 
-        Ok(Signed::new_unchecked(tx.into(), sig, hash))
+        Ok(Self::new_unchecked(tx.into(), sig, hash))
     }
 }
 
@@ -215,7 +212,7 @@ impl TransactionTrait for Transaction {
     }
 
     fn input(&self) -> &Bytes {
-        &self.inner.input()
+        self.inner.input()
     }
 
     fn ty(&self) -> u8 {
