@@ -1077,6 +1077,7 @@ mod tests {
 
     use super::*;
     use crate::{builder, ProviderBuilder, WalletProvider};
+    use alloy_consensus::Transaction;
     use alloy_network::AnyNetwork;
     use alloy_node_bindings::Anvil;
     use alloy_primitives::{address, b256, bytes, keccak256};
@@ -1643,7 +1644,7 @@ mod tests {
             .await
             .expect("failed to fetch tx")
             .expect("tx not included");
-        assert_eq!(tx.input, bytes!("deadbeef"));
+        assert_eq!(tx.input(), &[0xde, 0xad, 0xbe, 0xef]);
     }
 
     #[tokio::test]
