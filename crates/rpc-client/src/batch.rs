@@ -236,7 +236,7 @@ where
                 }
             }
             ResponsePacket::Batch(responses) => {
-                for response in responses.into_iter() {
+                for response in responses {
                     if let Some(tx) = channels.remove(&response.id) {
                         let _ = tx.send(transform_response(response));
                     }
