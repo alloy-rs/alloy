@@ -1627,7 +1627,7 @@ mod tests {
             .await
             .expect("failed to fetch tx")
             .expect("tx not included");
-        assert_eq!(tx.input(), &[0xde, 0xad, 0xbe, 0xef]);
+        assert_eq!(tx.input(), &bytes!("deadbeef"));
     }
 
     #[tokio::test]
