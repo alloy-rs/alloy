@@ -18,7 +18,7 @@ use alloy_rlp::Encodable;
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct Block<T = Transaction, H = Header> {
+pub struct Block<T = Transaction<TxEnvelope>, H = Header> {
     /// Header of the block.
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub header: H,

@@ -21,7 +21,10 @@ mod ethereum;
 pub use ethereum::{Ethereum, EthereumWallet};
 
 mod any;
-pub use any::{AnyNetwork, AnyTxEnvelope, AnyTxType, AnyTypedTransaction};
+pub use any::{
+    AnyHeader, AnyNetwork, AnyReceiptEnvelope, AnyRpcBlock, AnyRpcHeader, AnyTxEnvelope, AnyTxType,
+    AnyTypedTransaction,
+};
 
 pub use alloy_eips::eip2718;
 pub use alloy_network_primitives::{
