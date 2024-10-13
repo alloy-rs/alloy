@@ -155,6 +155,12 @@ pub struct SimBundleResponse {
     /// Logs returned by `mev_simBundle`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logs: Option<Vec<SimBundleLogs>>,
+    /// Error message if the bundle execution failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exec_error: Option<String>,
+    /// Contains the return data if the transaction reverted
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revert: Option<Bytes>,
 }
 
 /// Logs returned by `mev_simBundle`.
