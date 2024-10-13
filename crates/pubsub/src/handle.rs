@@ -79,8 +79,7 @@ impl ConnectionInterface {
     /// requests.
     pub async fn recv_from_frontend(&mut self) -> Option<Box<RawValue>> {
         match self.shutdown.try_recv() {
-            Ok(_) => return None,
-            Err(TryRecvError::Closed) => return None,
+            Ok(_) | Err(TryRecvError::Closed) => return None,
             Err(TryRecvError::Empty) => {}
         }
 

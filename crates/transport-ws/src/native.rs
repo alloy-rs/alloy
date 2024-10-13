@@ -93,9 +93,7 @@ impl WsBackend<TungsteniteStream> {
                 error!("Received binary message, expected text");
                 Err(())
             }
-            Message::Ping(_) => Ok(()),
-            Message::Pong(_) => Ok(()),
-            Message::Frame(_) => Ok(()),
+            Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => Ok(()),
         }
     }
 
