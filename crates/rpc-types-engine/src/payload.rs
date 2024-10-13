@@ -332,6 +332,8 @@ pub struct ExecutionPayloadV3 {
     /// See <https://github.com/ethereum/execution-apis/blob/fe8e13c288c592ec154ce25c534e26cb7ce0530d/src/engine/cancun.md#ExecutionPayloadV3>
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub excess_blob_gas: u64,
+    /// Array of hex[`u64`] representing the EIP-1559 parameters, enabled with V3
+    pub eip_1559_params: B64,
 }
 
 impl ExecutionPayloadV3 {

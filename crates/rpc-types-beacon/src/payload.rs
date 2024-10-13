@@ -13,7 +13,7 @@ use alloy_eips::{
     eip4895::Withdrawal, eip6110::DepositRequest, eip7002::WithdrawalRequest,
     eip7251::ConsolidationRequest,
 };
-use alloy_primitives::{Address, Bloom, Bytes, B256, U256};
+use alloy_primitives::{Address, Bloom, Bytes, B256, B64, U256};
 use alloy_rpc_types_engine::{
     ExecutionPayload, ExecutionPayloadV1, ExecutionPayloadV2, ExecutionPayloadV3,
     ExecutionPayloadV4,
@@ -361,22 +361,25 @@ struct BeaconExecutionPayloadV3<'a> {
     blob_gas_used: u64,
     #[serde_as(as = "DisplayFromStr")]
     excess_blob_gas: u64,
+    #[serde_as(as = "DisplayFromStr")]
+    eip_1559_params: B64,
 }
 
 impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {
     fn from(payload: BeaconExecutionPayloadV3<'a>) -> Self {
-        let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas } = payload;
-        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas }
+        let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas, eip_1559_params } = payload;
+        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas, eip_1559_params }
     }
 }
 
 impl<'a> From<&'a ExecutionPayloadV3> for BeaconExecutionPayloadV3<'a> {
     fn from(value: &'a ExecutionPayloadV3) -> Self {
-        let ExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas } = value;
+        let ExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas, eip_1559_params } = value;
         BeaconExecutionPayloadV3 {
             payload_inner: payload_inner.into(),
             blob_gas_used: *blob_gas_used,
             excess_blob_gas: *excess_blob_gas,
+            eip_1559_params: eip_1559_params.clone(),
         }
     }
 }
