@@ -47,7 +47,6 @@ impl Default for Block<Transaction, Header> {
             header: Default::default(),
             uncles: Default::default(),
             transactions: Default::default(),
-            size: Default::default(),
             withdrawals: Default::default(),
         }
     }
