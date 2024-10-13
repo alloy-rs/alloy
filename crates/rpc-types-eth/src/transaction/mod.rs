@@ -61,6 +61,12 @@ pub struct Transaction<T = TxEnvelope> {
     // pub hash: B256,
 }
 
+impl<T> AsRef<T> for Transaction<T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
 impl<T> Transaction<T>
 where
     T: TransactionTrait,
