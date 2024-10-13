@@ -1,10 +1,16 @@
 use crate::Network;
 use alloy_consensus::{TxEnvelope, TxType, TypedTransaction};
-use alloy_eips::eip2718::{Decodable2718, Eip2718Error, Encodable2718};
-use alloy_primitives::Bytes;
-use alloy_rpc_types_eth::{AnyTransactionReceipt, Block, Header, Transaction, TransactionRequest};
+use alloy_eips::{
+    eip2718::{Decodable2718, Eip2718Error, Encodable2718},
+    eip7702::SignedAuthorization,
+};
+use alloy_primitives::{Bytes, TxKind, B256, U256};
+use alloy_rpc_types_eth::{
+    AccessList, AnyTransactionReceipt, Block, Header, Transaction, TransactionRequest,
+};
 use alloy_serde::{OtherFields, WithOtherFields};
 use core::fmt;
+use std::sync::OnceLock;
 
 mod builder;
 
@@ -53,6 +59,16 @@ impl From<TxType> for AnyTxType {
     }
 }
 
+/// Memoization for deserialization of [`AnyTxEnvelope`] and [`AnyTypedTransaction`].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[allow(unnameable_types)]
+pub struct DeserMemo {
+    input: OnceLock<Bytes>,
+    access_list: OnceLock<AccessList>,
+    blob_versioned_hashes: OnceLock<Vec<B256>>,
+    authorization_list: OnceLock<Vec<SignedAuthorization>>,
+}
+
 /// Transaction envelope for a catch-all network.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -67,6 +83,10 @@ pub enum AnyTxEnvelope {
         ty: AnyTxType,
         /// Additional fields.
         fields: std::collections::BTreeMap<String, serde_json::Value>,
+
+        /// Memoization for deserialization.
+        #[serde(skip, default)]
+        memo: DeserMemo,
     },
 }
 
@@ -183,9 +203,9 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
                 .or(Some(&serde_json::Value::Null))
                 .map(|v| {
                     if v.is_null() {
-                        alloy_primitives::TxKind::Create
+                        TxKind::Create
                     } else {
-                        alloy_primitives::TxKind::Call(
+                        TxKind::Call(
                             v.as_str()
                                 .expect("to field is not a string")
                                 .parse()
@@ -197,7 +217,7 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
         }
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
             Self::Other { fields, .. } => fields
@@ -209,10 +229,14 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
     }
 
     fn input(&self) -> &Bytes {
-        static B: Bytes = Bytes::new();
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { .. } => &B,
+            Self::Other { fields, memo, .. } => memo.input.get_or_init(|| {
+                fields
+                    .get("input")
+                    .and_then(|value| serde_json::from_value(value.clone()).ok())
+                    .unwrap_or_default()
+            }),
         }
     }
 
@@ -223,24 +247,57 @@ impl alloy_consensus::Transaction for AnyTxEnvelope {
         }
     }
 
-    fn access_list(&self) -> Option<&alloy_rpc_types_eth::AccessList> {
+    fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("accessList") {
+                    Some(memo.access_list.get_or_init(|| {
+                        fields
+                            .get("accessList")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 
-    fn blob_versioned_hashes(&self) -> Option<&[alloy_primitives::B256]> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("blobVersionedHashes") {
+                    Some(memo.blob_versioned_hashes.get_or_init(|| {
+                        fields
+                            .get("blobVersionedHashes")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 
-    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("authorizationList") {
+                    Some(memo.authorization_list.get_or_init(|| {
+                        fields
+                            .get("authorizationList")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -259,6 +316,10 @@ pub enum AnyTypedTransaction {
         ty: AnyTxType,
         /// Additional fields.
         fields: std::collections::BTreeMap<String, serde_json::Value>,
+
+        /// Memoization for deserialization.
+        #[serde(skip, default)]
+        memo: DeserMemo,
     },
 }
 
@@ -272,7 +333,7 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
     fn from(value: AnyTxEnvelope) -> Self {
         match value {
             AnyTxEnvelope::Ethereum(tx) => Self::Ethereum(tx.into()),
-            AnyTxEnvelope::Other { ty, fields } => Self::Other { ty, fields },
+            AnyTxEnvelope::Other { ty, fields, memo } => Self::Other { ty, fields, memo },
         }
     }
 }
@@ -281,7 +342,7 @@ impl From<AnyTypedTransaction> for WithOtherFields<TransactionRequest> {
     fn from(value: AnyTypedTransaction) -> Self {
         match value {
             AnyTypedTransaction::Ethereum(tx) => WithOtherFields::new(tx.into()),
-            AnyTypedTransaction::Other { ty, mut fields } => {
+            AnyTypedTransaction::Other { ty, mut fields, .. } => {
                 fields.insert("type".to_string(), serde_json::Value::Number(ty.0.into()));
                 WithOtherFields { inner: Default::default(), other: OtherFields::new(fields) }
             }
@@ -373,9 +434,9 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
                 .or(Some(&serde_json::Value::Null))
                 .map(|v| {
                     if v.is_null() {
-                        alloy_primitives::TxKind::Create
+                        TxKind::Create
                     } else {
-                        alloy_primitives::TxKind::Call(
+                        TxKind::Call(
                             v.as_str()
                                 .expect("to field is not a string")
                                 .parse()
@@ -387,7 +448,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
         }
     }
 
-    fn value(&self) -> alloy_primitives::U256 {
+    fn value(&self) -> U256 {
         match self {
             Self::Ethereum(inner) => inner.value(),
             Self::Other { fields, .. } => fields
@@ -399,10 +460,14 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
     }
 
     fn input(&self) -> &Bytes {
-        static B: Bytes = Bytes::new();
         match self {
             Self::Ethereum(inner) => inner.input(),
-            Self::Other { .. } => &B,
+            Self::Other { fields, memo, .. } => memo.input.get_or_init(|| {
+                fields
+                    .get("input")
+                    .and_then(|value| serde_json::from_value(value.clone()).ok())
+                    .unwrap_or_default()
+            }),
         }
     }
 
@@ -413,24 +478,57 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
         }
     }
 
-    fn access_list(&self) -> Option<&alloy_rpc_types_eth::AccessList> {
+    fn access_list(&self) -> Option<&AccessList> {
         match self {
             Self::Ethereum(inner) => inner.access_list(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("accessList") {
+                    Some(memo.access_list.get_or_init(|| {
+                        fields
+                            .get("accessList")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 
-    fn blob_versioned_hashes(&self) -> Option<&[alloy_primitives::B256]> {
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
         match self {
             Self::Ethereum(inner) => inner.blob_versioned_hashes(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("blobVersionedHashes") {
+                    Some(memo.blob_versioned_hashes.get_or_init(|| {
+                        fields
+                            .get("blobVersionedHashes")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 
-    fn authorization_list(&self) -> Option<&[alloy_eips::eip7702::SignedAuthorization]> {
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         match self {
             Self::Ethereum(inner) => inner.authorization_list(),
-            Self::Other { .. } => None,
+            Self::Other { fields, memo, .. } => {
+                if fields.contains_key("authorizationList") {
+                    Some(memo.authorization_list.get_or_init(|| {
+                        fields
+                            .get("authorizationList")
+                            .and_then(|value| serde_json::from_value(value.clone()).ok())
+                            .unwrap_or_default()
+                    }))
+                } else {
+                    None
+                }
+            }
         }
     }
 }
