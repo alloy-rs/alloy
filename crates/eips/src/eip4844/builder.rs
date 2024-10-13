@@ -364,7 +364,7 @@ impl<T: SidecarCoder> SidecarBuilder<T> {
     ) -> Result<BlobTransactionSidecar, c_kzg::Error> {
         let mut commitments = Vec::with_capacity(self.inner.blobs.len());
         let mut proofs = Vec::with_capacity(self.inner.blobs.len());
-        for blob in self.inner.blobs.iter() {
+        for blob in &self.inner.blobs {
             // SAFETY: same size
             let blob = unsafe { core::mem::transmute::<&Blob, &c_kzg::Blob>(blob) };
             let commitment = KzgCommitment::blob_to_kzg_commitment(blob, settings)?;
