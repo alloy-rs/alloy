@@ -310,9 +310,9 @@ where
 }
 
 /// A trait which may be used to configure default fillers for [Network] implementations.
-pub trait RecommendedFillers {
+pub trait RecommendedFillers<N: Network = Ethereum> {
     /// Recommended fillers for this network.
-    type RecomendedFillers: TxFiller;
+    type RecomendedFillers: TxFiller<N>;
 
     /// Returns the recommended filler for this provider.
     fn recommended_fillers() -> Self::RecomendedFillers;
