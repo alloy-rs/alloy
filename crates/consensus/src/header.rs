@@ -497,7 +497,7 @@ impl Decodable for Header {
         };
 
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
+            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
                 buf.advance(1)
             } else {
                 this.base_fee_per_gas = Some(U256::decode(buf)?.to::<u64>());
@@ -506,7 +506,7 @@ impl Decodable for Header {
 
         // Withdrawals root for post-shanghai headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().map(|b| *b == EMPTY_STRING_CODE).unwrap_or_default() {
+            if buf.first().is_some_and(|b| *b == EMPTY_STRING_CODE) {
                 buf.advance(1)
             } else {
                 this.withdrawals_root = Some(Decodable::decode(buf)?);
@@ -515,7 +515,7 @@ impl Decodable for Header {
 
         // Blob gas used and excess blob gas for post-cancun headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
+            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
                 buf.advance(1)
             } else {
                 this.blob_gas_used = Some(U256::decode(buf)?.to::<u64>());
@@ -523,7 +523,7 @@ impl Decodable for Header {
         }
 
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().map(|b| *b == EMPTY_LIST_CODE).unwrap_or_default() {
+            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
                 buf.advance(1)
             } else {
                 this.excess_blob_gas = Some(U256::decode(buf)?.to::<u64>());

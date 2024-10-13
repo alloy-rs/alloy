@@ -21,6 +21,5 @@ pub struct ExecutionWitness {
     /// the execution of the block. during the execution of the block.
     ///
     /// `keccak(address|slot) => address|slot`
-    #[serde(default)]
-    pub keys: Option<B256HashMap<Bytes>>,
+    pub keys: B256HashMap<Bytes>,
 }

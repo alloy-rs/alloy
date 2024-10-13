@@ -9,7 +9,10 @@ use core::{
     hash::Hash,
     ops::{RangeFrom, RangeInclusive, RangeToInclusive},
 };
-use itertools::{EitherOrBoth::*, Itertools};
+use itertools::{
+    EitherOrBoth::{Both, Left, Right},
+    Itertools,
+};
 
 /// Helper type to represent a bloom filter used for matching logs.
 #[derive(Debug, Default)]
@@ -37,7 +40,7 @@ pub struct FilterSet<T: Eq + Hash>(HashSet<T>);
 
 impl<T: Eq + Hash> From<T> for FilterSet<T> {
     fn from(src: T) -> Self {
-        Self(FromIterator::from_iter(core::iter::once(src)))
+        Self(core::iter::once(src).collect())
     }
 }
 
@@ -51,7 +54,7 @@ impl<T: Eq + Hash> Hash for FilterSet<T> {
 
 impl<T: Eq + Hash> From<Vec<T>> for FilterSet<T> {
     fn from(src: Vec<T>) -> Self {
-        Self(HashSet::from_iter(src.into_iter().map(Into::into)))
+        Self(src.into_iter().map(Into::into).collect())
     }
 }
 
@@ -837,7 +840,7 @@ impl FilteredParams {
         // for each filter, iterate through the list of filter blooms. for each set of filter
         // (each BloomFilter), the given `bloom` must match at least one of them, unless the list is
         // empty (no filters).
-        for filter in topic_filters.iter() {
+        for filter in topic_filters {
             if !filter.matches(bloom) {
                 return false;
             }

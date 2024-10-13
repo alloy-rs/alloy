@@ -692,7 +692,7 @@ fn serialize_string_storage_map_opt<S: Serializer>(
         None => s.serialize_none(),
         Some(storage) => {
             let mut m = s.serialize_map(Some(storage.len()))?;
-            for (key, val) in storage.iter() {
+            for (key, val) in storage {
                 let key = format!("{:?}", key);
                 let val = format!("{:?}", val);
                 // skip the 0x prefix
@@ -772,10 +772,10 @@ mod tests {
     fn test_trace_result_serde() {
         let s = r#"        {
             "result": {
-                "from": "0xcCC5499E15FEdAaeABa68aEB79b95B20f725Bc56",
+                "from": "0xccc5499e15fedaaeaba68aeb79b95b20f725bc56",
                 "gas": "0x186a0",
                 "gasUsed": "0xdb91",
-                "to": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
                 "input": "0xa9059cbb000000000000000000000000e3f85a274c1edbea2f2498cf5978f41961cf8b5b0000000000000000000000000000000000000000000000000000000068c8f380",
                 "value": "0x0",
                 "type": "CALL"
