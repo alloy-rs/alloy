@@ -333,7 +333,7 @@ impl RecommendedFillers for Ethereum {
     }
 }
 
-impl RecommendedFillers for AnyNetwork {
+impl RecommendedFillers<Self> for AnyNetwork {
     type RecomendedFillers =
         JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>;
 
@@ -345,5 +345,15 @@ impl RecommendedFillers for AnyNetwork {
                 JoinFill::new(NonceFiller::default(), ChainIdFiller::default()),
             ),
         )
+    }
+}
+
+// Additional implementation in case someone will use `AnyNetwork` in generic context specialized
+// for `Ethereum`.
+impl RecommendedFillers<Ethereum> for AnyNetwork {
+    type RecomendedFillers = <Self as RecommendedFillers<Self>>::RecomendedFillers;
+
+    fn recommended_fillers() -> Self::RecomendedFillers {
+        <Self as RecommendedFillers<Self>>::recommended_fillers()
     }
 }

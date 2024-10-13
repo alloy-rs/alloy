@@ -127,14 +127,14 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     }
 }
 
-impl<L, N> ProviderBuilder<L, Identity, N> {
+impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
     pub fn with_recommended_fillers(
         self,
     ) -> ProviderBuilder<L, JoinFill<Identity, N::RecomendedFillers>, N>
     where
-        N: RecommendedFillers,
+        N: RecommendedFillers<N>,
     {
         self.filler(N::recommended_fillers())
     }
