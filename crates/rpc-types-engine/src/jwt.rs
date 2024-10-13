@@ -173,13 +173,13 @@ impl JwtSecret {
     /// This strips the leading `0x`, if any.
     pub fn from_hex<S: AsRef<str>>(hex: S) -> Result<Self, JwtError> {
         let hex: &str = hex.as_ref().trim().trim_start_matches("0x");
-        if hex.len() != JWT_SECRET_LEN {
-            Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
-        } else {
+        if hex.len() == JWT_SECRET_LEN {
             let hex_bytes = hex::decode(hex)?;
             // is 32bytes, see length check
             let bytes = hex_bytes.try_into().expect("is expected len");
             Ok(Self(bytes))
+        } else {
+            Err(JwtError::InvalidLength(JWT_SECRET_LEN, hex.len()))
         }
     }
 
