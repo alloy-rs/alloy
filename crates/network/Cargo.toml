@@ -32,6 +32,8 @@ alloy-sol-types.workspace = true
 auto_impl.workspace = true
 async-trait.workspace = true
 futures-utils-wasm.workspace = true
+serde.workspace = true
+serde_json = "1.0.128"
 thiserror.workspace = true
 
 [dev-dependencies]
