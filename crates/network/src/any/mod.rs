@@ -102,22 +102,22 @@ pub enum AnyTxEnvelope {
 impl Encodable2718 for AnyTxEnvelope {
     fn type_flag(&self) -> Option<u8> {
         match self {
-            AnyTxEnvelope::Ethereum(t) => t.type_flag(),
-            AnyTxEnvelope::Other { ty, .. } => Some(ty.into()),
+            Self::Ethereum(t) => t.type_flag(),
+            Self::Other { ty, .. } => Some(ty.into()),
         }
     }
 
     fn encode_2718_len(&self) -> usize {
         match self {
-            AnyTxEnvelope::Ethereum(t) => t.encode_2718_len(),
-            AnyTxEnvelope::Other { .. } => 1,
+            Self::Ethereum(t) => t.encode_2718_len(),
+            Self::Other { .. } => 1,
         }
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_primitives::bytes::BufMut) {
         match self {
-            AnyTxEnvelope::Ethereum(t) => t.encode_2718(out),
-            AnyTxEnvelope::Other { ty, .. } => {
+            Self::Ethereum(t) => t.encode_2718(out),
+            Self::Other { ty, .. } => {
                 out.put_u8(ty.into());
             }
         }
@@ -350,10 +350,10 @@ impl From<AnyTxEnvelope> for AnyTypedTransaction {
 impl From<AnyTypedTransaction> for WithOtherFields<TransactionRequest> {
     fn from(value: AnyTypedTransaction) -> Self {
         match value {
-            AnyTypedTransaction::Ethereum(tx) => WithOtherFields::new(tx.into()),
+            AnyTypedTransaction::Ethereum(tx) => Self::new(tx.into()),
             AnyTypedTransaction::Other { ty, mut fields, .. } => {
                 fields.insert("type".to_string(), serde_json::Value::Number(ty.0.into()));
-                WithOtherFields { inner: Default::default(), other: OtherFields::new(fields) }
+                Self { inner: Default::default(), other: OtherFields::new(fields) }
             }
         }
     }

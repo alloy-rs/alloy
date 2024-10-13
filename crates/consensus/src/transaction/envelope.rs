@@ -1000,6 +1000,7 @@ mod tests {
         let tx_envelope: TxEnvelope = tx.into_signed(signature).into();
 
         let serialized = serde_json::to_string(&tx_envelope).unwrap();
+
         let deserialized: TxEnvelope = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(tx_envelope, deserialized);
@@ -1123,5 +1124,20 @@ mod tests {
             .into_signed(Signature::from_str("48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b").unwrap())],
         };
         test_serde_roundtrip(tx);
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serde_tx_from_contract_call() {
+        let rpc_tx = r#"{"hash":"0x018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f","nonce":"0x1","blockHash":"0x3ca295f1dcaf8ac073c543dc0eccf18859f411206df181731e374e9917252931","blockNumber":"0x2","transactionIndex":"0x0","from":"0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266","to":"0x5fbdb2315678afecb367f032d93f642f64180aa3","value":"0x0","gasPrice":"0x3a29f0f8","gas":"0x1c9c380","maxFeePerGas":"0xba43b7400","maxPriorityFeePerGas":"0x5f5e100","input":"0xd09de08a","r":"0xd309309a59a49021281cb6bb41d164c96eab4e50f0c1bd24c03ca336e7bc2bb7","s":"0x28a7f089143d0a1355ebeb2a1b9f0e5ad9eca4303021c1400d61bc23c9ac5319","v":"0x0","yParity":"0x0","chainId":"0x7a69","accessList":[],"type":"0x2"}"#;
+
+        let te = serde_json::from_str::<TxEnvelope>(rpc_tx).unwrap();
+
+        assert_eq!(
+            *te.tx_hash(),
+            alloy_primitives::b256!(
+                "018b2331d461a4aeedf6a1f9cc37463377578244e6a35216057a8370714e798f"
+            )
+        );
     }
 }
