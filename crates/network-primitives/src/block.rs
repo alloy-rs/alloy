@@ -168,7 +168,7 @@ impl<'a, T> BlockTransactionHashes<'a, T> {
     }
 }
 
-impl<'a, T: TransactionResponse> Iterator for BlockTransactionHashes<'a, T> {
+impl<T: TransactionResponse> Iterator for BlockTransactionHashes<'_, T> {
     type Item = B256;
 
     #[inline]
@@ -213,7 +213,7 @@ impl<T: TransactionResponse> DoubleEndedIterator for BlockTransactionHashes<'_, 
 }
 
 #[cfg(feature = "std")]
-impl<'a, T: TransactionResponse> std::iter::FusedIterator for BlockTransactionHashes<'a, T> {}
+impl<T: TransactionResponse> std::iter::FusedIterator for BlockTransactionHashes<'_, T> {}
 
 /// Determines how the `transactions` field of block should be filled.
 ///

@@ -460,7 +460,7 @@ pub(super) mod serde_bincode_compat {
         }
     }
 
-    impl<'a> SerializeAs<super::TxEip7702> for TxEip7702<'a> {
+    impl SerializeAs<super::TxEip7702> for TxEip7702<'_> {
         fn serialize_as<S>(source: &super::TxEip7702, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
