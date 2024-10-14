@@ -53,7 +53,7 @@ impl fmt::Display for TxType {
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
-impl<'a> arbitrary::Arbitrary<'a> for TxType {
+impl arbitrary::Arbitrary<'_> for TxType {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
         Ok(u.int_in_range(0u8..=3)?.try_into().unwrap())
     }

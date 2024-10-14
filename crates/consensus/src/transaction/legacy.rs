@@ -460,7 +460,7 @@ pub(super) mod serde_bincode_compat {
         }
     }
 
-    impl<'a> SerializeAs<super::TxLegacy> for TxLegacy<'a> {
+    impl SerializeAs<super::TxLegacy> for TxLegacy<'_> {
         fn serialize_as<S>(source: &super::TxLegacy, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
