@@ -152,7 +152,7 @@ impl TraceFilterMatcher {
     ///
     /// # Behavior
     ///
-    /// The function evaluates whether the `trace` matches based on its action type:
+    /// This function evaluates whether the `trace` matches based on its action type:
     /// - `Call`: Matches if either the `from` or `to` addresses in the call action match the
     ///   filter's address criteria.
     /// - `Create`: Matches if the `from` address in action matches, and the result's address (if
@@ -162,7 +162,9 @@ impl TraceFilterMatcher {
     /// - `Reward`: Matches if the `author` address matches the filter's `to_addresses` criteria.
     ///
     /// The overall result depends on the filter mode:
-    /// - `Union` mode: The trace matches if either the `from` or `to` address matches.
+    /// - `Union` mode: The trace matches if either the `from` or `to` address matches. If either
+    /// of the from or to address set is empty, the trace matches only if the other address
+    /// matches, and if both are empty, the filter matches all traces.
     /// - `Intersection` mode: The trace matches only if both the `from` and `to` addresses match.
     pub fn matches(&self, trace: &TransactionTrace) -> bool {
         let (from_matches, to_matches) = match trace.action {
@@ -187,7 +189,15 @@ impl TraceFilterMatcher {
         };
 
         match self.mode {
-            TraceFilterMode::Union => from_matches || to_matches,
+            TraceFilterMode::Union => {
+                if self.from_addresses.is_empty() {
+                    to_matches
+                } else if self.to_addresses.is_empty() {
+                    from_matches
+                } else {
+                    from_matches || to_matches
+                }
+            }
             TraceFilterMode::Intersection => from_matches && to_matches,
         }
     }
