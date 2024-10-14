@@ -405,8 +405,6 @@ impl alloy_consensus::Transaction for Transaction {
 }
 
 impl TransactionResponse for Transaction {
-    type Signature = Signature;
-
     fn tx_hash(&self) -> B256 {
         self.hash
     }
@@ -425,10 +423,6 @@ impl TransactionResponse for Transaction {
 
     fn from(&self) -> Address {
         self.from
-    }
-
-    fn signature(&self) -> Option<Signature> {
-        self.signature
     }
 }
 
