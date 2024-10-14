@@ -564,7 +564,7 @@ impl alloy_consensus::Transaction for AnyTypedTransaction {
 ///   erroneous.
 /// - The [`TransactionRequest`] will build ONLY Ethereum types. It will error when attempting to
 ///   build any unknown type.
-/// - The [`TransactionResponse`] may deserialize unknown metadata fields into the inner
+/// - The [`Network::TransactionResponse`] may deserialize unknown metadata fields into the inner
 ///   [`AnyTxEnvelope`], rather than into the outer [`WithOtherFields`].
 #[derive(Clone, Copy, Debug)]
 pub struct AnyNetwork {
