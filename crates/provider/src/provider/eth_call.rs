@@ -73,8 +73,7 @@ where
     Polling,
 }
 
-impl<'req, T, N, Resp, Output, Map> core::fmt::Debug
-    for EthCallFutInner<'req, T, N, Resp, Output, Map>
+impl<T, N, Resp, Output, Map> core::fmt::Debug for EthCallFutInner<'_, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -97,7 +96,7 @@ where
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> EthCallFut<'req, T, N, Resp, Output, Map>
+impl<T, N, Resp, Output, Map> EthCallFut<'_, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -140,7 +139,7 @@ where
     }
 }
 
-impl<'req, T, N, Resp, Output, Map> Future for EthCallFut<'req, T, N, Resp, Output, Map>
+impl<T, N, Resp, Output, Map> Future for EthCallFut<'_, T, N, Resp, Output, Map>
 where
     T: Transport + Clone,
     N: Network,
@@ -187,7 +186,7 @@ where
     _pd: PhantomData<fn() -> (Resp, Output)>,
 }
 
-impl<'req, T, N, Resp> core::fmt::Debug for EthCall<'req, T, N, Resp>
+impl<T, N, Resp> core::fmt::Debug for EthCall<'_, T, N, Resp>
 where
     T: Transport + Clone,
     N: Network,

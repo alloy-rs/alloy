@@ -543,7 +543,7 @@ impl<'a> From<&'a ExecutionPayload> for BeaconExecutionPayload<'a> {
     }
 }
 
-impl<'a> SerializeAs<ExecutionPayload> for BeaconExecutionPayload<'a> {
+impl SerializeAs<ExecutionPayload> for BeaconExecutionPayload<'_> {
     fn serialize_as<S>(source: &ExecutionPayload, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

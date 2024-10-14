@@ -520,7 +520,7 @@ pub(super) mod serde_bincode_compat {
         }
     }
 
-    impl<'a> SerializeAs<super::TxEip1559> for TxEip1559<'a> {
+    impl SerializeAs<super::TxEip1559> for TxEip1559<'_> {
         fn serialize_as<S>(source: &super::TxEip1559, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
