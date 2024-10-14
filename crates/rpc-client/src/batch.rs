@@ -142,7 +142,7 @@ impl<'a, T> BatchRequest<'a, T> {
     }
 }
 
-impl<'a, Conn> BatchRequest<'a, Conn>
+impl<Conn> BatchRequest<'_, Conn>
 where
     Conn: Transport + Clone,
 {
@@ -170,7 +170,7 @@ where
     }
 }
 
-impl<'a, T> IntoFuture for BatchRequest<'a, T>
+impl<T> IntoFuture for BatchRequest<'_, T>
 where
     T: Transport + Clone,
 {

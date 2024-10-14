@@ -474,7 +474,7 @@ pub(super) mod serde_bincode_compat {
         }
     }
 
-    impl<'a> SerializeAs<super::TxEip2930> for TxEip2930<'a> {
+    impl SerializeAs<super::TxEip2930> for TxEip2930<'_> {
         fn serialize_as<S>(source: &super::TxEip2930, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,

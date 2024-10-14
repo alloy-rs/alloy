@@ -931,7 +931,7 @@ pub(super) mod serde_bincode_compat {
         }
     }
 
-    impl<'a> SerializeAs<super::Header> for Header<'a> {
+    impl SerializeAs<super::Header> for Header<'_> {
         fn serialize_as<S>(source: &super::Header, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,

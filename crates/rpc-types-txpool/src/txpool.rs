@@ -26,7 +26,7 @@ struct TxpoolInspectSummaryVisitor;
 
 /// Walk through the deserializer to parse a txpool inspection summary into the
 /// `TxpoolInspectSummary` struct.
-impl<'de> Visitor<'de> for TxpoolInspectSummaryVisitor {
+impl Visitor<'_> for TxpoolInspectSummaryVisitor {
     type Value = TxpoolInspectSummary;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
