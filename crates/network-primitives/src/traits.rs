@@ -64,9 +64,6 @@ pub trait ReceiptResponse {
 
 /// Transaction JSON-RPC response. Aggregates transaction data with its block and signer context.
 pub trait TransactionResponse: Transaction {
-    /// Signature type of the transaction
-    type Signature;
-
     /// Hash of the transaction
     #[doc(alias = "transaction_hash")]
     fn tx_hash(&self) -> TxHash;
@@ -104,9 +101,6 @@ pub trait TransactionResponse: Transaction {
         }
         Some(Transaction::max_fee_per_gas(self))
     }
-
-    /// Transaction signature
-    fn signature(&self) -> Option<Self::Signature>;
 
     /// Transaction type format for RPC. This field is included since eip-2930.
     fn transaction_type(&self) -> Option<u8> {
@@ -185,8 +179,6 @@ pub trait BlockResponse {
 }
 
 impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
-    type Signature = T::Signature;
-
     fn tx_hash(&self) -> TxHash {
         self.inner.tx_hash()
     }
@@ -205,10 +197,6 @@ impl<T: TransactionResponse> TransactionResponse for WithOtherFields<T> {
 
     fn from(&self) -> Address {
         self.inner.from()
-    }
-
-    fn signature(&self) -> Option<T::Signature> {
-        self.inner.signature()
     }
 }
 
