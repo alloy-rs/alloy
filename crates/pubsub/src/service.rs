@@ -103,7 +103,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     }
 
     /// Dispatch a request to the socket.
-    fn dispatch_request(&mut self, brv: Box<RawValue>) -> TransportResult<()> {
+    fn dispatch_request(&self, brv: Box<RawValue>) -> TransportResult<()> {
         self.handle.to_socket.send(brv).map(drop).map_err(|_| TransportErrorKind::backend_gone())
     }
 
@@ -123,7 +123,7 @@ impl<T: PubSubConnect> PubSubService<T> {
     /// the subscription does not exist, the waiter is sent nothing, and the
     /// `tx` is dropped. This notifies the waiter that the subscription does
     /// not exist.
-    fn service_get_sub(&mut self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
+    fn service_get_sub(&self, local_id: B256, tx: oneshot::Sender<RawSubscription>) {
         if let Some(rx) = self.subs.get_subscription(local_id) {
             let _ = tx.send(rx);
         }
