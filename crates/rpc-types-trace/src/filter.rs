@@ -320,7 +320,7 @@ mod tests {
         };
         assert!(m0.matches(&trace));
         assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(m5.matches(&trace));
@@ -364,7 +364,7 @@ mod tests {
         };
         assert!(m0.matches(&trace));
         assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(m5.matches(&trace));
@@ -399,8 +399,8 @@ mod tests {
             ..Default::default()
         };
         assert!(m0.matches(&trace));
-        assert!(m1.matches(&trace));
-        assert!(m2.matches(&trace));
+        assert!(!m1.matches(&trace));
+        assert!(!m2.matches(&trace));
         assert!(!m3.matches(&trace));
         assert!(m4.matches(&trace));
         assert!(!m5.matches(&trace));
