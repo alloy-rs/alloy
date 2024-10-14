@@ -2,7 +2,7 @@ use crate::receipt::{Eip658Value, TxReceipt};
 use alloc::{vec, vec::Vec};
 use alloy_primitives::{Bloom, Log};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
-use core::borrow::Borrow;
+use core::{borrow::Borrow, fmt};
 use derive_more::{DerefMut, From, IntoIterator};
 
 /// Receipt containing result of transaction execution.
@@ -69,7 +69,7 @@ where
     }
 }
 
-impl<T> TxReceipt<T> for Receipt<T>
+impl<T: Clone + fmt::Debug + PartialEq + Eq> TxReceipt<T> for Receipt<T>
 where
     T: Borrow<Log>,
 {
@@ -158,7 +158,7 @@ pub struct ReceiptWithBloom<T = Log> {
     pub logs_bloom: Bloom,
 }
 
-impl<T> TxReceipt<T> for ReceiptWithBloom<T> {
+impl<T: Clone + fmt::Debug + PartialEq + Eq> TxReceipt<T> for ReceiptWithBloom<T> {
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status
     }
