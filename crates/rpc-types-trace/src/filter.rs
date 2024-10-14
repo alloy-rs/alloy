@@ -118,11 +118,11 @@ impl From<Vec<Address>> for AddressFilter {
 impl AddressFilter {
     /// Returns `true` if the given address is in the filter or the filter address set is empty.
     pub fn matches(&self, addr: &Address) -> bool {
-        self.matches_all() || self.0.contains(addr)
+        self.is_empty() || self.0.contains(addr)
     }
 
     /// Returns `true` if the address set is empty.
-    pub fn matches_all(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
@@ -175,14 +175,14 @@ impl TraceFilterMatcher {
                     Some(TraceOutput::Create(CreateOutput { address: to, .. })) => {
                         self.to_addresses.matches(&to)
                     }
-                    _ => self.to_addresses.matches_all(),
+                    _ => self.to_addresses.is_empty(),
                 },
             ),
             Action::Selfdestruct(SelfdestructAction { address, refund_address, .. }) => {
                 (self.from_addresses.matches(&address), self.to_addresses.matches(&refund_address))
             }
             Action::Reward(RewardAction { author, .. }) => {
-                (self.from_addresses.matches_all(), self.to_addresses.matches(&author))
+                (self.from_addresses.is_empty(), self.to_addresses.matches(&author))
             }
         };
 
