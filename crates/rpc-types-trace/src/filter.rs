@@ -162,9 +162,9 @@ impl TraceFilterMatcher {
     /// - `Reward`: Matches if the `author` address matches the filter's `to_addresses` criteria.
     ///
     /// The overall result depends on the filter mode:
-    /// - `Union` mode: The trace matches if either the `from` or `to` address matches. If either
-    /// of the from or to address set is empty, the trace matches only if the other address
-    /// matches, and if both are empty, the filter matches all traces.
+    /// - `Union` mode: The trace matches if either the `from` or `to` address matches. If either of
+    ///   the from or to address set is empty, the trace matches only if the other address matches,
+    ///   and if both are empty, the filter matches all traces.
     /// - `Intersection` mode: The trace matches only if both the `from` and `to` addresses match.
     pub fn matches(&self, trace: &TransactionTrace) -> bool {
         let (from_matches, to_matches) = match trace.action {
