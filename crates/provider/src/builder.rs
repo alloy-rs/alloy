@@ -495,9 +495,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             .with_chain_id(Some(anvil_layer.instance().chain_id()));
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);
 
-        remaining_keys.iter().for_each(|key| {
+        for key in remaining_keys {
             wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
-        });
+        }
 
         Ok(self.wallet(wallet).layer(anvil_layer).on_http(url))
     }
