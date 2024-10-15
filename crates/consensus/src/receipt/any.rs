@@ -87,7 +87,10 @@ impl<T> AnyReceiptEnvelope<T> {
     }
 }
 
-impl<T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync> TxReceipt<T> for AnyReceiptEnvelope<T> {
+impl<T> TxReceipt<T> for AnyReceiptEnvelope<T>
+where
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+{
     fn status_or_post_state(&self) -> Eip658Value {
         self.inner.status_or_post_state()
     }

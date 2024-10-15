@@ -69,9 +69,9 @@ where
     }
 }
 
-impl<T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync> TxReceipt<T> for Receipt<T>
+impl<T> TxReceipt<T> for Receipt<T>
 where
-    T: Borrow<Log>,
+    T: Borrow<Log> + Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
 {
     fn status_or_post_state(&self) -> Eip658Value {
         self.status
@@ -158,7 +158,10 @@ pub struct ReceiptWithBloom<T = Log> {
     pub logs_bloom: Bloom,
 }
 
-impl<T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync> TxReceipt<T> for ReceiptWithBloom<T> {
+impl<T> TxReceipt<T> for ReceiptWithBloom<T>
+where
+    T: Clone + fmt::Debug + PartialEq + Eq + Send + Sync,
+{
     fn status_or_post_state(&self) -> Eip658Value {
         self.receipt.status
     }
