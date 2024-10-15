@@ -1,7 +1,7 @@
 use crate::common::{Privacy, ProtocolVersion, Validity};
 
 use alloy_eips::BlockId;
-use alloy_primitives::{Address, Bytes, Log, TxHash};
+use alloy_primitives::{Address, Bytes, Log, TxHash, U256};
 use serde::{Deserialize, Serialize};
 
 /// A bundle of transactions to send to the matchmaker.
@@ -144,20 +144,23 @@ pub struct SimBundleResponse {
     #[serde(with = "alloy_serde::quantity")]
     pub state_block: u64,
     /// The gas price of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub mev_gas_price: u64,
+    pub mev_gas_price: U256,
     /// The profit of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub profit: u64,
+    pub profit: U256,
     /// The refundable value of the simulated block.
-    #[serde(with = "alloy_serde::quantity")]
-    pub refundable_value: u64,
+    pub refundable_value: U256,
     /// The gas used by the simulated block.
     #[serde(with = "alloy_serde::quantity")]
     pub gas_used: u64,
     /// Logs returned by `mev_simBundle`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logs: Option<Vec<SimBundleLogs>>,
+    /// Error message if the bundle execution failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exec_error: Option<String>,
+    /// Contains the return data if the transaction reverted
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revert: Option<Bytes>,
 }
 
 /// Logs returned by `mev_simBundle`.
