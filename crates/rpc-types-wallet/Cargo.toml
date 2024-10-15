@@ -1,5 +1,5 @@
 [package]
-name = "wallet-rpc-types"
+name = "alloy-wallet-rpc-types"
 description = "Types for the 'wallet' Ethereum JSON-RPC namespace"
 
 version.workspace = true

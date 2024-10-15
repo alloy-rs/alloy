@@ -75,13 +75,5 @@ impl SendCallsRequest {
 /// See [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792#wallet_getcapabilities)
 pub type GetCapabilitiesResult = HashMap<ChainId, HashMap<String, PermissionValue>>;
 
-/// Response type of wallet_sendCalls
-pub type SendCallsResult = String;
-
 /// Request params of RPC call wallet_getCapabilities 
 pub type GetCapabilitiesParams = Vec<Address>;
-
-/// Alias for wallet_sendCalls params
-/// 
-/// See [EIP-5792](https://eips.ethereum.org/EIPS/eip-5792#wallet_sendcalls)
-pub type SendCallsParams = CallParams;
