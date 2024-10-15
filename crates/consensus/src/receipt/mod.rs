@@ -156,9 +156,11 @@ mod tests {
         }
         .with_bloom();
 
-        let mut data = vec![];
+        let len = receipt.length();
+        let mut data = Vec::with_capacity(receipt.length());
 
         receipt.encode(&mut data);
+        assert_eq!(data.len(), len);
         let decoded = ReceiptWithBloom::decode(&mut &data[..]).unwrap();
 
         // receipt.clone().to_compact(&mut data);
