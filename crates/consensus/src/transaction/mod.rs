@@ -3,7 +3,7 @@
 use crate::Signed;
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, ChainId, TxKind, B256, U256};
+use alloy_primitives::{keccak256, Address, ChainId, TxKind, B256, U256};
 use core::any;
 
 mod eip1559;
@@ -109,8 +109,16 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
 
-    /// Get `to`.
-    fn to(&self) -> TxKind;
+    /// Returns the transaction kind.
+    fn kind(&self) -> TxKind;
+
+    /// Get the transaction's address of the contract that will be called, or the address that will
+    /// receive the transfer.
+    ///
+    /// Returns `None` if this is a `CREATE` transaction.
+    fn to(&self) -> Option<Address> {
+        self.kind().to().copied()
+    }
 
     /// Get `value`.
     fn value(&self) -> U256;
@@ -243,8 +251,8 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
         self.inner.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.inner.to()
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
     }
 
     fn value(&self) -> U256 {

@@ -1,4 +1,5 @@
 use alloy_primitives::{Bloom, Log};
+use core::fmt;
 
 mod any;
 pub use any::AnyReceiptEnvelope;
@@ -15,7 +16,7 @@ pub use status::Eip658Value;
 /// Receipt is the result of a transaction execution.
 #[doc(alias = "TransactionReceipt")]
 #[auto_impl::auto_impl(&, Arc)]
-pub trait TxReceipt<T = Log> {
+pub trait TxReceipt<T = Log>: Clone + fmt::Debug + PartialEq + Eq + Send + Sync {
     /// Returns the status or post state of the transaction.
     ///
     /// ## Note
@@ -155,9 +156,11 @@ mod tests {
         }
         .with_bloom();
 
-        let mut data = vec![];
+        let len = receipt.length();
+        let mut data = Vec::with_capacity(receipt.length());
 
         receipt.encode(&mut data);
+        assert_eq!(data.len(), len);
         let decoded = ReceiptWithBloom::decode(&mut &data[..]).unwrap();
 
         // receipt.clone().to_compact(&mut data);

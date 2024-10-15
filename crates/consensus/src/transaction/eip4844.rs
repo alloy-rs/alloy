@@ -242,7 +242,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
             Self::TxEip4844WithSidecar(tx) => tx.tx.to,
@@ -717,7 +717,7 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to.into()
     }
 
@@ -990,8 +990,8 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.tx.to()
+    fn kind(&self) -> TxKind {
+        self.tx.kind()
     }
 
     fn value(&self) -> U256 {
@@ -1073,9 +1073,10 @@ mod tests {
         let actual_envelope: TxEnvelope = actual_signed.into();
 
         // now encode the transaction and check the length
-        let mut buf = Vec::new();
+        let len = expected_envelope.length();
+        let mut buf = Vec::with_capacity(len);
         expected_envelope.encode(&mut buf);
-        assert_eq!(buf.len(), expected_envelope.length());
+        assert_eq!(buf.len(), len);
 
         // ensure it's also the same size that `actual` claims to be, since we just changed the
         // sidecar values.

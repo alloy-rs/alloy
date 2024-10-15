@@ -296,7 +296,7 @@ impl Transaction for TxEip1559 {
         self.max_priority_fee_per_gas
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to
     }
 

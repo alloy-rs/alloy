@@ -176,7 +176,7 @@ impl TrezorSigner {
         let gas_limit = tx.gas_limit();
         let gas_limit = u64_to_trezor(gas_limit);
 
-        let to = match tx.to() {
+        let to = match tx.kind() {
             TxKind::Call(to) => address_to_trezor(&to),
             TxKind::Create => String::new(),
         };

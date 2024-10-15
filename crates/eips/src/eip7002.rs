@@ -36,3 +36,89 @@ pub struct WithdrawalRequest {
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub amount: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::hex;
+    use alloy_rlp::{Decodable, Encodable};
+    use core::str::FromStr;
+
+    #[test]
+    fn test_encode_decode_request_roundtrip() {
+        // Define multiple test cases as tuples containing the test data.
+        //
+        // Examples are randomly generated using some random validators found on Etherscan.
+        let test_cases = vec![
+            (
+                Address::from_str("0xaE0E8770147AaA6828a0D6f642504663F10F7d1E").unwrap(),
+                FixedBytes::<48>::from(hex!("8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b")),
+                10
+            ),
+            (
+                Address::from_str("0xf86f8D6A7d2AF439245c1145d88B04dAf2d7e509").unwrap(),
+                FixedBytes::<48>::from(hex!("a85d7a6aa90eedebe103b8d4d3dc86003aea8b6c8159d9d50f7685828bc97d211b2c512b1dcbb8d63b60a56c91dda8ea")),
+                354
+            ),
+            (
+                Address::from_str("0xf86f8D6A7d2AF439245c1145d88B04dAf2d7e509").unwrap(),
+                FixedBytes::<48>::from(hex!("a77eec36b046fbbf088e9253aa8c6800863d882c56fc6fa04800bbed742820f1bc7eb837601322840a18bbe0d24893b2")),
+                19
+            ),
+            (
+                Address::from_str("0xAFedF06777839D59eED3163cC3e0A5057b514399").unwrap(),
+                FixedBytes::<48>::from(hex!("a3ecb9359401bb22d00cefddf6f6879d14a2ee74d3325cc8cdff0796bd0b3b47c5f5b4d02e5a865d7b639eb8124286a5")),
+                9
+            ),
+        ];
+
+        // Iterate over each test case
+        for (source_address, validator_pubkey, amount) in test_cases {
+            let original_request = WithdrawalRequest { source_address, validator_pubkey, amount };
+
+            // Encode the request
+            let mut buf = Vec::new();
+            original_request.encode(&mut buf);
+
+            // Decode the request
+            let decoded_request =
+                WithdrawalRequest::decode(&mut &buf[..]).expect("Failed to decode request");
+
+            // Ensure the encoded and then decoded request matches the original
+            assert_eq!(original_request, decoded_request);
+        }
+    }
+
+    #[test]
+    fn test_serde_withdrawal_request() {
+        // Sample JSON input representing a withdrawal request
+        let json_data = r#"{
+            "sourceAddress":"0xAE0E8770147AaA6828a0D6f642504663F10F7d1E",
+            "validatorPubkey":"0x8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b",
+            "amount":"0x1"
+        }"#;
+
+        // Deserialize the JSON into a WithdrawalRequest struct
+        let withdrawal_request: WithdrawalRequest =
+            serde_json::from_str(json_data).expect("Failed to deserialize");
+
+        // Verify the deserialized content
+        assert_eq!(
+            withdrawal_request.source_address,
+            Address::from_str("0xAE0E8770147AaA6828a0D6f642504663F10F7d1E").unwrap()
+        );
+        assert_eq!(
+            withdrawal_request.validator_pubkey,
+            FixedBytes::<48>::from(hex!("8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b"))
+        );
+        assert_eq!(withdrawal_request.amount, 1);
+
+        // Serialize the struct back into JSON
+        let serialized_json =
+            serde_json::to_string(&withdrawal_request).expect("Failed to serialize");
+
+        // Check if the serialized JSON matches the expected JSON structure
+        let expected_json = r#"{"sourceAddress":"0xae0e8770147aaa6828a0d6f642504663f10f7d1e","validatorPubkey":"0x8e8d8749f6bc79b78be7cc6e49ff640e608454840c360b344c3a4d9b7428e280e7f40d2271bad65d8cbbfdd43cb8793b","amount":"0x1"}"#;
+        assert_eq!(serialized_json, expected_json);
+    }
+}
