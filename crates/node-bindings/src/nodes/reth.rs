@@ -102,13 +102,13 @@ impl RethInstance {
     }
 
     /// Returns the path to this instances' data directory.
-    pub const fn data_dir(&self) -> &Option<PathBuf> {
-        &self.data_dir
+    pub const fn data_dir(&self) -> Option<&PathBuf> {
+        self.data_dir.as_ref()
     }
 
     /// Returns the genesis configuration used to configure this instance
-    pub const fn genesis(&self) -> &Option<Genesis> {
-        &self.genesis
+    pub const fn genesis(&self) -> Option<&Genesis> {
+        self.genesis.as_ref()
     }
 
     /// Takes the stdout contained in the child process.

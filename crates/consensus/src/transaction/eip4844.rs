@@ -1073,9 +1073,10 @@ mod tests {
         let actual_envelope: TxEnvelope = actual_signed.into();
 
         // now encode the transaction and check the length
-        let mut buf = Vec::new();
+        let len = expected_envelope.length();
+        let mut buf = Vec::with_capacity(len);
         expected_envelope.encode(&mut buf);
-        assert_eq!(buf.len(), expected_envelope.length());
+        assert_eq!(buf.len(), len);
 
         // ensure it's also the same size that `actual` claims to be, since we just changed the
         // sidecar values.
