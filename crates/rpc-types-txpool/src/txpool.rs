@@ -110,12 +110,18 @@ impl Serialize for TxpoolInspectSummary {
 /// as the ones that are being scheduled for future execution only.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContent<T = Transaction> {
     /// pending tx
     pub pending: BTreeMap<Address, BTreeMap<String, T>>,
     /// queued tx
     pub queued: BTreeMap<Address, BTreeMap<String, T>>,
+}
+
+impl<T> Default for TxpoolContent<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
 }
 
 impl<T> TxpoolContent<T> {
@@ -133,12 +139,18 @@ impl<T> TxpoolContent<T> {
 /// Same as [TxpoolContent] but for a specific address.
 ///
 /// See [here](https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_contentFrom) for more details
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TxpoolContentFrom<T = Transaction> {
     /// pending tx
     pub pending: BTreeMap<String, T>,
     /// queued tx
     pub queued: BTreeMap<String, T>,
+}
+
+impl<T> Default for TxpoolContentFrom<T> {
+    fn default() -> Self {
+        Self { pending: BTreeMap::new(), queued: BTreeMap::new() }
+    }
 }
 
 /// Transaction Pool Inspect
