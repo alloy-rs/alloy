@@ -268,7 +268,7 @@ impl Transaction for TxEip2930 {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 
