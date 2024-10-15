@@ -15,6 +15,13 @@ pub struct WsConnect {
     pub url: String,
 }
 
+impl WsConnect {
+    /// Creates a new websocket connection configuration.
+    pub fn new<S: Into<String>>(url: S) -> Self {
+        Self { url: url.into() }
+    }
+}
+
 impl PubSubConnect for WsConnect {
     fn is_local(&self) -> bool {
         alloy_transport::utils::guess_local_url(&self.url)
