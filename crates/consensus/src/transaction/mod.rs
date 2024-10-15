@@ -109,7 +109,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
             .map_or(Some(fee), |priority_fee| Some(fee.min(priority_fee)))
     }
 
-    /// Get `to`.
+    /// Returns the transaction kind.
     fn kind(&self) -> TxKind;
 
     /// Get `value`.
