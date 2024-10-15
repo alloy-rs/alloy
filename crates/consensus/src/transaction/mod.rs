@@ -110,7 +110,7 @@ pub trait Transaction: any::Any + Send + Sync + 'static {
     }
 
     /// Get `to`.
-    fn to(&self) -> TxKind;
+    fn kind(&self) -> TxKind;
 
     /// Get `value`.
     fn value(&self) -> U256;
@@ -243,8 +243,8 @@ impl<T: Transaction> Transaction for alloy_serde::WithOtherFields<T> {
         self.inner.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.inner.to()
+    fn kind(&self) -> TxKind {
+        self.inner.kind()
     }
 
     fn value(&self) -> U256 {

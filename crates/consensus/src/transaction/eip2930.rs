@@ -260,7 +260,7 @@ impl Transaction for TxEip2930 {
         self.gas_price
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to
     }
 

@@ -216,13 +216,13 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         match self {
-            Self::Legacy(tx) => tx.to(),
-            Self::Eip2930(tx) => tx.to(),
-            Self::Eip1559(tx) => tx.to(),
-            Self::Eip4844(tx) => tx.to(),
-            Self::Eip7702(tx) => tx.to(),
+            Self::Legacy(tx) => tx.kind(),
+            Self::Eip2930(tx) => tx.kind(),
+            Self::Eip1559(tx) => tx.kind(),
+            Self::Eip4844(tx) => tx.kind(),
+            Self::Eip7702(tx) => tx.kind(),
         }
     }
 

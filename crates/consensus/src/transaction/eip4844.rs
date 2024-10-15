@@ -242,7 +242,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
             Self::TxEip4844WithSidecar(tx) => tx.tx.to,
@@ -717,7 +717,7 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to.into()
     }
 
@@ -990,8 +990,8 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.tx.to()
+    fn kind(&self) -> TxKind {
+        self.tx.kind()
     }
 
     fn value(&self) -> U256 {
