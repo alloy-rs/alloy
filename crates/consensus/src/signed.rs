@@ -10,8 +10,6 @@ pub struct Signed<T, Sig = Signature> {
     tx: T,
     #[cfg_attr(feature = "serde", serde(flatten))]
     signature: Sig,
-    #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    hash: B256,
 }
 
 impl<T, Sig> Signed<T, Sig> {
@@ -26,15 +24,9 @@ impl<T, Sig> Signed<T, Sig> {
         &self.signature
     }
 
-    /// Returns a reference to the transaction hash.
-    #[doc(alias = "tx_hash", alias = "transaction_hash")]
-    pub const fn hash(&self) -> &B256 {
-        &self.hash
-    }
-
     /// Splits the transaction into parts.
-    pub fn into_parts(self) -> (T, Sig, B256) {
-        (self.tx, self.signature, self.hash)
+    pub fn into_parts(self) -> (T, Sig) {
+        (self.tx, self.signature)
     }
 
     /// Returns the transaction without signature.
@@ -45,8 +37,8 @@ impl<T, Sig> Signed<T, Sig> {
 
 impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     /// Instantiate from a transaction and signature. Does not verify the signature.
-    pub const fn new_unchecked(tx: T, signature: Sig, hash: B256) -> Self {
-        Self { tx, signature, hash }
+    pub const fn new_unchecked(tx: T, signature: Sig) -> Self {
+        Self { tx, signature }
     }
 
     /// Calculate the signing hash for the transaction.

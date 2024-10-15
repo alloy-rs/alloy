@@ -80,11 +80,11 @@ impl From<TxEip7702> for TypedTransaction {
 impl From<TxEnvelope> for TypedTransaction {
     fn from(envelope: TxEnvelope) -> Self {
         match envelope {
-            TxEnvelope::Legacy(tx) => Self::Legacy(tx.strip_signature()),
-            TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.strip_signature()),
-            TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.strip_signature()),
-            TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.strip_signature()),
-            TxEnvelope::Eip7702(tx) => Self::Eip7702(tx.strip_signature()),
+            TxEnvelope::Legacy(tx) => Self::Legacy(tx.into_inner().strip_signature()),
+            TxEnvelope::Eip2930(tx) => Self::Eip2930(tx.into_inner().strip_signature()),
+            TxEnvelope::Eip1559(tx) => Self::Eip1559(tx.into_inner().strip_signature()),
+            TxEnvelope::Eip4844(tx) => Self::Eip4844(tx.into_inner().strip_signature()),
+            TxEnvelope::Eip7702(tx) => Self::Eip7702(tx.into_inner().strip_signature()),
         }
     }
 }

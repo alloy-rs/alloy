@@ -1,7 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -345,11 +344,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
-        self.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -414,8 +409,8 @@ mod tests {
             hex!("0d5688ac3897124635b6cf1bc0e29d6dfebceebdc10a54d74f2ef8b56535b682")
         );
 
-        let signed_tx = tx.into_signed(sig);
-        assert_eq!(*signed_tx.hash(), hash, "Expected same hash");
+        let signed_tx: crate::TxEnvelope = tx.into_signed(sig).into();
+        assert_eq!(signed_tx.tx_hash(), hash, "Expected same hash");
         assert_eq!(signed_tx.recover_signer().unwrap(), signer, "Recovering signer should pass.");
     }
 
@@ -446,7 +441,9 @@ mod tests {
         tx.encode_with_signature_fields(&sig, &mut buf);
         let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
         assert_eq!(decoded, tx.into_signed(sig));
-        assert_eq!(*decoded.hash(), hash);
+
+        let envelope = crate::TxEnvelope::from(decoded);
+        assert_eq!(envelope.tx_hash(), hash);
     }
 }
 

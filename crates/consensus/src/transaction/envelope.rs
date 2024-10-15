@@ -1,14 +1,21 @@
-use core::fmt;
-
-use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
+use crate::{
+    transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+    Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
+};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
-use alloy_primitives::{Bytes, TxKind, B256};
+use alloy_primitives::{keccak256, Bytes, Sealed, TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
+use core::fmt;
 
-use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+/// Enveloped transactions are [`Signed`] and [`Sealed`] (and maybe
+/// [delivered]).
+///
+///
+/// [delivered]: https://www.youtube.com/watch?v=pUj9frKY46E
+pub type Enveloped<T, S = alloy_primitives::Signature> = alloy_primitives::Sealed<Signed<T, S>>;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].
@@ -95,11 +102,11 @@ impl TryFrom<u8> for TxType {
 #[non_exhaustive]
 pub enum TxEnvelope {
     /// An untagged [`TxLegacy`].
-    Legacy(Signed<TxLegacy>),
+    Legacy(Enveloped<TxLegacy>),
     /// A [`TxEip2930`] tagged with type 1.
-    Eip2930(Signed<TxEip2930>),
+    Eip2930(Enveloped<TxEip2930>),
     /// A [`TxEip1559`] tagged with type 2.
-    Eip1559(Signed<TxEip1559>),
+    Eip1559(Enveloped<TxEip1559>),
     /// A TxEip4844 tagged with type 3.
     /// An EIP-4844 transaction has two network representations:
     /// 1 - The transaction itself, which is a regular RLP-encoded transaction and used to retrieve
@@ -107,52 +114,78 @@ pub enum TxEnvelope {
     ///
     /// 2 - The transaction with a sidecar, which is the form used to
     /// send transactions to the network.
-    Eip4844(Signed<TxEip4844Variant>),
+    Eip4844(Enveloped<TxEip4844Variant>),
     /// A [`TxEip7702`] tagged with type 4.
-    Eip7702(Signed<TxEip7702>),
+    Eip7702(Enveloped<TxEip7702>),
 }
 
 impl From<Signed<TxLegacy>> for TxEnvelope {
     fn from(v: Signed<TxLegacy>) -> Self {
-        Self::Legacy(v)
+        let mut buf = Vec::with_capacity(v.tx().encoded_len_with_signature(v.signature()));
+        v.tx().encode_with_signature_fields(v.signature(), &mut buf);
+        let h = keccak256(buf);
+
+        Self::Legacy(Sealed::new_unchecked(v, h))
     }
 }
 
 impl From<Signed<TxEip2930>> for TxEnvelope {
     fn from(v: Signed<TxEip2930>) -> Self {
-        Self::Eip2930(v)
+        let mut buf = Vec::with_capacity(v.tx().encoded_len_with_signature(v.signature(), false));
+        v.tx().encode_with_signature(v.signature(), &mut buf, false);
+        let h = keccak256(buf);
+
+        Self::Eip2930(Sealed::new_unchecked(v, h))
     }
 }
 
 impl From<Signed<TxEip1559>> for TxEnvelope {
     fn from(v: Signed<TxEip1559>) -> Self {
-        Self::Eip1559(v)
+        let tx = v.tx();
+        let signature = v.signature();
+
+        let mut buf = Vec::with_capacity(tx.encoded_len_with_signature(signature, false));
+        tx.encode_with_signature(signature, &mut buf, false);
+        let hash = keccak256(&buf);
+
+        Self::Eip1559(Sealed::new_unchecked(v, hash))
     }
 }
 
 impl From<Signed<TxEip4844Variant>> for TxEnvelope {
     fn from(v: Signed<TxEip4844Variant>) -> Self {
-        Self::Eip4844(v)
+        let tx = v.tx().tx();
+        let signature = v.signature();
+
+        let mut buf = Vec::with_capacity(tx.encoded_len_with_signature(signature, false));
+        tx.encode_with_signature(signature, &mut buf, false);
+        let hash = keccak256(&buf);
+
+        Self::Eip4844(Sealed::new_unchecked(v, hash))
     }
 }
 
 impl From<Signed<TxEip4844>> for TxEnvelope {
     fn from(v: Signed<TxEip4844>) -> Self {
-        let (tx, signature, hash) = v.into_parts();
-        Self::Eip4844(Signed::new_unchecked(tx.into(), signature, hash))
+        let (tx, signature) = v.into_parts();
+        Signed::new_unchecked(TxEip4844Variant::from(tx), signature).into()
     }
 }
 
 impl From<Signed<TxEip4844WithSidecar>> for TxEnvelope {
     fn from(v: Signed<TxEip4844WithSidecar>) -> Self {
-        let (tx, signature, hash) = v.into_parts();
-        Self::Eip4844(Signed::new_unchecked(tx.into(), signature, hash))
+        let (tx, signature) = v.into_parts();
+        Signed::new_unchecked(TxEip4844Variant::from(tx), signature).into()
     }
 }
 
 impl From<Signed<TxEip7702>> for TxEnvelope {
     fn from(v: Signed<TxEip7702>) -> Self {
-        Self::Eip7702(v)
+        let mut buf = Vec::with_capacity(v.tx().encoded_len_with_signature(v.signature(), false));
+        v.tx().encode_with_signature(v.signature(), &mut buf, false);
+        let h = keccak256(buf);
+
+        Self::Eip7702(Sealed::new_unchecked(v, h))
     }
 }
 
@@ -188,7 +221,7 @@ impl TxEnvelope {
     }
 
     /// Returns the [`TxLegacy`] variant if the transaction is a legacy transaction.
-    pub const fn as_legacy(&self) -> Option<&Signed<TxLegacy>> {
+    pub const fn as_legacy(&self) -> Option<&Enveloped<TxLegacy>> {
         match self {
             Self::Legacy(tx) => Some(tx),
             _ => None,
@@ -196,7 +229,7 @@ impl TxEnvelope {
     }
 
     /// Returns the [`TxEip2930`] variant if the transaction is an EIP-2930 transaction.
-    pub const fn as_eip2930(&self) -> Option<&Signed<TxEip2930>> {
+    pub const fn as_eip2930(&self) -> Option<&Enveloped<TxEip2930>> {
         match self {
             Self::Eip2930(tx) => Some(tx),
             _ => None,
@@ -204,7 +237,7 @@ impl TxEnvelope {
     }
 
     /// Returns the [`TxEip1559`] variant if the transaction is an EIP-1559 transaction.
-    pub const fn as_eip1559(&self) -> Option<&Signed<TxEip1559>> {
+    pub const fn as_eip1559(&self) -> Option<&Enveloped<TxEip1559>> {
         match self {
             Self::Eip1559(tx) => Some(tx),
             _ => None,
@@ -212,7 +245,7 @@ impl TxEnvelope {
     }
 
     /// Returns the [`TxEip4844`] variant if the transaction is an EIP-4844 transaction.
-    pub const fn as_eip4844(&self) -> Option<&Signed<TxEip4844Variant>> {
+    pub const fn as_eip4844(&self) -> Option<&Enveloped<TxEip4844Variant>> {
         match self {
             Self::Eip4844(tx) => Some(tx),
             _ => None,
@@ -220,7 +253,7 @@ impl TxEnvelope {
     }
 
     /// Returns the [`TxEip7702`] variant if the transaction is an EIP-7702 transaction.
-    pub const fn as_eip7702(&self) -> Option<&Signed<TxEip7702>> {
+    pub const fn as_eip7702(&self) -> Option<&Enveloped<TxEip7702>> {
         match self {
             Self::Eip7702(tx) => Some(tx),
             _ => None,
@@ -253,14 +286,14 @@ impl TxEnvelope {
     }
 
     /// Return the hash of the inner Signed.
-    #[doc(alias = "transaction_hash")]
-    pub const fn tx_hash(&self) -> &B256 {
+    #[doc(alias = "transaction_hash", alias = "hash")]
+    pub const fn tx_hash(&self) -> B256 {
         match self {
-            Self::Legacy(tx) => tx.hash(),
-            Self::Eip2930(tx) => tx.hash(),
-            Self::Eip1559(tx) => tx.hash(),
-            Self::Eip4844(tx) => tx.hash(),
-            Self::Eip7702(tx) => tx.hash(),
+            Self::Legacy(tx) => tx.seal(),
+            Self::Eip2930(tx) => tx.seal(),
+            Self::Eip1559(tx) => tx.seal(),
+            Self::Eip4844(tx) => tx.seal(),
+            Self::Eip7702(tx) => tx.seal(),
         }
     }
 
@@ -527,30 +560,30 @@ mod serde_from {
     //!
     //! We serialize via [`TaggedTxEnvelope`] and deserialize via
     //! [`MaybeTaggedTxEnvelope`].
-    use crate::{Signed, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxLegacy};
-
-    use super::TxEnvelope;
+    use crate::{
+        Enveloped, TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxEnvelope, TxLegacy,
+    };
 
     #[derive(Debug, serde::Deserialize)]
     #[serde(untagged)]
     pub(crate) enum MaybeTaggedTxEnvelope {
         Tagged(TaggedTxEnvelope),
-        Untagged(Signed<TxLegacy>),
+        Untagged(Enveloped<TxLegacy>),
     }
 
     #[derive(Debug, serde::Serialize, serde::Deserialize)]
     #[serde(tag = "type")]
     pub(crate) enum TaggedTxEnvelope {
         #[serde(rename = "0x0", alias = "0x00")]
-        Legacy(Signed<TxLegacy>),
+        Legacy(Enveloped<TxLegacy>),
         #[serde(rename = "0x1", alias = "0x01")]
-        Eip2930(Signed<TxEip2930>),
+        Eip2930(Enveloped<TxEip2930>),
         #[serde(rename = "0x2", alias = "0x02")]
-        Eip1559(Signed<TxEip1559>),
+        Eip1559(Enveloped<TxEip1559>),
         #[serde(rename = "0x3", alias = "0x03")]
-        Eip4844(Signed<TxEip4844Variant>),
+        Eip4844(Enveloped<TxEip4844Variant>),
         #[serde(rename = "0x4", alias = "0x04")]
-        Eip7702(Signed<TxEip7702>),
+        Eip7702(Enveloped<TxEip7702>),
     }
 
     impl From<MaybeTaggedTxEnvelope> for TxEnvelope {
@@ -635,16 +668,17 @@ mod tests {
         let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
         assert_eq!(res.tx_type(), TxType::Legacy);
 
+        assert_eq!(
+            res.tx_hash().to_string(),
+            "0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4"
+        );
+
         let tx = match res {
             TxEnvelope::Legacy(tx) => tx,
             _ => unreachable!(),
         };
 
         assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
-        assert_eq!(
-            tx.hash().to_string(),
-            "0x280cde7cdefe4b188750e76c888f13bd05ce9a4d7767730feefe8a0e50ca6fc4"
-        );
         let from = tx.recover_signer().unwrap();
         assert_eq!(from, address!("a12e1462d0ceD572f396F58B6E2D03894cD7C8a4"));
     }
@@ -892,20 +926,19 @@ mod tests {
     #[test]
     fn test_encode_decode_transaction_list() {
         let signature = Signature::test_signature();
-        let tx = TxEnvelope::Eip1559(
-            TxEip1559 {
-                chain_id: 1u64,
-                nonce: 2,
-                max_fee_per_gas: 3,
-                max_priority_fee_per_gas: 4,
-                gas_limit: 5,
-                to: Address::left_padding_from(&[6]).into(),
-                value: U256::from(7_u64),
-                input: vec![8].into(),
-                access_list: Default::default(),
-            }
-            .into_signed(signature),
-        );
+        let tx: TxEnvelope = TxEip1559 {
+            chain_id: 1u64,
+            nonce: 2,
+            max_fee_per_gas: 3,
+            max_priority_fee_per_gas: 4,
+            gas_limit: 5,
+            to: Address::left_padding_from(&[6]).into(),
+            value: U256::from(7_u64),
+            input: vec![8].into(),
+            access_list: Default::default(),
+        }
+        .into_signed(signature)
+        .into();
         let transactions = vec![tx.clone(), tx];
         let encoded = alloy_rlp::encode(&transactions);
         let decoded = Vec::<TxEnvelope>::decode(&mut &encoded[..]).unwrap();
