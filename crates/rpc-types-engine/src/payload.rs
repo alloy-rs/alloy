@@ -399,6 +399,7 @@ impl ssz::Decode for ExecutionPayloadV3 {
             },
             blob_gas_used: decoder.decode_next()?,
             excess_blob_gas: decoder.decode_next()?,
+            eip_1559_params: decoder.decode_next()?,
         })
     }
 }
@@ -540,6 +541,7 @@ impl ssz::Decode for ExecutionPayloadV4 {
                 },
                 blob_gas_used: decoder.decode_next()?,
                 excess_blob_gas: decoder.decode_next()?,
+                eip_1559_params: decoder.decode_next()?,
             },
             deposit_requests: decoder.decode_next()?,
             withdrawal_requests: decoder.decode_next()?,

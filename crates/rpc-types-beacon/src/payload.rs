@@ -367,14 +367,25 @@ struct BeaconExecutionPayloadV3<'a> {
 
 impl<'a> From<BeaconExecutionPayloadV3<'a>> for ExecutionPayloadV3 {
     fn from(payload: BeaconExecutionPayloadV3<'a>) -> Self {
-        let BeaconExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas, eip_1559_params } = payload;
-        Self { payload_inner: payload_inner.into(), blob_gas_used, excess_blob_gas, eip_1559_params }
+        let BeaconExecutionPayloadV3 {
+            payload_inner,
+            blob_gas_used,
+            excess_blob_gas,
+            eip_1559_params,
+        } = payload;
+        Self {
+            payload_inner: payload_inner.into(),
+            blob_gas_used,
+            excess_blob_gas,
+            eip_1559_params,
+        }
     }
 }
 
 impl<'a> From<&'a ExecutionPayloadV3> for BeaconExecutionPayloadV3<'a> {
     fn from(value: &'a ExecutionPayloadV3) -> Self {
-        let ExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas, eip_1559_params } = value;
+        let ExecutionPayloadV3 { payload_inner, blob_gas_used, excess_blob_gas, eip_1559_params } =
+            value;
         BeaconExecutionPayloadV3 {
             payload_inner: payload_inner.into(),
             blob_gas_used: *blob_gas_used,
