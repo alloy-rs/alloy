@@ -395,6 +395,10 @@ impl Encodable2718 for TxEnvelope {
             }
         }
     }
+
+    fn trie_hash(&self) -> B256 {
+        self.tx_hash()
+    }
 }
 
 impl Transaction for TxEnvelope {
