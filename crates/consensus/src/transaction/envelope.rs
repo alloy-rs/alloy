@@ -447,13 +447,13 @@ impl Transaction for TxEnvelope {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         match self {
-            Self::Legacy(tx) => tx.tx().to(),
-            Self::Eip2930(tx) => tx.tx().to(),
-            Self::Eip1559(tx) => tx.tx().to(),
-            Self::Eip4844(tx) => tx.tx().to(),
-            Self::Eip7702(tx) => tx.tx().to(),
+            Self::Legacy(tx) => tx.tx().kind(),
+            Self::Eip2930(tx) => tx.tx().kind(),
+            Self::Eip1559(tx) => tx.tx().kind(),
+            Self::Eip4844(tx) => tx.tx().kind(),
+            Self::Eip7702(tx) => tx.tx().kind(),
         }
     }
 
@@ -599,7 +599,7 @@ mod tests {
         };
 
         assert_eq!(
-            tx.tx().to(),
+            tx.tx().kind(),
             TxKind::Call(address!("11E9CA82A3a762b4B5bd264d4173a242e7a77064"))
         );
 

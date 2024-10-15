@@ -375,7 +375,7 @@ impl alloy_consensus::Transaction for Transaction {
         self.max_fee_per_gas.unwrap_or_else(|| self.gas_price.unwrap_or_default())
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to.into()
     }
 

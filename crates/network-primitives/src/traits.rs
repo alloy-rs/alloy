@@ -82,7 +82,7 @@ pub trait TransactionResponse: Transaction {
 
     /// Recipient of the transaction. Returns `None` if transaction is a contract creation.
     fn to(&self) -> Option<Address> {
-        Transaction::to(self).to().copied()
+        self.kind().to().copied()
     }
 
     /// Gas Price, this is the RPC format for `max_fee_per_gas`, pre-eip-1559.

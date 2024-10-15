@@ -238,7 +238,7 @@ impl Transaction for TxLegacy {
         self.gas_price
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to
     }
 
