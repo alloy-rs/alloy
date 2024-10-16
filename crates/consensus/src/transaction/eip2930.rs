@@ -26,7 +26,7 @@ pub struct TxEip2930 {
     /// As ethereum circulation is around 120mil eth as of 2022 that is around
     /// 120000000000000000000000000 wei we are safe to use u128 as its max number is:
     /// 340282366920938463463374607431768211455
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub gas_price: u128,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
