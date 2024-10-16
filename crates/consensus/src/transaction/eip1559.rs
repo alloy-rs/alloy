@@ -256,12 +256,12 @@ impl TxEip1559 {
 
     /// Decodes the transaction from RLP bytes, including the signature.
     pub fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
-        let original_len = buf.len();
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
 
+        let remaining: usize = buf.len();
         let tx = Self::rlp_decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
 
@@ -269,10 +269,10 @@ impl TxEip1559 {
             return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
         }
 
-        if buf.len() + header.payload_length != original_len {
+        if buf.len() + header.payload_length != remaining {
             return Err(alloy_rlp::Error::ListLengthMismatch {
                 expected: header.payload_length,
-                got: original_len - buf.len(),
+                got: remaining - buf.len(),
             });
         }
 
