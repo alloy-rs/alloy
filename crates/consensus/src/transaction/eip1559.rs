@@ -115,9 +115,9 @@ impl TxEip1559 {
     }
 }
 
+#[doc(hidden)]
 impl TxEip1559 {
     /// Outputs the length of the transaction's fields, without a RLP header.
-    #[doc(hidden)]
     pub fn rlp_encoded_fields_length(&self) -> usize {
         let mut len = 0;
         len += self.chain_id.length();
@@ -134,7 +134,6 @@ impl TxEip1559 {
 
     /// Encodes only the transaction's fields into the desired buffer, without
     /// a RLP header.
-    #[doc(hidden)]
     pub fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
         self.chain_id.encode(out);
         self.nonce.encode(out);
@@ -148,7 +147,6 @@ impl TxEip1559 {
     }
 
     /// Get the length of the transaction when RLP encoded.
-    #[doc(hidden)]
     pub fn rlp_encoded_length(&self) -> usize {
         let payload_length = self.rlp_encoded_fields_length();
         Header { list: true, payload_length }.length() + payload_length
@@ -162,14 +160,12 @@ impl TxEip1559 {
 
     /// Get the length of the transaction when RLP encoded with the given
     /// signature.
-    #[doc(hidden)]
     pub fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
         let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
         Header { list: true, payload_length }.length() + payload_length
     }
 
     /// RLP encodes the transaction with the given signature.
-    #[doc(hidden)]
     pub fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
         Header { list: true, payload_length }.encode(out);
@@ -179,13 +175,11 @@ impl TxEip1559 {
 
     /// Get the length of the transaction when EIP-2718 encoded. This is the
     /// 1 byte type flag + the length of the RLP encoded transaction.
-    #[doc(hidden)]
     pub fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
         self.rlp_encoded_length_with_signature(signature) + 1
     }
 
     /// EIP-2718 encode the transaction with the given signature and type flag.
-    #[doc(hidden)]
     pub fn eip2718_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
         out.put_u8(ty);
         self.rlp_encode_signed(signature, out);
@@ -193,21 +187,18 @@ impl TxEip1559 {
 
     /// EIP-2718 encode the transaction with the given signature and the default
     /// type flag.
-    #[doc(hidden)]
     pub fn eip2718_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.eip2718_encode_with_type(signature, Self::default_tx_type() as u8, out);
     }
 
     /// Get the length of the transaction when network encoded. This is the
     /// EIP-2718 encoded length with an outer RLP header.
-    #[doc(hidden)]
     pub fn network_encoded_length(&self, signature: &Signature) -> usize {
         let payload_length = self.eip2718_encoded_length(signature);
         Header { list: false, payload_length }.length() + payload_length
     }
 
     /// Network encode the transaction with the given signature.
-    #[doc(hidden)]
     pub fn network_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
         let payload_length = self.eip2718_encoded_length(signature);
         Header { list: false, payload_length }.encode(out);
@@ -216,7 +207,6 @@ impl TxEip1559 {
 
     /// Network encode the transaction with the given signature and the default
     /// type flag.
-    #[doc(hidden)]
     pub fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
         self.network_encode_with_type(signature, Self::default_tx_type() as u8, out);
     }
@@ -235,7 +225,6 @@ impl TxEip1559 {
     /// - `value`
     /// - `data` (`input`)
     /// - `access_list`
-    #[doc(hidden)]
     pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
@@ -250,7 +239,6 @@ impl TxEip1559 {
         })
     }
 
-    #[doc(hidden)]
     pub fn rlp_decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(data)?;
         if !header.list {
@@ -266,7 +254,6 @@ impl TxEip1559 {
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
-    #[doc(hidden)]
     pub fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
         let header = Header::decode(buf)?;
         if !header.list {
@@ -296,7 +283,6 @@ impl TxEip1559 {
 
     /// Decodes the transaction from eip2718 bytes, expecting the given type
     /// flag.
-    #[doc(hidden)]
     pub fn eip2718_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Signed<Self>> {
         if buf.remaining() < 1 {
             return Err(alloy_rlp::Error::InputTooShort.into());
@@ -310,7 +296,6 @@ impl TxEip1559 {
 
     /// Decodes the transaction from eip2718 bytes, expecting the default type
     /// flag.
-    #[doc(hidden)]
     pub fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
         Self::eip2718_decode_with_type(buf, Self::default_tx_type() as u8)
     }
