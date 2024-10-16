@@ -281,7 +281,7 @@ impl TxEnvelope {
         let payload_length = match self {
             Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
             Self::Eip2930(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip1559(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
+            Self::Eip1559(t) => t.tx().rlp_encoded_fields_length() + t.signature().rlp_vrs_len(),
             Self::Eip4844(t) => match t.tx() {
                 TxEip4844Variant::TxEip4844(tx) => tx.fields_len() + t.signature().rlp_vrs_len(),
                 TxEip4844Variant::TxEip4844WithSidecar(tx) => {
@@ -295,7 +295,9 @@ impl TxEnvelope {
             },
             Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
         };
-        Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
+        Header { list: false, payload_length }.length()
+            + payload_length
+            + !self.is_legacy() as usize
     }
 }
 
@@ -319,7 +321,7 @@ impl Decodable2718 for TxEnvelope {
     fn typed_decode(ty: u8, buf: &mut &[u8]) -> Eip2718Result<Self> {
         match ty.try_into().map_err(|_| alloy_rlp::Error::Custom("unexpected tx type"))? {
             TxType::Eip2930 => Ok(TxEip2930::decode_signed_fields(buf)?.into()),
-            TxType::Eip1559 => Ok(TxEip1559::decode_signed_fields(buf)?.into()),
+            TxType::Eip1559 => Ok(TxEip1559::rlp_decode_signed(buf)?.into()),
             TxType::Eip4844 => Ok(TxEip4844Variant::decode_signed_fields(buf)?.into()),
             TxType::Eip7702 => Ok(TxEip7702::decode_signed_fields(buf)?.into()),
             TxType::Legacy => Err(Eip2718Error::UnexpectedType(0)),
@@ -343,7 +345,10 @@ impl Encodable2718 for TxEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        self.rlp_payload_length()
+        match self {
+            Self::Eip1559(tx) => tx.tx().eip2718_encoded_length(tx.signature()),
+            _ => self.rlp_payload_length(),
+        }
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
@@ -354,7 +359,7 @@ impl Encodable2718 for TxEnvelope {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
             Self::Eip1559(tx) => {
-                tx.tx().encode_with_signature(tx.signature(), out, false);
+                tx.tx().eip2718_encode(tx.signature(), out);
             }
             Self::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
@@ -754,6 +759,7 @@ mod tests {
             access_list: Default::default(),
         };
         let signature = Signature::test_signature().with_parity(Parity::Eip155(42));
+
         test_encode_decode_roundtrip(tx, Some(signature));
     }
 
