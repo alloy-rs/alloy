@@ -1,14 +1,17 @@
-use core::fmt;
-
-use crate::{Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy};
+use crate::{
+    transaction::{
+        eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
+        RlpEcdsaTx,
+    },
+    Signed, Transaction, TxEip1559, TxEip2930, TxEip7702, TxLegacy,
+};
 use alloy_eips::{
     eip2718::{Decodable2718, Eip2718Error, Eip2718Result, Encodable2718},
     eip2930::AccessList,
 };
 use alloy_primitives::{Bytes, TxKind, B256};
 use alloy_rlp::{Decodable, Encodable, Header};
-
-use crate::transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar};
+use core::fmt;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
 /// [4844], and [7702].

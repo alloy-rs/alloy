@@ -1,12 +1,8 @@
-use crate::{SignableTransaction, Signed, Transaction, TxType};
+use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
 use alloc::vec::Vec;
-use alloy_eips::{
-    eip2718::{Eip2718Error, Eip2718Result},
-    eip2930::AccessList,
-    eip7702::SignedAuthorization,
-};
-use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
-use alloy_rlp::{Buf, BufMut, Decodable, Encodable, Header};
+use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
+use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
@@ -115,10 +111,11 @@ impl TxEip1559 {
     }
 }
 
-#[doc(hidden)]
-impl TxEip1559 {
+impl RlpEcdsaTx for TxEip1559 {
+    const DEFAULT_TX_TYPE: u8 = { Self::default_tx_type() as u8 };
+
     /// Outputs the length of the transaction's fields, without a RLP header.
-    pub fn rlp_encoded_fields_length(&self) -> usize {
+    fn rlp_encoded_fields_length(&self) -> usize {
         let mut len = 0;
         len += self.chain_id.length();
         len += self.nonce.length();
@@ -134,7 +131,7 @@ impl TxEip1559 {
 
     /// Encodes only the transaction's fields into the desired buffer, without
     /// a RLP header.
-    pub fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
         self.chain_id.encode(out);
         self.nonce.encode(out);
         self.max_priority_fee_per_gas.encode(out);
@@ -144,71 +141,6 @@ impl TxEip1559 {
         self.value.encode(out);
         self.input.0.encode(out);
         self.access_list.encode(out);
-    }
-
-    /// Get the length of the transaction when RLP encoded.
-    pub fn rlp_encoded_length(&self) -> usize {
-        let payload_length = self.rlp_encoded_fields_length();
-        Header { list: true, payload_length }.length() + payload_length
-    }
-
-    /// RLP encodes the transaction.
-    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.rlp_encoded_fields_length() }.encode(out);
-        self.rlp_encode_fields(out);
-    }
-
-    /// Get the length of the transaction when RLP encoded with the given
-    /// signature.
-    pub fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
-        Header { list: true, payload_length }.length() + payload_length
-    }
-
-    /// RLP encodes the transaction with the given signature.
-    pub fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
-        Header { list: true, payload_length }.encode(out);
-        self.rlp_encode_fields(out);
-        signature.write_rlp_vrs(out);
-    }
-
-    /// Get the length of the transaction when EIP-2718 encoded. This is the
-    /// 1 byte type flag + the length of the RLP encoded transaction.
-    pub fn eip2718_encoded_length(&self, signature: &Signature) -> usize {
-        self.rlp_encoded_length_with_signature(signature) + 1
-    }
-
-    /// EIP-2718 encode the transaction with the given signature and type flag.
-    pub fn eip2718_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
-        out.put_u8(ty);
-        self.rlp_encode_signed(signature, out);
-    }
-
-    /// EIP-2718 encode the transaction with the given signature and the default
-    /// type flag.
-    pub fn eip2718_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.eip2718_encode_with_type(signature, Self::default_tx_type() as u8, out);
-    }
-
-    /// Get the length of the transaction when network encoded. This is the
-    /// EIP-2718 encoded length with an outer RLP header.
-    pub fn network_encoded_length(&self, signature: &Signature) -> usize {
-        let payload_length = self.eip2718_encoded_length(signature);
-        Header { list: false, payload_length }.length() + payload_length
-    }
-
-    /// Network encode the transaction with the given signature.
-    pub fn network_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
-        let payload_length = self.eip2718_encoded_length(signature);
-        Header { list: false, payload_length }.encode(out);
-        self.eip2718_encode_with_type(signature, ty, out);
-    }
-
-    /// Network encode the transaction with the given signature and the default
-    /// type flag.
-    pub fn network_encode(&self, signature: &Signature, out: &mut dyn BufMut) {
-        self.network_encode_with_type(signature, Self::default_tx_type() as u8, out);
     }
 
     /// Decodes the inner [TxEip1559] fields from RLP bytes.
@@ -225,7 +157,7 @@ impl TxEip1559 {
     /// - `value`
     /// - `data` (`input`)
     /// - `access_list`
-    pub fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
             nonce: Decodable::decode(buf)?,
@@ -237,95 +169,6 @@ impl TxEip1559 {
             input: Decodable::decode(buf)?,
             access_list: Decodable::decode(buf)?,
         })
-    }
-
-    /// Decodes the transaction from RLP bytes.
-    pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-        let remaining_len = buf.len();
-
-        if header.payload_length > remaining_len {
-            return Err(alloy_rlp::Error::InputTooShort);
-        }
-
-        Self::rlp_decode_fields(buf)
-    }
-
-    /// Decodes the transaction from RLP bytes, including the signature.
-    pub fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
-        let header = Header::decode(buf)?;
-        if !header.list {
-            return Err(alloy_rlp::Error::UnexpectedString);
-        }
-
-        let remaining: usize = buf.len();
-        let tx = Self::rlp_decode_fields(buf)?;
-        let signature = Signature::decode_rlp_vrs(buf)?;
-
-        if !matches!(signature.v(), Parity::Parity(_)) {
-            return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
-        }
-
-        if buf.len() + header.payload_length != remaining {
-            return Err(alloy_rlp::Error::ListLengthMismatch {
-                expected: header.payload_length,
-                got: remaining - buf.len(),
-            });
-        }
-
-        Ok((tx, signature))
-    }
-
-    /// Decodes the transaction from RLP bytes, including the signature
-    /// Produces a [`Signed`].
-    pub fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        Self::rlp_decode_with_signature(buf).map(|(tx, signature)| tx.into_signed(signature))
-    }
-
-    /// Decodes the transaction from eip2718 bytes, expecting the given type
-    /// flag.
-    pub fn eip2718_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Signed<Self>> {
-        let original_buf = *buf;
-
-        if buf.remaining() < 1 {
-            return Err(alloy_rlp::Error::InputTooShort.into());
-        }
-        let actual = buf.get_u8();
-        if actual != ty {
-            return Err(Eip2718Error::UnexpectedType(actual));
-        }
-
-        // OPT: We avoid re-serializing by calculating the hash directly
-        // from the original buffer contents.
-        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
-        let total_len = tx.eip2718_encoded_length(&signature);
-        let hash = keccak256(&original_buf[..total_len]);
-
-        Ok(Signed::new_unchecked(tx, signature, hash))
-    }
-
-    /// Decodes the transaction from eip2718 bytes, expecting the default type
-    /// flag.
-    pub fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::eip2718_decode_with_type(buf, Self::default_tx_type() as u8)
-    }
-
-    /// Decodes the transaction from network bytes.
-    pub fn network_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Signed<Self>> {
-        let header = Header::decode(buf)?;
-        if header.list {
-            return Err(alloy_rlp::Error::UnexpectedList.into());
-        }
-        Self::eip2718_decode_with_type(buf, ty)
-    }
-
-    /// Decodes the transaction from network bytes, expecting the default type
-    /// flag.
-    pub fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
-        Self::network_decode_with_type(buf, Self::default_tx_type() as u8)
     }
 }
 
@@ -438,8 +281,7 @@ impl Decodable for TxEip1559 {
 
 #[cfg(all(test, feature = "k256"))]
 mod tests {
-    use super::TxEip1559;
-    use crate::SignableTransaction;
+    use crate::{transaction::RlpEcdsaTx, SignableTransaction, TxEip1559};
     use alloy_eips::eip2930::AccessList;
     use alloy_primitives::{address, b256, hex, Address, Signature, B256, U256};
 
