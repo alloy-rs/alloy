@@ -54,9 +54,7 @@ impl Visitor<'_> for TxpoolInspectSummaryVisitor {
             return Err(de::Error::custom("invalid format for TxpoolInspectSummary: gas_price"));
         }
         let to = match addr_split[0] {
-            "" => None,
-            "0x" => None,
-            "contract creation" => None,
+            "" | "0x" | "contract creation" => None,
             addr => {
                 Some(Address::from_str(addr.trim_start_matches("0x")).map_err(de::Error::custom)?)
             }
