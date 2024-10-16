@@ -240,29 +240,27 @@ impl TxEip1559 {
     }
 
     /// Decodes the transaction from RLP bytes.
-    pub fn rlp_decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        let header = Header::decode(data)?;
+    pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-        let remaining_len = data.len();
+        let remaining_len = buf.len();
 
         if header.payload_length > remaining_len {
             return Err(alloy_rlp::Error::InputTooShort);
         }
 
-        Self::rlp_decode_fields(data)
+        Self::rlp_decode_fields(buf)
     }
 
     /// Decodes the transaction from RLP bytes, including the signature.
-    pub fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+    pub fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
+        let original_len = buf.len();
         let header = Header::decode(buf)?;
         if !header.list {
             return Err(alloy_rlp::Error::UnexpectedString);
         }
-
-        // record original length so we can check encoding
-        let original_len = buf.len();
 
         let tx = Self::rlp_decode_fields(buf)?;
         let signature = Signature::decode_rlp_vrs(buf)?;
@@ -271,7 +269,6 @@ impl TxEip1559 {
             return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
         }
 
-        let signed = tx.into_signed(signature);
         if buf.len() + header.payload_length != original_len {
             return Err(alloy_rlp::Error::ListLengthMismatch {
                 expected: header.payload_length,
@@ -279,12 +276,22 @@ impl TxEip1559 {
             });
         }
 
-        Ok(signed)
+        Ok((tx, signature))
+    }
+
+    /// Decodes the transaction from RLP bytes, including the signature
+    /// Produces a [`Signed`].
+    pub fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
+        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
+
+        Ok(tx.into_signed(signature))
     }
 
     /// Decodes the transaction from eip2718 bytes, expecting the given type
     /// flag.
     pub fn eip2718_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Signed<Self>> {
+        let original_buf = *buf;
+
         if buf.remaining() < 1 {
             return Err(alloy_rlp::Error::InputTooShort.into());
         }
@@ -292,7 +299,14 @@ impl TxEip1559 {
         if actual != ty {
             return Err(Eip2718Error::UnexpectedType(actual));
         }
-        Self::rlp_decode_signed(buf).map_err(Into::into)
+
+        // OPT: We avoid re-serializing by calculating the hash directly
+        // from the original buffer contents.
+        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
+        let total_len = tx.eip2718_encoded_length(&signature);
+        let hash = keccak256(&original_buf[..total_len]);
+
+        Ok(Signed::new_unchecked(tx, signature, hash))
     }
 
     /// Decodes the transaction from eip2718 bytes, expecting the default type
@@ -419,8 +433,8 @@ impl Encodable for TxEip1559 {
 }
 
 impl Decodable for TxEip1559 {
-    fn decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Self::rlp_decode(data)
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode(buf)
     }
 }
 
