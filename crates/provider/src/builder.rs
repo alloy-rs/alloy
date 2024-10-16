@@ -127,7 +127,7 @@ impl<N> Default for ProviderBuilder<Identity, Identity, N> {
     }
 }
 
-impl<L, N> ProviderBuilder<L, Identity, N> {
+impl<L, N: Network> ProviderBuilder<L, Identity, N> {
     /// Add preconfigured set of layers handling gas estimation, nonce
     /// management, and chain-id fetching.
     pub fn with_recommended_fillers(
@@ -495,9 +495,9 @@ impl<L, F> ProviderBuilder<L, F, Ethereum> {
             .with_chain_id(Some(anvil_layer.instance().chain_id()));
         let mut wallet = alloy_network::EthereumWallet::from(default_signer);
 
-        remaining_keys.iter().for_each(|key| {
+        for key in remaining_keys {
             wallet.register_signer(alloy_signer_local::LocalSigner::from(key.clone()))
-        });
+        }
 
         Ok(self.wallet(wallet).layer(anvil_layer).on_http(url))
     }

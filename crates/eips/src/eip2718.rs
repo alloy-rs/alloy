@@ -136,9 +136,8 @@ pub trait Decodable2718: Sized {
         // If it's a list, we need to fallback to the legacy decoding.
         if h.list {
             return Self::fallback_decode(buf);
-        } else {
-            *buf = h_decode;
         }
+        *buf = h_decode;
 
         let remaining_len = buf.len();
 
