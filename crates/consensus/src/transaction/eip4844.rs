@@ -74,6 +74,15 @@ impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
     }
 }
 
+impl From<TxEip4844Variant> for TxEip4844 {
+    fn from(tx: TxEip4844Variant) -> Self {
+        match tx {
+            TxEip4844Variant::TxEip4844(tx) => tx,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx,
+        }
+    }
+}
+
 impl TxEip4844Variant {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
