@@ -4,7 +4,8 @@
 
 use alloc::vec::Vec;
 use alloy_primitives::{Address, U256};
-use alloy_rlp::{RlpDecodable, RlpEncodable};
+use alloy_rlp::{RlpDecodable, RlpDecodableWrapper, RlpEncodable, RlpEncodableWrapper};
+use derive_more::derive::{AsRef, Deref, DerefMut, From, IntoIterator};
 
 /// Multiplier for converting gwei to wei.
 pub const GWEI_TO_WEI: u64 = 1_000_000_000;
@@ -39,7 +40,21 @@ impl Withdrawal {
 }
 
 /// Represents a collection of Withdrawals.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Default,
+    Hash,
+    From,
+    AsRef,
+    Deref,
+    DerefMut,
+    IntoIterator,
+    RlpEncodableWrapper,
+    RlpDecodableWrapper,
+)]
 #[cfg_attr(any(test, feature = "arbitrary"), derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Withdrawals(Vec<Withdrawal>);
