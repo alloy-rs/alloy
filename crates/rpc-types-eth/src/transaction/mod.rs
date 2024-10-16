@@ -383,7 +383,7 @@ impl alloy_consensus::Transaction for Transaction {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 

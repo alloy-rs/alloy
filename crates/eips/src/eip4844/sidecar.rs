@@ -340,11 +340,11 @@ pub enum BlobTransactionValidationError {
 impl std::error::Error for BlobTransactionValidationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::InvalidProof { .. } => None,
             Self::KZGError(source) => Some(source),
-            Self::NotBlobTransaction { .. } => None,
-            Self::MissingSidecar { .. } => None,
-            Self::WrongVersionedHash { .. } => None,
+            Self::InvalidProof { .. }
+            | Self::NotBlobTransaction { .. }
+            | Self::MissingSidecar { .. }
+            | Self::WrongVersionedHash { .. } => None,
         }
     }
 }

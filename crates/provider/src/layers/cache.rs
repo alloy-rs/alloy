@@ -415,8 +415,7 @@ impl<Params: RpcParam> RequestType<Params> {
     const fn has_block_tag(&self) -> bool {
         if let Some(block_id) = self.block_id {
             match block_id {
-                BlockId::Hash(_) => return false,
-                BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
+                BlockId::Hash(_) | BlockId::Number(BlockNumberOrTag::Number(_)) => return false,
                 _ => return true,
             }
         }
