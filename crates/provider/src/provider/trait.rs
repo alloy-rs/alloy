@@ -534,7 +534,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
         self.client().request("eth_getTransactionByHash", (hash,)).into()
     }
 
-    /// Returns the transaction by block hash and transaction index position.
+    /// Gets a transaction by block hash and transaction index position.
     fn get_transaction_by_block_hash_and_index(
         &self,
         block_hash: B256,
@@ -545,7 +545,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             .into()
     }
 
-    /// Returns the raw transaction by block hash and transaction index position.
+    /// Gets a raw transaction by block hash and transaction index position.
     fn get_raw_transaction_by_block_hash_and_index(
         &self,
         block_hash: B256,
@@ -556,7 +556,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             .into()
     }
 
-    /// Returns the transaction by block number and transaction index position.
+    /// Gets a transaction by block number and transaction index position.
     fn get_transaction_by_block_number_and_index(
         &self,
         block_number: BlockNumberOrTag,
@@ -567,7 +567,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             .into()
     }
 
-    /// Returns the raw transaction by block number and transaction index position.
+    /// Gets a raw transaction by block number and transaction index position.
     fn get_raw_transaction_by_block_number_and_index(
         &self,
         block_number: BlockNumberOrTag,
