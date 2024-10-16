@@ -18,29 +18,39 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     /// a RLP header.
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut);
 
+    /// Create an rlp header for the unsigned transaction.
+    fn rlp_header(&self) -> Header {
+        Header { list: true, payload_length: self.rlp_encoded_fields_length() }
+    }
+
     /// Get the length of the transaction when RLP encoded.
     fn rlp_encoded_length(&self) -> usize {
         let payload_length = self.rlp_encoded_fields_length();
-        Header { list: true, payload_length }.length() + payload_length
+        self.rlp_header().length() + payload_length
     }
 
     /// RLP encodes the transaction.
     fn rlp_encode(&self, out: &mut dyn BufMut) {
-        Header { list: true, payload_length: self.rlp_encoded_fields_length() }.encode(out);
+        self.rlp_header().encode(out);
         self.rlp_encode_fields(out);
+    }
+
+    /// Create a header for the signed transaction.
+    fn rlp_header_signed(&self, signature: &Signature) -> Header {
+        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
+        Header { list: true, payload_length }
     }
 
     /// Get the length of the transaction when RLP encoded with the given
     /// signature.
     fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
-        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
-        Header { list: true, payload_length }.length() + payload_length
+        let header = self.rlp_header_signed(signature);
+        header.length() + header.payload_length
     }
 
     /// RLP encodes the transaction with the given signature.
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
-        let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
-        Header { list: true, payload_length }.encode(out);
+        self.rlp_header_signed(signature).encode(out);
         self.rlp_encode_fields(out);
         signature.write_rlp_vrs(out);
     }
@@ -63,17 +73,22 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         self.eip2718_encode_with_type(signature, Self::DEFAULT_TX_TYPE, out);
     }
 
+    /// Create a header for the network encoded transaction.
+    fn network_header(&self, signature: &Signature) -> Header {
+        let payload_length = self.eip2718_encoded_length(signature);
+        Header { list: false, payload_length }
+    }
+
     /// Get the length of the transaction when network encoded. This is the
     /// EIP-2718 encoded length with an outer RLP header.
     fn network_encoded_length(&self, signature: &Signature) -> usize {
-        let payload_length = self.eip2718_encoded_length(signature);
-        Header { list: false, payload_length }.length() + payload_length
+        let header = self.network_header(signature);
+        header.length() + header.payload_length
     }
 
     /// Network encode the transaction with the given signature.
     fn network_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
-        let payload_length = self.eip2718_encoded_length(signature);
-        Header { list: false, payload_length }.encode(out);
+        self.network_header(signature).encode(out);
         self.eip2718_encode_with_type(signature, ty, out);
     }
 
