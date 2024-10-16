@@ -257,10 +257,10 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         match self {
-            Self::TxEip4844(tx) => tx.input.as_ref(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
+            Self::TxEip4844(tx) => tx.input(),
+            Self::TxEip4844WithSidecar(tx) => tx.tx().input(),
         }
     }
 
@@ -725,7 +725,7 @@ impl Transaction for TxEip4844 {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 
@@ -998,7 +998,7 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.value()
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         self.tx.input()
     }
 

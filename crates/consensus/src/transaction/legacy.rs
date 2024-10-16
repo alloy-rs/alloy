@@ -246,7 +246,7 @@ impl Transaction for TxLegacy {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 
