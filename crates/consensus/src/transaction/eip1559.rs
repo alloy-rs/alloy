@@ -170,7 +170,7 @@ impl TxEip1559 {
 
     /// RLP encodes the transaction with the given signature.
     #[doc(hidden)]
-    pub fn rlp_encode_with_signature(&self, signature: &Signature, out: &mut dyn BufMut) {
+    pub fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         let payload_length = self.rlp_encoded_fields_length() + signature.rlp_vrs_len();
         Header { list: true, payload_length }.encode(out);
         self.rlp_encode_fields(out);
@@ -188,7 +188,7 @@ impl TxEip1559 {
     #[doc(hidden)]
     pub fn eip2718_encode_with_type(&self, signature: &Signature, ty: u8, out: &mut dyn BufMut) {
         out.put_u8(ty);
-        self.rlp_encode_with_signature(signature, out);
+        self.rlp_encode_signed(signature, out);
     }
 
     /// EIP-2718 encode the transaction with the given signature and the default
@@ -503,8 +503,8 @@ mod tests {
         .unwrap();
 
         let mut buf = vec![];
-        tx.encode_with_signature_fields(&sig, &mut buf);
-        let decoded = TxEip1559::decode_signed_fields(&mut &buf[..]).unwrap();
+        tx.rlp_encode_signed(&sig, &mut buf);
+        let decoded = TxEip1559::rlp_decode_signed(&mut &buf[..]).unwrap();
         assert_eq!(decoded, tx.into_signed(sig));
         assert_eq!(*decoded.hash(), hash);
     }
