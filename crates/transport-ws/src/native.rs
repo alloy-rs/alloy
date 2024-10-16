@@ -5,7 +5,7 @@ use futures::{SinkExt, StreamExt};
 use serde_json::value::RawValue;
 use std::time::Duration;
 use tokio_tungstenite::{
-    tungstenite::{self, client::IntoClientRequest, Message},
+    tungstenite::{self, client::IntoClientRequest, protocol::WebSocketConfig, Message},
     MaybeTlsStream, WebSocketStream,
 };
 
@@ -63,8 +63,17 @@ impl PubSubConnect for WsConnect {
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) =
-            tokio_tungstenite::connect_async(req).await.map_err(TransportErrorKind::custom)?;
+        let (socket, _) = tokio_tungstenite::connect_async_with_config(
+            req,
+            Some(WebSocketConfig {
+                max_frame_size: Some(usize::MAX),
+                max_message_size: Some(usize::MAX),
+                ..Default::default()
+            }),
+            false,
+        )
+        .await
+        .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface };
