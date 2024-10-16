@@ -239,6 +239,7 @@ impl TxEip1559 {
         })
     }
 
+    /// Decodes the transaction from RLP bytes.
     pub fn rlp_decode(data: &mut &[u8]) -> alloy_rlp::Result<Self> {
         let header = Header::decode(data)?;
         if !header.list {
