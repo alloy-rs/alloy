@@ -282,9 +282,7 @@ impl TxEip1559 {
     /// Decodes the transaction from RLP bytes, including the signature
     /// Produces a [`Signed`].
     pub fn rlp_decode_signed(buf: &mut &[u8]) -> alloy_rlp::Result<Signed<Self>> {
-        let (tx, signature) = Self::rlp_decode_with_signature(buf)?;
-
-        Ok(tx.into_signed(signature))
+        Self::rlp_decode_with_signature(buf).map(|(tx, signature)| tx.into_signed(signature))
     }
 
     /// Decodes the transaction from eip2718 bytes, expecting the given type
