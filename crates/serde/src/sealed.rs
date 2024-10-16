@@ -1,4 +1,6 @@
 /// Serializes and Deserializes [`Sealed`], flattening the struct.
+///
+/// [`Sealed`]: alloy_primitives::Sealed
 pub mod flat {
     use alloy_primitives::{Sealed, B256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -39,6 +41,8 @@ pub mod flat {
 
 /// Serializes and Deserializes [`Sealed`], flattening the struct and renaming
 /// the `seal` key to `hash`.
+///
+/// [`Sealed`]: alloy_primitives::Sealed
 pub mod flat_hash {
     use alloy_primitives::{Sealed, B256};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};

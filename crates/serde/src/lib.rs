@@ -23,7 +23,9 @@ pub use self::optional::*;
 
 pub mod quantity;
 
-/// Serialization for [`alloy_primitves::Sealed`].
+/// Serialization options for [`Sealed`].
+///
+/// [`Sealed`]: alloy_primitives::Sealed
 pub mod sealed;
 
 /// Storage related helpers.
