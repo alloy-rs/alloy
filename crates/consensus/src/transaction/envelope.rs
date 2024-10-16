@@ -347,7 +347,7 @@ impl Encodable2718 for TxEnvelope {
 
     fn encode_2718_len(&self) -> usize {
         match self {
-            Self::Eip1559(tx) => tx.tx().eip2718_encoded_length(tx.signature()),
+            Self::Eip1559(tx) => tx.eip2718_encoded_length(),
             _ => self.rlp_payload_length(),
         }
     }
@@ -360,7 +360,7 @@ impl Encodable2718 for TxEnvelope {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
             }
             Self::Eip1559(tx) => {
-                tx.tx().eip2718_encode(tx.signature(), out);
+                tx.eip2718_encode(out);
             }
             Self::Eip4844(tx) => {
                 tx.tx().encode_with_signature(tx.signature(), out, false);
