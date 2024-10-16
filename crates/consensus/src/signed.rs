@@ -1,5 +1,7 @@
-use crate::transaction::SignableTransaction;
+use crate::transaction::{RlpEcdsaTx, SignableTransaction};
+use alloy_eips::eip2718::Eip2718Result;
 use alloy_primitives::{Signature, B256};
+use alloy_rlp::BufMut;
 
 /// A transaction with a signature and hash seal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,6 +54,76 @@ impl<T: SignableTransaction<Sig>, Sig> Signed<T, Sig> {
     /// Calculate the signing hash for the transaction.
     pub fn signature_hash(&self) -> B256 {
         self.tx.signature_hash()
+    }
+}
+
+impl<T> Signed<T>
+where
+    T: RlpEcdsaTx,
+{
+    /// Get the length of the transaction when RLP encoded.
+    pub fn rlp_encoded_length(&self) -> usize {
+        self.tx.rlp_encoded_length_with_signature(&self.signature)
+    }
+
+    /// RLP encode the signed transaction.
+    pub fn rlp_encode(&self, out: &mut dyn BufMut) {
+        self.tx.rlp_encode_signed(&self.signature, out);
+    }
+
+    /// Get the length of the transaction when EIP-2718 encoded.
+    pub fn eip2718_encoded_length(&self) -> usize {
+        self.tx.eip2718_encoded_length(&self.signature)
+    }
+
+    /// EIP-2718 encode the signed transaction with a specified type flag.
+    pub fn eip2718_encode_with_type(&self, ty: u8, out: &mut dyn BufMut) {
+        self.tx.eip2718_encode_with_type(&self.signature, ty, out);
+    }
+
+    /// EIP-2718 encode the signed transaction.
+    pub fn eip2718_encode(&self, out: &mut dyn BufMut) {
+        self.tx.eip2718_encode(&self.signature, out);
+    }
+
+    /// Get the length of the transaction when network encoded.
+    pub fn network_encoded_length(&self) -> usize {
+        self.tx.network_encoded_length(&self.signature)
+    }
+
+    /// Network encode the signed transaction with a specified type flag.
+    pub fn network_encode_with_type(&self, ty: u8, out: &mut dyn BufMut) {
+        self.tx.network_encode_with_type(&self.signature, ty, out);
+    }
+
+    /// Network encode the signed transaction.
+    pub fn network_encode(&self, out: &mut dyn BufMut) {
+        self.tx.network_encode(&self.signature, out);
+    }
+
+    /// RLP decode the signed transaction.
+    pub fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        T::rlp_decode_signed(buf)
+    }
+
+    /// EIP-2718 decode the signed transaction with a specified type flag.
+    pub fn eip2718_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Self> {
+        T::eip2718_decode_with_type(buf, ty)
+    }
+
+    /// EIP-2718 decode the signed transaction.
+    pub fn eip2718_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::eip2718_decode(buf)
+    }
+
+    /// Network decode the signed transaction with a specified type flag.
+    pub fn network_decode_with_type(buf: &mut &[u8], ty: u8) -> Eip2718Result<Self> {
+        T::network_decode_with_type(buf, ty)
+    }
+
+    /// Network decode the signed transaction.
+    pub fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
+        T::network_decode(buf)
     }
 }
 
