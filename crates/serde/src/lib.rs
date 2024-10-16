@@ -23,6 +23,9 @@ pub use self::optional::*;
 
 pub mod quantity;
 
+/// Serialization for [`alloy_primitves::Sealed`].
+pub mod sealed;
+
 /// Storage related helpers.
 pub mod storage;
 pub use storage::JsonStorageKey;

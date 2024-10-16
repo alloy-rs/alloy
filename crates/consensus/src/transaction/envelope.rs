@@ -580,15 +580,15 @@ mod serde_from {
     #[serde(tag = "type")]
     pub(crate) enum TaggedTxEnvelope {
         #[serde(rename = "0x0", alias = "0x00")]
-        Legacy(Enveloped<TxLegacy>),
+        Legacy(#[serde(with = "alloy_serde::sealed::flat_hash")] Enveloped<TxLegacy>),
         #[serde(rename = "0x1", alias = "0x01")]
-        Eip2930(Enveloped<TxEip2930>),
+        Eip2930(#[serde(with = "alloy_serde::sealed::flat_hash")] Enveloped<TxEip2930>),
         #[serde(rename = "0x2", alias = "0x02")]
-        Eip1559(Enveloped<TxEip1559>),
+        Eip1559(#[serde(with = "alloy_serde::sealed::flat_hash")] Enveloped<TxEip1559>),
         #[serde(rename = "0x3", alias = "0x03")]
-        Eip4844(Enveloped<TxEip4844Variant>),
+        Eip4844(#[serde(with = "alloy_serde::sealed::flat_hash")] Enveloped<TxEip4844Variant>),
         #[serde(rename = "0x4", alias = "0x04")]
-        Eip7702(Enveloped<TxEip7702>),
+        Eip7702(#[serde(with = "alloy_serde::sealed::flat_hash")] Enveloped<TxEip7702>),
     }
 
     impl From<MaybeTaggedTxEnvelope> for TxEnvelope {
