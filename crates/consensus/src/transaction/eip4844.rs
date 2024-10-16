@@ -74,6 +74,15 @@ impl From<(TxEip4844, BlobTransactionSidecar)> for TxEip4844Variant {
     }
 }
 
+impl From<TxEip4844Variant> for TxEip4844 {
+    fn from(tx: TxEip4844Variant) -> Self {
+        match tx {
+            TxEip4844Variant::TxEip4844(tx) => tx,
+            TxEip4844Variant::TxEip4844WithSidecar(tx) => tx.tx,
+        }
+    }
+}
+
 impl TxEip4844Variant {
     /// Verifies that the transaction's blob data, commitments, and proofs are all valid.
     ///
@@ -242,7 +251,7 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         match self {
             Self::TxEip4844(tx) => tx.to,
             Self::TxEip4844WithSidecar(tx) => tx.tx.to,
@@ -257,10 +266,10 @@ impl Transaction for TxEip4844Variant {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         match self {
-            Self::TxEip4844(tx) => tx.input.as_ref(),
-            Self::TxEip4844WithSidecar(tx) => tx.tx().input.as_ref(),
+            Self::TxEip4844(tx) => tx.input(),
+            Self::TxEip4844WithSidecar(tx) => tx.tx().input(),
         }
     }
 
@@ -350,7 +359,7 @@ pub struct TxEip4844 {
     /// this transaction. This is paid up-front, before any
     /// computation is done and may not be increased
     /// later; formally Tg.
-    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
+    #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity", rename = "gas"))]
     pub gas_limit: u64,
     /// A scalar value equal to the maximum
     /// amount of gas that should be used in executing
@@ -717,7 +726,7 @@ impl Transaction for TxEip4844 {
         self.max_priority_fee_per_gas
     }
 
-    fn to(&self) -> TxKind {
+    fn kind(&self) -> TxKind {
         self.to.into()
     }
 
@@ -725,7 +734,7 @@ impl Transaction for TxEip4844 {
         self.value
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         &self.input
     }
 
@@ -990,15 +999,15 @@ impl Transaction for TxEip4844WithSidecar {
         self.tx.priority_fee_or_price()
     }
 
-    fn to(&self) -> TxKind {
-        self.tx.to()
+    fn kind(&self) -> TxKind {
+        self.tx.kind()
     }
 
     fn value(&self) -> U256 {
         self.tx.value()
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         self.tx.input()
     }
 
@@ -1073,9 +1082,10 @@ mod tests {
         let actual_envelope: TxEnvelope = actual_signed.into();
 
         // now encode the transaction and check the length
-        let mut buf = Vec::new();
+        let len = expected_envelope.length();
+        let mut buf = Vec::with_capacity(len);
         expected_envelope.encode(&mut buf);
-        assert_eq!(buf.len(), expected_envelope.length());
+        assert_eq!(buf.len(), len);
 
         // ensure it's also the same size that `actual` claims to be, since we just changed the
         // sidecar values.

@@ -38,4 +38,3 @@ rustls = { workspace = true, features = ["ring"] }
 # WASM only
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 ws_stream_wasm = "0.7.4"
-wasmtimer.workspace = true

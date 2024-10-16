@@ -32,8 +32,7 @@ impl<Ok, Err> TraceResult<Ok, Err> {
     #[doc(alias = "transaction_hash")]
     pub const fn tx_hash(&self) -> Option<TxHash> {
         *match self {
-            Self::Success { tx_hash, .. } => tx_hash,
-            Self::Error { tx_hash, .. } => tx_hash,
+            Self::Success { tx_hash, .. } | Self::Error { tx_hash, .. } => tx_hash,
         }
     }
 
