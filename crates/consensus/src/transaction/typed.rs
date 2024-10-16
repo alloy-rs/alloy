@@ -1,5 +1,5 @@
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{ChainId, TxKind, B256};
+use alloy_primitives::{Bytes, ChainId, TxKind, B256};
 
 use crate::{
     transaction::eip4844::{TxEip4844, TxEip4844Variant, TxEip4844WithSidecar},
@@ -236,7 +236,7 @@ impl Transaction for TypedTransaction {
         }
     }
 
-    fn input(&self) -> &[u8] {
+    fn input(&self) -> &Bytes {
         match self {
             Self::Legacy(tx) => tx.input(),
             Self::Eip2930(tx) => tx.input(),
