@@ -21,7 +21,7 @@ mod ethereum;
 pub use ethereum::{Ethereum, EthereumWallet};
 
 mod any;
-pub use any::{AnyNetwork, AnyTxType};
+pub use any::{AnyNetwork, AnyTxEnvelope, AnyTxType, AnyTypedTransaction};
 
 pub use alloy_eips::eip2718;
 pub use alloy_network_primitives::{
@@ -80,7 +80,7 @@ pub trait Network: Debug + Clone + Copy + Sized + Send + Sync + 'static {
 
     /// The JSON body of a transaction response.
     #[doc(alias = "TxResponse")]
-    type TransactionResponse: RpcObject + TransactionResponse;
+    type TransactionResponse: RpcObject + TransactionResponse + AsRef<Self::TxEnvelope>;
 
     /// The JSON body of a transaction receipt.
     #[doc(alias = "TransactionReceiptResponse", alias = "TxReceiptResponse")]
