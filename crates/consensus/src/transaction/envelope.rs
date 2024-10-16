@@ -295,9 +295,7 @@ impl TxEnvelope {
             },
             Self::Eip7702(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
         };
-        Header { list: false, payload_length }.length()
-            + payload_length
-            + !self.is_legacy() as usize
+        Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
     }
 }
 
