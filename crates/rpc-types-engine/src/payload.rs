@@ -139,8 +139,8 @@ pub struct ExecutionPayloadEnvelopeV3 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 pub struct ExecutionPayloadEnvelopeV4 {
-    /// Execution payload V4
-    pub execution_payload: ExecutionPayloadV4,
+    /// Execution payload V3
+    pub execution_payload: ExecutionPayloadV3,
     /// The expected value to be received by the feeRecipient in wei
     pub block_value: U256,
     /// The blobs, commitments, and proofs associated with the executed payload.
@@ -148,6 +148,10 @@ pub struct ExecutionPayloadEnvelopeV4 {
     /// Introduced in V3, this represents a suggestion from the execution layer if the payload
     /// should be used instead of an externally provided one.
     pub should_override_builder: bool,
+    /// A list of opaque [EIP-7685][eip7685] requests.
+    ///
+    /// [eip7685]: https://eips.ethereum.org/EIPS/eip-7685
+    pub execution_requests: Vec<Bytes>,
 }
 
 /// This structure maps on the ExecutionPayload structure of the beacon chain spec.
@@ -444,157 +448,6 @@ impl ssz::Encode for ExecutionPayloadV3 {
     }
 }
 
-/// This structure maps on the ExecutionPayloadV4 structure of the beacon chain spec.
-///
-/// See also: <https://github.com/ethereum/execution-apis/blob/main/src/engine/prague.md#ExecutionPayloadV4>
-///
-/// This structure has the syntax of ExecutionPayloadV3 and appends the new fields: depositRequests
-/// and withdrawalRequests.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
-pub struct ExecutionPayloadV4 {
-    /// Inner V3 payload
-    #[cfg_attr(feature = "serde", serde(flatten))]
-    pub payload_inner: ExecutionPayloadV3,
-    /// Array of deposit requests.
-    ///
-    /// This maps directly to the deposit requests defined in [EIP-6110](https://eips.ethereum.org/EIPS/eip-6110).
-    pub deposit_requests: Vec<DepositRequest>,
-    /// Array of execution layer triggerable withdrawal requests.
-    ///
-    /// See [EIP-7002](https://eips.ethereum.org/EIPS/eip-7002).
-    pub withdrawal_requests: Vec<WithdrawalRequest>,
-    /// Array of consolidation requests.
-    ///
-    /// See [EIP-7251](https://eips.ethereum.org/EIPS/eip-7251).
-    pub consolidation_requests: Vec<ConsolidationRequest>,
-}
-
-impl ExecutionPayloadV4 {
-    /// Returns the withdrawals for the payload.
-    pub const fn withdrawals(&self) -> &Vec<Withdrawal> {
-        self.payload_inner.withdrawals()
-    }
-
-    /// Returns the timestamp for the payload.
-    pub const fn timestamp(&self) -> u64 {
-        self.payload_inner.payload_inner.timestamp()
-    }
-}
-
-#[cfg(feature = "ssz")]
-impl ssz::Decode for ExecutionPayloadV4 {
-    fn is_ssz_fixed_len() -> bool {
-        false
-    }
-
-    fn from_ssz_bytes(bytes: &[u8]) -> Result<Self, ssz::DecodeError> {
-        let mut builder = ssz::SszDecoderBuilder::new(bytes);
-
-        builder.register_type::<B256>()?;
-        builder.register_type::<Address>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<Bloom>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<Bytes>()?;
-        builder.register_type::<U256>()?;
-        builder.register_type::<B256>()?;
-        builder.register_type::<Vec<Bytes>>()?;
-        builder.register_type::<Vec<Withdrawal>>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<u64>()?;
-        builder.register_type::<Vec<DepositRequest>>()?;
-        builder.register_type::<Vec<WithdrawalRequest>>()?;
-        builder.register_type::<Vec<ConsolidationRequest>>()?;
-
-        let mut decoder = builder.build()?;
-
-        Ok(Self {
-            payload_inner: ExecutionPayloadV3 {
-                payload_inner: ExecutionPayloadV2 {
-                    payload_inner: ExecutionPayloadV1 {
-                        parent_hash: decoder.decode_next()?,
-                        fee_recipient: decoder.decode_next()?,
-                        state_root: decoder.decode_next()?,
-                        receipts_root: decoder.decode_next()?,
-                        logs_bloom: decoder.decode_next()?,
-                        prev_randao: decoder.decode_next()?,
-                        block_number: decoder.decode_next()?,
-                        gas_limit: decoder.decode_next()?,
-                        gas_used: decoder.decode_next()?,
-                        timestamp: decoder.decode_next()?,
-                        extra_data: decoder.decode_next()?,
-                        base_fee_per_gas: decoder.decode_next()?,
-                        block_hash: decoder.decode_next()?,
-                        transactions: decoder.decode_next()?,
-                    },
-                    withdrawals: decoder.decode_next()?,
-                },
-                blob_gas_used: decoder.decode_next()?,
-                excess_blob_gas: decoder.decode_next()?,
-            },
-            deposit_requests: decoder.decode_next()?,
-            withdrawal_requests: decoder.decode_next()?,
-            consolidation_requests: decoder.decode_next()?,
-        })
-    }
-}
-
-#[cfg(feature = "ssz")]
-impl ssz::Encode for ExecutionPayloadV4 {
-    fn is_ssz_fixed_len() -> bool {
-        false
-    }
-
-    fn ssz_append(&self, buf: &mut Vec<u8>) {
-        let offset = <B256 as ssz::Encode>::ssz_fixed_len() * 5
-            + <Address as ssz::Encode>::ssz_fixed_len()
-            + <Bloom as ssz::Encode>::ssz_fixed_len()
-            + <u64 as ssz::Encode>::ssz_fixed_len() * 6
-            + <U256 as ssz::Encode>::ssz_fixed_len()
-            + ssz::BYTES_PER_LENGTH_OFFSET * 6;
-
-        let mut encoder = ssz::SszEncoder::container(buf, offset);
-
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.parent_hash);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.fee_recipient);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.state_root);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.receipts_root);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.logs_bloom);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.prev_randao);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_number);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_limit);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.gas_used);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.timestamp);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.extra_data);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.base_fee_per_gas);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.block_hash);
-        encoder.append(&self.payload_inner.payload_inner.payload_inner.transactions);
-        encoder.append(&self.payload_inner.payload_inner.withdrawals);
-        encoder.append(&self.payload_inner.blob_gas_used);
-        encoder.append(&self.payload_inner.excess_blob_gas);
-        encoder.append(&self.deposit_requests);
-        encoder.append(&self.withdrawal_requests);
-        encoder.append(&self.consolidation_requests);
-
-        encoder.finalize();
-    }
-
-    fn ssz_bytes_len(&self) -> usize {
-        <ExecutionPayloadV3 as ssz::Encode>::ssz_bytes_len(&self.payload_inner)
-            + ssz::BYTES_PER_LENGTH_OFFSET * 3
-            + self.deposit_requests.ssz_bytes_len()
-            + self.withdrawal_requests.ssz_bytes_len()
-            + self.consolidation_requests.ssz_bytes_len()
-    }
-}
-
 /// This includes all bundled blob related data of an executed payload.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -733,8 +586,6 @@ pub enum ExecutionPayload {
     V2(ExecutionPayloadV2),
     /// V3 payload
     V3(ExecutionPayloadV3),
-    /// V4 payload
-    V4(ExecutionPayloadV4),
 }
 
 impl ExecutionPayload {
@@ -744,7 +595,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &payload.payload_inner,
             Self::V3(payload) => &payload.payload_inner.payload_inner,
-            Self::V4(payload) => &payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -754,7 +604,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => &mut payload.payload_inner,
             Self::V3(payload) => &mut payload.payload_inner.payload_inner,
-            Self::V4(payload) => &mut payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -764,7 +613,6 @@ impl ExecutionPayload {
             Self::V1(payload) => payload,
             Self::V2(payload) => payload.payload_inner,
             Self::V3(payload) => payload.payload_inner.payload_inner,
-            Self::V4(payload) => payload.payload_inner.payload_inner.payload_inner,
         }
     }
 
@@ -774,7 +622,6 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&payload.payload_inner),
-            Self::V4(payload) => Some(&payload.payload_inner.payload_inner),
         }
     }
 
@@ -784,7 +631,6 @@ impl ExecutionPayload {
             Self::V1(_) => None,
             Self::V2(payload) => Some(payload),
             Self::V3(payload) => Some(&mut payload.payload_inner),
-            Self::V4(payload) => Some(&mut payload.payload_inner.payload_inner),
         }
     }
 
@@ -793,7 +639,6 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
-            Self::V4(payload) => Some(&payload.payload_inner),
         }
     }
 
@@ -802,23 +647,6 @@ impl ExecutionPayload {
         match self {
             Self::V1(_) | Self::V2(_) => None,
             Self::V3(payload) => Some(payload),
-            Self::V4(payload) => Some(&mut payload.payload_inner),
-        }
-    }
-
-    /// Returns a reference to the V4 payload, if any.
-    pub const fn as_v4(&self) -> Option<&ExecutionPayloadV4> {
-        match self {
-            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
-            Self::V4(payload) => Some(payload),
-        }
-    }
-
-    /// Returns a mutable reference to the V4 payload, if any.
-    pub fn as_v4_mut(&mut self) -> Option<&mut ExecutionPayloadV4> {
-        match self {
-            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
-            Self::V4(payload) => Some(payload),
         }
     }
 
@@ -879,12 +707,6 @@ impl From<ExecutionPayloadV3> for ExecutionPayload {
     }
 }
 
-impl From<ExecutionPayloadV4> for ExecutionPayload {
-    fn from(payload: ExecutionPayloadV4) -> Self {
-        Self::V4(payload)
-    }
-}
-
 // Deserializes untagged ExecutionPayload by trying each variant in falling order
 #[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for ExecutionPayload {
@@ -895,13 +717,11 @@ impl<'de> serde::Deserialize<'de> for ExecutionPayload {
         #[derive(serde::Deserialize)]
         #[serde(untagged)]
         enum ExecutionPayloadDesc {
-            V4(ExecutionPayloadV4),
             V3(ExecutionPayloadV3),
             V2(ExecutionPayloadV2),
             V1(ExecutionPayloadV1),
         }
         match ExecutionPayloadDesc::deserialize(deserializer)? {
-            ExecutionPayloadDesc::V4(payload) => Ok(Self::V4(payload)),
             ExecutionPayloadDesc::V3(payload) => Ok(Self::V3(payload)),
             ExecutionPayloadDesc::V2(payload) => Ok(Self::V2(payload)),
             ExecutionPayloadDesc::V1(payload) => Ok(Self::V1(payload)),

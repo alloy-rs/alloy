@@ -880,7 +880,7 @@ mod tests {
                 storage_keys: vec![B256::left_padding_from(&[9])],
             }]),
             authorization_list: vec![(Authorization {
-                chain_id: U256::from(1),
+                chain_id: 1,
                 address: Address::left_padding_from(&[10]),
                 nonce: 1u64,
             })
@@ -1051,7 +1051,7 @@ mod tests {
                 storage_keys: vec![B256::random()],
             }]),
             authorization_list: vec![(Authorization {
-                chain_id: U256::from(1),
+                chain_id: 1,
                 address: Address::left_padding_from(&[1]),
                 nonce: 1u64,
             })
