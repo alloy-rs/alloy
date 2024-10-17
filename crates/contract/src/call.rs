@@ -495,7 +495,7 @@ impl<T: Transport + Clone, P: Provider<T, N>, D: CallDecoder, N: Network> CallBu
     ///
     /// Returns a builder for configuring the pending transaction watcher.
     /// See [`Provider::send_transaction`] for more information.
-    pub async fn send(&self) -> Result<PendingTransactionBuilder<'_, T, N>> {
+    pub async fn send(&self) -> Result<PendingTransactionBuilder<T, N>> {
         Ok(self.provider.send_transaction(self.request.clone()).await?)
     }
 
