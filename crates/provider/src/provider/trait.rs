@@ -692,10 +692,10 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_raw_transaction(
         &self,
         encoded_tx: &[u8],
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
         let rlp_hex = hex::encode_prefixed(encoded_tx);
         let tx_hash = self.client().request("eth_sendRawTransaction", (rlp_hex,)).await?;
-        Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+        Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
     }
 
     /// Broadcasts a transaction to the network.
@@ -721,7 +721,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_transaction(
         &self,
         tx: N::TransactionRequest,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
         self.send_transaction_internal(SendableTx::Builder(tx)).await
     }
 
@@ -732,7 +732,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_tx_envelope(
         &self,
         tx: N::TxEnvelope,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
         self.send_transaction_internal(SendableTx::Envelope(tx)).await
     }
 
@@ -747,7 +747,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
     async fn send_transaction_internal(
         &self,
         tx: SendableTx<N>,
-    ) -> TransportResult<PendingTransactionBuilder<'_, T, N>> {
+    ) -> TransportResult<PendingTransactionBuilder<T, N>> {
         // Make sure to initialize heartbeat before we submit transaction, so that
         // we don't miss it if user will subscriber to it immediately after sending.
         let _handle = self.root().get_heart();
@@ -756,7 +756,7 @@ pub trait Provider<T: Transport + Clone = BoxTransport, N: Network = Ethereum>:
             SendableTx::Builder(mut tx) => {
                 alloy_network::TransactionBuilder::prep_for_submission(&mut tx);
                 let tx_hash = self.client().request("eth_sendTransaction", (tx,)).await?;
-                Ok(PendingTransactionBuilder::new(self.root(), tx_hash))
+                Ok(PendingTransactionBuilder::new(self.root().clone(), tx_hash))
             }
             SendableTx::Envelope(tx) => {
                 let mut encoded_tx = vec![];

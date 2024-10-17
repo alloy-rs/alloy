@@ -82,20 +82,20 @@ pub enum PendingTransactionError {
 #[must_use = "this type does nothing unless you call `register`, `watch` or `get_receipt`"]
 #[derive(Debug)]
 #[doc(alias = "PendingTxBuilder")]
-pub struct PendingTransactionBuilder<'a, T, N: Network> {
+pub struct PendingTransactionBuilder<T, N: Network> {
     config: PendingTransactionConfig,
-    provider: &'a RootProvider<T, N>,
+    provider: RootProvider<T, N>,
 }
 
-impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
+impl<T: Transport + Clone, N: Network> PendingTransactionBuilder<T, N> {
     /// Creates a new pending transaction builder.
-    pub const fn new(provider: &'a RootProvider<T, N>, tx_hash: TxHash) -> Self {
+    pub const fn new(provider: RootProvider<T, N>, tx_hash: TxHash) -> Self {
         Self::from_config(provider, PendingTransactionConfig::new(tx_hash))
     }
 
     /// Creates a new pending transaction builder from the given configuration.
     pub const fn from_config(
-        provider: &'a RootProvider<T, N>,
+        provider: RootProvider<T, N>,
         config: PendingTransactionConfig,
     ) -> Self {
         Self { config, provider }
@@ -107,17 +107,17 @@ impl<'a, T: Transport + Clone, N: Network> PendingTransactionBuilder<'a, T, N> {
     }
 
     /// Consumes this builder, returning the inner configuration.
-    pub const fn into_inner(self) -> PendingTransactionConfig {
+    pub fn into_inner(self) -> PendingTransactionConfig {
         self.config
     }
 
     /// Returns the provider.
-    pub const fn provider(&self) -> &'a RootProvider<T, N> {
-        self.provider
+    pub const fn provider(&self) -> &RootProvider<T, N> {
+        &self.provider
     }
 
     /// Consumes this builder, returning the provider and the configuration.
-    pub const fn split(self) -> (&'a RootProvider<T, N>, PendingTransactionConfig) {
+    pub fn split(self) -> (RootProvider<T, N>, PendingTransactionConfig) {
         (self.provider, self.config)
     }
 
@@ -325,8 +325,8 @@ impl PendingTransactionConfig {
     /// Wraps this configuration with a provider to expose watching methods.
     pub const fn with_provider<T: Transport + Clone, N: Network>(
         self,
-        provider: &RootProvider<T, N>,
-    ) -> PendingTransactionBuilder<'_, T, N> {
+        provider: RootProvider<T, N>,
+    ) -> PendingTransactionBuilder<T, N> {
         PendingTransactionBuilder::from_config(provider, self)
     }
 }
