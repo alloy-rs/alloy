@@ -406,4 +406,48 @@ mod test {
         assert_eq!(other.gas_used_for_l1, "0x2c906");
         assert_eq!(other.l1_block_number, "0x1323b96");
     }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn deserialize_pre_eip658_receipt() {
+        let receipt_json = r#"
+        {
+            "transactionHash": "0xea1093d492a1dcb1bef708f771a99a96ff05dcab81ca76c31940300177fcf49f",
+            "blockHash": "0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e",
+            "blockNumber": "0xf4240",
+            "logsBloom": "0x00000000000000000000000000000000000800000000000000000000000800000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000",
+            "gasUsed": "0x723c",
+            "root": "0x284d35bf53b82ef480ab4208527325477439c64fb90ef518450f05ee151c8e10",
+            "contractAddress": null,
+            "cumulativeGasUsed": "0x723c",
+            "transactionIndex": "0x0",
+            "from": "0x39fa8c5f2793459d6622857e7d9fbb4bd91766d3",
+            "to": "0xc083e9947cf02b8ffc7d3090ae9aea72df98fd47",
+            "type": "0x0",
+            "effectiveGasPrice": "0x12bfb19e60",
+            "logs": [
+                {
+                    "blockHash": "0x8e38b4dbf6b11fcc3b9dee84fb7986e29ca0a02cecd8977c161ff7333329681e",
+                    "address": "0xc083e9947cf02b8ffc7d3090ae9aea72df98fd47",
+                    "logIndex": "0x0",
+                    "data": "0x00000000000000000000000039fa8c5f2793459d6622857e7d9fbb4bd91766d30000000000000000000000000000000000000000000000056bc75e2d63100000",
+                    "removed": false,
+                    "topics": [
+                    "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
+                    ],
+                    "blockNumber": "0xf4240",
+                    "transactionIndex": "0x0",
+                    "transactionHash": "0xea1093d492a1dcb1bef708f771a99a96ff05dcab81ca76c31940300177fcf49f"
+                }
+            ]
+        }
+        "#;
+
+        let receipt = serde_json::from_str::<TransactionReceipt>(receipt_json).unwrap();
+
+        assert_eq!(
+            receipt.transaction_hash,
+            b256!("ea1093d492a1dcb1bef708f771a99a96ff05dcab81ca76c31940300177fcf49f")
+        );
+    }
 }
