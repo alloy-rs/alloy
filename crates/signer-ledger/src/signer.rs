@@ -16,6 +16,9 @@ use alloy_dyn_abi::TypedData;
 #[cfg(feature = "eip712")]
 use alloy_sol_types::{Eip712Domain, SolStruct};
 
+#[cfg(feature = "eip712")]
+use alloy_signer::Error;
+
 /// A Ledger Ethereum signer.
 ///
 /// This is a simple wrapper around the [Ledger transport](Ledger).
@@ -43,7 +46,33 @@ impl alloy_network::TxSigner<Signature> for LedgerSigner {
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> Result<Signature> {
-        sign_transaction_with_chain_id!(self, tx, self.sign_tx_rlp(&tx.encoded_for_signing()).await)
+        let encoded = tx.encoded_for_signing();
+
+        match encoded.as_slice() {
+            // Ledger requires passing EIP712 data to a separate instruction
+            #[cfg(feature = "eip712")]
+            [0x19, 0x1, data @ ..] => {
+                let domain_sep = data
+                    .get(..32)
+                    .ok_or_else(|| {
+                        Error::other("eip712 encoded data did not have a domain separator")
+                    })
+                    .map(B256::from_slice)?;
+
+                let hash = data[32..]
+                    .get(..32)
+                    .ok_or_else(|| Error::other("eip712 encoded data did not have hash struct"))
+                    .map(B256::from_slice)?;
+
+                sign_transaction_with_chain_id!(
+                    self,
+                    tx,
+                    self.sign_typed_data_with_separator(&hash, &domain_sep).await
+                )
+            }
+            // Usual flow
+            encoded => sign_transaction_with_chain_id!(self, tx, self.sign_tx_rlp(encoded).await),
+        }
     }
 }
 
@@ -208,10 +237,10 @@ impl LedgerSigner {
     }
 
     #[cfg(feature = "eip712")]
-    async fn sign_typed_data_(
+    async fn sign_typed_data_with_separator(
         &self,
         hash_struct: &B256,
-        domain: &Eip712Domain,
+        separator: &B256,
     ) -> Result<Signature, LedgerError> {
         // See comment for v1.6.0 requirement
         // https://github.com/LedgerHQ/app-ethereum/issues/105#issuecomment-765316999
@@ -225,10 +254,19 @@ impl LedgerSigner {
         }
 
         let mut data = Self::path_to_bytes(&self.derivation);
-        data.extend_from_slice(domain.separator().as_slice());
+        data.extend_from_slice(separator.as_slice());
         data.extend_from_slice(hash_struct.as_slice());
 
         self.sign_payload(INS::SIGN_ETH_EIP_712, &data).await
+    }
+
+    #[cfg(feature = "eip712")]
+    async fn sign_typed_data_(
+        &self,
+        hash_struct: &B256,
+        domain: &Eip712Domain,
+    ) -> Result<Signature, LedgerError> {
+        self.sign_typed_data_with_separator(hash_struct, &domain.separator()).await
     }
 
     /// Helper function for signing either transaction data, personal messages or EIP712 derived
