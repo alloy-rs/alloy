@@ -4,7 +4,7 @@ use alloy_eips::{
     eip2930::AccessList,
     eip7702::{constants::EIP7702_TX_TYPE_ID, SignedAuthorization},
 };
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -355,11 +355,7 @@ impl SignableTransaction<Signature> for TxEip7702 {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
-        self.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 

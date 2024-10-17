@@ -1,7 +1,6 @@
 use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType};
-use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -312,11 +311,7 @@ impl SignableTransaction<Signature> for TxEip2930 {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
-        self.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -391,7 +386,7 @@ mod tests {
 
         let tx = request.into_signed(signature);
 
-        let envelope = TxEnvelope::Eip2930(tx);
+        let envelope: TxEnvelope = tx.into();
 
         let mut encoded = Vec::new();
         envelope.encode(&mut encoded);

@@ -23,6 +23,11 @@ pub use self::optional::*;
 
 pub mod quantity;
 
+/// Serialization options for [`Sealed`].
+///
+/// [`Sealed`]: alloy_primitives::Sealed
+pub mod sealed;
+
 /// Storage related helpers.
 pub mod storage;
 pub use storage::JsonStorageKey;

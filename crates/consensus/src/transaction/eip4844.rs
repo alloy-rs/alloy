@@ -2,7 +2,7 @@ use crate::{EncodableSignature, SignableTransaction, Signed, Transaction, TxType
 
 use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip4844::DATA_GAS_PER_BLOB, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Address, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
+use alloy_primitives::{Address, Bytes, ChainId, Parity, Signature, TxKind, B256, U256};
 use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable, Header};
 use core::mem;
 
@@ -185,15 +185,15 @@ impl TxEip4844Variant {
         let header = Header::decode(&mut current_buf)?;
         if header.list {
             let tx = TxEip4844WithSidecar::decode_signed_fields(buf)?;
-            let (tx, signature, hash) = tx.into_parts();
-            return Ok(Signed::new_unchecked(tx.into(), signature, hash));
+            let (tx, signature) = tx.into_parts();
+            return Ok(Signed::new_unchecked(tx.into(), signature));
         }
 
         // Since there is not a second list header, this is a historical 4844 transaction without a
         // sidecar.
         let tx = TxEip4844::decode_signed_fields(buf)?;
-        let (tx, signature, hash) = tx.into_parts();
-        Ok(Signed::new_unchecked(tx.into(), signature, hash))
+        let (tx, signature) = tx.into_parts();
+        Ok(Signed::new_unchecked(tx.into(), signature))
     }
 }
 
@@ -329,13 +329,7 @@ impl SignableTransaction<Signature> for TxEip4844Variant {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let payload_length = 1 + self.fields_len() + signature.rlp_vrs_len();
-        let mut buf = Vec::with_capacity(payload_length);
-        // we use the inner tx to encode the fields
-        self.tx().encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -685,11 +679,7 @@ impl SignableTransaction<Signature> for TxEip4844 {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let mut buf = Vec::with_capacity(self.encoded_len_with_signature(&signature, false));
-        self.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -919,11 +909,11 @@ impl TxEip4844WithSidecar {
             });
         }
 
-        let (tx, signature, hash) = inner_tx.into_parts();
+        let (tx, signature) = inner_tx.into_parts();
 
         // create unchecked signed tx because these checks should have happened during construction
         // of `Signed<TxEip4844>` in `TxEip4844::decode_signed_fields`
-        Ok(Signed::new_unchecked(Self::from_tx_and_sidecar(tx, sidecar), signature, hash))
+        Ok(Signed::new_unchecked(Self::from_tx_and_sidecar(tx, sidecar), signature))
     }
 }
 
@@ -953,16 +943,7 @@ impl SignableTransaction<Signature> for TxEip4844WithSidecar {
         // signature.
         let signature = signature.with_parity_bool();
 
-        let mut buf = Vec::with_capacity(self.tx.encoded_len_with_signature(&signature, false));
-        // The sidecar is NOT included in the signed payload, only the transaction fields and the
-        // type byte. Include the type byte.
-        //
-        // Include the transaction fields, making sure to __not__ use the sidecar, and __not__
-        // encode a header.
-        self.tx.encode_with_signature(&signature, &mut buf, false);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        Signed::new_unchecked(self, signature)
     }
 }
 
@@ -1075,11 +1056,12 @@ mod tests {
         let actual_signed = tx.into_signed(signature);
 
         // the hashes should be the same
-        assert_eq!(expected_signed.hash(), actual_signed.hash());
 
         // convert to envelopes
         let expected_envelope: TxEnvelope = expected_signed.into();
         let actual_envelope: TxEnvelope = actual_signed.into();
+
+        assert_eq!(expected_envelope.tx_hash(), actual_envelope.tx_hash());
 
         // now encode the transaction and check the length
         let len = expected_envelope.length();
@@ -1124,9 +1106,9 @@ mod tests {
         )
         .unwrap();
 
-        let signed = variant.into_signed(signature);
+        let signed = TxEnvelope::from(variant.into_signed(signature));
         assert_eq!(
-            *signed.hash(),
+            signed.tx_hash(),
             b256!("93fc9daaa0726c3292a2e939df60f7e773c6a6a726a61ce43f4a217c64d85e87")
         );
     }

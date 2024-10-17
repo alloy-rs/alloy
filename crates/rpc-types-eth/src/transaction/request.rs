@@ -934,7 +934,7 @@ impl From<TxEnvelope> for TransactionRequest {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
+                    let tx: Self = tx.into_inner().strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -944,14 +944,14 @@ impl From<TxEnvelope> for TransactionRequest {
 
                 #[cfg(not(feature = "k256"))]
                 {
-                    tx.strip_signature().into()
+                    tx.into_inner().strip_signature().into()
                 }
             }
             TxEnvelope::Eip2930(tx) => {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
+                    let tx: Self = tx.into_inner().strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -961,14 +961,14 @@ impl From<TxEnvelope> for TransactionRequest {
 
                 #[cfg(not(feature = "k256"))]
                 {
-                    tx.strip_signature().into()
+                    tx.into_inner().strip_signature().into()
                 }
             }
             TxEnvelope::Eip1559(tx) => {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
+                    let tx: Self = tx.into_inner().strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -978,14 +978,14 @@ impl From<TxEnvelope> for TransactionRequest {
 
                 #[cfg(not(feature = "k256"))]
                 {
-                    tx.strip_signature().into()
+                    tx.into_inner().strip_signature().into()
                 }
             }
             TxEnvelope::Eip4844(tx) => {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
+                    let tx: Self = tx.into_inner().strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -995,14 +995,14 @@ impl From<TxEnvelope> for TransactionRequest {
 
                 #[cfg(not(feature = "k256"))]
                 {
-                    tx.strip_signature().into()
+                    tx.into_inner().strip_signature().into()
                 }
             }
             TxEnvelope::Eip7702(tx) => {
                 #[cfg(feature = "k256")]
                 {
                     let from = tx.recover_signer().ok();
-                    let tx: Self = tx.strip_signature().into();
+                    let tx: Self = tx.into_inner().strip_signature().into();
                     if let Some(from) = from {
                         tx.from(from)
                     } else {
@@ -1012,7 +1012,7 @@ impl From<TxEnvelope> for TransactionRequest {
 
                 #[cfg(not(feature = "k256"))]
                 {
-                    tx.strip_signature().into()
+                    tx.into_inner().strip_signature().into()
                 }
             }
             _ => Default::default(),
