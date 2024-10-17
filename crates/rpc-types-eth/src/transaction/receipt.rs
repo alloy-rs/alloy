@@ -70,7 +70,7 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     /// The post-transaction stateroot (pre Byzantium)
     ///
     /// EIP98 makes this optional field, if it's missing then skip serializing it
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none", rename = "root"))]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub state_root: Option<B256>,
     /// The authorization list is a list of tuples that store the address to code which the signer
     /// desires to execute in the context of their EOA.
