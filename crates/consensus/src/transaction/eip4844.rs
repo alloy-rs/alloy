@@ -65,14 +65,14 @@ impl<'de> serde::Deserialize<'de> for TxEip4844Variant {
 impl From<Signed<TxEip4844>> for Signed<TxEip4844Variant> {
     fn from(value: Signed<TxEip4844>) -> Self {
         let (tx, signature, hash) = value.into_parts();
-        Signed::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash)
+        Self::new_unchecked(TxEip4844Variant::TxEip4844(tx), signature, hash)
     }
 }
 
 impl From<Signed<TxEip4844WithSidecar>> for Signed<TxEip4844Variant> {
     fn from(value: Signed<TxEip4844WithSidecar>) -> Self {
         let (tx, signature, hash) = value.into_parts();
-        Signed::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
+        Self::new_unchecked(TxEip4844Variant::TxEip4844WithSidecar(tx), signature, hash)
     }
 }
 
@@ -238,42 +238,36 @@ impl RlpEcdsaTx for TxEip4844Variant {
 
     fn rlp_encoded_fields_length(&self) -> usize {
         match self {
-            TxEip4844Variant::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
-            TxEip4844Variant::TxEip4844WithSidecar(inner) => inner.rlp_encoded_fields_length(),
+            Self::TxEip4844(inner) => inner.rlp_encoded_fields_length(),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_fields_length(),
         }
     }
 
     fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
-            TxEip4844Variant::TxEip4844(inner) => inner.rlp_encode_fields(out),
-            TxEip4844Variant::TxEip4844WithSidecar(inner) => inner.rlp_encode_fields(out),
+            Self::TxEip4844(inner) => inner.rlp_encode_fields(out),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encode_fields(out),
         }
     }
 
     fn rlp_encoded_length(&self) -> usize {
         match self {
-            TxEip4844Variant::TxEip4844(inner) => inner.rlp_encoded_length(),
-            TxEip4844Variant::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length(),
+            Self::TxEip4844(inner) => inner.rlp_encoded_length(),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length(),
         }
     }
 
     fn rlp_encoded_length_with_signature(&self, signature: &Signature) -> usize {
         match self {
-            TxEip4844Variant::TxEip4844(inner) => {
-                inner.rlp_encoded_length_with_signature(signature)
-            }
-            TxEip4844Variant::TxEip4844WithSidecar(inner) => {
-                inner.rlp_encoded_length_with_signature(signature)
-            }
+            Self::TxEip4844(inner) => inner.rlp_encoded_length_with_signature(signature),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encoded_length_with_signature(signature),
         }
     }
 
     fn rlp_encode_signed(&self, signature: &Signature, out: &mut dyn BufMut) {
         match self {
-            TxEip4844Variant::TxEip4844(inner) => inner.rlp_encode_signed(signature, out),
-            TxEip4844Variant::TxEip4844WithSidecar(inner) => {
-                inner.rlp_encode_signed(signature, out)
-            }
+            Self::TxEip4844(inner) => inner.rlp_encode_signed(signature, out),
+            Self::TxEip4844WithSidecar(inner) => inner.rlp_encode_signed(signature, out),
         }
     }
 
@@ -291,8 +285,7 @@ impl RlpEcdsaTx for TxEip4844Variant {
         // To check these, we first try to decode the header. If it fails, we
         // know that the first byte was a header only by coincidence, and we
         // fall back to non-sidecar decoding
-        if Header::decode(needle).is_ok() {}
-        {
+        if Header::decode(needle).is_ok() {
             if let Ok(tx) = TxEip4844WithSidecar::rlp_decode_fields(trial) {
                 *buf = *trial;
                 return Ok(tx.into());
@@ -302,10 +295,8 @@ impl RlpEcdsaTx for TxEip4844Variant {
     }
 
     fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        dbg!(alloy_primitives::hex::encode(&buf[..10]));
         let header = Header::decode(buf)?;
         if !header.list {
-            dbg!("this one");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
         let remaining_len = buf.len();
@@ -904,7 +895,6 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
         let header = Header::decode(buf)?;
         if !header.list {
-            dbg!("here");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
         let remaining_len = buf.len();
