@@ -67,11 +67,6 @@ pub struct TransactionReceipt<T = ReceiptEnvelope<Log>> {
     pub to: Option<Address>,
     /// Contract address created, or None if not a deployment.
     pub contract_address: Option<Address>,
-    /// The post-transaction stateroot (pre Byzantium)
-    ///
-    /// EIP98 makes this optional field, if it's missing then skip serializing it
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub state_root: Option<B256>,
     /// The authorization list is a list of tuples that store the address to code which the signer
     /// desires to execute in the context of their EOA.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
@@ -134,7 +129,6 @@ impl<T> TransactionReceipt<T> {
             from: self.from,
             to: self.to,
             contract_address: self.contract_address,
-            state_root: self.state_root,
             authorization_list: self.authorization_list,
         }
     }
@@ -204,7 +198,7 @@ impl<T: TxReceipt<Log>> ReceiptResponse for TransactionReceipt<T> {
     }
 
     fn state_root(&self) -> Option<B256> {
-        self.state_root
+        self.inner.status_or_post_state().as_post_state()
     }
 }
 
