@@ -44,7 +44,7 @@ impl WsConnect {
     }
 
     /// Sets the websocket config.
-    pub fn with_config(mut self, config: WebSocketConfig) -> Self {
+    pub const fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
         self
     }
@@ -72,13 +72,9 @@ impl PubSubConnect for WsConnect {
     async fn connect(&self) -> TransportResult<alloy_pubsub::ConnectionHandle> {
         let request = self.clone().into_client_request();
         let req = request.map_err(TransportErrorKind::custom)?;
-        let (socket, _) = tokio_tungstenite::connect_async_with_config(
-            req,
-            Some(self.config.unwrap_or_default()),
-            false,
-        )
-        .await
-        .map_err(TransportErrorKind::custom)?;
+        let (socket, _) = tokio_tungstenite::connect_async_with_config(req, self.config, false)
+            .await
+            .map_err(TransportErrorKind::custom)?;
 
         let (handle, interface) = alloy_pubsub::ConnectionHandle::new();
         let backend = WsBackend { socket, interface };
