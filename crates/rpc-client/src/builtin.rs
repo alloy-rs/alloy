@@ -73,12 +73,11 @@ impl BuiltInConnectionString {
             )),
 
             #[cfg(all(not(target_arch = "wasm32"), feature = "ws"))]
-            Self::Ws(url, Some(auth)) => {
-                alloy_transport_ws::WsConnect::with_auth(url.clone(), Some(auth.clone()))
-                    .into_service()
-                    .await
-                    .map(alloy_transport::Transport::boxed)
-            }
+            Self::Ws(url, Some(auth)) => alloy_transport_ws::WsConnect::new(url.clone())
+                .with_auth(auth.clone())
+                .into_service()
+                .await
+                .map(alloy_transport::Transport::boxed),
 
             #[cfg(feature = "ws")]
             Self::Ws(url, _) => alloy_transport_ws::WsConnect::new(url.clone())
