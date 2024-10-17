@@ -275,6 +275,34 @@ impl BlobTransactionSidecar {
             self.commitments.len() * BYTES_PER_COMMITMENT + // commitments
             self.proofs.len() * BYTES_PER_PROOF // proofs
     }
+
+    /// Tries to create a new [`BlobTransactionSidecar`] from the given blobs.
+    #[cfg(all(feature = "kzg", any(test, feature = "arbitrary")))]
+    pub fn try_from_blobs(blobs: Vec<c_kzg::Blob>) -> Result<Self, c_kzg::Error> {
+        use crate::eip4844::env_settings::EnvKzgSettings;
+        use c_kzg::{KzgCommitment, KzgProof};
+
+        let kzg_settings = EnvKzgSettings::Default;
+
+        let commitments = blobs
+            .iter()
+            .map(|blob| {
+                KzgCommitment::blob_to_kzg_commitment(&blob.clone(), kzg_settings.get())
+                    .map(|blob| blob.to_bytes())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let proofs = blobs
+            .iter()
+            .zip(commitments.iter())
+            .map(|(blob, commitment)| {
+                KzgProof::compute_blob_kzg_proof(blob, commitment, kzg_settings.get())
+                    .map(|blob| blob.to_bytes())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Self::from_kzg(blobs, commitments, proofs))
+    }
 }
 
 impl Encodable for BlobTransactionSidecar {
