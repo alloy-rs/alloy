@@ -43,7 +43,7 @@ impl WsConnect {
         self
     }
 
-    /// Sets the websocket configuration.
+    /// Sets the websocket config.
     pub fn with_config(mut self, config: WebSocketConfig) -> Self {
         self.config = Some(config);
         self
