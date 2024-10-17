@@ -1,6 +1,6 @@
 use crate::{SignableTransaction, Signed};
 use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
-use alloy_primitives::{keccak256, Parity, Signature};
+use alloy_primitives::{keccak256, Parity, Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Header};
 
 /// Helper trait for managing RLP encoding of transactions inside 2718
@@ -105,8 +105,10 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Decodes the transaction from RLP bytes.
     fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        dbg!(alloy_primitives::hex::encode(&buf[..10]));
         let header = Header::decode(buf)?;
         if !header.list {
+            dbg!("tres");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
         let remaining_len = buf.len();
@@ -120,8 +122,10 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Decodes the transaction from RLP bytes, including the signature.
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
+        dbg!(alloy_primitives::hex::encode(&buf[..10]));
         let header = Header::decode(buf)?;
         if !header.list {
+            dbg!("quarto");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
 
@@ -190,5 +194,17 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
     /// flag.
     fn network_decode(buf: &mut &[u8]) -> Eip2718Result<Signed<Self>> {
         Self::network_decode_with_type(buf, Self::DEFAULT_TX_TYPE)
+    }
+
+    /// Calculate the transaction hash for the given signature and type.
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> TxHash {
+        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(signature));
+        self.eip2718_encode_with_type(signature, ty, &mut buf);
+        keccak256(&buf)
+    }
+
+    /// Calculate the transaction hash for the given signature.
+    fn tx_hash(&self, signature: &Signature) -> TxHash {
+        self.tx_hash_with_type(signature, Self::DEFAULT_TX_TYPE)
     }
 }
