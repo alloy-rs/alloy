@@ -105,10 +105,8 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Decodes the transaction from RLP bytes.
     fn rlp_decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        dbg!(alloy_primitives::hex::encode(&buf[..10]));
         let header = Header::decode(buf)?;
         if !header.list {
-            dbg!("tres");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
         let remaining_len = buf.len();
@@ -122,10 +120,8 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
 
     /// Decodes the transaction from RLP bytes, including the signature.
     fn rlp_decode_with_signature(buf: &mut &[u8]) -> alloy_rlp::Result<(Self, Signature)> {
-        dbg!(alloy_primitives::hex::encode(&buf[..10]));
         let header = Header::decode(buf)?;
         if !header.list {
-            dbg!("quarto");
             return Err(alloy_rlp::Error::UnexpectedString);
         }
 
@@ -134,7 +130,9 @@ pub trait RlpEcdsaTx: SignableTransaction<Signature> + Sized {
         let signature = Signature::decode_rlp_vrs(buf)?;
 
         if !matches!(signature.v(), Parity::Parity(_)) {
-            return Err(alloy_rlp::Error::Custom("invalid parity for typed transaction"));
+            return Err(alloy_rlp::Error::Custom(
+                "invalid parity for non-legacy typed transaction",
+            ));
         }
 
         if buf.len() + header.payload_length != remaining {
