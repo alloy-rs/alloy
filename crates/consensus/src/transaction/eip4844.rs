@@ -351,9 +351,9 @@ impl RlpEcdsaTx for TxEip4844Variant {
         TxEip4844::rlp_decode_with_signature(buf).map(|(tx, signature)| (tx.into(), signature))
     }
 
-    fn tx_hash(&self, signature: &Signature) -> alloy_primitives::TxHash {
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
         // eip4844 tx_hash is always based on the non-sidecar encoding
-        self.tx().tx_hash(signature)
+        self.tx().tx_hash_with_type(signature, ty)
     }
 }
 
@@ -919,8 +919,8 @@ impl RlpEcdsaTx for TxEip4844WithSidecar {
         Ok((Self { tx, sidecar }, signature))
     }
 
-    fn tx_hash(&self, signature: &Signature) -> alloy_primitives::TxHash {
-        self.tx.tx_hash(signature)
+    fn tx_hash_with_type(&self, signature: &Signature, ty: u8) -> alloy_primitives::TxHash {
+        self.tx.tx_hash_with_type(signature, ty)
     }
 }
 
