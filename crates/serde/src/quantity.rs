@@ -131,6 +131,70 @@ pub mod u128_vec_vec_opt {
     }
 }
 
+/// Serde functions for encoding a hashmap of primitive numbers using the Ethereum "quantity"
+/// format.
+///
+/// See [`quantity`](self) for more information.
+pub mod hashmap {
+    use super::private::ConvertRuint;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
+
+    /// Serializes a hashmap of primitive numbers as a "quantity" hex string.
+    pub fn serialize<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: ConvertRuint,
+        S: Serializer,
+    {
+        let vec = value.iter().copied().map(T::into_ruint).collect::<Vec<_>>();
+        vec.serialize(serializer)
+    }
+
+    /// Deserializes a hashmap of primitive numbers from a "quantity" hex string.
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        T: ConvertRuint,
+        D: Deserializer<'de>,
+    {
+        let vec = Vec::<T::Ruint>::deserialize(deserializer)?;
+        Ok(vec.into_iter().map(T::from_ruint).collect())
+    }
+}
+
+mod iter_map {
+    use crate::quantity::private::ConvertRuint;
+    use serde::{ser::SerializeMap, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<I, K, V, S>(values: I, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: ConvertRuint,
+        V: Serialize,
+        S: Serializer,
+    {
+        let mut iter = values.into_iter();
+        let mut map = serializer.serialize_map(iter.size_hint().1)?;
+        for (k, v) in iter {
+            map.serialize_entry(k.into_ruint(), &v)?;
+        }
+
+        map.end()
+    }
+
+    /// Deserializes a vector of primitive numbers from a "quantity" hex string.
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Vec<T>, D::Error>
+    where
+        T: ConvertRuint,
+        D: Deserializer<'de>,
+    {
+       deserializer.deserialize_map()
+
+        todo!()
+    }
+}
+
 /// Private implementation details of the [`quantity`](self) module.
 #[allow(unnameable_types)]
 mod private {
