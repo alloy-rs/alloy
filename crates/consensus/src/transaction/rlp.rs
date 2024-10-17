@@ -1,4 +1,5 @@
 use crate::{SignableTransaction, Signed};
+use alloc::vec::Vec;
 use alloy_eips::eip2718::{Eip2718Error, Eip2718Result};
 use alloy_primitives::{keccak256, Parity, Signature, TxHash};
 use alloy_rlp::{Buf, BufMut, Header};
