@@ -220,153 +220,166 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{ProviderBuilder, WalletProvider};
-
     use super::*;
+    use crate::{ext::test::async_ci_only, ProviderBuilder, WalletProvider};
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Geth, Reth};
     use alloy_primitives::{address, U256};
 
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     #[tokio::test]
     async fn test_debug_trace_transaction() {
-        init_tracing();
-        let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
-        let from = provider.default_signer_address();
+        async_ci_only(|| async move {
+            let provider = ProviderBuilder::new().with_recommended_fillers().on_anvil_with_wallet();
+            let from = provider.default_signer_address();
 
-        let gas_price = provider.get_gas_price().await.unwrap();
-        let tx = TransactionRequest::default()
-            .from(from)
-            .to(address!("deadbeef00000000deadbeef00000000deadbeef"))
-            .value(U256::from(100))
-            .max_fee_per_gas(gas_price + 1)
-            .max_priority_fee_per_gas(gas_price + 1);
-        let pending = provider.send_transaction(tx).await.unwrap();
-        let receipt = pending.get_receipt().await.unwrap();
+            let gas_price = provider.get_gas_price().await.unwrap();
+            let tx = TransactionRequest::default()
+                .from(from)
+                .to(address!("deadbeef00000000deadbeef00000000deadbeef"))
+                .value(U256::from(100))
+                .max_fee_per_gas(gas_price + 1)
+                .max_priority_fee_per_gas(gas_price + 1);
+            let pending = provider.send_transaction(tx).await.unwrap();
+            let receipt = pending.get_receipt().await.unwrap();
 
-        let hash = receipt.transaction_hash;
-        let trace_options = GethDebugTracingOptions::default();
+            let hash = receipt.transaction_hash;
+            let trace_options = GethDebugTracingOptions::default();
 
-        let trace = provider.debug_trace_transaction(hash, trace_options).await.unwrap();
+            let trace = provider.debug_trace_transaction(hash, trace_options).await.unwrap();
 
-        if let GethTrace::Default(trace) = trace {
-            assert_eq!(trace.gas, 21000)
-        }
+            if let GethTrace::Default(trace) = trace {
+                assert_eq!(trace.gas, 21000)
+            }
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_debug_trace_call() {
-        init_tracing();
-        let provider = ProviderBuilder::new().on_anvil_with_wallet();
-        let from = provider.default_signer_address();
-        let gas_price = provider.get_gas_price().await.unwrap();
-        let tx = TransactionRequest::default()
-            .from(from)
-            .with_input("0xdeadbeef")
-            .max_fee_per_gas(gas_price + 1)
-            .max_priority_fee_per_gas(gas_price + 1);
+        async_ci_only(|| async move {
+            let provider = ProviderBuilder::new().on_anvil_with_wallet();
+            let from = provider.default_signer_address();
+            let gas_price = provider.get_gas_price().await.unwrap();
+            let tx = TransactionRequest::default()
+                .from(from)
+                .with_input("0xdeadbeef")
+                .max_fee_per_gas(gas_price + 1)
+                .max_priority_fee_per_gas(gas_price + 1);
 
-        let trace = provider
-            .debug_trace_call(
-                tx,
-                BlockNumberOrTag::Latest.into(),
-                GethDebugTracingCallOptions::default(),
-            )
-            .await
-            .unwrap();
+            let trace = provider
+                .debug_trace_call(
+                    tx,
+                    BlockNumberOrTag::Latest.into(),
+                    GethDebugTracingCallOptions::default(),
+                )
+                .await
+                .unwrap();
 
-        if let GethTrace::Default(trace) = trace {
-            assert!(!trace.struct_logs.is_empty());
-        }
+            if let GethTrace::Default(trace) = trace {
+                assert!(!trace.struct_logs.is_empty());
+            }
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn call_debug_get_raw_header() {
-        run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("geth-test-", |temp_dir| async move {
+                let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-            let rlp_header = provider
-                .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
-                .await
-                .expect("debug_getRawHeader call should succeed");
+                let rlp_header = provider
+                    .debug_get_raw_header(BlockId::Number(BlockNumberOrTag::Latest))
+                    .await
+                    .expect("debug_getRawHeader call should succeed");
 
-            assert!(!rlp_header.is_empty());
+                assert!(!rlp_header.is_empty());
+            })
+            .await;
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
     async fn call_debug_get_raw_block() {
-        run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("geth-test-", |temp_dir| async move {
+                let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-            let rlp_block = provider
-                .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
-                .await
-                .expect("debug_getRawBlock call should succeed");
+                let rlp_block = provider
+                    .debug_get_raw_block(BlockId::Number(BlockNumberOrTag::Latest))
+                    .await
+                    .expect("debug_getRawBlock call should succeed");
 
-            assert!(!rlp_block.is_empty());
+                assert!(!rlp_block.is_empty());
+            })
+            .await;
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
     async fn call_debug_get_raw_receipts() {
-        run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("geth-test-", |temp_dir| async move {
+                let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-            let result =
-                provider.debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest)).await;
-            assert!(result.is_ok());
+                let result = provider
+                    .debug_get_raw_receipts(BlockId::Number(BlockNumberOrTag::Latest))
+                    .await;
+                assert!(result.is_ok());
+            })
+            .await;
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
     async fn call_debug_get_bad_blocks() {
-        run_with_tempdir("geth-test-", |temp_dir| async move {
-            let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("geth-test-", |temp_dir| async move {
+                let geth = Geth::new().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(geth.endpoint_url());
 
-            let result = provider.debug_get_bad_blocks().await;
-            assert!(result.is_ok());
+                let result = provider.debug_get_bad_blocks().await;
+                assert!(result.is_ok());
+            })
+            .await;
         })
-        .await
+        .await;
     }
 
     #[tokio::test]
     #[cfg(not(windows))]
     async fn debug_trace_call_many() {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider =
-                ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider =
+                    ProviderBuilder::new().with_recommended_fillers().on_http(reth.endpoint_url());
 
-            let tx1 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx1 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let tx2 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000456"))
-                .with_to(address!("0000000000000000000000000000000000000789"));
+                let tx2 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000456"))
+                    .with_to(address!("0000000000000000000000000000000000000789"));
 
-            let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
-            let state_context = StateContext::default();
-            let trace_options = GethDebugTracingCallOptions::default();
-            let result =
-                provider.debug_trace_call_many(bundles, state_context, trace_options).await;
-            assert!(result.is_ok());
+                let bundles = vec![Bundle { transactions: vec![tx1, tx2], block_override: None }];
+                let state_context = StateContext::default();
+                let trace_options = GethDebugTracingCallOptions::default();
+                let result =
+                    provider.debug_trace_call_many(bundles, state_context, trace_options).await;
+                assert!(result.is_ok());
 
-            let traces = result.unwrap();
-            assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 [
   [
     {
@@ -384,9 +397,11 @@ mod test {
   ]
 ]
 "#
-                .trim(),
-            );
+                    .trim(),
+                );
+            })
+            .await;
         })
-        .await
+        .await;
     }
 }

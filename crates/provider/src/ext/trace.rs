@@ -176,22 +176,16 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::ProviderBuilder;
+    use super::*;
+    use crate::{ext::test::async_ci_only, ProviderBuilder};
     use alloy_eips::BlockNumberOrTag;
     use alloy_network::TransactionBuilder;
     use alloy_node_bindings::{utils::run_with_tempdir, Reth};
     use alloy_primitives::address;
     use alloy_rpc_types_eth::TransactionRequest;
 
-    use super::*;
-
-    fn init_tracing() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     #[tokio::test]
     async fn trace_block() {
-        init_tracing();
         let provider = ProviderBuilder::new().on_anvil();
         let traces = provider.trace_block(BlockId::Number(BlockNumberOrTag::Latest)).await.unwrap();
         assert_eq!(traces.len(), 0);
@@ -200,21 +194,22 @@ mod test {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn trace_call() {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
-            assert!(result.is_ok());
+                let result = provider.trace_call(&tx, &[TraceType::Trace]).await;
+                assert!(result.is_ok());
 
-            let traces = result.unwrap();
-            assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 {
   "output": "0x",
   "stateDiff": null,
@@ -240,8 +235,10 @@ mod test {
   "vmTrace": null
 }
 "#
-                .trim(),
-            );
+                    .trim(),
+                );
+            })
+            .await;
         })
         .await;
     }
@@ -249,27 +246,28 @@ mod test {
     #[tokio::test]
     #[cfg(not(windows))]
     async fn trace_call_many() {
-        run_with_tempdir("reth-test-", |temp_dir| async move {
-            let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
-            let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
+        async_ci_only(|| async move {
+            run_with_tempdir("reth-test-", |temp_dir| async move {
+                let reth = Reth::new().dev().disable_discovery().data_dir(temp_dir).spawn();
+                let provider = ProviderBuilder::new().on_http(reth.endpoint_url());
 
-            let tx1 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000123"))
-                .with_to(address!("0000000000000000000000000000000000000456"));
+                let tx1 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000123"))
+                    .with_to(address!("0000000000000000000000000000000000000456"));
 
-            let tx2 = TransactionRequest::default()
-                .with_from(address!("0000000000000000000000000000000000000456"))
-                .with_to(address!("0000000000000000000000000000000000000789"));
+                let tx2 = TransactionRequest::default()
+                    .with_from(address!("0000000000000000000000000000000000000456"))
+                    .with_to(address!("0000000000000000000000000000000000000789"));
 
-            let result = provider
-                .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
-                .await;
-            assert!(result.is_ok());
+                let result = provider
+                    .trace_call_many(&[(tx1, &[TraceType::Trace]), (tx2, &[TraceType::Trace])])
+                    .await;
+                assert!(result.is_ok());
 
-            let traces = result.unwrap();
-            assert_eq!(
-                serde_json::to_string_pretty(&traces).unwrap().trim(),
-                r#"
+                let traces = result.unwrap();
+                assert_eq!(
+                    serde_json::to_string_pretty(&traces).unwrap().trim(),
+                    r#"
 [
   {
     "output": "0x",
@@ -321,8 +319,10 @@ mod test {
   }
 ]
 "#
-                .trim()
-            );
+                    .trim()
+                );
+            })
+            .await;
         })
         .await;
     }
