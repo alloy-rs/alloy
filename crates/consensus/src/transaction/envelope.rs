@@ -10,7 +10,7 @@ use alloy_eips::{
     eip2930::AccessList,
 };
 use alloy_primitives::{Bytes, TxKind, B256};
-use alloy_rlp::{Decodable, Encodable, Header};
+use alloy_rlp::{Decodable, Encodable};
 use core::fmt;
 
 /// Ethereum `TransactionType` flags as specified in EIPs [2718], [1559], [2930],
@@ -280,15 +280,14 @@ impl TxEnvelope {
     }
 
     /// Return the length of the inner txn, including type byte length
-    pub fn rlp_payload_length(&self) -> usize {
-        let payload_length = match self {
-            Self::Legacy(t) => t.tx().fields_len() + t.signature().rlp_vrs_len(),
-            Self::Eip2930(t) => t.tx().rlp_encoded_fields_length() + t.signature().rlp_vrs_len(),
-            Self::Eip1559(t) => t.tx().rlp_encoded_fields_length() + t.signature().rlp_vrs_len(),
-            Self::Eip4844(t) => t.tx().rlp_encoded_fields_length() + t.signature().rlp_vrs_len(),
-            Self::Eip7702(t) => t.tx().rlp_encoded_fields_length() + t.signature().rlp_vrs_len(),
-        };
-        Header { list: true, payload_length }.length() + payload_length + !self.is_legacy() as usize
+    pub fn eip2718_encoded_length(&self) -> usize {
+        match self {
+            Self::Legacy(t) => t.eip2718_encoded_length(),
+            Self::Eip2930(t) => t.eip2718_encoded_length(),
+            Self::Eip1559(t) => t.eip2718_encoded_length(),
+            Self::Eip4844(t) => t.eip2718_encoded_length(),
+            Self::Eip7702(t) => t.eip2718_encoded_length(),
+        }
     }
 }
 
@@ -320,7 +319,7 @@ impl Decodable2718 for TxEnvelope {
     }
 
     fn fallback_decode(buf: &mut &[u8]) -> Eip2718Result<Self> {
-        Ok(TxLegacy::decode_signed_fields(buf)?.into())
+        TxLegacy::rlp_decode_signed(buf).map(Into::into).map_err(Into::into)
     }
 }
 
@@ -336,16 +335,13 @@ impl Encodable2718 for TxEnvelope {
     }
 
     fn encode_2718_len(&self) -> usize {
-        match self {
-            Self::Eip1559(tx) => tx.eip2718_encoded_length(),
-            _ => self.rlp_payload_length(),
-        }
+        self.eip2718_encoded_length()
     }
 
     fn encode_2718(&self, out: &mut dyn alloy_rlp::BufMut) {
         match self {
             // Legacy transactions have no difference between network and 2718
-            Self::Legacy(tx) => tx.tx().encode_with_signature_fields(tx.signature(), out),
+            Self::Legacy(tx) => tx.eip2718_encode(out),
             Self::Eip2930(tx) => {
                 tx.eip2718_encode(out);
             }
@@ -627,14 +623,16 @@ mod tests {
     fn test_decode_live_legacy_tx() {
         use alloy_primitives::address;
 
-        let raw_tx = alloy_primitives::hex::decode("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8").unwrap();
-        let res = TxEnvelope::decode(&mut raw_tx.as_slice()).unwrap();
+        let raw_tx = alloy_primitives::bytes!("f9015482078b8505d21dba0083022ef1947a250d5630b4cf539739df2c5dacb4c659f2488d880c46549a521b13d8b8e47ff36ab50000000000000000000000000000000000000000000066ab5a608bd00a23f2fe000000000000000000000000000000000000000000000000000000000000008000000000000000000000000048c04ed5691981c42154c6167398f95e8f38a7ff00000000000000000000000000000000000000000000000000000000632ceac70000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000006c6ee5e31d828de241282b9606c8e98ea48526e225a0c9077369501641a92ef7399ff81c21639ed4fd8fc69cb793cfa1dbfab342e10aa0615facb2f1bcf3274a354cfe384a38d0cc008a11c2dd23a69111bc6930ba27a8");
+        let res = TxEnvelope::decode_2718(&mut raw_tx.as_ref()).unwrap();
         assert_eq!(res.tx_type(), TxType::Legacy);
 
         let tx = match res {
             TxEnvelope::Legacy(tx) => tx,
             _ => unreachable!(),
         };
+
+        assert_eq!(tx.tx().chain_id(), Some(1));
 
         assert_eq!(tx.tx().to, TxKind::Call(address!("7a250d5630B4cF539739dF2C5dAcb4c659F2488D")));
         assert_eq!(
