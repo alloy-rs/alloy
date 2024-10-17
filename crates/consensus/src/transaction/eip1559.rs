@@ -1,8 +1,7 @@
 use crate::{transaction::RlpEcdsaTx, SignableTransaction, Signed, Transaction, TxType};
-use alloc::vec::Vec;
 use alloy_eips::{eip2930::AccessList, eip7702::SignedAuthorization};
-use alloy_primitives::{keccak256, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable, Header};
+use alloy_primitives::{Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
 /// A transaction with a priority fee ([EIP-1559](https://eips.ethereum.org/EIPS/eip-1559)).
@@ -89,9 +88,9 @@ impl TxEip1559 {
         }
     }
 
-    /// Get transaction type
+    /// Get the transaction type
     #[doc(alias = "transaction_type")]
-    pub(crate) const fn default_tx_type() -> TxType {
+    pub(crate) const fn tx_type() -> TxType {
         TxType::Eip1559
     }
 
@@ -112,7 +111,7 @@ impl TxEip1559 {
 }
 
 impl RlpEcdsaTx for TxEip1559 {
-    const DEFAULT_TX_TYPE: u8 = { Self::default_tx_type() as u8 };
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
     /// Outputs the length of the transaction's fields, without a RLP header.
     fn rlp_encoded_fields_length(&self) -> usize {
@@ -240,7 +239,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        out.put_u8(Self::default_tx_type() as u8);
+        out.put_u8(Self::tx_type() as u8);
         self.encode(out)
     }
 
@@ -253,12 +252,8 @@ impl SignableTransaction<Signature> for TxEip1559 {
         // combination for an EIP-1559 transaction. V should indicate the y-parity of the
         // signature.
         let signature = signature.with_parity_bool();
-
-        let mut buf = Vec::with_capacity(self.eip2718_encoded_length(&signature));
-        self.eip2718_encode(&signature, &mut buf);
-        let hash = keccak256(&buf);
-
-        Signed::new_unchecked(self, signature, hash)
+        let tx_hash = self.tx_hash(&signature);
+        Signed::new_unchecked(self, signature, tx_hash)
     }
 }
 
@@ -268,8 +263,7 @@ impl Encodable for TxEip1559 {
     }
 
     fn length(&self) -> usize {
-        let payload_length = self.rlp_encoded_fields_length();
-        Header { list: true, payload_length }.length() + payload_length
+        self.rlp_encoded_length()
     }
 }
 
