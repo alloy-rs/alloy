@@ -14,7 +14,7 @@ use std::sync::Arc;
 /// A trait that determines the behavior of filling nonces.
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
+pub trait NonceManager: Send + Sync + std::fmt::Debug {
     /// Get the next nonce for the given account.
     async fn get_next_nonce<P, T, N>(&self, provider: &P, address: Address) -> TransportResult<u64>
     where
@@ -29,7 +29,7 @@ pub trait NonceManager: Clone + Send + Sync + std::fmt::Debug {
 /// Unlike [`CachedNonceManager`], this implementation does not store the transaction count locally,
 /// which results in more frequent calls to the provider, but it is more resilient to chain
 /// reorganizations.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct SimpleNonceManager;
 
@@ -54,7 +54,7 @@ impl NonceManager for SimpleNonceManager {
 ///
 /// There is also an alternative implementation [`SimpleNonceManager`] that does not store the
 /// transaction count locally.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct CachedNonceManager {
     nonces: DashMap<Address, Arc<Mutex<u64>>>,
 }
@@ -116,7 +116,7 @@ impl NonceManager for CachedNonceManager {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct NonceFiller<M: NonceManager = SimpleNonceManager> {
     nonce_manager: M,
 }

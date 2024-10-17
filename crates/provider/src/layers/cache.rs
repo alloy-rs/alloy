@@ -45,6 +45,19 @@ impl CacheLayer {
     }
 }
 
+impl<'a, P, T, N> ProviderLayer<P, T, N> for &'a CacheLayer
+where
+    P: Provider<T, N>,
+    T: Transport + Clone,
+    N: Network,
+{
+    type Provider = CacheProvider<P, T, N>;
+
+    fn layer(self, inner: P) -> Self::Provider {
+        CacheProvider::new(inner, self.cache())
+    }
+}
+
 impl<P, T, N> ProviderLayer<P, T, N> for CacheLayer
 where
     P: Provider<T, N>,
@@ -53,7 +66,7 @@ where
 {
     type Provider = CacheProvider<P, T, N>;
 
-    fn layer(&self, inner: P) -> Self::Provider {
+    fn layer(self, inner: P) -> Self::Provider {
         CacheProvider::new(inner, self.cache())
     }
 }

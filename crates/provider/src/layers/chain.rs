@@ -25,6 +25,24 @@ impl From<NamedChain> for ChainLayer {
     }
 }
 
+impl<'a, P, T> ProviderLayer<P, T, Ethereum> for &'a ChainLayer
+where
+    P: Provider<T>,
+    T: Transport + Clone,
+{
+    type Provider = P;
+
+    fn layer(self, inner: P) -> Self::Provider {
+        if !inner.client().is_local() {
+            if let Some(avg_block_time) = self.average_blocktime_hint() {
+                let poll_interval = avg_block_time.mul_f32(0.6);
+                inner.client().set_poll_interval(poll_interval);
+            }
+        }
+        inner
+    }
+}
+
 impl<P, T> ProviderLayer<P, T, Ethereum> for ChainLayer
 where
     P: Provider<T>,
@@ -32,7 +50,7 @@ where
 {
     type Provider = P;
 
-    fn layer(&self, inner: P) -> Self::Provider {
+    fn layer(self, inner: P) -> Self::Provider {
         if !inner.client().is_local() {
             if let Some(avg_block_time) = self.average_blocktime_hint() {
                 let poll_interval = avg_block_time.mul_f32(0.6);

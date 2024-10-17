@@ -21,7 +21,7 @@ pub trait ProviderLayer<P: Provider<T, N>, T: Transport + Clone, N: Network = Et
     type Provider: Provider<T, N>;
 
     /// Wrap the given provider in the layer's provider.
-    fn layer(&self, inner: P) -> Self::Provider;
+    fn layer(self, inner: P) -> Self::Provider;
 }
 
 /// An identity layer that does nothing.
@@ -57,6 +57,19 @@ where
     }
 }
 
+impl<'a, P, T, N> ProviderLayer<P, T, N> for &'a Identity
+where
+    T: Transport + Clone,
+    N: Network,
+    P: Provider<T, N>,
+{
+    type Provider = P;
+
+    fn layer(self, inner: P) -> Self::Provider {
+        inner
+    }
+}
+
 impl<P, T, N> ProviderLayer<P, T, N> for Identity
 where
     T: Transport + Clone,
@@ -65,7 +78,7 @@ where
 {
     type Provider = P;
 
-    fn layer(&self, inner: P) -> Self::Provider {
+    fn layer(self, inner: P) -> Self::Provider {
         inner
     }
 }
@@ -84,6 +97,27 @@ impl<Inner, Outer> Stack<Inner, Outer> {
     }
 }
 
+impl<'a, P, T, N, Inner, Outer> ProviderLayer<P, T, N> for &'a Stack<Inner, Outer>
+where
+    T: Transport + Clone,
+    N: Network,
+    P: Provider<T, N>,
+    &'a Inner: ProviderLayer<P, T, N>,
+    &'a Outer: ProviderLayer<<&'a Inner as ProviderLayer<P, T, N>>::Provider, T, N>,
+{
+    type Provider = <&'a Outer as ProviderLayer<
+        <&'a Inner as ProviderLayer<P, T, N>>::Provider,
+        T,
+        N,
+    >>::Provider;
+
+    fn layer(self, provider: P) -> Self::Provider {
+        let inner = self.inner.layer(provider);
+
+        self.outer.layer(inner)
+    }
+}
+
 impl<P, T, N, Inner, Outer> ProviderLayer<P, T, N> for Stack<Inner, Outer>
 where
     T: Transport + Clone,
@@ -94,7 +128,7 @@ where
 {
     type Provider = Outer::Provider;
 
-    fn layer(&self, provider: P) -> Self::Provider {
+    fn layer(self, provider: P) -> Self::Provider {
         let inner = self.inner.layer(provider);
 
         self.outer.layer(inner)
