@@ -271,17 +271,13 @@ impl SignableTransaction<Signature> for TxLegacy {
     }
 
     fn encode_for_signing(&self, out: &mut dyn BufMut) {
-        let mut v = vec![];
-
         Header {
             list: true,
             payload_length: self.rlp_encoded_fields_length() + self.eip155_fields_len(),
         }
-        .encode(&mut v);
-        self.rlp_encode_fields(&mut v);
-        self.encode_eip155_signing_fields(&mut v);
-
-        out.put_slice(v.as_slice());
+        .encode(out);
+        self.rlp_encode_fields(out);
+        self.encode_eip155_signing_fields(out);
     }
 
     fn payload_len_for_signature(&self) -> usize {
