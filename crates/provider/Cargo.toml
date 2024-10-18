@@ -91,6 +91,7 @@ tower-http = { workspace = true, features = [
 http-body-util.workspace = true
 http.workspace = true
 alloy-rpc-types-engine = { workspace = true, features = ["jwt"] }
+ci_info.workspace = true
 
 [features]
 default = ["reqwest", "reqwest-default-tls"]
