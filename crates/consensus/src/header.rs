@@ -9,9 +9,7 @@ use alloy_eips::{
 use alloy_primitives::{
     keccak256, Address, BlockNumber, Bloom, Bytes, Sealable, Sealed, B256, B64, U256,
 };
-use alloy_rlp::{
-    length_of_length, Buf, BufMut, Decodable, Encodable, EMPTY_LIST_CODE, EMPTY_STRING_CODE,
-};
+use alloy_rlp::{length_of_length, BufMut, Decodable, Encodable};
 use core::mem;
 
 /// Ethereum Block header
@@ -275,50 +273,29 @@ impl Header {
         length += self.nonce.length();
 
         if let Some(base_fee) = self.base_fee_per_gas {
+            // Adding base fee length if it exists.
             length += U256::from(base_fee).length();
-        } else if self.withdrawals_root.is_some()
-            || self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            length += 1; // EMPTY LIST CODE
         }
 
         if let Some(root) = self.withdrawals_root {
+            // Adding withdrawals_root length if it exists.
             length += root.length();
-        } else if self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            length += 1; // EMPTY STRING CODE
         }
 
         if let Some(blob_gas_used) = self.blob_gas_used {
+            // Adding blob_gas_used length if it exists.
             length += U256::from(blob_gas_used).length();
-        } else if self.excess_blob_gas.is_some() || self.parent_beacon_block_root.is_some() {
-            length += 1; // EMPTY LIST CODE
         }
 
         if let Some(excess_blob_gas) = self.excess_blob_gas {
+            // Adding excess_blob_gas length if it exists.
             length += U256::from(excess_blob_gas).length();
-        } else if self.parent_beacon_block_root.is_some() {
-            length += 1; // EMPTY LIST CODE
         }
 
-        // Encode parent beacon block root length.
         if let Some(parent_beacon_block_root) = self.parent_beacon_block_root {
             length += parent_beacon_block_root.length();
         }
 
-        // Encode requests hash length.
-        //
-        // If new fields are added, the above pattern will
-        // need to be repeated and placeholder length added. Otherwise, it's impossible to
-        // tell _which_ fields are missing. This is mainly relevant for contrived cases
-        // where a header is created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
         if let Some(requests_hash) = self.requests_hash {
             length += requests_hash.length();
         }
@@ -392,59 +369,27 @@ impl Encodable for Header {
         self.mix_hash.encode(out);
         self.nonce.encode(out);
 
-        // Encode base fee. Put empty list if base fee is missing,
-        // but withdrawals root is present.
+        // Encode all the fork specific fields
         if let Some(ref base_fee) = self.base_fee_per_gas {
             U256::from(*base_fee).encode(out);
-        } else if self.withdrawals_root.is_some()
-            || self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode withdrawals root. Put empty string if withdrawals root is missing,
-        // but blob gas used is present.
         if let Some(ref root) = self.withdrawals_root {
             root.encode(out);
-        } else if self.blob_gas_used.is_some()
-            || self.excess_blob_gas.is_some()
-            || self.parent_beacon_block_root.is_some()
-        {
-            out.put_u8(EMPTY_STRING_CODE);
         }
 
-        // Encode blob gas used. Put empty list if blob gas used is missing,
-        // but excess blob gas is present.
         if let Some(ref blob_gas_used) = self.blob_gas_used {
             U256::from(*blob_gas_used).encode(out);
-        } else if self.excess_blob_gas.is_some() || self.parent_beacon_block_root.is_some() {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode excess blob gas. Put empty list if excess blob gas is missing,
-        // but parent beacon block root is present.
         if let Some(ref excess_blob_gas) = self.excess_blob_gas {
             U256::from(*excess_blob_gas).encode(out);
-        } else if self.parent_beacon_block_root.is_some() {
-            out.put_u8(EMPTY_LIST_CODE);
         }
 
-        // Encode parent beacon block root.
         if let Some(ref parent_beacon_block_root) = self.parent_beacon_block_root {
             parent_beacon_block_root.encode(out);
         }
 
-        // Encode requests hash.
-        //
-        // If new fields are added, the above pattern will need to
-        // be repeated and placeholders added. Otherwise, it's impossible to tell _which_
-        // fields are missing. This is mainly relevant for contrived cases where a header is
-        // created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
         if let Some(ref requests_hash) = self.requests_hash {
             requests_hash.encode(out);
         }
@@ -488,39 +433,22 @@ impl Decodable for Header {
             parent_beacon_block_root: None,
             requests_hash: None,
         };
-
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.base_fee_per_gas = Some(Decodable::decode(buf)?);
-            }
+            this.base_fee_per_gas = Some(u64::decode(buf)?);
         }
 
         // Withdrawals root for post-shanghai headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_STRING_CODE) {
-                buf.advance(1)
-            } else {
-                this.withdrawals_root = Some(Decodable::decode(buf)?);
-            }
+            this.withdrawals_root = Some(Decodable::decode(buf)?);
         }
 
         // Blob gas used and excess blob gas for post-cancun headers
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.blob_gas_used = Some(Decodable::decode(buf)?);
-            }
+            this.blob_gas_used = Some(u64::decode(buf)?);
         }
 
         if started_len - buf.len() < rlp_head.payload_length {
-            if buf.first().is_some_and(|b| *b == EMPTY_LIST_CODE) {
-                buf.advance(1)
-            } else {
-                this.excess_blob_gas = Some(Decodable::decode(buf)?);
-            }
+            this.excess_blob_gas = Some(u64::decode(buf)?);
         }
 
         // Decode parent beacon block root.
@@ -529,14 +457,6 @@ impl Decodable for Header {
         }
 
         // Decode requests hash.
-        //
-        // If new fields are added, the above pattern will need to
-        // be repeated and placeholders decoded. Otherwise, it's impossible to tell _which_
-        // fields are missing. This is mainly relevant for contrived cases where a header is
-        // created at random, for example:
-        //  * A header is created with a withdrawals root, but no base fee. Shanghai blocks are
-        //    post-London, so this is technically not valid. However, a tool like proptest would
-        //    generate a block like this.
         if started_len - buf.len() < rlp_head.payload_length {
             this.requests_hash = Some(B256::decode(buf)?);
         }
