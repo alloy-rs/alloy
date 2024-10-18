@@ -15,7 +15,13 @@ use crate::{
 /// 4. EIP4844 [`TxEip4844Variant`]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        from = "serde_from::MaybeTaggedTypedTransaction",
+        into = "serde_from::TaggedTypedTransaction"
+    )
+)]
 #[doc(alias = "TypedTx", alias = "TxTyped", alias = "TransactionTyped")]
 pub enum TypedTransaction {
     /// Legacy transaction
@@ -298,5 +304,81 @@ impl<T: From<TypedTransaction>> From<TypedTransaction> for alloy_serde::WithOthe
 impl<T: From<TxEnvelope>> From<TxEnvelope> for alloy_serde::WithOtherFields<T> {
     fn from(value: TxEnvelope) -> Self {
         Self::new(value.into())
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_from {
+    //! NB: Why do we need this?
+    //!
+    //! Because the tag may be missing, we need an abstraction over tagged (with
+    //! type) and untagged (always legacy). This is
+    //! [`MaybeTaggedTypedTransaction`].
+    //!
+    //! The tagged variant is [`TaggedTypedTransaction`], which always has a
+    //! type tag.
+    //!
+    //! We serialize via [`TaggedTypedTransaction`] and deserialize via
+    //! [`MaybeTaggedTypedTransaction`].
+    use crate::{TxEip1559, TxEip2930, TxEip4844Variant, TxEip7702, TxLegacy, TypedTransaction};
+
+    #[derive(Debug, serde::Deserialize)]
+    #[serde(untagged)]
+    pub(crate) enum MaybeTaggedTypedTransaction {
+        Tagged(TaggedTypedTransaction),
+        Untagged(TxLegacy),
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize)]
+    #[serde(tag = "type")]
+    pub(crate) enum TaggedTypedTransaction {
+        /// Legacy transaction
+        #[serde(rename = "0x00", alias = "0x0")]
+        Legacy(TxLegacy),
+        /// EIP-2930 transaction
+        #[serde(rename = "0x01", alias = "0x1")]
+        Eip2930(TxEip2930),
+        /// EIP-1559 transaction
+        #[serde(rename = "0x02", alias = "0x2")]
+        Eip1559(TxEip1559),
+        /// EIP-4844 transaction
+        #[serde(rename = "0x03", alias = "0x3")]
+        Eip4844(TxEip4844Variant),
+        /// EIP-7702 transaction
+        #[serde(rename = "0x04", alias = "0x4")]
+        Eip7702(TxEip7702),
+    }
+
+    impl From<MaybeTaggedTypedTransaction> for TypedTransaction {
+        fn from(value: MaybeTaggedTypedTransaction) -> Self {
+            match value {
+                MaybeTaggedTypedTransaction::Tagged(tagged) => tagged.into(),
+                MaybeTaggedTypedTransaction::Untagged(tx) => Self::Legacy(tx),
+            }
+        }
+    }
+
+    impl From<TaggedTypedTransaction> for TypedTransaction {
+        fn from(value: TaggedTypedTransaction) -> Self {
+            match value {
+                TaggedTypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TaggedTypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
+                TaggedTypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
+                TaggedTypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
+                TaggedTypedTransaction::Eip7702(signed) => Self::Eip7702(signed),
+            }
+        }
+    }
+
+    impl From<TypedTransaction> for TaggedTypedTransaction {
+        fn from(value: TypedTransaction) -> Self {
+            match value {
+                TypedTransaction::Legacy(signed) => Self::Legacy(signed),
+                TypedTransaction::Eip2930(signed) => Self::Eip2930(signed),
+                TypedTransaction::Eip1559(signed) => Self::Eip1559(signed),
+                TypedTransaction::Eip4844(signed) => Self::Eip4844(signed),
+                TypedTransaction::Eip7702(signed) => Self::Eip7702(signed),
+            }
+        }
     }
 }
