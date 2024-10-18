@@ -1,11 +1,11 @@
 use crate::Provider;
 use alloy_network::Network;
-use alloy_primitives::{BlockHash, B256};
+use alloy_primitives::{BlockHash, Bytes, B256};
 use alloy_rpc_types_engine::{
     ClientVersionV1, ExecutionPayloadBodiesV1, ExecutionPayloadEnvelopeV2,
     ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, ExecutionPayloadInputV2,
-    ExecutionPayloadV1, ExecutionPayloadV3, ExecutionPayloadV4, ForkchoiceState, ForkchoiceUpdated,
-    PayloadAttributes, PayloadId, PayloadStatus,
+    ExecutionPayloadV1, ExecutionPayloadV3, ForkchoiceState, ForkchoiceUpdated, PayloadAttributes,
+    PayloadId, PayloadStatus,
 };
 use alloy_transport::{Transport, TransportResult};
 
@@ -46,9 +46,10 @@ pub trait EngineApi<N, T>: Send + Sync {
     /// See also <https://github.com/ethereum/execution-apis/blob/03911ffc053b8b806123f1fc237184b0092a485a/src/engine/prague.md#engine_newpayloadv4>
     async fn new_payload_v4(
         &self,
-        payload: ExecutionPayloadV4,
+        payload: ExecutionPayloadV3,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus>;
 
     /// Updates the execution layer client with the given fork choice, as specified for the Paris
@@ -210,12 +211,16 @@ where
 
     async fn new_payload_v4(
         &self,
-        payload: ExecutionPayloadV4,
+        payload: ExecutionPayloadV3,
         versioned_hashes: Vec<B256>,
         parent_beacon_block_root: B256,
+        execution_requests: Vec<Bytes>,
     ) -> TransportResult<PayloadStatus> {
         self.client()
-            .request("engine_newPayloadV4", (payload, versioned_hashes, parent_beacon_block_root))
+            .request(
+                "engine_newPayloadV4",
+                (payload, versioned_hashes, parent_beacon_block_root, execution_requests),
+            )
             .await
     }
 

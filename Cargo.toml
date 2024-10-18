@@ -82,7 +82,7 @@ alloy-chains = { version = "0.1.18", default-features = false }
 
 # eips
 alloy-eip2930 = { version = "0.1.0", default-features = false }
-alloy-eip7702 = { version = "0.1.1", default-features = false }
+alloy-eip7702 = { version = "0.2.0", default-features = false }
 
 # ethereum
 ethereum_ssz_derive = "0.8"
