@@ -28,6 +28,8 @@ pub use jwt::*;
 pub mod payload;
 pub use payload::*;
 
+mod error;
+
 mod transition;
 pub use transition::*;
 
