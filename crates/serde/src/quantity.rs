@@ -63,10 +63,13 @@ pub mod opt {
 /// See [`quantity`](self) for more information.
 pub mod vec {
     use super::private::ConvertRuint;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
+    use core::{fmt, marker::PhantomData};
+    use serde::{
+        de::{SeqAccess, Visitor},
+        ser::SerializeSeq,
+        Deserializer, Serializer,
+    };
 
     /// Serializes a vector of primitive numbers as a "quantity" hex string.
     pub fn serialize<T, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
@@ -74,8 +77,11 @@ pub mod vec {
         T: ConvertRuint,
         S: Serializer,
     {
-        let vec = value.iter().copied().map(T::into_ruint).collect::<Vec<_>>();
-        vec.serialize(serializer)
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for val in value {
+            seq.serialize_element(&val.into_ruint())?;
+        }
+        seq.end()
     }
 
     /// Deserializes a vector of primitive numbers from a "quantity" hex string.
@@ -84,8 +90,35 @@ pub mod vec {
         T: ConvertRuint,
         D: Deserializer<'de>,
     {
-        let vec = Vec::<T::Ruint>::deserialize(deserializer)?;
-        Ok(vec.into_iter().map(T::from_ruint).collect())
+        struct VecVisitor<T> {
+            marker: PhantomData<T>,
+        }
+
+        impl<'de, T> Visitor<'de> for VecVisitor<T>
+        where
+            T: ConvertRuint,
+        {
+            type Value = Vec<T>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a sequence")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut values = Vec::<T>::with_capacity(seq.size_hint().unwrap_or(0));
+
+                while let Some(value) = seq.next_element::<T::Ruint>()? {
+                    values.push(T::from_ruint(value));
+                }
+                Ok(values)
+            }
+        }
+
+        let visitor = VecVisitor { marker: PhantomData };
+        deserializer.deserialize_seq(visitor)
     }
 }
 
