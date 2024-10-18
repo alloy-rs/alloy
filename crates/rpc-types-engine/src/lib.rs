@@ -13,6 +13,8 @@ extern crate alloc;
 
 mod cancun;
 pub use cancun::*;
+mod sidecar;
+pub use sidecar::*;
 
 mod forkchoice;
 pub use forkchoice::*;
