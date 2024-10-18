@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.1
 - Extract error types to new modules ([#1518](https://github.com/alloy-rs/alloy/issues/1518))
 - Remove 7685 request variants ([#1515](https://github.com/alloy-rs/alloy/issues/1515))
 

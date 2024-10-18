@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Miscellaneous Tasks
 
+- Release 0.5.1
 - Add empty requests constant ([#1519](https://github.com/alloy-rs/alloy/issues/1519))
 - Remove 7685 request variants ([#1515](https://github.com/alloy-rs/alloy/issues/1515))
 - Remove redundant cfgs ([#1516](https://github.com/alloy-rs/alloy/issues/1516))
