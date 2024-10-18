@@ -144,9 +144,9 @@ pub struct Header {
     /// EIP-4788 parent beacon block root
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub parent_beacon_block_root: Option<B256>,
-    /// EIP-7685 requests root.
+    /// EIP-7685 requests hash.
     #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
-    pub requests_root: Option<B256>,
+    pub requests_hash: Option<B256>,
 }
 
 impl Header {
@@ -199,7 +199,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             blob_gas_used,
             excess_blob_gas,
             parent_beacon_block_root,
-            requests_root,
+            requests_hash,
             // not included in the consensus header
             hash: _hash,
             total_difficulty: _total_difficulty,
@@ -224,7 +224,7 @@ impl TryFrom<Header> for alloy_consensus::Header {
             blob_gas_used,
             excess_blob_gas,
             parent_beacon_block_root,
-            requests_root,
+            requests_hash,
             extra_data,
         })
     }
@@ -442,7 +442,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
-                requests_root: None,
+                requests_hash: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
@@ -485,7 +485,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
-                requests_root: None,
+                requests_hash: None,
             },
             uncles: vec![],
             transactions: BlockTransactions::Uncle,
@@ -528,7 +528,7 @@ mod tests {
                 blob_gas_used: None,
                 excess_blob_gas: None,
                 parent_beacon_block_root: None,
-                requests_root: None,
+                requests_hash: None,
             },
             uncles: vec![B256::with_last_byte(17)],
             transactions: vec![B256::with_last_byte(18)].into(),
