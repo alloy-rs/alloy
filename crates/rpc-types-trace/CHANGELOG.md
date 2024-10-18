@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Bug Fixes
+
+- [types/filter] Treat empty filter address as non-matching  ([#1473](https://github.com/alloy-rs/alloy/issues/1473))
+
+### Features
+
+- Add helpers to configure GethDebugTracingOptions properly ([#1436](https://github.com/alloy-rs/alloy/issues/1436))
+
+### Miscellaneous Tasks
+
+- Refactor some match with same arms ([#1463](https://github.com/alloy-rs/alloy/issues/1463))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+
+### Other
+
+- Revert test: update test cases with addresses ([#1358](https://github.com/alloy-rs/alloy/issues/1358)) ([#1444](https://github.com/alloy-rs/alloy/issues/1444))
+- Replace assert_eq! with similar_asserts::assert_eq! ([#1429](https://github.com/alloy-rs/alloy/issues/1429))
+
+## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
+
 ## [0.4.1](https://github.com/alloy-rs/alloy/releases/tag/v0.4.1) - 2024-10-01
 
 ### Miscellaneous Tasks

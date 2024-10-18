@@ -5,7 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/alloy-rs/alloy/releases/tag/v0.5.0) - 2024-10-18
+
+### Bug Fixes
+
+- [`rpc-types-eth`] Receipt deser ([#1506](https://github.com/alloy-rs/alloy/issues/1506))
+- Use `requests_hash` ([#1508](https://github.com/alloy-rs/alloy/issues/1508))
+- Allow missing-tag deser of tx envelope ([#1489](https://github.com/alloy-rs/alloy/issues/1489))
+- Rename gas_limit to gas in serde def for txns ([#1486](https://github.com/alloy-rs/alloy/issues/1486))
+- Enforce correct parity for legacy transactions ([#1428](https://github.com/alloy-rs/alloy/issues/1428))
+
+### Features
+
+- From impl for variant ([#1488](https://github.com/alloy-rs/alloy/issues/1488))
+- `Encodable2718::network_len` ([#1431](https://github.com/alloy-rs/alloy/issues/1431))
+
+### Miscellaneous Tasks
+
+- Flatten eip-7685 requests into a single opaque list ([#1383](https://github.com/alloy-rs/alloy/issues/1383))
+- Rename requests root to requests hash ([#1379](https://github.com/alloy-rs/alloy/issues/1379))
+- [consensus] Test use Vec::with_capacity ([#1476](https://github.com/alloy-rs/alloy/issues/1476))
+- Some lifetime simplifications ([#1467](https://github.com/alloy-rs/alloy/issues/1467))
+- Some small improvements ([#1461](https://github.com/alloy-rs/alloy/issues/1461))
+- Apply same member order ([#1408](https://github.com/alloy-rs/alloy/issues/1408))
+
+### Other
+
+- Rm redundant root hash definitions ([#1501](https://github.com/alloy-rs/alloy/issues/1501))
+- Add more constraints to `TxReceipt` trait ([#1478](https://github.com/alloy-rs/alloy/issues/1478))
+- Replace `to` by `kind` in Transaction trait ([#1484](https://github.com/alloy-rs/alloy/issues/1484))
+
+### Refactor
+
+- Change input output to Bytes ([#1487](https://github.com/alloy-rs/alloy/issues/1487))
+
 ## [0.4.2](https://github.com/alloy-rs/alloy/releases/tag/v0.4.2) - 2024-10-01
+
+### Miscellaneous Tasks
+
+- Release 0.4.2
 
 ### Styling
 
