@@ -10,7 +10,6 @@ use alloy_rlp::{Decodable, Encodable};
 #[cfg(any(test, feature = "arbitrary"))]
 use crate::eip4844::MAX_BLOBS_PER_BLOCK;
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 /// The versioned hash version for KZG.
