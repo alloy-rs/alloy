@@ -2,9 +2,7 @@
 //!
 //! [EIP-2718]: https://eips.ethereum.org/EIPS/eip-2718
 
-#[cfg(not(feature = "std"))]
-use crate::alloc::{vec, vec::Vec};
-
+use crate::alloc::vec::Vec;
 use alloy_primitives::{keccak256, Sealed, B256};
 use alloy_rlp::{Buf, BufMut, Header, EMPTY_STRING_CODE};
 use core::{
