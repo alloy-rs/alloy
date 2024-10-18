@@ -30,9 +30,6 @@ pub use receipt::{
     TxReceipt,
 };
 
-mod request;
-pub use request::{Request, Requests};
-
 pub mod transaction;
 #[cfg(feature = "kzg")]
 pub use transaction::BlobTransactionValidationError;

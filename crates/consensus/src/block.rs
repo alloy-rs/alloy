@@ -1,6 +1,6 @@
-//! Genesic Block Type
+//! Block Type
 
-use crate::{Header, Requests};
+use crate::Header;
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawal;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
@@ -32,8 +32,6 @@ pub struct BlockBody<T> {
     pub ommers: Vec<Header>,
     /// Block withdrawals.
     pub withdrawals: Option<Vec<Withdrawal>>,
-    /// Block requests
-    pub requests: Option<Requests>,
 }
 
 /// We need to implement RLP traits manually because we currently don't have a way to flatten
@@ -48,7 +46,6 @@ mod block_rlp {
         transactions: Vec<T>,
         ommers: Vec<Header>,
         withdrawals: Option<Vec<Withdrawal>>,
-        requests: Option<Requests>,
     }
 
     #[derive(RlpEncodable)]
@@ -58,20 +55,12 @@ mod block_rlp {
         transactions: &'a Vec<T>,
         ommers: &'a Vec<Header>,
         withdrawals: Option<&'a Vec<Withdrawal>>,
-        requests: Option<&'a Requests>,
     }
 
     impl<'a, T> From<&'a Block<T>> for HelperRef<'a, T> {
         fn from(block: &'a Block<T>) -> Self {
-            let Block { header, body: BlockBody { transactions, ommers, withdrawals, requests } } =
-                block;
-            Self {
-                header,
-                transactions,
-                ommers,
-                withdrawals: withdrawals.as_ref(),
-                requests: requests.as_ref(),
-            }
+            let Block { header, body: BlockBody { transactions, ommers, withdrawals } } = block;
+            Self { header, transactions, ommers, withdrawals: withdrawals.as_ref() }
         }
     }
 
@@ -89,8 +78,8 @@ mod block_rlp {
 
     impl<T: Decodable> Decodable for Block<T> {
         fn decode(b: &mut &[u8]) -> alloy_rlp::Result<Self> {
-            let Helper { header, transactions, ommers, withdrawals, requests } = Helper::decode(b)?;
-            Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals, requests } })
+            let Helper { header, transactions, ommers, withdrawals } = Helper::decode(b)?;
+            Ok(Self { header, body: BlockBody { transactions, ommers, withdrawals } })
         }
     }
 }
