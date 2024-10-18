@@ -29,6 +29,7 @@ pub mod payload;
 pub use payload::*;
 
 mod error;
+pub use error::*;
 
 mod transition;
 pub use transition::*;

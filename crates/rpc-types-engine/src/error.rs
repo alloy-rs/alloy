@@ -1,4 +1,4 @@
-//! Error
+//! Error variants when validating an execution payload.
 
 use alloy_primitives::{Bytes, B256, U256};
 
@@ -19,10 +19,10 @@ pub enum PayloadError {
     ExcessBlobGas(U256),
     /// withdrawals present in pre-shanghai payload.
     #[display("withdrawals present in pre-shanghai payload")]
-    PreShanghaiBlockWithWitdrawals,
+    PreShanghaiBlockWithWithdrawals,
     /// withdrawals missing in post-shanghai payload.
     #[display("withdrawals missing in post-shanghai payload")]
-    PostShanghaiBlockWithoutWitdrawals,
+    PostShanghaiBlockWithoutWithdrawals,
     /// blob transactions present in pre-cancun payload.
     #[display("blob transactions present in pre-cancun payload")]
     PreCancunBlockWithBlobTransactions,
@@ -98,3 +98,27 @@ impl PayloadError {
         matches!(self, Self::InvalidVersionedHashes)
     }
 }
+
+/// Various errors that can occur when validating a payload or forkchoice update.
+///
+/// This is intended for the [PayloadStatusEnum::Invalid](crate::PayloadStatusEnum) variant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, derive_more::Display)]
+pub enum PayloadValidationError {
+    /// Thrown when a forkchoice update's head links to a previously rejected payload.
+    #[display("links to previously rejected block")]
+    LinksToRejectedPayload,
+    /// Thrown when a new payload contains a wrong block number.
+    #[display("invalid block number")]
+    InvalidBlockNumber,
+    /// Thrown when a new payload contains a wrong state root
+    #[display("invalid merkle root: (remote: {remote:?} local: {local:?})")]
+    InvalidStateRoot {
+        /// The state root of the payload we received from remote (CL)
+        remote: B256,
+        /// The state root of the payload that we computed locally.
+        local: B256,
+    },
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for PayloadValidationError {}
