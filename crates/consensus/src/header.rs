@@ -538,7 +538,7 @@ impl Decodable for Header {
         //    post-London, so this is technically not valid. However, a tool like proptest would
         //    generate a block like this.
         if started_len - buf.len() < rlp_head.payload_length {
-            this.parent_beacon_block_root = Some(B256::decode(buf)?);
+            this.requests_hash = Some(B256::decode(buf)?);
         }
 
         let consumed = started_len - buf.len();
@@ -943,6 +943,7 @@ pub(super) mod serde_bincode_compat {
 #[cfg(all(test, feature = "serde"))]
 mod tests {
     use super::*;
+    use alloy_primitives::b256;
 
     #[test]
     fn test_header_serde_json_roundtrip() {
@@ -970,5 +971,15 @@ mod tests {
 
         // Check that the decoded RLP data matches the original header data
         assert_eq!(decoded_rlp, decoded);
+    }
+
+    #[test]
+    fn serde_rlp_prague() {
+        // Note: Some fields are renamed from eth_getHeaderByHash
+        let raw = r#"{"baseFeePerGas":"0x7","blobGasUsed":"0x20000","difficulty":"0x0","excessBlobGas":"0x40000","extraData":"0xd883010e0c846765746888676f312e32332e32856c696e7578","gasLimit":"0x1c9c380","gasUsed":"0x5208","hash":"0x661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","beneficiary":"0xf97e180c050e5ab072211ad2c213eb5aee4df134","mixHash":"0xe6d9c084dd36560520d5776a5387a82fb44793c9cd1b69afb61d53af29ee64b0","nonce":"0x0000000000000000","number":"0x315","parentBeaconBlockRoot":"0xd0bdb48ab45028568e66c8ddd600ac4c2a52522714bbfbf00ea6d20ba40f3ae2","parentHash":"0x60f1563d2c572116091a4b91421d8d972118e39604d23455d841f9431cea4b6a","receiptsRoot":"0xeaa8c40899a61ae59615cf9985f5e2194f8fd2b57d273be63bde6733e89b12ab","requestsHash":"0x6036c41849da9c076ed79654d434017387a88fb833c2856b32e18218b3341c5f","ommersHash":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","stateRoot":"0x8101d88f2761eb9849634740f92fe09735551ad5a4d5e9da9bcae1ef4726a475","timestamp":"0x6712ba6e","transactionsRoot":"0xf543eb3d405d2d6320344d348b06703ff1abeef71288181a24061e53f89bb5ef","withdrawalsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"}
+"#;
+        let header = serde_json::from_str::<Header>(raw).unwrap();
+        let hash = header.hash_slow();
+        assert_eq!(hash, b256!("661da523f3e44725f3a1cee38183d35424155a05674609a9f6ed81243adf9e26"));
     }
 }
